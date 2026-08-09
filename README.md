@@ -42,15 +42,23 @@ With no API key it runs in **mock mode**: deterministic, rule based, and every m
 
 ## Point it at a model
 
-Defaults target the Impala gateway provisioned for this buildathon. It is OpenAI-compatible, so any provider works.
+The engine is provider agnostic by design. It speaks the OpenAI chat completions API, so any
+OpenAI-compatible endpoint works by setting two environment variables. This was a deliberate day-one
+decision: the buildathon gateway key had not been issued when the build started, and the engine was
+written so that a missing key was a configuration state rather than a blocker.
+
+Running against MiniMax, one of the buildathon partner platforms:
 
 ```bash
-export YAAD_API_KEY="your-team-virtual-key"
-# Impala is the default; override only if you are using something else
-export YAAD_BASE_URL="https://ht.getimpala.ai/v1"
-export YAAD_MODEL="qwen3.6-27b"
+export YAAD_API_KEY="your-minimax-api-key"
+export YAAD_BASE_URL="https://api.minimax.io/v1"
+export YAAD_MODEL="MiniMax-M2"
 python run_demo.py
 ```
+
+Other endpoints verified as drop-in compatible: Nebius Token Factory
+(`https://api.tokenfactory.nebius.com/v1/`) and the Impala gateway
+(`https://ht.getimpala.ai/v1`, model `qwen3.6-27b`), which is the built-in default.
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -84,4 +92,9 @@ Three scripted jobs written against the planned December pilot in Portmore. Synt
 
 ## Licence
 
-Open source per the buildathon terms. Brand, benchmark data and operating playbook remain the property of Yaadly Ltd (England & Wales, no. 17358077).
+MIT. See [`LICENSE`](LICENSE). The code in this repository is open source and free to use, modify and distribute.
+
+Two things the MIT licence does not cover, stated plainly so nobody has to guess:
+
+- **Brand.** "Yaadly", "YaadlyHub", "Yaad Score" and the associated marks belong to Yaadly Ltd (England & Wales, no. 17358077). The licence grants no trademark rights.
+- **Operating playbook and proprietary data.** The benchmark values in `yaad/benchmarks.py` are a small seeded set derived from public sources (government grant tiers, published vendor prices, collected day rates) and are included so the pipeline runs. The wider cost research, the fee structure, the evidence and release rules and the compounding quote log are the company's operating playbook and are not part of this repository.
