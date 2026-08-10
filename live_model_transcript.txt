@@ -1,0 +1,191 @@
+==============================================================================
+YAAD TRUST ENGINE  |  verified job loop, Jamaica corridor
+Inference: https://api.minimax.io/v1 :: MiniMax-M2.7
+Governing rule: AI coordinates, verifies and drafts. Humans decide money and trust.
+==============================================================================
+
+==============================================================================
+JOB-001  Roof leak, diaspora client in London, complete evidence
+==============================================================================
+
+[1] INTAKE AGENT
+------------------------------------------------------------------------------
+Client (Andrea) said:
+  "Good evening. Mi madda house inna Portmore, St Catherine, and di roof a leak bad since di rain last week. Water a come through di back bedroom ceiling and di zinc look like it lift up one side. She 74 and she deh deh alone so mi want it fix quick. Mi deh a London so mi cyaan come look."
+
+Job Card:
+  trade      : roofing / zinc-repair
+  scope      : Zinc roofing sheet on rear slope has lifted, causing active leak through back bedroom ceiling with approximately 1m water stain visible inside. Urgent repair needed for elderly occupant living alone.
+  urgency    : urgent
+  parish     : St Catherine
+  access     : Client is overseas in London; 74-year-old mother resides alone at property. Key holder and entry arrangement not stated.
+  confidence : high
+  asks back  :
+    - Who holds the house keys and how will the tradesperson gain entry—will the mother be present or is an alternative arrangement needed?
+    - Is there a specific type or gauge of zinc sheet the client prefers, or should the tradesperson assess and recommend based on existing materials?
+    - Are there any other known roof issues or has the zinc been previously patched?
+  ready to quote: False
+
+[2] PRICING AGENT  (lookup, not a model. No invented numbers.)
+------------------------------------------------------------------------------
+  Roof repair, tier unconfirmed: J$75,000 to J$200,000 (about GBP 357 to 952). Confidence high, source: Government ROOFS grant tiers.
+  note: Prices trend up through 2026 and 2027: Hurricane Melissa (Oct 2025) spiked demand for zinc, ply and lumber, mining output fell 37.5 percent per STATIN pushing materials up, and a Feb 2025 collective labour agreement adds 19 percent to construction wages over two years.
+  note: Spans the minor to major tiers. Confirm the tier before quoting.
+
+  Deposit Protection Check, shape review of the worker's quote:
+    quoted : J$95,000 (about GBP 452)
+    verdict: within the expected range
+    flag   : Benchmark figures are labour and call-out unless stated. If the quote includes the item itself (a tank, sheets, a grill), compare the labour half only. Always ask for the split.
+    scope  : deal structure and quote shape only. Price estimation is QS work, not ours.
+
+  Money shape (fees on labour only, illustrative 60/40 split):
+    client pays     GBP 493.09
+    worker receives GBP 238.86
+    Yaadly net      GBP 57.95
+
+[3] VERIFICATION AGENT  (flags gaps, rules on nothing)
+------------------------------------------------------------------------------
+EVIDENCE REVIEW PACK, job JOB-001
+Prepared by the Verification Agent. This is not a ruling.
+
+[PASS] Arrival Log present: 3 arrival photos on file, 3 is the minimum.
+[PASS] Arrival Log geotagged: At least one arrival photo carries a location pin.
+[PASS] Site match confirmed: Worker confirmed the site matches the job description.
+[PASS] Evidence sequence: Arrival evidence predates the work log.
+[PASS] Wide pan video: 1 wide pan clip(s).
+[PASS] Close-up structural anchors: 2 close-up anchor shot(s), 2 is the minimum.
+[PASS] Video usable length: 1 clip(s) of 15 seconds or more.
+[PASS] Live pin on work log: Work-log media carries a location pin.
+[PASS] Submitted by midnight: Work log submitted the same working day.
+[PASS] Receipts geolocated: 1 receipt(s) on file.
+
+Blocking items: 0. Open questions: 0.
+A named human reviews this pack and decides. The engine does not release funds.
+
+  Attempting an automatic payout to prove the guardrail holds:
+    blocked as designed: Action 'release_funds' requires a named human decider. AI coordinates, verifies and drafts. It never releases money, rules on a dispute, or alters a reputation.
+    with a named human: queued for payout, human approved
+
+[4] REPORTING AGENT
+------------------------------------------------------------------------------
+Worker sent:
+  "Morning boss. Mi reach di yard 7:30 and start pon di back section. Mi tek off di four sheet weh did lif up, di batten under it rotten so mi haffi change two a dem. Mi put on di new zinc and seal round di edge. Ceiling still wet so mi nah touch it today, it haffi dry first. Mi tek up di old zinc and carry it gone. Tomorrow mi come back fi check di seal after di rain."
+
+Client-facing message:
+  Hi Andrea, update on JOB-001.
+  
+  Back section re-roofing done; ceiling work paused until plaster dries.
+  
+  The worker arrived at 7:30 and removed four roof sheets that had lifted. Two battens underneath were rotten and were replaced. New zinc was fitted and sealed around the edges. The old zinc was removed and taken away. The ceiling inside the property is still wet, so no work has been done on it yet—it must dry fully first.
+  
+  Next: The worker will return tomorrow to inspect the roof seal after rain. The ceiling must dry completely before plastering or painting can proceed. Awaiting confirmation on whether any further materials are needed.
+  You need to: Nothing right now.
+
+==============================================================================
+JOB-002  Painting job, no public benchmark, thin brief
+==============================================================================
+
+[1] INTAKE AGENT
+------------------------------------------------------------------------------
+Client (Delroy) said:
+  "Need the house painted. How much?"
+
+Job Card:
+  trade      : painting / *
+  scope      : House painting needed. Description is too thin to generate a meaningful quote without further details.
+  urgency    : standard
+  parish     : unknown
+  access     : not stated
+  confidence : low
+  asks back  :
+    - Is this interior, exterior, or both areas of the house?
+    - Approximately how many rooms or what is the square footage of the area to be painted?
+    - What is the parish or general area where the property is located?
+  ready to quote: False
+
+[2] PRICING AGENT  (lookup, not a model. No invented numbers.)
+------------------------------------------------------------------------------
+  Painting: no public price exists in Jamaica for this work. Priced from materials plus a skilled day rate of J$7,000 to J$12,000.
+  note: Prices trend up through 2026 and 2027: Hurricane Melissa (Oct 2025) spiked demand for zinc, ply and lumber, mining output fell 37.5 percent per STATIN pushing materials up, and a Feb 2025 collective labour agreement adds 19 percent to construction wages over two years.
+  note: Price from materials plus day rate, and log the quote.
+  note: Treat this as a conversation starter with the client, not a quote.
+
+==============================================================================
+JOB-003  Water tank install, evidence package fails the gate
+==============================================================================
+
+[1] INTAKE AGENT
+------------------------------------------------------------------------------
+Client (Marcia) said:
+  "Hi, I need a new water tank installed at my property in Spanish Town, St Catherine. The old one cracked. I'm in Toronto. Photos attached. Not urgent but I'd like it sorted this month."
+
+Job Card:
+  trade      : plumbing / tank
+  scope      : Replace a cracked water tank on an existing concrete base with pipework. Client is an absent owner based in Toronto.
+  urgency    : standard
+  parish     : St Catherine
+  access     : Not stated - client is in Toronto; no key holder or gate code mentioned
+  confidence : medium
+  asks back  :
+    - Who will grant access to the property on the day of work?
+    - What tank capacity (gallons) is required?
+    - Do you need the old cracked tank removed and disposed of, or just the new one installed?
+  ready to quote: False
+
+[2] PRICING AGENT  (lookup, not a model. No invented numbers.)
+------------------------------------------------------------------------------
+  Water tank install: J$18,850 to J$21,750 (about GBP 90 to 104). Confidence medium, source: UWI card 2019-20, inflated 30 to 50 percent.
+  note: Prices trend up through 2026 and 2027: Hurricane Melissa (Oct 2025) spiked demand for zinc, ply and lumber, mining output fell 37.5 percent per STATIN pushing materials up, and a Feb 2025 collective labour agreement adds 19 percent to construction wages over two years.
+
+  Deposit Protection Check, shape review of the worker's quote:
+    quoted : J$62,000 (about GBP 295)
+    verdict: red flag
+    flag   : Benchmark figures are labour and call-out unless stated. If the quote includes the item itself (a tank, sheets, a grill), compare the labour half only. Always ask for the split.
+    flag   : Quoted J$62,000 against a benchmark topping out near J$21,750. More than double the reference. Worth a direct conversation before any deposit moves.
+    scope  : deal structure and quote shape only. Price estimation is QS work, not ours.
+
+  Money shape (fees on labour only, illustrative 60/40 split):
+    client pays     GBP 321.81
+    worker receives GBP 155.88
+    Yaadly net      GBP 36.78
+
+[3] VERIFICATION AGENT  (flags gaps, rules on nothing)
+------------------------------------------------------------------------------
+EVIDENCE REVIEW PACK, job JOB-003
+Prepared by the Verification Agent. This is not a ruling.
+
+[BLOCK] Arrival Log present: 1 arrival photos on file, 3 is the minimum.
+[GAP ] Arrival Log geotagged: No arrival photo carries a location pin.
+[BLOCK] Site match confirmed: Site match not confirmed. Protects the worker from a mis-described job. Hold and ask.
+[PASS] Evidence sequence: Arrival evidence predates the work log.
+[BLOCK] Wide pan video: 0 wide pan clip(s).
+[BLOCK] Close-up structural anchors: 0 close-up anchor shot(s), 2 is the minimum.
+[GAP ] Video usable length: 0 clip(s) of 15 seconds or more.
+[GAP ] Live pin on work log: No location pin on the work log.
+[PASS] Submitted by midnight: Work log submitted the same working day.
+
+Blocking items: 4. Open questions: 3.
+A named human reviews this pack and decides. The engine does not release funds.
+
+  Attempting an automatic payout to prove the guardrail holds:
+    blocked as designed: Action 'release_funds' requires a named human decider. AI coordinates, verifies and drafts. It never releases money, rules on a dispute, or alters a reputation.
+    with a named human: queued for payout, human approved
+
+[4] REPORTING AGENT
+------------------------------------------------------------------------------
+Worker sent:
+  "Tank install done."
+
+Client-facing message:
+  Hi Marcia, update on JOB-003.
+  
+  The tank installation has been completed.
+  
+  A tank has been installed. The worker has not provided details on what type of tank was fitted or whether the installation has been tested. There is no confirmation on whether the work is ready for inspection.
+  
+  Next: Awaiting confirmation from the worker on whether testing was carried out, any parts used, and what remains to be done before the job can be considered complete.
+  You need to: Nothing right now.
+
+==============================================================================
+Model calls: 5 live, 0 mock, across 3 scenario(s).
+==============================================================================
