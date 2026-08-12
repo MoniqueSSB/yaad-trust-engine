@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yaadly · Proof before payment. Property work in Jamaica, done right.</title>
+<meta name="description" content="Yaadly gets property work done in Jamaica the trust-first way: vetted tradespeople, payment held until the work is proven with real evidence, fair local pricing wherever you are paying from. Serving the Kingston metro first: Kingston and Portmore.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ───────────────── TROPICS THEME (locked) ───────────────── */
+:root{
+  --bg:#08110F; --panel:#0F1B17; --panel2:#14231E; --line:#1F332C;
+  --ink:#F2FAF7; --mute:#9DB8AE; --dim:#67807A;
+  --teal:#14B8A6; --tealb:#2DD4BF; --mango:#FFB020; --coral:#FF6B4A; --melon:#E0525E; --sand:#FDE68A;
+  --soft:#0F2B26; --softline:#1E4A42; --red:#E5484D; --redsoft:#2A1414;
+  --grad:linear-gradient(90deg,#14B8A6,#FFB020);
+  --disp:'Anton',Impact,sans-serif; --body:'Space Grotesk',-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font:15.5px/1.6 var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--tealb)}
+.wrap{max-width:1060px;margin:0 auto;padding:0 18px}
+/* nav */
+nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:1060px;margin:0 auto;padding:12px 18px}
+.brand{display:flex;align-items:center;gap:10px;cursor:pointer}
+.mark{width:34px;height:34px;border-radius:9px;background:var(--teal);display:grid;place-items:center;color:#04211D;font-family:var(--disp);font-size:18px}
+.brand b{font-size:18px;font-weight:700}
+.brand b span{color:var(--mango)}
+.views{display:flex;gap:8px;flex-wrap:wrap}
+.vbtn{font:inherit;font-size:13px;font-weight:700;padding:9px 16px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--mute);cursor:pointer;transition:.15s}
+.vbtn:hover{border-color:var(--teal);color:var(--tealb)}
+.vbtn.on{background:var(--grad);border-color:transparent;color:#04211D}
+/* shared */
+section.pane{display:none;padding:26px 0 70px}
+#pane-site{background:radial-gradient(640px 320px at 18% 0%,rgba(20,184,166,.10),transparent 70%),radial-gradient(520px 280px at 85% 8%,rgba(255,176,32,.06),transparent 70%)}
+.kick{scroll-margin-top:80px}
+section.pane.show{display:block}
+h1.hx{font-family:var(--disp);font-weight:400;text-transform:uppercase;line-height:.97;font-size:clamp(38px,7.5vw,86px);margin:26px 0 8px}
+h1.hx .g1{background:linear-gradient(90deg,#2DD4BF,#14B8A6);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1.hx .g2{background:linear-gradient(90deg,#FFB020,#FF6B4A);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--mute);font-size:16px;max-width:64ch;margin-top:14px}
+.lead b{color:var(--ink)}
+.kick{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--tealb);margin-top:34px;margin-bottom:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-top:14px}
+.card h3{font-family:var(--disp);font-weight:400;text-transform:uppercase;font-size:20px;letter-spacing:.02em;margin-bottom:8px}
+.card h3 em{font-style:normal;color:var(--mango)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+.btn{font:inherit;font-size:14.5px;font-weight:700;padding:13px 26px;border-radius:100px;cursor:pointer;border:1px solid transparent;text-decoration:none;display:inline-flex;align-items:center;gap:8px;transition:.15s;background:var(--grad);color:#04211D}
+.btn:hover{filter:brightness(1.1)}
+.btn.o{background:transparent;border-color:var(--line);color:var(--ink)}
+.btn.o:hover{border-color:var(--mango);color:var(--mango)}
+.btn.warn{background:transparent;border-color:#542020;color:var(--red)}
+.btn.sm{font-size:12.5px;padding:8px 16px}
+.rule{margin-top:22px;padding:12px 15px;border-radius:12px;background:var(--soft);border:1px solid var(--softline);font-size:13.5px;color:#BDE8DE}
+.rule b{color:var(--ink)}
+.note{font-size:12px;color:var(--dim);margin-top:10px}
+.empty{color:var(--dim);font-size:13.5px;border:1px dashed var(--line);border-radius:12px;padding:18px;text-align:center;margin-top:12px}
+.pill{display:inline-flex;font-size:10.5px;font-weight:800;letter-spacing:.06em;padding:4px 11px;border-radius:100px;white-space:nowrap}
+.pill.hold{background:var(--soft);color:var(--tealb);border:1px solid var(--softline)}
+.pill.gold{background:#2E2408;color:var(--sand);border:1px solid #4A3A10}
+.pill.done{background:var(--mango);color:#3A2606}
+.pill.rev{background:var(--redsoft);color:var(--red);border:1px solid #542020}
+.field{margin-bottom:12px}
+label{display:block;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+input,textarea,select{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:11px;background:var(--panel2);color:var(--ink);font:inherit;font-size:14.5px}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(20,184,166,.15)}
+textarea{min-height:90px;resize:vertical}
+::placeholder{color:#5C756E}
+/* stages */
+.ptl{display:flex;margin:16px 0 4px}
+.ptl .n{flex:1;text-align:center;position:relative;font-size:10px;color:var(--dim);padding-top:16px;font-weight:600}
+.ptl .n::before{content:"";position:absolute;top:3px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;background:#1F332C;border:2px solid #1F332C;z-index:2}
+.ptl .n::after{content:"";position:absolute;top:8px;left:-50%;width:100%;height:2px;background:#1F332C}
+.ptl .n:first-child::after{display:none}
+.ptl .n.done{color:var(--tealb)}
+.ptl .n.done::before{background:var(--teal);border-color:var(--teal)}
+.ptl .n.done::after{background:var(--teal)}
+.ptl .n.now{color:var(--mango);font-weight:700}
+.ptl .n.now::before{background:#08110F;border-color:var(--mango);box-shadow:0 0 0 4px rgba(255,176,32,.16)}
+.ptl .n.now::after{background:var(--teal)}
+/* worker card */
+.wcard{display:flex;gap:13px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;flex-wrap:wrap;margin-top:10px}
+.wcard .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--coral),var(--melon));display:grid;place-items:center;font-weight:800;font-size:16px;color:#fff;flex:none}
+.wcard b{display:block;font-size:15px}
+.wcard small{color:var(--mute);font-size:12.5px}
+.lane{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.05em;padding:5px 11px;border-radius:100px}
+.lane.cert{background:#2E2408;color:var(--sand);border:1px solid #4A3A10}
+.lane.vet{background:var(--soft);color:var(--tealb);border:1px solid var(--softline)}
+.lane.pro{background:#26141F;color:#F5A9C8;border:1px solid #4A2038}
+/* checklist */
+.check{list-style:none;margin-top:6px}
+.check li{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;color:var(--mute);flex-wrap:wrap}
+.check li:first-child{border-top:0}
+.st{font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:3px 9px;border-radius:100px;flex:none}
+.st.pass{background:var(--soft);color:var(--tealb)}
+.st.gap{background:#2E2408;color:var(--sand)}
+.st.block{background:var(--redsoft);color:var(--red)}
+/* rows */
+.jrow{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 15px;cursor:pointer;transition:.15s;flex-wrap:wrap;margin-top:10px}
+.jrow:hover{border-color:var(--teal)}
+.jrow .l b{font-size:14.5px}
+.jrow .l small{display:block;color:var(--dim);font-size:12px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:10px}
+.gitem{border-radius:10px;overflow:hidden;border:1px solid var(--line);background:var(--panel2)}
+.gitem .img{height:86px;display:grid;place-items:center;font-size:20px;background:linear-gradient(135deg,#16302A,#0E1F1B)}
+.gitem img{width:100%;height:86px;object-fit:cover;display:block}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.filebtn{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:9px 14px;border-radius:100px;border:1px dashed var(--softline);background:var(--soft);color:var(--tealb);cursor:pointer}
+.filebtn input{display:none}
+.gitem .cap{font-size:10px;padding:6px 9px;color:var(--mute);display:flex;justify-content:space-between;gap:6px}
+.gitem .cap b{color:var(--ink)}
+.mono{background:#0B1714;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px;font-size:12.5px;color:#CDEDE4;white-space:pre-wrap}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.tab{font:inherit;font-size:12.5px;font-weight:700;padding:9px 15px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--mute);cursor:pointer}
+.tab.on{background:var(--grad);border-color:transparent;color:#04211D}
+footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
+.fgrid{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--dim)}
+.svc{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel2)}
+.svc h4{font-size:15.5px;margin-bottom:6px}
+.svc p{font-size:13px;color:var(--mute)}
+.svc .btn{margin-top:12px}
+.loop-row{display:grid;grid-template-columns:60px 1fr;gap:14px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
+.loop-row .no{font-family:var(--disp);font-size:30px;color:var(--tealb)}
+.loop-row h4{font-size:15px}
+.loop-row p{font-size:13px;color:var(--mute)}
+.faq{border:1px solid var(--line);border-radius:14px;background:var(--panel2);margin-top:10px;overflow:hidden}
+.faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:15px 18px;font-weight:700;font-size:14.5px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-family:var(--disp);font-size:20px;color:var(--mango);flex:none;transition:.15s}
+.faq[open] summary::after{content:"−";color:var(--tealb)}
+.faq[open] summary{color:var(--tealb)}
+.faq .a{padding:0 18px 16px;font-size:13.5px;color:var(--mute)}
+.faq .a b{color:var(--ink)}
+@media(max-width:640px){ .btn{width:100%;justify-content:center} .views{width:100%} .vbtn{flex:1;text-align:center;padding:9px 6px} .loop-row{grid-template-columns:42px 1fr;gap:10px} .loop-row .no{font-size:22px} .card{padding:16px} .jrow,.wcard{padding:12px} .lane{margin-left:0} .tabs .tab{flex:1;text-align:center} }
+</style>
+</head>
+<body>
+<nav class="top"><div class="nav-in">
+  <div class="brand" onclick="go('site')"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></div>
+  <div class="views">
+    <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
+    <button class="vbtn" data-v="client" onclick="go('client')">Client portal</button>
+    <button class="vbtn" data-v="worker" onclick="go('worker')">Worker portal</button>
+    <button class="vbtn" data-v="admin" onclick="go('admin')">Admin desk</button>
+  </div>
+</div></nav>
+
+<!-- ═══════════════ WEBSITE ═══════════════ -->
+<section class="pane show" id="pane-site"><div class="wrap">
+  <h1 class="hx">Everyone promises <span class="g1">proof.</span><br>Here, money moves <span class="g2">when you see it.</span></h1>
+  <p class="lead">Yaadly gets property work done in Jamaica the trust-first way: <b>vetted tradespeople</b>, payment <b>held and released only when you approve the evidence</b>, and <b>fair local pricing</b> wherever you are paying from.</p>
+  <div style="display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:8px 16px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);font-size:13px;color:#BDE8DE">📍 <b style="color:var(--ink)">Kingston metro first: Kingston and Portmore.</b>&nbsp;More parishes open as we grow.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px">
+    <a class="btn" id="site-start">Start your job on WhatsApp →</a>
+    <a class="btn o" onclick="document.getElementById('startform').scrollIntoView()">Or fill the request form</a>
+    <a class="btn o" onclick="document.getElementById('svc').scrollIntoView()">Professional services</a>
+    <a class="btn o" onclick="go('worker');workerTab('apply')">Apply to join as a tradesperson</a>
+  </div>
+  <div class="rule">⚖️ <b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div>
+
+  <div class="kick">The verified job loop</div>
+  <div class="card">
+    <div class="loop-row"><div class="no">01</div><div><h4>Tell us on WhatsApp, or start your job right here</h4><p>Text, photos or a voice note, Patois or English, or use the request form below on this page. No app to download.</p></div></div>
+    <div class="loop-row"><div class="no">02</div><div><h4>Fair price, checked</h4><p>Price bands come from real material costs and real day rates. Where no public price exists in Jamaica, we say so out loud.</p></div></div>
+    <div class="loop-row"><div class="no">03</div><div><h4>Money held</h4><p>Your payment is held and released only when you approve the evidence. The worker knows the money is real before lifting a tool.</p></div></div>
+    <div class="loop-row"><div class="no">04</div><div><h4>Work documented</h4><p>Arrival photos, before and after, video, all timestamped and geotagged.</p></div></div>
+    <div class="loop-row"><div class="no">05</div><div><h4>You approve, from anywhere</h4><p>London, New York, Toronto, Kingston or beyond. Nothing moves until you say so. Free, human-checked disputes.</p></div></div>
+    <div class="loop-row" style="border-bottom:0"><div class="no">06</div><div><h4>Worker paid fast</h4><p>Approved work is paid quickly, and every completed job builds the worker a record they own.</p></div></div>
+  </div>
+
+  <div class="kick" id="startform">Start your job right here</div>
+  <div class="card"><h3>Tell us what <em>needs doing</em></h3>
+    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Prefer WhatsApp? Use the button at the top. This form does the same thing: it reaches Yaadly directly and we reply the same day with next steps. No obligation, no payment now.</p>
+    <div class="grid2" style="margin-top:12px">
+      <div class="field"><label>Your name</label><input id="in-name"></div>
+      <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Where is the property?</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
+      <div class="field"><label>Type of work</label>
+        <select id="in-type"><option>Plumbing</option><option>Painting</option><option>Roofing</option><option>Tiling</option><option>Masonry and walls</option><option>Electrical</option><option>Carpentry</option><option>General repairs</option><option>Renovation project</option><option>Professional service</option><option>Something else</option></select>
+      </div>
+    </div>
+    <div class="field"><label>What needs doing, in your own words</label><textarea id="in-desc" placeholder="Describe the job. Voice notes can follow on WhatsApp."></textarea></div>
+    <div class="field"><label>Photos of the problem</label>
+      <label class="filebtn">📷 Add photos<input type="file" multiple accept="image/*" onchange="intakePhotos(event)"></label>
+      <span class="note" style="margin-left:10px">Up to 8. Phone photos are fine, we shrink them automatically.</span>
+      <div class="thumbs" id="in-thumbs"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>When should the work happen?</label>
+        <input id="in-date" type="date">
+        <span class="note">Pick a date from the calendar, or leave it empty for as soon as possible.</span>
+      </div>
+      <div class="field"><label>Are you overseas or in Jamaica?</label>
+        <select id="in-loc"><option>Overseas (UK, US, Canada, other)</option><option>In Jamaica</option></select>
+      </div>
+    </div>
+    <a class="btn" onclick="submitIntake()">Send my request →</a>
+    <p class="note">Sending opens a WhatsApp message to Yaadly with your details so nothing gets lost, and logs your request for our intake. You will hear back the same day.</p>
+    <div id="in-status"></div>
+  </div>
+
+  <div class="kick" id="svc">Professional services</div>
+  <p class="lead" style="margin-top:0">Delivered personally by Yaadly's founder, a construction project manager with 7+ years managing London projects. As the network grows, delivered by vetted professionals.</p>
+  <div class="grid3" style="margin-top:14px">
+    <div class="svc"><h4>Deposit Protection Check</h4><p>An independent review of a contractor's quote and deal terms before any money moves, benchmarked against real costs. Written report, clear recommendation.</p><a class="btn sm" onclick="requestService('Deposit Protection Check')">Request this service</a></div>
+    <div class="svc"><h4>Project Setup Pack</h4><p>Scope, milestones and a staged payment structure put in writing before work starts. The paperwork that protects both sides.</p><a class="btn sm" onclick="requestService('Project Setup Pack')">Request this service</a></div>
+    <div class="svc"><h4>Oversight Retainer</h4><p>Ongoing independent monitoring of an active job: site visits, photo and video reporting, contractor accountability.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request this service</a></div>
+    <div class="svc"><h4>Contractor Sourcing</h4><p>We find, vet and shortlist the right contractor for your project. You choose from up to five, or ask us to choose.</p><a class="btn sm" onclick="requestService('Contractor Sourcing')">Request this service</a></div>
+    <div class="svc"><h4>Full Project Management</h4><p>End to end management of a build or renovation, from scope to handover, with evidence at every stage.</p><a class="btn sm" onclick="requestService('Full Project Management')">Request this service</a></div>
+    <div class="svc"><h4>Property Care visits</h4><p>Scheduled walkthroughs with a photo report after each visit: leaks, locks, storm readiness. Weekly, fortnightly or monthly.</p><a class="btn sm" onclick="requestService('Property Care')">Request this service</a></div>
+  </div>
+
+  <div class="kick">Two sides, one deal</div>
+  <div class="grid2">
+    <div class="card"><h3>For property <em>owners</em></h3>
+      <ul class="check">
+        <li><span class="st pass">✓</span> See the proof before any money moves</li>
+        <li><span class="st pass">✓</span> Fair local pricing wherever you pay from</li>
+        <li><span class="st pass">✓</span> Vetted tradespeople, chosen for you or shortlisted so you choose</li>
+        <li><span class="st pass">✓</span> Free disputes, checked by a person</li>
+      </ul>
+      <a class="btn" style="margin-top:14px" onclick="startJob()">Start a job</a>
+    </div>
+    <div class="card"><h3>For <em>tradespeople</em></h3>
+      <ul class="check">
+        <li><span class="st pass">✓</span> Free to join. Never charged to quote, ever</li>
+        <li><span class="st pass">✓</span> The money is real and held before you start</li>
+        <li><span class="st pass">✓</span> Paid fast once the client approves</li>
+        <li><span class="st pass">✓</span> A record you own that finally counts</li>
+      </ul>
+      <a class="btn" style="margin-top:14px;background:linear-gradient(90deg,var(--coral),var(--melon));color:#fff" onclick="go('worker');workerTab('apply')">Apply to join</a>
+    </div>
+  </div>
+
+  <div class="kick">Questions, answered straight</div>
+  <details class="faq"><summary>How do I start a job?</summary><div class="a">Message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English. We reply the same day with next steps. No app to download, no forms to fight.</div></details>
+  <details class="faq"><summary>Where do you operate?</summary><div class="a">We are launching in the Kingston metro first, <b>Kingston and Portmore</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Outside the metro today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
+  <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so.</div></details>
+  <details class="faq"><summary>What does it cost?</summary><div class="a">Every job gets a written quote benchmarked against real material costs and real day rates, and our fee is confirmed in that quote <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client in London pays what a client in Portmore pays.</div></details>
+  <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are <b>free</b> and reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
+  <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
+  <details class="faq"><summary>How are workers vetted?</summary><div class="a">Every worker passes ID checks, reference calls, a portfolio review and a trial job before their first client. Certified professionals have their certification verified with the issuing body. Yaadly reviews every application personally.</div></details>
+  <details class="faq"><summary>I am a tradesperson. What does it cost to join?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. You are paid fast once the client approves, and every completed job builds a record you own.</div></details>
+  <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
+
+  <div class="kick">Why this exists</div>
+  <div class="card">
+    <p style="font-family:var(--disp);font-size:clamp(19px,3vw,28px);text-transform:uppercase;line-height:1.2">A trust engine for everyone <span style="color:var(--coral)">investing back</span> into Jamaica.</p>
+    <p class="lead" style="font-size:14px">Property services, maintenance and repairs delivered by verified workers on trusted payment routes, with evidence you check from anywhere. Get your job done from abroad, protect what you are building, and start making your investment back. Fair pricing is part of that trust, never the headline. Built by a London construction project manager with family roots in St Thomas and Portmore.</p>
+  </div>
+</div></section>
+
+<!-- ═══════════════ CLIENT PORTAL ═══════════════ -->
+<section class="pane" id="pane-client"><div class="wrap">
+  <div class="kick" style="margin-top:20px">Client portal</div>
+  <h1 class="hx" style="font-size:clamp(30px,5vw,54px)">Your jobs, <span class="g1">proven.</span></h1>
+  <div id="client-list"></div>
+  <div id="client-detail"></div>
+</div></section>
+
+<!-- ═══════════════ WORKER PORTAL ═══════════════ -->
+<section class="pane" id="pane-worker"><div class="wrap">
+  <div class="kick" style="margin-top:20px">Worker portal</div>
+  <h1 class="hx" style="font-size:clamp(30px,5vw,54px)">Do good work. <span class="g2">Get paid fast.</span></h1>
+  <div class="tabs">
+    <button class="tab on" data-wt="jobs" onclick="workerTab('jobs')">My jobs</button>
+    <button class="tab" data-wt="open" onclick="workerTab('open')">Open for quotes</button>
+    <button class="tab" data-wt="apply" onclick="workerTab('apply')">Apply to join</button>
+  </div>
+  <div id="wt-jobs"></div>
+  <div id="wt-open" style="display:none"></div>
+  <div id="wt-apply" style="display:none">
+    <div class="card"><h3>Apply to join <em>Yaadly</em></h3>
+      <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Joining is free. Quoting is free. Workers are never charged. Yaadly reviews every application personally.</p>
+      <div class="grid2" style="margin-top:12px">
+        <div class="field"><label>Full name</label><input id="ap-name"></div>
+        <div class="field"><label>WhatsApp number</label><input id="ap-phone" placeholder="876..."></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Parish</label><input id="ap-parish" placeholder="Kingston, Portmore..."></div>
+        <div class="field"><label>Trade or trades</label><input id="ap-trade" placeholder="Plumbing, tiling"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Years of experience</label><input id="ap-years" type="number" min="0"></div>
+        <div class="field"><label>Certified or licensed?</label>
+          <select id="ap-cert"><option value="">No, experience based</option><option value="yes">Yes, I hold certification</option></select>
+        </div>
+      </div>
+      <div class="field" id="ap-certrow" style="display:none"><label>Certifying body and certificate number</label><input id="ap-certno" placeholder="e.g. HEART/NSTA, number"></div>
+      <div class="field"><label>Past work <span style="font-weight:500;text-transform:none">(describe up to five jobs; photos come later on WhatsApp)</span></label><textarea id="ap-work"></textarea></div>
+      <div class="grid2">
+        <div class="field"><label>Reference 1, name and phone</label><input id="ap-ref1"></div>
+        <div class="field"><label>Reference 2, name and phone</label><input id="ap-ref2"></div>
+      </div>
+      <div class="field" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="ap-consent" style="width:auto;margin-top:4px"><span style="font-size:13px;color:var(--mute)">I consent to Yaadly verifying the information provided, including contacting my references.</span></div>
+      <a class="btn" onclick="submitApplication()">Submit application</a>
+      <p class="note">After you submit: Yaadly reviews every application personally, checks ID and references, and assigns a trial job. You will hear back on WhatsApp.</p>
+    </div>
+    <div id="ap-status"></div>
+  </div>
+  <div class="rule">🛡️ <b>Your protection:</b> the site match gate means you are never held to a job that was mis-described, and your completed jobs build a record you own.</div>
+</div></section>
+
+<!-- ═══════════════ ADMIN DESK ═══════════════ -->
+<section class="pane" id="pane-admin"><div class="wrap">
+  <div id="admin-lock" class="card" style="max-width:420px;margin:40px auto">
+    <h3>Admin <em>desk</em></h3>
+    <div class="field"><label>Passcode</label><input id="admin-pin" type="password" placeholder="Set in CONFIG on first run"></div>
+    <a class="btn" onclick="adminUnlock()">Unlock</a>
+  </div>
+  <div id="admin-ui" style="display:none">
+    <div class="kick" style="margin-top:20px">Admin desk</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h1 class="hx" style="font-size:clamp(28px,4.5vw,48px)">Your <span class="g2">desk.</span></h1>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span id="cloud-badge" style="font-size:11.5px;font-weight:700;color:var(--dim)">○ cloud off</span>
+        <button class="btn o sm" onclick="exportData()">⬇ Backup data</button>
+        <button class="btn o sm" onclick="exportCSV()">⬇ Spreadsheet (CSV)</button>
+        <button class="btn o sm" onclick="document.getElementById('imp').click()">⬆ Restore</button>
+        <input type="file" id="imp" style="display:none" accept=".json" onchange="importData(event)">
+        <button class="btn sm" onclick="newJob()">+ New job</button>
+      </div>
+    </div>
+    <div class="card" id="cloud-login" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="field" style="margin:0;flex:2;min-width:180px"><label>Cloud sign in, email</label><input id="cl-email" autocomplete="username"></div>
+      <div class="field" style="margin:0;flex:2;min-width:150px"><label>Password</label><input id="cl-pass" type="password" autocomplete="current-password"></div>
+      <button class="btn sm" onclick="cloudLogin()">Connect cloud</button>
+      <span class="note" style="flex-basis:100%">Signing in pulls form submissions from the online database and keeps a cloud backup of your desk. Skip it to work offline.</span>
+    </div>
+    <div class="card" style="border-color:var(--softline)">
+      <h3>⚡ Start here: type it, <em>AI builds it</em></h3>
+      <p class="note" style="margin-top:0">Type or paste anything: a client's WhatsApp message, a voice note transcript, Patois, or your own rough notes. The Intake Agent turns it into a structured job card with the questions to ask. It drafts, you decide. Everything manual lives in the tabs below.</p>
+      <textarea id="ai-in" placeholder="e.g. Mi aunty roof a leak bad inna Portmore, water a come een when rain fall, need somebody fi fix it quick"></textarea>
+      <a class="btn" style="margin-top:10px" onclick="aiIntake()">⚡ Generate job card</a>
+      <div id="ai-out"></div>
+    </div>
+    <div class="tabs">
+      <button class="tab" data-at="intake" onclick="adminTab('intake')">Intake <span id="intake-n"></span></button>
+      <button class="tab on" data-at="jobs" onclick="adminTab('jobs')">Jobs</button>
+      <button class="tab" data-at="services" onclick="adminTab('services')">Services</button>
+      <button class="tab" data-at="workers" onclick="adminTab('workers')">Workers</button>
+      <button class="tab" data-at="apps" onclick="adminTab('apps')">Applications</button>
+      <button class="tab" data-at="market" onclick="adminTab('market')">Marketplace</button>
+    </div>
+    <div id="at-intake" style="display:none"></div>
+    <div id="at-jobs"></div>
+    <div id="at-services" style="display:none"></div>
+    <div id="at-workers" style="display:none"></div>
+    <div id="at-apps" style="display:none"></div>
+    <div id="at-market" style="display:none"></div>
+    <div id="admin-detail"></div>
+    <div class="rule">⚖️ <b>The governing rule holds here:</b> the agents draft and flag. Only you confirm a payout, and only after you have actually paid.</div>
+  </div>
+</div></section>
+
+<footer><div class="wrap"><div class="fgrid">
+  <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
+  <span>Kingston metro first: Kingston and Portmore. More parishes as we grow.</span>
+  <span>A human confirms every step that moves money or changes a reputation.</span>
+  <a id="foot-wa">WhatsApp</a>
+</div></div></footer>
+
+<script>
+/* ─────────────── CONFIG: fill these two in ─────────────── */
+const CONFIG = {
+  whatsapp: "447000000000",   // your WhatsApp number, digits only, international format
+  adminPin: "yaadly2026",     // change this before anyone else touches this file
+  supabaseUrl: "https://leffyisvfvjwzilydlwf.supabase.co",
+  supabaseKey: "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz"  // publishable key, safe to be public
+};
+/* ─────────── cloud database (Supabase, free tier) ─────────── */
+const sb = (CONFIG.supabaseUrl && window.supabase) ? window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey) : null;
+let cloudOn = false, pushTimer = null;
+function schedulePush(){
+  if(!sb || !cloudOn) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>{ sb.from("app_state").upsert({key:"main", data:DB, updated_at:new Date().toISOString()}).then(r=>{ if(r.error) console.warn("cloud push:", r.error.message); setCloudBadge(r.error?"error":"on"); }); }, 1500);
+}
+function setCloudBadge(state){
+  const el = document.getElementById("cloud-badge"); if(!el) return;
+  el.textContent = state==="on"?"● cloud synced":state==="error"?"● cloud error":"○ cloud off";
+  el.style.color = state==="on"?"var(--tealb)":state==="error"?"var(--red)":"var(--dim)";
+}
+async function cloudLogin(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const em = $("cl-email").value.trim(), pw = $("cl-pass").value;
+  if(!em || !pw){ alert("Email and password needed."); return; }
+  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
+  $("cl-pass").value = "";
+  if(error){ alert("Cloud sign in failed: "+error.message); return; }
+  cloudOn = true; $("cloud-login").style.display="none"; setCloudBadge("on");
+  await cloudPull(); schedulePush();
+}
+async function cloudPull(){
+  if(!sb || !cloudOn) return;
+  try{
+    const [ri, ra] = await Promise.all([
+      sb.from("intakes").select("*").order("created_at"),
+      sb.from("applications").select("*").order("created_at")
+    ]);
+    (ri.data||[]).forEach(row=>{
+      if(DB.intakes.some(x=>x.cid===row.id)) return;
+      DB.intakes.push({ id:"REQ-C"+String(DB.inSeq++).padStart(3,"0"), cid:row.id,
+        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, where:row.place,
+        type:row.work_type, desc:row.descr, urgency:row.urgency, loc:row.loc,
+        photos:row.photos||[], status:row.status||"new" });
+    });
+    (ra.data||[]).forEach(row=>{
+      if(DB.applications.some(x=>x.cid===row.id)) return;
+      DB.applications.push({ id:"APP-C"+String(DB.applications.length+1).padStart(3,"0"), cid:row.id,
+        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, parish:row.parish,
+        trade:row.trade, years:row.years, cert:!!row.cert, certno:row.certno, work:row.work,
+        ref1:row.ref1, ref2:row.ref2, checks:{}, status:row.status||"received" });
+    });
+    save(); renderAll();
+  }catch(e){ console.warn("cloud pull:", e); setCloudBadge("error"); }
+}
+function cloudStatus(table, cid, status){
+  if(sb && cloudOn && cid) sb.from(table).update({status:status}).eq("id", cid).then(r=>{ if(r.error) console.warn(r.error.message); });
+}
+/* ─────────── AI agents (MiniMax via the yaad-agent edge function) ─────────── */
+async function askEngine(mode, text){
+  if(!sb){ alert("Cloud is not configured."); return null; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ alert("Connect cloud first (top of the Admin desk). The AI agents only answer to your signed in session."); return null; }
+  const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-agent", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
+    body: JSON.stringify({mode, text})
+  });
+  const j = await r.json().catch(()=>({error:"bad response"}));
+  if(j.error){ alert("Engine: "+j.error); return null; }
+  return j.result;
+}
+async function aiIntake(){
+  const txt = ($("ai-in")?$("ai-in").value:"").trim();
+  if(!txt){ alert("Paste the client's message first."); return; }
+  $("ai-out").innerHTML = '<div class="mono">Intake Agent reading the message...</div>';
+  const out = await askEngine("intake", txt);
+  if(out==null){ $("ai-out").innerHTML=""; return; }
+  let card = null;
+  try{ card = JSON.parse((out.match(/\{[\s\S]*\}/)||["{}"])[0]); }catch(e){}
+  if(!card || !card.title){ $("ai-out").innerHTML = '<div class="mono">'+esc(out)+'</div>'; return; }
+  const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
+  DB.jobs.push({ id:jid, title:card.title||"", parish:card.parish||"", client:card.client_name||"",
+    desc:(card.scope||"")+(card.urgency?"\nUrgency: "+card.urgency:"")+(card.preferred_date?"\nWanted by: "+card.preferred_date:"")+(card.trade?"\nTrade: "+card.trade:"")+(card.client_phone?"\nClient WhatsApp: "+card.client_phone:"")+"\n\n(Structured by the Intake Agent from the client's message. Verify before quoting.)",
+    stage:0, evidence:[], worker:{}, shortlist:[], open:false });
+  save();
+  $("ai-out").innerHTML = '<div class="mono">Job card created as '+jid+'.\n'+(card.questions&&card.questions.length?("Ask before quoting:\n· "+card.questions.slice(0,3).join("\n· ")):"No open questions flagged.")+'\n\nThe agent drafted. You decide.</div>';
+  renderAdmin(); adminTab("jobs"); editJob(jid);
+}
+async function runReport(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  $("agent-out").innerHTML = '<div class="mono">Reporting Agent drafting...</div>';
+  const extra = ($("rep-note")?$("rep-note").value:"").trim();
+  const facts = "Job: "+(j.title||"")+" ("+j.id+")\nStage: "+(j.review?"In review":STAGES[j.stage||0])+"\nParish: "+(j.parish||"not stated")+"\nClient first name: "+(j.client||"not stated")+"\nWorker: "+((j.worker&&j.worker.name)||"not yet assigned")+"\nEvidence on file: "+((j.evidence||[]).map(e=>e.label).join(", ")||"none yet")+(extra?"\nNote from Yaadly to include: "+extra:"");
+  const out = await askEngine("report", facts);
+  if(out==null){ $("agent-out").innerHTML=""; return; }
+  $("agent-out").innerHTML = '<div class="mono">'+esc(out)+'</div><a class="btn o sm" style="margin-top:8px" target="_blank" rel="noopener" href="'+wa(out)+'">Send to client on WhatsApp →</a><p class="note">Drafted by the Reporting Agent. Read it before you send; nothing goes out by itself.</p>';
+}
+/* ───────────── benchmarks (Yaadly_Cost_Benchmarks, Aug 2026) ───────────── */
+const BENCH = [
+  {re:/roof/i, label:"Roof repair, tier unconfirmed", low:75000, high:200000, conf:"high", src:"Government ROOFS grant tiers"},
+  {re:/tank|water/i, label:"Water tank install", low:18850, high:21750, conf:"medium", src:"UWI card 2019-20, inflated 30 to 50 percent"},
+  {re:/paint/i, none:true, label:"Painting", note:"No public price exists in Jamaica for this work. Priced from materials plus a skilled day rate of J$7,000 to J$12,000."},
+  {re:/septic/i, none:true, label:"Septic work", note:"No public price exists in Jamaica for this work. Priced from materials plus day rates. Log every quote."},
+  {re:/wall|fence|masonry|block/i, none:true, label:"Walls and masonry", note:"No public price exists in Jamaica for this work. Priced from materials plus day rates."},
+  {re:/grill/i, label:"Window or door grill", low:25000, high:30000, conf:"low", src:"Single seller, St Ann"}
+];
+const JMD_GBP = 210;
+const STAGES = ["Booked","Payment held","Work done","Evidence in","Client approval","Worker paid"];
+const SVC_STAGES = ["Requested","Scoped and agreed","In progress","Deliverable ready","Client approved","Complete"];
+const $ = id => document.getElementById(id);
+/* ───────────── data layer (localStorage; Backup button = JSON export) ───────────── */
+const DB_KEY = "yaadly-platform-v1";
+let DB = load();
+function load(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)) || seed(); }catch(e){ return seed(); } }
+function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ alert("Browser storage is full, mostly photos. Press Backup data to save everything to a file, then remove photos from old completed jobs."); } schedulePush(); }
+function seed(){ return { jobs:[], services:[], workers:[], applications:[], intakes:[], seq:1, svcSeq:1, inSeq:1 }; }
+DB.intakes = DB.intakes || []; DB.inSeq = DB.inSeq || 1;
+function exportData(){
+  const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+  a.download = "yaadly-backup-" + new Date().toISOString().slice(0,10) + ".json"; a.click();
+}
+function exportCSV(){
+  const q = v => '"'+String(v==null?"":v).replace(/"/g,'""').replace(/\n/g," ")+'"';
+  const rows = [["Record","ID","Title / Type","Name","Parish / Where","Status","Worker / Provider","Phone","Details","Date"]];
+  DB.jobs.forEach(j=>rows.push(["Job",j.id,j.title,j.client,j.parish,(j.review?"In review":STAGES[j.stage||0]),(j.worker&&j.worker.name)||"","",j.desc,""]));
+  DB.services.forEach(s=>rows.push(["Service",s.id,s.type,s.client,s.parish,SVC_STAGES[s.stage||0],s.provider||"","",s.notes,""]));
+  DB.intakes.forEach(i=>rows.push(["Request",i.id,i.type,i.name,i.where,i.status+(i.job?" → "+i.job:""),"",i.phone,i.desc,i.when]));
+  DB.workers.forEach(w=>rows.push(["Worker","",w.trade,w.name,w.parish,(w.lane==="cert"?"Certified":w.lane==="pro"?"Vetted professional":"Evidence vetted")+" · "+(w.jobs||0)+" jobs","",w.phone,"",""]));
+  DB.applications.forEach(a=>rows.push(["Application",a.id,a.trade,a.name,a.parish,a.status,"",a.phone,a.work,a.when]));
+  const csv = "﻿"+rows.map(r=>r.map(q).join(",")).join("\r\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download = "yaadly-tracker-"+new Date().toISOString().slice(0,10)+".csv"; a.click();
+}
+function importData(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => { try{ DB = JSON.parse(r.result); save(); renderAll(); alert("Data restored."); }catch(e){ alert("That file could not be read."); } };
+  r.readAsText(f);
+}
+/* ───────────── navigation ───────────── */
+function go(v){
+  document.querySelectorAll(".pane").forEach(p=>p.classList.remove("show"));
+  $("pane-"+v).classList.add("show");
+  document.querySelectorAll(".vbtn").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
+  window.scrollTo({top:0});
+  renderAll();
+}
+function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
+$("foot-wa").href = wa("Hello Yaadly.");
+$("site-start").href = wa("Hello Yaadly, I would like to start a job. The property is in: ____. What needs doing: ____. I can send photos.");
+function startJob(){ window.open($("site-start").href, "_blank", "noopener"); }
+/* photo handling: shrink to max 1280px JPEG so they fit browser storage */
+function shrink(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>{ const im=new Image(); im.onload=()=>{ const M=1280, sc=Math.min(1, M/Math.max(im.width,im.height)); const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc); c.getContext("2d").drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",.72)); }; im.src=r.result; }; r.readAsDataURL(file); }); }
+async function filesToPhotos(list){ const out=[]; for(const f of Array.from(list).slice(0,8)){ out.push(await shrink(f)); } return out; }
+let pendingPhotos = [];
+async function intakePhotos(ev){
+  pendingPhotos = await filesToPhotos(ev.target.files);
+  $("in-thumbs").innerHTML = pendingPhotos.map(p=>'<img src="'+p+'" alt="photo">').join("");
+}
+function submitIntake(){
+  const g = id => ($(id).value||"").trim();
+  if(!g("in-name") || !g("in-phone") || !g("in-desc")){ alert("Name, WhatsApp number and a description are needed."); return; }
+  const it = { id:"REQ-"+String(DB.inSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
+    name:g("in-name"), phone:g("in-phone"), where:g("in-where"), type:$("in-type").value,
+    desc:g("in-desc"), urgency:($("in-date").value ? "Wanted by "+$("in-date").value : "As soon as possible"), loc:$("in-loc").value, status:"new",
+    photos:pendingPhotos };
+  pendingPhotos = []; $("in-thumbs").innerHTML="";
+  DB.intakes.push(it); save();
+  if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, place:it.where, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
+  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies the same day on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.</div>';
+  window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nProperty: "+(it.where||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
+  ["in-name","in-phone","in-where","in-desc"].forEach(i=>$(i).value="");
+}
+function requestService(name){
+  window.open(wa("Hello Yaadly, I would like to request the service: " + name + ". My property is in: ____. Details: ____."), "_blank", "noopener");
+}
+/* ───────────── agents (rule based, never decide) ───────────── */
+function pricingAgent(text){
+  const hit = BENCH.find(b=>b.re.test(text||""));
+  if(!hit) return "No benchmark matched. No public price exists in Jamaica for this work. Price from materials plus a skilled day rate (J$7,000 to J$12,000), and log the quote.";
+  if(hit.none) return hit.label + ": " + hit.note + "\nTreat this as a conversation starter, not a quote.";
+  return hit.label + ": J$" + hit.low.toLocaleString() + " to J$" + hit.high.toLocaleString() +
+    " (about GBP " + Math.round(hit.low/JMD_GBP) + " to " + Math.round(hit.high/JMD_GBP) + ").\nConfidence " + hit.conf + " · source: " + hit.src +
+    "\nScope: deal structure and quote shape only. Price estimation is QS work, not ours.";
+}
+function checklist(job){
+  const ev = job.evidence||[];
+  const c = re => ev.filter(e=>re.test(e.label||"")).length;
+  return [
+    {name:"Arrival photos, minimum 3, before work starts", key:"Arrival photo", have:c(/arrival/i), need:3},
+    {name:"Before photo of each work area", key:"Before photo", have:c(/before/i), need:1},
+    {name:"After photo of each work area", key:"After photo", have:c(/after/i), need:1},
+    {name:"One wide video, 15 seconds or more", key:"Video pan", have:c(/video|pan/i), need:1},
+    {name:"Materials receipts", key:"Receipt", have:c(/receipt/i), need:1, gapOnly:true}
+  ];
+}
+function verifyAgent(job){
+  const rows = checklist(job).map(x=>{
+    const ok = x.have>=x.need;
+    return (ok?"[PASS] ":(x.gapOnly?"[GAP ] ":"[BLOCK] ")) + x.name + " (" + x.have + " of " + x.need + ")";
+  });
+  const blocks = rows.filter(r=>r.startsWith("[BLOCK")).length;
+  return rows.join("\n") + "\n\nBlocking items: " + blocks + "\nA named human reviews this pack and decides. The engine does not release funds.";
+}
+/* ───────────── CLIENT PORTAL ───────────── */
+function renderClient(){
+  const L = $("client-list"), D = $("client-detail"); D.innerHTML = "";
+  if(!DB.jobs.length && !DB.services.length){
+    L.innerHTML = '<div class="empty">No jobs yet. <b>Start your first job on WhatsApp</b>, we reply the same day.<br><br><a class="btn sm" href="'+$("site-start").href+'" target="_blank" rel="noopener">Start your job →</a></div>';
+    return;
+  }
+  L.innerHTML = "";
+  DB.jobs.forEach(j=>{
+    const st = j.review ? '<span class="pill rev">IN REVIEW</span>' : (j.stage>=5 ? '<span class="pill done">COMPLETE</span>' : '<span class="pill hold">'+STAGES[j.stage||0].toUpperCase()+'</span>');
+    const d = document.createElement("div"); d.className="jrow";
+    d.innerHTML = '<div class="l"><b>'+esc(j.id)+' · '+esc(j.title||"Job")+'</b><small>'+esc(j.parish||"")+'</small></div>'+st;
+    d.onclick = ()=>clientDetail(j.id);
+    L.appendChild(d);
+  });
+  DB.services.forEach(s=>{
+    const d = document.createElement("div"); d.className="jrow";
+    d.innerHTML = '<div class="l"><b>'+esc(s.id)+' · '+esc(s.type)+'</b><small>Professional service'+(s.parish?' · '+esc(s.parish):'')+'</small></div><span class="pill gold">'+SVC_STAGES[s.stage||0].toUpperCase()+'</span>';
+    L.appendChild(d);
+  });
+}
+function clientDetail(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const D = $("client-detail");
+  const stage = Math.min(5, j.stage||0);
+  let worker = "";
+  if(j.worker && j.worker.name){
+    worker = '<div class="wcard"><div class="av">'+esc(j.worker.name[0])+'</div><div><b>'+esc(j.worker.name)+'</b><small>'+esc(j.worker.trade||"")+(j.worker.parish?' · '+esc(j.worker.parish):'')+(j.worker.jobs?' · '+j.worker.jobs+' completed jobs on record':'')+'</small></div>'+laneBadge(j.worker.lane)+'</div>';
+  } else if((j.shortlist||[]).length && stage<=1){
+    worker = '<div class="kick" style="margin-top:10px">Choose your worker</div>' + j.shortlist.slice(0,5).map(w=>
+      '<div class="wcard"><div class="av">'+esc((w.name||"W")[0])+'</div><div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"")+(w.parish?' · '+esc(w.parish):'')+(w.jobs?' · '+w.jobs+' completed jobs':'')+'</small></div>'+laneBadge(w.lane)+
+      '<a class="btn sm" style="margin-left:auto" target="_blank" rel="noopener" href="'+wa(j.id+": I choose "+w.name+" for this job.")+'">Choose →</a></div>').join("");
+  } else {
+    worker = '<div class="empty">Your vetted worker is being matched. You will see them here, with their track record, before any money is held. Prefer to pick? Ask for a shortlist of up to five.</div>';
+  }
+  let gal = '<div class="empty">Evidence appears here as your worker documents the job and Yaadly checks it. Everything timestamped.</div>';
+  const vis = (j.evidence||[]).filter(e=>e.ok!==false);
+  if(vis.length){
+    gal = '<div class="gal">'+vis.map(e=>'<div class="gitem">'+(e.img?'<img src="'+e.img+'" alt="evidence">':'<div class="img">'+(e.icon||"🖼")+'</div>')+'<div class="cap"><b>'+esc(e.label||"Evidence")+'</b><span>'+esc((e.meta||"").replace(/ · by worker.*/,""))+'</span></div></div>').join("")+'</div>';
+  }
+  D.innerHTML = '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3>'+
+    (j.review?'<span class="pill rev">IN REVIEW · A PERSON HAS IT</span>':(stage>=5?'<span class="pill done">COMPLETE · WORKER PAID</span>':(stage===4?'<span class="pill gold">AWAITING YOUR APPROVAL</span>':'<span class="pill hold">'+STAGES[stage].toUpperCase()+'</span>')))+'</div>'+
+    '<div class="ptl">'+STAGES.map((s,i)=>'<div class="n '+(i<stage?"done":i===stage?"now":"")+'">'+s+'</div>').join("")+'</div>'+
+    '<div class="kick" style="margin-top:8px">Your worker</div>'+worker+
+    '<div class="kick">The job</div><p style="font-size:14px;color:var(--mute);white-space:pre-wrap">'+esc(j.desc||"")+'</p>'+
+    '<div class="kick">Photos of the site, from you</div>'+
+    '<p style="font-size:13px;color:var(--mute)">Send photos of the problem on WhatsApp, or add them here. They help us scope and price the job fairly.</p>'+
+    '<label class="filebtn" style="margin-top:6px">📷 Add site photos<input type="file" multiple accept="image/*" onchange="clientUpload(event,\''+j.id+'\')"></label>'+
+    '<div class="kick">Evidence</div>'+gal+
+    '<div class="kick">Money</div><div class="mono" style="margin-top:4px">Your payment is held and released only when you approve the evidence.</div>'+
+    (stage===0 && j.payLink ? '<a class="btn" style="margin-top:12px" target="_blank" rel="noopener" href="'+esc(j.payLink)+'">💳 Pay securely →</a><p class="note">Secure checkout hosted by Stripe. Your worker starts once the payment is held.</p>' : "")+
+    (stage===4 && !j.review ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+": I have reviewed the evidence and I APPROVE. Please release payment to the worker.")+'">✓ Approve and release</a><a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": I have a question before I approve. ")+'">Raise a question</a></div><p class="note">Approving opens a WhatsApp message from you to Yaadly confirming release. A person actions it: the AI never releases money.</p>' : "")+
+    '</div>';
+  D.scrollIntoView({behavior:"smooth"});
+}
+function laneBadge(l){ return l==="cert"?'<span class="lane cert">CERTIFIED PROFESSIONAL</span>':l==="pro"?'<span class="lane pro">VETTED PROFESSIONAL</span>':l?'<span class="lane vet">EVIDENCE VETTED</span>':""; }
+/* ───────────── WORKER PORTAL ───────────── */
+function workerTab(t){
+  go2("worker");
+  ["jobs","open","apply"].forEach(x=>{ $("wt-"+x).style.display = x===t?"block":"none"; });
+  document.querySelectorAll("[data-wt]").forEach(b=>b.classList.toggle("on", b.dataset.wt===t));
+}
+function go2(v){ if(!$("pane-"+v).classList.contains("show")) go(v); }
+$("ap-cert").addEventListener("change", ()=>{ $("ap-certrow").style.display = $("ap-cert").value==="yes"?"block":"none"; });
+function submitApplication(){
+  const g = id => ($(id).value||"").trim();
+  if(!g("ap-name") || !g("ap-phone") || !g("ap-trade")){ alert("Name, WhatsApp number and trade are needed."); return; }
+  if(!$("ap-consent").checked){ alert("The consent tick is needed so Yaadly can verify your details."); return; }
+  const ap = { id:"APP-"+String(DB.applications.length+1).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
+    name:g("ap-name"), phone:g("ap-phone"), parish:g("ap-parish"), trade:g("ap-trade"), years:g("ap-years"),
+    cert:$("ap-cert").value==="yes", certno:g("ap-certno"), work:g("ap-work"), ref1:g("ap-ref1"), ref2:g("ap-ref2"),
+    checks:{}, status:"received" };
+  DB.applications.push(ap); save();
+  if(sb) sb.from("applications").insert({app_id:ap.id, name:ap.name, phone:ap.phone, parish:ap.parish, trade:ap.trade, years:ap.years, cert:ap.cert, certno:ap.certno, work:ap.work, ref1:ap.ref1, ref2:ap.ref2, status:"received"}).then(r=>{ if(r.error) console.warn("application cloud:", r.error.message); });
+  $("ap-status").innerHTML = '<div class="card"><h3>Application <em>received</em></h3><p style="color:var(--mute);font-size:14px">Yaadly reviews every application personally: ID check, references called, and a trial job. You will hear back on WhatsApp. Joining is free, always.</p></div>';
+  ["ap-name","ap-phone","ap-parish","ap-trade","ap-years","ap-certno","ap-work","ap-ref1","ap-ref2"].forEach(i=>$(i).value="");
+  $("ap-consent").checked = false;
+}
+function renderWorker(){
+  const J = $("wt-jobs"), O = $("wt-open");
+  const assigned = DB.jobs.filter(j=>j.worker && j.worker.name && j.stage<5);
+  J.innerHTML = assigned.length ? "" : '<div class="empty">No jobs assigned right now. When Yaadly assigns you a job, it appears here with the scope and your evidence checklist.</div>';
+  assigned.forEach(j=>{
+    const rows = checklist(j).map(x=>{
+      const ok = x.have>=x.need; const cls = ok?"pass":(x.gapOnly?"gap":"block");
+      return '<li><span class="st '+cls+'">'+(ok?"PASS":(x.gapOnly?"GAP":"NEED"))+'</span> '+x.name+' <span style="color:var(--dim)">('+x.have+' of '+x.need+')</span>'+
+        '<label class="filebtn" style="margin-left:auto">📷 Upload<input type="file" multiple accept="image/*" onchange="workerUpload(event,\''+j.id+'\',\''+x.key+'\')"></label></li>';
+    }).join("");
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">'+STAGES[j.stage||0].toUpperCase()+'</span></div>'+
+      '<p style="font-size:13.5px;color:var(--mute);white-space:pre-wrap">'+esc(j.desc||"")+'</p>'+
+      '<div class="kick">Your evidence checklist, check it before you leave the site</div><ul class="check">'+rows+'</ul>'+
+      ((j.evidence||[]).some(e=>e.img)?'<div class="thumbs">'+j.evidence.filter(e=>e.img).map(e=>'<img src="'+e.img+'" alt="" title="'+esc(e.label)+'">').join("")+'</div>':'')+
+      '<a class="btn" style="margin-top:14px" target="_blank" rel="noopener" href="'+wa(j.id+": Work done. Evidence uploaded in my portal. Ready for review.")+'">✓ Mark work done</a>'+
+      '<p class="note">Upload straight from your phone camera, videos and voice notes go on WhatsApp. Yaadly checks your evidence before the client sees it. Money is held before you start and released fast once the client approves. You are never charged to be here.</p>';
+    J.appendChild(d);
+  });
+  const open = DB.jobs.filter(j=>j.open && !(j.worker&&j.worker.name));
+  O.innerHTML = open.length ? "" : '<div class="empty">No open jobs for your trade right now. You will be notified on WhatsApp when one matches. Quoting is free, always.</div>';
+  open.forEach(j=>{
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">OPEN FOR QUOTES</span></div>'+
+      '<p style="font-size:13.5px;color:var(--mute)">'+esc(j.desc||"")+'</p>'+
+      '<a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+" ("+(j.title||"")+", "+(j.parish||"")+"): My quote is J$____ labour only, materials at cost with receipts. I can start ____.")+'">Send my quote →</a>'+
+      '<p class="note">Your quote goes to Yaadly, is reviewed for shape against real costs, and is never beaten down.</p>';
+    O.appendChild(d);
+  });
+}
+/* ───────────── ADMIN ───────────── */
+let adminOpen = false;
+function adminUnlock(){
+  if($("admin-pin").value === CONFIG.adminPin){ adminOpen = true; $("admin-lock").style.display="none"; $("admin-ui").style.display="block"; renderAdmin(); }
+  else alert("Wrong passcode.");
+}
+function adminTab(t){
+  ["intake","jobs","services","workers","apps","market"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
+  document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
+  $("admin-detail").innerHTML="";
+}
+function newJob(){
+  const id = "JOB-"+String(DB.seq++).padStart(4,"0");
+  DB.jobs.push({id, title:"", parish:"", client:"", desc:"", stage:0, evidence:[], worker:{}, shortlist:[], open:false});
+  save(); renderAdmin(); editJob(id);
+}
+function renderAdmin(){
+  if(!adminOpen) return;
+  const I = $("at-intake");
+  const fresh = DB.intakes.filter(x=>x.status==="new");
+  $("intake-n").textContent = fresh.length ? "· "+fresh.length : "";
+  I.innerHTML = fresh.length ? "" : '<div class="empty">No new requests. Client form submissions from the website land here.</div>';
+  fresh.forEach(it=>{
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>'+esc(it.type)+' <em>'+esc(it.id)+'</em></h3><span class="pill hold">'+esc(it.when)+' · '+esc(it.urgency)+'</span></div>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(it.name)+' · WhatsApp '+esc(it.phone)+' · property: '+esc(it.where||"not given")+' · client is '+esc(it.loc)+'</p>'+
+      '<p style="font-size:13.5px;color:var(--mute);white-space:pre-wrap">'+esc(it.desc)+'</p>'+
+      ((it.photos||[]).length?'<div class="thumbs">'+it.photos.map(p=>'<img src="'+p+'" alt="client photo">').join("")+'</div>':'')+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
+      '<a class="btn sm" onclick="intakeToJob(\''+it.id+'\')">Create job from this →</a>'+
+      '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi "+it.name+", Yaadly here about your request "+it.id+" ("+it.type+"). ")+'">Reply on WhatsApp →</a>'+
+      '<a class="btn warn sm" onclick="intakeArchive(\''+it.id+'\')">Archive</a></div>';
+    I.appendChild(d);
+  });
+  const T = $("at-jobs");
+  T.innerHTML = DB.jobs.length ? "" : '<div class="empty">No jobs yet. Press New job when the first client comes through WhatsApp.</div>';
+  DB.jobs.forEach(j=>{
+    const st = j.review?'<span class="pill rev">IN REVIEW</span>':(j.stage>=5?'<span class="pill done">COMPLETE</span>':'<span class="pill hold">'+STAGES[j.stage||0].toUpperCase()+'</span>');
+    const d = document.createElement("div"); d.className="jrow";
+    d.innerHTML='<div class="l"><b>'+esc(j.id)+' · '+esc(j.title||"Untitled")+'</b><small>'+esc(j.parish||"")+(j.client?' · '+esc(j.client):'')+(j.worker&&j.worker.name?' · worker: '+esc(j.worker.name):'')+'</small></div>'+st;
+    d.onclick=()=>editJob(j.id);
+    T.appendChild(d);
+  });
+  const S = $("at-services");
+  S.innerHTML = '<a class="btn sm" onclick="newService()" style="margin-top:12px">+ New service booking</a>';
+  if(!DB.services.length) S.innerHTML += '<div class="empty">No service bookings yet. Requests arrive on WhatsApp; log them here.</div>';
+  DB.services.forEach(s=>{
+    const d = document.createElement("div"); d.className="jrow";
+    d.innerHTML='<div class="l"><b>'+esc(s.id)+' · '+esc(s.type)+'</b><small>'+esc(s.client||"")+(s.parish?' · '+esc(s.parish):'')+' · provider: '+esc(s.provider||"Founder")+'</small></div><span class="pill gold">'+SVC_STAGES[s.stage||0].toUpperCase()+'</span>';
+    d.onclick=()=>editService(s.id);
+    S.appendChild(d);
+  });
+  const W = $("at-workers");
+  W.innerHTML = DB.workers.length ? "" : '<div class="empty">No approved workers yet. Approve applications in the Applications tab; approved workers appear here.</div>';
+  DB.workers.forEach(w=>{
+    const d = document.createElement("div"); d.className="wcard";
+    d.innerHTML='<div class="av">'+esc((w.name||"W")[0])+'</div><div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"")+(w.parish?' · '+esc(w.parish):'')+' · '+(w.jobs||0)+' completed jobs</small></div>'+laneBadge(w.lane);
+    W.appendChild(d);
+  });
+  const A = $("at-apps");
+  const pend = DB.applications.filter(a=>a.status==="received");
+  A.innerHTML = pend.length ? "" : '<div class="empty">No applications waiting. New applications from the worker portal land here for your vetting.</div>';
+  pend.forEach(a=>{
+    const CHECKS = ["Government ID seen and matched","Portfolio reviewed","Reference one called","Reference two called", a.cert?"Certification verified with the issuing body":"", "Trial job assigned","Trial job passed"].filter(Boolean);
+    const boxes = CHECKS.map((c,i)=>'<li><span class="st '+(a.checks[i]?"pass":"gap")+'">'+(a.checks[i]?"PASS":"OPEN")+'</span> '+c+' <a class="btn o sm" style="margin-left:auto" onclick="toggleCheck(\''+a.id+'\','+i+')">'+(a.checks[i]?"Undo":"Mark done")+'</a></li>').join("");
+    const allDone = CHECKS.every((c,i)=>a.checks[i]);
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>'+esc(a.name)+' <em>'+esc(a.id)+'</em></h3><span class="pill hold">'+esc(a.when)+'</span></div>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(a.trade)+' · '+esc(a.parish||"parish not given")+' · '+esc(a.years||"?")+' yrs · WhatsApp '+esc(a.phone)+(a.cert?' · certified: '+esc(a.certno||"number not given"):' · experience based')+'</p>'+
+      (a.work?'<p style="font-size:13px;color:var(--mute)">Past work: '+esc(a.work)+'</p>':'')+
+      '<p style="font-size:12.5px;color:var(--dim)">Refs: '+esc(a.ref1||"none")+' · '+esc(a.ref2||"none")+'</p>'+
+      '<div class="kick">Vetting checklist</div><ul class="check">'+boxes+'</ul>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
+      (allDone?'<a class="btn sm" onclick="approveApp(\''+a.id+'\',\'cert\')">Approve as Certified professional</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'vet\')">Approve as Evidence vetted</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'pro\')">Approve as Vetted professional</a>':'<span class="note">Approval unlocks when every check passes. Only you approve; the AI never does.</span>')+
+      '<a class="btn warn sm" onclick="declineApp(\''+a.id+'\')">Decline</a>'+
+      '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi "+a.name+", Yaadly here about your application "+a.id+". ")+'">Message →</a></div>';
+    A.appendChild(d);
+  });
+  const M = $("at-market");
+  const open = DB.jobs.filter(j=>j.open);
+  M.innerHTML = '<p class="note" style="margin-top:12px">The marketplace is managed: workers see open jobs by invitation and quote free. Quotes come to you, never to the client. Shortlists cap at five.</p>';
+  M.innerHTML += open.length ? "" : '<div class="empty">No jobs open for quotes. Open one inside a job.</div>';
+  open.forEach(j=>{ const d=document.createElement("div"); d.className="jrow"; d.innerHTML='<div class="l"><b>'+esc(j.id)+' · '+esc(j.title)+'</b><small>open for quotes</small></div>'; d.onclick=()=>editJob(j.id); M.appendChild(d); });
+  renderClient(); renderWorker();
+}
+function intakeToJob(id){
+  const it = DB.intakes.find(x=>x.id===id); if(!it) return;
+  const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
+  DB.jobs.push({id:jid, title:it.type, parish:it.where||"", client:it.name,
+    desc:it.desc+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+" · WhatsApp "+it.phone+")",
+    stage:0, evidence:(it.photos||[]).map((p,n)=>({label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:p})), worker:{}, shortlist:[], open:false});
+  it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid);
+}
+function intakeArchive(id){ const it=DB.intakes.find(x=>x.id===id); it.status="archived"; save(); cloudStatus("intakes", it.cid, "archived"); renderAdmin(); }
+function toggleCheck(id,i){ const a=DB.applications.find(x=>x.id===id); a.checks[i]=!a.checks[i]; save(); renderAdmin(); }
+function approveApp(id,lane){
+  const a = DB.applications.find(x=>x.id===id);
+  a.status="approved";
+  DB.workers.push({name:a.name, phone:a.phone, trade:a.trade, parish:a.parish, lane:lane, jobs:0});
+  save(); cloudStatus("applications", a.cid, "approved"); renderAdmin();
+}
+function declineApp(id){
+  const why = prompt("Reason for declining (kept in the record, sent by you on WhatsApp):");
+  if(why===null) return;
+  const a = DB.applications.find(x=>x.id===id); a.status="declined"; a.reason=why; save(); cloudStatus("applications", a.cid, "declined"); renderAdmin();
+}
+function newService(){
+  const type = prompt("Service type (Deposit Protection Check, Project Setup Pack, Oversight Retainer, Contractor Sourcing, Full Project Management, Property Care):");
+  if(!type) return;
+  const id = "SVC-"+String(DB.svcSeq++).padStart(3,"0");
+  DB.services.push({id, type, client:"", parish:"", price:"", provider:"Founder", stage:0, notes:""});
+  save(); renderAdmin(); editService(id);
+}
+function editService(id){
+  const s = DB.services.find(x=>x.id===id); if(!s) return;
+  const D = $("admin-detail");
+  D.innerHTML = '<div class="card"><h3>'+esc(s.type)+' <em>'+esc(s.id)+'</em></h3>'+
+    '<div class="grid2"><div class="field"><label>Client</label><input id="sv-client" value="'+esc(s.client||"")+'"></div>'+
+    '<div class="field"><label>Parish / area</label><input id="sv-parish" value="'+esc(s.parish||"")+'"></div></div>'+
+    '<div class="grid2"><div class="field"><label>Agreed price</label><input id="sv-price" value="'+esc(s.price||"")+'" placeholder="set at scoping, never auto"></div>'+
+    '<div class="field"><label>Provider</label><input id="sv-provider" value="'+esc(s.provider||"Founder")+'"></div></div>'+
+    '<div class="field"><label>Notes</label><textarea id="sv-notes">'+esc(s.notes||"")+'</textarea></div>'+
+    '<div class="kick">Stage</div><div class="tabs" style="margin-top:6px">'+SVC_STAGES.map((st,i)=>'<button class="tab '+((s.stage||0)===i?"on":"")+'" onclick="svcStage(\''+s.id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><a class="btn o sm" onclick="saveService(\''+s.id+'\')">Save</a><a class="btn warn sm" onclick="delService(\''+s.id+'\')">Delete</a></div></div>';
+  D.scrollIntoView({behavior:"smooth"});
+}
+function svcStage(id,i){ const s=DB.services.find(x=>x.id===id); s.stage=i; save(); renderAdmin(); editService(id); }
+function saveService(id){ const s=DB.services.find(x=>x.id===id); s.client=$("sv-client").value; s.parish=$("sv-parish").value; s.price=$("sv-price").value; s.provider=$("sv-provider").value; s.notes=$("sv-notes").value; save(); renderAdmin(); }
+function delService(id){ if(!confirm("Delete this service booking?"))return; DB.services=DB.services.filter(x=>x.id!==id); save(); renderAdmin(); $("admin-detail").innerHTML=""; }
+function editJob(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return; j.worker=j.worker||{};
+  const D = $("admin-detail");
+  const evRows = (j.evidence||[]).map((e,k)=>'<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">'+(e.img?'<img src="'+e.img+'" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);flex:none">':'')+'<input style="flex:2;min-width:130px" value="'+esc(e.label||"")+'" placeholder="Arrival photo" onchange="evSet(\''+id+'\','+k+',\'label\',this.value)"><input style="flex:2;min-width:110px" value="'+esc(e.meta||"")+'" placeholder="09:41 · geotagged" onchange="evSet(\''+id+'\','+k+',\'meta\',this.value)"><label class="filebtn">📷<input type="file" accept="image/*" onchange="evPhoto(event,\''+id+'\','+k+')"></label>'+(e.ok===false?'<button class="btn sm" onclick="evOk(\''+id+'\','+k+')">Pass to client</button>':'<span class="st pass">CLIENT SEES</span>')+'<button class="btn warn sm" onclick="evDel(\''+id+'\','+k+')">✕</button></div>').join("");
+  const slRows = (j.shortlist||[]).map((w,k)=>'<div class="grid3" style="margin-bottom:8px"><input value="'+esc(w.name||"")+'" placeholder="Name" onchange="slSet(\''+id+'\','+k+',\'name\',this.value)"><input value="'+esc(w.trade||"")+'" placeholder="Trade" onchange="slSet(\''+id+'\','+k+',\'trade\',this.value)"><input value="'+esc(w.parish||"")+'" placeholder="Parish" onchange="slSet(\''+id+'\','+k+',\'parish\',this.value)"></div>').join("");
+  D.innerHTML = '<div class="card"><h3>'+esc(j.id)+' <em>'+esc(j.title||"")+'</em></h3>'+
+    '<div class="grid2"><div class="field"><label>Job title</label><input id="jb-title" value="'+esc(j.title||"")+'"></div><div class="field"><label>Parish / town</label><input id="jb-parish" value="'+esc(j.parish||"")+'"></div></div>'+
+    '<div class="grid2"><div class="field"><label>Client first name</label><input id="jb-client" value="'+esc(j.client||"")+'"></div><div class="field"><label>Open for worker quotes?</label><select id="jb-open"><option value=""'+(j.open?"":" selected")+'>No, matching privately</option><option value="1"'+(j.open?" selected":"")+'>Yes, invite quotes</option></select></div></div>'+
+    '<div class="field"><label>Scope, plain words</label><textarea id="jb-desc">'+esc(j.desc||"")+'</textarea></div>'+
+    '<div class="grid2"><div class="field"><label>Payment link (paste from Stripe)</label><input id="jb-pay" value="'+esc(j.payLink||"")+'" placeholder="https://buy.stripe.com/..."></div><div class="field"><label>Worker payout note (private)</label><input id="jb-payout" value="'+esc(j.payout||"")+'" placeholder="e.g. J$58,000 · bank transfer · paid 14 Aug"></div></div>'+
+    '<div class="kick">Worker assigned</div>'+
+    '<div class="grid3"><div class="field"><label>Name</label><input id="jb-wname" value="'+esc(j.worker.name||"")+'"></div><div class="field"><label>Trade</label><input id="jb-wtrade" value="'+esc(j.worker.trade||"")+'"></div><div class="field"><label>Lane</label><select id="jb-wlane"><option value="">Not set</option><option value="cert"'+(j.worker.lane==="cert"?" selected":"")+'>Certified professional</option><option value="vet"'+(j.worker.lane==="vet"?" selected":"")+'>Evidence vetted</option></select></div></div>'+
+    '<div class="kick">Client shortlist (cap five)</div>'+slRows+'<a class="btn o sm" onclick="slAdd(\''+id+'\')">+ Add to shortlist</a>'+
+    '<div class="kick">Evidence log</div>'+evRows+'<a class="btn o sm" onclick="evAdd(\''+id+'\')">+ Add evidence item</a> <label class="filebtn">📷 Add site photos from WhatsApp<input type="file" multiple accept="image/*" onchange="sitePhotos(event,\''+id+'\')"></label>'+
+    '<div class="kick">Stage · money states move only by your hand</div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
+    '<div class="kick">Agents · they draft and flag, you decide</div>'+
+    '<div class="field"><label>Tell the agent anything extra before drafting, optional</label><input id="rep-note" placeholder="e.g. tiles reach Thursday, Devon starts Friday morning"></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a></div><div id="agent-out"></div>'+
+    '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap"><a class="btn sm" onclick="saveJob(\''+id+'\')">Save</a>'+
+    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. Open your portal to review.")+'">Message client →</a>'+
+    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Open your portal for the scope and checklist.")+'">Message worker →</a>'+
+    '<a class="btn warn sm" onclick="delJob(\''+id+'\')">Delete</a></div></div>';
+  D.scrollIntoView({behavior:"smooth"});
+}
+function saveJob(id){
+  const j = DB.jobs.find(x=>x.id===id);
+  j.title=$("jb-title").value; j.parish=$("jb-parish").value; j.client=$("jb-client").value;
+  j.open=!!$("jb-open").value; j.desc=$("jb-desc").value;
+  j.payLink=$("jb-pay").value.trim(); j.payout=$("jb-payout").value.trim();
+  j.worker.name=$("jb-wname").value; j.worker.trade=$("jb-wtrade").value; j.worker.lane=$("jb-wlane").value;
+  save(); renderAdmin(); editJob(id);
+}
+function jobStage(id,i){
+  const j = DB.jobs.find(x=>x.id===id);
+  if(i===5 && !confirm("Mark WORKER PAID? Only after you have actually paid.")) return;
+  j.stage=i; save(); renderAdmin(); editJob(id);
+}
+function evAdd(id){ const j=DB.jobs.find(x=>x.id===id); (j.evidence=j.evidence||[]).push({label:"",meta:"",icon:"🖼"}); save(); editJob(id); }
+function evSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k][f]=v; j.evidence[k].icon=/video|pan/i.test(j.evidence[k].label||"")?"🎬":(/receipt/i.test(j.evidence[k].label||"")?"🧾":"🖼"); save(); }
+function evDel(id,k){ const j=DB.jobs.find(x=>x.id===id); j.evidence.splice(k,1); save(); editJob(id); }
+function evOk(id,k){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k].ok=true; j.evidence[k].meta=(j.evidence[k].meta||"").replace(/awaiting Yaadly check/,"checked by Yaadly"); save(); editJob(id); }
+async function evPhoto(ev,id,k){ const j=DB.jobs.find(x=>x.id===id); const ph=await filesToPhotos(ev.target.files); if(ph.length){ j.evidence[k].img=ph[0]; save(); editJob(id); } }
+async function addSite(ev,id,who){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const ph = await filesToPhotos(ev.target.files);
+  const t = new Date().toTimeString().slice(0,5);
+  ph.forEach(p=>{
+    const n = (j.evidence||[]).filter(e=>(e.label||"").indexOf("Site photo")===0).length + 1;
+    j.evidence.push({label:"Site photo "+n, meta:t+" · "+who, icon:"🖼", img:p, ok:true});
+  });
+  save();
+}
+async function clientUpload(ev,id){ await addSite(ev,id,"by client"); renderClient(); clientDetail(id); if(adminOpen) renderAdmin(); }
+async function sitePhotos(ev,id){ await addSite(ev,id,"from WhatsApp"); renderAdmin(); editJob(id); }
+async function workerUpload(ev,id,key){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const ph = await filesToPhotos(ev.target.files);
+  const t = new Date().toTimeString().slice(0,5);
+  ph.forEach(p=>{
+    const n = (j.evidence||[]).filter(e=>(e.label||"").indexOf(key)===0).length + 1;
+    j.evidence.push({label:key+" "+n, meta:t+" · by worker, awaiting Yaadly check", icon:"🖼", img:p, ok:false});
+  });
+  save(); renderWorker(); if(adminOpen) renderAdmin();
+}
+function slAdd(id){ const j=DB.jobs.find(x=>x.id===id); j.shortlist=j.shortlist||[]; if(j.shortlist.length>=5){ alert("Shortlists cap at five. Your rule."); return; } j.shortlist.push({name:"",trade:"",parish:"",lane:"vet",jobs:0}); save(); editJob(id); }
+function slSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.shortlist[k][f]=v; save(); }
+function delJob(id){ if(!confirm("Delete this job?"))return; DB.jobs=DB.jobs.filter(x=>x.id!==id); save(); renderAdmin(); $("admin-detail").innerHTML=""; }
+function runPrice(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").innerHTML='<div class="mono">'+esc(pricingAgent((j.title||"")+" "+(j.desc||"")))+'</div>'; }
+function runVerify(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").innerHTML='<div class="mono">'+esc(verifyAgent(j))+'</div>'; }
+/* ───────────── util + boot ───────────── */
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function renderAll(){ renderClient(); renderWorker(); if(adminOpen) renderAdmin(); }
+renderAll();
+</script>
+</body>
+</html>
