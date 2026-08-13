@@ -128,6 +128,10 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 .svc h4{font-size:15.5px;margin-bottom:6px}
 .svc p{font-size:13px;color:var(--mute)}
 .svc .price{font-family:var(--disp);font-size:19px;color:var(--mango);margin-bottom:8px;letter-spacing:.02em}
+.rate{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rbtn{font:inherit;font-size:15px;font-weight:700;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--mute);cursor:pointer;transition:.15s}
+.rbtn:hover{border-color:var(--teal);color:var(--tealb)}
+.rbtn.on{background:var(--grad);border-color:transparent;color:#04211D}
 .svc .btn{margin-top:12px}
 .loop-row{display:grid;grid-template-columns:60px 1fr;gap:14px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
 .loop-row .no{font-family:var(--disp);font-size:30px;color:var(--tealb)}
@@ -253,6 +257,34 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <details class="faq"><summary>I am a tradesperson. What does it cost to join?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. You are paid fast once the client approves, and every completed job builds a record you own.</div></details>
   <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
 
+  <div class="kick" id="feedback">Tell us how to make this better</div>
+  <div class="card"><h3>Your honest <em>opinion</em></h3>
+    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Yaadly is new and built in the open. If something confused you, felt missing, or made you hesitate, say it plainly. Every answer is read by the founder and shapes what gets built next. No name needed.</p>
+    <div class="field"><label>How much do you trust this so far?</label>
+      <div class="rate" id="fb-rate">
+        <button type="button" class="rbtn" data-v="1" onclick="setRate(1)">1</button>
+        <button type="button" class="rbtn" data-v="2" onclick="setRate(2)">2</button>
+        <button type="button" class="rbtn" data-v="3" onclick="setRate(3)">3</button>
+        <button type="button" class="rbtn" data-v="4" onclick="setRate(4)">4</button>
+        <button type="button" class="rbtn" data-v="5" onclick="setRate(5)">5</button>
+        <span class="note" style="margin-left:8px">1 not at all, 5 completely</span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Who are you?</label>
+        <select id="fb-who"><option>Property owner overseas</option><option>Property owner in Jamaica</option><option>Tradesperson</option><option>Just looking around</option><option>Industry or investor</option></select>
+      </div>
+      <div class="field"><label>What brought you here?</label><input id="fb-why" placeholder="e.g. mum's roof needs fixing"></div>
+    </div>
+    <div class="field"><label>What would make you trust or use Yaadly more?</label><textarea id="fb-better" placeholder="Anything missing, unclear, or off-putting. Be blunt, it helps."></textarea></div>
+    <div class="grid2">
+      <div class="field"><label>Anything you liked?</label><input id="fb-liked"></div>
+      <div class="field"><label>Email or WhatsApp, only if you want a reply</label><input id="fb-contact"></div>
+    </div>
+    <a class="btn" onclick="submitFeedback()">Send feedback</a>
+    <div id="fb-status"></div>
+  </div>
+
   <div class="kick">Why this exists</div>
   <div class="card">
     <p style="font-family:var(--disp);font-size:clamp(19px,3vw,28px);text-transform:uppercase;line-height:1.2">A trust engine for everyone <span style="color:var(--coral)">investing back</span> into Jamaica.</p>
@@ -351,6 +383,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <button class="tab" data-at="workers" onclick="adminTab('workers')">Workers</button>
       <button class="tab" data-at="apps" onclick="adminTab('apps')">Applications</button>
       <button class="tab" data-at="market" onclick="adminTab('market')">Marketplace</button>
+      <button class="tab" data-at="feedback" onclick="adminTab('feedback')">Feedback <span id="fb-n"></span></button>
     </div>
     <div id="at-intake" style="display:none"></div>
     <div id="at-jobs"></div>
@@ -358,6 +391,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
     <div id="at-workers" style="display:none"></div>
     <div id="at-apps" style="display:none"></div>
     <div id="at-market" style="display:none"></div>
+    <div id="at-feedback" style="display:none"></div>
     <div id="admin-detail"></div>
     <div class="rule">⚖️ <b>The governing rule holds here:</b> the agents draft and flag. Only you confirm a payout, and only after you have actually paid.</div>
   </div>
@@ -404,10 +438,17 @@ async function cloudLogin(){
 async function cloudPull(){
   if(!sb || !cloudOn) return;
   try{
-    const [ri, ra] = await Promise.all([
+    const [ri, ra, rf] = await Promise.all([
       sb.from("intakes").select("*").order("created_at"),
-      sb.from("applications").select("*").order("created_at")
+      sb.from("applications").select("*").order("created_at"),
+      sb.from("feedback").select("*").order("created_at")
     ]);
+    (rf.data||[]).forEach(row=>{
+      if(DB.feedback.some(x=>x.cid===row.id)) return;
+      DB.feedback.push({ id:"FB-C"+String(DB.fbSeq++).padStart(3,"0"), cid:row.id,
+        when:(row.created_at||"").slice(0,10), rating:row.rating, who:row.who, why:row.why,
+        better:row.better, liked:row.liked, contact:row.contact });
+    });
     (ri.data||[]).forEach(row=>{
       if(DB.intakes.some(x=>x.cid===row.id)) return;
       DB.intakes.push({ id:"REQ-C"+String(DB.inSeq++).padStart(3,"0"), cid:row.id,
@@ -486,8 +527,9 @@ const DB_KEY = "yaadly-platform-v1";
 let DB = load();
 function load(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)) || seed(); }catch(e){ return seed(); } }
 function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ alert("Browser storage is full, mostly photos. Press Backup data to save everything to a file, then remove photos from old completed jobs."); } schedulePush(); }
-function seed(){ return { jobs:[], services:[], workers:[], applications:[], intakes:[], seq:1, svcSeq:1, inSeq:1 }; }
+function seed(){ return { jobs:[], services:[], workers:[], applications:[], intakes:[], feedback:[], seq:1, svcSeq:1, inSeq:1, fbSeq:1 }; }
 DB.intakes = DB.intakes || []; DB.inSeq = DB.inSeq || 1;
+DB.feedback = DB.feedback || []; DB.fbSeq = DB.fbSeq || 1;
 function exportData(){
   const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -544,6 +586,23 @@ function submitIntake(){
   $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.</div>';
   window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nProperty: "+(it.where||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
   ["in-name","in-phone","in-where","in-desc"].forEach(i=>$(i).value="");
+}
+let fbRate = 0;
+function setRate(v){
+  fbRate = v;
+  document.querySelectorAll("#fb-rate .rbtn").forEach(b=>b.classList.toggle("on", Number(b.dataset.v)===v));
+}
+function submitFeedback(){
+  const g = id => ($(id).value||"").trim();
+  if(!fbRate && !g("fb-better")){ alert("Give it a score, or tell us what would make it better. Either is enough."); return; }
+  const fb = { id:"FB-"+String(DB.fbSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
+    rating:fbRate||null, who:$("fb-who").value, why:g("fb-why"), better:g("fb-better"),
+    liked:g("fb-liked"), contact:g("fb-contact") };
+  DB.feedback.push(fb); save();
+  if(sb) sb.from("feedback").insert({rating:fb.rating, who:fb.who, why:fb.why, better:fb.better, liked:fb.liked, contact:fb.contact}).then(r=>{ if(r.error) console.warn("feedback cloud:", r.error.message); });
+  $("fb-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Thank you, that is genuinely useful.</b> Every answer is read by the founder'+(fb.contact?" and we will come back to you":"")+'.</div>';
+  ["fb-why","fb-better","fb-liked","fb-contact"].forEach(i=>$(i).value="");
+  setRate(0); fbRate = 0;
 }
 function requestService(name){
   window.open(wa("Hello Yaadly, I would like a quote for: " + name + ". My property is in: ____. Details: ____."), "_blank", "noopener");
@@ -691,7 +750,7 @@ function adminUnlock(){
   else alert("Wrong passcode.");
 }
 function adminTab(t){
-  ["intake","jobs","services","workers","apps","market"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
+  ["intake","jobs","services","workers","apps","market","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
   document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
   $("admin-detail").innerHTML="";
 }
@@ -767,6 +826,25 @@ function renderAdmin(){
   M.innerHTML = '<p class="note" style="margin-top:12px">The marketplace is managed: workers see open jobs by invitation and quote free. Quotes come to you, never to the client. Shortlists cap at five.</p>';
   M.innerHTML += open.length ? "" : '<div class="empty">No jobs open for quotes. Open one inside a job.</div>';
   open.forEach(j=>{ const d=document.createElement("div"); d.className="jrow"; d.innerHTML='<div class="l"><b>'+esc(j.id)+' · '+esc(j.title)+'</b><small>open for quotes</small></div>'; d.onclick=()=>editJob(j.id); M.appendChild(d); });
+  const F = $("at-feedback");
+  const fbs = (DB.feedback||[]).slice().reverse();
+  const rated = fbs.filter(f=>f.rating);
+  const avg = rated.length ? (rated.reduce((s,f)=>s+f.rating,0)/rated.length).toFixed(1) : null;
+  $("fb-n").textContent = fbs.length ? "· "+fbs.length : "";
+  F.innerHTML = fbs.length
+    ? '<div class="rule" style="margin-top:12px">📊 <b>'+fbs.length+' responses</b>'+(avg?' · average trust score <b>'+avg+' of 5</b>':'')+'. Read these before building anything new.</div>'
+    : '<div class="empty">No feedback yet. The form sits at the bottom of your website: send the link to five people and ask them to be blunt.</div>';
+  fbs.forEach(f=>{
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(f.who||"Visitor")+' <em>'+esc(f.id||"")+'</em></h3>'+
+      (f.rating?'<span class="pill '+(f.rating>=4?'done':f.rating>=3?'gold':'rev')+'">TRUST '+f.rating+'/5</span>':'<span class="pill hold">NO SCORE</span>')+'</div>'+
+      (f.why?'<p style="font-size:13px;color:var(--dim)">Came here for: '+esc(f.why)+'</p>':'')+
+      (f.better?'<div class="kick" style="margin-top:10px">Would trust or use it more if</div><p style="font-size:14px;color:var(--ink);white-space:pre-wrap">'+esc(f.better)+'</p>':'')+
+      (f.liked?'<div class="kick">Liked</div><p style="font-size:13.5px;color:var(--mute)">'+esc(f.liked)+'</p>':'')+
+      '<p class="note">'+esc(f.when||"")+(f.contact?' · wants a reply: <b>'+esc(f.contact)+'</b>':' · anonymous')+'</p>'+
+      (f.contact&&/^[0-9+ ]+$/.test(f.contact)?'<a class="btn o sm" target="_blank" rel="noopener" href="https://wa.me/'+f.contact.replace(/[^0-9]/g,"")+'">Reply on WhatsApp →</a>':'');
+    F.appendChild(d);
+  });
   renderClient(); renderWorker();
 }
 function intakeToJob(id){
