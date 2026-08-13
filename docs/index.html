@@ -353,8 +353,13 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       </div>
     </div>
     <div class="field"><label>Anything we should know before the call?</label><textarea id="bk-note" placeholder="Where the property is, what stage it is at, what is worrying you."></textarea></div>
-    <a class="btn" onclick="bookCall()">Request my call</a>
-    <p class="note">We come back within 24 hours with a time. Calls are on WhatsApp or phone, whichever you prefer.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <a class="btn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">📅 Pick a time now · 15 min</a>
+      <a class="btn o" href="https://cal.com/yaadly/30min" target="_blank" rel="noopener">📅 Longer conversation · 30 min</a>
+    </div>
+    <p class="note" style="margin-bottom:14px">Choosing a slot books it straight into the diary, in your own time zone. Prefer we come back to you instead? Fill the form above and press below.</p>
+    <a class="btn o" onclick="bookCall()">Ask us to suggest a time</a>
+    <p class="note">Either way we come back within 24 hours. Calls are on WhatsApp or phone, whichever you prefer.</p>
     <div id="bk-status"></div>
   </div>
 
