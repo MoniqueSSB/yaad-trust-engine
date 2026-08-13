@@ -222,11 +222,11 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <div class="kick" id="svc">Professional services</div>
   <p class="lead" style="margin-top:0">Delivered personally by Yaadly's founder, a construction project manager with 7+ years managing London projects. As the network grows, delivered by vetted professionals.</p>
   <div class="grid3" style="margin-top:14px">
-    <div class="svc"><h4>Deposit Protection Check</h4><p class="price">from £149</p><p>An independent review of a contractor's quote and deal terms before any money moves, benchmarked against real costs. Written report, clear recommendation.</p><a class="btn sm" onclick="requestService('Deposit Protection Check')">Request a quote</a></div>
-    <div class="svc"><h4>Project Setup Pack</h4><p class="price">from £399</p><p>Scope, milestones and a staged payment structure put in writing before work starts. The paperwork that protects both sides.</p><a class="btn sm" onclick="requestService('Project Setup Pack')">Request a quote</a></div>
-    <div class="svc"><h4>Oversight Retainer</h4><p class="price">from £350 a month</p><p>Ongoing independent monitoring of an active job: site visits, photo and video reporting, contractor accountability.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request a quote</a></div>
+    <div class="svc"><h4>Site Verification Visit</h4><p class="price">£149 · one off</p><p>Our own person goes to the property and documents it to a fixed format: dated photos, video walkthrough, condition of the areas that matter. You get a written verdict from a construction project manager, not a contractor's word.</p><a class="btn sm" onclick="requestService('Site Verification Visit')">Request a quote</a></div>
+    <div class="svc"><h4>Oversight Retainer</h4><p class="price">£350 a month</p><p>Independent eyes on an active build, every month. Milestone sign off <b>before</b> money moves, a progress and cost summary you can act on, and a contractor who knows someone is checking.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request a quote</a></div>
+    <div class="svc"><h4>Full Project Management</h4><p class="price">10% of build cost</p><p>Your whole build run for you, from first drawing to keys in hand: scope, contractors, programme, payments against milestones, evidence at every stage. The UK and Jamaican market rate is 10 to 15 percent.</p><a class="btn sm" onclick="requestService('Full Project Management')">Request a quote</a></div>
   </div>
-  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px">Every service is quoted in writing before anything begins, and the price is confirmed with you first. Larger renovations, contractor sourcing and ongoing property care are assessed case by case: <b>just ask</b>.</p>
+  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px">Every service is quoted in writing before anything begins. Under £1,000 you can pay securely by card. Larger projects are invoiced from Yaadly Ltd against agreed stages, so you never pay for work before it is scoped.</p>
 
   <div class="kick">Two sides, one deal</div>
   <div class="grid2">
@@ -254,7 +254,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <details class="faq"><summary>How do I start a job?</summary><div class="a">Message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English. We reply within 24 hours with next steps. No app to download, no forms to fight.</div></details>
   <details class="faq"><summary>Where do you operate?</summary><div class="a">We are launching in the Kingston metro first, <b>Kingston and Portmore</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Outside the metro today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
   <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so.</div></details>
-  <details class="faq"><summary>What does it cost?</summary><div class="a">Professional services start at <b>£149</b> for a Deposit Protection Check, <b>£399</b> for a Project Setup Pack and <b>£350 a month</b> for an Oversight Retainer, each quoted in writing once we know the job. Property work gets a written quote benchmarked against real material costs and real day rates, with everything confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client in London pays what a client in Portmore pays.</div></details>
+  <details class="faq"><summary>What does it cost?</summary><div class="a">A Site Verification Visit is <b>£149</b>, one off. An Oversight Retainer is <b>£350 a month</b>. Full Project Management is <b>10% of build cost</b>, against a market rate of 10 to 15 percent. Everything is quoted in writing first: under £1,000 you pay securely by card, larger projects are invoiced against agreed stages. Property work gets a written quote benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client in London pays what a client in Portmore pays.</div></details>
   <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are <b>free</b> and reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
   <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
   <details class="faq"><summary>How are workers vetted?</summary><div class="a">Every worker passes ID checks, reference calls, a portfolio review and a trial job before their first client. Certified professionals have their certification verified with the issuing body. Yaadly reviews every application personally.</div></details>
@@ -669,6 +669,7 @@ function requestService(name){
     "3. Parish or area:",
     "4. What I need help with (be as exact as you can):",
     "5. Stage of the project (planning, quote received, work started, work gone wrong):",
+    "5b. If it is a build: rough build budget, so we can size the work:",
     "6. When I need it by:",
     "7. Are you overseas or in Jamaica:",
     "",
@@ -952,7 +953,7 @@ function declineApp(id){
   const a = DB.applications.find(x=>x.id===id); a.status="declined"; a.reason=why; save(); cloudStatus("applications", a.cid, "declined"); renderAdmin();
 }
 function newService(){
-  const type = prompt("Service type (Deposit Protection Check, Project Setup Pack, Oversight Retainer, Contractor Sourcing, Full Project Management, Property Care):");
+  const type = prompt("Service type (Site Verification Visit, Oversight Retainer, Full Project Management, Contractor Sourcing, Property Care):");
   if(!type) return;
   const id = "SVC-"+String(DB.svcSeq++).padStart(3,"0");
   DB.services.push({id, type, client:"", parish:"", price:"", provider:"Founder", stage:0, notes:""});
