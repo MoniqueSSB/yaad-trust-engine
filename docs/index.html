@@ -310,7 +310,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <ul class="check">
         <li><span class="st pass">✓</span> Free to join. Never charged to quote, ever</li>
         <li><span class="st pass">✓</span> The money is real and held before you start</li>
-        <li><span class="st pass">✓</span> Paid fast once the client approves</li>
+        <li><span class="st pass">✓</span> Paid within 3 working days of the client approving, by bank transfer, Lynk or remittance</li>
         <li><span class="st pass">✓</span> A record you own that finally counts</li>
       </ul>
       <a class="btn" style="margin-top:14px;background:linear-gradient(90deg,var(--coral),var(--melon));color:#fff" onclick="go('worker');workerTab('apply')">Apply to join</a>
@@ -325,7 +325,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are <b>free</b> and reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
   <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
   <details class="faq"><summary>How are workers vetted? Who is coming to my property?</summary><div class="a">Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address, and a selfie holding that ID so we know the document is theirs. For work inside occupied homes, or any time a client asks, we require a <b>police record check</b> from the Jamaica Constabulary Force. On top of that: references called, past work reviewed, and a trial job before they are trusted with yours. Certified trades have their certification checked with the issuing body. You are told who is coming, and you see their record before they arrive.</div></details>
-  <details class="faq"><summary>I am a tradesperson. What does it cost to join?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. You are paid fast once the client approves, and every completed job builds a record you own.</div></details>
+  <details class="faq"><summary>I am a tradesperson. What does it cost to join, and how do I get paid?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. The client's money is held before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own.</div></details>
   <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
 
   <div class="kick" id="book">Talk to us first</div>
@@ -470,9 +470,11 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <h1 class="hx" style="font-size:clamp(30px,5vw,54px)">Do good work. <span class="g2">Get paid fast.</span></h1>
   <div class="tabs">
     <button class="tab on" data-wt="jobs" onclick="workerTab('jobs')">My jobs</button>
+    <button class="tab" data-wt="pay" onclick="workerTab('pay')">My money</button>
     <button class="tab" data-wt="open" onclick="workerTab('open')">Open for quotes</button>
     <button class="tab" data-wt="apply" onclick="workerTab('apply')">Apply to join</button>
   </div>
+  <div id="wt-pay" style="display:none"></div>
   <div id="wt-jobs"></div>
   <div id="wt-open" style="display:none"></div>
   <div id="wt-apply" style="display:none">
@@ -494,6 +496,13 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       </div>
       <div class="field" id="ap-certrow" style="display:none"><label>Certifying body and certificate number</label><input id="ap-certno" placeholder="e.g. HEART/NSTA, number"></div>
       <div class="field"><label>Past work <span style="font-weight:500;text-transform:none">(describe up to five jobs; photos come later on WhatsApp)</span></label><textarea id="ap-work"></textarea></div>
+      <div class="grid2">
+        <div class="field"><label>How would you like to be paid?</label>
+          <select id="ap-pay"><option value="">Choose one</option><option>Bank transfer (NCB)</option><option>Bank transfer (Scotiabank)</option><option>Bank transfer (JN Bank)</option><option>Bank transfer (other Jamaican bank)</option><option>Lynk wallet</option><option>Remittance pick up</option><option>Not sure yet</option></select>
+        </div>
+        <div class="field"><label>Name the payment is held in</label><input id="ap-payname" placeholder="Exactly as it appears on the account"></div>
+      </div>
+      <p class="note" style="margin-top:0">Do not put account numbers on this form. Once you are approved we take those details from you directly and securely.</p>
       <div class="grid2">
         <div class="field"><label>Reference 1, name and phone</label><input id="ap-ref1"></div>
         <div class="field"><label>Reference 2, name and phone</label><input id="ap-ref2"></div>
@@ -931,7 +940,7 @@ function laneBadge(l){ return l==="cert"?'<span class="lane cert">CERTIFIED PROF
 /* ───────────── WORKER PORTAL ───────────── */
 function workerTab(t){
   go2("worker");
-  ["jobs","open","apply"].forEach(x=>{ $("wt-"+x).style.display = x===t?"block":"none"; });
+  ["jobs","pay","open","apply"].forEach(x=>{ $("wt-"+x).style.display = x===t?"block":"none"; });
   document.querySelectorAll("[data-wt]").forEach(b=>b.classList.toggle("on", b.dataset.wt===t));
 }
 function go2(v){ if(!$("pane-"+v).classList.contains("show")) go(v); }
@@ -944,6 +953,7 @@ function submitApplication(){
     name:g("ap-name"), phone:g("ap-phone"), parish:g("ap-parish"), trade:g("ap-trade"), years:g("ap-years"),
     cert:$("ap-cert").value==="yes", certno:g("ap-certno"), work:g("ap-work"), ref1:g("ap-ref1"), ref2:g("ap-ref2"),
     idtype:$("ap-idtype").value, police:$("ap-police").value,
+    payMethod:$("ap-pay").value, payName:g("ap-payname"),
     checks:{}, status:"received" };
   DB.applications.push(ap); save();
   if(sb) sb.from("applications").insert({app_id:ap.id, name:ap.name, phone:ap.phone, parish:ap.parish, trade:ap.trade, years:ap.years, cert:ap.cert, certno:ap.certno, work:ap.work, ref1:ap.ref1, ref2:ap.ref2, status:"received"}).then(r=>{ if(r.error) console.warn("application cloud:", r.error.message); });
@@ -969,6 +979,24 @@ function renderWorker(){
       '<a class="btn" style="margin-top:14px" target="_blank" rel="noopener" href="'+wa(j.id+": Work done. Evidence uploaded in my portal. Ready for review.")+'">✓ Mark work done</a>'+
       '<p class="note">Upload straight from your phone camera, videos and voice notes go on WhatsApp. Yaadly checks your evidence before the client sees it. Money is held before you start and released fast once the client approves. You are never charged to be here.</p>';
     J.appendChild(d);
+  });
+  const P = $("wt-pay");
+  const mine = DB.jobs.filter(j=>j.worker && j.worker.name);
+  P.innerHTML = '<div class="rule" style="margin-top:12px">💷 <b>How you get paid.</b> The client\'s money is held before you start, so it is real. Once you send your evidence and the client approves it, Yaadly pays you <b>within 3 working days</b>, by the method on your record: bank transfer, Lynk or remittance pick up. You are never charged to be here and never charged to quote.</div>';
+  if(!mine.length){ P.innerHTML += '<div class="empty">No jobs yet, so nothing owed. When you are assigned work it shows here with what you will be paid and when.</div>'; }
+  mine.forEach(j=>{
+    const state = j.stage>=5 ? "paid" : (j.stage>=4 ? "approved" : "working");
+    const pill = state==="paid" ? '<span class="pill done">PAID</span>'
+      : state==="approved" ? '<span class="pill gold">APPROVED · PAYMENT ON THE WAY</span>'
+      : '<span class="pill hold">IN PROGRESS · MONEY HELD FOR YOU</span>';
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3>'+pill+'</div>'+
+      '<p style="font-size:14px;color:var(--ink)">Agreed to you: <b>'+(j.owed?("J$"+Number(j.owed).toLocaleString()):"to be confirmed")+'</b></p>'+
+      (state==="paid" ? '<p style="font-size:13.5px;color:var(--mute)">Sent by '+esc(j.payMethod||"agreed method")+(j.payRef?' · reference '+esc(j.payRef):'')+'. If it has not reached you, message us and we will trace it.</p>'
+        : state==="approved" ? '<p style="font-size:13.5px;color:var(--mute)">The client has approved your evidence. Payment goes out within 3 working days.</p>'
+        : '<p style="font-size:13.5px;color:var(--mute)">Finish the work and send every item on your checklist. The faster the evidence is complete, the faster you are paid.</p>')+
+      '<a class="btn o sm" style="margin-top:10px" target="_blank" rel="noopener" href="'+wa(j.id+": question about my payment.")+'">Ask about this payment →</a>';
+    P.appendChild(d);
   });
   const open = DB.jobs.filter(j=>j.open && !(j.worker&&j.worker.name));
   O.innerHTML = open.length ? "" : '<div class="empty">No open jobs for your trade right now. You will be notified on WhatsApp when one matches. Quoting is free, always.</div>';
@@ -1037,7 +1065,7 @@ function renderAdmin(){
   W.innerHTML = DB.workers.length ? "" : '<div class="empty">No approved workers yet. Approve applications in the Applications tab; approved workers appear here.</div>';
   DB.workers.forEach(w=>{
     const d = document.createElement("div"); d.className="wcard";
-    d.innerHTML='<div class="av">'+esc((w.name||"W")[0])+'</div><div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"")+(w.parish?' · '+esc(w.parish):'')+' · '+(w.jobs||0)+' completed jobs</small></div>'+laneBadge(w.lane);
+    d.innerHTML='<div class="av">'+esc((w.name||"W")[0])+'</div><div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"")+(w.parish?' · '+esc(w.parish):'')+' · '+(w.jobs||0)+' completed jobs<br>paid by '+esc(w.payMethod||"method not set")+(w.payName?' · account name '+esc(w.payName):'')+'</small></div>'+laneBadge(w.lane);
     W.appendChild(d);
   });
   const A = $("at-apps");
@@ -1134,7 +1162,8 @@ function toggleCheck(id,i){ const a=DB.applications.find(x=>x.id===id); a.checks
 function approveApp(id,lane){
   const a = DB.applications.find(x=>x.id===id);
   a.status="approved";
-  DB.workers.push({name:a.name, phone:a.phone, trade:a.trade, parish:a.parish, lane:lane, jobs:0});
+  DB.workers.push({name:a.name, phone:a.phone, trade:a.trade, parish:a.parish, lane:lane, jobs:0,
+    payMethod:a.payMethod||"", payName:a.payName||"", payRef:""});
   save(); cloudStatus("applications", a.cid, "approved"); renderAdmin();
 }
 function declineApp(id){
@@ -1174,7 +1203,13 @@ function editJob(id){
     '<div class="grid2"><div class="field"><label>Job title</label><input id="jb-title" value="'+esc(j.title||"")+'"></div><div class="field"><label>Parish / town</label><input id="jb-parish" value="'+esc(j.parish||"")+'"></div></div>'+
     '<div class="grid2"><div class="field"><label>Client first name</label><input id="jb-client" value="'+esc(j.client||"")+'"></div><div class="field"><label>Open for worker quotes?</label><select id="jb-open"><option value=""'+(j.open?"":" selected")+'>No, matching privately</option><option value="1"'+(j.open?" selected":"")+'>Yes, invite quotes</option></select></div></div>'+
     '<div class="field"><label>Scope, plain words</label><textarea id="jb-desc">'+esc(j.desc||"")+'</textarea></div>'+
-    '<div class="grid2"><div class="field"><label>Payment link (paste from Stripe)</label><input id="jb-pay" value="'+esc(j.payLink||"")+'" placeholder="https://buy.stripe.com/..."></div><div class="field"><label>Worker payout note (private)</label><input id="jb-payout" value="'+esc(j.payout||"")+'" placeholder="e.g. J$58,000 · bank transfer · paid 14 Aug"></div></div>'+
+    '<div class="grid2"><div class="field"><label>Payment link (paste from Stripe)</label><input id="jb-pay" value="'+esc(j.payLink||"")+'" placeholder="https://buy.stripe.com/..."></div><div class="field"><label>Client paid you (GBP)</label><input id="jb-in" value="'+esc(j.paidIn||"")+'" placeholder="e.g. 300"></div></div>'+
+    '<div class="kick">Worker payout</div>'+
+    '<div class="grid3"><div class="field"><label>Owed to worker (J$)</label><input id="jb-owed" value="'+esc(j.owed||"")+'" placeholder="e.g. 58000"></div>'+
+    '<div class="field"><label>How you sent it</label><select id="jb-paymethod"><option value="">Not sent yet</option>'+
+      ["Bank transfer (NCB)","Bank transfer (Scotiabank)","Bank transfer (JN Bank)","Bank transfer (other)","Lynk wallet","Remittance pick up","Cash, receipted"].map(m=>'<option'+(j.payMethod===m?" selected":"")+'>'+m+'</option>').join("")+'</select></div>'+
+    '<div class="field"><label>Reference and date</label><input id="jb-payref" value="'+esc(j.payRef||"")+'" placeholder="e.g. NCB ref 88213 · 14 Aug"></div></div>'+
+    (j.worker&&j.worker.name?'<p class="note" style="margin-top:0">Paying '+esc(j.worker.name)+'. Their preferred method and account name are on their worker record. Never mark paid before the money has actually left.</p>':'')+
     '<div class="kick">Worker assigned</div>'+
     '<div class="grid3"><div class="field"><label>Name</label><input id="jb-wname" value="'+esc(j.worker.name||"")+'"></div><div class="field"><label>Trade</label><input id="jb-wtrade" value="'+esc(j.worker.trade||"")+'"></div><div class="field"><label>Lane</label><select id="jb-wlane"><option value="">Not set</option><option value="cert"'+(j.worker.lane==="cert"?" selected":"")+'>Certified professional</option><option value="vet"'+(j.worker.lane==="vet"?" selected":"")+'>Evidence vetted</option></select></div></div>'+
     '<div class="kick">Client shortlist (cap five)</div>'+slRows+'<a class="btn o sm" onclick="slAdd(\''+id+'\')">+ Add to shortlist</a>'+
@@ -1193,7 +1228,8 @@ function saveJob(id){
   const j = DB.jobs.find(x=>x.id===id);
   j.title=$("jb-title").value; j.parish=$("jb-parish").value; j.client=$("jb-client").value;
   j.open=!!$("jb-open").value; j.desc=$("jb-desc").value;
-  j.payLink=$("jb-pay").value.trim(); j.payout=$("jb-payout").value.trim();
+  j.payLink=$("jb-pay").value.trim(); j.paidIn=$("jb-in").value.trim();
+  j.owed=$("jb-owed").value.trim(); j.payMethod=$("jb-paymethod").value; j.payRef=$("jb-payref").value.trim();
   j.worker.name=$("jb-wname").value; j.worker.trade=$("jb-wtrade").value; j.worker.lane=$("jb-wlane").value;
   save(); renderAdmin(); editJob(id);
 }
