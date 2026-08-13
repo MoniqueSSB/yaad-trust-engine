@@ -261,6 +261,25 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <details class="faq"><summary>I am a tradesperson. What does it cost to join?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. You are paid fast once the client approves, and every completed job builds a record you own.</div></details>
   <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
 
+  <div class="kick" id="waitlist">Join the waiting list</div>
+  <div class="card">
+    <h3>Be first when <em>full service opens</em></h3>
+    <p class="note" style="margin-top:0;font-size:13.5px;color:var(--mute)">Yaadly is opening in stages. Professional services are available now. The full managed job service, where we match a vetted worker, hold the payment and prove the work with evidence, opens in the Kingston metro shortly. Join the list and you will be contacted first, with no obligation and nothing to pay.</p>
+    <div class="grid2" style="margin-top:12px">
+      <div class="field"><label>Your name</label><input id="wl-name"></div>
+      <div class="field"><label>Email or WhatsApp number</label><input id="wl-contact" placeholder="+44... or you@email.com"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Where is your property?</label><input id="wl-where" placeholder="Portmore, Kingston, or elsewhere"></div>
+      <div class="field"><label>What will you need first?</label>
+        <select id="wl-need"><option>Repairs or maintenance</option><option>A renovation</option><option>Regular property checks</option><option>Help with a contractor I already have</option><option>I am a tradesperson wanting work</option><option>Not sure yet</option></select>
+      </div>
+    </div>
+    <a class="btn" onclick="joinWaitlist()">Join the waiting list</a>
+    <p class="note">We contact you when we open in your area. No spam, no payment, and you can ask to be removed at any time.</p>
+    <div id="wl-status"></div>
+  </div>
+
   <div class="kick" id="feedback">Tell us how to make this better</div>
   <div class="card"><h3>Your honest <em>opinion</em></h3>
     <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Yaadly is new and built in the open. If something confused you, felt missing, or made you hesitate, say it plainly. Every answer is read by the founder and shapes what gets built next. No name needed.</p>
@@ -387,6 +406,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <button class="tab" data-at="workers" onclick="adminTab('workers')">Workers</button>
       <button class="tab" data-at="apps" onclick="adminTab('apps')">Applications</button>
       <button class="tab" data-at="market" onclick="adminTab('market')">Marketplace</button>
+      <button class="tab" data-at="waitlist" onclick="adminTab('waitlist')">Waiting list <span id="wl-n"></span></button>
       <button class="tab" data-at="feedback" onclick="adminTab('feedback')">Feedback <span id="fb-n"></span></button>
     </div>
     <div id="at-intake" style="display:none"></div>
@@ -395,6 +415,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
     <div id="at-workers" style="display:none"></div>
     <div id="at-apps" style="display:none"></div>
     <div id="at-market" style="display:none"></div>
+    <div id="at-waitlist" style="display:none"></div>
     <div id="at-feedback" style="display:none"></div>
     <div id="admin-detail"></div>
     <div class="rule">⚖️ <b>The governing rule holds here:</b> the agents draft and flag. Only you confirm a payout, and only after you have actually paid.</div>
@@ -442,11 +463,17 @@ async function cloudLogin(){
 async function cloudPull(){
   if(!sb || !cloudOn) return;
   try{
-    const [ri, ra, rf] = await Promise.all([
+    const [ri, ra, rf, rw] = await Promise.all([
       sb.from("intakes").select("*").order("created_at"),
       sb.from("applications").select("*").order("created_at"),
-      sb.from("feedback").select("*").order("created_at")
+      sb.from("feedback").select("*").order("created_at"),
+      sb.from("waitlist").select("*").order("created_at")
     ]);
+    (rw.data||[]).forEach(row=>{
+      if(DB.waitlist.some(x=>x.cid===row.id)) return;
+      DB.waitlist.push({ id:"WL-C"+String(DB.wlSeq++).padStart(3,"0"), cid:row.id,
+        when:(row.created_at||"").slice(0,10), name:row.name, contact:row.contact, where:row.place, need:row.need });
+    });
     (rf.data||[]).forEach(row=>{
       if(DB.feedback.some(x=>x.cid===row.id)) return;
       DB.feedback.push({ id:"FB-C"+String(DB.fbSeq++).padStart(3,"0"), cid:row.id,
@@ -531,9 +558,10 @@ const DB_KEY = "yaadly-platform-v1";
 let DB = load();
 function load(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)) || seed(); }catch(e){ return seed(); } }
 function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ alert("Browser storage is full, mostly photos. Press Backup data to save everything to a file, then remove photos from old completed jobs."); } schedulePush(); }
-function seed(){ return { jobs:[], services:[], workers:[], applications:[], intakes:[], feedback:[], seq:1, svcSeq:1, inSeq:1, fbSeq:1 }; }
+function seed(){ return { jobs:[], services:[], workers:[], applications:[], intakes:[], feedback:[], waitlist:[], seq:1, svcSeq:1, inSeq:1, fbSeq:1, wlSeq:1 }; }
 DB.intakes = DB.intakes || []; DB.inSeq = DB.inSeq || 1;
 DB.feedback = DB.feedback || []; DB.fbSeq = DB.fbSeq || 1;
+DB.waitlist = DB.waitlist || []; DB.wlSeq = DB.wlSeq || 1;
 function exportData(){
   const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -601,9 +629,19 @@ function submitIntake(){
   pendingPhotos = []; $("in-thumbs").innerHTML="";
   DB.intakes.push(it); save();
   if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, place:it.where, addr:it.addr, access:it.access, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
-  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.</div>';
+  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.<br><br>The full managed job service opens shortly in the Kingston metro. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
   window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nAddress: "+(it.addr||"not given")+"\nParish or area: "+(it.where||"not given")+"\nAccess contact: "+(it.access||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
   ["in-name","in-phone","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
+}
+function joinWaitlist(){
+  const g = id => ($(id).value||"").trim();
+  if(!g("wl-name") || !g("wl-contact")){ alert("Name and a way to reach you are needed."); return; }
+  const w = { id:"WL-"+String(DB.wlSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
+    name:g("wl-name"), contact:g("wl-contact"), where:g("wl-where"), need:$("wl-need").value };
+  DB.waitlist.push(w); save();
+  if(sb) sb.from("waitlist").insert({name:w.name, contact:w.contact, place:w.where, need:w.need}).then(r=>{ if(r.error) console.warn("waitlist cloud:", r.error.message); });
+  $("wl-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>You are on the list, '+esc(w.name)+'.</b> We will contact you as soon as we open in '+esc(w.where||"your area")+'. Nothing to pay, and nothing happens without your say so.</div>';
+  ["wl-name","wl-contact","wl-where"].forEach(i=>$(i).value="");
 }
 let fbRate = 0;
 function setRate(v){
@@ -716,7 +754,7 @@ function clientDetail(id){
     '<label class="filebtn" style="margin-top:6px">📷 Add site photos<input type="file" multiple accept="image/*" onchange="clientUpload(event,\''+j.id+'\')"></label>'+
     '<div class="kick">Evidence</div>'+gal+
     '<div class="kick">Money</div><div class="mono" style="margin-top:4px">Your payment is held and released only when you approve the evidence.</div>'+
-    (stage===0 && j.payLink ? '<a class="btn" style="margin-top:12px" target="_blank" rel="noopener" href="'+esc(j.payLink)+'">💳 Pay securely →</a><p class="note">Secure checkout hosted by Stripe. Your worker starts once the payment is held.</p>' : "")+
+    (stage===0 ? '<p class="note">Yaadly is not taking payments online yet. Your quote and payment arrangements are agreed with you directly, in writing, before any work starts.</p>' : "")+
     (stage===4 && !j.review ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+": I have reviewed the evidence and I APPROVE. Please release payment to the worker.")+'">✓ Approve and release</a><a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": I have a question before I approve. ")+'">Raise a question</a></div><p class="note">Approving opens a WhatsApp message from you to Yaadly confirming release. A person actions it: the AI never releases money.</p>' : "")+
     '</div>';
   D.scrollIntoView({behavior:"smooth"});
@@ -781,7 +819,7 @@ function adminUnlock(){
   else alert("Wrong passcode.");
 }
 function adminTab(t){
-  ["intake","jobs","services","workers","apps","market","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
+  ["intake","jobs","services","workers","apps","market","waitlist","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
   document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
   $("admin-detail").innerHTML="";
 }
@@ -857,6 +895,20 @@ function renderAdmin(){
   M.innerHTML = '<p class="note" style="margin-top:12px">The marketplace is managed: workers see open jobs by invitation and quote free. Quotes come to you, never to the client. Shortlists cap at five.</p>';
   M.innerHTML += open.length ? "" : '<div class="empty">No jobs open for quotes. Open one inside a job.</div>';
   open.forEach(j=>{ const d=document.createElement("div"); d.className="jrow"; d.innerHTML='<div class="l"><b>'+esc(j.id)+' · '+esc(j.title)+'</b><small>open for quotes</small></div>'; d.onclick=()=>editJob(j.id); M.appendChild(d); });
+  const WL = $("at-waitlist");
+  const wl = (DB.waitlist||[]).slice().reverse();
+  $("wl-n").textContent = wl.length ? "· "+wl.length : "";
+  WL.innerHTML = wl.length
+    ? '<div class="rule" style="margin-top:12px">📋 <b>'+wl.length+' people waiting.</b> These are your first calls the day you open. Message them personally, never in bulk.</div>'
+    : '<div class="empty">Nobody on the list yet. The sign up sits near the bottom of your website, and every request confirmation points to it.</div>';
+  wl.forEach(w=>{
+    const digits = (w.contact||"").replace(/[^0-9]/g,"");
+    const isPhone = /^[0-9+ ()-]+$/.test(w.contact||"") && digits.length>=8;
+    const d = document.createElement("div"); d.className="jrow";
+    d.innerHTML='<div class="l"><b>'+esc(w.name)+' · '+esc(w.need||"")+'</b><small>'+esc(w.where||"area not given")+' · '+esc(w.contact)+' · joined '+esc(w.when||"")+'</small></div>'+
+      (isPhone?'<a class="btn o sm" target="_blank" rel="noopener" href="https://wa.me/'+digits+'">WhatsApp →</a>':'<a class="btn o sm" href="mailto:'+esc(w.contact)+'">Email →</a>');
+    WL.appendChild(d);
+  });
   const F = $("at-feedback");
   const fbs = (DB.feedback||[]).slice().reverse();
   const rated = fbs.filter(f=>f.rating);
