@@ -127,6 +127,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 .svc{border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--panel2)}
 .svc h4{font-size:15.5px;margin-bottom:6px}
 .svc p{font-size:13px;color:var(--mute)}
+.svc .price{font-family:var(--disp);font-size:19px;color:var(--mango);margin-bottom:8px;letter-spacing:.02em}
 .svc .btn{margin-top:12px}
 .loop-row{display:grid;grid-template-columns:60px 1fr;gap:14px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
 .loop-row .no{font-family:var(--disp);font-size:30px;color:var(--tealb)}
@@ -179,7 +180,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 
   <div class="kick" id="startform">Start your job right here</div>
   <div class="card"><h3>Tell us what <em>needs doing</em></h3>
-    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Prefer WhatsApp? Use the button at the top. This form does the same thing: it reaches Yaadly directly and we reply the same day with next steps. No obligation, no payment now.</p>
+    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Prefer WhatsApp? Use the button at the top. This form does the same thing: it reaches Yaadly directly and we reply within 24 hours with next steps. No obligation, no payment now.</p>
     <div class="grid2" style="margin-top:12px">
       <div class="field"><label>Your name</label><input id="in-name"></div>
       <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
@@ -206,20 +207,18 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       </div>
     </div>
     <a class="btn" onclick="submitIntake()">Send my request →</a>
-    <p class="note">Sending opens a WhatsApp message to Yaadly with your details so nothing gets lost, and logs your request for our intake. You will hear back the same day.</p>
+    <p class="note">Sending opens a WhatsApp message to Yaadly with your details so nothing gets lost, and logs your request for our intake. You will hear back within 24 hours.</p>
     <div id="in-status"></div>
   </div>
 
   <div class="kick" id="svc">Professional services</div>
   <p class="lead" style="margin-top:0">Delivered personally by Yaadly's founder, a construction project manager with 7+ years managing London projects. As the network grows, delivered by vetted professionals.</p>
   <div class="grid3" style="margin-top:14px">
-    <div class="svc"><h4>Deposit Protection Check</h4><p>An independent review of a contractor's quote and deal terms before any money moves, benchmarked against real costs. Written report, clear recommendation.</p><a class="btn sm" onclick="requestService('Deposit Protection Check')">Request this service</a></div>
-    <div class="svc"><h4>Project Setup Pack</h4><p>Scope, milestones and a staged payment structure put in writing before work starts. The paperwork that protects both sides.</p><a class="btn sm" onclick="requestService('Project Setup Pack')">Request this service</a></div>
-    <div class="svc"><h4>Oversight Retainer</h4><p>Ongoing independent monitoring of an active job: site visits, photo and video reporting, contractor accountability.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request this service</a></div>
-    <div class="svc"><h4>Contractor Sourcing</h4><p>We find, vet and shortlist the right contractor for your project. You choose from up to five, or ask us to choose.</p><a class="btn sm" onclick="requestService('Contractor Sourcing')">Request this service</a></div>
-    <div class="svc"><h4>Full Project Management</h4><p>End to end management of a build or renovation, from scope to handover, with evidence at every stage.</p><a class="btn sm" onclick="requestService('Full Project Management')">Request this service</a></div>
-    <div class="svc"><h4>Property Care visits</h4><p>Scheduled walkthroughs with a photo report after each visit: leaks, locks, storm readiness. Weekly, fortnightly or monthly.</p><a class="btn sm" onclick="requestService('Property Care')">Request this service</a></div>
+    <div class="svc"><h4>Deposit Protection Check</h4><p class="price">from £149</p><p>An independent review of a contractor's quote and deal terms before any money moves, benchmarked against real costs. Written report, clear recommendation.</p><a class="btn sm" onclick="requestService('Deposit Protection Check')">Request a quote</a></div>
+    <div class="svc"><h4>Project Setup Pack</h4><p class="price">from £399</p><p>Scope, milestones and a staged payment structure put in writing before work starts. The paperwork that protects both sides.</p><a class="btn sm" onclick="requestService('Project Setup Pack')">Request a quote</a></div>
+    <div class="svc"><h4>Oversight Retainer</h4><p class="price">from £350 a month</p><p>Ongoing independent monitoring of an active job: site visits, photo and video reporting, contractor accountability.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request a quote</a></div>
   </div>
+  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px">Every service is quoted in writing before anything begins, and the price is confirmed with you first. Larger renovations, contractor sourcing and ongoing property care are assessed case by case: <b>just ask</b>.</p>
 
   <div class="kick">Two sides, one deal</div>
   <div class="grid2">
@@ -244,10 +243,10 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   </div>
 
   <div class="kick">Questions, answered straight</div>
-  <details class="faq"><summary>How do I start a job?</summary><div class="a">Message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English. We reply the same day with next steps. No app to download, no forms to fight.</div></details>
+  <details class="faq"><summary>How do I start a job?</summary><div class="a">Message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English. We reply within 24 hours with next steps. No app to download, no forms to fight.</div></details>
   <details class="faq"><summary>Where do you operate?</summary><div class="a">We are launching in the Kingston metro first, <b>Kingston and Portmore</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Outside the metro today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
   <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so.</div></details>
-  <details class="faq"><summary>What does it cost?</summary><div class="a">Every job gets a written quote benchmarked against real material costs and real day rates, and our fee is confirmed in that quote <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client in London pays what a client in Portmore pays.</div></details>
+  <details class="faq"><summary>What does it cost?</summary><div class="a">Professional services start at <b>£149</b> for a Deposit Protection Check, <b>£399</b> for a Project Setup Pack and <b>£350 a month</b> for an Oversight Retainer, each quoted in writing once we know the job. Property work gets a written quote benchmarked against real material costs and real day rates, with everything confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client in London pays what a client in Portmore pays.</div></details>
   <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are <b>free</b> and reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
   <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
   <details class="faq"><summary>How are workers vetted?</summary><div class="a">Every worker passes ID checks, reference calls, a portfolio review and a trial job before their first client. Certified professionals have their certification verified with the issuing body. Yaadly reviews every application personally.</div></details>
@@ -542,12 +541,12 @@ function submitIntake(){
   pendingPhotos = []; $("in-thumbs").innerHTML="";
   DB.intakes.push(it); save();
   if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, place:it.where, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
-  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies the same day on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.</div>';
+  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.</div>';
   window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nProperty: "+(it.where||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
   ["in-name","in-phone","in-where","in-desc"].forEach(i=>$(i).value="");
 }
 function requestService(name){
-  window.open(wa("Hello Yaadly, I would like to request the service: " + name + ". My property is in: ____. Details: ____."), "_blank", "noopener");
+  window.open(wa("Hello Yaadly, I would like a quote for: " + name + ". My property is in: ____. Details: ____."), "_blank", "noopener");
 }
 /* ───────────── agents (rule based, never decide) ───────────── */
 function pricingAgent(text){
@@ -581,7 +580,7 @@ function verifyAgent(job){
 function renderClient(){
   const L = $("client-list"), D = $("client-detail"); D.innerHTML = "";
   if(!DB.jobs.length && !DB.services.length){
-    L.innerHTML = '<div class="empty">No jobs yet. <b>Start your first job on WhatsApp</b>, we reply the same day.<br><br><a class="btn sm" href="'+$("site-start").href+'" target="_blank" rel="noopener">Start your job →</a></div>';
+    L.innerHTML = '<div class="empty">No jobs yet. <b>Start your first job on WhatsApp</b>, we reply within 24 hours.<br><br><a class="btn sm" href="'+$("site-start").href+'" target="_blank" rel="noopener">Start your job →</a></div>';
     return;
   }
   L.innerHTML = "";
