@@ -190,12 +190,16 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
     </div>
     <div class="grid2">
-      <div class="field"><label>Where is the property?</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
+      <div class="field"><label>Property address, street and town</label><input id="in-addr" placeholder="e.g. 12 Gregory Park Road, Gregory Park"></div>
+      <div class="field"><label>Parish or area</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Who is at the property, name and number</label><input id="in-access" placeholder="e.g. my aunt Sonia, 876 555 0100"></div>
       <div class="field"><label>Type of work</label>
         <select id="in-type"><option>Plumbing</option><option>Painting</option><option>Roofing</option><option>Tiling</option><option>Masonry and walls</option><option>Electrical</option><option>Carpentry</option><option>General repairs</option><option>Renovation project</option><option>Professional service</option><option>Something else</option></select>
       </div>
     </div>
-    <div class="field"><label>What needs doing, in your own words</label><textarea id="in-desc" placeholder="Describe the job. Voice notes can follow on WhatsApp."></textarea></div>
+    <div class="field"><label>What needs doing, as exactly as you can</label><textarea id="in-desc" placeholder="Which rooms or areas, what is wrong, roughly what size. Anything already tried or quoted. Voice notes can follow on WhatsApp."></textarea></div>
     <div class="field"><label>Photos of the problem</label>
       <label class="filebtn">📷 Add photos<input type="file" multiple accept="image/*" onchange="intakePhotos(event)"></label>
       <span class="note" style="margin-left:10px">Up to 8. Phone photos are fine, we shrink them automatically.</span>
@@ -453,7 +457,7 @@ async function cloudPull(){
       if(DB.intakes.some(x=>x.cid===row.id)) return;
       DB.intakes.push({ id:"REQ-C"+String(DB.inSeq++).padStart(3,"0"), cid:row.id,
         when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, where:row.place,
-        type:row.work_type, desc:row.descr, urgency:row.urgency, loc:row.loc,
+        addr:row.addr, access:row.access, type:row.work_type, desc:row.descr, urgency:row.urgency, loc:row.loc,
         photos:row.photos||[], status:row.status||"new" });
     });
     (ra.data||[]).forEach(row=>{
@@ -562,8 +566,22 @@ function go(v){
   renderAll();
 }
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
-$("foot-wa").href = wa("Hello Yaadly.");
-$("site-start").href = wa("Hello Yaadly, I would like to start a job. The property is in: ____. What needs doing: ____. I can send photos.");
+$("foot-wa").href = wa("Hello Yaadly, I have a question about:");
+const JOB_TEMPLATE = [
+  "Hello Yaadly, I would like to start a job. Here are my details:",
+  "",
+  "1. My name:",
+  "2. Property address (street and town):",
+  "3. Parish or area:",
+  "4. Who is at the property (name and number for access):",
+  "5. What needs doing (be as exact as you can):",
+  "6. When you want it done (a date, or as soon as possible):",
+  "7. Are you overseas or in Jamaica:",
+  "8. Anything already tried or quoted:",
+  "",
+  "I will send photos of the area in this chat."
+].join("\n");
+$("site-start").href = wa(JOB_TEMPLATE);
 function startJob(){ window.open($("site-start").href, "_blank", "noopener"); }
 /* photo handling: shrink to max 1280px JPEG so they fit browser storage */
 function shrink(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>{ const im=new Image(); im.onload=()=>{ const M=1280, sc=Math.min(1, M/Math.max(im.width,im.height)); const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc); c.getContext("2d").drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",.72)); }; im.src=r.result; }; r.readAsDataURL(file); }); }
@@ -577,15 +595,15 @@ function submitIntake(){
   const g = id => ($(id).value||"").trim();
   if(!g("in-name") || !g("in-phone") || !g("in-desc")){ alert("Name, WhatsApp number and a description are needed."); return; }
   const it = { id:"REQ-"+String(DB.inSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
-    name:g("in-name"), phone:g("in-phone"), where:g("in-where"), type:$("in-type").value,
+    name:g("in-name"), phone:g("in-phone"), where:g("in-where"), addr:g("in-addr"), access:g("in-access"), type:$("in-type").value,
     desc:g("in-desc"), urgency:($("in-date").value ? "Wanted by "+$("in-date").value : "As soon as possible"), loc:$("in-loc").value, status:"new",
     photos:pendingPhotos };
   pendingPhotos = []; $("in-thumbs").innerHTML="";
   DB.intakes.push(it); save();
-  if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, place:it.where, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
+  if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, place:it.where, addr:it.addr, access:it.access, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
   $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.</div>';
-  window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nProperty: "+(it.where||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
-  ["in-name","in-phone","in-where","in-desc"].forEach(i=>$(i).value="");
+  window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nAddress: "+(it.addr||"not given")+"\nParish or area: "+(it.where||"not given")+"\nAccess contact: "+(it.access||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
+  ["in-name","in-phone","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
 }
 let fbRate = 0;
 function setRate(v){
@@ -605,7 +623,20 @@ function submitFeedback(){
   setRate(0); fbRate = 0;
 }
 function requestService(name){
-  window.open(wa("Hello Yaadly, I would like a quote for: " + name + ". My property is in: ____. Details: ____."), "_blank", "noopener");
+  const msg = [
+    "Hello Yaadly, I would like a quote for: " + name + ".",
+    "",
+    "1. My name:",
+    "2. Property address (street and town):",
+    "3. Parish or area:",
+    "4. What I need help with (be as exact as you can):",
+    "5. Stage of the project (planning, quote received, work started, work gone wrong):",
+    "6. When I need it by:",
+    "7. Are you overseas or in Jamaica:",
+    "",
+    "I can send any quotes, photos or documents in this chat."
+  ].join("\n");
+  window.open(wa(msg), "_blank", "noopener");
 }
 /* ───────────── agents (rule based, never decide) ───────────── */
 function pricingAgent(text){
@@ -768,7 +799,7 @@ function renderAdmin(){
   fresh.forEach(it=>{
     const d = document.createElement("div"); d.className="card";
     d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>'+esc(it.type)+' <em>'+esc(it.id)+'</em></h3><span class="pill hold">'+esc(it.when)+' · '+esc(it.urgency)+'</span></div>'+
-      '<p style="font-size:13px;color:var(--mute)">'+esc(it.name)+' · WhatsApp '+esc(it.phone)+' · property: '+esc(it.where||"not given")+' · client is '+esc(it.loc)+'</p>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(it.name)+' · WhatsApp '+esc(it.phone)+' · '+esc(it.addr||"address not given")+' · '+esc(it.where||"parish not given")+' · access: '+esc(it.access||"not given")+' · client is '+esc(it.loc)+'</p>'+
       '<p style="font-size:13.5px;color:var(--mute);white-space:pre-wrap">'+esc(it.desc)+'</p>'+
       ((it.photos||[]).length?'<div class="thumbs">'+it.photos.map(p=>'<img src="'+p+'" alt="client photo">').join("")+'</div>':'')+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
@@ -851,7 +882,7 @@ function intakeToJob(id){
   const it = DB.intakes.find(x=>x.id===id); if(!it) return;
   const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
   DB.jobs.push({id:jid, title:it.type, parish:it.where||"", client:it.name,
-    desc:it.desc+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+" · WhatsApp "+it.phone+")",
+    desc:it.desc+"\n\nAddress: "+(it.addr||"not given")+"\nAccess contact: "+(it.access||"not given")+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+" · WhatsApp "+it.phone+")",
     stage:0, evidence:(it.photos||[]).map((p,n)=>({label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:p})), worker:{}, shortlist:[], open:false});
   it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid);
 }
