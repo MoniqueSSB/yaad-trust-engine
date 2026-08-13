@@ -1,2 +1,8 @@
 openai>=1.40
 pytest>=8.0
+
+# Observability (OpenTelemetry). The engine no-ops without these, but they
+# are first-class dependencies: spans, counter and duration histogram live in
+# yaad/telemetry.py, and openai-v2 auto-instrumentation covers the live path.
+opentelemetry-sdk>=1.30
+opentelemetry-instrumentation-openai-v2>=2.0
