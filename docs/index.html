@@ -132,6 +132,9 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 .rbtn{font:inherit;font-size:15px;font-weight:700;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--mute);cursor:pointer;transition:.15s}
 .rbtn:hover{border-color:var(--teal);color:var(--tealb)}
 .rbtn.on{background:var(--grad);border-color:transparent;color:#04211D}
+.slots{display:flex;gap:8px;flex-wrap:wrap}
+.slot{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--mute);background:var(--panel2);border:1px solid var(--line);border-radius:100px;padding:8px 14px;cursor:pointer}
+.slot input{width:auto;margin:0}
 .svc .btn{margin-top:12px}
 .loop-row{display:grid;grid-template-columns:60px 1fr;gap:14px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
 .loop-row .no{font-family:var(--disp);font-size:30px;color:var(--tealb)}
@@ -222,6 +225,18 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <div class="kick" id="svc">Professional services</div>
   <p class="lead" style="margin-top:0">Delivered personally by Yaadly's founder, a construction project manager with 7+ years managing London projects. As the network grows, delivered by vetted professionals.</p>
   <div class="grid3" style="margin-top:14px">
+    <div class="svc"><h4>Property Check In</h4><p class="price">£149 · one off</p><p>A straightforward visual check of your property by our person on the ground, with a written report. No technical assessment, no verdict on building work: just honest eyes on the place and proof of what is there.</p>
+      <div class="kick" style="margin-top:12px;font-size:10px">What you get</div>
+      <ul class="check" style="margin-bottom:12px">
+        <li>An attended visit by our person, dated and location stamped</li>
+        <li>Photos of the property inside and out, to a set list you approve</li>
+        <li>A short video walkthrough</li>
+        <li>A written report: is it secure, is anyone there, obvious damage, overgrowth, water or storm signs</li>
+        <li>Anything that looks wrong flagged plainly, with photos</li>
+      </ul>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="https://buy.stripe.com/cNi28k6Nm7alaGw5nv9Zm04" target="_blank" rel="noopener">Book and pay £149</a><a class="btn o sm" onclick="document.getElementById('book').scrollIntoView()">Book a call first</a></div>
+      <p class="note">A visual check by a trusted person, not a construction assessment. If you need a project manager's verdict on building work, choose the Site Verification Visit.</p>
+    </div>
     <div class="svc"><h4>Site Verification Visit</h4><p class="price">£249 · one off</p><p>Independent proof of what is actually happening at your property, documented by a construction project manager rather than taken on a contractor's word.</p>
       <div class="kick" style="margin-top:12px;font-size:10px">What you get</div>
       <ul class="check" style="margin-bottom:12px">
@@ -233,7 +248,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
         <li>A written verdict within 3 working days, in plain English</li>
         <li>Clear recommended next steps, and what they should reasonably cost</li>
       </ul>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="https://buy.stripe.com/4gM6oAef02U57uk2bj9Zm03" target="_blank" rel="noopener">Book and pay £249</a><a class="btn o sm" onclick="requestService('Site Verification Visit')">Ask first</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="https://buy.stripe.com/4gM6oAef02U57uk2bj9Zm03" target="_blank" rel="noopener">Book and pay £249</a><a class="btn o sm" onclick="requestService('Site Verification Visit')">Book a call first</a></div>
       <p class="note">Return visit to check work has been put right: £99.</p>
     </div>
     <div class="svc"><h4>Oversight Retainer</h4><p class="price">£695 a month<br><span style="font-size:12px;color:var(--mute)">weekly site visits</span></p><p>Independent eyes on an active build every week, so money only moves when the work is genuinely done. Cancel any time with one month's notice.</p>
@@ -249,7 +264,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
         <li>A WhatsApp line to us, answered within 24 hours</li>
         <li>A monthly written report you can forward to family or a lender</li>
       </ul>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="https://buy.stripe.com/9B6cMY6Nm2U59Cs17f9Zm02" target="_blank" rel="noopener">Start · £695 a month</a><a class="btn o sm" onclick="requestService('Oversight Retainer')">Ask first</a></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" href="https://buy.stripe.com/9B6cMY6Nm2U59Cs17f9Zm02" target="_blank" rel="noopener">Start · £695 a month</a><a class="btn o sm" onclick="requestService('Oversight Retainer')">Book a call first</a></div>
       <p class="note">We work from the contract, payment schedule and receipts you and your contractor provide. If none exists yet, we help you put one in place first.</p>
     </div>
     <div class="svc"><h4>Full Project Management</h4><p class="price">12% of build cost<br><span style="font-size:12px;color:var(--mute)">minimum fee £2,500</span></p><p>Your whole build run for you, start to keys. UK residential project management is 15 to 20 percent; ours is 12.</p>
@@ -268,7 +283,16 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <p class="note">Our fee only. Materials, labour, statutory fees and detailed cost estimation (quantity surveying) are separate and paid to the people doing that work.</p>
     </div>
   </div>
-  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px">Card payments are handled securely by Stripe. Not sure yet? Press <b>Ask first</b> and we scope it with you before you pay a penny. Larger projects are invoiced from Yaadly Ltd against agreed stages, so you never pay for work before it is scoped.</p>
+  <div class="card" style="border-color:var(--softline);margin-top:14px">
+    <h3>Need something <em>different?</em></h3>
+    <p style="font-size:14px;color:var(--mute)">Not everything fits a package. A one off inspection before you buy, a dispute with a contractor already underway, a family property nobody has checked in years, a build in a parish we have not named, or a scope somewhere between the services above. Tell us what you need and we price it properly.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <a class="btn sm" onclick="document.getElementById('book').scrollIntoView()">Book a call about a custom job</a>
+      <a class="btn o sm" onclick="requestService('A custom job, described below')">Message us on WhatsApp</a>
+    </div>
+    <p class="note">Custom work is quoted in writing after the call. Nothing is charged until you have agreed the scope and the price.</p>
+  </div>
+  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px">Card payments are handled securely by Stripe. Want to talk first? Press <b>Book a call first</b> and we scope it with you before you pay a penny. A call is optional: if you and your worker have already agreed the job, book the service directly. Larger projects are invoiced from Yaadly Ltd against agreed stages, so you never pay for work before it is scoped.</p>
 
   <div class="kick">Two sides, one deal</div>
   <div class="grid2">
@@ -302,6 +326,37 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <details class="faq"><summary>How are workers vetted?</summary><div class="a">Every worker passes ID checks, reference calls, a portfolio review and a trial job before their first client. Certified professionals have their certification verified with the issuing body. Yaadly reviews every application personally.</div></details>
   <details class="faq"><summary>I am a tradesperson. What does it cost to join?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. You are paid fast once the client approves, and every completed job builds a record you own.</div></details>
   <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
+
+  <div class="kick" id="book">Talk to us first</div>
+  <div class="card">
+    <h3>Book a free call <em>before you pay</em></h3>
+    <p class="note" style="margin-top:0;font-size:13.5px;color:var(--mute)">A conversation first means the scope is agreed properly and you know exactly what you are buying. <b>15 minutes</b> for a Site Verification Visit, <b>30 minutes</b> for a retainer, full project management or a custom quote. No charge, no obligation, and no advice is invoiced until you have said yes to a written scope.<br><br><b>A call is optional, not required.</b> If you already know what you need, or you and your worker have agreed the job between you and simply want it documented and overseen properly, go straight to the service and we pick it up from there.</p>
+    <div class="grid2" style="margin-top:12px">
+      <div class="field"><label>Your name</label><input id="bk-name"></div>
+      <div class="field"><label>Email or WhatsApp number</label><input id="bk-contact" placeholder="+44... or you@email.com"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>What do you want to talk about?</label>
+        <select id="bk-svc"><option>Site Verification Visit (15 min)</option><option>Oversight Retainer (30 min)</option><option>Full Project Management (30 min)</option><option>A custom quote or something else (30 min)</option></select>
+      </div>
+      <div class="field"><label>Where are you calling from?</label>
+        <select id="bk-tz"><option>UK</option><option>Jamaica</option><option>US East (New York, Florida)</option><option>US other</option><option>Canada</option><option>Elsewhere</option></select>
+      </div>
+    </div>
+    <div class="field"><label>When suits you? Tick all that work</label>
+      <div class="slots">
+        <label class="slot"><input type="checkbox" value="Weekday mornings"> Weekday mornings</label>
+        <label class="slot"><input type="checkbox" value="Weekday afternoons"> Weekday afternoons</label>
+        <label class="slot"><input type="checkbox" value="Weekday evenings"> Weekday evenings</label>
+        <label class="slot"><input type="checkbox" value="Saturday"> Saturday</label>
+        <label class="slot"><input type="checkbox" value="Sunday"> Sunday</label>
+      </div>
+    </div>
+    <div class="field"><label>Anything we should know before the call?</label><textarea id="bk-note" placeholder="Where the property is, what stage it is at, what is worrying you."></textarea></div>
+    <a class="btn" onclick="bookCall()">Request my call</a>
+    <p class="note">We come back within 24 hours with a time. Calls are on WhatsApp or phone, whichever you prefer.</p>
+    <div id="bk-status"></div>
+  </div>
 
   <div class="kick" id="waitlist">Join the waiting list</div>
   <div class="card">
@@ -448,6 +503,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <button class="tab" data-at="workers" onclick="adminTab('workers')">Workers</button>
       <button class="tab" data-at="apps" onclick="adminTab('apps')">Applications</button>
       <button class="tab" data-at="market" onclick="adminTab('market')">Marketplace</button>
+      <button class="tab" data-at="calls" onclick="adminTab('calls')">Calls <span id="call-n"></span></button>
       <button class="tab" data-at="waitlist" onclick="adminTab('waitlist')">Waiting list <span id="wl-n"></span></button>
       <button class="tab" data-at="feedback" onclick="adminTab('feedback')">Feedback <span id="fb-n"></span></button>
     </div>
@@ -457,6 +513,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
     <div id="at-workers" style="display:none"></div>
     <div id="at-apps" style="display:none"></div>
     <div id="at-market" style="display:none"></div>
+    <div id="at-calls" style="display:none"></div>
     <div id="at-waitlist" style="display:none"></div>
     <div id="at-feedback" style="display:none"></div>
     <div id="admin-detail"></div>
@@ -604,6 +661,7 @@ function seed(){ return { jobs:[], services:[], workers:[], applications:[], int
 DB.intakes = DB.intakes || []; DB.inSeq = DB.inSeq || 1;
 DB.feedback = DB.feedback || []; DB.fbSeq = DB.fbSeq || 1;
 DB.waitlist = DB.waitlist || []; DB.wlSeq = DB.wlSeq || 1;
+DB.calls = DB.calls || []; DB.callSeq = DB.callSeq || 1;
 function exportData(){
   const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -674,6 +732,20 @@ function submitIntake(){
   $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.<br><br>The full managed job service opens shortly in the Kingston metro. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
   window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nAddress: "+(it.addr||"not given")+"\nParish or area: "+(it.where||"not given")+"\nAccess contact: "+(it.access||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
   ["in-name","in-phone","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
+}
+function bookCall(){
+  const g = id => ($(id).value||"").trim();
+  if(!g("bk-name") || !g("bk-contact")){ alert("Name and a way to reach you are needed."); return; }
+  const slots = Array.from(document.querySelectorAll(".slots input:checked")).map(c=>c.value);
+  const c = { id:"CALL-"+String(DB.callSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
+    name:g("bk-name"), contact:g("bk-contact"), svc:$("bk-svc").value, tz:$("bk-tz").value,
+    slots:slots.join(", "), note:g("bk-note"), status:"requested" };
+  DB.calls.push(c); save();
+  if(sb) sb.from("calls").insert({name:c.name, contact:c.contact, svc:c.svc, tz:c.tz, slots:c.slots, note:c.note, status:"requested"}).then(r=>{ if(r.error) console.warn("call cloud:", r.error.message); });
+  $("bk-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Call requested, '+esc(c.name)+'.</b> We come back within 24 hours with a time that works for '+esc(c.tz)+'. Nothing is charged and nothing is booked until you have a written scope you are happy with.</div>';
+  window.open(wa("Hello Yaadly, I would like to book a call.\nName: "+c.name+"\nAbout: "+c.svc+"\nI am in: "+c.tz+"\nGood times: "+(c.slots||"flexible")+(c.note?"\nContext: "+c.note:"")), "_blank", "noopener");
+  ["bk-name","bk-contact","bk-note"].forEach(i=>$(i).value="");
+  document.querySelectorAll(".slots input:checked").forEach(c=>c.checked=false);
 }
 function joinWaitlist(){
   const g = id => ($(id).value||"").trim();
@@ -862,7 +934,7 @@ function adminUnlock(){
   else alert("Wrong passcode.");
 }
 function adminTab(t){
-  ["intake","jobs","services","workers","apps","market","waitlist","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
+  ["intake","jobs","services","workers","apps","market","calls","waitlist","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
   document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
   $("admin-detail").innerHTML="";
 }
@@ -938,6 +1010,26 @@ function renderAdmin(){
   M.innerHTML = '<p class="note" style="margin-top:12px">The marketplace is managed: workers see open jobs by invitation and quote free. Quotes come to you, never to the client. Shortlists cap at five.</p>';
   M.innerHTML += open.length ? "" : '<div class="empty">No jobs open for quotes. Open one inside a job.</div>';
   open.forEach(j=>{ const d=document.createElement("div"); d.className="jrow"; d.innerHTML='<div class="l"><b>'+esc(j.id)+' · '+esc(j.title)+'</b><small>open for quotes</small></div>'; d.onclick=()=>editJob(j.id); M.appendChild(d); });
+  const CL = $("at-calls");
+  const calls = (DB.calls||[]).slice().reverse();
+  const openCalls = calls.filter(c=>c.status!=="done");
+  $("call-n").textContent = openCalls.length ? "· "+openCalls.length : "";
+  CL.innerHTML = calls.length
+    ? '<div class="rule" style="margin-top:12px">📞 <b>'+openCalls.length+' waiting for a time.</b> Reply within 24 hours, that is the promise on the site. Agree the scope on the call, then send the payment link or the quote.</div>'
+    : '<div class="empty">No call requests yet. The booking form sits near the bottom of your website and every service points to it.</div>';
+  calls.forEach(c=>{
+    const digits = (c.contact||"").replace(/[^0-9]/g,"");
+    const isPhone = /^[0-9+ ()-]+$/.test(c.contact||"") && digits.length>=8;
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(c.name)+' <em>'+esc(c.svc||"")+'</em></h3>'+
+      (c.status==="done"?'<span class="pill done">DONE</span>':'<span class="pill gold">NEEDS A TIME</span>')+'</div>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(c.contact)+' · calling from '+esc(c.tz||"")+' · good times: '+esc(c.slots||"flexible")+' · asked '+esc(c.when||"")+'</p>'+
+      (c.note?'<p style="font-size:13.5px;color:var(--ink);white-space:pre-wrap">'+esc(c.note)+'</p>':'')+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+      (isPhone?'<a class="btn o sm" target="_blank" rel="noopener" href="https://wa.me/'+digits+'?text='+encodeURIComponent("Hi "+c.name+", Monique from Yaadly. Thanks for asking for a call about the "+(c.svc||"service")+". Does ")+'">Offer a time →</a>':'<a class="btn o sm" href="mailto:'+esc(c.contact)+'?subject=Your%20Yaadly%20call">Offer a time →</a>')+
+      (c.status==="done"?'':'<a class="btn sm" onclick="callDone(\''+c.id+'\')">Mark done</a>')+'</div>';
+    CL.appendChild(d);
+  });
   const WL = $("at-waitlist");
   const wl = (DB.waitlist||[]).slice().reverse();
   $("wl-n").textContent = wl.length ? "· "+wl.length : "";
@@ -981,6 +1073,7 @@ function intakeToJob(id){
     stage:0, evidence:(it.photos||[]).map((p,n)=>({label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:p})), worker:{}, shortlist:[], open:false});
   it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid);
 }
+function callDone(id){ const c=DB.calls.find(x=>x.id===id); if(c){ c.status="done"; save(); renderAdmin(); } }
 function intakeArchive(id){ const it=DB.intakes.find(x=>x.id===id); it.status="archived"; save(); cloudStatus("intakes", it.cid, "archived"); renderAdmin(); }
 function toggleCheck(id,i){ const a=DB.applications.find(x=>x.id===id); a.checks[i]=!a.checks[i]; save(); renderAdmin(); }
 function approveApp(id,lane){
