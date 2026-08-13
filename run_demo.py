@@ -16,6 +16,7 @@ import sys
 from yaad import benchmarks as bm
 from yaad.agents import intake, pricing, reporting, verification
 from yaad.config import load_config
+from yaad.guardrails import GuardrailViolation
 from yaad.llm import LLMClient
 from yaad.scenarios import SCENARIOS, by_ref
 
@@ -90,7 +91,11 @@ def run_scenario(client: LLMClient, scenario) -> None:
         try:
             verification.release_funds(scenario.ref, 400.0, decided_by="ai")
             print("    ERROR: the guardrail did not fire. This is a bug.")
-        except Exception as exc:  # noqa: BLE001
+        except GuardrailViolation as exc:
+            # Only the guardrail's own exception counts as "blocked as designed".
+            # Anything else (TypeError from a signature change, a bug inside
+            # release_funds) must surface as a real failure, matching what
+            # tests/test_engine.py pins with pytest.raises(GuardrailViolation).
             print(f"    blocked as designed: {exc}")
         approved = verification.release_funds(scenario.ref, 400.0, decided_by="Monique Sewell-Bennett")
         print(f"    with a named human: {approved['status']}")
@@ -117,9 +122,11 @@ def main(argv: list[str]) -> int:
         run_scenario(client, scenario)
 
     print(f"\n{RULE}")
-    live = sum(1 for c in client.calls if c.mode == "live")
-    mock = sum(1 for c in client.calls if c.mode == "mock")
-    print(f"Model calls: {live} live, {mock} mock, across {len(targets)} scenario(s).")
+    counts = client.call_counts
+    print(
+        f"Model calls: {counts.get('live', 0)} live, {counts.get('mock', 0)} mock, "
+        f"{counts.get('error', 0)} failed, across {len(targets)} scenario(s)."
+    )
     print(RULE)
     return 0
 

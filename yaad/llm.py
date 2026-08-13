@@ -15,24 +15,33 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
 from .config import Config, load_config
 
+# The per-call list is an audit trail for a single CLI run, not a metrics
+# store. It is capped so a long-lived client cannot grow it without bound;
+# the authoritative "how many" numbers live in LLMClient.call_counts.
+_MAX_CALL_RECORDS = 200
+
 
 @dataclass
 class CallRecord:
     agent: str
-    mode: str
-    prompt_chars: int
-    response_chars: int
+    mode: str            # "live" | "mock"
+    duration_s: float
+    ok: bool
+    error_type: str | None = None
 
 
 @dataclass
 class LLMClient:
     config: Config = field(default_factory=load_config)
     calls: list[CallRecord] = field(default_factory=list)
+    call_counts: Counter = field(default_factory=Counter)
     _client: Any = None
 
     def __post_init__(self) -> None:
@@ -48,22 +57,33 @@ class LLMClient:
     # ------------------------------------------------------------------ #
 
     def complete(self, agent: str, system: str, user: str) -> str:
-        if self.config.live:
-            text = self._complete_live(system, user)
-            mode = "live"
-        else:
-            text = mock_response(agent, user)
-            mode = "mock"
-        self.calls.append(
-            CallRecord(agent=agent, mode=mode, prompt_chars=len(system) + len(user), response_chars=len(text))
-        )
+        mode = "live" if self.config.live else "mock"
+        started = time.monotonic()
+        try:
+            if self.config.live:
+                text = self._complete_live(agent, system, user)
+            else:
+                text = mock_response(agent, user)
+        except Exception as exc:
+            # Record the failed call (exactly the ones worth investigating),
+            # then re-raise unchanged so callers see what they see today.
+            self._record(agent, mode, time.monotonic() - started, ok=False, error_type=type(exc).__name__)
+            raise
+        self._record(agent, mode, time.monotonic() - started, ok=True)
         return text
+
+    def _record(self, agent: str, mode: str, duration_s: float, ok: bool, error_type: str | None = None) -> None:
+        self.call_counts[mode if ok else "error"] += 1
+        self.call_counts[f"{mode}:{agent}"] += 1
+        self.calls.append(CallRecord(agent=agent, mode=mode, duration_s=duration_s, ok=ok, error_type=error_type))
+        if len(self.calls) > _MAX_CALL_RECORDS:
+            del self.calls[0]
 
     def complete_json(self, agent: str, system: str, user: str) -> dict:
         raw = self.complete(agent, system + "\n\nReturn ONLY valid JSON. No prose, no code fences.", user)
         return _extract_json(raw)
 
-    def _complete_live(self, system: str, user: str) -> str:
+    def _complete_live(self, agent: str, system: str, user: str) -> str:
         response = self._client.chat.completions.create(
             model=self.config.model,
             temperature=self.config.temperature,
@@ -72,6 +92,11 @@ class LLMClient:
                 {"role": "user", "content": user},
             ],
         )
+        if not response.choices:
+            raise RuntimeError(
+                f"Gateway returned no choices for agent {agent!r} "
+                f"(model={self.config.model!r}). Truncated or malformed response."
+            )
         return response.choices[0].message.content or ""
 
 
