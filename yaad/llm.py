@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .config import Config, load_config
+from .telemetry import llm_call_span, record_call
 
 # The per-call list is an audit trail for a single CLI run, not a metrics
 # store. It is capped so a long-lived client cannot grow it without bound;
@@ -59,22 +60,24 @@ class LLMClient:
     def complete(self, agent: str, system: str, user: str) -> str:
         mode = "live" if self.config.live else "mock"
         started = time.monotonic()
-        try:
-            if self.config.live:
-                text = self._complete_live(agent, system, user)
-            else:
-                text = mock_response(agent, user)
-        except Exception as exc:
-            # Record the failed call (exactly the ones worth investigating),
-            # then re-raise unchanged so callers see what they see today.
-            self._record(agent, mode, time.monotonic() - started, ok=False, error_type=type(exc).__name__)
-            raise
+        with llm_call_span(agent, mode, self.config.model):
+            try:
+                if self.config.live:
+                    text = self._complete_live(agent, system, user)
+                else:
+                    text = mock_response(agent, user)
+            except Exception as exc:
+                # Record the failed call (exactly the ones worth investigating),
+                # then re-raise unchanged so callers see what they see today.
+                self._record(agent, mode, time.monotonic() - started, ok=False, error_type=type(exc).__name__)
+                raise
         self._record(agent, mode, time.monotonic() - started, ok=True)
         return text
 
     def _record(self, agent: str, mode: str, duration_s: float, ok: bool, error_type: str | None = None) -> None:
         self.call_counts[mode if ok else "error"] += 1
         self.call_counts[f"{mode}:{agent}"] += 1
+        record_call(agent, mode, duration_s, ok, error_type)
         self.calls.append(CallRecord(agent=agent, mode=mode, duration_s=duration_s, ok=ok, error_type=error_type))
         if len(self.calls) > _MAX_CALL_RECORDS:
             del self.calls[0]
