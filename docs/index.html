@@ -159,7 +159,6 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
     <button class="vbtn" data-v="client" onclick="go('client')">Client portal</button>
     <button class="vbtn" data-v="worker" onclick="go('worker')">Worker portal</button>
-    <button class="vbtn" data-v="admin" onclick="go('admin')">Admin desk</button>
   </div>
 </div></nav>
 
@@ -168,6 +167,10 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <h1 class="hx">Everyone promises <span class="g1">proof.</span><br>Here, money moves <span class="g2">when you see it.</span></h1>
   <p class="lead">Yaadly gets property work done in Jamaica the trust-first way: <b>vetted tradespeople</b>, payment <b>held and released only when you approve the evidence</b>, and <b>fair local pricing</b> wherever you are paying from.</p>
   <div style="display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:8px 16px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);font-size:13px;color:#BDE8DE">📍 <b style="color:var(--ink)">Kingston metro first: Kingston and Portmore.</b>&nbsp;More parishes open as we grow.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+    <div style="display:inline-flex;gap:8px;align-items:center;padding:8px 16px;border-radius:100px;background:rgba(80,200,150,0.12);border:1px solid rgba(80,200,150,0.4);font-size:13px;cursor:pointer" onclick="go('services')">✅ <b style="color:var(--ink)">Available today:</b>&nbsp;Property checks &amp; PM oversight — book directly</div>
+    <div style="display:inline-flex;gap:8px;align-items:center;padding:8px 16px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);font-size:13px;cursor:pointer" onclick="document.getElementById('waitlist').scrollIntoView()">🕓 <b style="color:var(--ink)">Opening shortly:</b>&nbsp;Full vetted-worker matching &amp; escrow — join the waitlist</div>
+  </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px">
     <a class="btn" id="site-start">Start your job on WhatsApp →</a>
     <a class="btn o" onclick="document.getElementById('startform').scrollIntoView()">Or fill the request form</a>
@@ -703,8 +706,13 @@ function go(v){
   $("pane-"+v).classList.add("show");
   document.querySelectorAll(".vbtn").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
   window.scrollTo({top:0});
+  history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
   renderAll();
 }
+(function(){
+  const h = (location.hash||"").replace("#","");
+  if(h && document.getElementById("pane-"+h)) go(h);
+})();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
 $("foot-wa").href = wa("Hello Yaadly, I have a question about:");
 const JOB_TEMPLATE = [
@@ -1224,6 +1232,9 @@ function runVerify(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").inner
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function renderAll(){ renderClient(); renderWorker(); if(adminOpen) renderAdmin(); }
 renderAll();
+</script>
+</body>
+</html>
 </script>
 </body>
 </html>
