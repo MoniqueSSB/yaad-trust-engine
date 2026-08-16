@@ -68,6 +68,8 @@ h1.hx .g2{background:linear-gradient(90deg,#FFB020,#FF6B4A);-webkit-background-c
 .pill.gold{background:#2E2408;color:var(--sand);border:1px solid #4A3A10}
 .pill.done{background:var(--mango);color:#3A2606}
 .pill.rev{background:var(--redsoft);color:var(--red);border:1px solid #542020}
+.pill.ai{background:rgba(45,212,191,0.12);color:var(--tealb);border:1px solid rgba(45,212,191,0.35)}
+.pill.human{background:rgba(255,176,32,0.12);color:var(--mango);border:1px solid rgba(255,176,32,0.35)}
 .field{margin-bottom:12px}
 label{display:block;font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 input,textarea,select{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:11px;background:var(--panel2);color:var(--ink);font:inherit;font-size:14.5px}
@@ -162,6 +164,28 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   </div>
 </div></nav>
 
+<div id="wl-modal" style="display:none;position:fixed;right:16px;bottom:16px;left:16px;z-index:999;max-width:400px;margin-left:auto;box-shadow:0 12px 40px rgba(0,0,0,0.5)">
+  <div class="card" style="position:relative;margin:0">
+    <button onclick="closeWlModal()" aria-label="Close" style="position:absolute;top:12px;right:14px;background:none;border:0;color:var(--mute);font-size:20px;cursor:pointer;line-height:1">✕</button>
+    <h3>Be first when <em>full service opens</em></h3>
+    <p class="note" style="margin-top:0;font-size:13.5px;color:var(--mute)">Yaadly is opening in stages. Professional services are available now — <a onclick="closeWlModal();go('services')" style="color:var(--tealb);cursor:pointer">see them here</a>. The full managed job service, where we match a vetted worker, hold the payment and prove the work with evidence, opens in the Kingston metro shortly. Join the list and you'll be contacted first.</p>
+    <div class="grid2" style="margin-top:12px">
+      <div class="field"><label>Your name</label><input id="wlm-name"></div>
+      <div class="field"><label>Email or WhatsApp number</label><input id="wlm-contact" placeholder="+44... or you@email.com"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Where is your property?</label><input id="wlm-where" placeholder="Portmore, Kingston, or elsewhere"></div>
+      <div class="field"><label>What will you need first?</label>
+        <select id="wlm-need"><option>Repairs or maintenance</option><option>A renovation</option><option>Regular property checks</option><option>Help with a contractor I already have</option><option>I am a tradesperson wanting work</option><option>Not sure yet</option></select>
+      </div>
+    </div>
+    <a class="btn" onclick="joinWaitlistModal()">Join the waiting list</a>
+    <a onclick="closeWlModal()" style="display:block;text-align:center;margin-top:10px;font-size:13px;color:var(--dim);cursor:pointer">Maybe later</a>
+    <p class="note">No spam, no payment, and you can ask to be removed at any time.</p>
+    <div id="wlm-status"></div>
+  </div>
+</div>
+
 <!-- ═══════════════ WEBSITE ═══════════════ -->
 <section class="pane show" id="pane-site"><div class="wrap">
   <h1 class="hx">Everyone promises <span class="g1">proof.</span><br>Here, money moves <span class="g2">when you see it.</span></h1>
@@ -169,7 +193,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <div style="display:inline-flex;gap:8px;align-items:center;margin-top:14px;padding:8px 16px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);font-size:13px;color:#BDE8DE">📍 <b style="color:var(--ink)">Kingston metro first: Kingston and Portmore.</b>&nbsp;More parishes open as we grow.</div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
     <div style="display:inline-flex;gap:8px;align-items:center;padding:8px 16px;border-radius:100px;background:rgba(80,200,150,0.12);border:1px solid rgba(80,200,150,0.4);font-size:13px;cursor:pointer" onclick="go('services')">✅ <b style="color:var(--ink)">Available today:</b>&nbsp;Property checks &amp; PM oversight — book directly</div>
-    <div style="display:inline-flex;gap:8px;align-items:center;padding:8px 16px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);font-size:13px;cursor:pointer" onclick="document.getElementById('waitlist').scrollIntoView()">🕓 <b style="color:var(--ink)">Opening shortly:</b>&nbsp;Full vetted-worker matching &amp; escrow — join the waitlist</div>
+    <div style="display:inline-flex;gap:8px;align-items:center;padding:8px 16px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);font-size:13px;cursor:pointer" onclick="document.getElementById('waitlist').scrollIntoView()">🕓 <b style="color:var(--ink)">Opening shortly:</b>&nbsp;Full vetted-worker matching — join the waitlist</div>
   </div>
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px">
     <a class="btn" id="site-start">Start your job on WhatsApp →</a>
@@ -181,12 +205,12 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 
   <div class="kick">The verified job loop</div>
   <div class="card">
-    <div class="loop-row"><div class="no">01</div><div><h4>Tell us on WhatsApp, or start your job right here</h4><p>Text, photos or a voice note, Patois or English, or use the request form below on this page. No app to download.</p></div></div>
-    <div class="loop-row"><div class="no">02</div><div><h4>Fair price, checked</h4><p>Price bands come from real material costs and real day rates. Where no public price exists in Jamaica, we say so out loud.</p></div></div>
-    <div class="loop-row"><div class="no">03</div><div><h4>Money held</h4><p>Your payment is held and released only when you approve the evidence. The worker knows the money is real before lifting a tool.</p></div></div>
-    <div class="loop-row"><div class="no">04</div><div><h4>Work documented</h4><p>Arrival photos, before and after, video, all timestamped and geotagged.</p></div></div>
-    <div class="loop-row"><div class="no">05</div><div><h4>You approve, from anywhere</h4><p>London, New York, Toronto, Kingston or beyond. Nothing moves until you say so. Free, human-checked disputes.</p></div></div>
-    <div class="loop-row" style="border-bottom:0"><div class="no">06</div><div><h4>Worker paid fast</h4><p>Approved work is paid quickly, and every completed job builds the worker a record they own.</p></div></div>
+    <div class="loop-row"><div class="no">01</div><div><h4>Tell us on WhatsApp, or start your job right here <span class="pill ai">🤖 AI reads it</span></h4><p>Text, photos or a voice note, Patois or English, or use the request form below on this page. No app to download. Our AI Intake Agent turns it into a structured job the moment it lands.</p></div></div>
+    <div class="loop-row"><div class="no">02</div><div><h4>Fair price, checked <span class="pill ai">🤖 AI drafts it</span> <span class="pill human">🧍 We confirm</span></h4><p>Price bands come from real material costs and real day rates. Where no public price exists in Jamaica, we say so out loud. AI proposes the band, a project manager checks it before it reaches you.</p></div></div>
+    <div class="loop-row"><div class="no">03</div><div><h4>Money held <span class="pill human">🧍 You authorise</span></h4><p>Your payment is held and released only when you approve the evidence. The worker knows the money is real before lifting a tool. Nothing is charged without you.</p></div></div>
+    <div class="loop-row"><div class="no">04</div><div><h4>Work documented <span class="pill ai">🤖 AI checks it's complete</span></h4><p>Arrival photos, before and after, video, all timestamped and geotagged. AI checks the evidence set is complete and flags anything missing before it reaches you.</p></div></div>
+    <div class="loop-row"><div class="no">05</div><div><h4>You approve, from anywhere <span class="pill human">🧍 You decide</span></h4><p>London, New York, Toronto, Kingston or beyond. Nothing moves until you say so. Human-checked disputes. AI can draft the summary; only you release the money.</p></div></div>
+    <div class="loop-row" style="border-bottom:0"><div class="no">06</div><div><h4>Worker paid fast <span class="pill human">🧍 Released on your say so</span></h4><p>Approved work is paid quickly, and every completed job builds the worker a record they own.</p></div></div>
   </div>
 
   <div class="kick" id="startform">Start your job right here</div>
@@ -243,7 +267,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
         <li><span class="st pass">✓</span> See the proof before any money moves</li>
         <li><span class="st pass">✓</span> Fair local pricing wherever you pay from</li>
         <li><span class="st pass">✓</span> ID verified tradespeople, police checked where it matters, never a stranger at your gate</li>
-        <li><span class="st pass">✓</span> Free disputes, checked by a person</li>
+        <li><span class="st pass">✓</span> Disputes checked by a person</li>
       </ul>
       <a class="btn" style="margin-top:14px" onclick="startJob()">Start a job</a>
     </div>
@@ -263,7 +287,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <details class="faq"><summary>Where do you operate?</summary><div class="a">We are launching in the Kingston metro first, <b>Kingston and Portmore</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Outside the metro today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
   <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so.</div></details>
   <details class="faq"><summary>What does it cost?</summary><div class="a">A Site Verification Visit is <b>£249</b>, one off, with a return visit at £99. An Oversight Retainer is <b>£695 a month</b> for weekly site visits, cancel any time with one month's notice. Full Project Management is <b>12% of build cost</b> with a minimum fee of £2,500, against a UK residential market rate of 15 to 20 percent. Everything is quoted in writing first: under £1,000 you pay securely by card, larger projects are invoiced against agreed stages. Property work gets a written quote benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client in London pays what a client in Portmore pays.</div></details>
-  <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are <b>free</b> and reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
+  <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
   <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
   <details class="faq"><summary>How are workers vetted? Who is coming to my property?</summary><div class="a">Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address, and a selfie holding that ID so we know the document is theirs. For work inside occupied homes, or any time a client asks, we require a <b>police record check</b> from the Jamaica Constabulary Force. On top of that: references called, past work reviewed, and a trial job before they are trusted with yours. Certified trades have their certification checked with the issuing body. You are told who is coming, and you see their record before they arrive.</div></details>
   <details class="faq"><summary>I am a tradesperson. What does it cost to join, and how do I get paid?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. The client's money is held before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own.</div></details>
@@ -272,61 +296,59 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   <div class="kick" id="book">Talk to us first</div>
   <div class="card">
     <h3>Book a free call <em>before you pay</em></h3>
-    <p class="note" style="margin-top:0;font-size:13.5px;color:var(--mute)">A conversation first means the scope is agreed properly and you know exactly what you are buying. <b>15 minutes</b> for a Site Verification Visit, <b>30 minutes</b> for a retainer, full project management or a custom quote. No charge, no obligation, and no advice is invoiced until you have said yes to a written scope.<br><br><b>A call is optional, not required.</b> If you already know what you need, or you and your worker have agreed the job between you and simply want it documented and overseen properly, go straight to the service and we pick it up from there.</p>
-    <div class="grid2" style="margin-top:12px">
-      <div class="field"><label>Your name</label><input id="bk-name"></div>
-      <div class="field"><label>Email or WhatsApp number</label><input id="bk-contact" placeholder="+44... or you@email.com"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>What do you want to talk about?</label>
-        <select id="bk-svc"><option>Site Verification Visit (15 min)</option><option>Oversight Retainer (30 min)</option><option>Full Project Management (30 min)</option><option>A custom quote or something else (30 min)</option></select>
-      </div>
-      <div class="field"><label>Where are you calling from?</label>
-        <select id="bk-tz"><option>UK</option><option>Jamaica</option><option>US East (New York, Florida)</option><option>US other</option><option>Canada</option><option>Elsewhere</option></select>
-      </div>
-    </div>
-    <div class="field"><label>When suits you? Tick all that work</label>
-      <div class="slots">
-        <label class="slot"><input type="checkbox" value="Weekday mornings"> Weekday mornings</label>
-        <label class="slot"><input type="checkbox" value="Weekday afternoons"> Weekday afternoons</label>
-        <label class="slot"><input type="checkbox" value="Weekday evenings"> Weekday evenings</label>
-        <label class="slot"><input type="checkbox" value="Saturday"> Saturday</label>
-        <label class="slot"><input type="checkbox" value="Sunday"> Sunday</label>
-      </div>
-    </div>
-    <div class="field"><label>Anything we should know before the call?</label><textarea id="bk-note" placeholder="Where the property is, what stage it is at, what is worrying you."></textarea></div>
+    <p class="note" style="margin-top:0;font-size:13.5px;color:var(--mute)">No charge, no obligation. A call is optional — if you already know what you need, go straight to the service and we pick it up from there.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <a class="btn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">📅 Pick a time now · 15 min</a>
       <a class="btn o" href="https://cal.com/yaadly/30min" target="_blank" rel="noopener">📅 Longer conversation · 30 min</a>
     </div>
-    <p class="note" style="margin-bottom:14px">Choosing a slot books it straight into the diary, in your own time zone. Prefer we come back to you instead? Fill the form above and press below.</p>
-    <a class="btn o" onclick="bookCall()">Ask us to suggest a time</a>
-    <p class="note">Either way we come back within 24 hours. Calls are on WhatsApp or phone, whichever you prefer.</p>
-    <div id="bk-status"></div>
+    <a onclick="toggleBox('book-more', this)" data-open-label="Hide ▲" data-closed-label="Or tell us your availability, and we'll suggest a time ▾" style="display:inline-block;margin-top:12px;font-size:13px;color:var(--tealb);cursor:pointer">Or tell us your availability, and we'll suggest a time ▾</a>
+    <div id="book-more" style="display:none;margin-top:14px">
+      <div class="grid2">
+        <div class="field"><label>Your name</label><input id="bk-name"></div>
+        <div class="field"><label>Email or WhatsApp number</label><input id="bk-contact" placeholder="+44... or you@email.com"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>What do you want to talk about?</label>
+          <select id="bk-svc"><option>Site Verification Visit (15 min)</option><option>Oversight Retainer (30 min)</option><option>Full Project Management (30 min)</option><option>A custom quote or something else (30 min)</option></select>
+        </div>
+        <div class="field"><label>Where are you calling from?</label>
+          <select id="bk-tz"><option>UK</option><option>Jamaica</option><option>US East (New York, Florida)</option><option>US other</option><option>Canada</option><option>Elsewhere</option></select>
+        </div>
+      </div>
+      <div class="field"><label>When suits you? Tick all that work</label>
+        <div class="slots">
+          <label class="slot"><input type="checkbox" value="Weekday mornings"> Weekday mornings</label>
+          <label class="slot"><input type="checkbox" value="Weekday afternoons"> Weekday afternoons</label>
+          <label class="slot"><input type="checkbox" value="Weekday evenings"> Weekday evenings</label>
+          <label class="slot"><input type="checkbox" value="Saturday"> Saturday</label>
+          <label class="slot"><input type="checkbox" value="Sunday"> Sunday</label>
+        </div>
+      </div>
+      <div class="field"><label>Anything we should know before the call?</label><textarea id="bk-note" placeholder="Where the property is, what stage it is at, what is worrying you."></textarea></div>
+      <a class="btn o" onclick="bookCall()">Ask us to suggest a time</a>
+      <p class="note">Either way we come back within 24 hours. Calls are on WhatsApp or phone, whichever you prefer.</p>
+      <div id="bk-status"></div>
+    </div>
   </div>
 
   <div class="kick" id="waitlist">Join the waiting list</div>
-  <div class="card">
-    <h3>Be first when <em>full service opens</em></h3>
-    <p class="note" style="margin-top:0;font-size:13.5px;color:var(--mute)">Yaadly is opening in stages. Professional services are available now. The full managed job service, where we match a vetted worker, hold the payment and prove the work with evidence, opens in the Kingston metro shortly. Join the list and you will be contacted first, with no obligation and nothing to pay.</p>
-    <div class="grid2" style="margin-top:12px">
-      <div class="field"><label>Your name</label><input id="wl-name"></div>
-      <div class="field"><label>Email or WhatsApp number</label><input id="wl-contact" placeholder="+44... or you@email.com"></div>
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+    <div>
+      <h3 style="margin-bottom:4px">Be first when <em>full service opens</em></h3>
+      <p class="note" style="margin:0">Professional services are available now. The full managed job service opens in the Kingston metro shortly — no obligation, nothing to pay.</p>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Where is your property?</label><input id="wl-where" placeholder="Portmore, Kingston, or elsewhere"></div>
-      <div class="field"><label>What will you need first?</label>
-        <select id="wl-need"><option>Repairs or maintenance</option><option>A renovation</option><option>Regular property checks</option><option>Help with a contractor I already have</option><option>I am a tradesperson wanting work</option><option>Not sure yet</option></select>
-      </div>
-    </div>
-    <a class="btn" onclick="joinWaitlist()">Join the waiting list</a>
-    <p class="note">We contact you when we open in your area. No spam, no payment, and you can ask to be removed at any time.</p>
-    <div id="wl-status"></div>
+    <a class="btn" onclick="openWlModal()">Join the waiting list</a>
   </div>
 
   <div class="kick" id="feedback">Tell us how to make this better</div>
-  <div class="card"><h3>Your honest <em>opinion</em></h3>
-    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Yaadly is new and built in the open. If something confused you, felt missing, or made you hesitate, say it plainly. Every answer is read by the founder and shapes what gets built next. No name needed.</p>
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+    <div>
+      <h3 style="margin-bottom:4px">Your honest <em>opinion</em></h3>
+      <p class="note" style="margin:0">Yaadly is new and built in the open. If something confused you, felt missing, or made you hesitate, say it plainly. No name needed.</p>
+    </div>
+    <a class="btn o" onclick="openBox('feedback-form')">Give feedback</a>
+  </div>
+  <div id="feedback-form" class="card" style="display:none">
     <div class="field"><label>How much do you trust this so far?</label>
       <div class="rate" id="fb-rate">
         <button type="button" class="rbtn" data-v="1" onclick="setRate(1)">1</button>
@@ -482,8 +504,11 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 <section class="pane" id="pane-admin"><div class="wrap">
   <div id="admin-lock" class="card" style="max-width:420px;margin:40px auto">
     <h3>Admin <em>desk</em></h3>
-    <div class="field"><label>Passcode</label><input id="admin-pin" type="password" placeholder="Set in CONFIG on first run"></div>
-    <a class="btn" onclick="adminUnlock()">Unlock</a>
+    <p class="note" style="margin-top:0">Sign in with your Yaadly account to continue.</p>
+    <div class="field"><label>Email</label><input id="gate-email" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input id="gate-pass" type="password" autocomplete="current-password"></div>
+    <a class="btn" onclick="adminGateLogin()">Sign in</a>
+    <div id="gate-status"></div>
   </div>
   <div id="admin-ui" style="display:none">
     <div class="kick" style="margin-top:20px">Admin desk</div>
@@ -497,12 +522,6 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
         <input type="file" id="imp" style="display:none" accept=".json" onchange="importData(event)">
         <button class="btn sm" onclick="newJob()">+ New job</button>
       </div>
-    </div>
-    <div class="card" id="cloud-login" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-      <div class="field" style="margin:0;flex:2;min-width:180px"><label>Cloud sign in, email</label><input id="cl-email" autocomplete="username"></div>
-      <div class="field" style="margin:0;flex:2;min-width:150px"><label>Password</label><input id="cl-pass" type="password" autocomplete="current-password"></div>
-      <button class="btn sm" onclick="cloudLogin()">Connect cloud</button>
-      <span class="note" style="flex-basis:100%">Signing in pulls form submissions from the online database and keeps a cloud backup of your desk. Skip it to work offline.</span>
     </div>
     <div class="card" style="border-color:var(--softline)">
       <h3>⚡ Start here: type it, <em>AI builds it</em></h3>
@@ -547,7 +566,6 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 /* ─────────────── CONFIG: fill these two in ─────────────── */
 const CONFIG = {
   whatsapp: "447767171858",   // Monique's WhatsApp, international format, digits only
-  adminPin: "yaadly2026",     // change this before anyone else touches this file
   supabaseUrl: "https://leffyisvfvjwzilydlwf.supabase.co",
   supabaseKey: "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz"  // publishable key, safe to be public
 };
@@ -563,16 +581,6 @@ function setCloudBadge(state){
   const el = document.getElementById("cloud-badge"); if(!el) return;
   el.textContent = state==="on"?"● cloud synced":state==="error"?"● cloud error":"○ cloud off";
   el.style.color = state==="on"?"var(--tealb)":state==="error"?"var(--red)":"var(--dim)";
-}
-async function cloudLogin(){
-  if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("cl-email").value.trim(), pw = $("cl-pass").value;
-  if(!em || !pw){ alert("Email and password needed."); return; }
-  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
-  $("cl-pass").value = "";
-  if(error){ alert("Cloud sign in failed: "+error.message); return; }
-  cloudOn = true; $("cloud-login").style.display="none"; setCloudBadge("on");
-  await cloudPull(); schedulePush();
 }
 async function cloudPull(){
   if(!sb || !cloudOn) return;
@@ -709,6 +717,18 @@ function go(v){
   history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
   renderAll();
 }
+function openBox(id){
+  const el = $(id); if(!el) return;
+  el.style.display = "block";
+  setTimeout(()=>el.scrollIntoView({behavior:"smooth", block:"start"}), 30);
+}
+function toggleBox(id, btn){
+  const el = $(id); if(!el) return;
+  const opening = el.style.display === "none" || !el.style.display;
+  el.style.display = opening ? "block" : "none";
+  if(btn) btn.textContent = opening ? (btn.dataset.openLabel||btn.textContent) : (btn.dataset.closedLabel||btn.textContent);
+  if(opening) setTimeout(()=>el.scrollIntoView({behavior:"smooth", block:"start"}), 30);
+}
 (function(){
   const h = (location.hash||"").replace("#","");
   if(h && document.getElementById("pane-"+h)) go(h);
@@ -767,16 +787,49 @@ function bookCall(){
   ["bk-name","bk-contact","bk-note"].forEach(i=>$(i).value="");
   document.querySelectorAll(".slots input:checked").forEach(c=>c.checked=false);
 }
-function joinWaitlist(){
+function joinWaitlistModal(){
   const g = id => ($(id).value||"").trim();
-  if(!g("wl-name") || !g("wl-contact")){ alert("Name and a way to reach you are needed."); return; }
+  if(!g("wlm-name") || !g("wlm-contact")){ alert("Name and a way to reach you are needed."); return; }
   const w = { id:"WL-"+String(DB.wlSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
-    name:g("wl-name"), contact:g("wl-contact"), where:g("wl-where"), need:$("wl-need").value };
+    name:g("wlm-name"), contact:g("wlm-contact"), where:g("wlm-where"), need:$("wlm-need").value };
   DB.waitlist.push(w); save();
   if(sb) sb.from("waitlist").insert({name:w.name, contact:w.contact, place:w.where, need:w.need}).then(r=>{ if(r.error) console.warn("waitlist cloud:", r.error.message); });
-  $("wl-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>You are on the list, '+esc(w.name)+'.</b> We will contact you as soon as we open in '+esc(w.where||"your area")+'. Nothing to pay, and nothing happens without your say so.</div>';
-  ["wl-name","wl-contact","wl-where"].forEach(i=>$(i).value="");
+  $("wlm-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>You are on the list, '+esc(w.name)+'.</b> We will contact you as soon as we open in '+esc(w.where||"your area")+'.</div>';
+  ["wlm-name","wlm-contact","wlm-where"].forEach(i=>$(i).value="");
+  setTimeout(closeWlModal, 2200);
 }
+function openWlModal(){
+  const m = $("wl-modal"); if(m) m.style.display = "block";
+  setTimeout(()=>m.scrollIntoView({behavior:"smooth", block:"nearest"}), 30);
+}
+function closeWlModal(){
+  $("wl-modal").style.display = "none";
+  try{ localStorage.setItem("yaadly_wl_seen","1"); }catch(e){}
+}
+(function(){
+  const h = (location.hash||"").replace("#","");
+  const alreadySeen = (()=>{ try{ return localStorage.getItem("yaadly_wl_seen")==="1"; }catch(e){ return false; } })();
+  if(h || alreadySeen) return;
+  let shown = false;
+  function showModal(){
+    if(shown) return; shown = true;
+    const m = $("wl-modal"); if(m) m.style.display = "block";
+    document.removeEventListener("mouseout", onExitIntent);
+    window.removeEventListener("scroll", onScroll);
+  }
+  function onExitIntent(e){
+    if(e.clientY <= 0 && !e.relatedTarget && !e.toElement) showModal();
+  }
+  function onScroll(){
+    const pct = (window.scrollY) / (document.documentElement.scrollHeight - window.innerHeight || 1);
+    if(pct > 0.5) showModal();
+  }
+  document.addEventListener("DOMContentLoaded", ()=>{
+    document.addEventListener("mouseout", onExitIntent);
+    window.addEventListener("scroll", onScroll, {passive:true});
+    setTimeout(showModal, 20000); // fallback for mobile / no scroll / no exit
+  });
+})();
 let fbRate = 0;
 function setRate(v){
   fbRate = v;
@@ -969,10 +1022,28 @@ function renderWorker(){
 }
 /* ───────────── ADMIN ───────────── */
 let adminOpen = false;
-function adminUnlock(){
-  if($("admin-pin").value === CONFIG.adminPin){ adminOpen = true; $("admin-lock").style.display="none"; $("admin-ui").style.display="block"; renderAdmin(); }
-  else alert("Wrong passcode.");
+async function adminGateLogin(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const em = $("gate-email").value.trim(), pw = $("gate-pass").value;
+  if(!em || !pw){ alert("Email and password needed."); return; }
+  $("gate-status").innerHTML = '<div class="mono">Signing in...</div>';
+  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
+  $("gate-pass").value = "";
+  if(error){ $("gate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
+  adminOpen = true; cloudOn = true;
+  $("admin-lock").style.display = "none";
+  $("admin-ui").style.display = "block";
+  setCloudBadge("on");
+  renderAdmin();
+  await cloudPull(); schedulePush();
 }
+async function restoreAdminSession(){
+  if(!sb) return;
+  const {data:{session}} = await sb.auth.getSession();
+  if(session){ adminOpen = true; cloudOn = true; setCloudBadge("on"); await cloudPull(); schedulePush();
+    if(location.hash==="#admin"){ $("admin-lock").style.display="none"; $("admin-ui").style.display="block"; renderAdmin(); } }
+}
+restoreAdminSession();
 function adminTab(t){
   ["intake","jobs","services","workers","apps","market","calls","waitlist","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
   document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
@@ -1232,9 +1303,6 @@ function runVerify(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").inner
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function renderAll(){ renderClient(); renderWorker(); if(adminOpen) renderAdmin(); }
 renderAll();
-</script>
-</body>
-</html>
 </script>
 </body>
 </html>
