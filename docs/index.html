@@ -678,6 +678,45 @@ async function runReport(id){
   if(out==null){ $("agent-out").innerHTML=""; return; }
   $("agent-out").innerHTML = '<div class="mono">'+esc(out)+'</div><a class="btn o sm" style="margin-top:8px" target="_blank" rel="noopener" href="'+wa(out)+'">Send to client on WhatsApp →</a><p class="note">Drafted by the Reporting Agent. Read it before you send; nothing goes out by itself.</p>';
 }
+/* ─────────── AI Photo Review (yaad-vision edge function) ─────────── */
+const SEV_COLOR = { low:"pass", medium:"gap", high:"block" };
+function visionFindingsHTML(j){
+  const findings = j.aiFindings || [];
+  if(!findings.length) return "";
+  return '<div class="kick" style="margin-top:14px">AI photo review, draft findings</div>'+
+    '<p class="note" style="margin-top:0">These are the vision model\'s read of the photos on file, nothing more. Nothing here has been sent to the client. Remove anything wrong or not worth raising before you act on it.</p>'+
+    '<ul class="check">'+findings.map((f,k)=>
+      '<li><span class="st '+(SEV_COLOR[f.severity]||"gap")+'">'+esc((f.severity||"?").toUpperCase())+'</span> <b>'+esc(f.issue||"Finding")+'</b> ('+esc(f.category||"uncategorised")+(f.recommend_professional?", flagged for a professional look":"")+') <a class="btn warn sm" style="margin-left:auto" onclick="dismissFinding(\''+j.id+'\','+k+')">Remove</a><br><span style="width:100%;display:block;color:var(--mute);font-size:12.5px">'+esc(f.note||"")+'</span></li>'
+    ).join("")+'</ul>';
+}
+async function runVision(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const images = (j.evidence||[]).filter(e=>e.img).map(e=>e.img);
+  if(!images.length){ alert("No photos logged on this job yet. Add evidence photos first."); return; }
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ alert("Sign in to the admin desk first. The AI photo reviewer only answers to your signed in session."); return; }
+  $("vision-out").innerHTML = '<div class="mono">AI Photo Reviewer looking at '+images.length+' photo(s)...</div>';
+  try{
+    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-vision", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
+      body: JSON.stringify({ images, scope:j.desc||"", jobTitle:j.title||"" })
+    });
+    const out = await r.json().catch(()=>({error:"bad response"}));
+    if(out.error){ $("vision-out").innerHTML = '<p class="note" style="color:var(--red)">AI Photo Reviewer: '+esc(out.error)+'</p>'; return; }
+    j.aiFindings = out.findings || [];
+    save();
+    $("vision-out").innerHTML = visionFindingsHTML(j) || '<p class="note">No visible issues flagged in these photos.</p>';
+  }catch(e){
+    $("vision-out").innerHTML = '<p class="note" style="color:var(--red)">AI Photo Reviewer could not be reached: '+esc(String(e))+'</p>';
+  }
+}
+function dismissFinding(id,k){
+  const j = DB.jobs.find(x=>x.id===id); if(!j || !j.aiFindings) return;
+  j.aiFindings.splice(k,1); save();
+  $("vision-out").innerHTML = visionFindingsHTML(j) || '<p class="note">No findings left. None of this has ever reached the client.</p>';
+}
 /* ───────────── benchmarks (Yaadly_Cost_Benchmarks, Aug 2026) ───────────── */
 const BENCH = [
   {re:/roof/i, label:"Roof repair, tier unconfirmed", low:75000, high:200000, conf:"high", src:"Government ROOFS grant tiers"},
@@ -1322,7 +1361,8 @@ function editJob(id){
     '<div class="kick">Stage · money states move only by your hand</div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
     '<div class="kick">Agents · they draft and flag, you decide</div>'+
     '<div class="field"><label>Tell the agent anything extra before drafting, optional</label><input id="rep-note" placeholder="e.g. tiles reach Thursday, Devon starts Friday morning"></div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a></div><div id="agent-out"></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a><a class="btn o sm" onclick="runVision(\''+id+'\')">🖼 Run AI Photo Review</a></div><div id="agent-out"></div>'+
+    '<div id="vision-out">'+visionFindingsHTML(j)+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap"><a class="btn sm" onclick="saveJob(\''+id+'\')">Save</a>'+
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. Open your portal to review.")+'">Message client →</a>'+
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Open your portal for the scope and checklist.")+'">Message worker →</a>'+
