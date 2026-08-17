@@ -588,6 +588,11 @@ const CONFIG = {
 /* ─────────── cloud database (Supabase, free tier) ─────────── */
 const sb = (CONFIG.supabaseUrl && window.supabase) ? window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey) : null;
 let cloudOn = false, pushTimer = null;
+// Declared here, ahead of the hash-routing IIFE below, because landing directly on a URL
+// like #admin or #client calls go() -> renderAll() -> renderClient() during initial script
+// execution, before a `let` declared later in the file would be reachable (temporal dead zone).
+let clientTabState = "overview";
+let clientSelectedId = null;
 function schedulePush(){
   if(!sb || !cloudOn) return;
   clearTimeout(pushTimer);
@@ -948,8 +953,6 @@ function verifyAgent(job){
   return rows.join("\n") + "\n\nBlocking items: " + blocks + "\nA named human reviews this pack and decides. The engine does not release funds.";
 }
 /* ───────────── CLIENT PORTAL ───────────── */
-let clientTabState = "overview";
-let clientSelectedId = null;
 function clientNav(t){
   clientTabState = t;
   document.querySelectorAll(".dash-nav").forEach(b=>b.classList.toggle("on", b.dataset.ct===t));
