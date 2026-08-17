@@ -593,6 +593,7 @@ let cloudOn = false, pushTimer = null;
 // execution, before a `let` declared later in the file would be reachable (temporal dead zone).
 let clientTabState = "overview";
 let clientSelectedId = null;
+let adminOpen = false;
 function schedulePush(){
   if(!sb || !cloudOn) return;
   clearTimeout(pushTimer);
@@ -1139,7 +1140,6 @@ function renderWorker(){
   });
 }
 /* ───────────── ADMIN ───────────── */
-let adminOpen = false;
 async function adminGateLogin(){
   if(!sb){ alert("Cloud is not configured."); return; }
   const em = $("gate-email").value.trim(), pw = $("gate-pass").value;
