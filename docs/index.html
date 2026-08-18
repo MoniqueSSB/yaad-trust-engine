@@ -223,7 +223,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
   </div>
   <div class="kick" id="startform">Start your job right here</div>
   <div class="card"><h3>Tell us what <em>needs doing</em></h3>
-    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Prefer WhatsApp? Use the button at the top. This form does the same thing: it reaches Yaadly directly and we reply within 24 hours with next steps. No obligation, no payment now.</p>
+    <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">This form creates your job right away, no need to also message us on WhatsApp. You'll get a client portal link and code straight after sending it. No obligation, no payment now.</p>
     <div class="grid2" style="margin-top:12px">
       <div class="field"><label>Your name</label><input id="in-name"></div>
       <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
@@ -857,18 +857,33 @@ async function intakePhotos(ev){
   pendingPhotos = await filesToPhotos(ev.target.files);
   $("in-thumbs").innerHTML = pendingPhotos.map(p=>'<img src="'+p+'" alt="photo">').join("");
 }
-function submitIntake(){
+const WEBSITE_INTAKE_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-website-intake";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
+async function submitIntake(){
   const g = id => ($(id).value||"").trim();
   if(!g("in-name") || !g("in-phone") || !g("in-email") || !g("in-desc")){ alert("Name, WhatsApp number, email and a description are needed. The email is what unlocks your client portal login later."); return; }
-  const it = { id:"REQ-"+String(DB.inSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
-    name:g("in-name"), phone:g("in-phone"), email:g("in-email"), where:g("in-where"), addr:g("in-addr"), access:g("in-access"), type:$("in-type").value,
-    desc:g("in-desc"), urgency:($("in-date").value ? "Wanted by "+$("in-date").value : "As soon as possible"), loc:$("in-loc").value, status:"new",
-    photos:pendingPhotos };
-  pendingPhotos = []; $("in-thumbs").innerHTML="";
-  DB.intakes.push(it); save();
-  if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, email:it.email, place:it.where, addr:it.addr, access:it.access, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
-  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.<br><br>The full managed job service opens shortly in the Kingston metro. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
-  window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nEmail: "+it.email+"\nAddress: "+(it.addr||"not given")+"\nParish or area: "+(it.where||"not given")+"\nAccess contact: "+(it.access||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
+  const btn = document.querySelector('#pane-site [onclick="submitIntake()"]');
+  if(btn) btn.style.pointerEvents = "none";
+  $("in-status").innerHTML = '<div class="rule mono" style="margin-top:14px">Sending your request...</div>';
+  const payload = {
+    name:g("in-name"), phone:g("in-phone"), email:g("in-email"), parish:g("in-where"), addr:g("in-addr"), access:g("in-access"),
+    workType:$("in-type").value, desc:g("in-desc"), urgency:($("in-date").value ? "Wanted by "+$("in-date").value : "As soon as possible"),
+    clientLocation:$("in-loc").value, photos:pendingPhotos
+  };
+  let result = null;
+  try{
+    const r = await fetch(WEBSITE_INTAKE_URL, { method:"POST", headers:{ "Content-Type":"application/json", "apikey":SUPABASE_PUBLISHABLE_KEY }, body:JSON.stringify(payload) });
+    result = await r.json();
+    if(!r.ok || result.error) throw new Error(result.error || "Request failed");
+  }catch(e){
+    if(btn) btn.style.pointerEvents = "";
+    $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">Something went wrong sending that (' + esc(e.message||String(e)) + '). Try again, or message us directly: <a href="'+wa("New job request. Name: "+payload.name+". Email: "+payload.email+". Work: "+payload.workType+". Details: "+payload.desc)+'" target="_blank" rel="noopener">WhatsApp us instead</a>.</div>';
+    return;
+  }
+  pendingPhotos = []; $("in-thumbs").innerHTML=""; if(btn) btn.style.pointerEvents = "";
+  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Job '+esc(result.jobId)+' created.</b> A project manager reviews every request before any quote or work starts, nothing is booked and no money moves until you agree in writing.<br><br>'+
+    'Track it any time in your <a href="#client" onclick="go(\'client\')"><b>client portal</b></a>. First time there? Sign up with <b>'+esc(payload.email)+'</b> and job code <b>'+esc(result.portalCode||"check your email/WhatsApp for it")+'</b>, save that code now.<br><br>'+
+    'The full managed job service opens shortly in the Kingston metro. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
   ["in-name","in-phone","in-email","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
 }
 function bookCall(){
