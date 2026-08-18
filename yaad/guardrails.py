@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .telemetry import record_guardrail_event
+
 # 1. Never market payment holding as escrow.
 BANNED_TERMS: dict[str, str] = {
     r"\bescrow(ed|s)?\b": "Use 'held safely with a licensed payment provider', never 'escrow'.",
@@ -64,6 +66,14 @@ def assert_clean(text: str, *, where: str = "output") -> str:
     findings = scan(text)
     if findings:
         detail = "; ".join(f"{f.term!r}: {f.guidance}" for f in findings)
+        # The guidance strings are a fixed, closed set (the BANNED_TERMS
+        # values), unlike the matched excerpt, which can carry fragments of
+        # whatever text was being screened. Only the bounded set goes to
+        # telemetry.
+        record_guardrail_event(
+            "guardrail.banned_language",
+            {"where": where, "terms": ",".join(sorted({f.guidance for f in findings}))},
+        )
         raise GuardrailViolation(f"Banned language in {where}: {detail}")
     return text
 
@@ -71,6 +81,7 @@ def assert_clean(text: str, *, where: str = "output") -> str:
 def assert_human_decision(action: str, decided_by: str) -> None:
     """Any consequential action must carry a named human decider."""
     if action in HUMAN_ONLY_DECISIONS and decided_by.strip().lower() in {"", "ai", "agent", "system", "auto"}:
+        record_guardrail_event("guardrail.blocked_ai_decision", {"action": action})
         raise GuardrailViolation(
             f"Action {action!r} requires a named human decider. AI coordinates, verifies and drafts. "
             "It never releases money, rules on a dispute, or alters a reputation."

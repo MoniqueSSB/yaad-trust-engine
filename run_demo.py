@@ -14,6 +14,7 @@ from __future__ import annotations
 import sys
 
 from yaad import benchmarks as bm
+from yaad import telemetry
 from yaad.agents import intake, pricing, reporting, verification
 from yaad.config import load_config
 from yaad.guardrails import GuardrailViolation
@@ -114,6 +115,7 @@ def run_scenario(client: LLMClient, scenario) -> None:
 
 def main(argv: list[str]) -> int:
     config = load_config()
+    telemetry.init()
     client = LLMClient(config=config)
     banner(config)
 

@@ -10,6 +10,8 @@ from datetime import datetime
 import pytest
 
 from yaad import benchmarks as bm
+from yaad import guardrails as yaad_guardrails
+from yaad import telemetry
 from yaad.agents import intake, pricing, reporting, verification
 from yaad.agents.verification import EvidencePackage, MediaItem
 from yaad.config import Config
@@ -186,6 +188,62 @@ def test_mock_output_is_always_labelled(client: LLMClient) -> None:
 )
 def test_json_extraction_survives_chatty_models(raw: str) -> None:
     assert _extract_json(raw) == {"a": 1}
+
+
+# --------------------------------------------------------------------- #
+# Telemetry: every money and guardrail decision must emit a bounded event,
+# and never a free-text one, alongside whatever it already did.
+# --------------------------------------------------------------------- #
+
+def test_sdk_is_available_in_this_environment() -> None:
+    # opentelemetry-sdk is a first-class dependency now (requirements.txt),
+    # not an optional extra, so it must always be importable here. The rest
+    # of the module still no-ops gracefully if it is ever absent elsewhere.
+    assert telemetry.enabled() is True
+
+
+def test_banned_language_violation_emits_a_bounded_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(yaad_guardrails, "record_guardrail_event", lambda name, attrs: events.append((name, attrs)))
+    with pytest.raises(GuardrailViolation):
+        assert_clean("Your money sits in escrow until the job is done.", where="Client Update")
+    assert len(events) == 1
+    name, attrs = events[0]
+    assert name == "guardrail.banned_language"
+    assert attrs["where"] == "Client Update"
+    # The event carries the fixed, closed-set guidance string from
+    # BANNED_TERMS, never the sentence that was actually being screened.
+    assert attrs["terms"] == "Use 'held safely with a licensed payment provider', never 'escrow'."
+    assert "sits in escrow until the job is done" not in attrs["terms"]
+
+
+def test_blocked_ai_decision_emits_a_bounded_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(yaad_guardrails, "record_guardrail_event", lambda name, attrs: events.append((name, attrs)))
+    with pytest.raises(GuardrailViolation):
+        assert_human_decision("release_funds", "ai")
+    assert events == [("guardrail.blocked_ai_decision", {"action": "release_funds"})]
+
+
+def test_release_funds_emits_a_bounded_event_and_never_the_decider_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[tuple[str, dict]] = []
+    monkeypatch.setattr(verification, "record_guardrail_event", lambda name, attrs: events.append((name, attrs)))
+    verification.release_funds("JOB-001", 400.0, decided_by="Monique Sewell-Bennett")
+    assert len(events) == 1
+    name, attrs = events[0]
+    assert name == "guardrail.money.released"
+    assert attrs == {"job.id": "JOB-001", "amount_gbp": 400.0, "decider.role": "human"}
+    assert "Monique" not in str(attrs)
+
+
+def test_telemetry_init_is_silent_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    telemetry.init()  # must not raise, and must not require a collector
+
+
+def test_telemetry_init_does_not_raise_when_pointed_at_a_collector(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+    telemetry.init()  # activating the instrumentor must not itself require a live collector
 
 
 def test_json_extraction_raises_on_garbage() -> None:

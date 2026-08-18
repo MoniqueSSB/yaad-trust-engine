@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from ..guardrails import assert_human_decision
+from ..telemetry import record_guardrail_event
 
 
 @dataclass
@@ -205,6 +206,13 @@ def run(package: EvidencePackage) -> VerificationResult:
 def release_funds(job_id: str, amount_gbp: float, decided_by: str) -> dict:
     """Deliberately guarded. The engine cannot release money on its own."""
     assert_human_decision("release_funds", decided_by)
+    # decided_by is a free-text name and never goes to telemetry. Reaching
+    # this line already proves, via the guardrail above, that a human made
+    # the call, so the bounded role is always "human" here by construction.
+    record_guardrail_event(
+        "guardrail.money.released",
+        {"job.id": job_id, "amount_gbp": amount_gbp, "decider.role": "human"},
+    )
     return {
         "job_id": job_id,
         "amount_gbp": amount_gbp,
