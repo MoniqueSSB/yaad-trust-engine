@@ -702,7 +702,7 @@ async function runVision(id){
   if(!sb){ alert("Cloud is not configured."); return; }
   const {data:{session}} = await sb.auth.getSession();
   if(!session){ alert("Sign in to the admin desk first. The AI photo reviewer only answers to your signed in session."); return; }
-  $("vision-out").innerHTML = '<div class="mono">AI Photo Reviewer looking at '+images.length+' photo(s)...</div>';
+  $("vision-out").innerHTML = '<div class="mono">AI Photo Reviewer looking at '+images.length+' photo(s). This usually takes up to a minute, it is reading each photo properly rather than guessing. No need to click again.</div>';
   try{
     const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-vision", {
       method:"POST",
