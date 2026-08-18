@@ -995,8 +995,9 @@ function clientNav(t){
 }
 function allClientItems(){
   if(!clientOpen || !clientAuthEmail) return [];
-  const mine = DB.jobs.filter(j=>j.clientEmail && j.clientEmail.toLowerCase()===clientAuthEmail.toLowerCase());
-  return mine.map(j=>({...j, _kind:"job"}));
+  const myJobs = DB.jobs.filter(j=>j.clientEmail && j.clientEmail.toLowerCase()===clientAuthEmail.toLowerCase());
+  const myServices = DB.services.filter(s=>s.clientEmail && s.clientEmail.toLowerCase()===clientAuthEmail.toLowerCase());
+  return [...myJobs.map(j=>({...j, _kind:"job"})), ...myServices.map(s=>({...s, title:s.type, evidence:s.evidence||[], stage:s.stage||0, _kind:"service"}))];
 }
 function renderClient(){
   const main = $("client-dash-main"); if(!main) return;
@@ -1230,11 +1231,23 @@ async function pullMyCloudJobs(email){
   });
   save();
 }
+async function pullMyCloudServices(email){
+  if(!sb || !email) return;
+  const {data, error} = await sb.from("services").select("*");
+  if(error){ console.warn("cloud services pull:", error.message); return; }
+  (data||[]).forEach(row=>{
+    let s = DB.services.find(x=>x.id===row.id);
+    if(!s){ s = {id:row.id}; DB.services.push(s); }
+    s.type=row.type||""; s.client=row.client_name||""; s.clientEmail=row.client_email||"";
+    s.parish=row.parish||""; s.price=row.price||""; s.provider=row.provider||"Founder"; s.stage=row.stage||0; s.notes=row.notes||"";
+  });
+  save();
+}
 async function openClientPortal(email){
   clientOpen = true; clientAuthEmail = email;
   $("client-lock").style.display = "none";
   $("client-ui").style.display = "block";
-  await pullMyCloudJobs(email);
+  await Promise.all([pullMyCloudJobs(email), pullMyCloudServices(email)]);
   renderClient();
 }
 async function restoreClientSession(){
@@ -1465,8 +1478,8 @@ function newService(){
   const type = prompt("Service type (Site Verification Visit, Oversight Retainer, Full Project Management, Contractor Sourcing, Property Care):");
   if(!type) return;
   const id = "SVC-"+String(DB.svcSeq++).padStart(3,"0");
-  DB.services.push({id, type, client:"", parish:"", price:"", provider:"Founder", stage:0, notes:""});
-  save(); renderAdmin(); editService(id);
+  DB.services.push({id, type, client:"", clientEmail:"", parish:"", price:"", provider:"Founder", stage:0, notes:""});
+  save(); renderAdmin(); editService(id); syncServiceToCloud(id);
 }
 function editService(id){
   const s = DB.services.find(x=>x.id===id); if(!s) return;
@@ -1474,6 +1487,7 @@ function editService(id){
   D.innerHTML = '<div class="card"><h3>'+esc(s.type)+' <em>'+esc(s.id)+'</em></h3>'+
     '<div class="grid2"><div class="field"><label>Client</label><input id="sv-client" value="'+esc(s.client||"")+'"></div>'+
     '<div class="field"><label>Parish / area</label><input id="sv-parish" value="'+esc(s.parish||"")+'"></div></div>'+
+    '<div class="field"><label>Client email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="sv-cemail" type="email" value="'+esc(s.clientEmail||"")+'"></div>'+
     '<div class="grid2"><div class="field"><label>Agreed price</label><input id="sv-price" value="'+esc(s.price||"")+'" placeholder="set at scoping, never auto"></div>'+
     '<div class="field"><label>Provider</label><input id="sv-provider" value="'+esc(s.provider||"Founder")+'"></div></div>'+
     '<div class="field"><label>Notes</label><textarea id="sv-notes">'+esc(s.notes||"")+'</textarea></div>'+
@@ -1481,9 +1495,18 @@ function editService(id){
     '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap"><a class="btn o sm" onclick="saveService(\''+s.id+'\')">Save</a><a class="btn warn sm" onclick="delService(\''+s.id+'\')">Delete</a></div></div>';
   D.scrollIntoView({behavior:"smooth"});
 }
-function svcStage(id,i){ const s=DB.services.find(x=>x.id===id); s.stage=i; save(); renderAdmin(); editService(id); }
-function saveService(id){ const s=DB.services.find(x=>x.id===id); s.client=$("sv-client").value; s.parish=$("sv-parish").value; s.price=$("sv-price").value; s.provider=$("sv-provider").value; s.notes=$("sv-notes").value; save(); renderAdmin(); }
-function delService(id){ if(!confirm("Delete this service booking?"))return; DB.services=DB.services.filter(x=>x.id!==id); save(); renderAdmin(); $("admin-detail").innerHTML=""; }
+function svcStage(id,i){ const s=DB.services.find(x=>x.id===id); s.stage=i; save(); renderAdmin(); editService(id); syncServiceToCloud(id); }
+function saveService(id){ const s=DB.services.find(x=>x.id===id); s.client=$("sv-client").value; s.clientEmail=$("sv-cemail").value.trim(); s.parish=$("sv-parish").value; s.price=$("sv-price").value; s.provider=$("sv-provider").value; s.notes=$("sv-notes").value; save(); renderAdmin(); syncServiceToCloud(id); }
+function delService(id){ if(!confirm("Delete this service booking?"))return; DB.services=DB.services.filter(x=>x.id!==id); save(); renderAdmin(); $("admin-detail").innerHTML=""; if(sb) sb.from("services").delete().eq("id",id).then(r=>{ if(r.error) console.warn("service cloud delete:", r.error.message); }); }
+function syncServiceToCloud(id){
+  if(!sb) return;
+  const s = DB.services.find(x=>x.id===id); if(!s) return;
+  sb.from("services").upsert({
+    id:s.id, type:s.type||"", client_name:s.client||"", client_email:(s.clientEmail||"").toLowerCase()||null,
+    parish:s.parish||"", price:s.price||"", provider:s.provider||"Founder", stage:s.stage||0, notes:s.notes||"",
+    updated_at:new Date().toISOString()
+  }).then(r=>{ if(r.error) console.warn("service cloud sync:", r.error.message); });
+}
 function editJob(id){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return; j.worker=j.worker||{};
   const D = $("admin-detail");
