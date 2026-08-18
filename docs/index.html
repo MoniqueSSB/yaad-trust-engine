@@ -432,9 +432,10 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 <section class="pane" id="pane-client"><div class="wrap">
   <div id="client-lock" class="card" style="max-width:420px;margin:40px auto">
     <h3>Client <em>portal</em></h3>
-    <p class="note" style="margin-top:0">Sign in with the email you gave when you requested work. First time here? Create your portal account with that same email.</p>
+    <p class="note" style="margin-top:0">Already have an account? Sign in with the email you gave when you requested work. First time here? You will need the job code Yaadly sent you to create an account, this only unlocks once a project manager has taken your job on.</p>
     <div class="field"><label>Email</label><input id="cgate-email" type="email" autocomplete="username"></div>
     <div class="field"><label>Password</label><input id="cgate-pass" type="password" autocomplete="current-password"></div>
+    <div class="field"><label>Job code <span style="font-weight:500;text-transform:none">(from Yaadly, only needed the first time, to create an account)</span></label><input id="cgate-code" autocomplete="off" placeholder="e.g. 4F9B2A" style="text-transform:uppercase"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <a class="btn" onclick="clientGateLogin()">Sign in</a>
       <a class="btn o" onclick="clientGateSignup()">Create account</a>
@@ -1209,13 +1210,18 @@ async function clientGateLogin(){
 }
 async function clientGateSignup(){
   if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value;
+  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value, code = ($("cgate-code")?$("cgate-code").value:"").trim();
   if(!em || !pw){ alert("Email and password needed."); return; }
   if(pw.length<6){ alert("Password needs to be at least 6 characters."); return; }
+  if(!code){ alert("Enter the job code Yaadly sent you. Accounts can only be created once a project manager has taken your job on, this is not open sign-up."); return; }
+  $("cgate-status").innerHTML = '<div class="mono">Checking your code...</div>';
+  const {data:okCode, error:codeErr} = await sb.rpc("verify_portal_code", {p_email:em, p_code:code});
+  if(codeErr){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not check that code right now: '+esc(codeErr.message)+'</div>'; return; }
+  if(!okCode){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">That code and email do not match a job we have on file. Double check both, or message us on WhatsApp if you have not heard back yet.</div>'; return; }
   $("cgate-status").innerHTML = '<div class="mono">Creating account...</div>';
   const {data, error} = await sb.auth.signUp({email:em, password:pw});
   if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create account: '+esc(error.message)+'</div>'; return; }
-  $("cgate-pass").value = "";
+  $("cgate-pass").value = ""; $("cgate-code").value = "";
   if(data.session){ openClientPortal(em); }
   else { $("cgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
 }
@@ -1229,7 +1235,7 @@ async function pullMyCloudJobs(email){
     j.worker = j.worker || {};
     j.title=row.title||""; j.parish=row.parish||""; j.client=row.client_name||""; j.clientEmail=row.client_email||""; j.clientPhone=row.client_phone||"";
     j.worker.name=row.worker_name||""; j.worker.email=row.worker_email||""; j.worker.phone=row.worker_phone||""; j.worker.lane=row.worker_lane||"";
-    j.desc=row.descr||""; j.stage=row.stage||0; j.owed=row.owed||""; j.payMethod=row.pay_method||""; j.payRef=row.pay_ref||""; j.open=!!row.open;
+    j.desc=row.descr||""; j.stage=row.stage||0; j.owed=row.owed||""; j.payMethod=row.pay_method||""; j.payRef=row.pay_ref||""; j.open=!!row.open; j.portalCode=row.portal_code||"";
   });
   save();
 }
@@ -1241,7 +1247,7 @@ async function pullMyCloudServices(email){
     let s = DB.services.find(x=>x.id===row.id);
     if(!s){ s = {id:row.id}; DB.services.push(s); }
     s.type=row.type||""; s.client=row.client_name||""; s.clientEmail=row.client_email||"";
-    s.parish=row.parish||""; s.price=row.price||""; s.provider=row.provider||"Founder"; s.stage=row.stage||0; s.notes=row.notes||"";
+    s.parish=row.parish||""; s.price=row.price||""; s.provider=row.provider||"Founder"; s.stage=row.stage||0; s.notes=row.notes||""; s.portalCode=row.portal_code||"";
   });
   save();
 }
@@ -1507,7 +1513,10 @@ function syncServiceToCloud(id){
     id:s.id, type:s.type||"", client_name:s.client||"", client_email:(s.clientEmail||"").toLowerCase()||null,
     parish:s.parish||"", price:s.price||"", provider:s.provider||"Founder", stage:s.stage||0, notes:s.notes||"",
     updated_at:new Date().toISOString()
-  }).then(r=>{ if(r.error) console.warn("service cloud sync:", r.error.message); });
+  }).select("portal_code").single().then(r=>{
+    if(r.error){ console.warn("service cloud sync:", r.error.message); return; }
+    if(r.data && r.data.portal_code && s.portalCode !== r.data.portal_code){ s.portalCode = r.data.portal_code; save(); if(document.getElementById("admin-detail") && document.getElementById("admin-detail").innerHTML.indexOf(esc(id))>-1) editService(id); }
+  });
 }
 function editJob(id){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return; j.worker=j.worker||{};
@@ -1518,6 +1527,7 @@ function editJob(id){
     '<div class="grid2"><div class="field"><label>Job title</label><input id="jb-title" value="'+esc(j.title||"")+'"></div><div class="field"><label>Parish / town</label><input id="jb-parish" value="'+esc(j.parish||"")+'"></div></div>'+
     '<div class="grid2"><div class="field"><label>Client first name</label><input id="jb-client" value="'+esc(j.client||"")+'"></div><div class="field"><label>Open for worker quotes?</label><select id="jb-open"><option value=""'+(j.open?"":" selected")+'>No, matching privately</option><option value="1"'+(j.open?" selected":"")+'>Yes, invite quotes</option></select></div></div>'+
     '<div class="grid2"><div class="field"><label>Client email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="jb-cemail" type="email" value="'+esc(j.clientEmail||"")+'"></div><div class="field"><label>Client phone</label><input id="jb-cphone" value="'+esc(j.clientPhone||"")+'"></div></div>'+
+    '<p class="note" style="margin-top:0">Portal code for this job: <b style="letter-spacing:1px">'+esc(j.portalCode||"not generated yet, save once to get one")+'</b>. They need this plus their email to create a portal account, it is not open sign-up.</p>'+
     '<div class="field"><label>Scope, plain words</label><textarea id="jb-desc">'+esc(j.desc||"")+'</textarea></div>'+
     '<div class="grid2"><div class="field"><label>Payment link (paste from Stripe)</label><input id="jb-pay" value="'+esc(j.payLink||"")+'" placeholder="https://buy.stripe.com/..."></div><div class="field"><label>Client paid you (GBP)</label><input id="jb-in" value="'+esc(j.paidIn||"")+'" placeholder="e.g. 300"></div></div>'+
     '<div class="kick">Worker payout</div>'+
@@ -1537,7 +1547,7 @@ function editJob(id){
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a><a class="btn o sm" onclick="runVision(\''+id+'\')">🖼 Run AI Photo Review</a></div><div id="agent-out"></div>'+
     '<div id="vision-out">'+visionFindingsHTML(j)+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap"><a class="btn sm" onclick="saveJob(\''+id+'\')">Save</a>'+
-    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. See it and approve here: https://yaadly.co.uk/#client"+(j.clientEmail?" (sign in with "+j.clientEmail+")":", sign up with the email you gave us"))+'">Message client →</a>'+
+    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. See it and approve here: https://yaadly.co.uk/#client"+(j.clientEmail?" Sign in with "+j.clientEmail+".":" Sign up with the email you gave us.")+(j.portalCode?" First time signing up? Your job code is "+j.portalCode+".":""))+'">Message client →</a>'+
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Scope and checklist here: https://yaadly.co.uk/#worker")+'">Message worker →</a>'+
     '<a class="btn warn sm" onclick="delJob(\''+id+'\')">Delete</a></div></div>';
   D.scrollIntoView({behavior:"smooth"});
@@ -1568,7 +1578,10 @@ function syncJobToCloud(id){
     worker_lane:(j.worker&&j.worker.lane)||"", descr:j.desc||"", stage:j.stage||0,
     owed:j.owed||"", pay_method:j.payMethod||"", pay_ref:j.payRef||"", open:!!j.open,
     updated_at:new Date().toISOString()
-  }).then(r=>{ if(r.error) console.warn("job cloud sync:", r.error.message); });
+  }).select("portal_code").single().then(r=>{
+    if(r.error){ console.warn("job cloud sync:", r.error.message); return; }
+    if(r.data && r.data.portal_code && j.portalCode !== r.data.portal_code){ j.portalCode = r.data.portal_code; save(); if(document.getElementById("admin-detail") && document.getElementById("admin-detail").innerHTML.indexOf(esc(id))>-1) editJob(id); }
+  });
 }
 function evAdd(id){ const j=DB.jobs.find(x=>x.id===id); (j.evidence=j.evidence||[]).push({label:"",meta:"",icon:"🖼"}); save(); editJob(id); }
 function evSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k][f]=v; j.evidence[k].icon=/video|pan/i.test(j.evidence[k].label||"")?"🎬":(/receipt/i.test(j.evidence[k].label||"")?"🧾":"🖼"); save(); }
