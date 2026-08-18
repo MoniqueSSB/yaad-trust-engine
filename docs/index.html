@@ -994,7 +994,9 @@ function clientNav(t){
   renderClient();
 }
 function allClientItems(){
-  return [...DB.jobs.map(j=>({...j, _kind:"job"})), ...DB.services.map(s=>({...s, title:s.type, evidence:s.evidence||[], stage:s.stage||0, _kind:"service"}))];
+  if(!clientOpen || !clientAuthEmail) return [];
+  const mine = DB.jobs.filter(j=>j.clientEmail && j.clientEmail.toLowerCase()===clientAuthEmail.toLowerCase());
+  return mine.map(j=>({...j, _kind:"job"}));
 }
 function renderClient(){
   const main = $("client-dash-main"); if(!main) return;
@@ -1141,9 +1143,10 @@ function renderWorker(){
     });
     return;
   }
-  const assigned = DB.jobs.filter(j=>j.worker && j.worker.name && j.stage<5);
+  const isMine = j => j.worker && j.worker.email && j.worker.email.toLowerCase()===workerAuthEmail.toLowerCase();
+  const assigned = DB.jobs.filter(j=>isMine(j) && j.stage<5);
   if($("wd-count")) $("wd-count").textContent = assigned.length;
-  const heldTotal = DB.jobs.filter(j=>j.worker && j.worker.name && j.stage<4 && j.owed).reduce((s,j)=>s+Number(j.owed||0),0);
+  const heldTotal = DB.jobs.filter(j=>isMine(j) && j.stage<4 && j.owed).reduce((s,j)=>s+Number(j.owed||0),0);
   if($("wd-held")) $("wd-held").textContent = heldTotal ? "J$"+heldTotal.toLocaleString() : "n/a";
   J.innerHTML = assigned.length ? "" : '<div class="empty">No jobs assigned right now. When Yaadly assigns you a job, it appears here with the scope and your evidence checklist.</div>';
   assigned.forEach(j=>{
@@ -1162,7 +1165,7 @@ function renderWorker(){
     J.appendChild(d);
   });
   const P = $("wt-pay");
-  const mine = DB.jobs.filter(j=>j.worker && j.worker.name);
+  const mine = DB.jobs.filter(isMine);
   P.innerHTML = '<div class="rule" style="margin-top:12px">💷 <b>How you get paid.</b> The client\'s money is held before you start, so it is real. Once you send your evidence and the client approves it, Yaadly pays you <b>within 3 working days</b>, by the method on your record: bank transfer, Lynk or remittance pick up. You are never charged to be here and never charged to quote.</div>';
   if(!mine.length){ P.innerHTML += '<div class="empty">No jobs yet, so nothing owed. When you are assigned work it shows here with what you will be paid and when.</div>'; }
   mine.forEach(j=>{
@@ -1213,10 +1216,25 @@ async function clientGateSignup(){
   if(data.session){ openClientPortal(em); }
   else { $("cgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
 }
-function openClientPortal(email){
+async function pullMyCloudJobs(email){
+  if(!sb || !email) return;
+  const {data, error} = await sb.from("jobs").select("*");
+  if(error){ console.warn("cloud jobs pull:", error.message); return; }
+  (data||[]).forEach(row=>{
+    let j = DB.jobs.find(x=>x.id===row.id);
+    if(!j){ j = {id:row.id, evidence:[], shortlist:[], worker:{}}; DB.jobs.push(j); }
+    j.worker = j.worker || {};
+    j.title=row.title||""; j.parish=row.parish||""; j.client=row.client_name||""; j.clientEmail=row.client_email||""; j.clientPhone=row.client_phone||"";
+    j.worker.name=row.worker_name||""; j.worker.email=row.worker_email||""; j.worker.phone=row.worker_phone||""; j.worker.lane=row.worker_lane||"";
+    j.desc=row.descr||""; j.stage=row.stage||0; j.owed=row.owed||""; j.payMethod=row.pay_method||""; j.payRef=row.pay_ref||""; j.open=!!row.open;
+  });
+  save();
+}
+async function openClientPortal(email){
   clientOpen = true; clientAuthEmail = email;
   $("client-lock").style.display = "none";
   $("client-ui").style.display = "block";
+  await pullMyCloudJobs(email);
   renderClient();
 }
 async function restoreClientSession(){
@@ -1246,9 +1264,10 @@ async function workerGateSignup(){
   if(data.session){ openWorkerPortal(em); }
   else { $("wgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
 }
-function openWorkerPortal(email){
+async function openWorkerPortal(email){
   workerOpen = true; workerAuthEmail = email;
   $("worker-lock").style.display = "none";
+  await pullMyCloudJobs(email);
   renderWorker();
 }
 async function restoreWorkerSession(){
@@ -1293,8 +1312,8 @@ function adminTab(t){
 }
 function newJob(){
   const id = "JOB-"+String(DB.seq++).padStart(4,"0");
-  DB.jobs.push({id, title:"", parish:"", client:"", desc:"", stage:0, evidence:[], worker:{}, shortlist:[], open:false});
-  save(); renderAdmin(); editJob(id);
+  DB.jobs.push({id, title:"", parish:"", client:"", clientEmail:"", clientPhone:"", desc:"", stage:0, evidence:[], worker:{}, shortlist:[], open:false});
+  save(); renderAdmin(); editJob(id); syncJobToCloud(id);
 }
 function renderAdmin(){
   if(!adminOpen) return;
@@ -1473,6 +1492,7 @@ function editJob(id){
   D.innerHTML = '<div class="card"><h3>'+esc(j.id)+' <em>'+esc(j.title||"")+'</em></h3>'+
     '<div class="grid2"><div class="field"><label>Job title</label><input id="jb-title" value="'+esc(j.title||"")+'"></div><div class="field"><label>Parish / town</label><input id="jb-parish" value="'+esc(j.parish||"")+'"></div></div>'+
     '<div class="grid2"><div class="field"><label>Client first name</label><input id="jb-client" value="'+esc(j.client||"")+'"></div><div class="field"><label>Open for worker quotes?</label><select id="jb-open"><option value=""'+(j.open?"":" selected")+'>No, matching privately</option><option value="1"'+(j.open?" selected":"")+'>Yes, invite quotes</option></select></div></div>'+
+    '<div class="grid2"><div class="field"><label>Client email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="jb-cemail" type="email" value="'+esc(j.clientEmail||"")+'"></div><div class="field"><label>Client phone</label><input id="jb-cphone" value="'+esc(j.clientPhone||"")+'"></div></div>'+
     '<div class="field"><label>Scope, plain words</label><textarea id="jb-desc">'+esc(j.desc||"")+'</textarea></div>'+
     '<div class="grid2"><div class="field"><label>Payment link (paste from Stripe)</label><input id="jb-pay" value="'+esc(j.payLink||"")+'" placeholder="https://buy.stripe.com/..."></div><div class="field"><label>Client paid you (GBP)</label><input id="jb-in" value="'+esc(j.paidIn||"")+'" placeholder="e.g. 300"></div></div>'+
     '<div class="kick">Worker payout</div>'+
@@ -1483,6 +1503,7 @@ function editJob(id){
     (j.worker&&j.worker.name?'<p class="note" style="margin-top:0">Paying '+esc(j.worker.name)+'. Their preferred method and account name are on their worker record. Never mark paid before the money has actually left.</p>':'')+
     '<div class="kick">Worker assigned</div>'+
     '<div class="grid3"><div class="field"><label>Name</label><input id="jb-wname" value="'+esc(j.worker.name||"")+'"></div><div class="field"><label>Trade</label><input id="jb-wtrade" value="'+esc(j.worker.trade||"")+'"></div><div class="field"><label>Lane</label><select id="jb-wlane"><option value="">Not set</option><option value="cert"'+(j.worker.lane==="cert"?" selected":"")+'>Certified professional</option><option value="vet"'+(j.worker.lane==="vet"?" selected":"")+'>Evidence vetted</option></select></div></div>'+
+    '<div class="grid2"><div class="field"><label>Worker email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="jb-wemail" type="email" value="'+esc(j.worker.email||"")+'"></div><div class="field"><label>Worker phone</label><input id="jb-wphone" value="'+esc(j.worker.phone||"")+'"></div></div>'+
     '<div class="kick">Client shortlist (cap five)</div>'+slRows+'<a class="btn o sm" onclick="slAdd(\''+id+'\')">+ Add to shortlist</a>'+
     '<div class="kick">Evidence log</div>'+evRows+'<a class="btn o sm" onclick="evAdd(\''+id+'\')">+ Add evidence item</a> <label class="filebtn">📷 Add site photos from WhatsApp<input type="file" multiple accept="image/*" onchange="sitePhotos(event,\''+id+'\')"></label>'+
     '<div class="kick">Stage · money states move only by your hand</div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
@@ -1499,16 +1520,30 @@ function editJob(id){
 function saveJob(id){
   const j = DB.jobs.find(x=>x.id===id);
   j.title=$("jb-title").value; j.parish=$("jb-parish").value; j.client=$("jb-client").value;
+  j.clientEmail=$("jb-cemail").value.trim(); j.clientPhone=$("jb-cphone").value.trim();
   j.open=!!$("jb-open").value; j.desc=$("jb-desc").value;
   j.payLink=$("jb-pay").value.trim(); j.paidIn=$("jb-in").value.trim();
   j.owed=$("jb-owed").value.trim(); j.payMethod=$("jb-paymethod").value; j.payRef=$("jb-payref").value.trim();
   j.worker.name=$("jb-wname").value; j.worker.trade=$("jb-wtrade").value; j.worker.lane=$("jb-wlane").value;
-  save(); renderAdmin(); editJob(id);
+  j.worker.email=$("jb-wemail").value.trim(); j.worker.phone=$("jb-wphone").value.trim();
+  save(); renderAdmin(); editJob(id); syncJobToCloud(id);
 }
 function jobStage(id,i){
   const j = DB.jobs.find(x=>x.id===id);
   if(i===5 && !confirm("Mark WORKER PAID? Only after you have actually paid.")) return;
-  j.stage=i; save(); renderAdmin(); editJob(id);
+  j.stage=i; save(); renderAdmin(); editJob(id); syncJobToCloud(id);
+}
+function syncJobToCloud(id){
+  if(!sb) return;
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  sb.from("jobs").upsert({
+    id:j.id, title:j.title||"", parish:j.parish||"",
+    client_name:j.client||"", client_email:(j.clientEmail||"").toLowerCase()||null, client_phone:j.clientPhone||"",
+    worker_name:(j.worker&&j.worker.name)||"", worker_email:((j.worker&&j.worker.email)||"").toLowerCase()||null, worker_phone:(j.worker&&j.worker.phone)||"",
+    worker_lane:(j.worker&&j.worker.lane)||"", descr:j.desc||"", stage:j.stage||0,
+    owed:j.owed||"", pay_method:j.payMethod||"", pay_ref:j.payRef||"", open:!!j.open,
+    updated_at:new Date().toISOString()
+  }).then(r=>{ if(r.error) console.warn("job cloud sync:", r.error.message); });
 }
 function evAdd(id){ const j=DB.jobs.find(x=>x.id===id); (j.evidence=j.evidence||[]).push({label:"",meta:"",icon:"🖼"}); save(); editJob(id); }
 function evSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k][f]=v; j.evidence[k].icon=/video|pan/i.test(j.evidence[k].label||"")?"🎬":(/receipt/i.test(j.evidence[k].label||"")?"🧾":"🖼"); save(); }
@@ -1539,7 +1574,7 @@ async function workerUpload(ev,id,key){
 }
 function slAdd(id){ const j=DB.jobs.find(x=>x.id===id); j.shortlist=j.shortlist||[]; if(j.shortlist.length>=5){ alert("Shortlists cap at five. Your rule."); return; } j.shortlist.push({name:"",trade:"",parish:"",lane:"vet",jobs:0}); save(); editJob(id); }
 function slSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.shortlist[k][f]=v; save(); }
-function delJob(id){ if(!confirm("Delete this job?"))return; DB.jobs=DB.jobs.filter(x=>x.id!==id); save(); renderAdmin(); $("admin-detail").innerHTML=""; }
+function delJob(id){ if(!confirm("Delete this job?"))return; DB.jobs=DB.jobs.filter(x=>x.id!==id); save(); renderAdmin(); $("admin-detail").innerHTML=""; if(sb) sb.from("jobs").delete().eq("id",id).then(r=>{ if(r.error) console.warn("job cloud delete:", r.error.message); }); }
 function runPrice(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").innerHTML='<div class="mono">'+esc(pricingAgent((j.title||"")+" "+(j.desc||"")))+'</div>'; }
 function runVerify(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").innerHTML='<div class="mono">'+esc(verifyAgent(j))+'</div>'; }
 /* ───────────── util + boot ───────────── */
