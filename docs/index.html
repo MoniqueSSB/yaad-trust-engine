@@ -1537,8 +1537,8 @@ function editJob(id){
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a><a class="btn o sm" onclick="runVision(\''+id+'\')">🖼 Run AI Photo Review</a></div><div id="agent-out"></div>'+
     '<div id="vision-out">'+visionFindingsHTML(j)+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap"><a class="btn sm" onclick="saveJob(\''+id+'\')">Save</a>'+
-    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. Open your portal to review.")+'">Message client →</a>'+
-    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Open your portal for the scope and checklist.")+'">Message worker →</a>'+
+    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. See it and approve here: https://yaadly.co.uk/#client"+(j.clientEmail?" (sign in with "+j.clientEmail+")":", sign up with the email you gave us"))+'">Message client →</a>'+
+    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Scope and checklist here: https://yaadly.co.uk/#worker")+'">Message worker →</a>'+
     '<a class="btn warn sm" onclick="delJob(\''+id+'\')">Delete</a></div></div>';
   D.scrollIntoView({behavior:"smooth"});
 }
