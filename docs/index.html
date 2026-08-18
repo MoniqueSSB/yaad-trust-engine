@@ -229,11 +229,14 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
     </div>
     <div class="grid2">
+      <div class="field"><label>Your email <span style="font-weight:500;text-transform:none">(this becomes your client portal login)</span></label><input id="in-email" type="email" placeholder="you@email.com"></div>
       <div class="field"><label>Property address, street and town</label><input id="in-addr" placeholder="e.g. 12 Gregory Park Road, Gregory Park"></div>
-      <div class="field"><label>Parish or area</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
     </div>
     <div class="grid2">
+      <div class="field"><label>Parish or area</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
       <div class="field"><label>Who is at the property, name and number</label><input id="in-access" placeholder="e.g. my aunt Sonia, 876 555 0100"></div>
+    </div>
+    <div class="grid2">
       <div class="field"><label>Type of work</label>
         <select id="in-type"><option>Plumbing</option><option>Painting</option><option>Roofing</option><option>Tiling</option><option>Masonry and walls</option><option>Electrical</option><option>Carpentry</option><option>General repairs</option><option>Renovation project</option><option>Professional service</option><option>Something else</option></select>
       </div>
@@ -427,6 +430,18 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 </div></section>
 <!-- ═══════════════ CLIENT PORTAL ═══════════════ -->
 <section class="pane" id="pane-client"><div class="wrap">
+  <div id="client-lock" class="card" style="max-width:420px;margin:40px auto">
+    <h3>Client <em>portal</em></h3>
+    <p class="note" style="margin-top:0">Sign in with the email you gave when you requested work. First time here? Create your portal account with that same email.</p>
+    <div class="field"><label>Email</label><input id="cgate-email" type="email" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input id="cgate-pass" type="password" autocomplete="current-password"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <a class="btn" onclick="clientGateLogin()">Sign in</a>
+      <a class="btn o" onclick="clientGateSignup()">Create account</a>
+    </div>
+    <div id="cgate-status"></div>
+  </div>
+  <div id="client-ui" style="display:none">
   <div class="kick" style="margin-top:20px">Client portal</div>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
     <h1 class="hx" style="font-size:clamp(26px,4.5vw,44px);margin:0">Paid on proof, <span class="g1">not promises.</span></h1>
@@ -447,6 +462,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
     </div>
     <div class="dash-main" id="client-dash-main"></div>
   </div>
+  </div>
 </div></section>
 <!-- ═══════════════ WORKER PORTAL ═══════════════ -->
 <section class="pane" id="pane-worker"><div class="wrap">
@@ -457,6 +473,19 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <div class="stat-pill">💼 Active jobs<b id="wd-count">0</b></div>
       <div class="stat-pill">💷 Money held for you<b id="wd-held">n/a</b></div>
     </div>
+  </div>
+  <div id="worker-lock" class="card" style="max-width:520px">
+    <h3>Sign in to <em>see your jobs</em></h3>
+    <p class="note" style="margin-top:0">Sign in with the email from your application to see your assigned jobs and money. Not signed in yet? You can still browse open jobs or apply to join below.</p>
+    <div class="grid2">
+      <div class="field"><label>Email</label><input id="wgate-email" type="email" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input id="wgate-pass" type="password" autocomplete="current-password"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <a class="btn" onclick="workerGateLogin()">Sign in</a>
+      <a class="btn o" onclick="workerGateSignup()">Create account</a>
+    </div>
+    <div id="wgate-status"></div>
   </div>
   <div class="dash">
     <div class="dash-side">
@@ -477,11 +506,14 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
         <div class="field"><label>WhatsApp number</label><input id="ap-phone" placeholder="876..."></div>
       </div>
       <div class="grid2">
+        <div class="field"><label>Email <span style="font-weight:500;text-transform:none">(this becomes your worker portal login)</span></label><input id="ap-email" type="email" placeholder="you@email.com"></div>
         <div class="field"><label>Parish</label><input id="ap-parish" placeholder="Kingston, Portmore..."></div>
-        <div class="field"><label>Trade or trades</label><input id="ap-trade" placeholder="Plumbing, tiling"></div>
       </div>
       <div class="grid2">
+        <div class="field"><label>Trade or trades</label><input id="ap-trade" placeholder="Plumbing, tiling"></div>
         <div class="field"><label>Years of experience</label><input id="ap-years" type="number" min="0"></div>
+      </div>
+      <div class="grid2">
         <div class="field"><label>Certified or licensed?</label>
           <select id="ap-cert"><option value="">No, experience based</option><option value="yes">Yes, I hold certification</option></select>
         </div>
@@ -594,6 +626,8 @@ let cloudOn = false, pushTimer = null;
 let clientTabState = "overview";
 let clientSelectedId = null;
 let adminOpen = false;
+let clientOpen = false, clientAuthEmail = null;
+let workerOpen = false, workerAuthEmail = null;
 function schedulePush(){
   if(!sb || !cloudOn) return;
   clearTimeout(pushTimer);
@@ -627,14 +661,14 @@ async function cloudPull(){
     (ri.data||[]).forEach(row=>{
       if(DB.intakes.some(x=>x.cid===row.id)) return;
       DB.intakes.push({ id:"REQ-C"+String(DB.inSeq++).padStart(3,"0"), cid:row.id,
-        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, where:row.place,
+        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, email:row.email, where:row.place,
         addr:row.addr, access:row.access, type:row.work_type, desc:row.descr, urgency:row.urgency, loc:row.loc,
         photos:row.photos||[], status:row.status||"new" });
     });
     (ra.data||[]).forEach(row=>{
       if(DB.applications.some(x=>x.cid===row.id)) return;
       DB.applications.push({ id:"APP-C"+String(DB.applications.length+1).padStart(3,"0"), cid:row.id,
-        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, parish:row.parish,
+        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, email:row.email, parish:row.parish,
         trade:row.trade, years:row.years, cert:!!row.cert, certno:row.certno, work:row.work,
         ref1:row.ref1, ref2:row.ref2, checks:{}, status:row.status||"received" });
     });
@@ -822,17 +856,17 @@ async function intakePhotos(ev){
 }
 function submitIntake(){
   const g = id => ($(id).value||"").trim();
-  if(!g("in-name") || !g("in-phone") || !g("in-desc")){ alert("Name, WhatsApp number and a description are needed."); return; }
+  if(!g("in-name") || !g("in-phone") || !g("in-email") || !g("in-desc")){ alert("Name, WhatsApp number, email and a description are needed. The email is what unlocks your client portal login later."); return; }
   const it = { id:"REQ-"+String(DB.inSeq++).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
-    name:g("in-name"), phone:g("in-phone"), where:g("in-where"), addr:g("in-addr"), access:g("in-access"), type:$("in-type").value,
+    name:g("in-name"), phone:g("in-phone"), email:g("in-email"), where:g("in-where"), addr:g("in-addr"), access:g("in-access"), type:$("in-type").value,
     desc:g("in-desc"), urgency:($("in-date").value ? "Wanted by "+$("in-date").value : "As soon as possible"), loc:$("in-loc").value, status:"new",
     photos:pendingPhotos };
   pendingPhotos = []; $("in-thumbs").innerHTML="";
   DB.intakes.push(it); save();
-  if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, place:it.where, addr:it.addr, access:it.access, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
+  if(sb) sb.from("intakes").insert({req_id:it.id, name:it.name, phone:it.phone, email:it.email, place:it.where, addr:it.addr, access:it.access, work_type:it.type, descr:it.desc, urgency:it.urgency, loc:it.loc, photos:it.photos, status:"new"}).then(r=>{ if(r.error) console.warn("intake cloud:", r.error.message); });
   $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Request '+it.id+' sent.</b> Yaadly replies within 24 hours on WhatsApp. Nothing is booked and no money moves until you have a written quote and say yes.<br><br>The full managed job service opens shortly in the Kingston metro. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
-  window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nAddress: "+(it.addr||"not given")+"\nParish or area: "+(it.where||"not given")+"\nAccess contact: "+(it.access||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
-  ["in-name","in-phone","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
+  window.open(wa("New job request "+it.id+"\nName: "+it.name+"\nWhatsApp: "+it.phone+"\nEmail: "+it.email+"\nAddress: "+(it.addr||"not given")+"\nParish or area: "+(it.where||"not given")+"\nAccess contact: "+(it.access||"not given")+"\nWork: "+it.type+"\nWhen: "+it.urgency+"\nClient is: "+it.loc+"\nPhotos attached to request: "+(it.photos.length||"none, will send here")+"\nDetails: "+it.desc), "_blank", "noopener");
+  ["in-name","in-phone","in-email","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
 }
 function bookCall(){
   const g = id => ($(id).value||"").trim();
@@ -1074,22 +1108,39 @@ function go2(v){ if(!$("pane-"+v).classList.contains("show")) go(v); }
 $("ap-cert").addEventListener("change", ()=>{ $("ap-certrow").style.display = $("ap-cert").value==="yes"?"block":"none"; });
 function submitApplication(){
   const g = id => ($(id).value||"").trim();
-  if(!g("ap-name") || !g("ap-phone") || !g("ap-trade")){ alert("Name, WhatsApp number and trade are needed."); return; }
+  if(!g("ap-name") || !g("ap-phone") || !g("ap-email") || !g("ap-trade")){ alert("Name, WhatsApp number, email and trade are needed. The email is what unlocks your worker portal login later."); return; }
   if(!$("ap-consent").checked){ alert("The consent tick is needed so Yaadly can verify your details."); return; }
   const ap = { id:"APP-"+String(DB.applications.length+1).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
-    name:g("ap-name"), phone:g("ap-phone"), parish:g("ap-parish"), trade:g("ap-trade"), years:g("ap-years"),
+    name:g("ap-name"), phone:g("ap-phone"), email:g("ap-email"), parish:g("ap-parish"), trade:g("ap-trade"), years:g("ap-years"),
     cert:$("ap-cert").value==="yes", certno:g("ap-certno"), work:g("ap-work"), ref1:g("ap-ref1"), ref2:g("ap-ref2"),
     idtype:$("ap-idtype").value, police:$("ap-police").value,
     payMethod:$("ap-pay").value, payName:g("ap-payname"),
     checks:{}, status:"received" };
   DB.applications.push(ap); save();
-  if(sb) sb.from("applications").insert({app_id:ap.id, name:ap.name, phone:ap.phone, parish:ap.parish, trade:ap.trade, years:ap.years, cert:ap.cert, certno:ap.certno, work:ap.work, ref1:ap.ref1, ref2:ap.ref2, status:"received"}).then(r=>{ if(r.error) console.warn("application cloud:", r.error.message); });
+  if(sb) sb.from("applications").insert({app_id:ap.id, name:ap.name, phone:ap.phone, email:ap.email, parish:ap.parish, trade:ap.trade, years:ap.years, cert:ap.cert, certno:ap.certno, work:ap.work, ref1:ap.ref1, ref2:ap.ref2, status:"received"}).then(r=>{ if(r.error) console.warn("application cloud:", r.error.message); });
   $("ap-status").innerHTML = '<div class="card"><h3>Application <em>received</em></h3><p style="color:var(--mute);font-size:14px">Yaadly reviews every application personally: ID check, references called, and a trial job. You will hear back on WhatsApp. Joining is free, always.</p></div>';
-  ["ap-name","ap-phone","ap-parish","ap-trade","ap-years","ap-certno","ap-work","ap-ref1","ap-ref2"].forEach(i=>$(i).value="");
+  ["ap-name","ap-phone","ap-email","ap-parish","ap-trade","ap-years","ap-certno","ap-work","ap-ref1","ap-ref2"].forEach(i=>$(i).value="");
   $("ap-consent").checked = false;
 }
 function renderWorker(){
-  const J = $("wt-jobs"), O = $("wt-open");
+  const J = $("wt-jobs"), O = $("wt-open"), P0 = $("wt-pay");
+  if(!workerOpen){
+    const lockMsg = '<div class="empty">Sign in above with your application email to see this.</div>';
+    J.innerHTML = lockMsg; P0.innerHTML = lockMsg;
+    if($("wd-count")) $("wd-count").textContent = "0";
+    if($("wd-held")) $("wd-held").textContent = "n/a";
+    const open = DB.jobs.filter(j=>j.open && !(j.worker&&j.worker.name));
+    O.innerHTML = open.length ? "" : '<div class="empty">No open jobs for your trade right now. You will be notified on WhatsApp when one matches. Quoting is free, always.</div>';
+    open.forEach(j=>{
+      const d = document.createElement("div"); d.className="card";
+      d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">OPEN FOR QUOTES</span></div>'+
+        '<p style="font-size:13.5px;color:var(--mute)">'+esc(j.desc||"")+'</p>'+
+        '<a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+" ("+(j.title||"")+", "+(j.parish||"")+"): My quote is J$____ labour only, materials at cost with receipts. I can start ____.")+'">Send my quote →</a>'+
+        '<p class="note">Your quote goes to Yaadly, is reviewed for shape against real costs, and is never beaten down.</p>';
+      O.appendChild(d);
+    });
+    return;
+  }
   const assigned = DB.jobs.filter(j=>j.worker && j.worker.name && j.stage<5);
   if($("wd-count")) $("wd-count").textContent = assigned.length;
   const heldTotal = DB.jobs.filter(j=>j.worker && j.worker.name && j.stage<4 && j.owed).reduce((s,j)=>s+Number(j.owed||0),0);
@@ -1139,6 +1190,72 @@ function renderWorker(){
     O.appendChild(d);
   });
 }
+/* ───────────── CLIENT / WORKER AUTH ───────────── */
+async function clientGateLogin(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value;
+  if(!em || !pw){ alert("Email and password needed."); return; }
+  $("cgate-status").innerHTML = '<div class="mono">Signing in...</div>';
+  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
+  $("cgate-pass").value = "";
+  if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
+  openClientPortal(em);
+}
+async function clientGateSignup(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value;
+  if(!em || !pw){ alert("Email and password needed."); return; }
+  if(pw.length<6){ alert("Password needs to be at least 6 characters."); return; }
+  $("cgate-status").innerHTML = '<div class="mono">Creating account...</div>';
+  const {data, error} = await sb.auth.signUp({email:em, password:pw});
+  if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create account: '+esc(error.message)+'</div>'; return; }
+  $("cgate-pass").value = "";
+  if(data.session){ openClientPortal(em); }
+  else { $("cgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
+}
+function openClientPortal(email){
+  clientOpen = true; clientAuthEmail = email;
+  $("client-lock").style.display = "none";
+  $("client-ui").style.display = "block";
+  renderClient();
+}
+async function restoreClientSession(){
+  if(!sb || location.hash!=="#client") return;
+  const {data:{session}} = await sb.auth.getSession();
+  if(session && session.user && session.user.email) openClientPortal(session.user.email);
+}
+async function workerGateLogin(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const em = $("wgate-email").value.trim(), pw = $("wgate-pass").value;
+  if(!em || !pw){ alert("Email and password needed."); return; }
+  $("wgate-status").innerHTML = '<div class="mono">Signing in...</div>';
+  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
+  $("wgate-pass").value = "";
+  if(error){ $("wgate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
+  openWorkerPortal(em);
+}
+async function workerGateSignup(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const em = $("wgate-email").value.trim(), pw = $("wgate-pass").value;
+  if(!em || !pw){ alert("Email and password needed."); return; }
+  if(pw.length<6){ alert("Password needs to be at least 6 characters."); return; }
+  $("wgate-status").innerHTML = '<div class="mono">Creating account...</div>';
+  const {data, error} = await sb.auth.signUp({email:em, password:pw});
+  if(error){ $("wgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create account: '+esc(error.message)+'</div>'; return; }
+  $("wgate-pass").value = "";
+  if(data.session){ openWorkerPortal(em); }
+  else { $("wgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
+}
+function openWorkerPortal(email){
+  workerOpen = true; workerAuthEmail = email;
+  $("worker-lock").style.display = "none";
+  renderWorker();
+}
+async function restoreWorkerSession(){
+  if(!sb || location.hash!=="#worker") return;
+  const {data:{session}} = await sb.auth.getSession();
+  if(session && session.user && session.user.email) openWorkerPortal(session.user.email);
+}
 /* ───────────── ADMIN ───────────── */
 async function adminGateLogin(){
   if(!sb){ alert("Cloud is not configured."); return; }
@@ -1148,6 +1265,8 @@ async function adminGateLogin(){
   const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
   $("gate-pass").value = "";
   if(error){ $("gate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
+  const {data:isAdmin} = await sb.rpc("is_admin");
+  if(!isAdmin){ await sb.auth.signOut(); $("gate-status").innerHTML = '<div class="note" style="color:var(--red)">That account is not an admin account.</div>'; return; }
   adminOpen = true; cloudOn = true;
   $("admin-lock").style.display = "none";
   $("admin-ui").style.display = "block";
@@ -1158,10 +1277,15 @@ async function adminGateLogin(){
 async function restoreAdminSession(){
   if(!sb) return;
   const {data:{session}} = await sb.auth.getSession();
-  if(session){ adminOpen = true; cloudOn = true; setCloudBadge("on"); await cloudPull(); schedulePush();
-    if(location.hash==="#admin"){ $("admin-lock").style.display="none"; $("admin-ui").style.display="block"; renderAdmin(); } }
+  if(!session) return;
+  const {data:isAdmin} = await sb.rpc("is_admin");
+  if(!isAdmin) return;
+  adminOpen = true; cloudOn = true; setCloudBadge("on"); await cloudPull(); schedulePush();
+  if(location.hash==="#admin"){ $("admin-lock").style.display="none"; $("admin-ui").style.display="block"; renderAdmin(); }
 }
 restoreAdminSession();
+restoreClientSession();
+restoreWorkerSession();
 function adminTab(t){
   ["intake","jobs","services","workers","apps","market","calls","waitlist","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
   document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
@@ -1181,7 +1305,7 @@ function renderAdmin(){
   fresh.forEach(it=>{
     const d = document.createElement("div"); d.className="card";
     d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>'+esc(it.type)+' <em>'+esc(it.id)+'</em></h3><span class="pill hold">'+esc(it.when)+' · '+esc(it.urgency)+'</span></div>'+
-      '<p style="font-size:13px;color:var(--mute)">'+esc(it.name)+' · WhatsApp '+esc(it.phone)+' · '+esc(it.addr||"address not given")+' · '+esc(it.where||"parish not given")+' · access: '+esc(it.access||"not given")+' · client is '+esc(it.loc)+'</p>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(it.name)+' · WhatsApp '+esc(it.phone)+' · '+esc(it.email||"no email given")+' · '+esc(it.addr||"address not given")+' · '+esc(it.where||"parish not given")+' · access: '+esc(it.access||"not given")+' · client is '+esc(it.loc)+'</p>'+
       '<p style="font-size:13.5px;color:var(--mute);white-space:pre-wrap">'+esc(it.desc)+'</p>'+
       ((it.photos||[]).length?'<div class="thumbs">'+it.photos.map(p=>'<img src="'+p+'" alt="client photo">').join("")+'</div>':'')+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
@@ -1224,7 +1348,7 @@ function renderAdmin(){
     const allDone = CHECKS.every((c,i)=>a.checks[i]);
     const d = document.createElement("div"); d.className="card";
     d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>'+esc(a.name)+' <em>'+esc(a.id)+'</em></h3><span class="pill hold">'+esc(a.when)+'</span></div>'+
-      '<p style="font-size:13px;color:var(--mute)">'+esc(a.trade)+' · '+esc(a.parish||"parish not given")+' · '+esc(a.years||"?")+' yrs · WhatsApp '+esc(a.phone)+(a.cert?' · certified: '+esc(a.certno||"number not given"):' · experience based')+'</p>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(a.trade)+' · '+esc(a.parish||"parish not given")+' · '+esc(a.years||"?")+' yrs · WhatsApp '+esc(a.phone)+' · '+esc(a.email||"no email given")+(a.cert?' · certified: '+esc(a.certno||"number not given"):' · experience based')+'</p>'+
       '<p style="font-size:12.5px;color:'+((a.police||"").startsWith("No")?"var(--red)":"var(--dim)")+'">ID offered: '+esc(a.idtype||"not stated")+' · police check: '+esc(a.police||"not stated")+'</p>'+
       (a.work?'<p style="font-size:13px;color:var(--mute)">Past work: '+esc(a.work)+'</p>':'')+
       '<p style="font-size:12.5px;color:var(--dim)">Refs: '+esc(a.ref1||"none")+' · '+esc(a.ref2||"none")+'</p>'+
@@ -1298,10 +1422,10 @@ function renderAdmin(){
 function intakeToJob(id){
   const it = DB.intakes.find(x=>x.id===id); if(!it) return;
   const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
-  DB.jobs.push({id:jid, title:it.type, parish:it.where||"", client:it.name,
+  DB.jobs.push({id:jid, title:it.type, parish:it.where||"", client:it.name, clientEmail:it.email||"", clientPhone:it.phone||"",
     desc:it.desc+"\n\nAddress: "+(it.addr||"not given")+"\nAccess contact: "+(it.access||"not given")+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+" · WhatsApp "+it.phone+")",
     stage:0, evidence:(it.photos||[]).map((p,n)=>({label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:p})), worker:{}, shortlist:[], open:false});
-  it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid);
+  it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid); syncJobToCloud(jid);
 }
 function callDone(id){ const c=DB.calls.find(x=>x.id===id); if(c){ c.status="done"; save(); renderAdmin(); } }
 function intakeArchive(id){ const it=DB.intakes.find(x=>x.id===id); it.status="archived"; save(); cloudStatus("intakes", it.cid, "archived"); renderAdmin(); }
@@ -1309,7 +1433,7 @@ function toggleCheck(id,i){ const a=DB.applications.find(x=>x.id===id); a.checks
 function approveApp(id,lane){
   const a = DB.applications.find(x=>x.id===id);
   a.status="approved";
-  DB.workers.push({name:a.name, phone:a.phone, trade:a.trade, parish:a.parish, lane:lane, jobs:0,
+  DB.workers.push({name:a.name, phone:a.phone, email:a.email||"", trade:a.trade, parish:a.parish, lane:lane, jobs:0,
     payMethod:a.payMethod||"", payName:a.payName||"", payRef:""});
   save(); cloudStatus("applications", a.cid, "approved"); renderAdmin();
 }
