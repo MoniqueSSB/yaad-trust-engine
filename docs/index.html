@@ -703,11 +703,13 @@ async function aiIntake(){
   if(!card || !card.title){ $("ai-out").innerHTML = '<div class="mono">'+esc(out)+'</div>'; return; }
   const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
   DB.jobs.push({ id:jid, title:card.title||"", parish:card.parish||"", client:card.client_name||"",
+    clientEmail:(card.client_email||"").trim(), clientPhone:(card.client_phone||"").trim(),
     desc:(card.scope||"")+(card.urgency?"\nUrgency: "+card.urgency:"")+(card.preferred_date?"\nWanted by: "+card.preferred_date:"")+(card.trade?"\nTrade: "+card.trade:"")+(card.client_phone?"\nClient WhatsApp: "+card.client_phone:"")+"\n\n(Structured by the Intake Agent from the client's message. Verify before quoting.)",
     stage:0, evidence:[], worker:{}, shortlist:[], open:false });
   save();
-  $("ai-out").innerHTML = '<div class="mono">Job card created as '+jid+'.\n'+(card.questions&&card.questions.length?("Ask before quoting:\n· "+card.questions.slice(0,3).join("\n· ")):"No open questions flagged.")+'\n\nThe agent drafted. You decide.</div>';
-  renderAdmin(); adminTab("jobs"); editJob(jid);
+  const noEmailWarn = card.client_email ? "" : "\n\n⚠ No email was in the message. This job will not show in the client's portal until you add one on the job screen.";
+  $("ai-out").innerHTML = '<div class="mono">Job card created as '+jid+'.\n'+(card.questions&&card.questions.length?("Ask before quoting:\n· "+card.questions.slice(0,3).join("\n· ")):"No open questions flagged.")+noEmailWarn+'\n\nThe agent drafted. You decide.</div>';
+  renderAdmin(); adminTab("jobs"); editJob(jid); syncJobToCloud(jid);
 }
 async function runReport(id){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return;
