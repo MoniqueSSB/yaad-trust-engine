@@ -98,7 +98,8 @@ class LLMClient:
         if not response.choices:
             raise RuntimeError(
                 f"Gateway returned no choices for agent {agent!r} "
-                f"(model={self.config.model!r}). Truncated or malformed response."
+                f"(model={self.config.model!r}, response length={len(str(response))}). "
+                "Truncated or malformed response."
             )
         return response.choices[0].message.content or ""
 
