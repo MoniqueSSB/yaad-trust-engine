@@ -1,0 +1,110 @@
+name: CI
+
+# Free and unlimited: GitHub-hosted runners cost nothing on public repositories.
+#
+# Why this exists: on the night of 17-18 August a JavaScript temporal-dead-zone
+# crash shipped to the live site and silently broke admin sign-in whenever the
+# desk was reached by a direct link. It was found by walking into it. That is
+# the bug class this catches.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Engine tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run the guardrail and engine tests
+        run: python -m pytest -q
+
+      # The engine must stay runnable with no model key at all. If this breaks,
+      # the deterministic mock path has rotted and the demo cannot be reproduced.
+      - name: Prove the engine still runs in mock mode with no API key
+        env:
+          YAAD_API_KEY: ""
+        run: python run_demo.py > /dev/null
+
+  edge-functions:
+    name: Edge Function typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      # These four functions are deployed by hand. Typechecking them here is the
+      # only thing standing between a typo and a broken production endpoint.
+      - name: Typecheck every Edge Function
+        run: |
+          set -e
+          for d in supabase/functions/yaad-*; do
+            echo "::group::$d"
+            deno check "$d/index.ts"
+            echo "::endgroup::"
+          done
+
+      # The shared tracer is copied into each function directory because Supabase
+      # deploys self-contained bundles. If a copy drifts from _shared, the thing
+      # you tested is not the thing you deployed.
+      - name: Check the shared tracer copies are in sync
+        run: |
+          set -e
+          fail=0
+          for d in supabase/functions/yaad-*; do
+            if ! cmp -s supabase/functions/_shared/otel.ts "$d/otel.ts"; then
+              echo "::error file=$d/otel.ts::otel.ts has drifted from _shared/otel.ts. Run supabase/functions/sync-shared.sh"
+              fail=1
+            fi
+          done
+          exit $fail
+
+  secrets:
+    name: No secrets committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # One API key has already been exposed and rotated on this project. This
+      # is a cheap backstop, not a substitute for care.
+      - name: Scan tracked files for key-shaped strings
+        run: |
+          set -e
+          # Documentation placeholders (nvapi-xxxxxxxx, <your-key>) are not leaks.
+          # Filtering them out is what keeps this check trustworthy: a scanner
+          # that cries wolf is a scanner people start ignoring.
+          matches=$(git grep -nIE \
+            '(sk-[A-Za-z0-9_-]{16,}|nvapi-[A-Za-z0-9_-]{16,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,})' \
+            -- . ':!.github/workflows/ci.yml' \
+            | grep -viE 'x{8,}|<[^>]*>|your[-_ ]?(api[-_ ]?)?(key|token|secret)|placeholder|example|redacted|\.\.\.' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "::error::A string shaped like an API key or JWT is committed. Rotate it, then remove it."
+            exit 1
+          fi
+          echo "No key-shaped strings found in tracked files."
