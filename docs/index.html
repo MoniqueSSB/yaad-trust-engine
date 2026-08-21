@@ -695,6 +695,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
       <button class="tab" data-at="calls" onclick="adminTab('calls')">Calls <span id="call-n"></span></button>
       <button class="tab" data-at="waitlist" onclick="adminTab('waitlist')">Waiting list <span id="wl-n"></span></button>
       <button class="tab" data-at="feedback" onclick="adminTab('feedback')">Feedback <span id="fb-n"></span></button>
+      <button class="tab" data-at="kickoff" onclick="adminTab('kickoff')">Kickoff packs</button>
     </div>
     <div id="at-intake" style="display:none"></div>
     <div id="at-jobs"></div>
@@ -705,6 +706,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
     <div id="at-calls" style="display:none"></div>
     <div id="at-waitlist" style="display:none"></div>
     <div id="at-feedback" style="display:none"></div>
+    <div id="at-kickoff" style="display:none"></div>
     <div id="admin-detail"></div>
     <div class="rule">⚖️ <b>The governing rule holds here:</b> the agents draft and flag. Only you confirm a payout, and only after you have actually paid.</div>
   </div>
@@ -1446,7 +1448,8 @@ restoreAdminSession();
 restoreClientSession();
 restoreWorkerSession();
 function adminTab(t){
-  ["intake","jobs","services","workers","apps","market","calls","waitlist","feedback"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
+  ["intake","jobs","services","workers","apps","market","calls","waitlist","feedback","kickoff"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
+  if(t==="kickoff") renderKickoff();
   document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
   $("admin-detail").innerHTML="";
 }
@@ -1735,6 +1738,212 @@ function delJob(id){ if(!confirm("Delete this job?"))return; DB.jobs=DB.jobs.fil
 function runPrice(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").innerHTML='<div class="mono">'+esc(pricingAgent((j.title||"")+" "+(j.desc||"")))+'</div>'; }
 function runVerify(id){ const j=DB.jobs.find(x=>x.id===id); $("agent-out").innerHTML='<div class="mono">'+esc(verifyAgent(j))+'</div>'; }
 /* ───────────── util + boot ───────────── */
+/* --------- Project Kickoff Pack agent (yaad-kickoff edge function) ---------
+   Drafts the document set issued to a client before work starts. It drafts,
+   you approve. The database refuses to record an approval without a named
+   human, and revokes approval automatically if the documents are edited
+   afterwards, so a signature always refers to the text that was signed.
+
+   No prices anywhere, by design. Yaadly does project management, procurement
+   and oversight judgment, not estimation, and the site says so. The pack
+   gives the structure of money - stages, proportions, evidence gates - and a
+   tracking table the client fills from their own contractor's quote. The
+   agent is instructed accordingly and its output is checked regardless. */
+
+let KO = { current:null, list:[], busy:false };
+const KO_FIELDS = [
+  ["title","Project title","e.g. Roof repair and gutter replacement, Portmore"],
+  ["client_name","Client name",""],
+  ["client_location","Client is based","e.g. London"],
+  ["parish","Property location","e.g. Portmore, St Catherine"],
+  ["property_type","Property type","e.g. single storey family home"],
+  ["trades","Trades likely involved","e.g. roofer, mason"],
+  ["timing","Client's stated timing","e.g. wants it done before the rains"],
+  ["access","Access and security on site","who lets people in, is anyone living there"],
+  ["ground_contact","Who is on the ground in Jamaica","name and relationship, or none"],
+  ["constraints","Known constraints or worries",""],
+  ["already_agreed","Anything already agreed or started",""]
+];
+function renderKickoff(){
+  const c = $("at-kickoff");
+  if(c.dataset.built) { koRenderList(); return; }
+  c.dataset.built = "1";
+  c.innerHTML =
+    '<div class="card"><h3>Project Kickoff Pack <em>AI drafts, you approve</em></h3>'+
+    '<p class="note" style="margin-top:0">Give it the shape of the job. It drafts the scope of works, timeline, evidence-gated payment stages, evidence checklist, document pack, risk register and communications list. <b>Nothing is issued to a client until you approve it.</b> It never prices work.</p>'+
+    '<textarea id="ko-brief" placeholder="What does the client want done? Plain words are fine."></textarea>'+
+    '<div id="ko-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px"></div>'+
+    '<a class="btn" style="margin-top:12px" onclick="koDraft()" id="ko-go">Draft the pack</a> '+
+    '<a class="btn sm" style="margin-top:12px" onclick="koClear()">Clear</a>'+
+    '<div id="ko-status" class="note" style="margin-top:10px"></div></div>'+
+    '<div id="ko-out"></div>'+
+    '<div class="card"><h3>Saved packs</h3><div id="ko-list"><div class="empty">Loading...</div></div></div>';
+  $("ko-fields").innerHTML = KO_FIELDS.map(f=>
+    '<label style="font-size:12px;color:var(--mute)">'+esc(f[1])+
+    '<input id="ko-'+f[0]+'" placeholder="'+esc(f[2])+'" style="width:100%"></label>').join("");
+  koRenderList();
+}
+function koClear(){
+  $("ko-brief").value=""; KO_FIELDS.forEach(f=>{ const el=$("ko-"+f[0]); if(el) el.value=""; });
+  $("ko-out").innerHTML=""; $("ko-status").textContent=""; KO.current=null;
+}
+function koIntake(){
+  const o = { brief: $("ko-brief").value.trim() };
+  KO_FIELDS.forEach(f=>{ const el=$("ko-"+f[0]); if(el && el.value.trim()) o[f[0]] = el.value.trim(); });
+  return o;
+}
+async function koDraft(){
+  if(KO.busy) return;
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ alert("Connect cloud first."); return; }
+  const intake = koIntake();
+  if(!intake.brief){ alert("Tell it what the client wants done first."); return; }
+  KO.busy = true; $("ko-go").textContent = "Drafting...";
+  $("ko-status").textContent = "Drafting the pack. Usually up to a minute.";
+  try{
+    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-kickoff", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
+      body: JSON.stringify({ intake })
+    });
+    const j = await r.json().catch(()=>({error:"bad response"}));
+    if(j.error){ $("ko-status").textContent = "Failed: "+j.error; return; }
+    KO.current = { id:"KO-"+Date.now(), project_title: intake.title || (intake.brief.slice(0,60)+"..."),
+      client_name: intake.client_name || "", parish: intake.parish || "",
+      intake, docs: j.docs, model: j.model, status:"draft", guardrail: j.guardrail };
+    $("ko-status").textContent = "Draft ready. Read it before it goes anywhere near a client.";
+    koRenderPack();
+  } catch(e){ $("ko-status").textContent = "Failed: "+e; }
+  finally { KO.busy=false; $("ko-go").textContent="Draft the pack"; }
+}
+const koList = (a, f) => Array.isArray(a) && a.length ? '<ul style="margin:6px 0 0 18px;font-size:13px">'+a.map(f).join("")+'</ul>' : '<p class="note">Nothing listed.</p>';
+const koSec = (title, inner) => '<div class="card"><h3>'+esc(title)+'</h3>'+inner+'</div>';
+function koRenderPack(){
+  const p = KO.current; if(!p){ $("ko-out").innerHTML=""; return; }
+  const d = p.docs || {};
+  let h = "";
+  const badge = p.status==="approved"
+    ? '<span class="pill ok">Approved for issue'+(p.approved_by?" - "+esc(p.approved_by):"")+'</span>'
+    : '<span class="pill hold">Draft, not issued</span>';
+  h += '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+       '<h3>'+esc(p.project_title)+' <em>'+esc(p.id)+'</em></h3>'+badge+'</div>'+
+       '<p class="note">Drafted by '+esc(p.model||"the kickoff agent")+'. '+esc(p.client_name||"Client not named")+(p.parish?" - "+esc(p.parish):"")+'</p>'+
+       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+       '<a class="btn sm" onclick="koSave()">Save</a>'+
+       (p.status==="approved" ? '' : '<a class="btn sm" onclick="koApprove()">I have read this, approve for issue</a>')+
+       '<a class="btn sm" onclick="koExport()">Print / PDF</a></div></div>';
+  if(p.guardrail && p.guardrail.price_language_detected){
+    h += '<div class="card" style="border-color:var(--red)"><h3 style="color:var(--red)">Price language found in the draft</h3>'+
+         '<p class="note">Yaadly does not price work. Remove these before issuing: <b>'+
+         esc((p.guardrail.samples||[]).join("  -  "))+'</b></p></div>';
+  }
+  if(Array.isArray(d.human_review_notes) && d.human_review_notes.length){
+    h += koSec("Check these yourself before issuing", koList(d.human_review_notes, x=>'<li>'+esc(x)+'</li>'));
+  }
+  if(Array.isArray(d.open_questions) && d.open_questions.length){
+    h += koSec("Ask the client before this pack goes out", koList(d.open_questions, x=>'<li>'+esc(x)+'</li>'));
+  }
+  const sow = d.scope_of_works||{};
+  h += koSec("1 - Scope of works",
+    '<p style="font-size:13.5px">'+esc(sow.summary||"")+'</p>'+
+    '<b style="font-size:12px">Included</b>'+koList(sow.included, x=>'<li>'+esc(x)+'</li>')+
+    '<b style="font-size:12px">Not included</b>'+koList(sow.excluded, x=>'<li>'+esc(x)+'</li>')+
+    '<b style="font-size:12px">Assumptions</b>'+koList(sow.assumptions, x=>'<li>'+esc(x)+'</li>')+
+    '<b style="font-size:12px">How we know it is done</b>'+koList(sow.acceptance_criteria, x=>'<li>'+esc(x)+'</li>'));
+  const tl = d.timeline||{};
+  h += koSec("2 - Timeline",
+    '<p class="note">'+esc(tl.basis||"")+'</p>'+
+    koList(tl.phases, ph=>'<li><b>'+esc(ph.name)+'</b> - '+esc(ph.duration||"")+' - after: '+esc(ph.depends_on||"start")+'<br><span style="color:var(--mute)">Milestone: '+esc(ph.milestone||"")+'</span></li>'));
+  const ps = d.payment_schedule||{};
+  const tot = (ps.stages||[]).reduce((a,x)=>a+(Number(x.proportion_percent)||0),0);
+  h += koSec("3 - Payment stages, tied to evidence",
+    '<p class="note">'+esc(ps.note||"")+' <b>No amounts appear here.</b></p>'+
+    koList(ps.stages, st=>'<li><b>'+esc(st.stage)+'</b> - '+esc(String(st.proportion_percent||0))+'% of the agreed total<br>'+
+      '<span style="color:var(--mute)">Released when: '+esc(st.release_condition||"")+'</span>'+
+      koList(st.evidence_required, e=>'<li style="color:var(--mute)">'+esc(e)+'</li>')+'</li>')+
+    '<p class="note" style="margin-top:8px">Stages total <b>'+tot+'%</b>'+(tot!==100?' - <span style="color:var(--red)">that does not add to 100, fix before issuing</span>':' ok')+'</p>');
+  h += koSec("4 - Evidence checklist",
+    koList(d.evidence_checklist, s=>'<li><b>'+esc(s.stage)+'</b>'+
+      koList(s.items, i=>'<li>'+esc(i.item)+' <span style="color:var(--mute)">('+esc(i.type||"photo")+') - '+esc(i.why||"")+'</span></li>')+'</li>'));
+  h += koSec("5 - Documents to collect",
+    koList(d.document_pack, x=>'<li><b>'+esc(x.document)+'</b> - from '+esc(x.who_provides||"?")+'<br><span style="color:var(--mute)">'+esc(x.why||"")+' - If missing: '+esc(x.risk_if_missing||"")+'</span></li>'));
+  const sev = r => (String(r.likelihood).toLowerCase()==="high"&&String(r.impact).toLowerCase()==="high") ? "var(--red)" : (String(r.impact).toLowerCase()==="high" ? "#b7791f" : "var(--mute)");
+  h += koSec("6 - Risk register",
+    koList(d.risk_register, r=>'<li style="border-left:3px solid '+sev(r)+';padding-left:8px;margin-bottom:8px"><b>'+esc(r.risk)+'</b> <span class="pill hold">'+esc(r.category||"")+' - L:'+esc(r.likelihood||"")+' I:'+esc(r.impact||"")+'</span><br>'+
+      '<span style="color:var(--mute)">Mitigation: '+esc(r.mitigation||"")+'<br>Owner: '+esc(r.owner||"")+' - Early sign: '+esc(r.early_warning_sign||"")+'</span></li>'));
+  h += koSec("7 - Who talks to who",
+    koList(d.communications_list, x=>'<li><b>'+esc(x.role)+'</b> - '+esc(x.who||"TBC")+'<br><span style="color:var(--mute)">'+esc(x.responsibility||"")+' - via '+esc(x.contact_method||"")+' - '+esc(x.update_cadence||"")+'</span></li>'));
+  $("ko-out").innerHTML = h;
+}
+async function koSave(){
+  const p = KO.current; if(!p || !sb) return;
+  const row = { id:p.id, job_id:p.job_id||null, project_title:p.project_title, client_name:p.client_name||null,
+                parish:p.parish||null, intake:p.intake, docs:p.docs, model:p.model||null, status:p.status||"draft" };
+  const {error} = await sb.from("kickoff_packs").upsert(row);
+  $("ko-status").textContent = error ? ("Save failed: "+error.message) : "Saved.";
+  if(!error) koRenderList();
+}
+async function koApprove(){
+  const p = KO.current; if(!p || !sb) return;
+  if(!confirm("Approving means you have read every section and you are willing to issue this to the client.\n\nEditing the documents afterwards automatically withdraws the approval.")) return;
+  const {data:{session}} = await sb.auth.getSession();
+  const who = session && session.user ? session.user.email : null;
+  if(!who){ alert("Sign in first."); return; }
+  await koSave();
+  const {error} = await sb.from("kickoff_packs")
+    .update({ status:"approved", approved_by:who, approved_at:new Date().toISOString() }).eq("id", p.id);
+  if(error){ $("ko-status").textContent = "Approve failed: "+error.message; return; }
+  p.status="approved"; p.approved_by=who;
+  $("ko-status").textContent = "Approved. It is now issuable.";
+  koRenderPack(); koRenderList();
+}
+async function koRenderList(){
+  const el = $("ko-list"); if(!el) return;
+  if(!sb){ el.innerHTML='<div class="empty">Cloud not configured.</div>'; return; }
+  const {data, error} = await sb.from("kickoff_packs").select("id,project_title,client_name,status,approved_by,created_at").order("created_at",{ascending:false}).limit(30);
+  if(error){ el.innerHTML='<div class="empty">Could not load: '+esc(error.message)+'</div>'; return; }
+  KO.list = data||[];
+  el.innerHTML = KO.list.length ? KO.list.map(r=>
+    '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.08)">'+
+    '<div><b style="font-size:13.5px">'+esc(r.project_title)+'</b><br><span style="font-size:12px;color:var(--mute)">'+esc(r.client_name||"no client named")+' - '+esc(String(r.created_at).slice(0,10))+'</span></div>'+
+    '<div style="display:flex;gap:6px;align-items:center">'+
+    (r.status==="approved"?'<span class="pill ok">approved</span>':r.status==="in_review"?'<span class="pill hold">re-check</span>':'<span class="pill hold">draft</span>')+
+    '<a class="btn sm" onclick="koOpen(\''+esc(r.id)+'\')">Open</a></div></div>').join("")
+    : '<div class="empty">No packs yet.</div>';
+}
+async function koOpen(id){
+  const {data, error} = await sb.from("kickoff_packs").select("*").eq("id", id).single();
+  if(error){ alert("Could not open: "+error.message); return; }
+  KO.current = { id:data.id, project_title:data.project_title, client_name:data.client_name, parish:data.parish,
+                 intake:data.intake, docs:data.docs, model:data.model, status:data.status, approved_by:data.approved_by,
+                 job_id:data.job_id, guardrail:null };
+  $("ko-status").textContent = "";
+  koRenderPack();
+  $("ko-out").scrollIntoView({behavior:"smooth"});
+}
+function koExport(){
+  const p = KO.current; if(!p) return;
+  if(p.status !== "approved" && !confirm("This pack is not approved yet. Print anyway, as an internal draft?")) return;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to print."); return; }
+  const body = $("ko-out").innerHTML;
+  const mark = p.status==="approved"
+    ? '<p style="font-size:12px;color:#555">Approved for issue by '+esc(p.approved_by||"")+'</p>'
+    : '<p style="font-size:13px;color:#b00;font-weight:700">INTERNAL DRAFT - NOT APPROVED FOR ISSUE</p>';
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+esc(p.project_title)+' - Yaadly</title>'+
+    '<style>body{font:14px/1.55 -apple-system,Segoe UI,Roboto,sans-serif;max-width:820px;margin:32px auto;padding:0 20px;color:#111}'+
+    'h3{margin:22px 0 6px;font-size:16px}.card{border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin:12px 0}'+
+    '.note{color:#555;font-size:12.5px}.pill{font-size:11px;border:1px solid #ccc;border-radius:99px;padding:1px 7px}'+
+    '.empty{color:#777;font-size:13px}em{color:#777;font-style:normal;font-size:12px}a.btn{display:none}'+
+    '@media print{.card{break-inside:avoid}}</style></head><body>'+
+    '<h1 style="font-size:20px;margin:0">Yaadly - Project Kickoff Pack</h1>'+
+    '<p style="font-size:13px;color:#555;margin:4px 0 2px">'+esc(p.project_title)+(p.client_name?" - "+esc(p.client_name):"")+'</p>'+mark+
+    '<p class="note">Yaadly provides project management, procurement and oversight. This pack contains no prices, valuations or quantity surveying. Payment amounts are agreed between the client and their contractor and entered into the tracking table by the client.</p>'+
+    body+'</body></html>');
+  w.document.close(); w.focus();
+}
+
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function renderAll(){ renderClient(); renderWorker(); if(adminOpen) renderAdmin(); }
 renderAll();
