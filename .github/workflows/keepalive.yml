@@ -1,0 +1,85 @@
+name: Keep-alive and uptime
+
+# Supabase pauses free-tier projects after a stretch of inactivity. A paused
+# project means yaadly.co.uk is dead: no sign-in, no job requests, no WhatsApp
+# webhook. This makes one harmless database round trip on a schedule so that
+# never happens, and checks the public surfaces are answering while it is there.
+#
+# Free: GitHub-hosted runners cost nothing on public repositories.
+#
+# Two things worth knowing:
+#  1. GitHub disables scheduled workflows on a repository with no activity for
+#     60 days. If you go quiet over the winter, re-enable this in the Actions
+#     tab, or it stops silently.
+#  2. This is a substitute for Supabase Pro, not a replacement. Pro also buys
+#     daily backups and point-in-time recovery, which no cron job can fake.
+#     Backups are handled separately by scripts/backup-db.sh.
+
+on:
+  schedule:
+    # Every second day at 06:17 UTC. Deliberately not on the hour: GitHub's
+    # scheduler is congested at :00 and jobs get delayed or dropped.
+    - cron: "17 6 */2 * *"
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    name: Ping database and public endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the database so the project cannot idle into a pause
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::warning::SUPABASE_URL / SUPABASE_ANON_KEY repository secrets are not set, so the"
+            echo "::warning::database was NOT pinged. Set them under Settings -> Secrets and variables"
+            echo "::warning::-> Actions. The anon key is the one already published in your site's"
+            echo "::warning::JavaScript, so this is not a new exposure."
+            exit 0
+          fi
+          # A select the anon role is not permitted to read. Row-level security
+          # returns an empty array, which is the point: this proves the database
+          # answered without any data leaving it.
+          code=$(curl -s -o /tmp/body.txt -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/rest/v1/waitlist?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "HTTP $code, body: $(cat /tmp/body.txt)"
+          if [ "$code" != "200" ]; then
+            echo "::error::Supabase did not answer with 200. The project may be paused, over quota, or down."
+            exit 1
+          fi
+          if [ "$(cat /tmp/body.txt)" != "[]" ]; then
+            echo "::error::The anon role read rows it should not be able to see. Check row-level security on waitlist."
+            exit 1
+          fi
+          echo "Database awake, and anon still cannot read anything."
+
+      - name: Check the live site is answering
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -L https://yaadly.co.uk)
+          echo "yaadly.co.uk -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::yaadly.co.uk returned $code."
+            exit 1
+          fi
+
+      - name: Check the public job-request endpoint is alive
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ]; then echo "Skipped, secret not set."; exit 0; fi
+          # A GET must be refused with 405. That proves the function is deployed
+          # and running without creating a job or sending anything.
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/functions/v1/yaad-website-intake")
+          echo "yaad-website-intake GET -> HTTP $code (405 expected)"
+          if [ "$code" != "405" ]; then
+            echo "::error::yaad-website-intake answered $code instead of 405. The form endpoint may be broken."
+            exit 1
+          fi

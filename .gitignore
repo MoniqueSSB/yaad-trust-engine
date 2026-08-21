@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 .pytest_cache/
 out/
+*.sql
+*.sql.gz
+*.dump
+backups/
+.yaadly/
+*.env
+!.env.example
