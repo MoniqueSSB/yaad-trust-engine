@@ -9,6 +9,110 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- ─── Error monitoring (Sentry). Loaded first so it sees failures in everything after it. ───
+     There was no global error handler on this page at all before this. The admin sign-in
+     crash of 17-18 August was found by walking into it; this is so that does not happen twice.
+
+     PRIVACY: this page shows client addresses, worker ID and police-check status. Nothing
+     personal is allowed to leave the browser. PII collection is off, form input is never
+     recorded, click text is stripped, and every outgoing event is scrubbed by redact()
+     below. Job ids are deliberately preserved because they are what makes a report useful.
+     Errors only - no tracing, no session replay - which also keeps the free tier intact. -->
+<script src="https://browser.sentry-cdn.com/10.70.0/bundle.min.js"
+        integrity="sha384-79FhSq4eaPA7rdWwXh1Jly3F3Wvgq7HChMpaIIx7feYEZicWt/LnwIfTFTXSJao5"
+        crossorigin="anonymous"></script>
+<script>
+(function(){
+  /* Paste the DSN from a Sentry project of type "Browser JavaScript" here.
+     A browser DSN is public by design - it is meant to sit in client-side code. */
+  var SENTRY_DSN = "";
+
+  if (!SENTRY_DSN || !window.Sentry) return;   /* also covers ad-blockers eating the CDN */
+
+  var RE_EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+  var RE_PHONE = /(\+?\d[\d\s().-]{7,}\d)/g;
+  var RE_LONGNUM = /\b\d{6,}\b/g;
+  var RE_JOBID = /\bJOB-[A-Z]+-\d+\b/g;
+  var SECRET_KEYS = /^(email|client_email|worker_email|phone|client_phone|contact|addr|address|portal_code|password|token|img|photo|selfie|id_document|client_name|worker_name|client|who|ref1|ref2|cert|certno)$/i;
+
+  function scrubStr(str){
+    if (typeof str !== "string" || !str) return str;
+    var kept = [];
+    str = str.replace(RE_JOBID, function(m){ kept.push(m); return "\u0000J" + (kept.length-1) + "\u0000"; });
+    str = str.replace(RE_EMAIL, "[email]").replace(RE_PHONE, "[phone]").replace(RE_LONGNUM, "[number]");
+    return str.replace(/\u0000J(\d+)\u0000/g, function(_, i){ return kept[+i]; });
+  }
+
+  function redact(o, d){
+    d = d || 0;
+    if (d > 8 || o == null) return o;              /* depth cap also defuses circular refs */
+    if (typeof o === "string") return scrubStr(o);
+    if (Array.isArray(o)){ for (var i=0;i<o.length;i++) o[i] = redact(o[i], d+1); return o; }
+    if (typeof o === "object"){
+      for (var k in o){
+        if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+        if (SECRET_KEYS.test(k)) { o[k] = "[redacted]"; continue; }
+        o[k] = redact(o[k], d+1);
+      }
+    }
+    return o;
+  }
+
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: (location.hostname === "yaadly.co.uk") ? "production" : "local",
+    sendDefaultPii: false,          /* no IP addresses, no request headers, no cookies */
+    autoSessionTracking: false,
+    ignoreErrors: [
+      "ResizeObserver loop limit exceeded",
+      "ResizeObserver loop completed with undelivered notifications",
+      "Non-Error promise rejection captured"
+    ],
+    denyUrls: [/extensions\//i, /^chrome:\/\//i, /^moz-extension:\/\//i, /^safari-extension:\/\//i],
+
+    beforeBreadcrumb: function(crumb){
+      /* Anything typed into a form is client or worker personal data. Never record it. */
+      if (crumb.category === "ui.input") return null;
+      /* A click breadcrumb carries the element's text, which on the portals is someone's
+         address or name. Keep that a click happened, throw away what it said. */
+      if (crumb.category === "ui.click" && crumb.message) crumb.message = String(crumb.message).split(/\s/)[0];
+      if (crumb.data) crumb.data = redact(crumb.data);
+      if (crumb.message) crumb.message = scrubStr(crumb.message);
+      return crumb;
+    },
+
+    beforeSend: function(event){
+      try {
+        event = redact(event);
+        /* Closing the name gap. Guessing what a name looks like with a regex is
+           unreliable and mangles real error text ("TypeError", "Cannot GET").
+           Instead: read the names actually loaded in this browser right now and
+           remove those exact strings. Precise, and no false positives. */
+        var names = [];
+        try {
+          var db = window.DB || {};
+          [].concat(db.jobs || [], db.services || [], db.workers || []).forEach(function(r){
+            ["client_name","worker_name","client","name","who"].forEach(function(f){
+              var v = r && r[f];
+              if (typeof v === "string" && v.length > 2) names.push(v);
+              if (r && r.worker && typeof r.worker.name === "string") names.push(r.worker.name);
+            });
+          });
+        } catch (_) { /* best effort */ }
+        if (names.length){
+          var blob = JSON.stringify(event);
+          names.forEach(function(n){
+            blob = blob.split(n).join("[name]");
+          });
+          event = JSON.parse(blob);
+        }
+        return event;
+      }
+      catch (e) { return null; }    /* if scrubbing fails, send nothing rather than risk it */
+    }
+  });
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ───────────────── TROPICS THEME (locked) ───────────────── */
