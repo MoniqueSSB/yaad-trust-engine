@@ -10,3 +10,12 @@ backups/
 .yaadly/
 *.env
 !.env.example
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
