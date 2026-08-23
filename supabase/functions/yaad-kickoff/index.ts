@@ -26,6 +26,16 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // EdgeRuntime.waitUntil, and the result is written to kickoff_drafts, which
 // the desk polls. Every failure path writes status='failed' with the reason,
 // so a dead draft is visible instead of silent.
+//
+// v9, same night: ONE model call for the whole pack was still too slow. The
+// smoke brief drafted in ~100s, but the Old Harbour brief ran past the
+// background worker's own lifetime and was culled silently at ~6 minutes.
+// The pack is therefore drafted as THREE PARALLEL calls - (A) cover, scope,
+// timeline, open questions, review notes; (B) payment schedule and evidence
+// checklist, which share stage names and so must come from one mind; (C)
+// document pack, risk register, communications - merged into one document
+// set. Wall time drops to the slowest third. Same table, same polling desk;
+// MiniMax stays the model, per the standing decision.
 
 // Provider selection, checked at request time. MiniMax is the DEFAULT by
 // Monique's standing decision (23 Aug: "leave NVIDIA, make it better on
@@ -170,10 +180,79 @@ async function draftsWrite(method: string, path: string, body: unknown): Promise
   });
 }
 
+// The pack in three parts. B keeps payment_schedule and evidence_checklist
+// together on purpose: they share stage names, and two separate calls would
+// invent two different stage lists.
+const PARTS: { name: string; keys: string[]; maxTokens: number }[] = [
+  { name: "A", keys: ["cover_note", "scope_of_works", "timeline", "open_questions", "human_review_notes"], maxTokens: 6000 },
+  { name: "B", keys: ["payment_schedule", "evidence_checklist"], maxTokens: 6000 },
+  { name: "C", keys: ["document_pack", "risk_register", "communications_list"], maxTokens: 7000 },
+];
+const ALL_KEYS = PARTS.flatMap((p) => p.keys);
+
+async function draftPart(
+  prov: { name: string; api: string; key: string; model: string },
+  userPrompt: string,
+  part: { name: string; keys: string[]; maxTokens: number },
+  trace: Trace,
+): Promise<Record<string, unknown>> {
+  let finishReason = "";
+  const raw = await trace.span(`chat ${prov.model} part ${part.name}`, SpanKind.CLIENT, {
+    "gen_ai.system": prov.name,
+    "gen_ai.operation.name": "chat",
+    "gen_ai.request.model": prov.model,
+    "gen_ai.request.temperature": 0.3,
+    "server.address": new URL(prov.api).hostname,
+    "yaadly.agent.name": "kickoff",
+    "yaadly.kickoff.part": part.name,
+  }, async (s) => {
+    const r = await fetch(prov.api, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
+      body: JSON.stringify({
+        model: prov.model,
+        temperature: 0.3,
+        max_tokens: part.maxTokens,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content:
+            userPrompt.slice(0, 8000) +
+            "\n\nFOR THIS RESPONSE ONLY: return STRICT JSON with EXACTLY these top-level keys and no others: " +
+            part.keys.join(", ") +
+            ". Follow the shape defined for those keys in the schema above. The remaining sections are being drafted separately; do not mention or include them." },
+        ],
+      }),
+      signal: AbortSignal.timeout(240_000),
+    });
+    const j = await r.json();
+    s.setAttributes({
+      "http.response.status_code": r.status,
+      "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
+      "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
+    });
+    if (!r.ok) {
+      s.recordError(`${prov.name} http ${r.status}`);
+      throw new Error(`part ${part.name}: model call failed (${prov.name} ${r.status})`);
+    }
+    finishReason = j?.choices?.[0]?.finish_reason ?? "";
+    return j?.choices?.[0]?.message?.content ?? "";
+  });
+  const parsed = extractJson(String(raw));
+  if (!parsed) {
+    throw new Error(finishReason === "length"
+      ? `part ${part.name}: ran out of room before it finished`
+      : `part ${part.name}: did not return usable JSON`);
+  }
+  const missing = part.keys.filter((k) => !(k in parsed));
+  if (missing.length) throw new Error(`part ${part.name}: missing sections ${missing.join(", ")}`);
+  return parsed;
+}
+
 // The background draft. Runs after the HTTP response has returned, inside
 // EdgeRuntime.waitUntil, so the 150s request limit no longer applies to the
-// model call. Every exit path updates the row: a draft is never left
-// 'drafting' by this code.
+// model calls. Every exit path updates the row: a draft is never left
+// 'drafting' by this code (short of the platform culling the worker, which
+// the desk's own 8 minute cutoff reports).
 async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace): Promise<void> {
   const fail = async (msg: string) => {
     console.error("kickoff draft", draftId, "failed:", msg);
@@ -186,54 +265,10 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     if (!prov) { await fail("No model API key is set on this function. Add MINIMAX_API_KEY in Supabase secrets."); return; }
 
     const userPrompt = intakeToPrompt(intake);
-    let finishReason = "";
-    const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
-      "gen_ai.system": prov.name,
-      "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": prov.model,
-      "gen_ai.request.temperature": 0.3,
-      "server.address": new URL(prov.api).hostname,
-      "yaadly.agent.name": "kickoff",
-      "yaadly.kickoff.draft_id": draftId,
-    }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model,
-          temperature: 0.3,
-          // A reasoning model spends part of the budget thinking. 14000
-          // leaves room for the thinking, the full document set and prose.
-          max_tokens: 14000,
-          messages: [
-            { role: "system", content: SYSTEM },
-            { role: "user", content: userPrompt.slice(0, 8000) },
-          ],
-        }),
-        signal: AbortSignal.timeout(330_000),
-      });
-      const j = await r.json();
-      s.setAttributes({
-        "http.response.status_code": r.status,
-        "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
-        "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
-      });
-      if (!r.ok) {
-        s.recordError(`${prov.name} http ${r.status}`);
-        throw new Error(`Model call failed (${prov.name} ${r.status})`);
-      }
-      finishReason = j?.choices?.[0]?.finish_reason ?? "";
-      return j?.choices?.[0]?.message?.content ?? "";
-    });
-
-    const docs = extractJson(String(raw));
-    if (!docs) {
-      const truncated = finishReason === "length";
-      await fail(truncated
-        ? "The draft ran out of room before it finished. Trim the intake a little and try again."
-        : "The model did not return usable JSON. Try again.");
-      return;
-    }
+    const partDocs = await Promise.all(PARTS.map((p) => draftPart(prov, userPrompt, p, trace)));
+    const docs: Record<string, unknown> = Object.assign({}, ...partDocs);
+    const absent = ALL_KEYS.filter((k) => !(k in docs));
+    if (absent.length) { await fail(`Merged draft is missing sections: ${absent.join(", ")}`); return; }
 
     // Guardrail. The model is told never to price; this checks whether it did
     // anyway, and reports it rather than trusting the instruction held.

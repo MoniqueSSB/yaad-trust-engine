@@ -2311,6 +2311,7 @@ async function koDraft(){
   $("ko-status").textContent = "Sending the brief to the drafting agent...";
   const finish = () => { KO.busy=false; $("ko-go").textContent="Draft the pack"; };
   const accept = (docs, model, guardrail) => {
+    docs = koScrubDashes(docs);
     KO.current = { id:"KO-"+Date.now(), project_title: intake.title || (intake.brief.slice(0,60)+"..."),
       client_name: intake.client_name || "", parish: intake.parish || "",
       intake, docs, model, status:"draft", guardrail };
@@ -2575,11 +2576,19 @@ async function koRenderList(){
     '<a class="btn sm" onclick="koOpen(\''+esc(r.id)+'\')">Open</a></div></div>').join("")
     : '<div class="empty">No packs yet.</div>';
 }
+/* House style: no em or en dashes in anything issued under Yaadly's name.
+   The model writes them anyway; scrub them wherever a pack enters the desk. */
+function koScrubDashes(o){
+  if (typeof o === "string") return o.replace(/\s*[\u2014\u2013]\s*/g, ", ");
+  if (Array.isArray(o)) return o.map(koScrubDashes);
+  if (o && typeof o === "object"){ const r = {}; for (const k in o) r[k] = koScrubDashes(o[k]); return r; }
+  return o;
+}
 async function koOpen(id){
   const {data, error} = await sb.from("kickoff_packs").select("*").eq("id", id).single();
   if(error){ alert("Could not open: "+error.message); return; }
   KO.current = { id:data.id, project_title:data.project_title, client_name:data.client_name, parish:data.parish,
-                 intake:data.intake, docs:data.docs, model:data.model, status:data.status, approved_by:data.approved_by,
+                 intake:data.intake, docs:koScrubDashes(data.docs), model:data.model, status:data.status, approved_by:data.approved_by,
                  job_id:data.job_id, rev:data.rev||1, revisions:data.revisions||[], guardrail:null };
   $("ko-status").textContent = "";
   koRenderPack();
