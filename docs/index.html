@@ -2308,22 +2308,43 @@ async function koDraft(){
   const intake = koIntake();
   if(!intake.brief){ alert("Tell it what the client wants done first."); return; }
   KO.busy = true; $("ko-go").textContent = "Drafting...";
-  $("ko-status").textContent = "Drafting the pack. Usually up to a minute.";
+  $("ko-status").textContent = "Sending the brief to the drafting agent...";
+  const finish = () => { KO.busy=false; $("ko-go").textContent="Draft the pack"; };
+  const accept = (docs, model, guardrail) => {
+    KO.current = { id:"KO-"+Date.now(), project_title: intake.title || (intake.brief.slice(0,60)+"..."),
+      client_name: intake.client_name || "", parish: intake.parish || "",
+      intake, docs, model, status:"draft", guardrail };
+    $("ko-status").textContent = "Draft ready. Read it before it goes anywhere near a client.";
+    finish(); koRenderPack();
+  };
   try{
     const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-kickoff", {
       method:"POST",
       headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
       body: JSON.stringify({ intake })
     });
-    const j = await r.json().catch(()=>({error:"bad response"}));
-    if(j.error){ $("ko-status").textContent = "Failed: "+j.error; return; }
-    KO.current = { id:"KO-"+Date.now(), project_title: intake.title || (intake.brief.slice(0,60)+"..."),
-      client_name: intake.client_name || "", parish: intake.parish || "",
-      intake, docs: j.docs, model: j.model, status:"draft", guardrail: j.guardrail };
-    $("ko-status").textContent = "Draft ready. Read it before it goes anywhere near a client.";
-    koRenderPack();
-  } catch(e){ $("ko-status").textContent = "Failed: "+e; }
-  finally { KO.busy=false; $("ko-go").textContent="Draft the pack"; }
+    const j = await r.json().catch(()=>({error:"The server reply could not be read (http "+r.status+")."}));
+    if(j.error){ $("ko-status").textContent = "Failed: "+j.error; finish(); return; }
+    /* Older function shape: the whole pack came back in one response. */
+    if(j.docs){ accept(j.docs, j.model, j.guardrail); return; }
+    /* Background shape: a draft id now, the pack when it is done. */
+    if(!j.draftId){
+      $("ko-status").textContent = "Failed: the server did not return a draft (http "+r.status+(j.code?", "+j.code:"")+(j.message?": "+j.message:"")+"). Nothing was drafted.";
+      finish(); return;
+    }
+    const t0 = Date.now(), LIMIT = 8*60*1000;
+    const poll = async () => {
+      const mins = Math.floor((Date.now()-t0)/60000), secs = Math.floor(((Date.now()-t0)%60000)/1000);
+      $("ko-status").textContent = "Drafting in the background ("+mins+"m "+String(secs).padStart(2,"0")+"s). The agent reads the brief, thinks, then writes seven sections; rich briefs take two to three minutes. Leave this tab open.";
+      const {data, error} = await sb.from("kickoff_drafts").select("status,docs,model,guardrail,error").eq("id", j.draftId).single();
+      if(error){ $("ko-status").textContent = "Could not check the draft: "+error.message; finish(); return; }
+      if(data.status==="ready"){ accept(data.docs, data.model, data.guardrail); return; }
+      if(data.status==="failed"){ $("ko-status").textContent = "The draft failed: "+(data.error||"no reason recorded")+" Nothing was written; try again."; finish(); return; }
+      if(Date.now()-t0 > LIMIT){ $("ko-status").textContent = "The draft has been running over 8 minutes, which is not normal. Check the function logs; nothing has been rendered."; finish(); return; }
+      setTimeout(poll, 5000);
+    };
+    setTimeout(poll, 4000);
+  } catch(e){ $("ko-status").textContent = "Failed: "+e; finish(); }
 }
 const koList = (a, f) => Array.isArray(a) && a.length ? '<ul style="margin:6px 0 0 18px;font-size:13px">'+a.map(f).join("")+'</ul>' : '<p class="note">Nothing listed.</p>';
 const koSec = (title, inner) => '<div class="card"><h3>'+esc(title)+'</h3>'+inner+'</div>';
