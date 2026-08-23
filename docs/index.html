@@ -554,7 +554,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div class="tile"><div class="no">02</div><h4>Fair price, checked</h4><p>Real material costs and real day rates. Never guessed. A project manager checks the band before it reaches you.</p><span class="pill ai">🤖 AI drafts it</span> <span class="pill human">🧍 We confirm</span></div>
     <div class="tile money"><div class="no">03</div><h4>Payment agreed and held</h4><p>Agreed in writing before a tool is lifted. Nothing is charged without you.</p><span class="pill human">🧍 You confirm it</span></div>
     <div class="tile"><div class="no">04</div><h4>Work documented</h4><p>Arrival, before, after and video. Timestamped and geotagged, checked for anything visibly wrong.</p><span class="pill ai">🤖 AI checks it</span> <span class="pill human">🧍 We confirm</span></div>
-    <div class="tile"><div class="no">05</div><h4>You approve, from anywhere</h4><p>Against a <b>signed Completion Report</b>: before and after side by side, with the worker's own confirmation on it. Nothing moves until you say so.</p><span class="pill human">🧍 You decide</span></div>
+    <div class="tile"><div class="no">05</div><h4>You approve, from anywhere</h4><p>Against a <b>signed Completion Report</b>, or book a <b>live video walkthrough</b> of the site first and raise anything on the spot. Nothing moves until you say so.</p><span class="pill human">🧍 You decide</span></div>
     <div class="tile money"><div class="no">06</div><h4>Worker paid fast</h4><p>Within 3 working days, and the job builds their <b>Yaad Score</b>, a record they own that a bank can finally see.</p><span class="pill human">🧍 Released on your say so</span></div>
   </div>
   <div class="rule rv d2">💷 <b>On payments today:</b> holding your payment online goes live once our professional indemnity insurance is in force. Until then the quote and payment terms are agreed with you directly, in writing, before work starts. Same rule either way: nothing is charged without you.</div>
@@ -792,6 +792,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Online holding goes live once our professional indemnity insurance is in force; until then the terms are agreed with you directly in writing before work starts.</div></details>
     <details class="faq"><summary>What does it cost?</summary><div class="a">Prices are published when we open, which happens once our professional indemnity insurance is in force. We are not taking payment before then, on purpose. Everything will be quoted in writing before any work begins. Join the waiting list and you will be told the day booking opens. Property work gets a written quote benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client overseas pays what a client in Jamaica pays.</div></details>
     <details class="faq"><summary>What do I actually get at the end of a job?</summary><div class="a">A <b>signed Completion Report</b>, as a PDF that is yours to keep: the job summary, before and after photographs side by side, the verification record, the worker's own confirmation that what is written is what was done, and your approval with the payment record on the final page. It is drafted automatically from the evidence (the worker files one evidence package and writes no paperwork), confirmed by them, reviewed by a person, then delivered to you. Forward it to family, keep it with the house papers, show it to the next contractor.</div></details>
+    <details class="faq"><summary>Can I see the site live before I approve?</summary><div class="a">Yes. At sign-off you can approve from the evidence package, or book a <b>live video walkthrough</b>: the worker walks the whole site with you on WhatsApp video, you raise anything you see on the spot, and anything raised is recorded on your Completion Report. On builds and larger works we also require a continuous <b>site overview video</b> as part of the evidence itself.</div></details>
     <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
     <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
     <details class="faq"><summary>How are workers vetted? Who is coming to my property?</summary><div class="a">Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address, and a selfie holding that ID so we know the document is theirs. For work inside occupied homes, or any time a client asks, we require a <b>police record check</b> from the Jamaica Constabulary Force. On top of that: references called, past work reviewed, and a trial job before they are trusted with yours. Certified trades have their certification checked with the issuing body. You are told who is coming, and you see their record before they arrive.</div></details>
@@ -1489,7 +1490,7 @@ function checklist(job){
     {name:"After photo of each work area", key:"After photo", have:c(/after/i), need:1},
     {name:"One wide video, 15 seconds or more", key:"Video pan", have:c(/video|pan/i), need:1},
     {name:"Materials receipts", key:"Receipt", have:c(/receipt/i), need:1, gapOnly:true}
-  ];
+  ].concat(job.overviewReq ? [{name:"Site overview footage, one continuous walkthrough of the whole site", key:"Overview footage", have:c(/overview/i), need:1}] : []);
 }
 function verifyAgent(job){
   const rows = checklist(job).map(x=>{
@@ -1642,7 +1643,11 @@ function jobDetailHTML(j){
     '<div class="kick">Evidence</div>'+gal+
     '<div class="kick">Money</div><div class="mono" style="margin-top:4px">Your payment is held and released only when you approve the evidence.</div>'+
     (stage===0 ? '<p class="note">Yaadly is not taking payments online yet. Your quote and payment arrangements are agreed with you directly, in writing, before any work starts.</p>' : "")+
-    (stage===4 && !j.review ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+": I have reviewed the evidence and I APPROVE. Please release payment to the worker.")+'">✓ Approve and release</a><a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": I have a question before I approve. ")+'">Raise a question</a></div><p class="note">Approving opens a WhatsApp message from you to Yaadly confirming release. A person actions it: the AI never releases money.</p>' : "")+
+    (stage===4 && !j.review ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+": I have reviewed the evidence and I APPROVE. Please release payment to the worker.")+'">✓ Approve and release</a>'+
+      '<a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": Before I approve, I would like a LIVE VIDEO WALKTHROUGH of the site with the worker. When can we do it? I am on WhatsApp video.")+'">📹 Book a live walkthrough first</a>'+
+      '<a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": I have a question before I approve. ")+'">Raise a question</a></div>'+
+      '<p class="note">Two ways to sign off, both fine: approve from the evidence package above, or book a live video walkthrough first. The worker walks the site on WhatsApp video, you raise anything on the spot, and you approve when you are satisfied. Approving opens a WhatsApp message from you to Yaadly confirming release. A person actions it: the AI never releases money.</p>'+
+      (j.walkDate?'<p class="note">📹 Walkthrough booked: <b>'+esc(j.walkDate)+'</b>'+(j.walkWho?' · '+esc(j.walkWho):'')+'</p>':'') : "")+
     '</div>';
 }
 function laneBadge(l){ return l==="cert"?'<span class="lane cert">CERTIFIED PROFESSIONAL</span>':l==="pro"?'<span class="lane pro">VETTED PROFESSIONAL</span>':l?'<span class="lane vet">EVIDENCE VETTED</span>':""; }
@@ -2076,6 +2081,13 @@ function editJob(id){
     '<div class="kick">Client shortlist (cap five)</div>'+slRows+'<a class="btn o sm" onclick="slAdd(\''+id+'\')">+ Add to shortlist</a>'+
     '<div class="kick">Evidence log</div>'+evRows+'<a class="btn o sm" onclick="evAdd(\''+id+'\')">+ Add evidence item</a> <label class="filebtn">📷 Add site photos from WhatsApp<input type="file" multiple accept="image/*" onchange="sitePhotos(event,\''+id+'\')"></label>'+
     '<div class="kick">Quotes received</div><div id="jq-'+esc(id)+'"><p class="note">Loading quotes...</p></div>'+
+    '<div class="kick">Sign-off</div>'+
+    '<div class="grid3"><div class="field"><label>How the client signs off</label><select id="jb-signoff">'+
+      ["Evidence package","Live video walkthrough","Evidence package + live walkthrough"].map(m=>'<option'+((j.signoffMethod||"Evidence package")===m?" selected":"")+'>'+m+'</option>').join("")+'</select></div>'+
+    '<div class="field"><label>Walkthrough date <span style="font-weight:500;text-transform:none">(if booked)</span></label><input id="jb-walkdate" value="'+esc(j.walkDate||"")+'" placeholder="e.g. Thu 28 Aug, 4pm JA time"></div>'+
+    '<div class="field"><label>Who attends</label><input id="jb-walkwho" value="'+esc(j.walkWho||"")+'" placeholder="Client, worker, Yaadly"></div></div>'+
+    '<div class="field"><label>Walkthrough notes <span style="font-weight:500;text-transform:none">(issues raised and how they were resolved, lands on the Completion Report)</span></label><textarea id="jb-walknotes" style="min-height:60px">'+esc(j.walkNotes||"")+'</textarea></div>'+
+    '<label class="slot" style="margin-bottom:12px"><input type="checkbox" id="jb-overview"'+(j.overviewReq?" checked":"")+'> Site overview footage required for this job (adds one continuous full-site walkthrough video to the evidence checklist, for builds and larger works)</label>'+
     '<div class="kick">Stage · money states move only by your hand</div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
     '<div class="kick">Agents · they draft and flag, you decide</div>'+
     '<div class="field"><label>Tell the agent anything extra before drafting, optional</label><input id="rep-note" placeholder="e.g. tiles reach Thursday, Devon starts Friday morning"></div>'+
@@ -2095,6 +2107,9 @@ function saveJob(id){
   j.clientEmail=$("jb-cemail").value.trim(); j.clientPhone=$("jb-cphone").value.trim();
   j.open=!!$("jb-open").value; j.desc=$("jb-desc").value;
   j.payLink=$("jb-pay").value.trim(); j.paidIn=$("jb-in").value.trim();
+  j.signoffMethod=$("jb-signoff").value; j.walkDate=$("jb-walkdate").value.trim();
+  j.walkWho=$("jb-walkwho").value.trim(); j.walkNotes=$("jb-walknotes").value.trim();
+  j.overviewReq=$("jb-overview").checked;
   j.owed=$("jb-owed").value.trim(); j.payMethod=$("jb-paymethod").value; j.payRef=$("jb-payref").value.trim();
   j.worker.name=$("jb-wname").value; j.worker.trade=$("jb-wtrade").value; j.worker.lane=$("jb-wlane").value;
   j.worker.email=$("jb-wemail").value.trim(); j.worker.phone=$("jb-wphone").value.trim();
@@ -2689,7 +2704,7 @@ function wgDocHtml(){
   '<tr><td><b>Arrival, first day</b></td><td>Minimum three photos of the site before you touch anything, different angles</td><td>Protects you: proves the condition you found</td></tr>'+
   '<tr><td><b>Before covering anything</b></td><td>Photos of what is about to be hidden (timbers, pipework, wiring, foundations)</td><td>Hold point: do not cover until Yaadly confirms the evidence is in</td></tr>'+
   '<tr><td><b>End of each day</b></td><td>One package: progress photos, any video asked for, receipts for materials bought</td><td>Keeps the client calm and the money moving</td></tr>'+
-  '<tr><td><b>Completion</b></td><td>After photos matching the before angles, plus the wide video pan</td><td>Feeds your Completion Report</td></tr>'+
+  '<tr><td><b>Completion</b></td><td>After photos matching the before angles, plus the wide video pan. On builds and larger works: one continuous site overview video. If the client books a live video walkthrough, attend it on time and walk the whole site; it does not replace the evidence package</td><td>Feeds your Completion Report</td></tr>'+
   '</tbody></table>'+
   '<p>Photos and video are timestamped and geotagged. Leave location on for the photos, that is what makes them proof.</p></section>'+
   '<section><h2><span>6</span>The Completion Report and your Yaad Score</h2>'+
@@ -2845,6 +2860,11 @@ function crDocHtml(j){
   '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · checked and issued · signature and date</div></div></div></div>');
   body += S("Your approval, and the payment record",
   '<p>Nothing on this job moved without the client\'s say-so. Payment was released to the worker only after the client reviewed the evidence in this report and approved it.</p>'+
+  '<h3>How this job was signed off</h3>'+
+  '<table><tbody><tr><td style="width:34%">Method</td><td><b>'+E(j.signoffMethod||"Evidence package")+'</b></td></tr>'+
+  (j.walkDate?'<tr><td>Live walkthrough</td><td>'+E(j.walkDate)+(j.walkWho?' · attended by '+E(j.walkWho):'')+'</td></tr>':'')+
+  (j.walkNotes?'<tr><td>Raised on the walkthrough</td><td>'+E(j.walkNotes)+'</td></tr>':'')+
+  '</tbody></table>'+
   '<table><tbody>'+
   '<tr><td style="width:34%">Agreed amount to worker</td><td>'+(j.owed?('J$'+E(Number(j.owed).toLocaleString())):'not recorded')+'</td></tr>'+
   '<tr><td>Paid by</td><td>'+dash(j.payMethod)+'</td></tr>'+
@@ -3277,6 +3297,7 @@ function cgDocHtml(){
   '<li>Extra work you think of on site goes through Yaadly first, in writing, never negotiated at the gate.</li></ul></section>'+
   '<section><h2><span>5</span>Evidence, approval and money</h2><ul>'+
   '<li>Review evidence when it lands, within 3 days where you can. A worker who has proven a stage is waiting on your word to be paid.</li>'+
+  '<li>At final sign-off you may approve from the evidence package, or book a live video walkthrough of the site first. If you book one, attend it: the worker is standing on site waiting for you.</li>'+
   '<li>Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free and reviewed by a person, and nothing moves while one is open.</li>'+
   '<li>Pay through the agreed route only. Never pay a worker directly on the side, and never withhold approval to renegotiate a price already agreed.</li></ul></section>'+
   '<section><h2><span>6</span>What loses the account</h2>'+
