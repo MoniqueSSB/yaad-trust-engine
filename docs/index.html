@@ -458,6 +458,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="brand" onclick="go('site')"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></div>
   <div class="views">
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
+    <button class="vbtn" data-v="market" onclick="go('market')">Marketplace</button>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
     <button class="vbtn" data-v="client" onclick="go('client')">Client portal</button>
     <button class="vbtn" data-v="worker" onclick="go('worker')">Worker portal</button>
@@ -588,7 +589,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
           <div class="thread">
             <div class="msg in">New job open for your quote: minor roof repair, Portmore. Quoting is free, always. Reply with labour, materials and earliest start.<span class="t">08:14</span></div>
             <div class="msg out">Labour 45,000. Materials 28,500 with receipts. Can start Tuesday.<span class="t">08:31</span></div>
-            <div class="sysnote">Quote sent to Yaadly for review, never to the client directly.</div>
+            <div class="sysnote">Quote goes to the client with Yaadly's fair-price indicator beside it.</div>
             <div class="msg in">You got the job. The payment is agreed and confirmed, so start when ready. Document the site first: three arrival photos minimum.<span class="t">Mon 17:02</span></div>
             <div class="msg out"><div class="shot">📷 Arrival photos ×3 · 09:41</div>On site. Zinc coming off now.<span class="t">Tue 09:52</span></div>
             <div class="msg in">Checklist: PASS ✓ Evidence complete. Your Completion Report is drafted, just confirm it is true.<span class="t">Tue 22:45</span></div>
@@ -821,6 +822,34 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 </div></div>
 
 </section>
+<!-- ═══════════════ MARKETPLACE (public) ═══════════════ -->
+<section class="pane" id="pane-market"><div class="wrap">
+  <h1 class="hx">The <span class="g1">marketplace.</span></h1>
+  <p class="lead">Open to everyone to look at: the jobs waiting for quotes, and the verified workers who do them. <b>Taking part is signed-on only.</b> Workers sign in to quote. You become a client by creating your profile and signing the Client Guidelines, then you can pitch jobs, and your completed jobs build your own record, the same way a worker's do.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
+    <a class="btn" onclick="go('client')">Become a client →</a>
+    <a class="btn o" onclick="go('worker');workerTab('apply')">Apply as a worker</a>
+    <a class="btn o" onclick="go('client')">Client sign in</a>
+    <a class="btn o" onclick="go('worker')">Worker sign in</a>
+  </div>
+  <div class="rule" style="margin-top:18px">⚖️ <b>How the door works:</b> anyone can look. To quote you must be a verified, signed-in worker who has signed the Worker Guidelines. To pitch a job you must have created your profile and signed the Client Guidelines. Both sides sign the same kind of promise, both sides build a scored record, and nobody carries the risk alone.</div>
+
+  <div class="kick" style="margin-top:34px">Jobs open for quotes</div>
+  <div id="mp-jobs"><div class="empty">Loading the jobs board...</div></div>
+
+  <div class="kick" style="margin-top:34px">The worker network</div>
+  <div id="mp-workers"><div class="empty">Loading the directory...</div></div>
+
+  <div class="card" style="margin-top:26px"><h3>Want to be <em>part of it?</em></h3>
+    <p class="note" style="margin-top:0">Property owners: create your profile, sign the Client Guidelines, and pitch your job, free, and your record starts building from the first completed job. Tradespeople: apply free, pass verification, sign the Worker Guidelines, and every job on this board is yours to quote.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" onclick="go('client')">Become a client →</a>
+      <a class="btn o" onclick="go('worker');workerTab('apply')">Join as a worker →</a>
+      <a class="btn o" onclick="openClientGuidelines()">Read the Client Guidelines</a>
+      <a class="btn o" onclick="openWorkerGuidelines()">Read the Worker Guidelines</a>
+    </div>
+  </div>
+</div></section>
 <!-- ═══════════════ SERVICES PAGE ═══════════════ -->
 <section class="pane" id="pane-services"><div class="wrap">
   <h1 class="hx">Project management, <span class="g1">from London</span> to your gate.</h1>
@@ -869,10 +898,9 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <section class="pane" id="pane-client"><div class="wrap">
   <div id="client-lock" class="card" style="max-width:420px;margin:40px auto">
     <h3>Client <em>portal</em></h3>
-    <p class="note" style="margin-top:0">Already have an account? Sign in with the email you gave when you requested work. First time here? You will need the job code Yaadly sent you to create an account, this only unlocks once a project manager has taken your job on.</p>
+    <p class="note" style="margin-top:0">Already have a profile? Sign in. New here? Create your profile with just an email, you then read and sign the <a onclick="openClientGuidelines()" style="color:var(--tealb);cursor:pointer">Client Guidelines</a>, and once signed you can pitch your first job. Becoming a client is free.</p>
     <div class="field"><label>Email</label><input id="cgate-email" type="email" autocomplete="username"></div>
     <div class="field"><label>Password</label><input id="cgate-pass" type="password" autocomplete="current-password"></div>
-    <div class="field"><label>Job code <span style="font-weight:500;text-transform:none">(from Yaadly, only needed the first time, to create an account)</span></label><input id="cgate-code" autocomplete="off" placeholder="e.g. 4F9B2A" style="text-transform:uppercase"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <a class="btn" onclick="clientGateLogin()">Sign in</a>
       <a class="btn o" onclick="clientGateSignup()">Create account</a>
@@ -880,6 +908,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div id="cgate-status"></div>
   </div>
   <div id="client-ui" style="display:none">
+  <div id="cg-gate" style="display:none;margin-top:24px"></div>
+  <div id="client-dash">
   <div class="kick" style="margin-top:20px">Client portal</div>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
     <h1 class="hx" style="font-size:clamp(26px,4.5vw,44px);margin:0">Paid on proof, <span class="g1">not promises.</span></h1>
@@ -899,6 +929,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div class="dash-nav" data-ct="settings" onclick="clientNav('settings')">⚙ Settings</div>
     </div>
     <div class="dash-main" id="client-dash-main"></div>
+  </div>
   </div>
   </div>
 </div></section>
@@ -938,7 +969,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div id="wt-open" style="display:none"></div>
       <div id="wt-apply" style="display:none">
     <div class="card"><h3>Apply to join <em>Yaadly</em></h3>
-      <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Joining is free. Quoting is free. Workers are never charged. Yaadly reviews every application personally.</p>
+      <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Joining is free. Quoting is free. Workers are never charged. Yaadly reviews every application personally. <a onclick="openWorkerGuidelines()" style="color:var(--tealb);cursor:pointer">Read the Worker Guidelines →</a></p>
       <div class="grid2" style="margin-top:12px">
         <div class="field"><label>Full name</label><input id="ap-name"></div>
         <div class="field"><label>WhatsApp number</label><input id="ap-phone" placeholder="876..."></div>
@@ -1253,6 +1284,7 @@ function go(v){
   window.scrollTo({top:0});
   history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
   renderAll();
+  if(v==="market") renderMarketplace();
 }
 function openBox(id){
   const el = $(id); if(!el) return;
@@ -1485,6 +1517,11 @@ function renderClient(){
   if($("cd-count")) $("cd-count").textContent = items.length + (items.length===1?" property":" properties");
   const doneCount = items.filter(j=>(j.stage||0)>=5).length;
   if($("cd-protected")) $("cd-protected").textContent = items.length ? Math.round((doneCount/items.length)*100)+"%" : "n/a";
+  if(clientTabState==="workers"){
+    main.innerHTML = '<h3 style="margin:0 0 10px">The Yaadly <em style="font-style:normal;color:var(--mango)">worker network</em></h3><div id="cw-dir"><div class="empty">Loading the directory...</div></div>';
+    cwLoad($("cw-dir"));
+    return;
+  }
   if(clientTabState!=="overview"){
     const labels = {properties:"Properties",evidence:"Evidence",workers:"Workers",aihub:"AI Hub",reports:"Reports",settings:"Settings"};
     main.innerHTML = '<div class="empty" style="margin-top:0">'+labels[clientTabState]+': this section is coming soon. You are looking at a layout preview; full functionality is being built next.</div>';
@@ -1539,7 +1576,35 @@ function renderClientOverview(main, items){
       '<div><div class="note" style="margin:0">Stage</div><b>'+stageLabels[stage]+'</b></div>'+
       (sel._kind==="job" ? '<a class="btn o sm" onclick="clientDetail(\''+sel.id+'\')">View full details →</a>' : '')+
     '</div>'+
+    '<div id="cq-'+esc(sel.id)+'"></div>'+
     '<div id="client-full-detail"></div>';
+  if(sel._kind==="job") cqLoad(sel.id);
+}
+/* Quotes, straight to the client. Live quotes on their job with the
+   fair-price indicator where a benchmark exists. Choosing one messages
+   Yaadly to execute the match, a person assigns, never the table. */
+async function cqLoad(jobId){
+  const box = $("cq-"+jobId); if(!box || !sb) return;
+  const j = DB.jobs.find(x=>x.id===jobId);
+  if(j && (j.stage||0) > 1){ box.innerHTML=""; return; }
+  const {data, error} = await sb.from("job_quotes").select("worker_name,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,status").eq("job_id", jobId);
+  if(error || !data || !data.length){ box.innerHTML=""; return; }
+  const b = wqBand(j);
+  box.innerHTML = '<div class="card"><h3 style="font-size:15px">Quotes for this job</h3>'+
+    (b ? '<p class="note" style="margin-top:0">Yaadly\'s fair-price benchmark for this kind of work: <b>J$'+b.low.toLocaleString()+' to J$'+b.high.toLocaleString()+'</b>. The indicator shows where each quote sits, the choice is entirely yours.</p>'
+       : '<p class="note" style="margin-top:0">No public benchmark exists yet for this kind of work in Jamaica, we say so rather than guess. Compare the quotes and choose; nothing is charged without you.</p>')+
+    '<div class="ktwrap"><table class="kt"><thead><tr><th>From</th><th>Labour</th><th>Materials</th><th>Total</th><th>Indicator</th><th>Can start</th><th></th></tr></thead><tbody>'+
+    data.map(q=>{
+      const tot = Number(q.labour_jmd)+Number(q.materials_jmd);
+      return '<tr><td><b>'+esc(q.worker_name)+'</b>'+(q.status==="accepted"?' <span class="pill done">CHOSEN</span>':'')+'</td>'+
+      '<td>J$'+Number(q.labour_jmd).toLocaleString()+'</td>'+
+      '<td>J$'+Number(q.materials_jmd).toLocaleString()+(q.materials_at_cost?'<br><span style="font-size:10px">at cost, receipted</span>':'')+'</td>'+
+      '<td><b>J$'+tot.toLocaleString()+'</b></td>'+
+      '<td>'+(wqIndicator(j, tot)||'<span style="color:var(--dim);font-size:11px">no benchmark</span>')+'</td>'+
+      '<td>'+esc(q.earliest_start)+'</td>'+
+      '<td>'+(q.status==="submitted"?'<a class="btn sm" target="_blank" rel="noopener" href="'+wa(jobId+": I choose "+q.worker_name+"\'s quote at J$"+tot.toLocaleString()+" total. Please go ahead and assign.")+'">Choose →</a>':'')+'</td></tr>';
+    }).join("")+'</tbody></table></div>'+
+    '<p class="note">Every worker here is ID verified before they can quote. Choosing opens a WhatsApp message from you to Yaadly; a person executes the match and confirms your payment terms in writing before any work starts.</p></div>';
 }
 function clientDetail(id){
   clientSelectedId = id;
@@ -1619,7 +1684,7 @@ function renderWorker(){
       d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">OPEN FOR QUOTES</span></div>'+
         '<p style="font-size:13.5px;color:var(--mute)">'+esc(j.desc||"")+'</p>'+
         '<a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+" ("+(j.title||"")+", "+(j.parish||"")+"): My quote is J$____ labour only, materials at cost with receipts. I can start ____.")+'">Send my quote →</a>'+
-        '<p class="note">Your quote goes to Yaadly, is reviewed for shape against real costs, and is never beaten down.</p>';
+        '<p class="note">Your quote is yours. Where Yaadly has a benchmark, a fair-price indicator sits beside it for the client; it is never beaten down. <b>Sign in above to quote right here instead, no WhatsApp needed.</b></p>';
       O.appendChild(d);
     });
     return;
@@ -1629,7 +1694,8 @@ function renderWorker(){
   if($("wd-count")) $("wd-count").textContent = assigned.length;
   const heldTotal = DB.jobs.filter(j=>isMine(j) && j.stage<4 && j.owed).reduce((s,j)=>s+Number(j.owed||0),0);
   if($("wd-held")) $("wd-held").textContent = heldTotal ? "J$"+heldTotal.toLocaleString() : "n/a";
-  J.innerHTML = assigned.length ? "" : '<div class="empty">No jobs assigned right now. When Yaadly assigns you a job, it appears here with the scope and your evidence checklist.</div>';
+  J.innerHTML = '<div id="wg-sign"></div>' + (assigned.length ? "" : '<div class="empty">No jobs assigned right now. When Yaadly assigns you a job, it appears here with the scope and your evidence checklist.</div>');
+  wgLoadSign();
   assigned.forEach(j=>{
     const rows = checklist(j).map(x=>{
       const ok = x.have>=x.need; const cls = ok?"pass":(x.gapOnly?"gap":"block");
@@ -1663,16 +1729,8 @@ function renderWorker(){
       '<a class="btn o sm" style="margin-top:10px" target="_blank" rel="noopener" href="'+wa(j.id+": question about my payment.")+'">Ask about this payment →</a>';
     P.appendChild(d);
   });
-  const open = DB.jobs.filter(j=>j.open && !(j.worker&&j.worker.name));
-  O.innerHTML = open.length ? "" : '<div class="empty">No open jobs for your trade right now. You will be notified on WhatsApp when one matches. Quoting is free, always.</div>';
-  open.forEach(j=>{
-    const d = document.createElement("div"); d.className="card";
-    d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">OPEN FOR QUOTES</span></div>'+
-      '<p style="font-size:13.5px;color:var(--mute)">'+esc(j.desc||"")+'</p>'+
-      '<a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+" ("+(j.title||"")+", "+(j.parish||"")+"): My quote is J$____ labour only, materials at cost with receipts. I can start ____.")+'">Send my quote →</a>'+
-      '<p class="note">Your quote goes to Yaadly, is reviewed for shape against real costs, and is never beaten down.</p>';
-    O.appendChild(d);
-  });
+  O.innerHTML = '<div class="empty">Loading the jobs board...</div>';
+  wqMarketplace(O);
 }
 /* ───────────── CLIENT / WORKER AUTH ───────────── */
 async function clientGateLogin(){
@@ -1687,20 +1745,15 @@ async function clientGateLogin(){
 }
 async function clientGateSignup(){
   if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value, code = ($("cgate-code")?$("cgate-code").value:"").trim();
+  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value;
   if(!em || !pw){ alert("Email and password needed."); return; }
   if(pw.length<6){ alert("Password needs to be at least 6 characters."); return; }
-  if(!code){ alert("Enter the job code Yaadly sent you. Accounts can only be created once a project manager has taken your job on, this is not open sign-up."); return; }
-  $("cgate-status").innerHTML = '<div class="mono">Checking your code...</div>';
-  const {data:okCode, error:codeErr} = await sb.rpc("verify_portal_code", {p_email:em, p_code:code});
-  if(codeErr){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not check that code right now: '+esc(codeErr.message)+'</div>'; return; }
-  if(!okCode){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">That code and email do not match a job we have on file. Double check both, or message us on WhatsApp if you have not heard back yet.</div>'; return; }
-  $("cgate-status").innerHTML = '<div class="mono">Creating account...</div>';
+  $("cgate-status").innerHTML = '<div class="mono">Creating your profile...</div>';
   const {data, error} = await sb.auth.signUp({email:em, password:pw});
-  if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create account: '+esc(error.message)+'</div>'; return; }
-  $("cgate-pass").value = ""; $("cgate-code").value = "";
+  if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create the profile: '+esc(error.message)+'</div>'; return; }
+  $("cgate-pass").value = "";
   if(data.session){ openClientPortal(em); }
-  else { $("cgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
+  else { $("cgate-status").innerHTML = '<div class="note">Profile created. Check '+esc(em)+' for a confirmation link, then sign in above. The Client Guidelines are waiting for your signature, and then you can pitch your first job.</div>'; }
 }
 async function pullMyCloudJobs(email){
   if(!sb || !email) return;
@@ -1734,6 +1787,7 @@ async function openClientPortal(email){
   $("client-ui").style.display = "block";
   await Promise.all([pullMyCloudJobs(email), pullMyCloudServices(email)]);
   renderClient();
+  cgCheckGate();
 }
 async function restoreClientSession(){
   if(!sb || location.hash!=="#client") return;
@@ -1851,7 +1905,9 @@ function renderAdmin(){
     S.appendChild(d);
   });
   const W = $("at-workers");
-  W.innerHTML = DB.workers.length ? "" : '<div class="empty">No approved workers yet. Approve applications in the Applications tab; approved workers appear here.</div>';
+  W.innerHTML = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h3 style="margin:0">Worker <em>Guidelines</em></h3><p class="note" style="margin:4px 0 0">The standing rules of working with Yaadly, version '+esc(WG_VERSION)+'. Workers read and sign electronically in their portal; signatures are permanent records.</p></div><a class="btn sm" onclick="openWorkerGuidelines()">Open the guidelines →</a></div><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)"><a class="btn o sm" onclick="wpPublish()">Publish directory to clients</a><span class="note" id="wp-pub-status" style="margin:0">Pushes every approved worker below (name, trade, parish, lane, verified jobs) to the client-facing directory. Deliberate, never automatic.</span></div><div id="wg-admin-sigs" style="margin-top:12px"><p class="note">Loading signatures...</p></div></div>'+
+    (DB.workers.length ? "" : '<div class="empty">No approved workers yet. Approve applications in the Applications tab; approved workers appear here.</div>');
+  wgAdminSigs();
   DB.workers.forEach(w=>{
     const d = document.createElement("div"); d.className="wcard";
     d.innerHTML='<div class="av">'+esc((w.name||"W")[0])+'</div><div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"")+(w.parish?' · '+esc(w.parish):'')+' · '+(w.jobs||0)+' completed jobs<br>paid by '+esc(w.payMethod||"method not set")+(w.payName?' · account name '+esc(w.payName):'')+'</small></div>'+laneBadge(w.lane);
@@ -2019,16 +2075,19 @@ function editJob(id){
     '<div class="grid2"><div class="field"><label>Worker email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="jb-wemail" type="email" value="'+esc(j.worker.email||"")+'"></div><div class="field"><label>Worker phone</label><input id="jb-wphone" value="'+esc(j.worker.phone||"")+'"></div></div>'+
     '<div class="kick">Client shortlist (cap five)</div>'+slRows+'<a class="btn o sm" onclick="slAdd(\''+id+'\')">+ Add to shortlist</a>'+
     '<div class="kick">Evidence log</div>'+evRows+'<a class="btn o sm" onclick="evAdd(\''+id+'\')">+ Add evidence item</a> <label class="filebtn">📷 Add site photos from WhatsApp<input type="file" multiple accept="image/*" onchange="sitePhotos(event,\''+id+'\')"></label>'+
+    '<div class="kick">Quotes received</div><div id="jq-'+esc(id)+'"><p class="note">Loading quotes...</p></div>'+
     '<div class="kick">Stage · money states move only by your hand</div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
     '<div class="kick">Agents · they draft and flag, you decide</div>'+
     '<div class="field"><label>Tell the agent anything extra before drafting, optional</label><input id="rep-note" placeholder="e.g. tiles reach Thursday, Devon starts Friday morning"></div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a><a class="btn o sm" onclick="runVision(\''+id+'\')">🖼 Run AI Photo Review</a></div><div id="agent-out"></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a><a class="btn o sm" onclick="runCrNarrative(\''+id+'\')">⚡ AI: Report narrative</a><a class="btn o sm" onclick="runVision(\''+id+'\')">🖼 Run AI Photo Review</a></div><div id="agent-out"></div>'+
     '<div id="vision-out">'+visionFindingsHTML(j)+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap"><a class="btn sm" onclick="saveJob(\''+id+'\')">Save</a>'+
+    '<a class="btn sm" onclick="crExport(\''+id+'\')">📄 Completion Report →</a>'+
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. See it and approve here: https://yaadly.co.uk/#client"+(j.clientEmail?" Sign in with "+j.clientEmail+".":" Sign up with the email you gave us.")+(j.portalCode?" First time signing up? Your job code is "+j.portalCode+".":""))+'">Message client →</a>'+
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Scope and checklist here: https://yaadly.co.uk/#worker")+'">Message worker →</a>'+
     '<a class="btn warn sm" onclick="delJob(\''+id+'\')">Delete</a></div></div>';
   D.scrollIntoView({behavior:"smooth"});
+  jqLoad(id);
 }
 function saveJob(id){
   const j = DB.jobs.find(x=>x.id===id);
@@ -2193,13 +2252,19 @@ function koRenderPack(){
        '<p class="note">Drafted by '+esc(p.model||"the kickoff agent")+'. '+esc(p.client_name||"Client not named")+(p.parish?" - "+esc(p.parish):"")+'</p>'+
        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+
        '<a class="btn sm" onclick="koSave()">Save</a>'+
+       '<a class="btn sm" onclick="koEdit()">✏️ Edit the document</a>'+
        (p.status==="approved" ? '' : '<a class="btn sm" onclick="koApprove()">I have read this, approve for issue</a>')+
-       '<a class="btn sm" onclick="koExport()">Open as document &rarr;</a></div>'+
-       '<p class="note" style="margin-top:8px">This screen is your working view. <b>Open as document</b> builds the client-facing Kickoff Pack: cover page, document control, numbered sections, signature page. Print it to PDF from there.</p></div>';
+       '<a class="btn sm" onclick="koExport()">Open as document &rarr;</a>'+
+       '<a class="btn sm" onclick="koQaExport()">Worker QA sheet &rarr;</a>'+
+       '<span class="pill hold" style="align-self:center">Revision r'+(p.rev||1)+'</span></div>'+
+       '<p class="note" style="margin-top:8px">This screen is your working view. <b>Edit the document</b> lets you change any section; each save becomes a new numbered revision, and editing an approved pack automatically withdraws the approval. <b>Open as document</b> builds the client-facing pack: cover page, document control, numbered sections, signature page.</p></div>';
   if(p.guardrail && p.guardrail.price_language_detected){
     h += '<div class="card" style="border-color:var(--red)"><h3 style="color:var(--red)">Price language found in the draft</h3>'+
          '<p class="note">Yaadly does not price work. Remove these before issuing: <b>'+
          esc((p.guardrail.samples||[]).join("  -  "))+'</b></p></div>';
+  }
+  if(d.cover_note){
+    h += koSec("Note to the client", '<p style="font-size:13.5px">'+esc(d.cover_note)+'</p>');
   }
   if(Array.isArray(d.human_review_notes) && d.human_review_notes.length){
     h += koSec("Check these yourself before issuing", koList(d.human_review_notes, x=>'<li>'+esc(x)+'</li>'));
@@ -2243,15 +2308,130 @@ function koRenderPack(){
   h += koSec("7 · Roles and communications",
     koTbl(["Role","Who","Responsibility","Contact","Cadence"],
       (d.communications_list||[]).map(x=>'<tr><td><b>'+esc(x.role)+'</b></td><td>'+esc(x.who||"TBC")+'</td><td>'+esc(x.responsibility||"")+'</td><td>'+esc(x.contact_method||"")+'</td><td>'+esc(x.update_cadence||"")+'</td></tr>')));
+  if (Array.isArray(p.revisions) && p.revisions.length){
+    h += koSec("Previous revisions",
+      '<p class="note">Every content edit files the outgoing version here automatically. Viewing opens the old text as a watermarked, superseded document; restoring makes it the newest revision (it never rewrites history).</p>'+
+      koTbl(["Revision","Saved","Status then","Approved by",""],
+        p.revisions.slice().reverse().map(r=>'<tr><td><b>r'+esc(String(r.rev))+'</b></td><td>'+esc(String(r.saved_at||"").slice(0,16).replace("T"," "))+'</td><td>'+esc(r.status||"draft")+'</td><td>'+esc(r.approved_by||"not approved")+'</td>'+
+        '<td style="white-space:nowrap"><a class="btn sm" onclick="koViewRev('+Number(r.rev)+')">View</a> <a class="btn sm" onclick="koRestoreRev('+Number(r.rev)+')">Restore</a></td></tr>')));
+  }
   $("ko-out").innerHTML = h;
+}
+/* revision viewing and restoring */
+function koFindRev(n){
+  const p = KO.current; if(!p || !Array.isArray(p.revisions)) return null;
+  return p.revisions.find(r => Number(r.rev) === Number(n)) || null;
+}
+function koViewRev(n){
+  const p = KO.current; const r = koFindRev(n); if(!p || !r) return;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to view the revision."); return; }
+  w.document.write(koDocHtml({ id:p.id, project_title:p.project_title, client_name:p.client_name,
+    parish:p.parish, model:p.model, status:"draft", approved_by:null, rev:r.rev,
+    docs:r.docs, superseded:true }));
+  w.document.close(); w.focus();
+}
+async function koRestoreRev(n){
+  const p = KO.current; const r = koFindRev(n); if(!p || !r) return;
+  if(!confirm("Restore revision r"+n+"? The current text is archived and r"+n+"\'s content becomes the newest revision. Nothing is deleted.")) return;
+  p.docs = JSON.parse(JSON.stringify(r.docs));
+  await koSave();
+}
+/* The section editor: a form generated from the pack data itself, bound by
+   JSON path, so every field the AI can write, Monique can edit. Nothing
+   touches the saved pack until Save revision. */
+const KO_LABELS = { cover_note:"Cover note to the client", scope_of_works:"1 · Scope of works",
+  timeline:"2 · Programme", payment_schedule:"3 · Payment schedule", evidence_checklist:"4 · Evidence plan",
+  document_pack:"5 · Document pack", risk_register:"6 · Risk register", communications_list:"7 · Roles and communications",
+  open_questions:"Open questions", human_review_notes:"Notes for your own review" };
+const koNice = k => KO_LABELS[k] || String(k).replace(/_/g," ").replace(/^./, c=>c.toUpperCase());
+function koSetPath(obj, path, val){
+  const seg = path.split("."); let o = obj;
+  for (let i=0;i<seg.length-1;i++) o = o[/^\d+$/.test(seg[i]) ? Number(seg[i]) : seg[i]];
+  const last = seg[seg.length-1];
+  o[/^\d+$/.test(last) ? Number(last) : last] = val;
+}
+function koField(path, key, val){
+  const label = '<label style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)">'+esc(koNice(key))+'</label>';
+  if (typeof val === "number")
+    return '<div class="field" style="margin-bottom:8px">'+label+'<input type="number" data-kpath="'+esc(path)+'" data-kind="num" value="'+esc(String(val))+'"></div>';
+  if (typeof val === "boolean")
+    return '<div class="field" style="margin-bottom:8px"><label class="slot" style="display:inline-flex"><input type="checkbox" data-kpath="'+esc(path)+'" data-kind="bool"'+(val?" checked":"")+'> '+esc(koNice(key))+'</label></div>';
+  const str = String(val==null?"":val);
+  const rows = Math.min(6, Math.max(1, Math.ceil(str.length/90)));
+  return '<div class="field" style="margin-bottom:8px">'+label+'<textarea data-kpath="'+esc(path)+'" data-kind="str" style="min-height:0" rows="'+rows+'">'+esc(str)+'</textarea></div>';
+}
+function koGroup(path, val){
+  if (Array.isArray(val)){
+    if (!val.length || typeof val[0] !== "object")
+      return '<div class="field" style="margin-bottom:8px"><label style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)">One item per line</label>'+
+        '<textarea data-kpath="'+esc(path)+'" data-kind="lines" rows="'+Math.min(8,Math.max(2,val.length+1))+'">'+esc(val.join("\n"))+'</textarea></div>';
+    return val.map((item,i)=>
+      '<div style="position:relative;padding-right:34px;border-top:1px solid var(--line);padding-top:10px;margin-top:10px">'+koGroup(path+"."+i, item)+
+      '<button class="btn warn sm" type="button" style="position:absolute;top:8px;right:0" data-krem="'+esc(path)+'" data-ki="'+i+'" title="Remove">✕</button></div>').join("")+
+      '<button class="btn sm o" type="button" data-kadd="'+esc(path)+'" style="margin-top:8px">+ Add one</button>';
+  }
+  if (val && typeof val === "object")
+    return Object.keys(val).map(k=>koGroup(path+"."+k, val[k])).join("");
+  return koField(path, path.split(".").pop(), val);
+}
+function koEdit(){
+  const p = KO.current; if(!p) return;
+  KO.edit = JSON.parse(JSON.stringify(p.docs||{}));
+  koDrawEdit();
+}
+function koDrawEdit(){
+  const d = KO.edit;
+  const order = Object.keys(KO_LABELS).filter(k=>k in d).concat(Object.keys(d).filter(k=>!(k in KO_LABELS)));
+  let h = '<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">'+
+    '<h3>Editing <em>'+esc(KO.current.id)+'</em></h3>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" onclick="koSaveEdit()">Save as new revision</a>'+
+    '<a class="btn sm o" onclick="koRenderPack()">Cancel, discard changes</a></div></div>'+
+    '<p class="note">Change anything below. Saving creates revision r'+((KO.current.rev||1)+1)+'; the current text is archived automatically'+
+    (KO.current.status==="approved" ? ', and because this pack is approved, saving also withdraws the approval until it is re-read and re-approved' : '')+'.</p></div>';
+  order.forEach(k=>{ h += '<div class="card"><h3 style="font-size:16px">'+esc(koNice(k))+'</h3>'+koGroup(k, d[k])+'</div>'; });
+  const box = $("ko-out"); box.innerHTML = h;
+  box.querySelectorAll("[data-kpath]").forEach(el=>{
+    el.addEventListener("input", ()=>{
+      const kind = el.dataset.kind;
+      koSetPath(KO.edit, el.dataset.kpath,
+        kind==="num" ? Number(el.value)||0 :
+        kind==="bool" ? el.checked :
+        kind==="lines" ? el.value.split("\n").map(x=>x.trim()).filter(Boolean) : el.value);
+    });
+  });
+  box.querySelectorAll("[data-krem]").forEach(b=>b.addEventListener("click", ()=>{
+    const seg=b.dataset.krem.split("."); let o=KO.edit;
+    seg.forEach(sg=>{ o=o[/^\d+$/.test(sg)?Number(sg):sg]; });
+    o.splice(Number(b.dataset.ki),1); koDrawEdit();
+  }));
+  box.querySelectorAll("[data-kadd]").forEach(b=>b.addEventListener("click", ()=>{
+    const seg=b.dataset.kadd.split("."); let o=KO.edit;
+    seg.forEach(sg=>{ o=o[/^\d+$/.test(sg)?Number(sg):sg]; });
+    const tpl = o.length ? JSON.parse(JSON.stringify(o[o.length-1])) : {};
+    Object.keys(tpl).forEach(k=>{ if(typeof tpl[k]==="string") tpl[k]=""; else if(Array.isArray(tpl[k])) tpl[k]=[]; else if(typeof tpl[k]==="number") tpl[k]=0; });
+    o.push(tpl); koDrawEdit();
+  }));
+  box.scrollIntoView({behavior:"smooth"});
+}
+async function koSaveEdit(){
+  if(!KO.edit) return;
+  KO.current.docs = KO.edit; KO.edit = null;
+  await koSave();
 }
 async function koSave(){
   const p = KO.current; if(!p || !sb) return;
   const row = { id:p.id, job_id:p.job_id||null, project_title:p.project_title, client_name:p.client_name||null,
-                parish:p.parish||null, intake:p.intake, docs:p.docs, model:p.model||null, status:p.status||"draft" };
-  const {error} = await sb.from("kickoff_packs").upsert(row);
-  $("ko-status").textContent = error ? ("Save failed: "+error.message) : "Saved.";
-  if(!error) koRenderList();
+                parish:p.parish||null, intake:p.intake||{}, docs:p.docs, model:p.model||null, status:p.status||"draft" };
+  // The database is the authority on revisions: its trigger archives the
+  // outgoing docs, bumps rev, and withdraws approval on edit. Read the row
+  // back so the screen shows what actually happened.
+  const {data, error} = await sb.from("kickoff_packs").upsert(row).select().single();
+  if(error){ $("ko-status").textContent = "Save failed: "+error.message; return; }
+  p.rev = data.rev; p.revisions = data.revisions||[]; p.status = data.status;
+  p.approved_by = data.approved_by;
+  $("ko-status").textContent = "Saved as revision r"+(data.rev||1)+"."+(data.status==="in_review"?" This edit withdrew the previous approval; re-approve when you have re-read it.":"");
+  koRenderPack(); koRenderList();
 }
 async function koApprove(){
   const p = KO.current; if(!p || !sb) return;
@@ -2286,7 +2466,7 @@ async function koOpen(id){
   if(error){ alert("Could not open: "+error.message); return; }
   KO.current = { id:data.id, project_title:data.project_title, client_name:data.client_name, parish:data.parish,
                  intake:data.intake, docs:data.docs, model:data.model, status:data.status, approved_by:data.approved_by,
-                 job_id:data.job_id, guardrail:null };
+                 job_id:data.job_id, rev:data.rev||1, revisions:data.revisions||[], guardrail:null };
   $("ko-status").textContent = "";
   koRenderPack();
   $("ko-out").scrollIntoView({behavior:"smooth"});
@@ -2300,7 +2480,7 @@ function koDocHtml(p){
   const d = p.docs || {};
   const E = esc;
   const today = new Date().toLocaleDateString("en-GB", {day:"numeric", month:"long", year:"numeric"});
-  const approved = p.status === "approved";
+  const approved = p.status === "approved" && !p.superseded;
   const T = (head, rows, cls) => rows.length
     ? '<table class="'+(cls||"")+'"><thead><tr>'+head.map(x=>'<th>'+E(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.join("")+'</tbody></table>'
     : '<p class="none">Nothing listed.</p>';
@@ -2315,6 +2495,7 @@ function koDocHtml(p){
 
   let body = "";
   body += S("Purpose of this pack",
+    (d.cover_note ? '<p class="callout">'+E(d.cover_note)+'</p>' : '')+
     '<p>This Kickoff Pack sets out, before any work begins, exactly what has been agreed for <b>'+E(p.project_title)+'</b>: the scope of works, the order the work will run in, the stages in which money will be released and the evidence each release depends on, the risks we are watching, and who speaks to whom while the work runs.</p>'+
     '<p>It exists so that '+(p.client_name?E(p.client_name):"the client")+' can follow every step from anywhere, and so that nothing rests on memory or on trust alone. <b>Money moves only when work is proven.</b> That rule runs through every section that follows.</p>');
   body += S("Scope of works",
@@ -2384,7 +2565,7 @@ function koDocHtml(p){
   'h3{font-size:10pt;margin:14px 0 2px;text-transform:uppercase;letter-spacing:.06em;color:#33473F;page-break-after:avoid}'+
   'p{margin:6px 0}ul{margin:6px 0;padding-left:20px}li{margin:3px 0}'+
   '.none{color:#7A8B84;font-style:italic}'+
-  '.callout{background:#F2F8F5;border-left:4px solid #14B8A6;padding:9px 12px;font-size:9.5pt}'+
+  '.callout{background:#F2F8F5;border-left:4px solid #14B8A6;padding:9px 12px;font-size:9.5pt;page-break-inside:avoid}'+
   '.notice{background:#FBF7EC;border:1px solid #E3D5AE;border-radius:4px;padding:10px 14px;font-size:9pt;color:#5C4F2E;margin-top:16px}'+
   '.sig{margin-top:26px;page-break-inside:avoid}'+
   '.sig .row{display:flex;gap:28px;margin-top:34px}.sig .cell{flex:1}'+
@@ -2397,8 +2578,8 @@ function koDocHtml(p){
   '.toolbar button{font:inherit;font-weight:700;padding:8px 18px;border-radius:6px;border:0;background:linear-gradient(90deg,#14B8A6,#FFB020);color:#04211D;cursor:pointer}'+
   '@media print{.toolbar{display:none}}'+
   '</style></head><body>'+
-  '<div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button><span>'+E(p.id)+' · '+(approved?"Approved for issue":"Internal draft, not approved for issue")+'</span></div>'+
-  (approved?'':'<div class="wmark">DRAFT</div>')+
+  '<div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button><span>'+E(p.id)+' · r'+E(String(p.rev||1))+' · '+(p.superseded?"Superseded revision, for reference only":approved?"Approved for issue":"Internal draft, not approved for issue")+'</span></div>'+
+  (approved?'':'<div class="wmark">'+(p.superseded?"SUPERSEDED":"DRAFT")+'</div>')+
   '<div class="page">'+
   '<div class="cover"><div class="brandbar"></div>'+
   '<div class="wm">Yaadly<i>Hub</i></div>'+
@@ -2407,7 +2588,7 @@ function koDocHtml(p){
   '<div class="meta">'+(p.client_name?'Prepared for '+E(p.client_name)+'<br>':'')+(p.parish?E(p.parish)+'<br>':'')+today+'</div>'+
   '<div class="stamp '+(approved?'ok':'dr')+'">'+(approved?'Approved for issue':'Draft, not approved for issue')+'</div>'+
   '<div class="dc"><table><thead><tr><th colspan="2">Document control</th></tr></thead><tbody>'+
-  '<tr><td style="width:38%">Reference</td><td><b>'+E(p.id)+'</b></td></tr>'+
+  '<tr><td style="width:38%">Reference</td><td><b>'+E(p.id)+'</b> · revision r'+E(String(p.rev||1))+'</td></tr>'+
   '<tr><td>Status</td><td>'+(approved?'Approved for issue':'Draft, internal, not for issue')+'</td></tr>'+
   '<tr><td>Prepared by</td><td>Yaadly Ltd · England and Wales · no. 17358077</td></tr>'+
   '<tr><td>Approved by</td><td>'+(approved?E(p.approved_by||""):"pending")+'</td></tr>'+
@@ -2434,7 +2615,758 @@ function koExport(){
   w.document.close(); w.focus();
 }
 
+
+/* ── Shared shell for the worker-facing documents ─────────────
+   Same house style as the Kickoff Pack. koDocHtml keeps its own
+   copy on purpose: it is tested and issued to clients, and a
+   shared refactor is not worth the risk of disturbing it. */
+function yaadDocShell(o){
+  const E = esc;
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>'+E(o.title)+' · Yaadly</title><style>'+
+  '@page{size:A4;margin:18mm 16mm 22mm}*{box-sizing:border-box}'+
+  'body{font:10.5pt/1.6 "Helvetica Neue",Helvetica,Arial,sans-serif;color:#15211D;margin:0}'+
+  '.page{max-width:186mm;margin:0 auto;padding:24px 18px 90px}'+
+  '@media screen{body{background:#E8ECEA}.page{background:#fff;margin:18px auto;box-shadow:0 2px 18px rgba(0,0,0,.15)}}'+
+  '.brandbar{height:7px;background:linear-gradient(90deg,#14B8A6,#FFB020);border-radius:4px}'+
+  '.wm{font-size:15pt;font-weight:800;margin-top:20px}.wm i{font-style:normal;color:#C98A00}'+
+  '.doctype{margin-top:26px;font-size:10pt;letter-spacing:.25em;text-transform:uppercase;color:#5E7268}'+
+  'h1{font-size:22pt;line-height:1.15;margin:8px 0 4px;font-weight:800}'+
+  '.meta{font-size:10.5pt;color:#3D544C;margin-bottom:14px}'+
+  'table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-size:9.5pt}tr{page-break-inside:avoid}'+
+  'th{background:#EEF4F1;text-align:left;font-size:8pt;letter-spacing:.08em;text-transform:uppercase;color:#33473F;padding:7px 8px;border:1px solid #C9D6D0}'+
+  'td{padding:7px 8px;border:1px solid #C9D6D0;vertical-align:top}td.num{text-align:center;white-space:nowrap}'+
+  'td.tick{width:34px;text-align:center;font-size:12pt;color:#8AA39A}'+
+  'section{margin-top:20px}h2{font-size:13pt;margin:0 0 8px;padding-bottom:6px;border-bottom:2.5px solid #14B8A6;font-weight:800;page-break-after:avoid}'+
+  'h2 span{display:inline-block;min-width:26px;color:#0D8A7C}'+
+  'h3{font-size:10pt;margin:12px 0 2px;text-transform:uppercase;letter-spacing:.06em;color:#33473F;page-break-after:avoid}'+
+  'p{margin:6px 0}ul{margin:6px 0;padding-left:20px}li{margin:4px 0}'+
+  '.callout{background:#F2F8F5;border-left:4px solid #14B8A6;padding:9px 12px;font-size:9.5pt;page-break-inside:avoid}'+
+  '.warn{background:#FDF3F1;border-left:4px solid #C2452F;padding:9px 12px;font-size:9.5pt}'+
+  '.notice{background:#FBF7EC;border:1px solid #E3D5AE;border-radius:4px;padding:10px 14px;font-size:9pt;color:#5C4F2E;margin-top:14px}'+
+  '.sig{margin-top:24px;page-break-inside:avoid}.sig .row{display:flex;gap:28px;margin-top:30px}.sig .cell{flex:1}'+
+  '.sig .line{border-bottom:1.5px solid #15211D;height:34px}.sig .lbl{font-size:8.5pt;color:#5E7268;margin-top:5px}'+
+  '.foot{position:fixed;bottom:2mm;left:0;right:0;text-align:center;font-size:7.5pt;color:#7A8B84;background:#fff;padding:2px 0}'+
+  '@media screen{.foot{display:none}}'+
+  (o.watermark?'.wmark{position:fixed;top:42%;left:0;right:0;text-align:center;font-size:58pt;font-weight:800;letter-spacing:.1em;color:rgba(194,69,47,.10);transform:rotate(-22deg);pointer-events:none;z-index:0}':'')+
+  '.toolbar{position:sticky;top:0;background:#15211D;color:#fff;padding:10px 16px;display:flex;gap:14px;align-items:center;font-size:13px}'+
+  '.toolbar button{font:inherit;font-weight:700;padding:8px 18px;border-radius:6px;border:0;background:linear-gradient(90deg,#14B8A6,#FFB020);color:#04211D;cursor:pointer}'+
+  '@media print{.toolbar{display:none}}'+
+  '</style></head><body>'+
+  '<div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button><span>'+E(o.ref)+' · '+E(o.status)+'</span></div>'+
+  (o.watermark?'<div class="wmark">'+E(o.watermark)+'</div>':'')+
+  '<div class="page"><div class="brandbar"></div><div class="wm">Yaadly<i>Hub</i></div>'+
+  '<div class="doctype">'+E(o.doctype)+'</div><h1>'+E(o.title)+'</h1><div class="meta">'+o.metaHtml+'</div>'+
+  o.body+
+  '</div><div class="foot">'+E(o.ref)+' · Yaadly Ltd, England and Wales no. 17358077 · '+E(o.status)+'</div></body></html>';
+}
+
+/* ── Worker Guidelines: the standing rules of working with Yaadly.
+   Assembled from the policies already published on this site.
+   Review before issuing; bump the version when the rules change. */
+const WG_VERSION = "1.0 · 22 August 2026";
+function wgDocHtml(){
+  const E = esc;
+  const body =
+  '<section><h2><span>1</span>What Yaadly is, and what you are agreeing to</h2>'+
+  '<p>Yaadly connects vetted tradespeople with property owners, most of them overseas, and holds every job to one standard: <b>work is proven with evidence, and money moves when the client approves that evidence.</b> These guidelines are the rules of working with us. They exist to protect you as much as the client. Every rule here has a named counterpart on the other side, and nobody carries the risk alone.</p>'+
+  '<div class="callout"><b>What you never pay:</b> joining is free, quoting is free, and you are never charged to be on Yaadly or to take a job.</div></section>'+
+  '<section><h2><span>2</span>Verification, before your first job</h2>'+
+  '<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide proof of address and a selfie holding that ID, and give two references we will call. For work inside occupied homes, or whenever a client asks, a police record check from the Jamaica Constabulary Force is required. Certified trades have their certification checked with the issuing body, and your first job is a trial job.</p>'+
+  '<div class="warn"><b>One hard line:</b> any false document ends the application permanently.</div></section>'+
+  '<section><h2><span>3</span>Quoting</h2><ul>'+
+  '<li>Quote whatever amount you judge right: labour, materials at cost with receipts, and your earliest start. Your quote goes to the client; where Yaadly has a benchmark, a fair-price indicator is shown beside it. Your price is never beaten down.</li>'+
+  '<li>Never inflate a price because the payer is overseas. A client in London pays what a client in Portmore pays. The end of the farrin price is the reason clients trust the platform that brings you work.</li>'+
+  '<li>Quoting costs nothing and losing a quote costs nothing.</li></ul></section>'+
+  '<section><h2><span>4</span>On site: conduct</h2><ul>'+
+  '<li>Arrive when you said you would. A no-show without word is a strike, and the client is rematched with the money untouched.</li>'+
+  '<li><b>The site match gate protects you:</b> if the site does not match how the job was described, say so before starting and you can walk away without penalty.</li>'+
+  '<li>Treat the property and whoever is present with respect. You are often the only person the family meets in person.</li>'+
+  '<li>Only the work agreed in the scope. Anything extra the client asks for on site goes through Yaadly first, in writing, before you do it. This protects you from doing work nobody will pay for.</li>'+
+  '<li>Keep the site safe and tidy at the end of each day.</li></ul></section>'+
+  '<section><h2><span>5</span>Evidence: how your work gets proven</h2>'+
+  '<p>Evidence is not surveillance. There is <b>no daytime tracking, ever</b>. One evidence package at the end of the working day, and your day is your own.</p>'+
+  '<table><thead><tr><th>When</th><th>What you send</th><th>Why</th></tr></thead><tbody>'+
+  '<tr><td><b>Arrival, first day</b></td><td>Minimum three photos of the site before you touch anything, different angles</td><td>Protects you: proves the condition you found</td></tr>'+
+  '<tr><td><b>Before covering anything</b></td><td>Photos of what is about to be hidden (timbers, pipework, wiring, foundations)</td><td>Hold point: do not cover until Yaadly confirms the evidence is in</td></tr>'+
+  '<tr><td><b>End of each day</b></td><td>One package: progress photos, any video asked for, receipts for materials bought</td><td>Keeps the client calm and the money moving</td></tr>'+
+  '<tr><td><b>Completion</b></td><td>After photos matching the before angles, plus the wide video pan</td><td>Feeds your Completion Report</td></tr>'+
+  '</tbody></table>'+
+  '<p>Photos and video are timestamped and geotagged. Leave location on for the photos, that is what makes them proof.</p></section>'+
+  '<section><h2><span>6</span>The Completion Report and your Yaad Score</h2>'+
+  '<p>At the end of the job a Completion Report is drafted for you from your evidence, and you write no paperwork. You read it and confirm one thing: <b>what is written is what was done.</b> Signing something untrue is treated the same as a false document. Every completed, documented job builds your <b>Yaad Score</b>: a verified record you own, that counts with clients and, in time, with a bank.</p></section>'+
+  '<section><h2><span>7</span>Getting paid</h2><ul>'+
+  '<li>The client\'s payment terms are agreed and confirmed before you start, so you know the money is real.</li>'+
+  '<li>Once your evidence is in and the client approves, you are paid <b>within 3 working days</b>: bank transfer, Lynk wallet or remittance pick-up, whichever you chose.</li>'+
+  '<li>You can see what you are owed and what has been paid in your worker portal.</li>'+
+  '<li>Never take side payments from the client, and never ask for them. It voids the protection for both of you.</li></ul></section>'+
+  '<section><h2><span>8</span>If something goes wrong</h2>'+
+  '<p>Disputes are reviewed by a person, not an algorithm, and they are free. You get a fair chance to make the work right, and the evidence trail, which you built, is what speaks for you. While a dispute is open, nothing moves.</p></section>'+
+  '<section><h2><span>9</span>Strikes: what loses you the platform</h2>'+
+  '<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody>'+
+  '<tr><td>No-show without word</td><td>Strike; client rematched</td></tr>'+
+  '<tr><td>Side payments or off-platform deals with a Yaadly client</td><td>Removal</td></tr>'+
+  '<tr><td>False document, or confirming an untrue Completion Report</td><td>Permanent removal</td></tr>'+
+  '<tr><td>Disrespect or unsafe conduct on site</td><td>Reviewed by a person; can be removal</td></tr>'+
+  '</tbody></table></section>'+
+  '<div class="notice">These guidelines are issued by Yaadly Ltd and may be updated; workers are told when they change. They do not create employment, you work for yourself, on jobs you choose to quote for.</div>'+
+  '<section class="sig"><h2><span>✓</span>Acknowledgement</h2>'+
+  '<p>I have read these guidelines and I agree to work to them on every Yaadly job.</p>'+
+  '<div class="row"><div class="cell"><div class="line"></div><div class="lbl">Worker · name, signature and date</div></div>'+
+  '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · signature and date</div></div></div></section>';
+  return yaadDocShell({ title:"Worker Guidelines", doctype:"Working with Yaadly",
+    ref:"YAADLY-WG-"+WG_VERSION.split(" ")[0], status:"Version "+WG_VERSION,
+    metaHtml:'For all Yaadly tradespeople · Version '+E(WG_VERSION), watermark:"", body });
+}
+function openWorkerGuidelines(){
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to open the document."); return; }
+  w.document.write(wgDocHtml()); w.document.close(); w.focus();
+}
+
+/* ── Worker QA sheet: per job, built from the kickoff pack data.
+   The pack's acceptance criteria, hold points and evidence plan
+   ARE the QA content, one generation feeds both documents. */
+function koQaHtml(p){
+  const E = esc;
+  const d = p.docs||{}; const sow = d.scope_of_works||{}; const ps = d.payment_schedule||{};
+  const T = (head, rows) => rows.length
+    ? '<table><thead><tr>'+head.map(x=>'<th>'+E(x)+'</th>').join("")+'</tr></thead><tbody>'+rows.join("")+'</tbody></table>'
+    : '<p>Nothing listed.</p>';
+  const body =
+  '<section><h2><span>1</span>The job in one look</h2>'+
+  '<p>'+E(sow.summary||"")+'</p>'+
+  '<h3>You are doing</h3><ul>'+(sow.included||[]).map(x=>'<li>'+E(x)+'</li>').join("")+'</ul>'+
+  '<h3>You are NOT doing: do not start these even if asked on site</h3><ul>'+(sow.excluded||[]).map(x=>'<li>'+E(x)+'</li>').join("")+'</ul>'+
+  '<div class="callout">Anything extra the client wants goes through Yaadly first, in writing. That protects your payment.</div></section>'+
+  '<section><h2><span>2</span>Hold points: stop and send evidence before going past these</h2>'+
+  T(["Stage","Do not go past this until","Evidence Yaadly needs first"],
+    (ps.stages||[]).map(st=>'<tr><td><b>'+E(st.stage)+'</b></td><td>'+E(st.release_condition||"")+'</td><td>'+(st.evidence_required||[]).map(E).join("<br>")+'</td></tr>'))+
+  '<p>Money is released stage by stage as this evidence is approved. The faster it is in, the faster the money moves.</p></section>'+
+  '<section><h2><span>3</span>Quality checkpoints: how this job is judged done</h2>'+
+  T(["#","The finished work must show","Worker ✓","Yaadly ✓"],
+    (sow.acceptance_criteria||[]).map((c,i)=>'<tr><td class="num">'+(i+1)+'</td><td>'+E(c)+'</td><td class="tick">☐</td><td class="tick">☐</td></tr>'))+
+  '<p>Tick each item yourself before calling the job complete. Yaadly checks against the same list: same list, no surprises.</p></section>'+
+  '<section><h2><span>4</span>Evidence duties on this job</h2>'+
+  T(["Stage","Capture","Type","What it proves"],
+    (d.evidence_checklist||[]).flatMap(sg=>(sg.items||[]).map((i,k)=>'<tr><td>'+(k===0?'<b>'+E(sg.stage)+'</b>':'')+'</td><td>'+E(i.item)+'</td><td>'+E(i.type||"photo")+'</td><td>'+E(i.why||"")+'</td></tr>')))+
+  '<p>All photos and video timestamped and geotagged, so leave location on. Arrival photos before touching anything, one package at the end of each day, no daytime tracking ever.</p></section>'+
+  '<section><h2><span>5</span>The rules that always apply</h2><ul>'+
+  '<li>Site not as described? Say so before starting, you can walk away without penalty.</li>'+
+  '<li>No side payments, no off-platform deals. Paid within 3 working days of client approval.</li>'+
+  '<li>Keep the site safe and tidy at the end of each day.</li>'+
+  '<li>Your Completion Report is drafted from this evidence, you confirm <b>what is written is what was done</b>.</li></ul></section>'+
+  '<section class="sig"><h2><span>✓</span>Worker confirmation</h2>'+
+  '<p>I have read this QA sheet. I understand the scope, the hold points, and the evidence this job requires, and I will not go past a hold point before its evidence is in.</p>'+
+  '<div class="row"><div class="cell"><div class="line"></div><div class="lbl">Worker · name, signature and date</div></div>'+
+  '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · signature and date</div></div></div></section>'+
+  '<div class="notice">This sheet is generated from the approved Kickoff Pack '+E(p.id)+' (revision r'+E(String(p.rev||1))+'). It contains no prices. If the pack changes, a new sheet is issued and this one is superseded.</div>';
+  const approved = p.status === "approved";
+  return yaadDocShell({ title:(p.project_title||"Job")+": Worker QA Sheet", doctype:"Quality & Evidence Sheet",
+    ref:E(p.id)+"-QA-r"+(p.rev||1), status: approved?"From an approved pack":"DRAFT, pack not yet approved",
+    metaHtml:(p.parish?E(p.parish)+' · ':'')+'From Kickoff Pack '+E(p.id)+' revision r'+E(String(p.rev||1)),
+    watermark: approved?"":"DRAFT", body });
+}
+function koQaExport(){
+  const p = KO.current; if(!p) return;
+  if(p.status !== "approved" && !confirm("The pack behind this QA sheet is not approved yet. Open it anyway, watermarked as a draft?")) return;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to open the document."); return; }
+  w.document.write(koQaHtml(p)); w.document.close(); w.focus();
+}
+
+/* ── The Completion Report ────────────────────────────────────
+   The document the whole platform promises: job summary, before
+   and after side by side, the verification record, the worker's
+   confirmation, and the client's approval with the payment
+   record on the final page. Issued on EVERY job, small or
+   project-managed. The big documentation (Kickoff Pack, QA
+   sheet) belongs to PM jobs and services; the Completion Report
+   belongs to all of them. Built from the job's own evidence log:
+   only items checked by Yaadly (client-visible) appear. */
+function crDocHtml(j){
+  const E = esc;
+  const done = (j.stage||0) >= 5;
+  const nar = j.crNarrative || null;
+  const today = new Date().toLocaleDateString("en-GB", {day:"numeric", month:"long", year:"numeric"});
+  const ev = (j.evidence||[]).filter(e => e.ok !== false);
+  const withImg = ev.filter(e => e.img);
+  const befores = withImg.filter(e => /before/i.test(e.label||""));
+  const afters  = withImg.filter(e => /after/i.test(e.label||""));
+  const paired  = Math.max(befores.length, afters.length);
+  const others  = withImg.filter(e => !/before|after/i.test(e.label||""));
+  const cell = e => e
+    ? '<td style="width:50%"><img src="'+e.img+'" alt="" style="width:100%;border-radius:4px;border:1px solid #C9D6D0">'+
+      '<div style="font-size:8.5pt;color:#5E7268;margin-top:3px"><b style="color:#15211D">'+E(e.label||"")+'</b>'+(e.meta?' · '+E(e.meta):'')+'</div></td>'
+    : '<td style="width:50%"></td>';
+  let pairs = "";
+  for (let i=0;i<paired;i++) pairs += '<tr>'+cell(befores[i])+cell(afters[i])+'</tr>';
+  const laneLabel = j.worker && j.worker.lane === "cert" ? "Certified professional, certification checked with the issuing body"
+                  : j.worker && j.worker.lane === "vet" ? "Evidence-vetted tradesperson, ID verified" : "ID verified";
+  const checks = checklist(j).map(x=>{
+    const ok = x.have >= x.need;
+    return '<tr><td>'+E(x.name)+'</td><td class="num">'+x.have+' of '+x.need+'</td><td class="num">'+
+      (ok ? '<b style="color:#0D8A7C">PASS</b>' : (x.gapOnly ? '<span style="color:#C98A00;font-weight:800">GAP</span>' : '<span style="color:#C2452F;font-weight:800">MISSING</span>'))+'</td></tr>';
+  }).join("");
+  const dash = v => (v && String(v).trim()) ? E(String(v).trim()) : "not recorded";
+  let secN = 0; const S = (title, inner, extra) => { secN++; return '<section'+(extra||'')+'><h2><span>'+secN+'</span>'+E(title)+'</h2>'+inner+'</section>'; };
+
+  let body = "";
+  body += S("The job, in summary",
+  '<table><tbody>'+
+  '<tr><td style="width:34%">Property</td><td><b>'+dash(j.parish)+'</b></td></tr>'+
+  '<tr><td>Client</td><td>'+dash(j.client)+'</td></tr>'+
+  '<tr><td>Work carried out by</td><td><b>'+dash(j.worker&&j.worker.name)+'</b>'+(j.worker&&j.worker.trade?' · '+E(j.worker.trade):'')+'<br><span style="font-size:8.5pt;color:#5E7268">'+E(laneLabel)+'</span></td></tr>'+
+  '<tr><td>Oversight</td><td>Yaadly Ltd · every evidence item below was checked by a person before reaching the client</td></tr>'+
+  '<tr><td>Report issued</td><td>'+E(today)+'</td></tr>'+
+  '</tbody></table>'+
+  (nar && nar.overview ? '<h3>Overview</h3><p>'+E(nar.overview)+'</p><h3>Scope as agreed</h3><p>'+E(j.desc||"")+'</p>'
+                       : '<h3>What was done</h3><p>'+E(j.desc||"")+'</p>'));
+  if (nar && Array.isArray(nar.work_carried_out) && nar.work_carried_out.length){
+    body += S("How the work proceeded", nar.work_carried_out.map(p=>'<p>'+E(p)+'</p>').join(""));
+  }
+  body += S("Before and after, side by side",
+  (pairs ? '<table><thead><tr><th>Before</th><th>After</th></tr></thead><tbody>'+pairs+'</tbody></table>'
+         : '<p class="none">No paired before and after photographs are on this job yet.</p>')+
+  (others.length ? '<h3>Further evidence on record</h3><table><tbody>'+
+    others.map((e,i)=> i%2===0 ? '<tr>'+cell(e)+cell(others[i+1])+'</tr>' : '').join("")+'</tbody></table>' : '')+
+  '<p>Photographs are timestamped and geotagged at capture. The full-resolution originals are held on the job record.</p>');
+  body += S("Verification record",
+  '<table><thead><tr><th>Evidence standard</th><th>On record</th><th>Result</th></tr></thead><tbody>'+checks+'</tbody></table>'+
+  (nar && nar.evidence_note ? '<p>'+E(nar.evidence_note)+'</p>' : '')+
+  '<p>Checked against the Yaadly evidence standard for this job. A GAP is noted, never hidden. Nothing in this report is self-certified by the person who did the work.</p>');
+  if (nar && Array.isArray(nar.care_notes) && nar.care_notes.length){
+    body += S("Caring for the finished work",
+    '<ul>'+nar.care_notes.map(c=>'<li>'+E(c)+'</li>').join("")+'</ul>'+
+    '<p style="font-size:8.5pt;color:#5E7268">General good practice for this kind of work, offered as suggestions, not a survey, an inspection standard or a warranty. Anything beyond routine care belongs with a qualified tradesperson.</p>');
+  }
+  body += S("The worker\'s confirmation",
+  '<p class="callout"><b>"What is written is what was done."</b> This report was drafted from the evidence, not by the worker; the worker\'s signature confirms the record is true. This completed job joins their verified record, their Yaad Score.</p>'+
+  '<div class="sig"><div class="row"><div class="cell"><div class="line"></div><div class="lbl">'+dash(j.worker&&j.worker.name)+' · worker · signature and date</div></div>'+
+  '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · checked and issued · signature and date</div></div></div></div>');
+  body += S("Your approval, and the payment record",
+  '<p>Nothing on this job moved without the client\'s say-so. Payment was released to the worker only after the client reviewed the evidence in this report and approved it.</p>'+
+  '<table><tbody>'+
+  '<tr><td style="width:34%">Agreed amount to worker</td><td>'+(j.owed?('J$'+E(Number(j.owed).toLocaleString())):'not recorded')+'</td></tr>'+
+  '<tr><td>Paid by</td><td>'+dash(j.payMethod)+'</td></tr>'+
+  '<tr><td>Reference and date</td><td>'+dash(j.payRef)+'</td></tr>'+
+  '<tr><td>Status</td><td><b>'+(done ? 'Complete · worker paid on the client\'s approval' : E(STAGES[j.stage||0])+' · in progress')+'</b></td></tr>'+
+  '</tbody></table>'+
+  '<div class="sig"><div class="row"><div class="cell"><div class="line"></div><div class="lbl">'+dash(j.client)+' · client approval · signature and date</div></div></div></div>'+
+  (nar && nar.closing_note ? '<p class="callout">'+E(nar.closing_note)+'</p>' : '')+
+  '<div class="notice">This report is yours to keep: forward it to family, keep it with the house papers, show it to the next contractor. Yaadly provides project management, procurement and oversight; amounts above record the transaction that took place and are not a valuation or estimate.'+
+  (nar ? ' Narrative drafted with AI assistance ('+E(nar.model||"")+'), read and issued by a person.' : '')+'</div>',
+  ' style="page-break-before:always"');
+  return yaadDocShell({
+    title: (j.title||"Job")+": Completion Report",
+    doctype: "Completion Report",
+    ref: E(j.id)+"-CR",
+    status: done ? "Final" : "DRAFT, job not yet complete",
+    metaHtml: (j.parish?E(j.parish)+' · ':'')+'Job '+E(j.id)+(j.client?' · for '+E(j.client):''),
+    watermark: done ? "" : "DRAFT", body });
+}
+function crExport(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  if((j.stage||0) < 5 && !confirm("This job is not at Worker Paid yet, so the report opens as a watermarked draft. Continue?")) return;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to open the document."); return; }
+  w.document.write(crDocHtml(j)); w.document.close(); w.focus();
+}
+/* AI narrative for the Completion Report. Drafts only; Monique reads,
+   edits or clears it before the report is issued. Facts in, prose out:
+   no client contact details and no money fields ever leave the browser. */
+async function runCrNarrative(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const out = $("agent-out");
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ alert("Connect cloud first."); return; }
+  if(!String(j.desc||"").trim()){ alert("Give the job a scope description first, the narrative is drafted from it."); return; }
+  out.innerHTML = '<div class="mono">Drafting the report narrative. Usually up to a minute.</div>';
+  try{
+    const payload = { job: {
+      title:j.title||"", parish:j.parish||"", client:j.client||"", desc:j.desc||"",
+      workerName:(j.worker&&j.worker.name)||"", workerTrade:(j.worker&&j.worker.trade)||"",
+      evidence:(j.evidence||[]).filter(e=>e.ok!==false).map(e=>({label:e.label||"",meta:e.meta||""})),
+      checklist: checklist(j).map(c=>({name:c.name,have:c.have,need:c.need}))
+    }};
+    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-completion", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
+      body: JSON.stringify(payload)
+    });
+    const res = await r.json().catch(()=>({error:"bad response"}));
+    if(res.error){ out.innerHTML = '<div class="note" style="color:var(--red)">Failed: '+esc(res.error)+'</div>'; return; }
+    j.crNarrative = { ...res.narrative, model: res.model, at: new Date().toISOString() };
+    save();
+    crNarEditor(id, res.guardrail);
+  } catch(e){ out.innerHTML = '<div class="note" style="color:var(--red)">Failed: '+esc(String(e))+'</div>'; }
+}
+function crNarEditor(id, guardrail){
+  const j = DB.jobs.find(x=>x.id===id); const n = j && j.crNarrative; const out = $("agent-out");
+  if(!n){ out.innerHTML=""; return; }
+  const warn = guardrail && guardrail.money_language_detected
+    ? '<p class="note" style="color:var(--red)"><b>Money language found in the narrative:</b> '+esc((guardrail.samples||[]).join(" · "))+'. Remove it below, the payment record is data, never prose.</p>' : '';
+  out.innerHTML = '<div class="card"><h3>Report narrative <em>drafted, read it before issuing</em></h3>'+warn+
+    '<p class="note" style="margin-top:0">This lands in the Completion Report. Edit anything; changes save as you type. It describes what the evidence shows, it never certifies.</p>'+
+    '<div class="field"><label>Overview</label><textarea data-crn="overview">'+esc(n.overview||"")+'</textarea></div>'+
+    '<div class="field"><label>How the work proceeded (one paragraph per line)</label><textarea data-crn="work_carried_out" rows="5">'+esc((n.work_carried_out||[]).join("\n"))+'</textarea></div>'+
+    '<div class="field"><label>Evidence note</label><textarea data-crn="evidence_note" rows="2">'+esc(n.evidence_note||"")+'</textarea></div>'+
+    '<div class="field"><label>Care notes (one per line)</label><textarea data-crn="care_notes" rows="3">'+esc((n.care_notes||[]).join("\n"))+'</textarea></div>'+
+    '<div class="field"><label>Closing note</label><textarea data-crn="closing_note" rows="2">'+esc(n.closing_note||"")+'</textarea></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" onclick="crExport(\''+id+'\')">📄 Open the report with this narrative →</a>'+
+    '<a class="btn warn sm" onclick="crNarClear(\''+id+'\')">Remove narrative from the report</a></div></div>';
+  out.querySelectorAll("[data-crn]").forEach(t=>t.addEventListener("input", ()=>{
+    const k = t.dataset.crn;
+    if(k==="work_carried_out"||k==="care_notes") j.crNarrative[k] = t.value.split("\n").map(x=>x.trim()).filter(Boolean);
+    else j.crNarrative[k] = t.value;
+    save();
+  }));
+}
+function crNarClear(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  if(!confirm("Remove the AI narrative? The report goes back to data-only sections.")) return;
+  delete j.crNarrative; save(); $("agent-out").innerHTML = '<p class="note">Narrative removed.</p>';
+}
+
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+/* ── Signing the Worker Guidelines, in the portal, on a phone ──
+   A simple electronic signature: the signed-in account, a typed
+   legal name, a finger-drawn signature, the exact consent text
+   shown, the guidelines version, and the timestamp, written to
+   doc_signatures, which accepts inserts only. No printing. */
+const WG_CONSENT = "I confirm I have read the Yaadly Worker Guidelines version " + WG_VERSION +
+  " and I agree to work to them on every Yaadly job. I understand this electronic signature has the same effect as signing on paper.";
+let wgPad = { drawn:false };
+async function wgLoadSign(){
+  const box = $("wg-sign"); if(!box || !sb) return;
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ box.innerHTML=""; return; }
+  const {data, error} = await sb.from("doc_signatures").select("doc_version,signed_at")
+    .eq("doc_type","worker_guidelines").eq("signer_user", session.user.id);
+  if(error){ box.innerHTML = '<div class="note" style="color:var(--red)">Could not check your guidelines signature: '+esc(error.message)+'</div>'; return; }
+  const current = (data||[]).find(r=>r.doc_version===WG_VERSION);
+  if(current){
+    box.innerHTML = '<div class="card" style="border-color:var(--softline)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">'+
+      '<div><h3 style="margin:0">Worker Guidelines <em>signed</em></h3>'+
+      '<p class="note" style="margin:4px 0 0">Version '+esc(WG_VERSION)+' · signed '+esc(String(current.signed_at).slice(0,10))+'. Kept on record; you will be asked again only when the guidelines change.</p></div>'+
+      '<a class="btn sm o" onclick="openWorkerGuidelines()">Read again</a></div></div>';
+    return;
+  }
+  const older = (data||[]).length;
+  box.innerHTML = '<div class="card" style="border-color:var(--mango)">'+
+    '<h3>'+(older?'The guidelines have <em>changed</em>':'One thing before your first job: <em>sign the guidelines</em>')+'</h3>'+
+    '<p class="note" style="margin-top:0">'+(older?'A new version is out; please read and sign it. Your earlier signature stays on record.':'The Worker Guidelines are the rules of working with Yaadly: what protects you, what is expected, and how you get paid. Read them, then sign below with your finger. No printing needed.')+'</p>'+
+    '<a class="btn sm o" onclick="openWorkerGuidelines()">1 · Read the guidelines →</a>'+
+    '<div class="field" style="margin-top:14px"><label>2 · Your full legal name</label><input id="wg-name" autocomplete="name" placeholder="As it appears on your ID"></div>'+
+    '<div class="field"><label>3 · Sign with your finger</label>'+
+    '<canvas id="wg-canvas" width="600" height="160" style="width:100%;height:130px;background:#101E19;border:1px dashed var(--softline);border-radius:11px;touch-action:none"></canvas>'+
+    '<a class="btn sm o" style="margin-top:6px" onclick="wgClearPad()">Clear and sign again</a></div>'+
+    '<label class="slot" style="align-items:flex-start;white-space:normal"><input type="checkbox" id="wg-consent" style="margin-top:3px"> <span style="font-size:12.5px">'+esc(WG_CONSENT)+'</span></label>'+
+    '<div style="margin-top:12px"><a class="btn" onclick="wgSubmitSign()">Sign the guidelines</a></div>'+
+    '<div id="wg-status"></div></div>';
+  wgWirePad();
+}
+function wgWirePad(){
+  const c = $("wg-canvas"); if(!c) return;
+  const ctx = c.getContext("2d");
+  ctx.strokeStyle = "#F2FAF7"; ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  wgPad = { drawn:false, active:false };
+  const pos = e => {
+    const r = c.getBoundingClientRect();
+    const p = e.touches ? e.touches[0] : e;
+    return { x:(p.clientX-r.left)*(c.width/r.width), y:(p.clientY-r.top)*(c.height/r.height) };
+  };
+  const start = e => { e.preventDefault(); wgPad.active = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
+  const move  = e => { if(!wgPad.active) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); wgPad.drawn = true; };
+  const end   = () => { wgPad.active = false; };
+  c.addEventListener("mousedown",start); c.addEventListener("mousemove",move); window.addEventListener("mouseup",end);
+  c.addEventListener("touchstart",start,{passive:false}); c.addEventListener("touchmove",move,{passive:false}); c.addEventListener("touchend",end);
+}
+function wgClearPad(){
+  const c = $("wg-canvas"); if(!c) return;
+  c.getContext("2d").clearRect(0,0,c.width,c.height); wgPad.drawn = false;
+}
+async function wgSubmitSign(){
+  const st = $("wg-status");
+  const name = ($("wg-name").value||"").trim();
+  if(name.length < 2){ st.innerHTML = '<p class="note" style="color:var(--red)">Type your full legal name first.</p>'; return; }
+  if(!wgPad.drawn){ st.innerHTML = '<p class="note" style="color:var(--red)">Sign in the box with your finger.</p>'; return; }
+  if(!$("wg-consent").checked){ st.innerHTML = '<p class="note" style="color:var(--red)">Tick the confirmation to sign.</p>'; return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ st.innerHTML = '<p class="note" style="color:var(--red)">Your session expired. Sign in again.</p>'; return; }
+  st.innerHTML = '<div class="mono">Recording your signature...</div>';
+  const img = $("wg-canvas").toDataURL("image/png");
+  const {error} = await sb.from("doc_signatures").insert({
+    signer_user: session.user.id, signer_email: session.user.email,
+    signer_name: name, doc_type: "worker_guidelines", doc_version: WG_VERSION,
+    signature_image: img, consent_text: WG_CONSENT
+  });
+  if(error){
+    st.innerHTML = '<p class="note" style="color:var(--red)">Could not record it: '+esc(error.message)+'</p>';
+    return;
+  }
+  wgLoadSign();
+}
+/* admin: who has signed which version */
+async function wgAdminSigs(){
+  const box = $("wg-admin-sigs"); if(!box || !sb) return;
+  const {data, error} = await sb.from("doc_signatures").select("signer_name,signer_email,doc_type,doc_version,signed_at").order("signed_at",{ascending:false}).limit(200);
+  if(error){ box.innerHTML = '<p class="note">Signatures: '+esc(error.message)+'</p>'; return; }
+  box.innerHTML = (data&&data.length)
+    ? '<div class="ktwrap"><table class="kt"><thead><tr><th>Signed by</th><th>Email</th><th>Document</th><th>Version</th><th>When</th></tr></thead><tbody>'+
+      data.map(r=>'<tr><td><b>'+esc(r.signer_name)+'</b></td><td>'+esc(r.signer_email)+'</td><td>'+esc(r.doc_type.replace(/_/g," "))+'</td><td>'+esc(r.doc_version)+'</td><td>'+esc(String(r.signed_at).slice(0,16).replace("T"," "))+'</td></tr>').join("")+
+      '</tbody></table></div>'
+    : '<p class="note">Nobody has signed yet. Workers sign in their portal, on their phone; signatures land here as permanent records.</p>';
+}
+/* ── Structured quotes: worker side ───────────────────────────
+   Labour + materials at cost, earliest start, duration, written
+   to job_quotes under the signed-in worker's identity. One live
+   quote per worker per job; editable or withdrawable only while
+   Yaadly has not yet acted on it. Free to quote, always. */
+let WQ = { mine:{} };
+/* Fair-price indicator. Advisory only, never a hold point: where a
+   benchmark exists it says where a total sits against the band; where none
+   exists yet, most trades, it stays silent rather than guessing. */
+function wqBand(job){
+  const text = ((job&&job.title)||"")+" "+((job&&job.desc)||"");
+  const b = BENCH.find(x=>x.re.test(text));
+  if(!b || b.none || !b.low || !b.high) return null;
+  return b;
+}
+function wqIndicator(job, total){
+  const b = wqBand(job); if(!b) return "";
+  const mid = (b.low+b.high)/2;
+  if(total > b.high) return '<span class="pill gold" title="Band: J$'+b.low.toLocaleString()+' to J$'+b.high.toLocaleString()+' ('+esc(b.src||"")+')">ABOVE THE FAIR BAND</span>';
+  if(total < b.low) return '<span class="pill hold" title="Band: J$'+b.low.toLocaleString()+' to J$'+b.high.toLocaleString()+'">BELOW THE FAIR BAND</span>';
+  return '<span class="pill hold" style="background:var(--soft);color:var(--tealb)" title="Band: J$'+b.low.toLocaleString()+' to J$'+b.high.toLocaleString()+'">'+(total>mid?'UPPER':'LOWER')+' HALF OF THE FAIR BAND</span>';
+}
+async function wqLoadOpen(jobIds){
+  if(!sb || !jobIds.length) return;
+  const {data:{session}} = await sb.auth.getSession(); if(!session) return;
+  const {data, error} = await sb.from("job_quotes").select("*").in("job_id", jobIds).eq("worker_user", session.user.id);
+  if(error){ jobIds.forEach(id=>{ const b=$("wq-"+id); if(b) b.innerHTML='<p class="note" style="color:var(--red)">Could not load quotes: '+esc(error.message)+'</p>'; }); return; }
+  WQ.mine = {}; (data||[]).forEach(q=>{ WQ.mine[q.job_id]=q; });
+  jobIds.forEach(id=>wqRender(id));
+}
+function wqRender(jobId){
+  const box = $("wq-"+jobId); if(!box) return;
+  const q = WQ.mine[jobId];
+  if(q && q.status !== "withdrawn" && !box.dataset.editing){
+    const pill = q.status==="accepted" ? '<span class="pill done">ACCEPTED · YOU GOT THE JOB</span>'
+      : q.status==="declined" ? '<span class="pill rev">NOT THIS TIME</span>'
+      : '<span class="pill hold">QUOTE IN · WITH THE CLIENT</span>';
+    box.innerHTML = '<div style="border:1px solid var(--softline);border-radius:12px;padding:12px 14px;background:var(--soft)">'+
+      '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><b>Your quote</b>'+pill+'</div>'+
+      '<p style="font-size:13.5px;margin-top:6px">Labour <b>J$'+Number(q.labour_jmd).toLocaleString()+'</b> · Materials <b>J$'+Number(q.materials_jmd).toLocaleString()+'</b>'+(q.materials_at_cost?' at cost with receipts':'')+
+      ' · Total <b>J$'+(Number(q.labour_jmd)+Number(q.materials_jmd)).toLocaleString()+'</b><br>Can start: '+esc(q.earliest_start)+(q.days_estimate?' · about '+esc(q.days_estimate):'')+'</p>'+
+      (q.status==="submitted" ? '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="wqEdit(\''+esc(jobId)+'\')">Change my quote</a><a class="btn warn sm" onclick="wqWithdraw(\''+esc(jobId)+'\')">Withdraw</a></div>' : '')+
+      '</div>';
+    return;
+  }
+  const v = q || {};
+  box.dataset.editing = "";
+  box.innerHTML =
+    '<div class="grid3">'+
+    '<div class="field"><label>Labour (J$)</label><input id="wq-lab-'+esc(jobId)+'" type="number" min="0" inputmode="numeric" value="'+esc(v.labour_jmd!=null?String(v.labour_jmd):"")+'" placeholder="45000"></div>'+
+    '<div class="field"><label>Materials (J$)</label><input id="wq-mat-'+esc(jobId)+'" type="number" min="0" inputmode="numeric" value="'+esc(v.materials_jmd!=null?String(v.materials_jmd):"")+'" placeholder="28500"></div>'+
+    '<div class="field"><label>Days needed</label><input id="wq-days-'+esc(jobId)+'" value="'+esc(v.days_estimate||"")+'" placeholder="e.g. 3 to 4 days"></div></div>'+
+    '<div class="grid2">'+
+    '<div class="field"><label>Earliest start</label><input id="wq-start-'+esc(jobId)+'" value="'+esc(v.earliest_start||"")+'" placeholder="e.g. Tuesday, or 2 Sep"></div>'+
+    '<div class="field"><label>Anything Yaadly should know</label><input id="wq-note-'+esc(jobId)+'" value="'+esc(v.note||"")+'" placeholder="optional"></div></div>'+
+    '<label class="slot" style="margin-bottom:10px"><input type="checkbox" id="wq-cost-'+esc(jobId)+'"'+((v.materials_at_cost!==false)?" checked":"")+'> Materials at cost, receipts provided</label>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn sm" onclick="wqSubmit(\''+esc(jobId)+'\')">'+(q?'Update my quote':'Send my quote')+'</a>'+
+    (q?'<a class="btn o sm" onclick="wqCancelEdit(\''+esc(jobId)+'\')">Cancel</a>':'')+'</div>'+
+    '<p class="note">Quote your true price and quote what you want, the amount is yours. Where Yaadly has a benchmark, a fair-price indicator is shown beside your quote so the client can see where it sits; where none exists yet, nothing is shown. Your quote goes to the client. Quoting is free, always.</p>'+
+    '<div id="wq-st-'+esc(jobId)+'"></div>';
+}
+function wqEdit(jobId){ const b=$("wq-"+jobId); if(b){ b.dataset.editing="1"; wqRender(jobId); } }
+function wqCancelEdit(jobId){ const b=$("wq-"+jobId); if(b){ delete b.dataset.editing; wqRender(jobId); } }
+async function wqSubmit(jobId){
+  const st = $("wq-st-"+jobId);
+  const lab = Math.round(Number($("wq-lab-"+jobId).value));
+  const mat = Math.round(Number($("wq-mat-"+jobId).value||0));
+  const start = ($("wq-start-"+jobId).value||"").trim();
+  if(!isFinite(lab) || lab<=0){ st.innerHTML='<p class="note" style="color:var(--red)">Put your labour price in.</p>'; return; }
+  if(!start){ st.innerHTML='<p class="note" style="color:var(--red)">Say when you can start.</p>'; return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ st.innerHTML='<p class="note" style="color:var(--red)">Your session expired, sign in again.</p>'; return; }
+  st.innerHTML = '<div class="mono">Sending...</div>';
+  const row = { job_id: jobId, worker_user: session.user.id, worker_email: session.user.email,
+    worker_name: (workerAuthEmail||session.user.email).split("@")[0],
+    labour_jmd: lab, materials_jmd: isFinite(mat)?mat:0,
+    materials_at_cost: $("wq-cost-"+jobId).checked,
+    earliest_start: start, days_estimate: ($("wq-days-"+jobId).value||"").trim() || null,
+    note: ($("wq-note-"+jobId).value||"").trim() || null, status: "submitted" };
+  const existing = WQ.mine[jobId];
+  const r = existing
+    ? await sb.from("job_quotes").update(row).eq("id", existing.id).select().single()
+    : await sb.from("job_quotes").upsert(row, {onConflict:"job_id,worker_user"}).select().single();
+  if(r.error){ st.innerHTML='<p class="note" style="color:var(--red)">Could not send: '+esc(r.error.message)+'</p>'; return; }
+  WQ.mine[jobId] = r.data; const b=$("wq-"+jobId); if(b) delete b.dataset.editing;
+  wqRender(jobId);
+}
+async function wqWithdraw(jobId){
+  const q = WQ.mine[jobId]; if(!q) return;
+  if(!confirm("Withdraw your quote for "+jobId+"?")) return;
+  const r = await sb.from("job_quotes").update({status:"withdrawn"}).eq("id", q.id).select().single();
+  if(r.error){ alert("Could not withdraw: "+r.error.message); return; }
+  WQ.mine[jobId] = r.data; wqRender(jobId);
+}
+/* ── quotes: admin side, in the job editor ── */
+async function jqLoad(jobId){
+  const box = $("jq-"+jobId); if(!box || !sb) return;
+  const j = DB.jobs.find(x=>x.id===jobId);
+  const {data, error} = await sb.from("job_quotes").select("*").eq("job_id", jobId).order("created_at",{ascending:true});
+  if(error){ box.innerHTML='<p class="note">Quotes: '+esc(error.message)+'</p>'; return; }
+  const b = wqBand(j);
+  const rows = (data||[]).filter(q=>q.status!=="withdrawn");
+  box.innerHTML =
+    (b ? '<p class="note" style="margin-top:0">Fair-price benchmark for this work: <b>J$'+b.low.toLocaleString()+' to J$'+b.high.toLocaleString()+'</b> ('+esc(b.src||"")+'). Advisory only, it indicates, it never blocks.</p>'
+       : '<p class="note" style="margin-top:0">No established benchmark for this trade yet, so no indicator is shown. Quotes stand on their own.</p>')+
+    (rows.length
+      ? '<div class="ktwrap"><table class="kt"><thead><tr><th>Worker</th><th>Labour</th><th>Materials</th><th>Total</th><th>Indicator</th><th>Start</th><th>Status</th><th></th></tr></thead><tbody>'+
+        rows.map(q=>{
+          const tot = Number(q.labour_jmd)+Number(q.materials_jmd);
+          const pill = q.status==="accepted" ? '<span class="pill done">ACCEPTED</span>' : q.status==="declined" ? '<span class="pill rev">DECLINED</span>' : '<span class="pill hold">SUBMITTED</span>';
+          return '<tr><td><b>'+esc(q.worker_name)+'</b><br><span style="font-size:11px">'+esc(q.worker_email)+'</span>'+(q.note?'<br><span style="font-size:11px;color:var(--dim)">'+esc(q.note)+'</span>':'')+'</td>'+
+          '<td>J$'+Number(q.labour_jmd).toLocaleString()+'</td>'+
+          '<td>J$'+Number(q.materials_jmd).toLocaleString()+(q.materials_at_cost?'<br><span style="font-size:10px">at cost, receipted</span>':'')+'</td>'+
+          '<td><b>J$'+tot.toLocaleString()+'</b></td>'+
+          '<td>'+(wqIndicator(j, tot)||'<span style="color:var(--dim);font-size:11px">no benchmark</span>')+'</td>'+
+          '<td>'+esc(q.earliest_start)+(q.days_estimate?'<br><span style="font-size:11px">'+esc(q.days_estimate)+'</span>':'')+'</td>'+
+          '<td>'+pill+'</td>'+
+          '<td style="white-space:nowrap">'+(q.status==="submitted"
+            ? '<a class="btn sm" onclick="jqAccept(\''+esc(jobId)+'\',\''+q.id+'\')">Accept</a> <a class="btn warn sm" onclick="jqDecline(\''+esc(jobId)+'\',\''+q.id+'\')">Decline</a>'
+            : '')+'</td></tr>'; }).join("")+
+        '</tbody></table></div>'+
+        '<p class="note">The client already sees every live quote with the indicator beside it, there is no review gate. When the client chooses, press Accept to execute the match: it fills the worker and payout fields below, you press Save, and you tell both sides. Your hand moves the money states, never the table.</p>'
+      : '<p class="note">No structured quotes yet. Workers quote from the Open for quotes tab in their portal; WhatsApp quotes still work and can be entered by hand.</p>');
+}
+async function jqAccept(jobId, quoteId){
+  const {data, error} = await sb.from("job_quotes").update({status:"accepted"}).eq("id", quoteId).select().single();
+  if(error){ alert("Could not accept: "+error.message); return; }
+  if($("jb-wname") && !$("jb-wname").value) $("jb-wname").value = data.worker_name;
+  if($("jb-wemail") && !$("jb-wemail").value) $("jb-wemail").value = data.worker_email;
+  if($("jb-owed") && !$("jb-owed").value) $("jb-owed").value = String(Number(data.labour_jmd)+Number(data.materials_jmd));
+  jqLoad(jobId);
+}
+async function jqDecline(jobId, quoteId){
+  if(!confirm("Decline this quote? The worker sees Not this time.")) return;
+  const {error} = await sb.from("job_quotes").update({status:"declined"}).eq("id", quoteId);
+  if(error){ alert("Could not decline: "+error.message); return; }
+  jqLoad(jobId);
+}
+/* ── The jobs board: every open job, from the cloud ───────────
+   Workers browse on their own phones, so the board comes from
+   the open_jobs view: safe columns only, no client contact
+   details ever reach a worker's browser. Local rows (Monique's
+   own machine) merge in so her preview stays live too. */
+async function wqMarketplace(O){
+  let rows = [];
+  if(sb){
+    const {data, error} = await sb.from("open_jobs").select("*").order("updated_at",{ascending:false});
+    if(!error && data) rows = data.map(r=>({id:r.id, title:r.title, parish:r.parish, desc:r.descr}));
+  }
+  DB.jobs.filter(j=>j.open && !(j.worker&&j.worker.name)).forEach(j=>{
+    if(!rows.find(r=>r.id===j.id)) rows.push({id:j.id, title:j.title, parish:j.parish, desc:j.desc});
+  });
+  O.innerHTML = "";
+  if(!rows.length){
+    O.innerHTML = '<div class="empty">No open jobs on the board right now. New jobs land here the moment Yaadly opens them for quotes, so check back, and you will also be told on WhatsApp when one matches your trade. Quoting is free, always.</div>';
+    return;
+  }
+  O.innerHTML = '<p class="note" style="margin-top:12px">'+rows.length+' open '+(rows.length===1?'job':'jobs')+' on the board. Any verified worker can quote on any of them, the client sees every quote side by side and chooses. Quote your true price; it is never beaten down.</p>';
+  rows.forEach(j=>{
+    const d = document.createElement("div"); d.className="card";
+    d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">OPEN FOR QUOTES'+(j.parish?' · '+esc(j.parish).toUpperCase():'')+'</span></div>'+
+      '<p style="font-size:13.5px;color:var(--mute)">'+esc(j.desc||"")+'</p>'+
+      '<div id="wq-'+esc(j.id)+'"><p class="note">Loading your quote...</p></div>';
+    O.appendChild(d);
+  });
+  wqLoadOpen(rows.map(j=>j.id));
+}
+/* ── The worker directory: clients browsing the network ──────
+   Published by Yaadly, worker by worker, never automatic. The
+   score starts honest: verified jobs completed on the platform,
+   with the vetting lane beside it. */
+async function cwLoad(box){
+  if(!sb){ box.innerHTML = '<div class="empty">The directory needs the cloud connection.</div>'; return; }
+  const {data, error} = await sb.from("worker_profiles").select("*").eq("active", true).order("jobs_completed",{ascending:false});
+  if(error){ box.innerHTML = '<div class="empty">Could not load the directory: '+esc(error.message)+'</div>'; return; }
+  if(!data || !data.length){
+    box.innerHTML = '<div class="empty">The worker network is being built parish by parish, and nobody is listed before verification is complete: government photo ID on a video call, references called, and a trial job. Profiles appear here as workers pass.</div>';
+    return;
+  }
+  box.innerHTML = '<p class="note" style="margin-top:0">Every person here passed Yaadly verification before their first job: government photo ID seen on a video call, references called, past work reviewed, and a trial job. The <b>Yaad Score record</b> is verified jobs completed on Yaadly: evidence-documented, client-approved, never self-reported. Score numbers publish as history builds.</p>'+
+      data.map(w=>{
+        const laneB = w.lane==="cert" ? '<span class="lane cert">CERTIFIED PROFESSIONAL</span>' : '<span class="lane vet">EVIDENCE VETTED</span>';
+        return '<div class="wcard"><div class="av">'+esc((w.name||"W")[0].toUpperCase())+'</div>'+
+        '<div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"General trades")+(w.parish?' · '+esc(w.parish):'')+'</small>'+
+        '<small style="color:var(--tealb)">Yaad Score record: '+Number(w.jobs_completed||0)+' verified '+(Number(w.jobs_completed||0)===1?'job':'jobs')+' completed</small></div>'+laneB+'</div>';
+      }).join("")+
+      '<p class="note" style="margin-top:12px">Workers are matched or shortlisted for your job by Yaadly, so you never have a stranger at your gate. Want someone here for your next job? Say so when your job is scoped.</p>';
+}
+/* admin: publish the directory */
+async function wpPublish(){
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const rows = DB.workers.filter(w=>w.email).map(w=>({
+    worker_email: w.email.toLowerCase(), name: w.name||"", trade: w.trade||"", parish: w.parish||"",
+    lane: (w.lane==="cert"||w.lane==="vet"||w.lane==="pro") ? w.lane : null,
+    jobs_completed: Number(w.jobs||0), active: true
+  }));
+  if(!rows.length){ alert("No approved workers with an email on record yet. Approve applications first."); return; }
+  const {error} = await sb.from("worker_profiles").upsert(rows);
+  const st = $("wp-pub-status");
+  if(st) st.textContent = error ? ("Publish failed: "+error.message) : ("Published "+rows.length+" profile"+(rows.length===1?"":"s")+" to the client directory.");
+}
+/* ── The public marketplace ──────────────────────────────────
+   The shop window. Jobs and workers load anonymously from the
+   safe public surfaces (open_jobs view, published profiles).
+   Every card ends at the same door: sign on to take part. */
+async function renderMarketplace(){
+  const JB = $("mp-jobs"), WD = $("mp-workers");
+  if(!JB) return;
+  if(!sb){ JB.innerHTML = WD.innerHTML = '<div class="empty">The marketplace needs the cloud connection.</div>'; return; }
+  const [jr, wr] = await Promise.all([
+    sb.from("open_jobs").select("*").order("updated_at",{ascending:false}),
+    sb.from("worker_profiles").select("name,trade,parish,lane,jobs_completed").eq("active",true).order("jobs_completed",{ascending:false})
+  ]);
+  if(jr.error || !jr.data || !jr.data.length){
+    JB.innerHTML = '<div class="empty">No jobs are open for quotes right now. Pitched jobs land here the moment Yaadly opens them, so pitch yours and it can be next.</div>';
+  } else {
+    JB.innerHTML = '<div class="grid2">'+jr.data.map(j=>
+      '<div class="card" style="margin-top:0"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3 style="font-size:16px">'+esc(j.title||"Job")+'</h3><span class="pill hold">OPEN</span></div>'+
+      '<p class="note" style="margin:4px 0 8px">'+esc(j.parish||"")+' · '+esc(j.id)+' · '+(j.client_signed?'client signed on · '+Number(j.client_jobs_completed||0)+' completed '+(Number(j.client_jobs_completed||0)===1?'job':'jobs'):'client record pending')+'</p>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(String(j.descr||"").slice(0,180))+(String(j.descr||"").length>180?'...':'')+'</p>'+
+      '<a class="btn sm" style="margin-top:10px" onclick="go(\'worker\')">Sign in as a worker to quote →</a></div>').join("")+'</div>';
+  }
+  if(wr.error || !wr.data || !wr.data.length){
+    WD.innerHTML = '<div class="empty">The worker network is being built parish by parish. Nobody is listed before verification: government photo ID on a video call, references called, and a trial job.</div>';
+  } else {
+    WD.innerHTML = '<p class="note" style="margin-top:0">Every worker here passed Yaadly verification before their first job. The <b>Yaad Score record</b> is verified jobs completed on Yaadly: evidence-documented, client-approved, never self-reported.</p>'+
+      wr.data.map(w=>{
+        const laneB = w.lane==="cert" ? '<span class="lane cert">CERTIFIED PROFESSIONAL</span>' : '<span class="lane vet">EVIDENCE VETTED</span>';
+        return '<div class="wcard"><div class="av">'+esc((w.name||"W")[0].toUpperCase())+'</div>'+
+        '<div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"General trades")+(w.parish?' · '+esc(w.parish):'')+'</small>'+
+        '<small style="color:var(--tealb)">Yaad Score record: '+Number(w.jobs_completed||0)+' verified '+(Number(w.jobs_completed||0)===1?'job':'jobs')+'</small></div>'+laneB+'</div>';
+      }).join("")+
+      '<a class="btn sm" style="margin-top:12px" onclick="go(\'site\');setTimeout(()=>document.getElementById(\'startform\').scrollIntoView(),100)">Pitch a job to hire from this network →</a>';
+  }
+}
+/* ── Client Guidelines: the client's side of the deal ─────────
+   The mirror of the Worker Guidelines. Signed electronically at
+   profile creation: a client account is not complete until the
+   current version is signed. Review before first issue; bump
+   CG_VERSION when the rules change. */
+const CG_VERSION = "1.0 · 23 August 2026";
+function cgDocHtml(){
+  const E = esc;
+  const body =
+  '<section><h2><span>1</span>What being a Yaadly client means</h2>'+
+  '<p>Yaadly gets property work done on evidence: verified workers, documented stages, and money that moves only when you approve what you can see. These guidelines are your side of that deal. Every protection you enjoy has a named counterpart the worker enjoys, and nobody carries the risk alone.</p></section>'+
+  '<section><h2><span>2</span>Describing your job honestly</h2><ul>'+
+  '<li>Describe the site and the work as they really are. Workers can walk away from a mis-described site without penalty, so an honest pitch protects your own timeline.</li>'+
+  '<li>Share what you know: access, occupancy, past repairs, anything already tried or quoted.</li></ul></section>'+
+  '<section><h2><span>3</span>Quotes and choosing</h2><ul>'+
+  '<li>Workers quote their own price. Where Yaadly has a benchmark, an indicator shows where a quote sits against the fair band. The choice is entirely yours.</li>'+
+  '<li>Do not beat workers down or ask them to shave the price off-platform. A fair yes or a clean no.</li>'+
+  '<li>All work is engaged through Yaadly. Approaching a worker from this platform for a side deal removes the protection for both of you, and repeat side-dealing ends the account.</li></ul></section>'+
+  '<section><h2><span>4</span>While the work runs</h2><ul>'+
+  '<li>Keep the access you promised. If your ground contact cannot open up on an agreed day, say so the day before.</li>'+
+  '<li>Treat workers with respect, in messages and in person. They are verified professionals, and they see your conduct the way you see theirs.</li>'+
+  '<li>Extra work you think of on site goes through Yaadly first, in writing, never negotiated at the gate.</li></ul></section>'+
+  '<section><h2><span>5</span>Evidence, approval and money</h2><ul>'+
+  '<li>Review evidence when it lands, within 3 days where you can. A worker who has proven a stage is waiting on your word to be paid.</li>'+
+  '<li>Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free and reviewed by a person, and nothing moves while one is open.</li>'+
+  '<li>Pay through the agreed route only. Never pay a worker directly on the side, and never withhold approval to renegotiate a price already agreed.</li></ul></section>'+
+  '<section><h2><span>6</span>What loses the account</h2>'+
+  '<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody>'+
+  '<tr><td>Side deals with platform workers</td><td>Warning, then removal</td></tr>'+
+  '<tr><td>Abusive conduct toward a worker or staff</td><td>Reviewed by a person; can be removal</td></tr>'+
+  '<tr><td>Withholding approval in bad faith to force a discount</td><td>Dispute ruled by a person; repeat ends the account</td></tr>'+
+  '<tr><td>Knowingly false job descriptions</td><td>Warning, then removal</td></tr>'+
+  '</tbody></table></section>'+
+  '<div class="notice">These guidelines are issued by Yaadly Ltd and may be updated; clients are told when they change. They sit alongside, and do not replace, the terms agreed in writing for each job.</div>'+
+  '<section class="sig"><h2><span>✓</span>Acknowledgement</h2>'+
+  '<p>I have read these guidelines and I agree to do business on Yaadly this way.</p>'+
+  '<div class="row"><div class="cell"><div class="line"></div><div class="lbl">Client · name, signature and date</div></div>'+
+  '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · signature and date</div></div></div></section>';
+  return yaadDocShell({ title:"Client Guidelines", doctype:"Doing business on Yaadly",
+    ref:"YAADLY-CG-"+CG_VERSION.split(" ")[0], status:"Version "+CG_VERSION,
+    metaHtml:'For all Yaadly clients · Version '+E(CG_VERSION), watermark:"", body });
+}
+function openClientGuidelines(){
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to open the document."); return; }
+  w.document.write(cgDocHtml()); w.document.close(); w.focus();
+}
+/* ── Client signing gate: dashboard unlocks after signature ── */
+const CG_CONSENT = "I confirm I have read the Yaadly Client Guidelines version " + CG_VERSION +
+  " and I agree to do business on Yaadly this way. I understand this electronic signature has the same effect as signing on paper.";
+let cgPad = { drawn:false, active:false };
+async function cgCheckGate(){
+  const box = $("cg-gate"); if(!box || !sb) return;
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ box.innerHTML=""; box.style.display="none"; return; }
+  const {data, error} = await sb.from("doc_signatures").select("doc_version")
+    .eq("doc_type","client_guidelines").eq("signer_user", session.user.id);
+  if(error){ box.style.display="none"; return; }
+  const current = (data||[]).find(r=>r.doc_version===CG_VERSION);
+  if(current){
+    box.style.display="block";
+    box.innerHTML = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span class="pill ok">CLIENT · GUIDELINES SIGNED</span>'+
+      '<a class="btn sm" onclick="go(\'site\');setTimeout(()=>{const e=$(\'in-email\');if(e&&clientAuthEmail)e.value=clientAuthEmail;document.getElementById(\'startform\').scrollIntoView();},120)">+ Pitch a new job</a></div>';
+    $("client-dash").style.display=""; return;
+  }
+  $("client-dash").style.display = "none";
+  box.style.display = "block";
+  box.innerHTML = '<div class="card" style="border-color:var(--mango);max-width:640px">'+
+    '<h3>One signature makes you a <em>client</em></h3>'+
+    '<p class="note" style="margin-top:0">Your profile exists, the signature completes it. The Client Guidelines are how business is done here: what protects you, and what the workers can expect of you. Read them, sign below with your finger, and then you can pitch your first job. Your completed jobs build your own record, the same way a worker\'s do.</p>'+
+    '<a class="btn sm o" onclick="openClientGuidelines()">1 · Read the Client Guidelines →</a>'+
+    '<div class="field" style="margin-top:14px"><label>2 · Your full legal name</label><input id="cg-name" autocomplete="name" placeholder="As it appears on your ID"></div>'+
+    '<div class="field"><label>3 · Sign with your finger</label>'+
+    '<canvas id="cg-canvas" width="600" height="160" style="width:100%;height:130px;background:#101E19;border:1px dashed var(--softline);border-radius:11px;touch-action:none"></canvas>'+
+    '<a class="btn sm o" style="margin-top:6px" onclick="cgClearPad()">Clear and sign again</a></div>'+
+    '<label class="slot" style="align-items:flex-start;white-space:normal"><input type="checkbox" id="cg-consent" style="margin-top:3px"> <span style="font-size:12.5px">'+esc(CG_CONSENT)+'</span></label>'+
+    '<div style="margin-top:12px"><a class="btn" onclick="cgSubmitSign()">Sign and open my dashboard</a></div>'+
+    '<div id="cg-status"></div></div>';
+  cgWirePad();
+}
+function cgWirePad(){
+  const c = $("cg-canvas"); if(!c) return;
+  const ctx = c.getContext("2d");
+  ctx.strokeStyle = "#F2FAF7"; ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  cgPad = { drawn:false, active:false };
+  const pos = e => { const r = c.getBoundingClientRect(); const p = e.touches ? e.touches[0] : e;
+    return { x:(p.clientX-r.left)*(c.width/r.width), y:(p.clientY-r.top)*(c.height/r.height) }; };
+  const start = e => { e.preventDefault(); cgPad.active = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); };
+  const move  = e => { if(!cgPad.active) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); cgPad.drawn = true; };
+  const end   = () => { cgPad.active = false; };
+  c.addEventListener("mousedown",start); c.addEventListener("mousemove",move); window.addEventListener("mouseup",end);
+  c.addEventListener("touchstart",start,{passive:false}); c.addEventListener("touchmove",move,{passive:false}); c.addEventListener("touchend",end);
+}
+function cgClearPad(){ const c = $("cg-canvas"); if(c){ c.getContext("2d").clearRect(0,0,c.width,c.height); cgPad.drawn = false; } }
+async function cgSubmitSign(){
+  const st = $("cg-status");
+  const name = ($("cg-name").value||"").trim();
+  if(name.length < 2){ st.innerHTML = '<p class="note" style="color:var(--red)">Type your full legal name first.</p>'; return; }
+  if(!cgPad.drawn){ st.innerHTML = '<p class="note" style="color:var(--red)">Sign in the box with your finger.</p>'; return; }
+  if(!$("cg-consent").checked){ st.innerHTML = '<p class="note" style="color:var(--red)">Tick the confirmation to sign.</p>'; return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ st.innerHTML = '<p class="note" style="color:var(--red)">Your session expired. Sign in again.</p>'; return; }
+  st.innerHTML = '<div class="mono">Recording your signature...</div>';
+  const {error} = await sb.from("doc_signatures").insert({
+    signer_user: session.user.id, signer_email: session.user.email,
+    signer_name: name, doc_type: "client_guidelines", doc_version: CG_VERSION,
+    signature_image: $("cg-canvas").toDataURL("image/png"), consent_text: CG_CONSENT
+  });
+  if(error){ st.innerHTML = '<p class="note" style="color:var(--red)">Could not record it: '+esc(error.message)+'</p>'; return; }
+  // The signature completes the profile: this row is the client's public
+  // record, the mirror of the worker's Yaad Score, admin-maintained.
+  await sb.from("client_profiles").upsert({ user_id: session.user.id, email: session.user.email, name, jobs_completed: 0, active: true }, {onConflict:"user_id"});
+  cgCheckGate();
+}
 function renderAll(){ renderClient(); renderWorker(); if(adminOpen) renderAdmin(); }
 renderAll();
 </script>
