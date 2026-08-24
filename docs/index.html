@@ -1704,6 +1704,9 @@ function jobDetailHTML(j){
     '<div class="ptl">'+STAGES.map((s,i)=>'<div class="n '+(i<stage?"done":i===stage?"now":"")+'">'+s+'</div>').join("")+'</div>'+
     '<div class="kick" style="margin-top:8px">Your worker</div>'+worker+
     '<div class="kick">The job</div><p style="font-size:14px;color:var(--mute);white-space:pre-wrap">'+esc(j.desc||"")+'</p>'+
+    ((j.packTier==="project")
+      ? '<p class="note">This job runs as a full project: Yaadly issues you a Project Kickoff Pack as its own document, with the scope, programme, staged payments and risk register inside it.</p>'
+      : '<a class="btn o sm" onclick="jobSheetExport(\''+j.id+'\')">📄 Job Sheet →</a>')+
     '<div class="kick">Photos of the site, from you</div>'+
     '<p style="font-size:13px;color:var(--mute)">Send photos of the problem on WhatsApp, or add them here. They help us scope and price the job fairly.</p>'+
     '<label class="filebtn" style="margin-top:6px">📷 Add site photos<input type="file" multiple accept="image/*" onchange="clientUpload(event,\''+j.id+'\')"></label>'+
@@ -1780,7 +1783,8 @@ function renderWorker(){
       '<p style="font-size:13.5px;color:var(--mute);white-space:pre-wrap">'+esc(j.desc||"")+'</p>'+
       '<div class="kick">Your evidence checklist, check it before you leave the site</div><ul class="check">'+rows+'</ul>'+
       ((j.evidence||[]).some(e=>e.img)?'<div class="thumbs">'+j.evidence.filter(e=>e.img).map(e=>'<img src="'+e.img+'" alt="" title="'+esc(e.label)+'">').join("")+'</div>':'')+
-      '<a class="btn" style="margin-top:14px" target="_blank" rel="noopener" href="'+wa(j.id+": Work done. Evidence uploaded in my portal. Ready for review.")+'">✓ Mark work done</a>'+
+      '<a class="btn" style="margin-top:14px" target="_blank" rel="noopener" href="'+wa(j.id+": Work done. Evidence uploaded in my portal. Ready for review.")+'">✓ Mark work done</a> '+
+      '<a class="btn o sm" style="margin-top:14px" onclick="jobSheetExport(\''+j.id+'\')">📄 Job Sheet →</a>'+
       '<p class="note">Upload straight from your phone camera, videos and voice notes go on WhatsApp. Yaadly checks your evidence before the client sees it. Money is held before you start and released fast once the client approves. You are never charged to be here.</p>';
     J.appendChild(d);
   });
@@ -1842,6 +1846,7 @@ async function pullMyCloudJobs(email){
     j.signoffMethod=row.signoff_method||j.signoffMethod||""; j.walkPlatform=row.walk_platform||j.walkPlatform||"";
     j.walkLink=row.walk_link||j.walkLink||""; j.walkDate=row.walk_date||j.walkDate||"";
     j.walkWho=row.walk_who||j.walkWho||""; j.walkNotes=row.walk_notes||j.walkNotes||""; j.overviewReq=(row.overview_req!=null)?!!row.overview_req:!!j.overviewReq;
+    j.packTier=row.pack_tier||j.packTier||"oneoff";
   });
   save();
 }
@@ -2151,6 +2156,16 @@ function editJob(id){
     '<div class="grid2"><div class="field"><label>Worker email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="jb-wemail" type="email" value="'+esc(j.worker.email||"")+'"></div><div class="field"><label>Worker phone</label><input id="jb-wphone" value="'+esc(j.worker.phone||"")+'"></div></div>'+
     '<div class="kick">Client shortlist (cap five)</div>'+slRows+'<a class="btn o sm" onclick="slAdd(\''+id+'\')">+ Add to shortlist</a>'+
     '<div class="kick">Evidence log</div>'+evRows+'<a class="btn o sm" onclick="evAdd(\''+id+'\')">+ Add evidence item</a> <label class="filebtn">📷 Add site photos from WhatsApp<input type="file" multiple accept="image/*" onchange="sitePhotos(event,\''+id+'\')"></label>'+
+    '<div class="kick">Job pack · issue it before any price is agreed</div>'+
+    '<div class="grid2"><div class="field"><label>Pack tier</label><select id="jb-packtier">'+
+      '<option value="oneoff"'+((j.packTier||"oneoff")==="oneoff"?" selected":"")+'>One-off job: simple Job Sheet</option>'+
+      '<option value="project"'+(j.packTier==="project"?" selected":"")+'>Project or PM service: full Kickoff Pack</option></select></div>'+
+    '<div class="field" style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap">'+
+      ((j.packTier==="project")
+        ? '<a class="btn sm" onclick="koFromJob(\''+id+'\')">Draft full Kickoff Pack from this job →</a>'
+        : '<a class="btn sm" onclick="jobSheetExport(\''+id+'\')">📄 Job Sheet →</a>')+
+    '</div></div>'+
+    '<p class="note" style="margin-top:0">The worker prices INTO the pack: the Job Sheet carries a blank quote table for one-off jobs, and the full pack carries the staged cost tracking table for projects. Change the tier and press Save to switch the button. Every job, either tier, ends with the Completion Report.</p>'+
     '<div class="kick">Quotes received</div><div id="jq-'+esc(id)+'"><p class="note">Loading quotes...</p></div>'+
     '<div class="kick">Sign-off</div>'+
     '<div class="grid3"><div class="field"><label>How the client signs off</label><select id="jb-signoff">'+
@@ -2186,6 +2201,7 @@ function saveJob(id){
   j.walkWho=$("jb-walkwho").value.trim(); j.walkNotes=$("jb-walknotes").value.trim();
   j.walkPlatform=$("jb-walkplat").value; j.walkLink=$("jb-walklink").value.trim();
   j.overviewReq=$("jb-overview").checked;
+  j.packTier=$("jb-packtier").value;
   j.owed=$("jb-owed").value.trim(); j.payMethod=$("jb-paymethod").value; j.payRef=$("jb-payref").value.trim();
   j.worker.name=$("jb-wname").value; j.worker.trade=$("jb-wtrade").value; j.worker.lane=$("jb-wlane").value;
   j.worker.email=$("jb-wemail").value.trim(); j.worker.phone=$("jb-wphone").value.trim();
@@ -2207,6 +2223,7 @@ function syncJobToCloud(id){
     owed:j.owed||"", pay_method:j.payMethod||"", pay_ref:j.payRef||"", open:!!j.open,
     signoff_method:j.signoffMethod||null, walk_platform:j.walkPlatform||null, walk_link:j.walkLink||null,
     walk_date:j.walkDate||null, walk_who:j.walkWho||null, walk_notes:j.walkNotes||null, overview_req:!!j.overviewReq,
+    pack_tier:(j.packTier==="project"?"project":"oneoff"),
     updated_at:new Date().toISOString()
   }).select("portal_code").single().then(r=>{
     if(r.error){ console.warn("job cloud sync:", r.error.message); return; }
@@ -2314,7 +2331,9 @@ async function koDraft(){
     docs = koScrubDashes(docs);
     KO.current = { id:"KO-"+Date.now(), project_title: intake.title || (intake.brief.slice(0,60)+"..."),
       client_name: intake.client_name || "", parish: intake.parish || "",
+      job_id: KO.jobLink || null,
       intake, docs, model, status:"draft", guardrail };
+    KO.jobLink = null;
     $("ko-status").textContent = "Draft ready. Read it before it goes anywhere near a client.";
     finish(); koRenderPack();
   };
@@ -3086,6 +3105,91 @@ function crNarEditor(id, guardrail){
     save();
   }));
 }
+/* ── The Job Sheet: the small pack for one-off jobs ───────────
+   Every job gets a pack. Projects get the full Kickoff Pack; a
+   one-off repair gets this: ONE document, issued BEFORE any
+   price is agreed, carrying a blank quote table the worker
+   prices into. Built from the job data itself, no model call,
+   so it is instant and cannot fail. The Completion Report still
+   closes every job, either tier. */
+const JSROWS = {};
+function jsDocHtml(j){
+  const E = esc;
+  const assigned = !!(j.worker && j.worker.name);
+  const fill = '<td style="background:#FBFDF7;min-width:34mm">&nbsp;</td>';
+  let secN = 0; const S = (title, inner) => { secN++; return '<section><h2><span>'+secN+'</span>'+E(title)+'</h2>'+inner+'</section>'; };
+  let body = "";
+  body += S("The job",
+    '<table><tbody>'+
+    '<tr><td style="width:34%">Job reference</td><td><b>'+E(j.id)+'</b></td></tr>'+
+    '<tr><td>Where</td><td>'+E(j.parish||"to be confirmed")+'</td></tr>'+
+    '<tr><td>Pack tier</td><td>One-off job: this sheet is the whole pack, plus the Completion Report at the end.</td></tr>'+
+    (assigned?'<tr><td>Assigned to</td><td><b>'+E(j.worker.name)+'</b>'+(j.worker.trade?' · '+E(j.worker.trade):'')+'</td></tr>':'')+
+    '</tbody></table>'+
+    '<h3>What needs doing</h3><p style="white-space:pre-wrap">'+E(j.desc||"Scope to be confirmed.")+'</p>'+
+    '<div class="callout">Only the work described here. Anything extra goes through Yaadly first, in writing, before it is done. That protects the worker from unpaid work and the client from surprise bills.</div>');
+  body += S("Your quote, priced into this sheet",
+    '<p>This sheet is issued <b>before any price is agreed</b>. The worker prices the job by filling this table, on paper or with the same numbers in the worker portal. The amount is the worker\'s own and it is never beaten down; where Yaadly holds a benchmark, a fair-price indicator is shown beside the quote for the client.</p>'+
+    '<table><tbody>'+
+    '<tr><td style="width:44%">Labour (J$)</td>'+fill+'</tr>'+
+    '<tr><td>Materials at cost, receipted (J$)</td>'+fill+'</tr>'+
+    '<tr><td><b>Total (J$)</b></td>'+fill+'</tr>'+
+    '<tr><td>Earliest start</td>'+fill+'</tr>'+
+    '<tr><td>Days needed</td>'+fill+'</tr>'+
+    '</tbody></table>'+
+    (j.owed?'<p class="callout"><b>Agreed:</b> J$'+E(Number(j.owed).toLocaleString())+' to the worker, confirmed in writing before work started.</p>':''));
+  body += S("How the money works",
+    '<ul>'+
+    '<li>The price and payment terms are agreed in writing before a tool is lifted. Nothing is charged without the client.</li>'+
+    '<li>Money is released only when the client approves the evidence. It is never released because a date passed.</li>'+
+    '<li>Once the client approves, the worker is paid within 3 working days by bank transfer, Lynk or remittance pick up.</li>'+
+    '<li>No side payments in either direction. A side deal removes the protection for both people.</li>'+
+    '</ul>');
+  const duties = checklist(j).map(x=>'<tr><td>'+E(x.name)+'</td><td class="num">'+E(String(x.need))+'</td></tr>').join("");
+  body += S("Evidence duties",
+    '<p>Photos and video are timestamped and geotagged at capture; leave location on. Arrival photos before anything is touched, one package at the end of the day, no daytime tracking ever.</p>'+
+    '<table><thead><tr><th>What is captured</th><th>Minimum</th></tr></thead><tbody>'+duties+'</tbody></table>');
+  body += S("Sign-off",
+    '<p>The client signs off by <b>'+E(j.signoffMethod||"Evidence package")+'</b>.'+
+    ' A live video walkthrough can be booked before approval, on WhatsApp video, Google Meet or Zoom; anything raised on it is recorded and confirmed by the client on the Completion Report.'+
+    (j.walkDate?' Walkthrough booked: <b>'+E(j.walkDate)+'</b>'+(j.walkWho?' · '+E(j.walkWho):'')+'.':'')+'</p>');
+  body += S("How the job ends",
+    '<p>Every Yaadly job, this one included, closes with a <b>signed Completion Report</b>: the job summary, before and after photographs side by side, the verification record, the worker\'s confirmation that what is written is what was done, and the client\'s approval with the payment record. The completed job joins the worker\'s <b>Yaad Score</b>, a verified record they own.</p>'+
+    '<div class="sig"><div class="row">'+
+    '<div class="cell"><div class="line"></div><div class="lbl">Worker · name, signature and date</div></div>'+
+    '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · signature and date</div></div>'+
+    '</div></div>');
+  body += '<div class="notice">The site match gate protects the worker: if the site does not match this description, say so before starting and walk away without penalty. Yaadly provides project management, procurement and oversight; the quote above belongs to the worker and is not a Yaadly valuation or estimate.</div>';
+  return yaadDocShell({
+    title: (j.title||"Job")+": Job Sheet",
+    doctype: "One-off Job Pack",
+    ref: E(j.id)+"-JS",
+    status: assigned ? "Issued" : "FOR QUOTING",
+    metaHtml: (j.parish?E(j.parish)+' · ':'')+'Job '+E(j.id)+' · issued before any price is agreed',
+    watermark: "", body });
+}
+function jobSheetExport(id){
+  const j = DB.jobs.find(x=>x.id===id) || JSROWS[id];
+  if(!j) return;
+  const w = window.open("", "_blank");
+  if(!w){ alert("Allow pop-ups to open the Job Sheet."); return; }
+  w.document.write(jsDocHtml(j)); w.document.close(); w.focus();
+}
+/* Big pack, from the job: prefill the Kickoff drafting form from the job
+   record and link the resulting pack back to the job. */
+function koFromJob(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  adminTab('kickoff'); renderKickoff();
+  setTimeout(()=>{
+    $("ko-brief").value = j.desc||"";
+    $("ko-title").value = (j.title||"") + (j.parish?", "+j.parish:"");
+    const cn=$("ko-client_name"); if(cn) cn.value = j.client||"";
+    const pa=$("ko-parish"); if(pa) pa.value = j.parish||"";
+    KO.jobLink = j.id;
+    $("ko-status").textContent = "Prefilled from "+j.id+". Add anything the job record does not say, then draft; the pack will be linked to this job.";
+    document.getElementById("at-kickoff").scrollIntoView({behavior:"smooth"});
+  }, 300);
+}
 function crNarClear(id){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return;
   if(!confirm("Remove the AI narrative? The report goes back to data-only sections.")) return;
@@ -3344,7 +3448,9 @@ async function wqMarketplace(O){
     const d = document.createElement("div"); d.className="card";
     d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">OPEN FOR QUOTES'+(j.parish?' · '+esc(j.parish).toUpperCase():'')+'</span></div>'+
       '<p style="font-size:13.5px;color:var(--mute)">'+esc(j.desc||"")+'</p>'+
+      '<a class="btn o sm" onclick="jobSheetExport(\''+esc(j.id)+'\')">📄 View the Job Sheet</a>'+
       '<div id="wq-'+esc(j.id)+'"><p class="note">Loading your quote...</p></div>';
+    JSROWS[j.id] = { id:j.id, title:j.title, parish:j.parish, desc:j.desc };
     O.appendChild(d);
   });
   wqLoadOpen(rows.map(j=>j.id));
