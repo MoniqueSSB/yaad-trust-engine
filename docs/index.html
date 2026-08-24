@@ -2392,6 +2392,11 @@ function koRenderPack(){
        '<a class="btn sm" onclick="koQaExport()">Worker QA sheet &rarr;</a>'+
        '<span class="pill hold" style="align-self:center">Revision r'+(p.rev||1)+'</span></div>'+
        '<p class="note" style="margin-top:8px">This screen is your working view. <b>Edit the document</b> lets you change any section; each save becomes a new numbered revision, and editing an approved pack automatically withdraws the approval. <b>Open as document</b> builds the client-facing pack: cover page, document control, numbered sections, signature page.</p></div>';
+  if(p.guardrail && p.guardrail.foreign_text_detected){
+    h += '<div class="card" style="border-color:var(--red)"><h3 style="color:var(--red)">Foreign text found in the draft</h3>'+
+         '<p class="note">The model slipped out of English. Find and rewrite these before issuing: <b>'+
+         esc((p.guardrail.foreign_samples||[]).join("  ·  "))+'</b>. Use Edit the document to fix them.</p></div>';
+  }
   if(p.guardrail && p.guardrail.price_language_detected){
     h += '<div class="card" style="border-color:var(--red)"><h3 style="color:var(--red)">Price language found in the draft</h3>'+
          '<p class="note">Yaadly does not price work. Remove these before issuing: <b>'+

@@ -27,6 +27,14 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // the desk polls. Every failure path writes status='failed' with the reason,
 // so a dead draft is visible instead of silent.
 //
+// v11, 24 Aug 2026: the v10 budgets made part A too slow for one worker; a
+// rich-brief draft was culled at the background worker's 400 second lifetime
+// with the row left 'drafting'. The pack now drafts as FOUR parallel parts
+// (cover+scope / timeline+questions+notes / payments+evidence / documents+
+// risks+comms), so the slowest part carries a third less writing. A foreign
+// text guardrail also flags any CJK characters in the draft: MiniMax leaked
+// "\u8fde\u7eed" into a v9 risk register and nothing caught it.
+//
 // v10, 24 Aug 2026: the writing bar raised to the worked example Monique
 // approved ("Yaadly Kickoff Pack - Old Harbour"): a personal multi-paragraph
 // cover note that answers the client's stated fear, scope prose that explains
@@ -110,6 +118,7 @@ QUALITY BARS - a pack that misses these is not issuable:
 - Every early warning sign is a concretely observable event someone could screenshot or photograph: a specific phrase appearing in a message, a missed weekly photograph, a request for money accompanied by an explanation instead of evidence. Never a feeling or a tendency.
 - Where one named person controls site access, their availability and the unpaid burden on them is itself a risk with a named mitigation. Where the client is overseas, decision latency across time zones is itself a risk with a batching mitigation.
 - Write as if the pack will be read aloud to a nervous first-time client. Every sentence should survive that reading.
+- Write in English only, throughout. No characters from any other script, anywhere in the output.
 
 Jamaica-specific realities are expected wherever relevant: hurricane season and rain stopping outdoor work, utility connection lead times, JPS and NWC, parish council building approvals, material availability and delivery to site, site access and security, and the client being in a different time zone from the work.`;
 
@@ -197,7 +206,8 @@ async function draftsWrite(method: string, path: string, body: unknown): Promise
 // together on purpose: they share stage names, and two separate calls would
 // invent two different stage lists.
 const PARTS: { name: string; keys: string[]; maxTokens: number }[] = [
-  { name: "A", keys: ["cover_note", "scope_of_works", "timeline", "open_questions", "human_review_notes"], maxTokens: 9000 },
+  { name: "A1", keys: ["cover_note", "scope_of_works"], maxTokens: 6000 },
+  { name: "A2", keys: ["timeline", "open_questions", "human_review_notes"], maxTokens: 6000 },
   { name: "B", keys: ["payment_schedule", "evidence_checklist"], maxTokens: 7000 },
   { name: "C", keys: ["document_pack", "risk_register", "communications_list"], maxTokens: 8000 },
 ];
@@ -291,6 +301,9 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
       ...(blob.match(/\b\d[\d,]{2,}(?:\.\d{2})?\s?(?:dollars|pounds|JMD|USD|GBP)\b/gi) ?? []),
     ];
     const priced = priceHits.length > 0;
+    // MiniMax is a Chinese model and can leak CJK fragments into English
+    // prose (it did, once). Flag them; the desk shows the samples.
+    const cjkHits = blob.match(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]+/g) ?? [];
 
     const up = await draftsWrite("PATCH", `?id=eq.${draftId}`, {
       status: "ready",
@@ -299,6 +312,8 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
       guardrail: {
         price_language_detected: priced,
         samples: priceHits.slice(0, 5),
+        foreign_text_detected: cjkHits.length > 0,
+        foreign_samples: cjkHits.slice(0, 5),
         note: priced
           ? "The draft contains something that reads like a price. Yaadly does not price work. Remove it before issuing."
           : "No price-like figures found in the draft.",
