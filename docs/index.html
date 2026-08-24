@@ -505,12 +505,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
         <span onclick="document.getElementById('waitlist').scrollIntoView()">🕓 <b>Opening shortly:</b>&nbsp;checks, oversight, full PM</span>
       </div>
       <div class="cta-row rv d3">
-        <a class="btn" id="site-start">Start your job on WhatsApp →</a>
-        <a class="btn o" onclick="document.getElementById('startform').scrollIntoView()">Or fill the request form</a>
-      </div>
-      <div class="cta-row rv d3" style="margin-top:10px">
-        <a class="btn o" onclick="go('services')">Project management services</a>
-        <a class="btn o" onclick="go('worker');workerTab('apply')">Apply as a tradesperson</a>
+        <a class="btn" onclick="document.getElementById('startform').scrollIntoView()">Start your job →</a>
+        <a class="btn o" id="site-start">Or start on WhatsApp</a>
       </div>
       <div class="rule rv d3">⚖️ <b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div>
     </div>
@@ -673,14 +669,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div class="field"><label>Your name</label><input id="in-name"></div>
       <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Your email <span style="font-weight:500;text-transform:none">(this becomes your client portal login)</span></label><input id="in-email" type="email" placeholder="you@email.com"></div>
-      <div class="field"><label>Property address, street and town</label><input id="in-addr" placeholder="e.g. 12 Gregory Park Road, Gregory Park"></div>
-    </div>
-    <div class="grid2">
-      <div class="field"><label>Parish or area</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
-      <div class="field"><label>Who is at the property, name and number</label><input id="in-access" placeholder="e.g. my aunt Sonia, 876 555 0100"></div>
-    </div>
+    <div class="field"><label>Your email <span style="font-weight:500;text-transform:none">(this becomes your client portal login)</span></label><input id="in-email" type="email" placeholder="you@email.com"></div>
     <div class="grid2">
       <div class="field"><label>Type of work</label>
         <select id="in-type"><option>Plumbing</option><option>Painting</option><option>Roofing</option><option>Tiling</option><option>Masonry and walls</option><option>Electrical</option><option>Carpentry</option><option>General repairs</option><option>Renovation project</option><option>Professional service</option><option>Something else</option></select>
@@ -695,9 +684,19 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <span class="note" style="margin-left:10px">Up to 8. Phone photos are fine, we shrink them automatically.</span>
       <div class="thumbs" id="in-thumbs"></div>
     </div>
-    <div class="field"><label>When should the work happen?</label>
-      <input id="in-date" type="date">
-      <span class="note">Pick a date, or leave it empty for as soon as possible.</span>
+    <a onclick="toggleBox('in-more', this)" data-open-label="Fewer details ▲" data-closed-label="Add the property details now, or send them later on WhatsApp ▾" style="display:inline-block;margin:4px 0 10px;font-size:13.5px;color:#6B5A33;font-weight:700;cursor:pointer">Add the property details now, or send them later on WhatsApp ▾</a>
+    <div id="in-more" style="display:none">
+      <div class="grid2">
+        <div class="field"><label>Property address, street and town</label><input id="in-addr" placeholder="e.g. 12 Gregory Park Road, Gregory Park"></div>
+        <div class="field"><label>Parish or area</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Who is at the property, name and number</label><input id="in-access" placeholder="e.g. my aunt Sonia, 876 555 0100"></div>
+        <div class="field"><label>When should the work happen?</label>
+          <input id="in-date" type="date">
+          <span class="note">Pick a date, or leave it empty for as soon as possible.</span>
+        </div>
+      </div>
     </div>
     <a class="btn" onclick="submitIntake()">Send my request →</a>
     <p class="note">A project manager reviews it before anything is quoted. You will hear from us within 24 hours.</p>
@@ -922,12 +921,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="dash">
     <div class="dash-side">
       <div class="dash-nav on" data-ct="overview" onclick="clientNav('overview')">🏠 Overview</div>
-      <div class="dash-nav" data-ct="properties" onclick="clientNav('properties')">🖼 Properties</div>
-      <div class="dash-nav" data-ct="evidence" onclick="clientNav('evidence')">📷 Evidence</div>
       <div class="dash-nav" data-ct="workers" onclick="clientNav('workers')">👥 Workers</div>
-      <div class="dash-nav" data-ct="aihub" onclick="clientNav('aihub')">✦ AI Hub</div>
-      <div class="dash-nav" data-ct="reports" onclick="clientNav('reports')">📄 Reports</div>
-      <div class="dash-nav" data-ct="settings" onclick="clientNav('settings')">⚙ Settings</div>
     </div>
     <div class="dash-main" id="client-dash-main"></div>
   </div>
@@ -1354,7 +1348,7 @@ async function submitIntake(){
   }
   pendingPhotos = []; $("in-thumbs").innerHTML=""; if(btn) btn.style.pointerEvents = "";
   $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Job '+esc(result.jobId)+' created.</b> A project manager reviews every request before any quote or work starts, nothing is booked and no money moves until you agree in writing.<br><br>'+
-    'Track it any time in your <a href="#client" onclick="go(\'client\')"><b>client portal</b></a>. First time there? Sign up with <b>'+esc(payload.email)+'</b> and job code <b>'+esc(result.portalCode||"check your email/WhatsApp for it")+'</b>, save that code now.<br><br>'+
+    'Track it any time in your <a href="#client" onclick="go(\'client\')"><b>client portal</b></a>: create your profile with <b>'+esc(payload.email)+'</b>, sign the Client Guidelines, and your job is there waiting.<br><br>'+
     'The full managed job service opens shortly in Jamaica, starting with Kingston and Portmore. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
   ["in-name","in-phone","in-email","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
 }
@@ -1434,8 +1428,8 @@ function closeWlModal(){
   }
   document.addEventListener("DOMContentLoaded", ()=>{
     document.addEventListener("mouseout", onExitIntent);
-    window.addEventListener("scroll", onScroll, {passive:true});
-    setTimeout(showModal, 20000); // fallback for mobile / no scroll / no exit
+    /* exit intent only: a timer or scroll trigger interrupts people who
+       are reading, and the in-page waitlist card already exists */
   });
 })();
 let fbRate = 0;
@@ -1855,8 +1849,8 @@ function renderWorker(){
   if($("wd-count")) $("wd-count").textContent = assigned.length;
   const heldTotal = DB.jobs.filter(j=>isMine(j) && j.stage<4 && j.owed).reduce((s,j)=>s+Number(j.owed||0),0);
   if($("wd-held")) $("wd-held").textContent = heldTotal ? "J$"+heldTotal.toLocaleString() : "n/a";
-  J.innerHTML = '<div id="wg-sign"></div>' + (assigned.length ? "" : '<div class="empty">No jobs assigned right now. When Yaadly assigns you a job, it appears here with the scope and your evidence checklist.</div>');
-  wgLoadSign();
+  J.innerHTML = '<div id="wapp-status"></div><div id="wg-sign"></div>' + (assigned.length ? "" : '<div class="empty">No jobs assigned right now. When Yaadly assigns you a job, it appears here with the scope and your evidence checklist.</div>');
+  wappStatus(); wgLoadSign();
   assigned.forEach(j=>{
     const rows = checklist(j).map(x=>{
       const ok = x.have>=x.need; const cls = ok?"pass":(x.gapOnly?"gap":"block");
@@ -3324,6 +3318,20 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, c=>({"&":"&amp;
    legal name, a finger-drawn signature, the exact consent text
    shown, the guidelines version, and the timestamp, written to
    doc_signatures, which accepts inserts only. No printing. */
+/* The application status card: a worker who signs in sees where their
+   application stands, matched by email under its own read policy. */
+async function wappStatus(){
+  const box = $("wapp-status"); if(!box || !sb) return;
+  const {data, error} = await sb.from("applications").select("trade,status,created_at").order("created_at",{ascending:false}).limit(1);
+  if(error || !data || !data.length){ box.innerHTML=""; return; }
+  const a = data[0];
+  const line = a.status==="approved"
+    ? '<span class="pill done">APPROVED</span> Your application is approved. Assigned jobs and the open board are below.'
+    : a.status==="declined"
+    ? '<span class="pill rev">NOT THIS TIME</span> Your application was not approved. You are welcome to ask why on WhatsApp.'
+    : '<span class="pill hold">IN VETTING</span> Application received'+(a.trade?' for '+esc(a.trade):'')+'. Next: your ID video call and reference checks. You will hear from Yaadly on WhatsApp.';
+  box.innerHTML = '<div class="card" style="border-color:var(--softline)"><h3 style="font-size:15px">Your <em>application</em></h3><p style="font-size:13.5px;margin-top:4px">'+line+'</p></div>';
+}
 const WG_CONSENT = "I confirm I have read the Yaadly Worker Guidelines version " + WG_VERSION +
   " and I agree to work to them on every Yaadly job. I understand this electronic signature has the same effect as signing on paper.";
 let wgPad = { drawn:false };
@@ -3716,11 +3724,17 @@ async function cgCheckGate(){
       '<a class="btn sm" onclick="go(\'site\');setTimeout(()=>{const e=$(\'in-email\');if(e&&clientAuthEmail)e.value=clientAuthEmail;document.getElementById(\'startform\').scrollIntoView();},120)">+ Pitch a new job</a></div>';
     $("client-dash").style.display=""; return;
   }
-  $("client-dash").style.display = "none";
+  const older = (data||[]).length > 0;
+  /* Signed an earlier version: the dashboard and evidence stay open, the
+     new signature is asked for, and only pitching new work waits on it.
+     Never signed at all: the dashboard waits for the first signature. */
+  $("client-dash").style.display = older ? "" : "none";
   box.style.display = "block";
   box.innerHTML = '<div class="card" style="border-color:var(--mango);max-width:640px">'+
-    '<h3>One signature makes you a <em>client</em></h3>'+
-    '<p class="note" style="margin-top:0">Your profile exists, the signature completes it. The Client Guidelines are how business is done here: what protects you, and what the workers can expect of you. Read them, sign below with your finger, and then you can pitch your first job. Your completed jobs build your own record, the same way a worker\'s do.</p>'+
+    '<h3>'+(older?'The Client Guidelines have <em>changed</em>':'One signature makes you a <em>client</em>')+'</h3>'+
+    '<p class="note" style="margin-top:0">'+(older
+      ? 'A new version of the Client Guidelines is out. Your dashboard and your evidence stay open, and your earlier signature stays on record; pitching your next job needs the new version signed. Read it and sign below.'
+      : 'Your profile exists, the signature completes it. The Client Guidelines are how business is done here: what protects you, and what the workers can expect of you. Read them, sign below with your finger, and then you can pitch your first job. Your completed jobs build your own record, the same way a worker\'s do.')+'</p>'+
     '<a class="btn sm o" onclick="openClientGuidelines()">1 · Read the Client Guidelines →</a>'+
     '<div class="field" style="margin-top:14px"><label>2 · Your full legal name</label><input id="cg-name" autocomplete="name" placeholder="As it appears on your ID"></div>'+
     '<div class="field"><label>3 · Sign with your finger</label>'+
