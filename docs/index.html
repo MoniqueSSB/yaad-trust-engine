@@ -1500,6 +1500,91 @@ function verifyAgent(job){
   const blocks = rows.filter(r=>r.startsWith("[BLOCK")).length;
   return rows.join("\n") + "\n\nBlocking items: " + blocks + "\nA named human reviews this pack and decides. The engine does not release funds.";
 }
+/* ── Evidence, cloud first ────────────────────────────────────
+   The evidence table is the source of truth; browser storage is a
+   cache. Every upload from any device inserts a row; every portal
+   pulls the job's rows on open. RLS scopes reads and writes to the
+   job's own client and worker, plus the admin, and only the admin
+   can flip ok (the Pass to client gate) or edit rows. */
+function evIcon(label){ return /video|pan|overview/i.test(label||"")?"🎬":(/receipt/i.test(label||"")?"🧾":"🖼"); }
+async function evPull(jobId){
+  if(!sb) return false;
+  const j = DB.jobs.find(x=>x.id===jobId); if(!j) return false;
+  const {data, error} = await sb.from("evidence").select("id,label,meta,img,ok,uploaded_by").eq("job_id", jobId).order("created_at",{ascending:true});
+  if(error){ console.warn("evidence pull:", error.message); return false; }
+  const local = (j.evidence||[]).filter(e=>e.unsynced);
+  j.evidence = (data||[]).map(r=>({cid:r.id, label:r.label||"", meta:r.meta||"", img:r.img||null, ok:r.ok!==false, icon:evIcon(r.label)})).concat(local);
+  save();
+  return true;
+}
+async function evCloudInsert(jobId, item){
+  if(!sb) return;
+  const {data:{session}} = await sb.auth.getSession(); if(!session){ item.unsynced=true; return; }
+  const {data, error} = await sb.from("evidence").insert({
+    job_id:jobId, label:item.label||"", meta:item.meta||"", img:item.img||null,
+    ok:item.ok!==false, uploaded_by:session.user.email||""
+  }).select("id").single();
+  if(error){ console.warn("evidence insert:", error.message); item.unsynced=true; return; }
+  item.cid = data.id; delete item.unsynced; save();
+}
+function evCloudUpdate(item){
+  if(!sb || !item.cid) return;
+  sb.from("evidence").update({label:item.label||"", meta:item.meta||"", img:item.img||null, ok:item.ok!==false})
+    .eq("id", item.cid).then(r=>{ if(r.error) console.warn("evidence update:", r.error.message); });
+}
+function evCloudDelete(item){
+  if(!sb || !item.cid) return;
+  sb.from("evidence").delete().eq("id", item.cid).then(r=>{ if(r.error) console.warn("evidence delete:", r.error.message); });
+}
+/* ── Release approval, same ceremony as everything else ───────
+   Approving is recorded as an insert-only signature bound to a
+   fingerprint of the exact evidence approved, then WhatsApp opens
+   so a person executes it. If the evidence changes afterwards the
+   fingerprint stops matching and the desk says so. */
+async function evFingerprint(j){
+  const src = JSON.stringify((j.evidence||[]).filter(e=>e.ok!==false).map(e=>[String(e.cid||e.label), e.label||"", !!e.img]).sort());
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(src));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,16);
+}
+async function approveRelease(id){
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  if(!sb){ alert("Cloud is not configured."); return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ alert("Sign in first."); return; }
+  const fp = await evFingerprint(j);
+  const evList = (j.evidence||[]).filter(e=>e.ok!==false).map(e=>e.label).filter(Boolean).join("; ") || "no items";
+  if(!confirm("Approve and release payment for "+id+"?\n\nThis records your approval against the exact evidence you are looking at, then opens WhatsApp to tell Yaadly. A person executes the release; nothing moves by itself.")) return;
+  const {error} = await sb.from("doc_signatures").insert({
+    signer_user: session.user.id, signer_email: session.user.email,
+    signer_name: j.client || session.user.email, doc_type: "job_release",
+    doc_version: id+":"+fp,
+    consent_text: "I have reviewed the evidence on job "+id+" ("+evList+") and I approve release of payment to the worker. Evidence fingerprint "+fp+". This approval refers only to the evidence listed."
+  });
+  if(error){ alert("Could not record the approval: "+error.message); return; }
+  window.open(wa(id+": I have reviewed the evidence and I APPROVE release (ref "+fp+"). Please pay the worker."), "_blank", "noopener");
+  clientDetail(id);
+}
+async function relStatus(id){
+  const box = $("rel-"+id); if(!box || !sb) return;
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const {data} = await sb.from("doc_signatures").select("doc_version,signed_at").eq("doc_type","job_release").like("doc_version", id+":%").order("signed_at",{ascending:false}).limit(1);
+  if(!data || !data.length) return;
+  const fp = await evFingerprint(j);
+  const cur = data[0].doc_version === id+":"+fp;
+  box.innerHTML = cur
+    ? '<p class="note">✓ You approved release against this exact evidence on '+esc(String(data[0].signed_at).slice(0,10))+'.</p>'
+    : '<p class="note" style="color:var(--mango)">You approved release on '+esc(String(data[0].signed_at).slice(0,10))+', but the evidence has changed since. Review it and approve again.</p>';
+}
+async function relAdminStatus(id){
+  const box = $("jrel-"+id); if(!box || !sb) return;
+  const j = DB.jobs.find(x=>x.id===id); if(!j) return;
+  const {data} = await sb.from("doc_signatures").select("doc_version,signer_email,signed_at").eq("doc_type","job_release").like("doc_version", id+":%").order("signed_at",{ascending:false}).limit(1);
+  if(!data || !data.length){ box.innerHTML='<p class="note">No recorded client release approval yet. The client approves from their portal against the evidence they see.</p>'; return; }
+  const fp = await evFingerprint(j);
+  box.innerHTML = (data[0].doc_version === id+":"+fp)
+    ? '<p class="note" style="color:var(--tealb)">✓ Client release approval on record ('+esc(data[0].signer_email)+', '+esc(String(data[0].signed_at).slice(0,10))+') matches the CURRENT evidence.</p>'
+    : '<p class="note" style="color:var(--mango)">⚠ The client\'s recorded approval predates changes to the evidence. Ask them to reconfirm before paying out.</p>';
+}
 /* ───────────── CLIENT PORTAL ───────────── */
 function clientNav(t){
   clientTabState = t;
@@ -1613,7 +1698,7 @@ function clientDetail(id){
   const target = $("client-full-detail");
   if(!j || !target) return;
   target.innerHTML = jobDetailHTML(j);
-  wnLoad(id);
+  wnLoad(id); relStatus(id);
   target.scrollIntoView({behavior:"smooth"});
 }
 /* ── Walkthrough notes, confirmed by the client ───────────────
@@ -1713,7 +1798,7 @@ function jobDetailHTML(j){
     '<div class="kick">Evidence</div>'+gal+
     '<div class="kick">Money</div><div class="mono" style="margin-top:4px">Your payment is held and released only when you approve the evidence.</div>'+
     (stage===0 ? '<p class="note">Yaadly is not taking payments online yet. Your quote and payment arrangements are agreed with you directly, in writing, before any work starts.</p>' : "")+
-    (stage===4 && !j.review ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn" target="_blank" rel="noopener" href="'+wa(j.id+": I have reviewed the evidence and I APPROVE. Please release payment to the worker.")+'">✓ Approve and release</a>'+
+    (stage===4 && !j.review ? '<div id="rel-'+esc(j.id)+'"></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn" onclick="approveRelease(\''+j.id+'\')">✓ Approve and release</a>'+
       '<a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": Before I approve, I would like a LIVE VIDEO WALKTHROUGH of the site with the worker. When can we do it? WhatsApp video, Google Meet or Zoom all work for me.")+'">📹 Book a live walkthrough first</a>'+
       '<a class="btn o" target="_blank" rel="noopener" href="'+wa(j.id+": I have a question before I approve. ")+'">Raise a question</a></div>'+
       '<p class="note">Two ways to sign off, both fine: approve from the evidence package above, or book a live video walkthrough first, on WhatsApp video, Google Meet or Zoom. The worker walks the whole site with you live, you raise anything on the spot, and you approve when you are satisfied. Approving opens a WhatsApp message from you to Yaadly confirming release. A person actions it: the AI never releases money.</p>'+
@@ -1869,6 +1954,8 @@ async function openClientPortal(email){
   $("client-lock").style.display = "none";
   $("client-ui").style.display = "block";
   await Promise.all([pullMyCloudJobs(email), pullMyCloudServices(email)]);
+  const mine = DB.jobs.filter(x=>x.clientEmail && x.clientEmail.toLowerCase()===email.toLowerCase());
+  for (const jj of mine) await evPull(jj.id);
   renderClient();
   cgCheckGate();
 }
@@ -1903,6 +1990,8 @@ async function openWorkerPortal(email){
   workerOpen = true; workerAuthEmail = email;
   $("worker-lock").style.display = "none";
   await pullMyCloudJobs(email);
+  const mine = DB.jobs.filter(x=>x.worker && x.worker.email && x.worker.email.toLowerCase()===email.toLowerCase());
+  for (const jj of mine) await evPull(jj.id);
   renderWorker();
 }
 async function restoreWorkerSession(){
@@ -1975,7 +2064,7 @@ function renderAdmin(){
     const st = j.review?'<span class="pill rev">IN REVIEW</span>':(j.stage>=5?'<span class="pill done">COMPLETE</span>':'<span class="pill hold">'+STAGES[j.stage||0].toUpperCase()+'</span>');
     const d = document.createElement("div"); d.className="jrow";
     d.innerHTML='<div class="l"><b>'+esc(j.id)+' · '+esc(j.title||"Untitled")+'</b><small>'+esc(j.parish||"")+(j.client?' · '+esc(j.client):'')+(j.worker&&j.worker.name?' · worker: '+esc(j.worker.name):'')+'</small></div>'+st;
-    d.onclick=()=>editJob(j.id);
+    d.onclick=()=>{ editJob(j.id); evPull(j.id).then(ok=>{ if(ok && $("admin-detail").innerHTML.indexOf(esc(j.id))>-1){ editJob(j.id); relAdminStatus(j.id); } }); };
     T.appendChild(d);
   });
   const S = $("at-services");
@@ -2082,7 +2171,9 @@ function intakeToJob(id){
   DB.jobs.push({id:jid, title:it.type, parish:it.where||"", client:it.name, clientEmail:it.email||"", clientPhone:it.phone||"",
     addr:it.addr||"", accessContact:it.access||"",
     desc:it.desc+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+")",
-    stage:0, evidence:(it.photos||[]).map((p,n)=>({label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:p})), worker:{}, shortlist:[], open:false});
+    stage:0, evidence:[], worker:{}, shortlist:[], open:false});
+  const nj = DB.jobs.find(x=>x.id===jid);
+  (async()=>{ for (let n=0;n<(it.photos||[]).length;n++){ const item={label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:it.photos[n], ok:true}; nj.evidence.push(item); await evCloudInsert(jid, item); } save(); if($("admin-detail").innerHTML.indexOf(esc(jid))>-1) editJob(jid); })();
   it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid); syncJobToCloud(jid);
 }
 function callDone(id){ const c=DB.calls.find(x=>x.id===id); if(c){ c.status="done"; save(); renderAdmin(); } }
@@ -2182,7 +2273,7 @@ function editJob(id){
     '<div class="field"><label>Walkthrough notes <span style="font-weight:500;text-transform:none">(issues raised and how they were resolved. The client is asked to confirm these in their portal, and the confirmation lands on the Completion Report)</span></label><textarea id="jb-walknotes" style="min-height:60px">'+esc(j.walkNotes||"")+'</textarea></div>'+
     '<div id="wn-adm-'+esc(id)+'"></div>'+
     '<label class="slot" style="margin-bottom:12px"><input type="checkbox" id="jb-overview"'+(j.overviewReq?" checked":"")+'> Site overview footage required for this job (adds one continuous full-site walkthrough video to the evidence checklist, for builds and larger works)</label>'+
-    '<div class="kick">Stage · money states move only by your hand</div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
+    '<div class="kick">Stage · money states move only by your hand</div><div id="jrel-'+esc(id)+'"></div><div class="tabs" style="margin-top:6px">'+STAGES.map((st,i)=>'<button class="tab '+((j.stage||0)===i?"on":"")+'" onclick="jobStage(\''+id+'\','+i+')">'+(i+1)+" · "+st+'</button>').join("")+'</div>'+
     '<div class="kick">Agents · they draft and flag, you decide</div>'+
     '<div class="field"><label>Tell the agent anything extra before drafting, optional</label><input id="rep-note" placeholder="e.g. tiles reach Thursday, Devon starts Friday morning"></div>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn o sm" onclick="runPrice(\''+id+'\')">Run Pricing Agent</a><a class="btn o sm" onclick="runVerify(\''+id+'\')">Run Verification Agent</a><a class="btn o sm" onclick="runReport(\''+id+'\')">⚡ AI: Draft client update</a><a class="btn o sm" onclick="runCrNarrative(\''+id+'\')">⚡ AI: Report narrative</a><a class="btn o sm" onclick="runVision(\''+id+'\')">🖼 Run AI Photo Review</a></div><div id="agent-out"></div>'+
@@ -2193,7 +2284,7 @@ function editJob(id){
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Scope and checklist here: https://yaadly.co.uk/#worker")+'">Message worker →</a>'+
     '<a class="btn warn sm" onclick="delJob(\''+id+'\')">Delete</a></div></div>';
   D.scrollIntoView({behavior:"smooth"});
-  jqLoad(id); wnAdminStatus(id);
+  jqLoad(id); wnAdminStatus(id); relAdminStatus(id);
 }
 function saveJob(id){
   const j = DB.jobs.find(x=>x.id===id);
@@ -2242,19 +2333,21 @@ function syncJobToCloud(id){
     if(r.data && r.data.portal_code && j.portalCode !== r.data.portal_code){ j.portalCode = r.data.portal_code; save(); if(document.getElementById("admin-detail") && document.getElementById("admin-detail").innerHTML.indexOf(esc(id))>-1) editJob(id); }
   });
 }
-function evAdd(id){ const j=DB.jobs.find(x=>x.id===id); (j.evidence=j.evidence||[]).push({label:"",meta:"",icon:"🖼"}); save(); editJob(id); }
-function evSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k][f]=v; j.evidence[k].icon=/video|pan/i.test(j.evidence[k].label||"")?"🎬":(/receipt/i.test(j.evidence[k].label||"")?"🧾":"🖼"); save(); }
-function evDel(id,k){ const j=DB.jobs.find(x=>x.id===id); j.evidence.splice(k,1); save(); editJob(id); }
-function evOk(id,k){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k].ok=true; j.evidence[k].meta=(j.evidence[k].meta||"").replace(/awaiting Yaadly check/,"checked by Yaadly"); save(); editJob(id); }
-async function evPhoto(ev,id,k){ const j=DB.jobs.find(x=>x.id===id); const ph=await filesToPhotos(ev.target.files); if(ph.length){ j.evidence[k].img=ph[0]; save(); editJob(id); } }
+async function evAdd(id){ const j=DB.jobs.find(x=>x.id===id); const item={label:"",meta:"",icon:"🖼",ok:true}; (j.evidence=j.evidence||[]).push(item); await evCloudInsert(id,item); save(); editJob(id); }
+function evSet(id,k,f,v){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k][f]=v; j.evidence[k].icon=evIcon(j.evidence[k].label); evCloudUpdate(j.evidence[k]); save(); }
+function evDel(id,k){ const j=DB.jobs.find(x=>x.id===id); const gone=j.evidence.splice(k,1)[0]; if(gone) evCloudDelete(gone); save(); editJob(id); }
+function evOk(id,k){ const j=DB.jobs.find(x=>x.id===id); j.evidence[k].ok=true; j.evidence[k].meta=(j.evidence[k].meta||"").replace(/awaiting Yaadly check/,"checked by Yaadly"); evCloudUpdate(j.evidence[k]); save(); editJob(id); }
+async function evPhoto(ev,id,k){ const j=DB.jobs.find(x=>x.id===id); const ph=await filesToPhotos(ev.target.files); if(ph.length){ j.evidence[k].img=ph[0]; if(j.evidence[k].cid) evCloudUpdate(j.evidence[k]); else await evCloudInsert(id, j.evidence[k]); save(); editJob(id); } }
 async function addSite(ev,id,who){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return;
   const ph = await filesToPhotos(ev.target.files);
   const t = new Date().toTimeString().slice(0,5);
-  ph.forEach(p=>{
+  for (const p of ph){
     const n = (j.evidence||[]).filter(e=>(e.label||"").indexOf("Site photo")===0).length + 1;
-    j.evidence.push({label:"Site photo "+n, meta:t+" · "+who, icon:"🖼", img:p, ok:true});
-  });
+    const item = {label:"Site photo "+n, meta:t+" · "+who, icon:"🖼", img:p, ok:true};
+    j.evidence.push(item);
+    await evCloudInsert(id, item);
+  }
   save();
 }
 async function clientUpload(ev,id){ await addSite(ev,id,"by client"); renderClient(); clientDetail(id); if(adminOpen) renderAdmin(); }
@@ -2263,10 +2356,12 @@ async function workerUpload(ev,id,key){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return;
   const ph = await filesToPhotos(ev.target.files);
   const t = new Date().toTimeString().slice(0,5);
-  ph.forEach(p=>{
+  for (const p of ph){
     const n = (j.evidence||[]).filter(e=>(e.label||"").indexOf(key)===0).length + 1;
-    j.evidence.push({label:key+" "+n, meta:t+" · by worker, awaiting Yaadly check", icon:"🖼", img:p, ok:false});
-  });
+    const item = {label:key+" "+n, meta:t+" · by worker, awaiting Yaadly check", icon:"🖼", img:p, ok:false};
+    j.evidence.push(item);
+    await evCloudInsert(id, item);
+  }
   save(); renderWorker(); if(adminOpen) renderAdmin();
 }
 function slAdd(id){ const j=DB.jobs.find(x=>x.id===id); j.shortlist=j.shortlist||[]; if(j.shortlist.length>=5){ alert("Shortlists cap at five. Your rule."); return; } j.shortlist.push({name:"",trade:"",parish:"",lane:"vet",jobs:0}); save(); editJob(id); }
