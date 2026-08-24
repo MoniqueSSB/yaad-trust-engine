@@ -1187,7 +1187,7 @@ async function aiIntake(){
     stage:0, evidence:[], worker:{}, shortlist:[], open:false });
   save();
   const noEmailWarn = card.client_email ? "" : "\n\n⚠ No email was in the message. This job will not show in the client's portal until you add one on the job screen.";
-  $("ai-out").innerHTML = '<div class="mono">Job card created as '+jid+'.\n'+(card.questions&&card.questions.length?("Ask before quoting:\n· "+card.questions.slice(0,3).join("\n· ")):"No open questions flagged.")+noEmailWarn+'\n\nThe agent drafted. You decide.</div>';
+  $("ai-out").innerHTML = '<div class="mono">Job card created as '+jid+'.\n'+(card.questions&&card.questions.length?("Ask before quoting:\n· "+card.questions.slice(0,3).map(esc).join("\n· ")):"No open questions flagged.")+noEmailWarn+'\n\nThe agent drafted. You decide.</div>';
   renderAdmin(); adminTab("jobs"); editJob(jid); syncJobToCloud(jid);
 }
 async function runReport(id){
