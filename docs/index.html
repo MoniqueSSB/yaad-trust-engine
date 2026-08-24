@@ -559,7 +559,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="kick rv">The verified job loop</div>
   <h2 class="h2 rv d1">Six steps. <u>Proven,</u> <em>not promised.</em></h2>
   <div class="tiles rv d2">
-    <div class="tile"><div class="no">01</div><h4>Tell us on WhatsApp</h4><p>Text, photos or a voice note, Patois or English. Or the form on this page. No app to download.</p><span class="pill ai">🤖 AI reads it</span></div>
+    <div class="tile"><div class="no">01</div><h4>Tell us what needs doing</h4><p>Use the form on this page and it creates your job on the spot, or message us on WhatsApp: text, photos or a voice note, Patois or English. No app to download.</p><span class="pill ai">🤖 AI reads it</span></div>
     <div class="tile"><div class="no">02</div><h4>Fair price, checked</h4><p>Real material costs and real day rates. Never guessed. A project manager checks the band before it reaches you.</p><span class="pill ai">🤖 AI drafts it</span> <span class="pill human">🧍 We confirm</span></div>
     <div class="tile money"><div class="no">03</div><h4>Payment agreed and held</h4><p>Agreed in writing before a tool is lifted. Nothing is charged without you.</p><span class="pill human">🧍 You confirm it</span></div>
     <div class="tile"><div class="no">04</div><h4>Work documented</h4><p>Arrival, before, after and video. Timestamped and geotagged, checked for anything visibly wrong.</p><span class="pill ai">🤖 AI checks it</span> <span class="pill human">🧍 We confirm</span></div>
@@ -799,7 +799,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="kick rv" style="text-align:center">Straight answers</div>
   <h2 class="h2 rv d1" style="text-align:center">Questions people <em>actually ask.</em></h2>
   <div class="faqwrap rv d2">
-    <details class="faq" open><summary>How do I start a job?</summary><div class="a">Message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English. Or use the form on this page. We reply within 24 hours with next steps. No app to download, no forms to fight.</div></details>
+    <details class="faq" open><summary>How do I start a job?</summary><div class="a">Two ways, both free. Fill in the form on this page and it creates your job straight away, with a client portal link and code sent to you on the spot. Or message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English, and we reply within 24 hours. No app to download either way.</div></details>
     <details class="faq"><summary>Where do you operate?</summary><div class="a">Yaadly is built for property work across <b>Jamaica</b>. We are <b>launching in Kingston and Portmore first</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Elsewhere in Jamaica today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
     <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Online holding goes live once our professional indemnity insurance is in force; until then the terms are agreed with you directly in writing before work starts.</div></details>
     <details class="faq"><summary>What does it cost?</summary><div class="a">Prices are published when we open, which happens once our professional indemnity insurance is in force. We are not taking payment before then, on purpose. Everything will be quoted in writing before any work begins. Join the waiting list and you will be told the day booking opens. Property work gets a written quote benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client overseas pays what a client in Jamaica pays.</div></details>
@@ -1627,7 +1627,7 @@ function renderClient(){
 }
 function renderClientOverview(main, items){
   if(!items.length){
-    main.innerHTML = '<div class="empty" style="margin-top:0">No properties under oversight yet.<br><br><b>Start your first job on WhatsApp</b>, and it will appear here with evidence once work begins.<br><br><a class="btn sm" href="'+($("site-start")?$("site-start").href:wa("I would like to start a job."))+'" target="_blank" rel="noopener">Start your job →</a></div>';
+    main.innerHTML = '<div class="empty" style="margin-top:0">No properties under oversight yet.<br><br><b>Start your first job from the form on the home page, or on WhatsApp</b>, and it will appear here with evidence once work begins.<br><br><a class="btn sm" href="'+($("site-start")?$("site-start").href:wa("I would like to start a job."))+'" target="_blank" rel="noopener">Start your job →</a></div>';
     return;
   }
   const sel = items.find(x=>x.id===clientSelectedId) || items[0];
