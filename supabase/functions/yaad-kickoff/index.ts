@@ -27,6 +27,13 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // the desk polls. Every failure path writes status='failed' with the reason,
 // so a dead draft is visible instead of silent.
 //
+// v12, 24 Aug 2026: model shootout plumbing. The desk can pass an OpenRouter
+// model slug per draft (admin session only, slug shape validated), so the
+// same brief can be drafted by MiniMax M2.7, GLM 5.2, Kimi K3 and DeepSeek
+// V4 Pro and the packs read side by side. Requires the OPENROUTER_API_KEY
+// secret; without it the override is refused with a plain message. The
+// default remains MiniMax direct, per the standing decision.
+//
 // v11, 24 Aug 2026: the v10 budgets made part A too slow for one worker; a
 // rich-brief draft was culled at the background worker's 400 second lifetime
 // with the row left 'drafting'. The pack now drafts as FOUR parallel parts
@@ -59,7 +66,12 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // MiniMax") - the mere presence of an NVIDIA key must never hijack the
 // draft (v5 did exactly that and a test failed on an NVIDIA 503).
 // NVIDIA runs only when explicitly chosen: set the secret PROVIDER=nvidia.
-function pickProvider(): { name: string; api: string; key: string; model: string } | null {
+function pickProvider(override?: string): { name: string; api: string; key: string; model: string } | null {
+  if (override) {
+    const ork = Deno.env.get("OPENROUTER_API_KEY");
+    if (!ork) return null;
+    return { name: "openrouter", api: "https://openrouter.ai/api/v1/chat/completions", key: ork, model: override };
+  }
   const want = (Deno.env.get("PROVIDER") || "").toLowerCase();
   const nk = Deno.env.get("NVIDIA_API_KEY");
   const mk = Deno.env.get("MINIMAX_API_KEY");
@@ -276,7 +288,7 @@ async function draftPart(
 // model calls. Every exit path updates the row: a draft is never left
 // 'drafting' by this code (short of the platform culling the worker, which
 // the desk's own 8 minute cutoff reports).
-async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace): Promise<void> {
+async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace, overrideModel?: string): Promise<void> {
   const fail = async (msg: string) => {
     console.error("kickoff draft", draftId, "failed:", msg);
     await draftsWrite("PATCH", `?id=eq.${draftId}`, {
@@ -284,8 +296,10 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     }).catch(() => {});
   };
   try {
-    const prov = pickProvider();
-    if (!prov) { await fail("No model API key is set on this function. Add MINIMAX_API_KEY in Supabase secrets."); return; }
+    const prov = pickProvider(overrideModel);
+    if (!prov) { await fail(overrideModel
+      ? "A model override needs the OPENROUTER_API_KEY secret, which is not set."
+      : "No model API key is set on this function. Add MINIMAX_API_KEY in Supabase secrets."); return; }
 
     const userPrompt = intakeToPrompt(intake);
     const partDocs = await Promise.all(PARTS.map((p) => draftPart(prov, userPrompt, p, trace)));
@@ -359,6 +373,17 @@ Deno.serve(async (req: Request) => {
     if (!SB_URL || !SB_SERVICE) {
       return json({ error: "Function is missing its Supabase service configuration." }, 500);
     }
+    // Optional per-draft model override, for reading the same brief drafted by
+    // different models side by side. Admin session only; OpenRouter slugs only.
+    const overrideModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
+    if (overrideModel) {
+      if (!/^[\w-]+\/[\w.:-]+$/.test(overrideModel)) {
+        return json({ error: "Model override must be an OpenRouter slug like z-ai/glm-5.2." }, 400);
+      }
+      if (!Deno.env.get("OPENROUTER_API_KEY")) {
+        return json({ error: "Model overrides go through OpenRouter. Add the OPENROUTER_API_KEY secret to this function first (Supabase dashboard, Edge Functions, Secrets)." }, 400);
+      }
+    }
 
     // Register the draft, hand back its id, and do the slow work after the
     // response. The desk polls kickoff_drafts for the result.
@@ -380,7 +405,7 @@ Deno.serve(async (req: Request) => {
       "yaadly.kickoff.outcome": "queued",
     });
 
-    const bg = runDraft(row.id, intake, trace);
+    const bg = runDraft(row.id, intake, trace, overrideModel);
     const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
     if (rt?.waitUntil) rt.waitUntil(bg);
 

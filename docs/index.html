@@ -2298,6 +2298,13 @@ function renderKickoff(){
     '<p class="note" style="margin-top:0">Give it the shape of the job. It drafts the scope of works, timeline, evidence-gated payment stages, evidence checklist, document pack, risk register and communications list. <b>Nothing is issued to a client until you approve it.</b> It never prices work.</p>'+
     '<textarea id="ko-brief" placeholder="What does the client want done? Plain words are fine."></textarea>'+
     '<div id="ko-fields" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px"></div>'+
+    '<div class="field" style="margin-top:10px;max-width:360px"><label>Drafting model</label><select id="ko-model">'+
+      '<option value="">MiniMax M2.7 (default, direct)</option>'+
+      '<option value="minimax/minimax-m2.7">MiniMax M2.7 via OpenRouter</option>'+
+      '<option value="z-ai/glm-5.2">GLM 5.2</option>'+
+      '<option value="moonshotai/kimi-k3">Kimi K3</option>'+
+      '<option value="deepseek/deepseek-v4-pro">DeepSeek V4 Pro</option>'+
+      '</select><span class="note">Same brief, different writer, so packs can be read side by side. Every option except the default needs the OPENROUTER_API_KEY secret on the function.</span></div>'+
     '<a class="btn" style="margin-top:12px" onclick="koDraft()" id="ko-go">Draft the pack</a> '+
     '<a class="btn sm" style="margin-top:12px" onclick="koClear()">Clear</a>'+
     '<div id="ko-status" class="note" style="margin-top:10px"></div></div>'+
@@ -2341,7 +2348,7 @@ async function koDraft(){
     const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-kickoff", {
       method:"POST",
       headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
-      body: JSON.stringify({ intake })
+      body: JSON.stringify(($("ko-model")&&$("ko-model").value) ? { intake, model: $("ko-model").value } : { intake })
     });
     const j = await r.json().catch(()=>({error:"The server reply could not be read (http "+r.status+")."}));
     if(j.error){ $("ko-status").textContent = "Failed: "+j.error; finish(); return; }
