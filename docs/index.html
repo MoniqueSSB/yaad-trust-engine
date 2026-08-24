@@ -2536,6 +2536,10 @@ async function koSaveEdit(){
 }
 async function koSave(){
   const p = KO.current; if(!p || !sb) return;
+  if(koPackEmpty(p.docs)){
+    $("ko-status").textContent = "This pack has no documents in it, so there is nothing to save. Draft it first; an empty pack must never reach the table.";
+    return;
+  }
   const row = { id:p.id, job_id:p.job_id||null, project_title:p.project_title, client_name:p.client_name||null,
                 parish:p.parish||null, intake:p.intake||{}, docs:p.docs, model:p.model||null, status:p.status||"draft" };
   // The database is the authority on revisions: its trigger archives the
@@ -2550,6 +2554,15 @@ async function koSave(){
 }
 async function koApprove(){
   const p = KO.current; if(!p || !sb) return;
+  if(koPackEmpty(p.docs)){
+    alert("This pack has no documents in it. An empty pack cannot be approved; draft it first.");
+    return;
+  }
+  const tot = koStagesTotal(p.docs);
+  if(tot !== 100){
+    alert("The payment stages total "+tot+" percent, not 100. Fix the schedule in the editor before approving; the money structure must add up exactly.");
+    return;
+  }
   if(!confirm("Approving means you have read every section and you are willing to issue this to the client.\n\nEditing the documents afterwards automatically withdraws the approval.")) return;
   const {data:{session}} = await sb.auth.getSession();
   const who = session && session.user ? session.user.email : null;
@@ -2575,6 +2588,18 @@ async function koRenderList(){
     (r.status==="approved"?'<span class="pill ok">approved</span>':r.status==="in_review"?'<span class="pill hold">re-check</span>':'<span class="pill hold">draft</span>')+
     '<a class="btn sm" onclick="koOpen(\''+esc(r.id)+'\')">Open</a></div></div>').join("")
     : '<div class="empty">No packs yet.</div>';
+}
+/* An empty pack must never be saved or approved: on 23 Aug a silently
+   failed draft (docs NULL) was approved two milliseconds after creation.
+   The database now refuses too; these are the desk's friendlier versions. */
+function koPackEmpty(docs){
+  if(!docs || typeof docs !== "object") return true;
+  const sow = docs.scope_of_works;
+  return !(sow && ((Array.isArray(sow.included) && sow.included.length) || String(sow.summary||"").trim()));
+}
+function koStagesTotal(docs){
+  try{ return (docs.payment_schedule.stages||[]).reduce((a,x)=>a+(Number(x.proportion_percent)||0),0); }
+  catch(e){ return 0; }
 }
 /* House style: no em or en dashes in anything issued under Yaadly's name.
    The model writes them anyway; scrub them wherever a pack enters the desk. */
