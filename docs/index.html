@@ -676,7 +676,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <div class="sect joinband"><div class="wrap">
   <div class="kick rv" id="startform">Start your job right here</div>
   <h2 class="h2 rv d1">Tell us what <em>needs doing.</em></h2>
-  <p class="lead rv d2">This form creates your job right away, no need to also message us. <b>You get a client portal link and code straight after sending it.</b> No obligation, no payment now.</p>
+  <p class="lead rv d2">This form saves your job right away, no need to also message us. <b>You get a client portal link and code straight after sending it</b>, and it goes to workers once you have created your profile and signed the Client Guidelines there. No obligation, no payment now.</p>
   <div class="formcard rv d2">
     <div class="grid2">
       <div class="field"><label>Your name</label><input id="in-name"></div>
@@ -1363,8 +1363,8 @@ async function submitIntake(){
     return;
   }
   pendingPhotos = []; $("in-thumbs").innerHTML=""; if(btn) btn.style.pointerEvents = "";
-  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Job '+esc(result.jobId)+' created.</b> A project manager reviews every request before any quote or work starts, nothing is booked and no money moves until you agree in writing.<br><br>'+
-    'Track it any time in your <a href="#client" onclick="go(\'client\')"><b>client portal</b></a>: create your profile with <b>'+esc(payload.email)+'</b>, sign the Client Guidelines, and your job is there waiting.<br><br>'+
+  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Job '+esc(result.jobId)+' saved.</b> It stays private until you send it: create your profile and sign the Client Guidelines, then it can go to workers for quotes. A project manager reviews every request, and nothing is booked and no money moves until you agree in writing.<br><br>'+
+    'Track it any time in your <a href="#client" onclick="go(\'client\')"><b>client portal</b></a>: create your profile with <b>'+esc(payload.email)+'</b>, sign the Client Guidelines, and your job is ready to go to workers.<br><br>'+
     'The full managed job service opens shortly in Jamaica, starting with Kingston and Portmore. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
   ["in-name","in-phone","in-email","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
 }
