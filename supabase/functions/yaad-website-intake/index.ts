@@ -18,6 +18,15 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // Note the evidence insert below runs on the service-role client, so it is
 // unaffected by the row-level security policy that restricts browser-side
 // evidence inserts to the parties attached to a job.
+//
+// Package 1 guards, 24 Aug 2026: the property address and access contact
+// used to be embedded in descr, and descr is published to ANYONE by the
+// open_jobs view the moment a job is opened for quotes. They now live in
+// their own columns (addr, access_contact) and descr stays clean. The
+// function also pushes a notification to Monique's phone via ntfy.sh (free,
+// topic held in app_settings, payload carries no client contact details),
+// because the site promises a reply within 24 hours and until now nothing
+// told her a request had arrived.
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 
@@ -60,10 +69,11 @@ Deno.serve(async (req: Request) => {
 
   const jobId = `JOB-WEB-${Date.now()}`;
   const title = workType ? `${workType} request from ${name}` : `Job request from ${name}`;
+  // Contact details deliberately NOT in descr: the open_jobs view publishes
+  // descr to the public board. Address and access contact go in their own
+  // columns, visible only to the assigned worker, the client and the admin.
   const descr = [
     desc,
-    addr ? `Address: ${addr}` : "",
-    access ? `Access contact: ${access}` : "",
     urgency ? `When: ${urgency}` : "",
     clientLocation ? `Client is: ${clientLocation}` : "",
     workType ? `Trade: ${workType}` : "",
@@ -92,6 +102,8 @@ Deno.serve(async (req: Request) => {
       client_email: email.toLowerCase(),
       client_phone: phone,
       descr,
+      addr,
+      access_contact: access,
       stage: 0,
       open: false
     }).select("portal_code").single();
@@ -123,6 +135,24 @@ Deno.serve(async (req: Request) => {
   }
 
   root.setAttributes({ "yaadly.intake.outcome": "job_created" });
+
+  // Tell Monique. Fire and forget: a notification relay being down must
+  // never fail the client's request. No names, addresses or numbers leave
+  // for the relay, only the reference, trade and parish.
+  const notify = (async () => {
+    try {
+      const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+      if (!st?.value) return;
+      await fetch(`https://ntfy.sh/${st.value}`, {
+        method: "POST",
+        headers: { Title: "New Yaadly request", Priority: "high", Tags: "house" },
+        body: `${jobId}: ${workType || "job"}, ${parish || "parish not given"}. Reply promised within 24 hours.`,
+        signal: AbortSignal.timeout(4000),
+      });
+    } catch (_) { /* never let telemetry or notification break intake */ }
+  })();
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(notify);
 
   return done(new Response(JSON.stringify({
     ok: true,

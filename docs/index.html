@@ -1781,6 +1781,7 @@ function renderWorker(){
     const d = document.createElement("div"); d.className="card";
     d.innerHTML = '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3>'+esc(j.title||"Job")+' <em>'+esc(j.id)+'</em></h3><span class="pill hold">'+STAGES[j.stage||0].toUpperCase()+'</span></div>'+
       '<p style="font-size:13.5px;color:var(--mute);white-space:pre-wrap">'+esc(j.desc||"")+'</p>'+
+      (j.addr?'<p style="font-size:13px"><b>Site address:</b> '+esc(j.addr)+(j.accessContact?' · <b>Access:</b> '+esc(j.accessContact):'')+'</p>':'')+
       '<div class="kick">Your evidence checklist, check it before you leave the site</div><ul class="check">'+rows+'</ul>'+
       ((j.evidence||[]).some(e=>e.img)?'<div class="thumbs">'+j.evidence.filter(e=>e.img).map(e=>'<img src="'+e.img+'" alt="" title="'+esc(e.label)+'">').join("")+'</div>':'')+
       '<a class="btn" style="margin-top:14px" target="_blank" rel="noopener" href="'+wa(j.id+": Work done. Evidence uploaded in my portal. Ready for review.")+'">✓ Mark work done</a> '+
@@ -1847,6 +1848,7 @@ async function pullMyCloudJobs(email){
     j.walkLink=row.walk_link||j.walkLink||""; j.walkDate=row.walk_date||j.walkDate||"";
     j.walkWho=row.walk_who||j.walkWho||""; j.walkNotes=row.walk_notes||j.walkNotes||""; j.overviewReq=(row.overview_req!=null)?!!row.overview_req:!!j.overviewReq;
     j.packTier=row.pack_tier||j.packTier||"oneoff";
+    j.addr=row.addr||j.addr||""; j.accessContact=row.access_contact||j.accessContact||"";
   });
   save();
 }
@@ -2078,7 +2080,8 @@ function intakeToJob(id){
   const it = DB.intakes.find(x=>x.id===id); if(!it) return;
   const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
   DB.jobs.push({id:jid, title:it.type, parish:it.where||"", client:it.name, clientEmail:it.email||"", clientPhone:it.phone||"",
-    desc:it.desc+"\n\nAddress: "+(it.addr||"not given")+"\nAccess contact: "+(it.access||"not given")+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+" · WhatsApp "+it.phone+")",
+    addr:it.addr||"", accessContact:it.access||"",
+    desc:it.desc+"\n\n(From request "+it.id+" · "+it.urgency+" · client is "+it.loc+")",
     stage:0, evidence:(it.photos||[]).map((p,n)=>({label:"Client photo "+(n+1), meta:"from request", icon:"🖼", img:p})), worker:{}, shortlist:[], open:false});
   it.status="converted"; it.job=jid; save(); cloudStatus("intakes", it.cid, "converted"); renderAdmin(); adminTab("jobs"); editJob(jid); syncJobToCloud(jid);
 }
@@ -2142,6 +2145,7 @@ function editJob(id){
     '<div class="grid2"><div class="field"><label>Job title</label><input id="jb-title" value="'+esc(j.title||"")+'"></div><div class="field"><label>Parish / town</label><input id="jb-parish" value="'+esc(j.parish||"")+'"></div></div>'+
     '<div class="grid2"><div class="field"><label>Client first name</label><input id="jb-client" value="'+esc(j.client||"")+'"></div><div class="field"><label>Open for worker quotes?</label><select id="jb-open"><option value=""'+(j.open?"":" selected")+'>No, matching privately</option><option value="1"'+(j.open?" selected":"")+'>Yes, invite quotes</option></select></div></div>'+
     '<div class="grid2"><div class="field"><label>Client email <span style="font-weight:500;text-transform:none">(their portal login)</span></label><input id="jb-cemail" type="email" value="'+esc(j.clientEmail||"")+'"></div><div class="field"><label>Client phone</label><input id="jb-cphone" value="'+esc(j.clientPhone||"")+'"></div></div>'+
+    '<div class="grid2"><div class="field"><label>Property address <span style="font-weight:500;text-transform:none">(never shown on the public board)</span></label><input id="jb-addr" value="'+esc(j.addr||"")+'"></div><div class="field"><label>Access contact, name and number</label><input id="jb-access" value="'+esc(j.accessContact||"")+'"></div></div>'+
     '<p class="note" style="margin-top:0">Portal code for this job: <b style="letter-spacing:1px">'+esc(j.portalCode||"not generated yet, save once to get one")+'</b>. They need this plus their email to create a portal account, it is not open sign-up.</p>'+
     '<div class="field"><label>Scope, plain words</label><textarea id="jb-desc">'+esc(j.desc||"")+'</textarea></div>'+
     '<div class="grid2"><div class="field"><label>Payment link (paste from Stripe)</label><input id="jb-pay" value="'+esc(j.payLink||"")+'" placeholder="https://buy.stripe.com/..."></div><div class="field"><label>Client paid you (GBP)</label><input id="jb-in" value="'+esc(j.paidIn||"")+'" placeholder="e.g. 300"></div></div>'+
@@ -2195,7 +2199,14 @@ function saveJob(id){
   const j = DB.jobs.find(x=>x.id===id);
   j.title=$("jb-title").value; j.parish=$("jb-parish").value; j.client=$("jb-client").value;
   j.clientEmail=$("jb-cemail").value.trim(); j.clientPhone=$("jb-cphone").value.trim();
-  j.open=!!$("jb-open").value; j.desc=$("jb-desc").value;
+  j.addr=$("jb-addr").value.trim(); j.accessContact=$("jb-access").value.trim();
+  const wantOpen=!!$("jb-open").value, newDesc=$("jb-desc").value;
+  if(wantOpen && !j.open && (/(\+?\d[\d\s().-]{7,}\d)/.test(newDesc) || /address\s*:/i.test(newDesc) || /access contact/i.test(newDesc))){
+    if(!confirm("The description looks like it still contains an address or phone number, and opening this job publishes the description to EVERYONE on the public board. The public view scrubs known patterns, but the clean fix is moving contact details into the address and access fields above. Open it anyway?")){
+      $("jb-open").value=""; 
+    }
+  }
+  j.open=!!$("jb-open").value; j.desc=newDesc;
   j.payLink=$("jb-pay").value.trim(); j.paidIn=$("jb-in").value.trim();
   j.signoffMethod=$("jb-signoff").value; j.walkDate=$("jb-walkdate").value.trim();
   j.walkWho=$("jb-walkwho").value.trim(); j.walkNotes=$("jb-walknotes").value.trim();
@@ -2224,6 +2235,7 @@ function syncJobToCloud(id){
     signoff_method:j.signoffMethod||null, walk_platform:j.walkPlatform||null, walk_link:j.walkLink||null,
     walk_date:j.walkDate||null, walk_who:j.walkWho||null, walk_notes:j.walkNotes||null, overview_req:!!j.overviewReq,
     pack_tier:(j.packTier==="project"?"project":"oneoff"),
+    addr:j.addr||"", access_contact:j.accessContact||"",
     updated_at:new Date().toISOString()
   }).select("portal_code").single().then(r=>{
     if(r.error){ console.warn("job cloud sync:", r.error.message); return; }
@@ -3139,6 +3151,7 @@ function jsDocHtml(j){
     '<tr><td>Where</td><td>'+E(j.parish||"to be confirmed")+'</td></tr>'+
     '<tr><td>Pack tier</td><td>One-off job: this sheet is the whole pack, plus the Completion Report at the end.</td></tr>'+
     (assigned?'<tr><td>Assigned to</td><td><b>'+E(j.worker.name)+'</b>'+(j.worker.trade?' · '+E(j.worker.trade):'')+'</td></tr>':'')+
+    (assigned&&j.addr?'<tr><td>Site address</td><td>'+E(j.addr)+(j.accessContact?'<br>Access: '+E(j.accessContact):'')+'</td></tr>':'')+
     '</tbody></table>'+
     '<h3>What needs doing</h3><p style="white-space:pre-wrap">'+E(j.desc||"Scope to be confirmed.")+'</p>'+
     '<div class="callout">Only the work described here. Anything extra goes through Yaadly first, in writing, before it is done. That protects the worker from unpaid work and the client from surprise bills.</div>');
@@ -3383,7 +3396,12 @@ async function wqSubmit(jobId){
   const r = existing
     ? await sb.from("job_quotes").update(row).eq("id", existing.id).select().single()
     : await sb.from("job_quotes").upsert(row, {onConflict:"job_id,worker_user"}).select().single();
-  if(r.error){ st.innerHTML='<p class="note" style="color:var(--red)">Could not send: '+esc(r.error.message)+'</p>'; return; }
+  if(r.error){
+    const friendly = /row-level security|violates/i.test(r.error.message)
+      ? "Your account is not cleared to quote yet. Quoting opens once Yaadly has verified your ID, published your profile, and you have signed the Worker Guidelines in the My jobs tab, and only on jobs that are open for quotes."
+      : "Could not send: "+r.error.message;
+    st.innerHTML='<p class="note" style="color:var(--red)">'+esc(friendly)+'</p>'; return;
+  }
   WQ.mine[jobId] = r.data; const b=$("wq-"+jobId); if(b) delete b.dataset.editing;
   wqRender(jobId);
 }
