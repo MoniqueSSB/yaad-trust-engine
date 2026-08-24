@@ -11,6 +11,13 @@
 <meta property="og:url" content="https://yaadly.co.uk/">
 <meta property="og:site_name" content="Yaadly">
 <meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="https://yaadly.co.uk/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Yaadly. Proof before payment. Property work in Jamaica, done right.">
+<meta name="twitter:image" content="https://yaadly.co.uk/og.png">
+<link rel="canonical" href="https://yaadly.co.uk/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%2314B8A6'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%2304211D'%3EY%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
@@ -145,6 +152,11 @@ nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-f
 .vbtn{font:inherit;font-size:13px;font-weight:700;padding:9px 16px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--mute);cursor:pointer;transition:.15s}
 .vbtn:hover{border-color:var(--teal);color:var(--tealb)}
 .vbtn.on{background:var(--grad);border-color:transparent;color:#04211D}
+.nav-toggle{display:none;flex-direction:column;justify-content:center;gap:5px;width:44px;height:40px;padding:0 10px;background:transparent;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.nav-toggle span{display:block;height:2px;width:100%;background:var(--tealb);border-radius:2px;transition:.2s}
+.nav-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.nav-toggle[aria-expanded="true"] span:nth-child(2){opacity:0}
+.nav-toggle[aria-expanded="true"] span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 /* shared */
 section.pane{display:none;padding:26px 0 70px}
 #pane-site{background:radial-gradient(640px 320px at 18% 0%,rgba(20,184,166,.10),transparent 70%),radial-gradient(520px 280px at 85% 8%,rgba(255,176,32,.06),transparent 70%)}
@@ -271,7 +283,7 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 .faq[open] summary{color:var(--tealb)}
 .faq .a{padding:0 18px 16px;font-size:13.5px;color:var(--mute)}
 .faq .a b{color:var(--ink)}
-@media(max-width:640px){ .btn{width:100%;justify-content:center} .views{width:100%} .vbtn{flex:1;text-align:center;padding:9px 6px} .loop-row{grid-template-columns:42px 1fr;gap:10px} .loop-row .no{font-size:22px} .card{padding:16px} .jrow,.wcard{padding:12px} .lane{margin-left:0} .tabs .tab{flex:1;text-align:center} .dash{grid-template-columns:1fr} .dash-side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)} .dash-nav{white-space:nowrap} .ov-grid{grid-template-columns:1fr !important} }
+@media(max-width:640px){ .btn{width:100%;justify-content:center} .nav-toggle{display:flex} .views{display:none;position:absolute;left:0;right:0;top:100%;flex-direction:column;gap:6px;padding:12px 18px;background:rgba(8,17,15,.98);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)} .views.open{display:flex} .vbtn{width:100%;text-align:left;padding:12px 14px} .loop-row{grid-template-columns:42px 1fr;gap:10px} .loop-row .no{font-size:22px} .card{padding:16px} .jrow,.wcard{padding:12px} .lane{margin-left:0} .tabs .tab{flex:1;text-align:center} .dash{grid-template-columns:1fr} .dash-side{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)} .dash-nav{white-space:nowrap} .ov-grid{grid-template-columns:1fr !important} }
 /* ═══════════ SITE PANE · layout refresh (Aug 2026) ═══════════
    Scoped to #pane-site plus new class names only. The TROPICS
    tokens above are untouched, and nothing here reaches the
@@ -456,7 +468,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <body>
 <nav class="top"><div class="nav-in">
   <div class="brand" onclick="go('site')"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></div>
-  <div class="views">
+  <button class="nav-toggle" id="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="views" onclick="toggleNav()"><span></span><span></span><span></span></button>
+  <div class="views" id="views">
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
     <button class="vbtn" data-v="market" onclick="go('market')">Marketplace</button>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
@@ -1272,12 +1285,15 @@ function importData(ev){
   r.readAsText(f);
 }
 /* ───────────── navigation ───────────── */
+function toggleNav(){ var v=$("views"), t=$("nav-toggle"); if(!v||!t) return; var open=v.classList.toggle("open"); t.setAttribute("aria-expanded", open?"true":"false"); }
+function closeNav(){ var v=$("views"), t=$("nav-toggle"); if(v) v.classList.remove("open"); if(t) t.setAttribute("aria-expanded","false"); }
 function go(v){
   document.querySelectorAll(".pane").forEach(p=>p.classList.remove("show"));
   $("pane-"+v).classList.add("show");
   document.querySelectorAll(".vbtn").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
   window.scrollTo({top:0});
   history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
+  closeNav();
   renderAll();
   if(v==="market") renderMarketplace();
 }
@@ -3797,7 +3813,11 @@ renderAll();
     for (var i=0;i<n.length;i++){ n[i].classList.add('on'); n[i].classList.add('show-m'); }
   }
   /* failsafe: whatever happens below, nothing stays invisible */
-  setTimeout(function(){ if (!R.getAttribute('data-rv')) revealAll(); }, 4000);
+  setTimeout(function(){
+    if (!R.getAttribute('data-rv')){ revealAll(); return; }
+    var rv = document.querySelectorAll('.rv:not(.on)');
+    for (var k=0;k<rv.length;k++){ if (rv[k].getBoundingClientRect().top < window.innerHeight) rv[k].classList.add('on'); }
+  }, 4000);
 
   try{
     var reduced = false;
