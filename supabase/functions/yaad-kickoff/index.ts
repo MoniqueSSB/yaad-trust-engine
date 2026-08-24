@@ -27,6 +27,15 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // the desk polls. Every failure path writes status='failed' with the reason,
 // so a dead draft is visible instead of silent.
 //
+// v10, 24 Aug 2026: the writing bar raised to the worked example Monique
+// approved ("Yaadly Kickoff Pack - Old Harbour"): a personal multi-paragraph
+// cover note that answers the client's stated fear, scope prose that explains
+// the order the building demands, a diagnosis-and-decision gate wherever the
+// job opens something up, weighting rationale on the payment stages, open
+// questions that each carry their reason, and early warnings that are
+// concretely observable events. Per-part token budgets raised to give the
+// writing room.
+//
 // v9, same night: ONE model call for the whole pack was still too slow. The
 // smoke brief drafted in ~100s, but the Old Harbour brief ran past the
 // background worker's own lifetime and was culled silently at ~6 minutes.
@@ -76,10 +85,10 @@ ABSOLUTE RULES, these override everything else:
 
 Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
 {
- "cover_note": "3-4 warm plain-English sentences addressed to the client by name where known: what this pack is, how it protects them, and what happens next. No prices.",
- "scope_of_works": {"summary":"4-6 sentences a non-builder understands: what is wrong today, what will be done about it, in what order, and what the property will be like when it is finished","included":["specific items of work"],"excluded":["what is explicitly not covered"],"assumptions":["what this scope assumes to be true"],"acceptance_criteria":["how each party knows the work is done"]},
- "timeline": {"basis":"2-3 sentences: what the sequence depends on, including the season and weather reality for this specific job","phases":[{"name":"phase name","duration":"working days or weeks, as a range","depends_on":"what must finish first, or Start","milestone":"the observable thing that marks it complete"}]},
- "payment_schedule": {"note":"2-3 sentences: why the money is staged this way for this job, and that no amounts appear here because the client inserts figures from their own contractor quote","stages":[{"stage":"stage name","proportion_percent":0,"release_condition":"the evidence that must be approved before release","evidence_required":["specific photo, video or document"]}],"cost_tracking_template":{"columns":["Stage","Agreed amount (client to enter)","Released to date","Balance remaining","Evidence approved date"],"instruction":"one sentence on how to use it"}},
+ "cover_note": "3 to 5 short paragraphs addressed to the client by name where known, separated by \\n\\n. Name the specific fear or constraint the intake states and answer it directly. Explain in plain words that no figures appear anywhere in this pack and why, and that the client drops their own contractor's figures into the tracking table. Close with exactly what happens next before anything is instructed. Warm, direct, never salesy. No prices.",
+ "scope_of_works": {"summary":"3 to 4 short paragraphs separated by \\n\\n, written for a non-builder: what is wrong today, in plain words; the order the work will run in and WHY the building demands that order (open up before diagnosing, diagnose before repairing, prove watertight before covering, decorate last); anything inspected but not worked on, framed explicitly as an inspection and not a work item; and what the property will be like when it is finished","included":["specific items of work"],"excluded":["what is explicitly not covered"],"assumptions":["what this scope assumes to be true"],"acceptance_criteria":["how each party knows the work is done"]},
+ "timeline": {"basis":"3 to 5 sentences: what the sequence depends on, including the season and weather reality for this specific job, which phases are rain-stoppable and how the programme absorbs that without stopping internal work, and what site access assumes. Wherever the job involves opening something up or an unknown, the phases MUST include a dedicated diagnosis-and-client-decision phase between opening up and repair, so nothing is bought or covered before the client has instructed in writing","phases":[{"name":"phase name","duration":"working days or weeks, as a range","depends_on":"what must finish first, or Start","milestone":"the observable thing that marks it complete"}]},
+ "payment_schedule": {"note":"2 to 3 short paragraphs separated by \\n\\n: why the money is staged this way for THIS job, naming which stages are deliberately weighted and the reason (an opening-up stage paid early and generously so the contractor has every reason to open up fully; a final stage held back so the retention still has something in it), and that no amounts appear because the client inserts figures from their own contractor quote","stages":[{"stage":"stage name","proportion_percent":0,"release_condition":"the evidence that must be approved before release","evidence_required":["specific photo, video or document"]}],"cost_tracking_template":{"columns":["Stage","Agreed amount (client to enter)","Released to date","Balance remaining","Evidence approved date"],"instruction":"one sentence on how to use it"}},
  "evidence_checklist": [{"stage":"stage name","items":[{"item":"what to capture","type":"photo | video | document","why":"what it proves","timestamped_geotagged":true}]}],
  "document_pack": [{"document":"name of the document to obtain","who_provides":"client | contractor | Yaadly | authority","why":"why it matters","risk_if_missing":"plain consequence"}],
  "risk_register": [{"risk":"what could go wrong","category":"scope | schedule | quality | payment | legal | access | weather | supply","likelihood":"low | medium | high","impact":"low | medium | high","mitigation":"the practical step that reduces it","owner":"who holds it","early_warning_sign":"what would be seen first"}],
@@ -96,7 +105,11 @@ QUALITY BARS - a pack that misses these is not issuable:
 - Every evidence item states what would prove the work rather than merely show it: angles, counts, before-and-after pairing, receipts.
 - Phases and stages must follow the real build logic of the trade involved (strip before inspect, inspect before cover, prove watertight before finishes, and so on).
 - For renovation and build-scale projects, the final stage of the evidence checklist must include one continuous site overview video walking the whole site, and the final payment stage's release condition should note the client may take a live video walkthrough with the worker before approving.
-- Aim for 4-7 payment stages, 8-12 risks, and at least one open question. Weight the risk register toward the things that actually go wrong on this kind of job in Jamaica.
+- Aim for 5-7 payment stages, 9-12 risks, and 8-16 open questions. Weight the risk register toward the things that actually go wrong on this kind of job in Jamaica.
+- Every open question carries its reason in the same breath: not "Is the property insured?" but "Is the property currently insured, and does the insurer know it is unoccupied and about to be renovated?" Wherever the intake leaves them open, the questions must cover: authority or title to instruct the works, utility account status and reconnection, insurance for an unoccupied property under renovation, whether the stated deadline is a commitment to someone else or a preference, and the burden falling on any single named person on the ground.
+- Every early warning sign is a concretely observable event someone could screenshot or photograph: a specific phrase appearing in a message, a missed weekly photograph, a request for money accompanied by an explanation instead of evidence. Never a feeling or a tendency.
+- Where one named person controls site access, their availability and the unpaid burden on them is itself a risk with a named mitigation. Where the client is overseas, decision latency across time zones is itself a risk with a batching mitigation.
+- Write as if the pack will be read aloud to a nervous first-time client. Every sentence should survive that reading.
 
 Jamaica-specific realities are expected wherever relevant: hurricane season and rain stopping outdoor work, utility connection lead times, JPS and NWC, parish council building approvals, material availability and delivery to site, site access and security, and the client being in a different time zone from the work.`;
 
@@ -184,9 +197,9 @@ async function draftsWrite(method: string, path: string, body: unknown): Promise
 // together on purpose: they share stage names, and two separate calls would
 // invent two different stage lists.
 const PARTS: { name: string; keys: string[]; maxTokens: number }[] = [
-  { name: "A", keys: ["cover_note", "scope_of_works", "timeline", "open_questions", "human_review_notes"], maxTokens: 6000 },
-  { name: "B", keys: ["payment_schedule", "evidence_checklist"], maxTokens: 6000 },
-  { name: "C", keys: ["document_pack", "risk_register", "communications_list"], maxTokens: 7000 },
+  { name: "A", keys: ["cover_note", "scope_of_works", "timeline", "open_questions", "human_review_notes"], maxTokens: 9000 },
+  { name: "B", keys: ["payment_schedule", "evidence_checklist"], maxTokens: 7000 },
+  { name: "C", keys: ["document_pack", "risk_register", "communications_list"], maxTokens: 8000 },
 ];
 const ALL_KEYS = PARTS.flatMap((p) => p.keys);
 
@@ -222,7 +235,7 @@ async function draftPart(
             ". Follow the shape defined for those keys in the schema above. The remaining sections are being drafted separately; do not mention or include them." },
         ],
       }),
-      signal: AbortSignal.timeout(240_000),
+      signal: AbortSignal.timeout(300_000),
     });
     const j = await r.json();
     s.setAttributes({

@@ -2398,7 +2398,7 @@ function koRenderPack(){
          esc((p.guardrail.samples||[]).join("  -  "))+'</b></p></div>';
   }
   if(d.cover_note){
-    h += koSec("Note to the client", '<p style="font-size:13.5px">'+esc(d.cover_note)+'</p>');
+    h += koSec("Note to the client", '<p style="font-size:13.5px;white-space:pre-wrap">'+esc(d.cover_note)+'</p>');
   }
   if(Array.isArray(d.human_review_notes) && d.human_review_notes.length){
     h += koSec("Check these yourself before issuing", koList(d.human_review_notes, x=>'<li>'+esc(x)+'</li>'));
@@ -2408,7 +2408,7 @@ function koRenderPack(){
   }
   const sow = d.scope_of_works||{};
   h += koSec("1 · Scope of works",
-    '<p style="font-size:13.5px">'+esc(sow.summary||"")+'</p>'+
+    '<p style="font-size:13.5px;white-space:pre-wrap">'+esc(sow.summary||"")+'</p>'+
     koTbl(["Included in this scope","Explicitly not included"],
       (function(){ const a=sow.included||[], b=sow.excluded||[], n=Math.max(a.length,b.length), r=[];
         for(let i=0;i<n;i++) r.push('<tr><td>'+(a[i]?'✓ '+esc(a[i]):'')+'</td><td>'+(b[i]?'✕ '+esc(b[i]):'')+'</td></tr>');
@@ -2661,12 +2661,22 @@ function koDocHtml(p){
   let secN = 0; const S = (title, body) => { secN++; return '<section><h2><span>'+secN+'</span>'+E(title)+'</h2>'+body+'</section>'; };
 
   let body = "";
+  if (Array.isArray(d.open_questions) && d.open_questions.length){
+    body += '<section><h2>Before this pack is issued</h2>'+
+      '<p>These questions must be answered before this pack goes past draft. Several of them can stop the job after money has moved, which is why they sit at the front of the document rather than at the back.</p>'+
+      UL(d.open_questions)+'</section>';
+  }
+  if (!approved && Array.isArray(d.human_review_notes) && d.human_review_notes.length){
+    body += '<section><h2>Internal: remove before issuing to the client</h2>'+
+      '<p class="callout" style="border-left-color:#C2452F;background:#FDF3F1">This section is for the project manager only. It is stripped automatically from any approved issue of this pack; it appears here because this copy is a draft.</p>'+
+      UL(d.human_review_notes)+'</section>';
+  }
   body += S("Purpose of this pack",
-    (d.cover_note ? '<p class="callout">'+E(d.cover_note)+'</p>' : '')+
+    (d.cover_note ? '<p class="callout" style="white-space:pre-wrap">'+E(d.cover_note)+'</p>' : '')+
     '<p>This Kickoff Pack sets out, before any work begins, exactly what has been agreed for <b>'+E(p.project_title)+'</b>: the scope of works, the order the work will run in, the stages in which money will be released and the evidence each release depends on, the risks we are watching, and who speaks to whom while the work runs.</p>'+
     '<p>It exists so that '+(p.client_name?E(p.client_name):"the client")+' can follow every step from anywhere, and so that nothing rests on memory or on trust alone. <b>Money moves only when work is proven.</b> That rule runs through every section that follows.</p>');
   body += S("Scope of works",
-    '<p>'+E(sow.summary||"")+'</p>'+
+    '<p style="white-space:pre-wrap">'+E(sow.summary||"")+'</p>'+
     '<h3>Included</h3>'+UL(sow.included)+
     '<h3>Explicitly not included</h3>'+UL(sow.excluded)+
     '<h3>Assumptions this scope rests on</h3>'+UL(sow.assumptions)+
@@ -2676,12 +2686,12 @@ function koDocHtml(p){
     T(["Phase","Duration","Starts after","Complete when"],
       (tl.phases||[]).map(ph=>'<tr><td><b>'+E(ph.name)+'</b></td><td>'+E(ph.duration||"")+'</td><td>'+E(ph.depends_on||"Start")+'</td><td>'+E(ph.milestone||"")+'</td></tr>')));
   body += S("Payment schedule, tied to evidence",
-    '<p>'+E(ps.note||"")+'</p><p class="callout">No amounts appear in this document by design. Yaadly provides project management, procurement and oversight judgment, not estimation or quantity surveying. The figures belong to the contract between the client and their contractor; this schedule fixes the <b>structure</b>: what proportion is released at each stage, and the evidence that must be approved first.</p>'+
+    '<p style="white-space:pre-wrap">'+E(ps.note||"")+'</p><p class="callout">No amounts appear in this document by design. Yaadly provides project management, procurement and oversight judgment, not estimation or quantity surveying. The figures belong to the contract between the client and their contractor; this schedule fixes the <b>structure</b>: what proportion is released at each stage, and the evidence that must be approved first.</p>'+
     T(["Stage","Share of agreed total","Released only when","Evidence required"],
       (ps.stages||[]).map(st=>'<tr><td><b>'+E(st.stage)+'</b></td><td class="num">'+E(String(st.proportion_percent||0))+'%</td><td>'+E(st.release_condition||"")+'</td><td>'+(st.evidence_required||[]).map(E).join("<br>")+'</td></tr>')
       .concat(['<tr class="total"><td>Total</td><td class="num">'+tot+'%</td><td colspan="2">'+(tot===100?"":"Does not total 100%, to be corrected before issue")+'</td></tr>'])) +
     '<h3>Cost tracking table, for the client to complete from their contractor\'s quote</h3>'+
-    '<p>'+E(ct.instruction||"Enter the agreed amount for each stage from your contractor\'s written quote, then track releases against it as evidence is approved.")+'</p>'+
+    '<p>'+E(ct.instruction||"Enter the agreed amount for each stage from your contractor\'s written quote, then track releases against it as evidence is approved.")+' If a row shows a released figure with no approval date beside it, stop and contact Yaadly before releasing anything further.</p>'+
     T(ctCols, (ps.stages||[]).map(st=>'<tr><td>'+E(st.stage)+'</td>'+ctCols.slice(1).map(()=>'<td class="fill">&nbsp;</td>').join("")+'</tr>')));
   body += S("Evidence plan",
     '<p>Every stage is documented before, during and after. Photographs and video are timestamped and geotagged; nothing in this plan is self-certified by the person doing the work.</p>'+
@@ -2701,9 +2711,6 @@ function koDocHtml(p){
   body += S("Roles and communications",
     T(["Role","Who","Decides or does","Reached via","Hears from Yaadly"],
       (d.communications_list||[]).map(x=>'<tr><td><b>'+E(x.role)+'</b></td><td>'+E(x.who||"TBC")+'</td><td>'+E(x.responsibility||"")+'</td><td>'+E(x.contact_method||"")+'</td><td>'+E(x.update_cadence||"")+'</td></tr>')));
-  if (Array.isArray(d.open_questions) && d.open_questions.length){
-    body += S("Open questions, to be resolved before this pack is issued", UL(d.open_questions));
-  }
 
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>'+E(p.project_title)+' · Kickoff Pack · Yaadly</title><style>'+
   '@page{size:A4;margin:18mm 16mm 22mm}'+
@@ -2760,13 +2767,15 @@ function koDocHtml(p){
   '<tr><td>Prepared by</td><td>Yaadly Ltd · England and Wales · no. 17358077</td></tr>'+
   '<tr><td>Approved by</td><td>'+(approved?E(p.approved_by||""):"pending")+'</td></tr>'+
   '<tr><td>Date</td><td>'+today+'</td></tr>'+
+  '<tr><td>Basis of preparation</td><td>Prepared from the client\'s written intake only. No inspection of the property has been carried out by Yaadly or by any contractor. Every statement about the current condition of the property is the client\'s description, not an observation.</td></tr>'+
+  '<tr><td>What this document is not</td><td>It is not a survey, a valuation, a structural assessment, a quantity surveyor\'s estimate or legal advice. It contains no prices, rates or amounts of any kind, in any currency, by deliberate policy.</td></tr>'+
   '<tr><td>Drafting note</td><td>Drafted with AI assistance ('+E(p.model||"kickoff agent")+'), reviewed and issued by a person. Any edit after approval withdraws the approval automatically.</td></tr>'+
   '</tbody></table>'+
   '<div class="notice">Yaadly provides project management, procurement and oversight. This pack contains no prices, valuations or quantity surveying, and does not replace a licensed surveyor, engineer or attorney where one is needed. Payment amounts are agreed between the client and their contractor and entered into the cost tracking table by the client. Payment stages are released against approved evidence, never against elapsed time.</div>'+
   '</div></div>'+
   body+
   '<section class="sig"><h2><span>✓</span>Agreement to proceed on this basis</h2>'+
-  '<p>Signing records agreement to the scope, programme structure, evidence-gated payment structure and communication plan in this pack, not to any price, which is agreed separately in writing with the contractor.</p>'+
+  '<p>Signing records agreement to the scope, programme structure, evidence-gated payment structure and communication plan in this pack, not to any price, which is agreed separately in writing with the contractor. For the client it also confirms the scope matches what they want done, and that they understand no payment is released except against the evidence set out in the payment schedule and evidence plan.</p>'+
   '<div class="row"><div class="cell"><div class="line"></div><div class="lbl">For the client'+(p.client_name?', '+E(p.client_name):'')+' · signature and date</div></div>'+
   '<div class="cell"><div class="line"></div><div class="lbl">For Yaadly Ltd · signature and date</div></div></div></section>'+
   '</div>'+
