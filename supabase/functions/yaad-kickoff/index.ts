@@ -142,6 +142,21 @@ function callerJwt(req: Request): { role: string; sub: string } {
   } catch (_) { return { role: "", sub: "" }; }
 }
 
+async function callerIsAdmin(req: Request): Promise<boolean> {
+  try {
+    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const url = Deno.env.get("SUPABASE_URL"), anon = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!tok || !url || !anon) return false;
+    const r = await fetch(`${url}/rest/v1/rpc/is_admin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${tok}` },
+      body: "{}",
+    });
+    return r.ok && (await r.json()) === true;
+  } catch (_) { return false; }
+}
+
+
 function intakeToPrompt(i: Record<string, unknown>): string {
   const line = (label: string, key: string) => {
     const v = String(i[key] ?? "").trim();
@@ -362,6 +377,10 @@ Deno.serve(async (req: Request) => {
     if (caller.role !== "authenticated") {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return json({ error: "Sign in required. The kickoff agent only answers to the Yaadly admin session." }, 401);
+    }
+    if (!(await callerIsAdmin(req))) {
+      root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
+      return json({ error: "Admin only. The kickoff agent answers only to the Yaadly admin." }, 403);
     }
     root.setAttributes({ "yaadly.auth.outcome": "authenticated" });
 

@@ -104,6 +104,11 @@ Deno.serve(async (req) => {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return done(new Response(JSON.stringify({ error: "Not signed in." }), { status: 401, headers: cors }), 401);
     }
+    const { data: isAdm } = await supabase.rpc("is_admin");
+    if (isAdm !== true) {
+      root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
+      return done(new Response(JSON.stringify({ error: "Admin only." }), { status: 403, headers: cors }), 403);
+    }
     root.setAttributes({ "yaadly.auth.outcome": "authenticated" });
 
     if (!NVIDIA_API_KEY) {

@@ -20,6 +20,21 @@ function callerRole(req: Request): string {
   } catch (_) { return ""; }
 }
 
+async function callerIsAdmin(req: Request): Promise<boolean> {
+  try {
+    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const url = Deno.env.get("SUPABASE_URL"), anon = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!tok || !url || !anon) return false;
+    const r = await fetch(`${url}/rest/v1/rpc/is_admin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${tok}` },
+      body: "{}",
+    });
+    return r.ok && (await r.json()) === true;
+  } catch (_) { return false; }
+}
+
+
 Deno.serve(async (req) => {
   const cors = {
     "Access-Control-Allow-Origin": "*",
@@ -40,6 +55,10 @@ Deno.serve(async (req) => {
     if (callerRole(req) !== "authenticated") {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return done(new Response(JSON.stringify({ error: "Sign in required. The agents only answer to the Yaadly admin session." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } }), 401);
+    }
+    if (!(await callerIsAdmin(req))) {
+      root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
+      return done(new Response(JSON.stringify({ error: "Admin only. These agents answer only to the Yaadly admin." }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } }), 403);
     }
     root.setAttributes({ "yaadly.auth.outcome": "authenticated" });
 
