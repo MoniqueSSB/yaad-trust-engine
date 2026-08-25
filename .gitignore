@@ -19,3 +19,6 @@ backups/
 .Trashes
 .AppleDouble
 .LSOverride
+
+# Supabase CLI scratch
+supabase/.temp/
