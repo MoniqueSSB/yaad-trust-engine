@@ -909,7 +909,16 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 </div></section>
 <!-- ═══════════════ CLIENT PORTAL ═══════════════ -->
 <section class="pane" id="pane-client"><div class="wrap">
-  <div id="client-lock" class="card" style="max-width:420px;margin:40px auto">
+  <div class="card" style="max-width:640px;margin:20px auto 0">
+    <h3>How the <em>pricing</em> works</h3>
+    <ul style="margin:10px 0 0;padding-left:18px;line-height:1.65;color:var(--mute);font-size:14px">
+      <li>You agree a price with your worker for their labour. That price is theirs, never beaten down, and materials are billed separately at cost, never touched by a fee.</li>
+      <li>Yaadly adds a <b style="color:var(--ink)">15% Guarantee &amp; Support fee</b> on top of the labour price. That covers the held payment, the evidence check, and the guarantee behind every job.</li>
+      <li>Example: a <b style="color:var(--ink)">£300</b> labour price means you pay <b style="color:var(--ink)">£345</b> in total. Nothing reaches the worker until you approve the evidence.</li>
+      <li>Paying from Jamaica already? Pay the same way in J$, no card fees, no currency conversion.</li>
+    </ul>
+  </div>
+  <div id="client-lock" class="card" style="max-width:420px;margin:20px auto">
     <h3>Client <em>portal</em></h3>
     <p class="note" style="margin-top:0">Already have a profile? Sign in. New here? Create your profile with just an email, you then read and sign the <a onclick="openClientGuidelines()" style="color:var(--tealb);cursor:pointer">Client Guidelines</a>, and once signed you can pitch your first job. Becoming a client is free.</p>
     <div class="field"><label>Email</label><input id="cgate-email" type="email" autocomplete="username"></div>
@@ -950,6 +959,16 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div class="stat-pill">💼 Active jobs<b id="wd-count">0</b></div>
       <div class="stat-pill">💷 Money held for you<b id="wd-held">n/a</b></div>
     </div>
+  </div>
+  <div class="card" style="max-width:640px;margin:0 0 20px">
+    <h3>How you get <em>paid</em></h3>
+    <ul style="margin:10px 0 0;padding-left:18px;line-height:1.65;color:var(--mute);font-size:14px">
+      <li>You set your own price for the job. It is never beaten down, and materials are never fee'd, at cost is at cost.</li>
+      <li>Yaadly takes <b style="color:var(--ink)">12%</b> of your labour price, so you keep <b style="color:var(--ink)">88%</b>. Joining is free, quoting is free, there are no lead fees ever.</li>
+      <li>Example: a <b style="color:var(--ink)">£300</b> labour price means you receive <b style="color:var(--ink)">£264</b>.</li>
+      <li>Paid within 24 hours once the client approves your evidence, to your bank, Lynk wallet, or cash pickup, whichever suits you.</li>
+      <li>Remote, digital work carries a lower <b style="color:var(--ink)">10%</b> fee instead.</li>
+    </ul>
   </div>
   <div id="worker-lock" class="card" style="max-width:520px">
     <h3>Sign in to <em>see your jobs</em></h3>
