@@ -55,3 +55,34 @@ Cloudflare dashboard, and needs the domain to be on Cloudflare first.
   Server Components. Never share a server client between requests.
 - `proxy.ts` refreshes the auth session on every request. It uses `getUser()`
   rather than `getSession()` on purpose: `getSession()` trusts the cookie.
+
+## Where logic lives: the service boundary
+
+Yaadly has two places server code can run. This is settled, do not drift.
+
+**Edge Functions (`../supabase/functions`) own anything called from outside
+this app:**
+
+- Inbound third-party webhooks (`yaad-whatsapp-webhook`). Meta calls that URL
+  directly, so it must not change when this app deploys.
+- Public entry points used by the marketing site (`yaad-website-intake`).
+  yaadly.co.uk is hand-written HTML on GitHub Pages and cannot call a Server
+  Action.
+- All AI model calls (`yaad-agent`, `yaad-kickoff`, `yaad-vision`,
+  `yaad-completion`). They hold model API keys and run long.
+
+**This app owns everything a signed-in user does:** the client, worker and
+admin portals. Auth-gated pages, Server Components that read, Server Actions
+that write.
+
+**Unclear? Ask who calls it.** Third party or marketing site, Edge Function.
+Signed-in user inside the app, here.
+
+**Three rules:**
+
+1. Never wrap an Edge Function in a route here just to call it from the app.
+   Query Postgres directly via `@supabase/ssr` and let row level security
+   decide. Edge Functions are for callers that cannot do that.
+2. Never re-implement an Edge Function's logic here. One rule, one home.
+3. Money and trust invariants belong in Postgres (triggers, RLS), not in
+   either runtime. A database constraint holds no matter who is calling.
