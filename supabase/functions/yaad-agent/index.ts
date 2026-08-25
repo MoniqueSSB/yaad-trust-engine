@@ -20,15 +20,26 @@ function callerRole(req: Request): string {
   } catch (_) { return ""; }
 }
 
-async function callerIsAdmin(req: Request): Promise<boolean> {
+function callerEmail(req: Request): string {
+  try {
+    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const payload = JSON.parse(atob(tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload.email || "";
+  } catch (_) { return ""; }
+}
+
+// Who may use the agents: the Yaadly admin, or a client who has a profile and
+// has signed the CURRENT Client Guidelines version. The rule lives in Postgres
+// (may_use_agents) so it cannot drift between here and yaad-vision.
+async function callerMayUse(req: Request): Promise<boolean> {
   try {
     const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     const url = Deno.env.get("SUPABASE_URL"), anon = Deno.env.get("SUPABASE_ANON_KEY");
     if (!tok || !url || !anon) return false;
-    const r = await fetch(`${url}/rest/v1/rpc/is_admin`, {
+    const r = await fetch(`${url}/rest/v1/rpc/may_use_agents`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${tok}` },
-      body: "{}",
+      body: JSON.stringify({ p_email: callerEmail(req) }),
     });
     return r.ok && (await r.json()) === true;
   } catch (_) { return false; }
@@ -54,11 +65,11 @@ Deno.serve(async (req) => {
   try {
     if (callerRole(req) !== "authenticated") {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
-      return done(new Response(JSON.stringify({ error: "Sign in required. The agents only answer to the Yaadly admin session." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } }), 401);
+      return done(new Response(JSON.stringify({ error: "Sign in required." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } }), 401);
     }
-    if (!(await callerIsAdmin(req))) {
-      root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
-      return done(new Response(JSON.stringify({ error: "Admin only. These agents answer only to the Yaadly admin." }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } }), 403);
+    if (!(await callerMayUse(req))) {
+      root.setAttributes({ "yaadly.auth.outcome": "not_permitted" });
+      return done(new Response(JSON.stringify({ error: "Complete your client profile and sign the current Client Guidelines to use this." }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } }), 403);
     }
     root.setAttributes({ "yaadly.auth.outcome": "authenticated" });
 
