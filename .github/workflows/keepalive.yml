@@ -71,15 +71,31 @@ jobs:
       - name: Check the public job-request endpoint is alive
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "${SUPABASE_URL:-}" ]; then echo "Skipped, secret not set."; exit 0; fi
-          # A GET must be refused with 405. That proves the function is deployed
-          # and running without creating a job or sending anything.
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then echo "Skipped, secrets not set."; exit 0; fi
+          # Since the 24 Aug 2026 hardening the function sits behind the
+          # gateway's JWT check, so two things must both be true:
+          #  1. A bare GET with no key is turned away with 401. That proves the
+          #     auth gate is still up.
+          #  2. A GET carrying the same apikey header the website sends is
+          #     refused with 405, method not allowed. That proves the request
+          #     got past the gate and the function itself answered, without
+          #     creating a job or sending anything.
+          bare=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             "$SUPABASE_URL/functions/v1/yaad-website-intake")
-          echo "yaad-website-intake GET -> HTTP $code (405 expected)"
-          if [ "$code" != "405" ]; then
-            echo "::error::yaad-website-intake answered $code instead of 405. The form endpoint may be broken."
+          echo "yaad-website-intake bare GET -> HTTP $bare (401 expected)"
+          if [ "$bare" != "401" ]; then
+            echo "::error::A keyless request answered $bare instead of 401. The gateway auth gate on yaad-website-intake may be off."
+            exit 1
+          fi
+          keyed=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/functions/v1/yaad-website-intake" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "yaad-website-intake keyed GET -> HTTP $keyed (405 expected)"
+          if [ "$keyed" != "405" ]; then
+            echo "::error::yaad-website-intake answered $keyed instead of 405. The form endpoint may be broken."
             exit 1
           fi
