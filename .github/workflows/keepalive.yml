@@ -71,18 +71,25 @@ jobs:
       - name: Check the public job-request endpoint is alive
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # The same publishable key the website form sends. It is printed in
+          # yaadly.co.uk's own JavaScript, so it is public by design and safe
+          # to keep here in the open. If it is ever rotated, update it here
+          # and in the site in the same breath.
+          PUBLISHABLE_KEY: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
         run: |
           set -euo pipefail
-          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then echo "Skipped, secrets not set."; exit 0; fi
+          if [ -z "${SUPABASE_URL:-}" ]; then echo "Skipped, secret not set."; exit 0; fi
           # Since the 24 Aug 2026 hardening the function sits behind the
-          # gateway's JWT check, so two things must both be true:
+          # gateway's auth check, so two things must both be true:
           #  1. A bare GET with no key is turned away with 401. That proves the
           #     auth gate is still up.
-          #  2. A GET carrying the same apikey header the website sends is
-          #     refused with 405, method not allowed. That proves the request
-          #     got past the gate and the function itself answered, without
-          #     creating a job or sending anything.
+          #  2. A GET sent exactly the way the website sends it, publishable
+          #     key in the apikey header and nothing else, is refused with
+          #     405, method not allowed. That proves the request got past the
+          #     gate and the function itself answered, without creating a job
+          #     or sending anything. Deliberately not the SUPABASE_ANON_KEY
+          #     secret: the gateway rejects that value as a bearer token, and
+          #     the point of this check is to mimic the real form.
           bare=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             "$SUPABASE_URL/functions/v1/yaad-website-intake")
           echo "yaad-website-intake bare GET -> HTTP $bare (401 expected)"
@@ -92,8 +99,7 @@ jobs:
           fi
           keyed=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             "$SUPABASE_URL/functions/v1/yaad-website-intake" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+            -H "apikey: $PUBLISHABLE_KEY")
           echo "yaad-website-intake keyed GET -> HTTP $keyed (405 expected)"
           if [ "$keyed" != "405" ]; then
             echo "::error::yaad-website-intake answered $keyed instead of 405. The form endpoint may be broken."
