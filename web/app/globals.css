@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* Yaadly brand tokens, lifted from the live site so the app and the marketing
+   site stay one visual system. Change them here, not in components. */
+@theme {
+  --color-bg: #08110f;
+  --color-panel: #0f1b17;
+  --color-panel2: #14231e;
+  --color-line: #1f332c;
+  --color-ink: #f2faf7;
+  --color-mute: #9db8ae;
+  --color-dim: #67807a;
+  --color-teal: #14b8a6;
+  --color-tealb: #2dd4bf;
+  --color-mango: #ffb020;
+  --color-coral: #ff6b4a;
+  --color-soft: #0f2b26;
+  --color-softline: #1e4a42;
+
+  --font-display: var(--font-anton), Impact, sans-serif;
+  --font-body: var(--font-space-grotesk), -apple-system, sans-serif;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
