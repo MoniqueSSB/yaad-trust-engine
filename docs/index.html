@@ -271,6 +271,18 @@ footer{border-top:1px solid var(--line);padding:26px 0;margin-top:40px}
 .slot{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--mute);background:var(--panel2);border:1px solid var(--line);border-radius:100px;padding:8px 14px;cursor:pointer}
 .slot input{width:auto;margin:0}
 .svc .btn{margin-top:12px}
+.svc .price small{display:block;font-family:var(--body);font-size:11.5px;font-weight:600;letter-spacing:0;color:var(--dim);margin-top:4px;line-height:1.45}
+.svc .price small b{color:var(--mute);font-weight:700}
+.svc .rung{font-family:var(--body);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--tealb);display:block;margin-bottom:5px}
+.tw{overflow-x:auto;margin-top:10px}
+.mkt{width:100%;border-collapse:collapse;font-size:12.5px;min-width:520px}
+.mkt th{text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:8px 10px;border-bottom:1px solid var(--line);font-weight:800}
+.mkt td{padding:9px 10px;border-bottom:1px solid var(--line);color:var(--mute);vertical-align:top;line-height:1.5}
+.mkt tr:last-child td{border-bottom:0}
+.mkt tr.h td{color:var(--mango);font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;padding-top:18px}
+.mkt b{color:var(--ink)}
+.mkt .f{color:var(--mango);white-space:nowrap}
+.mkt .p{color:var(--tealb);white-space:nowrap;font-weight:700}
 .loop-row{display:grid;grid-template-columns:60px 1fr;gap:14px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
 .loop-row .no{font-family:var(--disp);font-size:30px;color:var(--tealb)}
 .loop-row h4{font-size:15px}
@@ -515,7 +527,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <p class="sub rv d2"><b>Vetted tradespeople.</b> Payment <b>held and released only when you approve the evidence.</b> Fair local pricing wherever you are paying from. <b>Property work across Jamaica</b>, launching first in Kingston and Portmore.</p>
       <div class="avail rv d3">
         <span class="now" onclick="document.getElementById('book').scrollIntoView()">✅ <b>Available today:</b>&nbsp;free scoping call</span>
-        <span onclick="document.getElementById('waitlist').scrollIntoView()">🕓 <b>Opening shortly:</b>&nbsp;checks, oversight, full PM</span>
+        <span onclick="go('services')">✅ <b>Prices published:</b>&nbsp;checks, sign-offs, oversight, full PM</span>
       </div>
       <div class="cta-row rv d3">
         <a class="btn" onclick="document.getElementById('startform').scrollIntoView()">Start your job →</a>
@@ -612,7 +624,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div class="kick rv">The worker's side</div>
       <h2 class="h2 rv d1">Same thread. <em>Fair deal.</em></h2>
       <ul class="chk rv d2">
-        <li><b>Quote in the thread.</b> Free to see, free to quote, never charged a fee</li>
+        <li><b>Quote in the thread.</b> Free to see, free to quote, never a lead fee</li>
         <li><b>The money is real</b> and confirmed before a tool is lifted</li>
         <li><b>One evidence package</b> at the end of the day. No daytime tracking, ever</li>
         <li><b>No paperwork.</b> The Completion Report is drafted from your evidence, you just confirm it</li>
@@ -662,12 +674,12 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <h2 class="h2 rv d1">Eyes on the ground, <em>on the record.</em></h2>
   <p class="lead rv d2">Property checks, site verification, monthly oversight and full project management, delivered by trained project managers. Right now that is the founder doing every visit herself, with the roster growing behind her.</p>
   <div class="svcgrid rv d2">
-    <div class="svc"><h4>Property Check In</h4><p class="price">Coming soon</p><p>A visual check by our person on the ground: photos, video, written report.</p></div>
-    <div class="svc"><h4>Site Verification Visit</h4><p class="price">Coming soon</p><p>Independent proof of what is actually happening, observed by a project manager.</p></div>
-    <div class="svc"><h4>Oversight Retainer</h4><p class="price">Coming soon</p><p>Weekly site visits, so money only moves when the work is genuinely done.</p></div>
-    <div class="svc"><h4>Full Project Management</h4><p class="price">Coming soon</p><p>Your whole build run, start to keys. UK rate is 15 to 20 percent.</p></div>
-    <div class="svc"><h4>Property Care</h4><p class="price">Coming soon</p><p>Recurring visits on a schedule, the same checklist every time, so change is visible visit to visit.</p></div>
-    <div class="svc"><h4>Milestone Inspections</h4><p class="price">Coming soon</p><p>An independent inspector critiques the work before money moves. The checker is never the worker.</p></div>
+    <div class="svc"><h4>Deposit Protection Check</h4><p class="price">&pound;149<small>Founding rate, first five clients. <b>Full price &pound;249.</b> Fixed fee, back in 72 hours.</small></p><p>Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates. Written go or no go. No site visit needed.</p></div>
+    <div class="svc"><h4>Visual Check</h4><p class="price">&pound;95<small>Founding rate, first five clients. <b>Full price &pound;149 per visit.</b></small></p><p><span class="rung">Someone attends</span>A trained checker photographs the property or the stage against a written checklist and files a one page observation note. They record what is there. They do not rate it, advise on it, or certify it.</p></div>
+    <div class="svc"><h4>Condition Report</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;325.</b></small></p><p><span class="rung">Someone attends</span>The whole property recorded system by system, every finding rated Severe, Moderate or Low, issue summary on page one. It tells you what is wrong and how bad, not what to do about it.</p></div>
+    <div class="svc"><h4>Technical Sign-off</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;300 per sign-off.</b></small></p><p><span class="rung">Someone attends</span>A qualified trade inspector assesses one stage against the trade standard and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record.</p></div>
+    <div class="svc"><h4>Oversight Retainer</h4><p class="price">&pound;495<small>Founding rate, first five clients. <b>Full price &pound;595 a month.</b> Weekly visits from &pound;895.</small></p><p>Two documented site visits a month, a monthly cost and progress report, a contractor accountability call, and a direct line to Monique. Enough that nothing goes two weeks unseen.</p></div>
+    <div class="svc"><h4>Full Project Management</h4><p class="price">12 to 15%<small>Of build cost. <b>Minimum fee &pound;2,500.</b> Paid in milestones alongside the build, never up front. From December 2026.</small></p><p>The whole build. Scope and specification, contractor sourcing and vetting, staged payments, programme, site inspections, handover and aftercare.</p></div>
   </div>
   <a class="btn o rv d2" style="margin-top:20px" onclick="go('services')">See all services and what's included →</a>
 </div></div>
@@ -734,7 +746,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     </div>
     <div class="grid2">
       <div class="field"><label>What do you want to talk about?</label>
-        <select id="bk-svc"><option>Site Verification Visit (15 min)</option><option>Oversight Retainer (30 min)</option><option>Full Project Management (30 min)</option><option>A custom quote or something else (30 min)</option></select>
+        <select id="bk-svc"><option>Deposit Protection Check (15 min)</option><option>Visual Check or Condition Report (15 min)</option><option>Technical or Certified Milestone Sign-off (15 min)</option><option>Property Care (15 min)</option><option>Oversight Retainer (30 min)</option><option>Project Setup Pack (30 min)</option><option>Full Project Management (30 min)</option><option>A custom quote or something else (30 min)</option></select>
       </div>
       <div class="field"><label>Where are you calling from?</label>
         <select id="bk-tz"><option>UK</option><option>Jamaica</option><option>US East (New York, Florida)</option><option>US other</option><option>Canada</option><option>Elsewhere</option></select>
@@ -801,14 +813,15 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="faqwrap rv d2">
     <details class="faq" open><summary>How do I start a job?</summary><div class="a">Two ways, both free. Fill in the form on this page and it creates your job straight away, with a client portal link and code sent to you on the spot. Or message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English, and we reply within 24 hours. No app to download either way.</div></details>
     <details class="faq"><summary>Where do you operate?</summary><div class="a">Yaadly is built for property work across <b>Jamaica</b>. We are <b>launching in Kingston and Portmore first</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Elsewhere in Jamaica today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
-    <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Online holding opens shortly; until then the terms are agreed with you directly in writing before work starts.</div></details>
-    <details class="faq"><summary>What does it cost?</summary><div class="a">Prices are not published yet. They go live the day we open, and we are not taking payment before then. Everything will be quoted in writing before any work begins. Join the waiting list and you will be told the day booking opens. Property work gets a written quote benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client overseas pays what a client in Jamaica pays.</div></details>
+    <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Yaadly's own fee is separate from the worker's price, itemised on your quote, and explained in full below. Online holding opens shortly; until then the terms are agreed with you directly in writing before work starts.</div></details>
+    <details class="faq"><summary>What does it cost?</summary><div class="a"><b>Professional services are priced on the page.</b> Every one shows the full price and the founding rate side by side, because a discount off a price nobody can actually buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024. Deposit Protection Check from <b>&pound;149</b>, Visual Check from <b>&pound;95</b> a visit, Condition Report from <b>&pound;245</b>, Technical Sign-off from <b>&pound;245</b>, Certified Milestone Sign-off from <b>&pound;550</b>, Oversight Retainer from <b>&pound;495</b> a month, Full Project Management 12 to 15% of build cost. Founding rates are limited to the first five clients per service. <a onclick="go('services')" style="color:var(--tealb);cursor:pointer">See the full list and what each one is priced against &rarr;</a><br><br><b>Property work through the marketplace</b> gets a written quote from the worker, benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client overseas pays what a client in Jamaica pays.</div></details>
+    <details class="faq"><summary>What does Yaadly charge? Show me the breakdown.</summary><div class="a">Yaadly is not free to run and you should see the cost before you commit, not after. On a marketplace job there are two fees, and both are charged <b>on labour only, never on materials</b>.<br><br><b>You pay a Guarantee &amp; Support fee of 15%</b> on top of the worker's labour price. That is what pays for vetting the worker, holding your money, checking the evidence, running a dispute if you raise one, and a person to call.<br><br><b>The worker pays 12%</b> of their labour price, so they keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave a worker, and they are never charged to join, never charged to quote, and never charged for a lead they did not win.<br><br><b>A &pound;300 labour job, in full:</b><br>Worker's labour price: <b>&pound;300</b><br>Your Guarantee &amp; Support fee, 15%: <b>&pound;45</b><br>You pay: <b>&pound;345</b><br>Worker's fee, 12%: <b>&pound;36</b><br>Worker receives: <b>&pound;264</b><br><br>The rest, plainly. If we advance cash for materials there is a disclosed 5% admin charge. On very small jobs a minimum Guarantee &amp; Support fee applies, J$3,500 to J$4,500 depending on the trade, so on a small job the fee works out as a higher percentage. If you pay from abroad, the exchange rate we use carries a margin of about 2%. Paying from Jamaica in J$ skips that entirely. Inspections, Property Care visits and project management are priced separately and always shown before you book. Every fee that applies to your job is on your quote, itemised, before you agree to anything.</div></details>
     <details class="faq"><summary>What do I actually get at the end of a job?</summary><div class="a">A <b>signed Completion Report</b>, as a PDF that is yours to keep: the job summary, before and after photographs side by side, the verification record, the worker's own confirmation that what is written is what was done, and your approval with the payment record on the final page. It is drafted automatically from the evidence (the worker files one evidence package and writes no paperwork), confirmed by them, reviewed by a person, then delivered to you. Forward it to family, keep it with the house papers, show it to the next contractor.</div></details>
     <details class="faq"><summary>Can I see the site live before I approve?</summary><div class="a">Yes. At sign-off you can approve from the evidence package, or book a <b>live video walkthrough</b>: the worker walks the whole site with you on WhatsApp video, Google Meet or Zoom, whichever suits you. You raise anything you see on the spot, the notes are recorded, <b>you confirm them in your portal</b>, and both land on your Completion Report. On builds and larger works we also require a continuous <b>site overview video</b> as part of the evidence itself.</div></details>
     <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
     <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
-    <details class="faq"><summary>How are workers vetted? Who is coming to my property?</summary><div class="a">Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address, and a selfie holding that ID so we know the document is theirs. For work inside occupied homes, or any time a client asks, we require a <b>police record check</b> from the Jamaica Constabulary Force. On top of that: references called, past work reviewed, and a trial job before they are trusted with yours. Certified trades have their certification checked with the issuing body. You are told who is coming, and you see their record before they arrive.</div></details>
-    <details class="faq"><summary>I am a tradesperson. What does it cost to join, and how do I get paid?</summary><div class="a"><b>Nothing, ever.</b> Joining is free, quoting is free, and you are never charged to be on Yaadly. The client's money is confirmed before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own.</div></details>
+    <details class="faq"><summary>How are workers vetted? Who is coming to my property?</summary><div class="a">Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address dated within three months, and their TRN. They also give a <b>live photo taken in the moment</b> and a <b>short video turning their face slowly left, then right</b>. An upload proves somebody has a document. A live turn proves the person holding it is them, now.<br><br>A <b>police record check from the Jamaica Constabulary Force</b> is <b>mandatory</b> on any job over <b>&pound;500</b>, on any work inside an occupied home, and any time the worker holds keys or attends an empty property. Below &pound;500 with the owner present it is optional, and you can still require it at no cost to you. That line is drawn at &pound;500 because that is roughly where a job stops being a call-out and starts being someone's savings.<br><br>On top of that: references called rather than emailed, past work reviewed, and a trial job with <b>an independent reviewer on site at Yaadly's cost</b> before they are trusted with yours. Certified trades have their certification checked with the body that issued it. You are told who is coming, and you see their record before they arrive.</div></details>
+    <details class="faq"><summary>I am a tradesperson. What does it cost to join, and how do I get paid?</summary><div class="a">Joining is free, quoting is free, and you are never charged for a lead, win or lose. <b>The one charge is 12% of your labour price on a completed job</b>, taken when you are paid, so you keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave you, your materials are never touched, and Founding Pros pay nothing at all for their first 90 days. Remote digital work carries 10% instead. The client pays their own separate fee on top of your price, so their total is higher than your quote, but not a cent of your 88% goes anywhere else. The client's money is confirmed before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own.</div></details>
     <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
   </div>
 </div></div>
@@ -868,7 +881,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <h1 class="hx">Project management, <span class="g1">from London</span> to your gate.</h1>
   <p class="lead">Yaadly is a hub: a marketplace of verified tradespeople, and the professional oversight that makes using them safe. This page is the oversight, delivered by trained project managers, held to the same evidence standard on every job. Founded by <b>Monique Sewell-Bennett</b>, construction project manager, seven years running projects in London, family roots in St Thomas and Portmore. Every visit today is run by Monique personally; as the network grows, oversight is delivered by vetted professionals to the same standard.</p>
   <div class="rule">👁️ <b>What we do, plainly:</b> we observe, document and oversee. We report what we saw, on the day, with photographs, and we hold contractors to what was agreed. We do not carry out structural surveys, valuations or quantity surveying, and we do not replace a licensed surveyor or engineer where one is needed. Every decision stays yours.</div>
-  <div class="rule">🪪 <b>Nobody unverified attends your property.</b> Government photo ID checked on video, proof of address, selfie with the ID, and a police record check for work inside occupied homes.</div>
+  <div class="rule">🪪 <b>Nobody unverified attends your property.</b> Government photo ID checked on video, proof of address, TRN, a live photo and a left to right turn video, and a <b>police record check that is mandatory on any job over &pound;500</b>, any work inside an occupied home, and any time keys are held or an empty property is attended.</div>
   <div class="kick">Who this is for</div>
   <div class="grid3">
     <div class="card"><h3>Buying or <em>inheriting</em></h3><p style="font-size:13.5px;color:var(--mute)">You need to know what is actually standing there before you commit money, and whether the price you have been quoted is real.</p></div>
@@ -884,10 +897,89 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div class="loop-row" style="border-bottom:0"><div class="no">05</div><div><h4>You decide, always</h4><p>We observe, document and ask the awkward questions. Every decision about your money and your property stays yours.</p></div></div>
   </div>
   <div class="kick">The services</div>
-  <div class="card"><h3>Property Check In <em>coming soon</em></h3><p style="font-size:13.5px;color:var(--mute)">Visual check by our person, photos, video, written report. Security, occupancy, obvious damage, overgrowth, storm signs. Not a construction assessment.</p><a class="btn sm" onclick="go('site');setTimeout(()=>document.getElementById('waitlist').scrollIntoView(),100)">Join the waiting list</a></div>
-  <div class="card"><h3>Site Verification Visit <em>coming soon</em></h3><p style="font-size:13.5px;color:var(--mute)">Observed and documented by a project manager: attended visit, full photo set, video walkthrough, condition notes on structure, roof, water, electrics and security, and a written observation report in 3 working days. A return visit is also available.</p><a class="btn sm" onclick="go('site');setTimeout(()=>document.getElementById('waitlist').scrollIntoView(),100)">Join the waiting list</a></div>
-  <div class="card"><h3>Oversight Retainer <em>coming soon</em></h3><p style="font-size:13.5px;color:var(--mute)">Weekly attended visits, evidence pack each time, milestone sign off before payments, progress against programme, payment tracking against your schedule, variations reviewed before you agree them, monthly written report. Cancel any time with one month's notice.</p><a class="btn sm" onclick="document.getElementById('waitlist').scrollIntoView()">Join the waiting list</a></div>
-  <div class="card"><h3>Full Project Management <em>coming soon</em></h3><p style="font-size:13.5px;color:var(--mute)">Scope and specification, contractor sourcing and vetting, contract and staged payments, programme, site inspections, payments released against milestones we have verified, cost and change control, snag list and handover. Priced as a percentage of build cost, published when we open.</p><a class="btn sm" onclick="requestService('Full Project Management')">Request a quote</a></div>
+  <p class="lead">Two families. <b>Remote work I do at a desk</b>, and <b>work where somebody physically attends your property</b>. Every price on this page shows the full price and the founding rate, because a discount off a price nobody can actually buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024, and because you deserve the real number first.</p>
+  <div class="rule">📐 <b>The one distinction the whole thing is built on.</b> A <b>checker records</b> what is there. A <b>trained inspector tells you what it means.</b> That is the line the UK market draws between a Level 1 and a Level 2 report, it is where the price steps, and we tell you which one you are buying before you buy it.</div>
+
+  <div class="kick">Remote, no site visit</div>
+  <div class="svcgrid">
+    <div class="svc"><h4>Deposit Protection Check</h4><p class="price">&pound;149<small>Founding rate, first five clients. <b>Full price &pound;249.</b> Fixed fee.</small></p><p>Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates: payment structure, deposit exposure, works scope, red flags. Written go or no go, back in 72 hours. Money, works, evidence and process only. No title, no contract interpretation.</p><a class="btn sm" onclick="requestService('Deposit Protection Check')">Request this</a></div>
+    <div class="svc"><h4>Project Setup Pack</h4><p class="price">3 to 7%<small>Of build cost. <b>Minimum &pound;399.</b></small></p><p>Milestone payment schedule, evidence protocol, works scope written down, contractor briefed, reporting cadence agreed. The thing that makes oversight work, and the thing that stops a job going wrong before it starts. On a &pound;17,000 renovation that is &pound;510 to &pound;1,190.</p><a class="btn sm" onclick="requestService('Project Setup Pack')">Request this</a></div>
+    <div class="svc"><h4>Full Project Management</h4><p class="price">12 to 15%<small>Of build cost. <b>Minimum fee &pound;2,500.</b> Paid in milestones alongside the build. From December 2026.</small></p><p>The whole build. Scope and specification, contractor sourcing and vetting, staged payments, programme, site inspections, handover and aftercare. On a &pound;17,000 renovation 12% is &pound;2,040, so the minimum bites and you pay &pound;2,500, an effective 14.7%. Said here rather than left for you to work out.</p><a class="btn sm" onclick="requestService('Full Project Management')">Request a quote</a></div>
+  </div>
+  <div class="rule">🧾 <b>If you buy setup and then full management, the setup fee is credited against it.</b> The UK 3 to 7% band is what a project manager charges for a whole project. Charging it for setup and then again for management would stack your fees above the UK norm, so it does not stack here.</div>
+
+  <div class="kick">On the ground, someone attends</div>
+  <p class="lead">Built to the shape the UK market already uses, because that is the market you benchmark against. Every rung is priced at or below the bottom of its UK band, because the scope is narrower: one property or one works package, not a whole pre-purchase survey.</p>
+  <div class="svcgrid">
+    <div class="svc"><h4>Visual Check</h4><p class="price">&pound;95<small>Founding rate, first five clients. <b>Full price &pound;149 per visit.</b> Short notice inside 48 hours, &pound;185.</small></p><p><span class="rung">A trained checker</span>Attends, photographs the property or the stage against a written checklist, and files a one page observation note in 72 hours. <b>They record what is there. They do not rate it, advise on it, or certify it.</b> Mirrors the UK property inspection report at &pound;80 to &pound;150.</p><a class="btn sm" onclick="requestService('Visual Check')">Request this</a></div>
+    <div class="svc"><h4>Condition Report</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;325.</b> Fixed fee.</small></p><p><span class="rung">A trained inspector</span>The whole property recorded system by system: roof and hurricane fixings, structure, water and tank, electrics and inverter, drainage and septic, termites, security. Every finding rated Severe, Moderate or Low, issue summary on page one. Like a RICS Level 1, it tells you what is wrong and how bad, not what to do about it.</p><a class="btn sm" onclick="requestService('Condition Report')">Request this</a></div>
+    <div class="svc"><h4>Technical Sign-off</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;300 per sign-off.</b> Short notice inside 48 hours, &pound;395.</small></p><p><span class="rung">A qualified trade inspector</span>Assesses one stage or one works package against the trade standard for that job type, and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record. Right for anything structural or electrical, and any stage about to be covered over.</p><a class="btn sm" onclick="requestService('Technical Sign-off')">Request this</a></div>
+    <div class="svc"><h4>Certified Milestone Sign-off</h4><p class="price">&pound;550<small>Founding rate, first five clients. <b>Full price &pound;750 per milestone.</b></small></p><p><span class="rung">A credentialed professional</span>PERB-registered where the work is structural. Signs off a milestone before it is covered over or paid, with estimated cost and timescale for anything to be put right. Named, with their registration number on the report. <b>The only rung where anybody certifies anything.</b></p><a class="btn sm" onclick="requestService('Certified Milestone Sign-off')">Request this</a></div>
+    <div class="svc"><h4>Property Care</h4><p class="price">&pound;75<small>Founding rate, first five clients. <b>Full price &pound;95 per visit, standard.</b> Large or rental &pound;135, villa &pound;175.</small></p><p><span class="rung">A trained checker</span>Recurring visits on a schedule, the same checklist every time, so change is visible visit to visit. An empty or elder occupied home, checked and documented while you are four thousand miles away. Paying in Jamaica, in J$: J$7,500, J$12,000 or J$18,000 per visit, no exchange rate margin at all.</p><a class="btn sm" onclick="requestService('Property Care')">Request this</a></div>
+    <div class="svc"><h4>Oversight Retainer</h4><p class="price">&pound;495<small>Founding rate, first five clients. <b>Full price &pound;595 a month.</b> Weekly visits &pound;895 founding, &pound;1,095 full.</small></p><p><b>Two documented site visits a month</b>, a monthly cost and progress report, a contractor accountability call, and a direct line to Monique. Weekly is four visits a month, for an active build or a contractor you are not yet sure about. Still under a quarter of what one UK monitoring surveyor charges for a single visit.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request this</a></div>
+  </div>
+
+  <div class="card" style="margin-top:14px;border-color:var(--softline)">
+    <h3>Optional add-on: <em>watch it happen</em></h3>
+    <p style="font-size:14px;color:var(--mute)">By default the inspection happens and you get the report and the sign-off afterwards. That is how most people want it: you are asleep, or at work, or four thousand miles and six hours away.</p>
+    <p style="font-size:14px;color:var(--mute);margin-top:10px">If you would rather be there, add live viewing and we call you in on video while the inspector is on site. You see what they see, in real time, you can ask them to point the camera at something, and anything you raise goes in the report as your own note. The recording is filed with the evidence. <b style="color:var(--ink)">&pound;40, on any rung.</b></p>
+  </div>
+
+  <div class="kick">What this is priced against</div>
+  <p class="lead">Researched 26 August 2026. Every figure below is a published price from a live market, not an estimate.</p>
+  <div class="card">
+    <div class="tw"><table class="mkt">
+      <thead><tr><th>Comparable</th><th>Price</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr class="h"><td colspan="3">Basic, not a surveyor</td></tr>
+        <tr><td>UK property inspection report</td><td class="p">&pound;80 to &pound;150</td><td>gvec.co.uk, 2026</td></tr>
+        <tr><td>Same day or emergency</td><td class="p">&pound;130 to &pound;180</td><td>gvec.co.uk, 2026</td></tr>
+        <tr><td>UK periodic property inspection, <b>per visit</b></td><td class="p">&pound;80 + VAT</td><td>Leisure Guard, 2026</td></tr>
+        <tr><td>UK snagging survey, 3 bed house</td><td class="p">&pound;449</td><td>HomeOwners Alliance, 2026</td></tr>
+        <tr class="h"><td colspan="3">Carried out by a trained professional</td></tr>
+        <tr><td><b>RICS Level 1</b>, Condition Report, no advice</td><td class="p">&pound;300 to &pound;900</td><td>HomeOwners Alliance, 2026</td></tr>
+        <tr><td><b>RICS Level 2</b>, HomeBuyer, with repair advice</td><td class="p">&pound;400 to &pound;1,000</td><td>HomeOwners Alliance, 2026</td></tr>
+        <tr><td><b>RICS Level 3</b>, Building Survey, with repair costs</td><td class="p">&pound;630 to &pound;1,500+</td><td>HomeOwners Alliance, 2026</td></tr>
+        <tr><td>Structural engineer, site visit only</td><td class="p">&pound;300</td><td>Checkatrade, 2026</td></tr>
+        <tr><td>Structural engineer, visit plus report</td><td class="p">&pound;1,000</td><td>Checkatrade, 2026</td></tr>
+        <tr class="h"><td colspan="3">Ongoing oversight</td></tr>
+        <tr><td>UK monitoring surveyor, <b>per visit</b></td><td class="p">&pound;500 to &pound;1,500</td><td>Construction Capital, 2026</td></tr>
+        <tr><td>UK monitoring, desk-top review, one off</td><td class="p">&pound;750 to &pound;2,000</td><td>Construction Capital, 2026</td></tr>
+        <tr class="h"><td colspan="3">Advisory, quote review and project setup</td></tr>
+        <tr><td>Quantity surveyor, early cost advice</td><td class="p">&pound;300 to &pound;1,000</td><td>Homebuilding &amp; Renovating, 2026</td></tr>
+        <tr><td>Quantity surveyor, full cost control and tendering</td><td class="p">&pound;2,000 to &pound;10,000+</td><td>Homebuilding &amp; Renovating, 2026</td></tr>
+        <tr><td>Project manager, percentage of build cost</td><td class="p">3 to 7%</td><td>Homebuilding &amp; Renovating, 2026</td></tr>
+        <tr><td>Professional fees, whole self-build</td><td class="p">8 to 15% of build</td><td>Homebuilding &amp; Renovating, 2026</td></tr>
+        <tr class="h"><td colspan="3">Diaspora comparables</td></tr>
+        <tr><td>JAMCO, Before You Build Audit <b>(direct competitor)</b></td><td class="p">about &pound;263</td><td>buildingjamaica.ca</td></tr>
+        <tr><td>JAMCO, Build Smart, setup plus oversight</td><td class="p">about &pound;2,384</td><td>buildingjamaica.ca</td></tr>
+        <tr><td>IndiaForNRI, property report</td><td class="p">about &pound;186</td><td>indiafornri.com</td></tr>
+        <tr><td>NaijaSight, monitoring, per visit</td><td class="p">about &pound;74</td><td>naijasight.com</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note" style="font-size:12.5px"><b>Why we do not price at the Nigerian level.</b> NaijaSight at &pound;74 and SimpleXD at &pound;27 are priced against a local cost base with local staff. Yaadly Ltd is a UK company carrying UK professional indemnity cover with territorial reach into Jamaica and jurisdiction including the USA and Canada, which is the expensive end of that market. Their prices are right for their cost base. They are not right for ours.</p>
+  </div>
+
+  <div class="kick">Say the quiet part first</div>
+  <div class="card">
+    <h3>What these services <em>are</em></h3>
+    <p style="font-size:14px;color:var(--mute)">A record of physical works and costs, prepared by a construction project manager. What was observed on site on the date and time stated, and how the prices you were quoted compare against material costs, day rates and completed jobs in our database.</p>
+    <h3 style="margin-top:16px">What they <em>are not</em></h3>
+    <p style="font-size:14px;color:var(--mute)">Yaadly is not a law firm and nobody here is an attorney-at-law. Nothing is legal advice. We do not verify title, tell you whether a title is good, or advise on what an agreement means. That is an attorney's work and you should instruct one.</p>
+    <p style="font-size:14px;color:var(--mute);margin-top:10px">We do not carry out land surveys or confirm boundaries. Only a surveyor registered under the Land Surveyors Act may do that. We do not certify structural adequacy. Only an engineer registered with the PERB may do that. We do not buy, sell, market or introduce property, and we take no commission on any property transaction.</p>
+    <h3 style="margin-top:16px">What we <em>owe you</em></h3>
+    <p style="font-size:14px;color:var(--mute)">The service carried out with reasonable care and skill, as section 49 of the Consumer Rights Act 2015 requires. Nothing in our terms limits that duty or your rights under it.</p>
+    <p class="note">This block appears on the site, in every quote, and bound into the report itself, so the deliverable and the terms are one document you cannot separate.</p>
+  </div>
+
+  <div class="kick">How a service actually runs</div>
+  <div class="card">
+    <div class="loop-row"><div class="no">01</div><div><h4>On payment, a portal link</h4><p>Reference, link and access code by email before I have done anything. Same portal a marketplace client gets, just a different kind of job inside it. No password to remember.</p></div></div>
+    <div class="loop-row"><div class="no">02</div><div><h4>While it runs, the clock is visible</h4><p>72 hours from your documents landing, not from when you paid. You see the due date without asking me for it.</p></div></div>
+    <div class="loop-row"><div class="no">03</div><div><h4>You read the draft first</h4><p>If a fact about your job is wrong, you tell me and I fix it. The verdict is on page one, not buried at the back.</p></div></div>
+    <div class="loop-row" style="border-bottom:0"><div class="no">04</div><div><h4>Then it becomes your scope</h4><p>Post the job on the board with the scope already written, or keep your own contractor and add oversight. Roughly half of people will keep their own contractor, and that is fine.</p></div></div>
+  </div>
+
   <div class="card" style="border-color:var(--softline);margin-top:14px">
     <h3>Need something <em>different?</em></h3>
     <p style="font-size:14px;color:var(--mute)">Not everything fits a package. A one off inspection before you buy, a dispute with a contractor already underway, a family property nobody has checked in years, a build in a parish we have not named, or a scope somewhere between the services above. Tell us what you need and we price it properly.</p>
@@ -897,7 +989,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     </div>
     <p class="note">Custom work is quoted in writing after the call. Nothing is charged until you have agreed the scope and the price.</p>
   </div>
-  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px"><b>Opening shortly.</b> Prices and booking are not live yet. Join the waiting list and you will be contacted first, or book a free call now and we will scope your job ready for the day we open.<br><br><b>What these services are:</b> observation, documentation and oversight. We report what we saw on the day, in photographs and writing, and we hold contractors to what was agreed. We do not provide structural surveys, valuations, quantity surveying or legal advice, and we do not replace a licensed surveyor or engineer where one is required. Every decision stays yours.<br><br>Free calls are available now. No payment is taken and no service is booked until we open. Larger projects are invoiced from Yaadly Ltd against agreed stages, so you never pay for work before it is scoped.</p>
+  <p class="note" style="font-size:13px;color:var(--mute);margin-top:14px"><b>Founding rates are limited to the first five clients per service</b>, and the full price beside each one is the price everybody else pays. <b>Talk to me first.</b> A free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote in writing before anything starts, and nothing is charged until you have agreed it. Larger projects are invoiced from Yaadly Ltd against agreed stages, so you never pay for work before it is scoped.</p>
   <div class="kick">Talk to us first</div>
   <div class="card"><h3>Free call, <em>no obligation</em></h3><p style="font-size:14px;color:var(--mute)">Fifteen minutes for a check or a visit, thirty for a retainer, full project management or something custom. Nothing is charged until you have agreed a written scope.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
@@ -920,9 +1012,10 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   </div>
   <div id="client-lock" class="card" style="max-width:420px;margin:20px auto">
     <h3>Client <em>portal</em></h3>
-    <p class="note" style="margin-top:0">Already have a profile? Sign in. New here? Create your profile with just an email, you then read and sign the <a onclick="openClientGuidelines()" style="color:var(--tealb);cursor:pointer">Client Guidelines</a>, and once signed you can pitch your first job. Becoming a client is free.</p>
+    <p class="note" style="margin-top:0">Already have a profile? Sign in. New here? You need the job code Yaadly sent you, then you read and sign the <a onclick="openClientGuidelines()" style="color:var(--tealb);cursor:pointer">Client Guidelines</a>, and once signed you can pitch your first job. Becoming a client is free.</p>
     <div class="field"><label>Email</label><input id="cgate-email" type="email" autocomplete="username"></div>
     <div class="field"><label>Password</label><input id="cgate-pass" type="password" autocomplete="current-password"></div>
+    <div class="field"><label>Job code <span style="color:var(--dim);font-weight:400">(first time only)</span></label><input id="cgate-code" autocomplete="off" placeholder="On the message we sent you"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <a class="btn" onclick="clientGateLogin()">Sign in</a>
       <a class="btn o" onclick="clientGateSignup()">Create account</a>
@@ -996,7 +1089,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div id="wt-open" style="display:none"></div>
       <div id="wt-apply" style="display:none">
     <div class="card"><h3>Apply to join <em>Yaadly</em></h3>
-      <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Joining is free. Quoting is free. Workers are never charged. Yaadly reviews every application personally. <a onclick="openWorkerGuidelines()" style="color:var(--tealb);cursor:pointer">Read the Worker Guidelines →</a></p>
+      <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Joining is free. Quoting is free. No lead fees, ever. Yaadly takes 12% of your labour price on completed work, so you keep 88%. Yaadly reviews every application personally. <a onclick="openWorkerGuidelines()" style="color:var(--tealb);cursor:pointer">Read the Worker Guidelines →</a></p>
       <div class="grid2" style="margin-top:12px">
         <div class="field"><label>Full name</label><input id="ap-name"></div>
         <div class="field"><label>WhatsApp number</label><input id="ap-phone" placeholder="876..."></div>
@@ -1027,7 +1120,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
         <div class="field"><label>Reference 1, name and phone</label><input id="ap-ref1"></div>
         <div class="field"><label>Reference 2, name and phone</label><input id="ap-ref2"></div>
       </div>
-      <div class="rule" style="margin-top:6px">🪪 <b>Identity checks are compulsory.</b> Nobody attends a client's property without verified ID. Before your first job you must show, on a video call or in person: a <b>government photo ID</b> (passport, driver's licence or national ID), proof of your address, and a selfie holding the ID so we know it is you. For work inside occupied homes, or where a client asks, we also require a <b>police record check</b> from the Jamaica Constabulary Force. We do not accept photos of someone else's documents, and any false document ends the application permanently.</div>
+      <div class="rule" style="margin-top:6px">🪪 <b>Identity checks are compulsory.</b> Nobody attends a client's property without verified ID. Before your first job you must show, on a video call: a <b>government photo ID</b> (passport, driver's licence or national ID), proof of your address dated within three months, your TRN, a <b>live photo taken in the moment</b>, and a <b>short video turning your face slowly left, then right</b>. The turn is the check. A photograph held up to a camera cannot turn, and neither can a screen. It takes four seconds and it is why a client lets you through the gate.<br><br>A <b>police record check</b> from the Jamaica Constabulary Force is <b>mandatory for any job over &pound;500</b>, any work inside an occupied home, and any time you hold keys or attend an empty property. Skip it and your profile still publishes, but you are locked out of every job over &pound;500 and every occupied-home job, which on this board is most of the money. Get it once and it covers every job you take.<br><br>We do not accept photos of someone else's documents, and any false document ends the application permanently.</div>
       <div class="grid2" style="margin-top:12px">
         <div class="field"><label>Government photo ID you will show</label>
           <select id="ap-idtype"><option value="">Choose one</option><option>Jamaican passport</option><option>Driver's licence</option><option>National ID (NIDS or voter ID)</option><option>Other government photo ID</option></select>
@@ -1856,7 +1949,7 @@ function submitApplication(){
     checks:{}, status:"received" };
   DB.applications.push(ap); save();
   if(sb) sb.from("applications").insert({app_id:ap.id, name:ap.name, phone:ap.phone, email:ap.email, parish:ap.parish, trade:ap.trade, years:ap.years, cert:ap.cert, certno:ap.certno, work:ap.work, ref1:ap.ref1, ref2:ap.ref2, status:"received"}).then(r=>{ if(r.error) console.warn("application cloud:", r.error.message); });
-  $("ap-status").innerHTML = '<div class="card"><h3>Application <em>received</em></h3><p style="color:var(--mute);font-size:14px">Yaadly reviews every application personally: ID check, references called, and a trial job. You will hear back on WhatsApp. Joining is free, always.</p></div>';
+  $("ap-status").innerHTML = '<div class="card"><h3>Application <em>received</em></h3><p style="color:var(--mute);font-size:14px">Yaadly reviews every application personally: ID check, references called, and a trial job with an independent reviewer on site at our cost. You will hear back on WhatsApp. Joining is free, quoting is free, and there are no lead fees. The one charge is 12% of your labour price on completed work.</p></div>';
   ["ap-name","ap-phone","ap-email","ap-parish","ap-trade","ap-years","ap-certno","ap-work","ap-ref1","ap-ref2"].forEach(i=>$(i).value="");
   $("ap-consent").checked = false;
 }
@@ -1900,12 +1993,12 @@ function renderWorker(){
       ((j.evidence||[]).some(e=>e.img)?'<div class="thumbs">'+j.evidence.filter(e=>e.img).map(e=>'<img src="'+e.img+'" alt="" title="'+esc(e.label)+'">').join("")+'</div>':'')+
       '<a class="btn" style="margin-top:14px" target="_blank" rel="noopener" href="'+wa(j.id+": Work done. Evidence uploaded in my portal. Ready for review.")+'">✓ Mark work done</a> '+
       '<a class="btn o sm" style="margin-top:14px" onclick="jobSheetExport(\''+j.id+'\')">📄 Job Sheet →</a>'+
-      '<p class="note">Upload straight from your phone camera, videos and voice notes go on WhatsApp. Yaadly checks your evidence before the client sees it. Money is held before you start and released fast once the client approves. You are never charged to be here.</p>';
+      '<p class="note">Upload straight from your phone camera, videos and voice notes go on WhatsApp. Yaadly checks your evidence before the client sees it. Money is held before you start and released fast once the client approves. Joining and quoting are free with no lead fees. Yaadly takes 12% of your labour price on completed work.</p>';
     J.appendChild(d);
   });
   const P = $("wt-pay");
   const mine = DB.jobs.filter(isMine);
-  P.innerHTML = '<div class="rule" style="margin-top:12px">💷 <b>How you get paid.</b> The client\'s money is held before you start, so it is real. Once you send your evidence and the client approves it, Yaadly pays you <b>within 3 working days</b>, by the method on your record: bank transfer, Lynk or remittance pick up. You are never charged to be here and never charged to quote.</div>';
+  P.innerHTML = '<div class="rule" style="margin-top:12px">💷 <b>How you get paid.</b> The client\'s money is held before you start, so it is real. Once you send your evidence and the client approves it, Yaadly pays you <b>within 3 working days</b>, by the method on your record: bank transfer, Lynk or remittance pick up. Joining and quoting are free with no lead fees. Yaadly takes 12% of your labour price on completed work, so you keep 88%.</div>';
   if(!mine.length){ P.innerHTML += '<div class="empty">No jobs yet, so nothing owed. When you are assigned work it shows here with what you will be paid and when.</div>'; }
   mine.forEach(j=>{
     const state = j.stage>=5 ? "paid" : (j.stage>=4 ? "approved" : "working");
@@ -1937,15 +2030,30 @@ async function clientGateLogin(){
 }
 async function clientGateSignup(){
   if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value;
+  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value, cd = ($("cgate-code")?$("cgate-code").value:"").trim();
   if(!em || !pw){ alert("Email and password needed."); return; }
-  if(pw.length<6){ alert("Password needs to be at least 6 characters."); return; }
-  $("cgate-status").innerHTML = '<div class="mono">Creating your profile...</div>';
-  const {data, error} = await sb.auth.signUp({email:em, password:pw});
-  if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create the profile: '+esc(error.message)+'</div>'; return; }
-  $("cgate-pass").value = "";
-  if(data.session){ openClientPortal(em); }
-  else { $("cgate-status").innerHTML = '<div class="note">Profile created. Check '+esc(em)+' for a confirmation link, then sign in above. The Client Guidelines are waiting for your signature, and then you can pitch your first job.</div>'; }
+  if(pw.length<8){ alert("Password needs to be at least 8 characters."); return; }
+  if(!cd){ alert("Your job code is needed the first time. It is on the message Yaadly sent you."); return; }
+  $("cgate-status").innerHTML = '<div class="mono">Checking your job code...</div>';
+  // Accounts are created server-side by yaad-portal-signup, behind the code
+  // check. Public sign-up is switched off in Auth, so this is the only door.
+  let res;
+  try{
+    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-portal-signup", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+CONFIG.supabaseKey },
+      body: JSON.stringify({ email:em, password:pw, code:cd, role:"client" })
+    });
+    res = await r.json();
+    if(!r.ok || res.error) throw new Error(res.error || "Could not create the profile.");
+  }catch(e){
+    $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">'+esc(e.message||String(e))+'</div>';
+    return;
+  }
+  // The account is created unconfirmed. They must click the link in the email
+  // before they can sign in, which is what proves they own the mailbox.
+  $("cgate-pass").value = ""; if($("cgate-code")) $("cgate-code").value = "";
+  $("cgate-status").innerHTML = '<div class="note">'+esc(res.message || ("Check "+em+" for a confirmation link, then sign in above."))+' The Client Guidelines are waiting for you inside.</div>';
 }
 async function pullMyCloudJobs(email){
   if(!sb || !email) return;
@@ -2007,13 +2115,25 @@ async function workerGateSignup(){
   if(!sb){ alert("Cloud is not configured."); return; }
   const em = $("wgate-email").value.trim(), pw = $("wgate-pass").value;
   if(!em || !pw){ alert("Email and password needed."); return; }
-  if(pw.length<6){ alert("Password needs to be at least 6 characters."); return; }
-  $("wgate-status").innerHTML = '<div class="mono">Creating account...</div>';
-  const {data, error} = await sb.auth.signUp({email:em, password:pw});
-  if(error){ $("wgate-status").innerHTML = '<div class="note" style="color:var(--red)">Could not create account: '+esc(error.message)+'</div>'; return; }
+  if(pw.length<8){ alert("Password needs to be at least 8 characters."); return; }
+  $("wgate-status").innerHTML = '<div class="mono">Checking your application...</div>';
+  // Worker accounts only open once Yaadly has vetted them and created their
+  // worker profile. Checked server-side in yaad-portal-signup.
+  let res;
+  try{
+    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-portal-signup", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+CONFIG.supabaseKey },
+      body: JSON.stringify({ email:em, password:pw, role:"worker" })
+    });
+    res = await r.json();
+    if(!r.ok || res.error) throw new Error(res.error || "Could not create the account.");
+  }catch(e){
+    $("wgate-status").innerHTML = '<div class="note" style="color:var(--red)">'+esc(e.message||String(e))+'</div>';
+    return;
+  }
   $("wgate-pass").value = "";
-  if(data.session){ openWorkerPortal(em); }
-  else { $("wgate-status").innerHTML = '<div class="note">Account created. Check '+esc(em)+' for a confirmation link, then sign in above.</div>'; }
+  $("wgate-status").innerHTML = '<div class="note">'+esc(res.message || ("Check "+em+" for a confirmation link, then sign in above."))+'</div>';
 }
 async function openWorkerPortal(email){
   workerOpen = true; workerAuthEmail = email;
@@ -2221,7 +2341,7 @@ function declineApp(id){
   const a = DB.applications.find(x=>x.id===id); a.status="declined"; a.reason=why; save(); cloudStatus("applications", a.cid, "declined"); renderAdmin();
 }
 function newService(){
-  const type = prompt("Service type (Site Verification Visit, Oversight Retainer, Full Project Management, Contractor Sourcing, Property Care):");
+  const type = prompt("Service type (Deposit Protection Check, Project Setup Pack, Visual Check, Condition Report, Technical Sign-off, Certified Milestone Sign-off, Property Care, Oversight Retainer, Full Project Management):");
   if(!type) return;
   const id = "SVC-"+String(DB.svcSeq++).padStart(3,"0");
   DB.services.push({id, type, client:"", clientEmail:"", parish:"", price:"", provider:"Founder", stage:0, notes:""});
@@ -2980,15 +3100,18 @@ function yaadDocShell(o){
 /* ── Worker Guidelines: the standing rules of working with Yaadly.
    Assembled from the policies already published on this site.
    Review before issuing; bump the version when the rules change. */
-const WG_VERSION = "1.0 · 22 August 2026";
+const WG_VERSION = "1.2 · 26 August 2026";
 function wgDocHtml(){
   const E = esc;
   const body =
   '<section><h2><span>1</span>What Yaadly is, and what you are agreeing to</h2>'+
   '<p>Yaadly connects vetted tradespeople with property owners, most of them overseas, and holds every job to one standard: <b>work is proven with evidence, and money moves when the client approves that evidence.</b> These guidelines are the rules of working with us. They exist to protect you as much as the client. Every rule here has a named counterpart on the other side, and nobody carries the risk alone.</p>'+
-  '<div class="callout"><b>What you never pay:</b> joining is free, quoting is free, and you are never charged to be on Yaadly or to take a job.</div></section>'+
+  '<div class="callout"><b>What Yaadly charges you:</b> 12% of your agreed labour price on a completed job, taken at the point you are paid, so you keep 88%. Remote digital work carries 10% instead. Founding Pros pay nothing at all for their first 90 days. Materials are never charged a fee, at cost is at cost. <b>What you never pay:</b> joining is free, quoting is free, there are no lead fees whether you win the job or not, and there is no subscription.</div></section>'+
   '<section><h2><span>2</span>Verification, before your first job</h2>'+
-  '<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide proof of address and a selfie holding that ID, and give two references we will call. For work inside occupied homes, or whenever a client asks, a police record check from the Jamaica Constabulary Force is required. Certified trades have their certification checked with the issuing body, and your first job is a trial job.</p>'+
+  '<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide proof of address dated within three months, and your TRN. You will also provide a <b>live photo taken in the moment</b> and a <b>short video turning your face slowly left, then right</b>. The turn is the check: a photograph held up to a camera cannot turn, and neither can a screen. It takes four seconds, and it is why a client lets you through the gate.</p>'+
+  '<p>You give <b>references we will call</b>, every one of them, and you confirm each has been told we are calling. If we ring somebody who has no idea who we are, that is not a reference, the line does not count, and an application built on names that were never asked is a mark against you rather than a neutral. Certified trades have their certification checked with the body that issued it, not just photographed.</p>'+
+  '<div class="callout"><b>Police record check, Jamaica Constabulary Force.</b> Mandatory for any job over <b>&pound;500</b>, any work inside an occupied home, and any job where you hold keys or attend an empty property. Optional below &pound;500 with the owner present, and a client may still require it, free to them. Without a current check on file you cannot be matched to any job in the mandatory categories, and on this board that is most of the money. Get it once and it covers every job you take.</div>'+
+  '<p><b>Your first job carries an independent reviewer on site, at Yaadly\'s cost.</b> They walk the work with you and their notes join the record. It is not a probation you can fail quietly, it is how a brand new profile carries the same promise as a worker with thirty jobs behind them.</p>'+
   '<div class="warn"><b>One hard line:</b> any false document ends the application permanently.</div></section>'+
   '<section><h2><span>3</span>Quoting</h2><ul>'+
   '<li>Quote whatever amount you judge right: labour, materials at cost with receipts, and your earliest start. Your quote goes to the client; where Yaadly has a benchmark, a fair-price indicator is shown beside it. Your price is never beaten down.</li>'+
@@ -3698,7 +3821,7 @@ async function renderMarketplace(){
    profile creation: a client account is not complete until the
    current version is signed. Review before first issue; bump
    CG_VERSION when the rules change. */
-const CG_VERSION = "1.0 · 23 August 2026";
+const CG_VERSION = "1.2 · 26 August 2026";
 function cgDocHtml(){
   const E = esc;
   const body =
@@ -3719,8 +3842,18 @@ function cgDocHtml(){
   '<li>Review evidence when it lands, within 3 days where you can. A worker who has proven a stage is waiting on your word to be paid.</li>'+
   '<li>At final sign-off you may approve from the evidence package, or book a live video walkthrough of the site first, on WhatsApp video, Google Meet or Zoom. If you book one, attend it: the worker is standing on site waiting for you. Notes taken on the walkthrough are shown to you in your portal to confirm, and the confirmation joins your Completion Report.</li>'+
   '<li>Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free and reviewed by a person, and nothing moves while one is open.</li>'+
-  '<li>Pay through the agreed route only. Never pay a worker directly on the side, and never withhold approval to renegotiate a price already agreed.</li></ul></section>'+
-  '<section><h2><span>6</span>What loses the account</h2>'+
+  '<li>Yaadly&rsquo;s Guarantee &amp; Support fee is 15% of the worker&rsquo;s labour price, added on top and never charged on materials, subject to a small-job minimum of J$3,500 to J$4,500 depending on the trade. It is itemised on your quote before you agree to anything. Where you pay in a currency other than Jamaican dollars, the conversion carries a margin of about 2%.</li>'+'<li>Pay through the agreed route only. Never pay a worker directly on the side, and never withhold approval to renegotiate a price already agreed.</li></ul></section>'+
+  '<section><h2><span>6</span>Independent review at sign-off</h2>'+
+  '<p>You may have somebody attend the property before you release the final payment. Chosen when the job is set up and priced then, not after, when it is an extra visit. Every rung is priced at or below the bottom of its UK band, because the scope is narrower: one property or one works package, not a whole pre-purchase survey.</p>'+
+  '<ul>'+
+  '<li><b>Visual Check, &pound;149</b> (&pound;95 founding). A trained checker attends, records the finished work against the agreed scope, photographs anything visibly wrong, and files a one page observation note in 72 hours. <b>They record. They do not rate, advise or certify.</b> Mirrors the UK property inspection report at &pound;80 to &pound;150.</li>'+
+  '<li><b>Condition Report, &pound;325</b> (&pound;245 founding). The whole property recorded system by system, every finding rated Severe, Moderate or Low, issue summary on page one. Mirrors a RICS Level 1 at &pound;300 to &pound;900: it tells you what is wrong and how bad, not what to do about it.</li>'+
+  '<li><b>Technical Sign-off, &pound;300</b> (&pound;245 founding, &pound;395 inside 48 hours). A qualified trade inspector assesses one stage against the trade standard and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion. Priced against a UK structural engineer\'s site visit at &pound;300.</li>'+
+  '<li><b>Certified Milestone Sign-off, &pound;750</b> (&pound;550 founding), per milestone. A credentialed professional, PERB-registered where the work is structural, named with their registration, with estimated cost and timescale for anything to put right. Mirrors a RICS Level 3 at &pound;630 to &pound;1,500.</li>'+
+  '</ul>'+
+  '<p><b>Live viewing, &pound;40, on any rung.</b> By default the inspection happens and you get the report afterwards. If you would rather be there, we call you in on video while the inspector is on site: you see what they see, you can ask them to look closer at something, and anything you raise goes in the report as your own note.</p>'+
+  '<div class="callout"><b>Visits not agreed at the start are chargeable.</b> Where a dispute is raised we will attend for a visual review, and one visit is covered. Any further visit is charged, because it was not in the scope you agreed. We attend to look and record. Certification is a matter for a PERB-registered engineer, and we will say so rather than guess.</div></section>'+
+  '<section><h2><span>7</span>What loses the account</h2>'+
   '<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody>'+
   '<tr><td>Side deals with platform workers</td><td>Warning, then removal</td></tr>'+
   '<tr><td>Abusive conduct toward a worker or staff</td><td>Reviewed by a person; can be removal</td></tr>'+
