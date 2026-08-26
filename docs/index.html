@@ -145,7 +145,7 @@
   --r:14px;                                           /* the default corner */
   --r-sm:9px; --r-md:12px; --r-lg:18px; --r-pill:100px;
   --s1:6px; --s2:9px; --s3:12px; --s4:16px; --s5:22px; --s6:32px; --s7:48px; --s8:64px;
-  --wrap:1080px; --wrap-wide:1200px; --gutter:20px;   /* wrap-wide is the home page only */
+  --wrap:1080px; --gutter:20px;                       /* one width, every page */
   --t-kick:10.5px; --t-tiny:12.5px; --t-body:13.5px; --t-lead:16.5px;
   --tr:.15s;                                          /* the one transition speed */
 }
@@ -313,7 +313,6 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 @media(prefers-reduced-motion:reduce){html.jsrv .rv{opacity:1;transform:none}.rv{transition:none}*{animation-duration:.01ms!important}}
 
 #pane-site{padding:0 0 0}
-#pane-site .wrap{max-width:var(--wrap-wide)}   /* the home page runs wider than the rest, deliberately */
 #pane-site .sect{padding:64px 0}
 #pane-site .sect.first{padding-top:44px}
 #pane-site .sect.band{background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -331,7 +330,7 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 .hero-grid{display:grid;grid-template-columns:1.2fr 370px;gap:48px;align-items:center}
 @media(max-width:940px){.hero-grid{grid-template-columns:1fr;gap:36px}}
 .hpill{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mango);border:1px solid #3A3418;background:rgba(255,176,32,.06);padding:7px 14px;border-radius:100px;font-weight:700;margin-bottom:20px}
-#pane-site h1.hx{font-size:clamp(40px,6.2vw,80px);line-height:.96;margin:0}
+#pane-site h1.hx{font-size:clamp(40px,5.7vw,74px);line-height:.96;margin:0}  /* capped so the longest line clears 1080 */
 #pane-site h1.hx span{display:block}
 .sub{font-size:clamp(15.5px,1.7vw,18px);color:var(--mute);max-width:50ch;margin-top:22px}
 .sub b{color:var(--ink);font-weight:700}
