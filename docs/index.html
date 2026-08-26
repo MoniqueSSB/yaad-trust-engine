@@ -496,7 +496,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <button class="nav-toggle" id="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="views" onclick="toggleNav()"><span></span><span></span><span></span></button>
   <div class="views" id="views">
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
-    <button class="vbtn" data-v="market" onclick="go('market')">Marketplace</button>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Marketplace</a>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
     <button class="vbtn" data-v="client" onclick="go('client')">Client portal</button>
     <button class="vbtn" data-v="worker" onclick="go('worker')">Worker portal</button>
@@ -860,33 +860,6 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 
 </section>
 <!-- ═══════════════ MARKETPLACE (public) ═══════════════ -->
-<section class="pane" id="pane-market"><div class="wrap">
-  <h1 class="hx">The <span class="g1">marketplace.</span></h1>
-  <p class="lead">Open to everyone to look at: the jobs waiting for quotes, and the verified workers who do them. <b>Taking part is signed-on only.</b> Workers sign in to quote. You become a client by creating your profile and signing the Client Guidelines, then you can pitch jobs, and your completed jobs build your own record, the same way a worker's do.</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
-    <a class="btn" onclick="go('client')">Become a client →</a>
-    <a class="btn o" onclick="go('worker');workerTab('apply')">Apply as a worker</a>
-    <a class="btn o" onclick="go('client')">Client sign in</a>
-    <a class="btn o" onclick="go('worker')">Worker sign in</a>
-  </div>
-  <div class="rule" style="margin-top:18px">⚖️ <b>How the door works:</b> anyone can look. To quote you must be a verified, signed-in worker who has signed the Worker Guidelines. To pitch a job you must have created your profile and signed the Client Guidelines. Both sides sign the same kind of promise, both sides build a scored record, and nobody carries the risk alone.</div>
-
-  <div class="kick" style="margin-top:34px">Jobs open for quotes</div>
-  <div id="mp-jobs"><div class="empty">Loading the jobs board...</div></div>
-
-  <div class="kick" style="margin-top:34px">The worker network</div>
-  <div id="mp-workers"><div class="empty">Loading the directory...</div></div>
-
-  <div class="card" style="margin-top:26px"><h3>Want to be <em>part of it?</em></h3>
-    <p class="note" style="margin-top:0">Property owners: create your profile, sign the Client Guidelines, and pitch your job, free, and your record starts building from the first completed job. Tradespeople: apply free, pass verification, sign the Worker Guidelines, and every job on this board is yours to quote.</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <a class="btn" onclick="go('client')">Become a client →</a>
-      <a class="btn o" onclick="go('worker');workerTab('apply')">Join as a worker →</a>
-      <a class="btn o" onclick="openClientGuidelines()">Read the Client Guidelines</a>
-      <a class="btn o" onclick="openWorkerGuidelines()">Read the Worker Guidelines</a>
-    </div>
-  </div>
-</div></section>
 <!-- ═══════════════ SERVICES PAGE ═══════════════ -->
 <section class="pane" id="pane-services"><div class="wrap">
   <h1 class="hx">Project management, <span class="g1">from London</span> to your gate.</h1>
@@ -1383,7 +1356,6 @@ function go(v){
   history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
   closeNav();
   renderAll();
-  if(v==="market") renderMarketplace();
 }
 function openBox(id){
   const el = $(id); if(!el) return;
@@ -1399,6 +1371,7 @@ function toggleBox(id, btn){
 }
 (function(){
   const h = (location.hash||"").replace("#","");
+  if(h === "market"){ location.replace("https://app.yaadly.co.uk/jobs"); return; }
   if(h && document.getElementById("pane-"+h)) go(h);
 })();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
