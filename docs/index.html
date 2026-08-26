@@ -348,6 +348,85 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 .searchcard .hnote{font-size:var(--t-tiny);color:var(--dim);line-height:1.55;margin-top:11px}
 .searchcard .hnote a{color:var(--tealb);cursor:pointer;text-decoration:underline}
 
+/* ============ visual language, from the prototype ============ */
+.gl{width:22px;height:22px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.gl.lg{width:30px;height:30px;stroke-width:1.5}
+
+/* the trust engine */
+.engine{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 18px;margin-top:20px;overflow:hidden}
+.eng-stage{display:grid;grid-template-columns:1fr 118px 1fr;gap:14px;align-items:center}
+@media(max-width:720px){.eng-stage{grid-template-columns:1fr;gap:12px}}
+.eng-box{border:1px solid var(--line);border-radius:14px;padding:13px;text-align:center;background:var(--bg)}
+.eng-box .who{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.eng-box .amt{font-family:var(--disp);font-size:26px;letter-spacing:.01em;line-height:1}
+.eng-box.held{border-color:rgba(255,176,32,.45);background:rgba(255,176,32,.05)}
+.eng-box.held .amt{color:var(--mango)}
+.eng-box.paid .amt{color:var(--tealb)}
+.eng-box .st2{font-size:11px;color:var(--mute);margin-top:6px;min-height:15px}
+.eng-mid{display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--mango)}
+.lockem{font-size:22px;line-height:1}
+.eng-mid .lockw{width:44px;height:44px;border-radius:13px;border:1px solid rgba(255,176,32,.45);background:rgba(255,176,32,.08);display:grid;place-items:center;transition:.5s}
+.engine.open .eng-mid{color:var(--tealb)}
+.engine.open .eng-mid .lockw{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.1)}
+.eng-mid small{font-family:var(--mono);font-size:9px;letter-spacing:.11em;text-transform:uppercase}
+.eng-ev{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:16px}
+@media(max-width:560px){.eng-ev{grid-template-columns:repeat(3,1fr)}}
+.eng-ev i{height:52px;border-radius:10px;border:1px dashed var(--line);background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-style:normal;font-size:8.5px;color:var(--dim);text-align:center;padding:3px;transition:.45s}
+.eng-ev i .gl{width:16px;height:16px;opacity:.45;transition:.45s}
+.eng-ev i.on{border-style:solid;border-color:rgba(45,212,191,.45);background:rgba(45,212,191,.07);color:var(--tealb)}
+.eng-ev i.on .gl{opacity:1}
+.eng-cap{display:flex;align-items:center;gap:9px;margin-top:14px;padding-top:12px;border-top:1px solid var(--softline);font-size:12.5px;color:var(--mute);min-height:36px}
+.eng-cap b{color:var(--ink)}
+.eng-dot{width:7px;height:7px;border-radius:50%;background:var(--mango);flex:0 0 auto;animation:bl 1.4s ease-in-out infinite}
+.engine.open .eng-dot{background:var(--tealb);animation:none}
+@keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* icon step cards */
+.isteps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+@media(max-width:820px){.isteps{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.isteps{grid-template-columns:1fr}}
+.ist{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;transition:.16s}
+.ist:hover{border-color:var(--teal);transform:translateY(-2px)}
+.ist .ih{display:flex;align-items:center;gap:10px;margin-bottom:8px;color:var(--tealb)}
+.ist .ih b{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--dim)}
+.ist h4{font-size:14.5px;margin-bottom:5px;color:var(--ink)}
+.ist p{font-size:12.5px;color:var(--mute);line-height:1.55}
+.ist.gate{border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.045)}
+.ist.gate .ih{color:var(--mango)}
+.ist .tag{display:inline-flex;align-items:center;gap:5px;margin-top:9px;font-size:10px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+
+/* two-column icon compare */
+.icmp{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+@media(max-width:700px){.icmp{grid-template-columns:1fr}}
+.icol{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px}
+.icol.warn{border-color:rgba(255,176,32,.35);background:rgba(255,176,32,.04)}
+.iline{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--mute);line-height:1.5;padding:8px 0;border-top:1px solid var(--softline)}
+.icol .iline:first-of-type{border-top:0}
+.iline .gl{margin-top:1px;color:var(--tealb)}
+.icol.warn .iline .gl{color:var(--mango)}
+.iline b{color:var(--ink)}
+
+@media(prefers-reduced-motion:reduce){
+ .eng-dot{animation:none}
+ .eng-ev i,.eng-mid .lockw,.eng-ev i .gl{transition:none}
+ .ist:hover{transform:none}
+}
+
+
+
+/* ---------- trades grid ---------- */
+.grid-trades{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:22px}
+@media(max-width:860px){.grid-trades{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.grid-trades{grid-template-columns:1fr}}
+.trade{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;transition:.15s;text-align:left;width:100%}
+.trade:hover{border-color:var(--teal);background:var(--panel2);transform:translateY(-2px)}
+.trade .ic{width:38px;height:38px;border-radius:10px;background:var(--soft);border:1px solid var(--softline);display:grid;place-items:center;flex:0 0 auto}
+.trade b{display:block;font-size:14px}
+.trade span{font-size:11.5px;color:var(--dim)}
+.trade.on{border-color:var(--mango);background:rgba(255,176,32,.07)}
+svg.i{width:19px;height:19px;stroke:var(--tealb);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+
 /* WhatsApp demo phone */
 .phone{background:#000;border-radius:36px;padding:11px;border:1px solid #232C34;box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px rgba(20,184,166,.12);margin:0 auto;max-width:370px;width:100%}
 .phone .screen{background:#0B141A;border-radius:26px;overflow:hidden;height:540px;display:flex;flex-direction:column}
@@ -498,8 +577,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Marketplace</a>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
-    <button class="vbtn" data-v="client" onclick="go('client')">Client portal</button>
-    <button class="vbtn" data-v="worker" onclick="go('worker')">Worker portal</button>
+    <a class="vbtn" href="https://app.yaadly.co.uk/portal">Client portal</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/portal">Worker portal</a>
   </div>
   <button class="navcta" onclick="go('site');setTimeout(function(){var e=document.getElementById('startform');if(e)e.scrollIntoView()},60)">Post a job</button>
 </div></nav>
@@ -577,18 +656,47 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="stat rv d2"><b>3 working days</b><span>from your approval to the worker being paid. Free to join, free to quote, always.</span><cite>Bank transfer, Lynk or remittance</cite></div>
 </div></div>
 
+<!-- ── the trust engine ── -->
+<div class="sect"><div class="wrap">
+  <div class="kick rv">What you're paying for</div>
+  <h2 class="h2 rv d1">Money moves <em>when the proof lands.</em></h2>
+  <p class="lead rv d2">Not when they ask. Not when you hope. Watch it.</p>
+    <div class="engine" id="engine">
+      <div class="eng-stage">
+        <div class="eng-box"><div class="who">You</div><div class="amt" id="eng-you">J$66,800</div><div class="st2" id="eng-you2">Funding stage one</div></div>
+        <div class="eng-mid">
+          <div class="lockw" id="eng-lock"><span class="lockem">🔒</span></div>
+          <small id="eng-lab">Held</small>
+        </div>
+        <div class="eng-box paid"><div class="who">Delroy, the worker</div><div class="amt" id="eng-w">J$0</div><div class="st2" id="eng-w2">Can see the money is real</div></div>
+      </div>
+
+      <div class="eng-ev" id="eng-ev">
+        <i><svg class="gl" viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Arrival</span></i>
+        <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>Before</span></i>
+        <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span>Receipt</span></i>
+        <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>After</span></i>
+        <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5 21 7v10l-6-3.5v-3Z"/></svg><span>Walk-round</span></i>
+        <i><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></i>
+      </div>
+
+      <div class="eng-cap"><span class="eng-dot"></span><span id="eng-cap"><b>Nothing has moved.</b> He starts because he can see the money is real, not because you sent it.</span></div>
+    </div>
+
+  </div></div>
+
 <!-- ── the verified job loop ── -->
 <div class="sect"><div class="wrap">
   <div class="kick rv">The verified job loop</div>
   <h2 class="h2 rv d1">Six steps. <u>Proven,</u> <em>not promised.</em></h2>
-  <div class="tiles rv d2">
-    <div class="tile"><div class="no">01</div><h4>Tell us what needs doing</h4><p>Use the form on this page and it creates your job on the spot, or message us on WhatsApp: text, photos or a voice note, Patois or English. No app to download.</p><span class="pill ai">🤖 AI reads it</span></div>
-    <div class="tile"><div class="no">02</div><h4>Fair price, checked</h4><p>Real material costs and real day rates. Never guessed. A project manager checks the band before it reaches you.</p><span class="pill ai">🤖 AI drafts it</span> <span class="pill human">🧍 We confirm</span></div>
-    <div class="tile money"><div class="no">03</div><h4>Payment agreed and held</h4><p>Agreed in writing before a tool is lifted. Nothing is charged without you.</p><span class="pill human">🧍 You confirm it</span></div>
-    <div class="tile"><div class="no">04</div><h4>Work documented</h4><p>Arrival, before, after and video. Timestamped and geotagged, checked for anything visibly wrong.</p><span class="pill ai">🤖 AI checks it</span> <span class="pill human">🧍 We confirm</span></div>
-    <div class="tile"><div class="no">05</div><h4>You approve, from anywhere</h4><p>Against a <b>signed Completion Report</b>, or book a <b>live video walkthrough</b> of the site first and raise anything on the spot. Nothing moves until you say so.</p><span class="pill human">🧍 You decide</span></div>
-    <div class="tile money"><div class="no">06</div><h4>Worker paid fast</h4><p>Within 3 working days, and the job builds their <b>Yaad Score</b>, a record they own that a bank can finally see.</p><span class="pill human">🧍 Released on your say so</span></div>
-  </div>
+    <div class="isteps">
+      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg><b>01</b></div><h4>Tell us what needs doing</h4><p>Form, WhatsApp, voice note, Patois. No app.</p><span class="tag">🤖 AI reads it</span></div>
+      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><b>02</b></div><h4>An itemised quote</h4><p>Labour split from materials, checked before it reaches you.</p><span class="tag">🤖 AI drafts · 🧍 we confirm</span></div>
+      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3.2"/><path d="M5 7v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V7"/><path d="M5 12v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-5"/></svg><b>03</b></div><h4>Money held, not sent</h4><p>Agreed in writing before a tool is lifted.</p><span class="tag">🧍 you confirm</span></div>
+      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><b>04</b></div><h4>Every stage documented</h4><p>Before, after, video. Timestamped and geotagged.</p><span class="tag">🤖 AI checks · 🧍 we confirm</span></div>
+      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><b>05</b></div><h4>You approve, from anywhere</h4><p>Or walk the site on video first and raise it live.</p><span class="tag">🧍 you decide</span></div>
+      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><b>06</b></div><h4>Worker paid in 3 days</h4><p>And the job builds a record a bank can finally see.</p><span class="tag">🧍 released on your say so</span></div>
+    </div>
   <div class="rule rv d2">💷 <b>On payments today:</b> online payment holding opens shortly. Until then the quote and payment terms are agreed with you directly, in writing, before work starts. Same rule either way: nothing is charged without you.</div>
 </div></div>
 
@@ -650,33 +758,31 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="kick rv">Two sides, one deal</div>
   <h2 class="h2 rv d1">Fair for the <u>owner.</u><br>Fair for the <em>worker.</em></h2>
   <p class="lead rv d2">Read the two columns across. Every protection on the left has a named counterpart on the right.</p>
-  <div class="sides rv d2">
-    <div class="sd a">
-      <h3>For property owners</h3>
-      <ul>
-        <li><b>You release nothing</b> until the evidence lands</li>
-        <li><b>Fair local pricing</b> wherever you pay from</li>
-        <li><b>ID verified tradespeople</b>, police checked where it matters. Never a stranger at your gate</li>
-        <li><b>A no-show is a strike</b> and you are rematched instantly, money untouched</li>
-        <li><b>Disputes checked by a person</b>, free, and nothing moves while it is open</li>
-      </ul>
-      <span class="big">→ The work you agreed, proven</span>
-      <a class="btn" style="margin-top:14px;background:#04201B;color:#2DD4BF" onclick="startJob()">Start a job</a>
+    <div class="icmp">
+      <div class="icol">
+        <p class="kick m" style="margin-bottom:8px">For property owners</p>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>You press release</b>, here, after you have looked</span></div>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>An itemised quote</b>, labour split from materials</span></div>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>ID on video.</b> JCF police check required over &pound;500</span></div>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Disputes read by a person.</b> Nothing moves while it is open</span></div>
+      </div>
+      <div class="icol">
+        <p class="kick m" style="margin-bottom:8px">For tradespeople</p>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>Paid in 3 working days</b> once the client approves</span></div>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>Free to join.</b> Never charged to quote, ever</span></div>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>The money is real</b> and confirmed before you start</span></div>
+        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Walk away</b> from a mis-described site, no penalty</span></div>
+      </div>
     </div>
-    <div class="sd b">
-      <h3>For tradespeople</h3>
-      <ul>
-        <li><b>You are paid fast</b> once the client approves, within 3 working days</li>
-        <li><b>Free to join.</b> Never charged to quote, ever</li>
-        <li><b>The money is real</b> and confirmed before you start</li>
-        <li><b>Walk away from a mis-described site</b> without penalty</li>
-        <li><b>A Yaad Score you own</b>: a verified record that finally counts with a bank</li>
-      </ul>
-      <span class="big">→ The pay you agreed, fast</span>
-      <a class="btn" style="margin-top:14px;background:linear-gradient(90deg,var(--coral),var(--melon));color:#fff" onclick="go('worker');workerTab('apply')">Apply to join</a>
-    </div>
-  </div>
-  <div class="rule rv d2">🪞 <b>We call this the Mirror Rule.</b> Every protection has a named counterpart on the other side, so nobody carries the risk alone.</div>
+
+  </div></div>
+
+<!-- ── popular trades ── -->
+<div class="sect"><div class="wrap">
+  <div class="kick rv">Popular trades</div>
+  <h2 class="h2 rv d1">What people are <em>hiring for</em></h2>
+  <div class="grid-trades rv d2" id="tradegrid"></div>
+  <p class="rv d2" style="margin-top:16px"><a class="btn o sm" href="https://app.yaadly.co.uk/trades">See all 18 trades →</a></p>
 </div></div>
 
 <!-- ── professional services ── -->
@@ -1369,6 +1475,88 @@ function toggleBox(id, btn){
   if(btn) btn.textContent = opening ? (btn.dataset.openLabel||btn.textContent) : (btn.dataset.closedLabel||btn.textContent);
   if(opening) setTimeout(()=>el.scrollIntoView({behavior:"smooth", block:"start"}), 30);
 }
+var IC={
+ pipe:'<path d="M4 8h6a3 3 0 0 1 3 3v6"/><path d="M13 4v3"/><path d="M17 17h3"/><circle cx="4" cy="8" r="1.6"/>',
+ roof:'<path d="M3 11 12 4l9 7"/><path d="M6 11v8h12v-8"/><path d="M10 19v-4h4v4"/>',
+ bolt:'<path d="M13 3 5 13h6l-1 8 8-10h-6z"/>',
+ tile:'<rect x="3" y="3" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"/>',
+ brick:'<rect x="3" y="5" width="18" height="5"/><rect x="3" y="10" width="18" height="5"/><rect x="3" y="15" width="18" height="5"/><path d="M9 5v5M15 10v5M9 15v5"/>',
+ brush:'<path d="M4 20s2-1 2-3 3-2 3-2l8-8 2 2-8 8s0 3-2 3-5 0-5 0z"/><path d="M15 5l4 4"/>',
+ gate:'<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 5v14M12 5v14M16 5v14M3 12h18"/>',
+ snow:'<path d="M12 3v18M4.5 7.5l15 9M19.5 7.5l-15 9"/>',
+ leaf:'<path d="M20 4c0 9-5 14-12 14a6 6 0 0 1 0-12c5 0 8-1 12-2z"/><path d="M4 20c3-4 6-6 10-8"/>',
+ hand:'<path d="M14 3 21 10l-3 3-7-7z"/><path d="M11 6 4 13v4h4l7-7"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+ tank:'<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/>',
+ lock:'<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+ win:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16M3 12h18"/>',
+ wood:'<path d="M3 7h18M3 12h18M3 17h18"/><path d="M7 7v10M17 7v10"/>',
+ drain:'<circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/>',
+ fence:'<path d="M5 20V8l2-3 2 3v12M15 20V8l2-3 2 3v12M3 11h18M3 15h18"/>',
+ cctv:'<path d="M4 7h12l3 4H4z"/><path d="M6 11v3a3 3 0 0 0 6 0"/><path d="M4 7v8"/>'
+};
+var svg=function(k){return '<svg class="i" viewBox="0 0 24 24">'+(IC[k]||IC.hand)+'</svg>'};
+
+
+(function(){
+  var POPULAR=[["Plumbing","pipe"],["Roofing","roof"],["Electrical","bolt"],["Masonry & Concrete","brick"],["Painting & Decorating","brush"],["General Handyman","hand"]];
+  var box=document.getElementById('tradegrid'); if(!box) return;
+  box.innerHTML=POPULAR.map(function(t){
+    return '<a class="trade" href="https://app.yaadly.co.uk/jobs?trade='+encodeURIComponent(t[0].toLowerCase())+'">'
+      +'<span class="ic">'+svg(t[1])+'</span><span><b>'+t[0]+'</b><span>See the open jobs</span></span></a>';
+  }).join('');
+})();
+/* ---------- the trust engine ---------- */
+(function(){
+ var EV=[
+  ['Arrival photos landed, geotagged 09:41.','J$66,800','J$0','Still held','Working'],
+  ['The damage, before he touched it.','J$66,800','J$0','Still held','Working'],
+  ['Materials bought, receipt filed against the job.','J$66,800','J$0','Still held','Working'],
+  ['Same angle, after. That is the standard.','J$66,800','J$0','Still held','Working'],
+  ['Walk-round clip. Nothing hidden off camera.','J$66,800','J$0','Still held','Evidence complete'],
+  ['<b>You signed it off.</b> Released, and only now.','J$0','J$66,800','Released','Paid in 3 working days']
+ ];
+ var eng=document.getElementById('engine'); if(!eng) return;
+ var tiles=eng.querySelectorAll('.eng-ev i');
+ var cap=document.getElementById('eng-cap'), lab=document.getElementById('eng-lab'),
+     lock=document.getElementById('eng-lock'), you=document.getElementById('eng-you'),
+     wk=document.getElementById('eng-w'), you2=document.getElementById('eng-you2'), w2=document.getElementById('eng-w2');
+ var LOCKED=lock.innerHTML;
+ var OPEN='<span class="lockem">🔓</span>';
+ var i=-1, t=null;
+ var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ function reset(){
+  i=-1; eng.classList.remove('open'); lock.innerHTML=LOCKED;
+  tiles.forEach(function(n){n.classList.remove('on')});
+  cap.innerHTML='<b>Nothing has moved.</b> He starts because he can see the money is real, not because you sent it.';
+  lab.textContent='Held'; you.textContent='J$66,800'; wk.textContent='J$0';
+  you2.textContent='Funding stage one'; w2.textContent='Can see the money is real';
+ }
+ function step(){
+  i++;
+  if(i>=EV.length){ setTimeout(function(){reset();t=setTimeout(step,1400)},3600); return }
+  tiles[i].classList.add('on');
+  var e=EV[i];
+  cap.innerHTML=e[0];
+  you.textContent=e[1]; wk.textContent=e[2]; lab.textContent=e[3]; w2.textContent=e[4];
+  if(i===EV.length-1){ eng.classList.add('open'); lock.innerHTML=OPEN; you2.textContent='Approved by you'; }
+  t=setTimeout(step, i===EV.length-1?0:1250);
+ }
+ if(reduce){ tiles.forEach(function(n){n.classList.add('on')}); eng.classList.add('open'); lock.innerHTML=OPEN;
+  cap.innerHTML='<b>You signed it off.</b> Released, and only now.'; lab.textContent='Released';
+  you.textContent='J$0'; wk.textContent='J$66,800'; you2.textContent='Approved by you'; w2.textContent='Paid in 3 working days'; return }
+ var seen=false;
+ if('IntersectionObserver' in window){
+  var io2=new IntersectionObserver(function(es){es.forEach(function(e){
+   if(e.isIntersecting&&!seen){seen=true;t=setTimeout(step,600);io2.disconnect()}})},{threshold:.3});
+  io2.observe(eng);
+ } else { t=setTimeout(step,900) }
+})();
+
+
+
+
+
 (function(){
   const h = (location.hash||"").replace("#","");
   if(h === "market"){ location.replace("https://app.yaadly.co.uk/jobs"); return; }
