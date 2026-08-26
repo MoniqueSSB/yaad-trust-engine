@@ -4,6 +4,7 @@ import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { STAGES, jobStage } from "@/lib/portal/journey";
 import { StageRail } from "@/components/portal/StageRail";
+import { CalBand } from "@/components/portal/CalBand";
 
 export const dynamic = "force-dynamic";
 
@@ -67,13 +68,13 @@ export default async function JobRoom({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ s?: string }>;
+  searchParams: Promise<{ s?: string; cal?: string; d?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
-  const { s: sParam } = await searchParams;
+  const { s: sParam, cal, d } = await searchParams;
   const supabase = await createClient();
 
   const { data: job } = await supabase
@@ -131,6 +132,19 @@ export default async function JobRoom({
       >
         &larr; All your jobs
       </Link>
+
+      {job.worker_email && (
+        <CalBand
+          side={role === "worker" ? "worker" : "client"}
+          owner={job.worker_email.toLowerCase()}
+          jobId={job.id}
+          kind="job"
+          base={"/portal/jobs/" + encodeURIComponent(job.id)}
+          cal={cal}
+          sel={d}
+          viewerEmail={email}
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap items-start gap-3">
         <h1 className="min-w-[240px] flex-1 font-display text-[clamp(24px,3.6vw,34px)] uppercase leading-none">

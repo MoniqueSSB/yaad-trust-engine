@@ -4,6 +4,7 @@ import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { STAGES_SVC, svcStage } from "@/lib/portal/journey";
 import { StageRail } from "@/components/portal/StageRail";
+import { CalBand } from "@/components/portal/CalBand";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +30,16 @@ export default async function ServiceRoom({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ s?: string }>;
+  searchParams: Promise<{ s?: string; cal?: string; d?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
-  const { s: sParam } = await searchParams;
+  const { s: sParam, cal, d } = await searchParams;
   const supabase = await createClient();
+
+  const { data: providerEmail } = await supabase.rpc("provider_email");
 
   const { data: svc } = await supabase
     .from("services")
@@ -61,6 +64,19 @@ export default async function ServiceRoom({
       >
         &larr; All your jobs
       </Link>
+
+      {typeof providerEmail === "string" && providerEmail && (
+        <CalBand
+          side="service"
+          owner={providerEmail.toLowerCase()}
+          jobId={svc.id}
+          kind="service"
+          base={"/portal/services/" + encodeURIComponent(svc.id)}
+          cal={cal}
+          sel={d}
+          viewerEmail={(user.email ?? "").toLowerCase()}
+        />
+      )}
 
       <div className="mt-4 flex flex-wrap items-start gap-3">
         <h1 className="min-w-[240px] flex-1 font-display text-[clamp(24px,3.6vw,34px)] uppercase leading-none">
