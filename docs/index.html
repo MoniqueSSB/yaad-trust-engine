@@ -145,7 +145,7 @@
   --r:14px;                                           /* the default corner */
   --r-sm:9px; --r-md:12px; --r-lg:18px; --r-pill:100px;
   --s1:6px; --s2:9px; --s3:12px; --s4:16px; --s5:22px; --s6:32px; --s7:48px; --s8:64px;
-  --wrap:1080px; --gutter:20px;                       /* stage 2 widens to these */
+  --wrap:1080px; --wrap-wide:1200px; --gutter:20px;   /* wrap-wide is the home page only */
   --t-kick:10.5px; --t-tiny:12.5px; --t-body:13.5px; --t-lead:16.5px;
   --tr:.15s;                                          /* the one transition speed */
 }
@@ -153,18 +153,20 @@
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--ink);font:15.5px/1.6 var(--body);-webkit-font-smoothing:antialiased}
 a{color:var(--tealb)}
-.wrap{max-width:1060px;margin:0 auto;padding:0 18px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--gutter)}
 /* nav */
 nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.nav-in{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:1060px;margin:0 auto;padding:12px 18px}
+.nav-in{display:flex;justify-content:space-between;align-items:center;gap:14px;max-width:var(--wrap);margin:0 auto;padding:11px var(--gutter)}
 .brand{display:flex;align-items:center;gap:10px;cursor:pointer}
 .mark{width:34px;height:34px;border-radius:9px;background:var(--teal);display:grid;place-items:center;color:#04211D;font-family:var(--disp);font-size:18px}
 .brand b{font-size:18px;font-weight:700}
 .brand b span{color:var(--mango)}
-.views{display:flex;gap:8px;flex-wrap:wrap}
-.vbtn{font:inherit;font-size:13px;font-weight:700;padding:9px 16px;border-radius:100px;border:1px solid var(--line);background:transparent;color:var(--mute);cursor:pointer;transition:.15s}
-.vbtn:hover{border-color:var(--teal);color:var(--tealb)}
-.vbtn.on{background:var(--grad);border-color:transparent;color:#04211D}
+.views{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.vbtn{font:inherit;font-size:13px;font-weight:500;padding:7px 11px;border-radius:var(--r-sm);border:1px solid transparent;background:transparent;color:var(--mute);cursor:pointer;transition:var(--tr)}
+.vbtn:hover{color:var(--ink);background:var(--panel2)}
+.vbtn.on{color:var(--tealb);background:var(--soft);border-color:var(--softline)}
+.navcta{font:inherit;font-size:13px;font-weight:700;padding:9px 15px;border-radius:var(--r-pill);border:0;background:var(--grad);color:#04211D;cursor:pointer;transition:var(--tr);white-space:nowrap}
+.navcta:hover{filter:brightness(1.08)}
 .nav-toggle{display:none;flex-direction:column;justify-content:center;gap:5px;width:44px;height:40px;padding:0 10px;background:transparent;border:1px solid var(--line);border-radius:10px;cursor:pointer}
 .nav-toggle span{display:block;height:2px;width:100%;background:var(--tealb);border-radius:2px;transition:.2s}
 .nav-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(7px) rotate(45deg)}
@@ -311,7 +313,7 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 @media(prefers-reduced-motion:reduce){html.jsrv .rv{opacity:1;transform:none}.rv{transition:none}*{animation-duration:.01ms!important}}
 
 #pane-site{padding:0 0 0}
-#pane-site .wrap{max-width:1200px}
+#pane-site .wrap{max-width:var(--wrap-wide)}   /* the home page runs wider than the rest, deliberately */
 #pane-site .sect{padding:64px 0}
 #pane-site .sect.first{padding-top:44px}
 #pane-site .sect.band{background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -338,6 +340,13 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 .avail span{display:inline-flex;gap:8px;align-items:center;padding:8px 15px;border-radius:100px;font-size:12.5px;cursor:pointer;border:1px solid var(--softline);background:var(--soft);color:#BDE8DE}
 .avail span b{color:var(--ink)}
 .avail span.now{background:rgba(80,200,150,.12);border-color:rgba(80,200,150,.4)}
+
+.strip3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:22px}
+@media(max-width:760px){.strip3{grid-template-columns:1fr}}
+.strip3>div{background:var(--panel);padding:15px 16px}
+.strip3 b{display:block;font-family:var(--disp);font-size:23px;color:var(--tealb);line-height:1.1;font-weight:400;letter-spacing:.01em}
+.strip3 span{font-size:var(--t-tiny);color:var(--mute);line-height:1.5}
+.strip3 i{font-style:normal;color:var(--dim)}
 
 /* WhatsApp demo phone */
 .phone{background:#000;border-radius:36px;padding:11px;border:1px solid #232C34;box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px rgba(20,184,166,.12);margin:0 auto;max-width:370px;width:100%}
@@ -492,6 +501,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <button class="vbtn" data-v="client" onclick="go('client')">Client portal</button>
     <button class="vbtn" data-v="worker" onclick="go('worker')">Worker portal</button>
   </div>
+  <button class="navcta" onclick="go('site');setTimeout(function(){var e=document.getElementById('startform');if(e)e.scrollIntoView()},60)">Post a job</button>
 </div></nav>
 <div id="wl-modal" style="display:none;position:fixed;right:16px;bottom:16px;left:16px;z-index:999;max-width:400px;margin-left:auto;box-shadow:0 12px 40px rgba(0,0,0,0.5)">
   <div class="card" style="position:relative;margin:0">
@@ -536,6 +546,11 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div class="cta-row rv d3">
         <a class="btn" onclick="document.getElementById('startform').scrollIntoView()">Start your job →</a>
         <a class="btn o" id="site-start">Or start on WhatsApp</a>
+      </div>
+      <div class="strip3 rv d3">
+        <div><b>US$3.49bn</b><span>sent home in 2025. Most of it moves blind. <i>Bank of Jamaica</i></span></div>
+        <div><b>No public price</b><span>exists for most Jamaican trades. We show what your quote is built from.</span></div>
+        <div><b>3 working days</b><span>from your approval to the worker paid.</span></div>
       </div>
       <div class="rule rv d3">⚖️ <b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div>
     </div>
