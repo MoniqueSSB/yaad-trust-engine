@@ -1,4 +1,4 @@
-# Yaadly — prototype preview
+# Yaadly, prototype preview
 
 **Live at:** https://yaadly.co.uk/preview/
 **Does not touch the live site.** `docs/index.html` is production; this is a separate
@@ -10,7 +10,7 @@ Last updated 26 August 2026.
 
 ## What this is
 
-A clickable prototype of the whole platform — homepage, marketplace, services,
+A clickable prototype of the whole platform, homepage, marketplace, services,
 client and worker portals, the post-a-job wizard, the WhatsApp intake workflow,
 and the worker join journey. Nothing is saved and no money moves. There is no
 Supabase connection: all data on these screens is illustrative.
@@ -34,7 +34,7 @@ It exists to settle product and pricing decisions before they are built into
 
 **Gating.** Anyone can build a job with no account. It saves as a draft. It reaches
 the marketplace only when the client signs up **and** confirms the Client Guidelines.
-No signature, no listing — whichever door they came through.
+No signature, no listing, whichever door they came through.
 
 **Agents are locked until signature.** No AI touches a client's work until they have
 signed and have a profile. The first job is a fully manual intake.
@@ -55,44 +55,43 @@ agreements with acknowledgement blocks, not tickboxes. Both carry a visible
 built from the accepted quote. Two or three stages get a full Kickoff Pack. Four or
 more get a pack plus programme and materials schedule.
 
-## Pricing — anchored to published UK rates
+## Pricing, anchored to published UK rates
 
 Every figure below has a live market comparable; the full table is on the Services
 screen with sources.
 
-**Whole-property reports** — Visual Check £149 · Condition Report £325 ·
+**Whole-property reports**, Visual Check £149 · Condition Report £325 ·
 Full Report with advice £595
 
-**In-job sign-offs** — Visual Check £149 · Technical Sign-off £300
+**In-job sign-offs**, Visual Check £149 · Technical Sign-off £300
 
-**Recurring** — Property Care £95 / £135 / £175 per visit ·
+**Recurring**, Property Care £95 / £135 / £175 per visit ·
 Oversight Retainer fortnightly £595/mo, weekly £1,095/mo
 
-**Advisory** — Deposit Protection Check £249 · Full Project Management 12–15%,
+**Advisory**, Deposit Protection Check £249 · Full Project Management 12 to 15%,
 minimum £2,500
 
-**Add-on** — Live viewing £40 on any rung
+**Add-on**, Live viewing £40 on any rung
 
 Founding prices for the first five run below each full price and are shown as a real,
-dated discount off a price that is genuinely purchasable — required under DMCCA 2024 s226.
+dated discount off a price that is genuinely purchasable, required under DMCCA 2024 s226.
 
-Marketplace fee is unchanged: 27% blended on labour only, never on materials —
-15% client, 12% worker, worker keeps 88%.
+Marketplace fee is unchanged: 27% blended on labour only, never on materials, 15% client, 12% worker, worker keeps 88%.
 
 ## Removed, deliberately
 
-- **Project Setup Pack** — not required
-- **Certified Milestone Sign-off** — removed
-- **Document Pack Check** — removed
-- **Founding Pros 0% for 90 days** — not happening
+- **Project Setup Pack**, not required
+- **Certified Milestone Sign-off**, removed
+- **Document Pack Check**, removed
+- **Founding Pros 0% for 90 days**, not happening
 
 ## Still open
 
-- **A3 Full Report with advice, £595** — a rung with no founder decision behind it.
+- **A3 Full Report with advice, £595**, a rung with no founder decision behind it.
   Confirm or cut.
-- **Property Care £95 vs the £85 floor** — recurring care sits outside the one-off
+- **Property Care £95 vs the £85 floor**, recurring care sits outside the one-off
   ladder; the local J$ menu (J$7,500 / 12,000 / 18,000) is untouched.
-- **Fee stacking** — Full PM at 12–15% against a UK norm of 8–15% for all
+- **Fee stacking**, Full PM at 12 to 15% against a UK norm of 8 to 15% for all
   professional fees combined.
 - Client counter (`client_profiles.jobs_completed`) still never increments in production.
 - `yaad-match` and the patched `yaad-agent` are written and tested but not deployed.
