@@ -875,7 +875,6 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
       <button class="nl" data-go="portal">Portals</button>
       <button class="nl" data-go="join">Join as a pro</button>
       <button class="nl" data-go="wa">WhatsApp intake</button>
-      <button class="nl" data-go="build">How it's wired</button>
     </div>
     <button class="navcta" data-go="post">Post a job, free</button>
   </div>
@@ -1394,7 +1393,6 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 
     <div class="wnav" style="margin-top:30px">
       <button class="btn" data-go="market">See your job on the board</button>
-      <button class="btn ghost" data-go="build">See how this is wired</button>
       <button class="btn ghost" data-go="home">Back to home</button>
     </div>
   </div>
@@ -1843,84 +1841,6 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
       <p class="tiny" style="margin-top:10px">Answered by vetted workers. Our assistant may add a labelled starter answer within a minute so you're not left waiting.</p>
     </div>
     <div class="grid g2c" style="margin-top:24px" id="askfull"></div>
-  </div>
-</section>
-
-<!-- ========================= BUILD / WIRING ========================= -->
-<section class="screen" id="s-build">
-  <div class="wrap">
-    <p class="kick">How it's wired</p>
-    <h2 class="hx">What's real, what's a hop,<br>what's a fight</h2>
-    <p class="lead">Two questions here. Can the agents live inside the web app rather than beside it? Yes, and four of the five already exist. And where does the guidelines signature sit? At go-live, which is where your database already puts it. The awkward part is neither of those, it is that steps 2 and 3 hand admin-only AI endpoints to people with no account.</p>
-
-    <div class="sec" style="margin-top:40px">
-      <p class="kick m">Agent by agent</p>
-      <div class="tw">
-        <table>
-          <thead><tr><th>Where in the flow</th><th>Function</th><th>Status today</th><th>What it needs</th></tr></thead>
-          <tbody>
-            <tr><td>Step 2, tidy the description, ask the two missing questions <span class="st b">signed clients only</span></td><td><code>yaad-agent</code> v12</td><td><span class="st a">Exists</span></td><td>Swap the <code>is_admin()</code> check for a signed-guidelines check. Same shape, different predicate.</td></tr>
-            <tr><td>Step 3, read the photos; later, check evidence at each stage <span class="st b">signed clients only</span></td><td><code>yaad-vision</code> v5</td><td><span class="st a">Exists</span></td><td>Same predicate swap, plus a hard cap on images per job.</td></tr>
-            <tr><td>Step 5, save the draft; step 6, flip it live on signature</td><td><code>yaad-website-intake</code> v4</td><td><span class="st a">Live &amp; public</span></td><td>Wizard fields, a <code>draft</code> status, and a resume link. Small.</td></tr>
-            <tr><td>After posting, alert matching workers</td><td><code>yaad-match</code></td><td><span class="st c">Doesn't exist</span></td><td>New. A SQL match on trade + parish + published profile, then ntfy and email. Half a day.</td></tr>
-            <tr><td>On confirm, Kickoff Pack, stages, QA sheet</td><td><code>yaad-kickoff</code> v13</td><td><span class="st a">Exists</span></td><td>Trigger it from the client's confirm, not the admin desk.</td></tr>
-            <tr><td>On completion, Completion Report</td><td><code>yaad-completion</code> v1</td><td><span class="st a">Exists</span></td><td>Nothing. Already fits.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="sec">
-      <p class="kick m">The abuse risk, resolved</p>
-      <div class="card" style="border-color:var(--softline);background:var(--soft)">
-        <h3 class="hx" style="font-size:22px">You closed this one yourself</h3>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">The earlier draft of this flow fired <code style="font-family:var(--mono);font-size:12px">yaad-agent</code> and <code style="font-family:var(--mono);font-size:12px">yaad-vision</code> at step 2 and step 3 for someone with no account and nothing at stake. That is a MiniMax bill waiting to happen and it would have needed Turnstile, IP caps and a kill switch before going public.</p>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Locking the agents behind the signature removes the problem instead of defending against it. Every model call now belongs to a known account with a signed guidelines row, so you rate-limit per client, not per IP, and an abuser has to sign your terms under a real email before they can cost you a penny. The security posture from commit 29e87b2 stays intact: the check just moves from <code style="font-family:var(--mono);font-size:12px">is_admin()</code> to "has a <code style="font-family:var(--mono);font-size:12px">doc_signatures</code> row for the current guidelines version".</p>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Still worth doing: a per-account monthly call budget in <code style="font-family:var(--mono);font-size:12px">app_settings</code>, a hard character cap on model input, and a kill switch you can flip without a deploy. Reuse the <code style="font-family:var(--mono);font-size:12px">yaad-kickoff</code> v8 background-drafting pattern so the 150-second worker cull can't hand you another empty pack.</p>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">The cost you have accepted in exchange: the first job any client posts is fully manual, so it is the roughest brief you will ever receive from them, and it is also their first impression. Someone reads those. Budget for that.</p>
-      </div>
-    </div>
-
-    <div class="sec">
-      <p class="kick m">The gate, decided</p>
-      <div class="card">
-        <h3 class="hx" style="font-size:22px">Build free, sign to go live</h3>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Decided 25 Aug: anyone can build a job with no account. It saves as a draft. To put it in the marketplace you sign up <em>and</em> confirm the Client Guidelines, no signature, no listing. This is what <code style="font-family:var(--mono);font-size:12px">trg_enforce_signed_before_open</code> already enforces, so the database side is done. What changes is where the person meets it: at the end of a wizard they have already invested six screens in, instead of on a cold form.</p>
-        <div class="tw">
-          <table>
-            <thead><tr><th>Point in the flow</th><th>What the person does</th><th>Job state</th><th>Enforced by</th></tr></thead>
-            <tbody>
-              <tr><td>Steps 1 to 4</td><td>Nothing. No account, no email, no reading.</td><td><span class="st b">Nothing saved yet</span></td><td>, </td></tr>
-              <tr><td>End of step 5</td><td>Creates an account: name, email, password or one-tap link.</td><td><span class="st b">Draft</span> <code>open = false</code></td><td>Auth + <code>yaad-website-intake</code></td></tr>
-              <tr><td>Step 6</td><td>Reads and confirms Client Guidelines v1.0, types their name to sign.</td><td><span class="st a">Live</span> <code>open = true</code></td><td><code>doc_signatures</code> row → <code>trg_enforce_signed_before_open</code></td></tr>
-              <tr><td>Picks a worker</td><td>Agrees stages in writing, funds stage one.</td><td><span class="st c">Confirmed</span></td><td><code>yaad-kickoff</code></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p style="margin-top:14px;color:var(--mute);font-size:14.5px;line-height:1.7">The draft row is the part worth building properly. If someone bails at step 5 you still have their job, their trade, their parish and their tidied description, that is a recoverable lead and an email you can send. MyBuilder loses those people entirely. Keep a <code style="font-family:var(--mono);font-size:12px">jobs.status</code> of <span style="font-family:var(--mono);font-size:12px">draft</span> and a resume link, and the friction you just added starts paying you back.</p>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">One thing to watch: signature at go-live means every listing on your board comes from someone who has read the rules, which is exactly the standard you want to hold workers to. Measure the drop-off between step 5 and step 6. If more than a third of drafts never go live, the guidelines are too long, not the gate wrong.</p>
-      </div>
-    </div>
-
-    <div class="sec">
-      <p class="kick m">What I'd leave on MyBuilder's side of the fence</p>
-      <div class="grid g2c" style="margin-top:18px">
-        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Pay-per-lead</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">Their whole revenue model. It's also why workers there chase and clients get eight calls in an hour. Charging your workers to see a job undercuts the thing you're selling.</p></div>
-        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Unlimited interest</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">Their volume makes a free-for-all work. With 142 workers, cap it at five interested per job and it reads as curation instead of a thin list.</p></div>
-        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">"Post free" as the whole promise</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">Free posting is the door, not the pitch. Yours is money held until proof. Say the free bit small and the held bit loud.</p></div>
-        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Review-count bragging</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">2.8 million reviews is their moat and you can't fake a number near it. Lead on evidence per job instead, a thing they don't have at all.</p></div>
-      </div>
-    </div>
-
-    <div class="sec">
-      <p class="kick m">Order I'd build it in</p>
-      <div class="grid steps s4" style="margin-top:22px">
-        <div class="step"><h4>Wizard + draft state</h4><p>Six steps against the existing intake function, saving a draft at step 5 and flipping <code style="font-family:var(--mono);font-size:11px">open</code> on signature. No agents yet.</p></div>
-        <div class="step"><h4>Trades grid + profiles</h4><p>Both read from tables you already have. Mostly front-end.</p></div>
-        <div class="step"><h4>Match &amp; alert</h4><p>The new function. Without it nobody responds and the wizard is theatre.</p></div>
-        <div class="step"><h4>Agents, behind Turnstile</h4><p>Tidy-up first, vision second. Only after the abuse controls exist.</p></div>
-      </div>
-    </div>
   </div>
 </section>
 
