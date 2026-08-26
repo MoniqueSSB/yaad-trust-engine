@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { STAGES, jobStage } from "@/lib/portal/journey";
 import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
+import { ReviewForm } from "@/components/portal/ReviewForm";
 
 export const dynamic = "force-dynamic";
 
@@ -119,6 +120,13 @@ export default async function JobRoom({
     const n = Number(sParam);
     return Number.isInteger(n) && n >= 0 && n < STAGES.length ? n : current;
   })();
+
+  const { data: myReview } = await supabase
+    .from("reviews")
+    .select("id")
+    .eq("job_id", id)
+    .ilike("author_email", email)
+    .maybeSingle();
 
   const ev = (evidence ?? []) as Evidence[];
   const qs = (quotes ?? []) as Quote[];
@@ -286,6 +294,21 @@ export default async function JobRoom({
             ))}
           </ul>
         </section>
+      )}
+
+      {job.status === "complete" && !myReview && (
+        <ReviewForm
+          jobId={job.id}
+          direction={role === "client" ? "client_of_worker" : "worker_of_client"}
+          subjectEmail={(role === "client" ? job.worker_email : job.client_email) ?? ""}
+          subjectName={role === "client" ? (job.worker_name ?? "the worker") : "the client"}
+        />
+      )}
+      {job.status === "complete" && myReview && (
+        <p className="mt-4 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] text-mute">
+          Your review of this job is in. It publishes when the other side
+          writes theirs, or after fourteen days.
+        </p>
       )}
 
       {pk.length > 0 && (

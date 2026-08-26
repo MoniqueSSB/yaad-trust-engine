@@ -23,7 +23,7 @@ type OpenJob = {
   access_type: string | null; materials_by: string | null; urgency: string | null;
 };
 type Photo = { job_id: string; caption: string; img: string | null; position: number };
-type Worker = { name: string | null; trade: string | null; parish: string | null; lane: string | null; jobs_completed: number | null };
+type Worker = { name: string | null; trade: string | null; parish: string | null; lane: string | null; jobs_completed: number | null; slug: string | null };
 
 export const metadata = {
   title: "The marketplace · Yaadly",
@@ -68,7 +68,7 @@ export default async function Board({
 
   const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] = await Promise.all([
     jq,
-    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed").eq("active", true).order("jobs_completed", { ascending: false }),
+    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed,slug").eq("active", true).order("jobs_completed", { ascending: false }),
     supabase.from("open_jobs").select("trade"),
   ]);
 
@@ -101,6 +101,11 @@ export default async function Board({
         safe columns only, anyone can read it, and a job only appears here once
         its client has signed the Client Guidelines. No addresses, no phone
         numbers, ever.
+      </p>
+      <p className="mt-2 text-[13px]">
+        <Link href="/trades" className="text-tealb underline-offset-2 hover:underline">All 18 trades</Link>
+        <span className="text-dim"> · </span>
+        <Link href="/ask" className="text-tealb underline-offset-2 hover:underline">Ask a Yaad, free answers from tradespeople</Link>
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5">
@@ -329,6 +334,11 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
           <div className="grid grid-cols-4 gap-1.5">
             {[0, 1, 2, 3].map((k) => <span key={k} className="h-9 rounded-md border border-line bg-linear-to-br from-panel2 to-soft" />)}
           </div>
+          {w.slug && (
+            <Link href={"/workers/" + encodeURIComponent(w.slug)} className="rounded-full border border-line2 py-2 text-center text-[12.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">
+              View profile
+            </Link>
+          )}
         </div>
       ))}
     </div>

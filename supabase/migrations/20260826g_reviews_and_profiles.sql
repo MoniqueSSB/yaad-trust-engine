@@ -1,0 +1,16 @@
+-- Applied to production 26 Aug 2026 via MCP (reviews_and_profiles).
+-- MARKETPLACE-BUILD-SPEC section 5: two-way, job-bound reviews. The four
+-- rules live in Postgres, each proven by attempting to break it:
+--   1 party-only, completed jobs only  -> insert policy (42501 witnessed)
+--   2 sealed until both or 14 days    -> published_reviews predicate
+--     (sealed-while-single and published-when-both both witnessed)
+--   3 one public reply, nothing else  -> trg_reviews_guard (stars edit and
+--     second reply both refused, witnessed); no delete policy exists
+--   4 once per job per direction      -> unique constraint (23505 witnessed)
+-- Scores are DERIVED in worker_scores / client_scores rather than stored,
+-- stronger than the specced trigger: a derived number cannot be inflated.
+-- Also: worker_profiles gains slug/about/years/areas; worker_checks and
+-- portfolio tables; Ask a Yaad (questions publish only after a human look,
+-- a deliberate moderation gate; answers are vetted workers only, the same
+-- bar as quoting; anon self-publish refused, witnessed).
+-- Full SQL as applied lives in the MCP migration of the same name.
