@@ -65,3 +65,19 @@ Three steps, in `desk.html`:
 The tab router, the auth gate and the styling are already done. The ten dashed
 tabs are the migration checklist: they are the real tab list from the old desk,
 and each one turns solid when its pane moves across.
+
+## It is temporarily on the public site
+
+`docs/desk.html` is a copy of `desk.html`, published at
+`https://yaadly.co.uk/desk.html` so it can be tested from a phone and from a
+signed-in browser without serving it locally.
+
+Be clear about what that costs. The page itself is now reachable by anyone who
+finds the URL, and a URL is always findable: `noindex` keeps it out of search
+results but nothing keeps it out of a wordlist. What protects the business is
+not the address, it is the sign-in gate on the page and `is_admin()` plus RLS
+underneath it. No data is exposed. The interface is.
+
+This copy should come down, or move behind Cloudflare Access, once the
+names.co.uk zone file has been exported. Delete `docs/desk.html` and it is
+gone; `desk/desk.html` stays as the source.
