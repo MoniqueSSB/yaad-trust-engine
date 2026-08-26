@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { STAGES_SVC, svcStage } from "@/lib/portal/journey";
+import { StageRail } from "@/components/portal/StageRail";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +26,16 @@ const TRACK = [
 
 export default async function ServiceRoom({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ s?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
+  const { s: sParam } = await searchParams;
   const supabase = await createClient();
 
   const { data: svc } = await supabase
@@ -42,6 +47,11 @@ export default async function ServiceRoom({
   if (!svc) notFound();
 
   const stage = Math.max(0, Math.min(svc.stage ?? 0, TRACK.length - 1));
+  const current = svcStage(svc.stage);
+  const viewing = (() => {
+    const n = Number(sParam);
+    return Number.isInteger(n) && n >= 0 && n < STAGES_SVC.length ? n : current;
+  })();
 
   return (
     <>
@@ -67,6 +77,13 @@ export default async function ServiceRoom({
         {svc.price && <span>{svc.price}</span>}
         {svc.provider && <span>Carried out by {svc.provider}</span>}
       </div>
+
+      <StageRail
+        stages={STAGES_SVC}
+        current={current}
+        viewing={viewing}
+        base={"/portal/services/" + encodeURIComponent(svc.id)}
+      />
 
       <section className="mt-7">
         <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">

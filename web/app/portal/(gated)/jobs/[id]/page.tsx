@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { STAGES, jobStage } from "@/lib/portal/journey";
+import { StageRail } from "@/components/portal/StageRail";
 
 export const dynamic = "force-dynamic";
 
@@ -62,13 +64,16 @@ function jmd(n: number | null) {
 
 export default async function JobRoom({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ s?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
+  const { s: sParam } = await searchParams;
   const supabase = await createClient();
 
   const { data: job } = await supabase
@@ -108,6 +113,12 @@ export default async function JobRoom({
         .order("updated_at", { ascending: false }),
     ]);
 
+  const current = jobStage(job.status);
+  const viewing = (() => {
+    const n = Number(sParam);
+    return Number.isInteger(n) && n >= 0 && n < STAGES.length ? n : current;
+  })();
+
   const ev = (evidence ?? []) as Evidence[];
   const qs = (quotes ?? []) as Quote[];
   const pk = (packs ?? []) as Pack[];
@@ -134,12 +145,18 @@ export default async function JobRoom({
         <span>{job.id}</span>
         {job.trade && <span>{job.trade}</span>}
         {job.parish && <span>{job.parish}</span>}
-        {job.stage != null && <span>Stage {job.stage}</span>}
         <span>
           You are the {role === "client" ? "client" : "tradesperson"} on this
           job
         </span>
       </div>
+
+      <StageRail
+        stages={STAGES}
+        current={current}
+        viewing={viewing}
+        base={"/portal/jobs/" + encodeURIComponent(job.id)}
+      />
 
       {job.descr && (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
