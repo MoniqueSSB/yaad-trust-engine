@@ -104,6 +104,13 @@ Deno.serve(async (req: Request) => {
       descr,
       addr,
       access_contact: access,
+      // The wizard already asks for this at step 1; until now it was written
+      // into descr and the trace and then thrown away, so every job arrived
+      // with no trade and matched nobody. Stored raw: the trg_normalise_job_trade
+      // trigger runs it through trade_key() so there is one normalisation
+      // point and no TypeScript copy of that regex to drift.
+      trade: workType || null,
+      trade_source: workType ? "wizard" : null,
       stage: 0,
       open: false
     }).select("portal_code").single();
