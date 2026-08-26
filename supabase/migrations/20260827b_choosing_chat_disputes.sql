@@ -1,0 +1,13 @@
+-- Applied 26-27 Aug 2026 via MCP as choosing_chat_disputes,
+-- choose_worker_clamp_pass and parties_read_approved_packs.
+-- PORTAL-SPEC 5.4/5.5/5.6: scope_agreements (both sides tick before
+-- choosing), choose_worker() security definer (every precondition in one
+-- place; proven: refused with zero and one tick, passed with both),
+-- messages (party-only, scrubbed app-side on insert AND render),
+-- disputes (direct to the worker first; escalate only if that fails).
+-- job_quotes_touch clamp now recognises the transaction-local
+-- yaadly.choosing flag that only choose_worker sets, because inside a
+-- definer function the JWT is still the client's and the clamp was
+-- silently reverting accepted/declined. Parties may read APPROVED
+-- kickoff packs; drafts stay internal.
+-- Full SQL as applied lives in the MCP migrations of those names.

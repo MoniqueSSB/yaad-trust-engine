@@ -748,7 +748,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
         <li><b>One evidence package</b> at the end of the day. No daytime tracking, ever</li>
         <li><b>No paperwork.</b> The Completion Report is drafted from your evidence, you just confirm it</li>
       </ul>
-      <a class="btn rv d2" style="margin-top:20px;background:linear-gradient(90deg,var(--coral),var(--melon));color:#fff" onclick="go('worker');workerTab('apply')">Apply to join</a>
+      <a class="btn rv d2" style="margin-top:20px;background:linear-gradient(90deg,var(--coral),var(--melon));color:#fff" href="https://app.yaadly.co.uk/apply">Apply to join</a>
     </div>
   </div>
 </div></div>
@@ -1055,145 +1055,6 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   </div>
 </div></section>
 <!-- ═══════════════ CLIENT PORTAL ═══════════════ -->
-<section class="pane" id="pane-client"><div class="wrap">
-  <div class="card" style="max-width:640px;margin:20px auto 0">
-    <h3>How the <em>pricing</em> works</h3>
-    <ul style="margin:10px 0 0;padding-left:18px;line-height:1.65;color:var(--mute);font-size:14px">
-      <li>You agree a price with your worker for their labour. That price is theirs, never beaten down, and materials are billed separately at cost, never touched by a fee.</li>
-      <li>Yaadly adds a <b style="color:var(--ink)">15% Guarantee &amp; Support fee</b> on top of the labour price. That covers the held payment, the evidence check, and the guarantee behind every job.</li>
-      <li>Example: a <b style="color:var(--ink)">£300</b> labour price means you pay <b style="color:var(--ink)">£345</b> in total. Nothing reaches the worker until you approve the evidence.</li>
-      <li>Paying from Jamaica already? Pay the same way in J$, no card fees, no currency conversion.</li>
-    </ul>
-  </div>
-  <div id="client-lock" class="card" style="max-width:420px;margin:20px auto">
-    <h3>Client <em>portal</em></h3>
-    <p class="note" style="margin-top:0">Already have a profile? Sign in. New here? You need the job code Yaadly sent you, then you read and sign the <a onclick="openClientGuidelines()" style="color:var(--tealb);cursor:pointer">Client Guidelines</a>, and once signed you can pitch your first job. Becoming a client is free.</p>
-    <div class="field"><label>Email</label><input id="cgate-email" type="email" autocomplete="username"></div>
-    <div class="field"><label>Password</label><input id="cgate-pass" type="password" autocomplete="current-password"></div>
-    <div class="field"><label>Job code <span style="color:var(--dim);font-weight:400">(first time only)</span></label><input id="cgate-code" autocomplete="off" placeholder="On the message we sent you"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-      <a class="btn" onclick="clientGateLogin()">Sign in</a>
-      <a class="btn o" onclick="clientGateSignup()">Create account</a>
-    </div>
-    <div id="cgate-status"></div>
-  </div>
-  <div id="client-ui" style="display:none">
-  <div id="cg-gate" style="display:none;margin-top:24px"></div>
-  <div id="client-dash">
-  <div class="kick" style="margin-top:20px">Client portal</div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
-    <h1 class="hx" style="font-size:clamp(26px,4.5vw,44px);margin:0">Paid on proof, <span class="g1">not promises.</span></h1>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <div class="stat-pill">🏠 Active oversight<b id="cd-count">0 properties</b></div>
-      <div class="stat-pill">🛡 Work protected<b id="cd-protected">n/a</b></div>
-    </div>
-  </div>
-  <div class="dash">
-    <div class="dash-side">
-      <div class="dash-nav on" data-ct="overview" onclick="clientNav('overview')">🏠 Overview</div>
-      <div class="dash-nav" data-ct="workers" onclick="clientNav('workers')">👥 Workers</div>
-    </div>
-    <div class="dash-main" id="client-dash-main"></div>
-  </div>
-  </div>
-  </div>
-</div></section>
-<!-- ═══════════════ WORKER PORTAL ═══════════════ -->
-<section class="pane" id="pane-worker"><div class="wrap">
-  <div class="kick" style="margin-top:20px">Worker portal</div>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
-    <h1 class="hx" style="font-size:clamp(26px,4.5vw,44px);margin:0">Do good work. <span class="g2">Get paid fast.</span></h1>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <div class="stat-pill">💼 Active jobs<b id="wd-count">0</b></div>
-      <div class="stat-pill">💷 Money held for you<b id="wd-held">n/a</b></div>
-    </div>
-  </div>
-  <div class="card" style="max-width:640px;margin:0 0 20px">
-    <h3>How you get <em>paid</em></h3>
-    <ul style="margin:10px 0 0;padding-left:18px;line-height:1.65;color:var(--mute);font-size:14px">
-      <li>You set your own price for the job. It is never beaten down, and materials are never fee'd, at cost is at cost.</li>
-      <li>Yaadly takes <b style="color:var(--ink)">12%</b> of your labour price, so you keep <b style="color:var(--ink)">88%</b>. Joining is free, quoting is free, there are no lead fees ever.</li>
-      <li>Example: a <b style="color:var(--ink)">£300</b> labour price means you receive <b style="color:var(--ink)">£264</b>.</li>
-      <li>Paid within 24 hours once the client approves your evidence, to your bank, Lynk wallet, or cash pickup, whichever suits you.</li>
-      <li>Remote, digital work carries a lower <b style="color:var(--ink)">10%</b> fee instead.</li>
-    </ul>
-  </div>
-  <div id="worker-lock" class="card" style="max-width:520px">
-    <h3>Sign in to <em>see your jobs</em></h3>
-    <p class="note" style="margin-top:0">Sign in with the email from your application to see your assigned jobs and money. Not signed in yet? You can still browse open jobs or apply to join below.</p>
-    <div class="grid2">
-      <div class="field"><label>Email</label><input id="wgate-email" type="email" autocomplete="username"></div>
-      <div class="field"><label>Password</label><input id="wgate-pass" type="password" autocomplete="current-password"></div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-      <a class="btn" onclick="workerGateLogin()">Sign in</a>
-      <a class="btn o" onclick="workerGateSignup()">Create account</a>
-    </div>
-    <div id="wgate-status"></div>
-  </div>
-  <div class="dash">
-    <div class="dash-side">
-      <div class="dash-nav on" data-wt="jobs" onclick="workerTab('jobs')">💼 My jobs</div>
-      <div class="dash-nav" data-wt="pay" onclick="workerTab('pay')">💷 My money</div>
-      <div class="dash-nav" data-wt="open" onclick="workerTab('open')">📋 Open for quotes</div>
-      <div class="dash-nav" data-wt="apply" onclick="workerTab('apply')">📝 Apply to join</div>
-    </div>
-    <div class="dash-main">
-      <div id="wt-pay" style="display:none"></div>
-      <div id="wt-jobs"></div>
-      <div id="wt-open" style="display:none"></div>
-      <div id="wt-apply" style="display:none">
-    <div class="card"><h3>Apply to join <em>Yaadly</em></h3>
-      <p class="note" style="margin-top:0;font-size:13px;color:var(--mute)">Joining is free. Quoting is free. No lead fees, ever. Yaadly takes 12% of your labour price on completed work, so you keep 88%. Yaadly reviews every application personally. <a onclick="openWorkerGuidelines()" style="color:var(--tealb);cursor:pointer">Read the Worker Guidelines →</a></p>
-      <div class="grid2" style="margin-top:12px">
-        <div class="field"><label>Full name</label><input id="ap-name"></div>
-        <div class="field"><label>WhatsApp number</label><input id="ap-phone" placeholder="876..."></div>
-      </div>
-      <div class="grid2">
-        <div class="field"><label>Email <span style="font-weight:500;text-transform:none">(this becomes your worker portal login)</span></label><input id="ap-email" type="email" placeholder="you@email.com"></div>
-        <div class="field"><label>Parish</label><input id="ap-parish" placeholder="Kingston, Portmore..."></div>
-      </div>
-      <div class="grid2">
-        <div class="field"><label>Trade or trades</label><input id="ap-trade" placeholder="Plumbing, tiling"></div>
-        <div class="field"><label>Years of experience</label><input id="ap-years" type="number" min="0"></div>
-      </div>
-      <div class="grid2">
-        <div class="field"><label>Certified or licensed?</label>
-          <select id="ap-cert"><option value="">No, experience based</option><option value="yes">Yes, I hold certification</option></select>
-        </div>
-      </div>
-      <div class="field" id="ap-certrow" style="display:none"><label>Certifying body and certificate number</label><input id="ap-certno" placeholder="e.g. HEART/NSTA, number"></div>
-      <div class="field"><label>Past work <span style="font-weight:500;text-transform:none">(describe up to five jobs; photos come later on WhatsApp)</span></label><textarea id="ap-work"></textarea></div>
-      <div class="grid2">
-        <div class="field"><label>How would you like to be paid?</label>
-          <select id="ap-pay"><option value="">Choose one</option><option>Bank transfer (NCB)</option><option>Bank transfer (Scotiabank)</option><option>Bank transfer (JN Bank)</option><option>Bank transfer (other Jamaican bank)</option><option>Lynk wallet</option><option>Remittance pick up</option><option>Not sure yet</option></select>
-        </div>
-        <div class="field"><label>Name the payment is held in</label><input id="ap-payname" placeholder="Exactly as it appears on the account"></div>
-      </div>
-      <p class="note" style="margin-top:0">Do not put account numbers on this form. Once you are approved we take those details from you directly and securely.</p>
-      <div class="grid2">
-        <div class="field"><label>Reference 1, name and phone</label><input id="ap-ref1"></div>
-        <div class="field"><label>Reference 2, name and phone</label><input id="ap-ref2"></div>
-      </div>
-      <div class="rule" style="margin-top:6px">🪪 <b>Identity checks are compulsory.</b> Nobody attends a client's property without verified ID. Before your first job you must show, on a video call: a <b>government photo ID</b> (passport, driver's licence or national ID), proof of your address dated within three months, your TRN, a <b>live photo taken in the moment</b>, and a <b>short video turning your face slowly left, then right</b>. The turn is the check. A photograph held up to a camera cannot turn, and neither can a screen. It takes four seconds and it is why a client lets you through the gate.<br><br>A <b>police record check</b> from the Jamaica Constabulary Force is <b>mandatory for any job over &pound;500</b>, any work inside an occupied home, and any time you hold keys or attend an empty property. Skip it and your profile still publishes, but you are locked out of every job over &pound;500 and every occupied-home job, which on this board is most of the money. Get it once and it covers every job you take.<br><br>We do not accept photos of someone else's documents, and any false document ends the application permanently.</div>
-      <div class="grid2" style="margin-top:12px">
-        <div class="field"><label>Government photo ID you will show</label>
-          <select id="ap-idtype"><option value="">Choose one</option><option>Jamaican passport</option><option>Driver's licence</option><option>National ID (NIDS or voter ID)</option><option>Other government photo ID</option></select>
-        </div>
-        <div class="field"><label>Can you provide a police record check if asked?</label>
-          <select id="ap-police"><option value="">Choose one</option><option>Yes, I already have one</option><option>Yes, I can apply for one</option><option>No</option></select>
-        </div>
-      </div>
-      <div class="field" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="ap-consent" style="width:auto;margin-top:4px"><span style="font-size:13px;color:var(--mute)">I consent to Yaadly verifying the information provided, including checking my government photo ID, contacting my references, and requesting a police record check where the work requires it. I confirm the documents I provide are my own and genuine.</span></div>
-      <a class="btn" onclick="submitApplication()">Submit application</a>
-      <p class="note">After you submit: Yaadly reviews every application personally, verifies your ID on a video call, calls your references, and assigns a trial job. You will hear back on WhatsApp. Joining is free, always.</p>
-    </div>
-    <div id="ap-status"></div>
-  </div>
-  <div class="rule">🛡️ <b>Your protection:</b> the site match gate means you are never held to a job that was mis-described, and your completed jobs build a record you own.</div>
-      </div>
-    </div>
-</div></section>
 <!-- ═══════════════ ADMIN DESK ═══════════════ -->
 <section class="pane" id="pane-admin"><div class="wrap">
   <div id="admin-lock" class="card" style="max-width:420px;margin:40px auto">
@@ -1560,6 +1421,7 @@ var svg=function(k){return '<svg class="i" viewBox="0 0 24 24">'+(IC[k]||IC.hand
 (function(){
   const h = (location.hash||"").replace("#","");
   if(h === "market"){ location.replace("https://app.yaadly.co.uk/jobs"); return; }
+  if(h === "client" || h === "worker"){ location.replace("https://app.yaadly.co.uk/portal"); return; }
   if(h && document.getElementById("pane-"+h)) go(h);
 })();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
@@ -2081,7 +1943,7 @@ function workerTab(t){
   document.querySelectorAll("[data-wt]").forEach(b=>b.classList.toggle("on", b.dataset.wt===t));
 }
 function go2(v){ if(!$("pane-"+v).classList.contains("show")) go(v); }
-$("ap-cert").addEventListener("change", ()=>{ $("ap-certrow").style.display = $("ap-cert").value==="yes"?"block":"none"; });
+if($("ap-cert")) $("ap-cert").addEventListener("change", ()=>{ $("ap-certrow").style.display = $("ap-cert").value==="yes"?"block":"none"; });  // the apply form moved to app.yaadly.co.uk/apply
 function submitApplication(){
   const g = id => ($(id).value||"").trim();
   if(!g("ap-name") || !g("ap-phone") || !g("ap-email") || !g("ap-trade")){ alert("Name, WhatsApp number, email and trade are needed. The email is what unlocks your worker portal login later."); return; }
@@ -2100,6 +1962,7 @@ function submitApplication(){
 }
 function renderWorker(){
   const J = $("wt-jobs"), O = $("wt-open"), P0 = $("wt-pay");
+  if(!J) return;  // the worker pane moved to app.yaadly.co.uk/portal
   if(!workerOpen){
     const lockMsg = '<div class="empty">Sign in above with your application email to see this.</div>';
     J.innerHTML = lockMsg; P0.innerHTML = lockMsg;

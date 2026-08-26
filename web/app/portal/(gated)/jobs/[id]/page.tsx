@@ -7,6 +7,10 @@ import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
+import { ChatThread } from "@/components/portal/ChatThread";
+import { DisputePanel } from "@/components/portal/DisputePanel";
+import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
+import { scrub } from "@/lib/scrub";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +101,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -116,6 +120,9 @@ export default async function JobRoom({
         .select("id,project_title,status,rev,updated_at")
         .eq("job_id", id)
         .order("updated_at", { ascending: false }),
+      supabase.from("scope_agreements").select("side,email").eq("job_id", id),
+      supabase.from("messages").select("id,sender_email,body,created_at").eq("job_id", id).order("created_at").limit(200),
+      supabase.from("disputes").select("id,state,body,reply,kinds").eq("job_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
   const current = jobStage(job.status);
@@ -135,6 +142,19 @@ export default async function JobRoom({
   const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
+  const scopeTicks = scopeRows ?? [];
+  const clientTicked = scopeTicks.some((t) => t.side === "client");
+  const iTicked = scopeTicks.some((t) => t.email.toLowerCase() === email);
+  const chooseOpen = !job.worker_email && job.status !== "complete";
+  const chat = (msgRows ?? []).map((m) => ({
+    id: m.id,
+    mine: m.sender_email.toLowerCase() === email,
+    body: scrub(m.body).clean,
+    at: String(m.created_at).slice(0, 16).replace("T", " "),
+  }));
+  const dispute = disputeRow
+    ? { id: disputeRow.id, state: disputeRow.state, body: disputeRow.body, reply: disputeRow.reply, kinds: (disputeRow.kinds ?? []) as string[] }
+    : null;
   const pk = (packs ?? []) as Pack[];
 
   return (
@@ -288,6 +308,36 @@ export default async function JobRoom({
         )}
       </section>
 
+      {chooseOpen && (
+        <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            The scope gate
+          </h2>
+          <p className="mb-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
+            Nobody is chosen on a price alone. Both sides tick the written
+            scope; until both ticks land there is no Choose button, and the
+            database refuses even if there were.
+          </p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (clientTicked ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
+              {clientTicked ? "✓ Client agreed" : "Client not yet agreed"}
+            </span>
+            <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (scopeTicks.some((t) => t.side === "worker") ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
+              {scopeTicks.some((t) => t.side === "worker") ? "✓ A worker agreed" : "No worker agreed yet"}
+            </span>
+            {!iTicked && (role === "client" || qs.length > 0) && (
+              <form action={agreeScope}>
+                <input type="hidden" name="jobId" value={job.id} />
+                <input type="hidden" name="side" value={role} />
+                <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                  I agree to this scope
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
+
       {qs.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -325,6 +375,21 @@ export default async function JobRoom({
                     {q.note}
                   </p>
                 )}
+                {role === "client" && chooseOpen && q.status === "submitted" && (
+                  clientTicked && scopeTicks.some((t) => t.side === "worker") ? (
+                    <form action={chooseQuote} className="mt-3">
+                      <input type="hidden" name="jobId" value={job.id} />
+                      <input type="hidden" name="quoteId" value={q.id} />
+                      <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                        Choose this worker
+                      </button>
+                    </form>
+                  ) : (
+                    <span className="mt-3 inline-block rounded-full border border-line bg-panel2 px-3.5 py-2 text-[12px] font-bold text-dim">
+                      Choose unlocks when both have agreed
+                    </span>
+                  )
+                )}
               </li>
             ))}
           </ul>
@@ -353,9 +418,10 @@ export default async function JobRoom({
           </h2>
           <ul className="grid gap-3">
             {pk.map((p) => (
-              <li
-                key={p.id}
-                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5"
+              <li key={p.id}>
+              <Link
+                href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
               >
                 <b className="text-[14px]">
                   Kickoff Pack{p.rev != null ? ` · rev ${p.rev}` : ""}
@@ -366,10 +432,27 @@ export default async function JobRoom({
                 <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
                   {p.status}
                 </span>
+              </Link>
               </li>
             ))}
+            {job.status === "complete" && (
+              <li>
+                <Link href={"/portal/jobs/" + encodeURIComponent(job.id) + "/completion"}
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal">
+                  <b className="text-[14px]">Completion Report</b>
+                  <span className="text-[12.5px] text-dim">Yours to keep, with the evidence index and fingerprints</span>
+                </Link>
+              </li>
+            )}
           </ul>
         </section>
+      )}
+
+      {job.worker_email && (
+        <>
+          <ChatThread jobId={job.id} messages={chat} self={role === "client" ? "the client" : "the worker"} />
+          <DisputePanel jobId={job.id} role={role} dispute={dispute} workerName={job.worker_name ?? "the worker"} />
+        </>
       )}
     </>
   );

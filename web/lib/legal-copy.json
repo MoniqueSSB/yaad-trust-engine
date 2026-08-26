@@ -1,0 +1,89 @@
+{
+ "WG_VERSION": "1.2 · 26 August 2026",
+ "CG_VERSION": "1.2 · 26 August 2026",
+ "worker_guidelines": [
+  {
+   "n": 1,
+   "title": "What Yaadly is, and what you are agreeing to",
+   "html": "<p>Yaadly connects vetted tradespeople with property owners, most of them overseas, and holds every job to one standard: <b>work is proven with evidence, and money moves when the client approves that evidence.</b> These guidelines are the rules of working with us. They exist to protect you as much as the client. Every rule here has a named counterpart on the other side, and nobody carries the risk alone.</p><div class=\"callout\"><b>What Yaadly charges you:</b> <b>12% of your agreed labour price</b> on a completed job, taken at the point you are paid, so you keep <b>88%</b>. Remote digital work carries 10% instead. Materials are never charged a fee, at cost is at cost. <b>What you never pay:</b> joining is free, quoting is free, there are no lead fees whether you win the job or not, and there is no subscription.</div><p class=\"amend\"><b>Amended in v1.1.</b> Version 1.0 stated that workers are never charged. That was wrong. It is corrected here rather than quietly, and no signature against v1.0 is carried over onto this wording, everyone re-signs.</p>"
+  },
+  {
+   "n": 2,
+   "title": "Verification, before your first job",
+   "html": "<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide a <b>live photo and a short video turning your face left to right</b>, proof of address dated within three months, and your TRN. You give <b>three references we will call</b>, and you confirm each one has been told we are calling. Certified trades have their certification checked with the body that issued it.</p><div class=\"callout warn\"><b>Police record check, Jamaica Constabulary Force.</b> Mandatory for any job over <b>&pound;500</b>, any work inside an occupied home, and any job where you hold keys or attend an empty property. Optional below &pound;500 with the owner present, and a client may still require it. Without a current check on file you cannot be matched to any job in the mandatory categories.</div><p><b>Your first job carries an independent reviewer on site, at Yaadly’s cost.</b> They walk the work with you and their notes join the record. This is not a probation you can fail quietly, it is how a brand-new profile carries the same promise as a worker with thirty jobs behind them.</p>"
+  },
+  {
+   "n": 3,
+   "title": "Quoting",
+   "html": "<ul><li>You set your own price. Yaadly does not price your work and never shows you a band to quote against.</li><li>Quote labour separately from materials. The fee is calculated on labour only.</li><li>Name your exclusions in writing. What you leave out of the quote is what you are not being paid for, and it is what stops an argument in a fortnight.</li><li>Quoting is free, every time, win or lose. There is no lead fee on this platform.</li></ul>"
+  },
+  {
+   "n": 4,
+   "title": "On site: conduct",
+   "html": "<ul><li>Turn up when you said, or say so before the day, not on it.</li><li>Treat the client, their family and anyone giving you access with respect. They see your conduct the way you see theirs.</li><li>Extra work found on site is raised through Yaadly with a photo and a price <b>before</b> it is done. Unagreed work is not payable, which protects you as much as them.</li><li>Never ask for a side payment and never accept one. It voids the protection for both of you.</li><li>Leave the site clean and show the waste has gone.</li></ul>"
+  },
+  {
+   "n": 5,
+   "title": "Evidence: how your work gets proven",
+   "html": "<p>Every stage has a checklist issued in the Kickoff Pack or Job Sheet. You file evidence against it and you write no paperwork. Evidence is timestamped and fingerprinted on upload, that is what makes it proof rather than photographs.</p><ul><li>Document the site on arrival, before anything is touched.</li><li>Photograph materials with the receipt.</li><li>Nothing gets covered over before it has been photographed.</li><li>Evidence from another job, reused, is a permanent removal. There is no second version of that conversation.</li></ul>"
+  },
+  {
+   "n": 6,
+   "title": "The Completion Report and your Yaad Score",
+   "html": "<p>At the end of the job a Completion Report is drafted for you from your evidence. You read it and confirm one thing: <b>what is written is what was done.</b> Signing something untrue is treated the same as a false document. Every completed, documented job builds your <b>Yaad Score</b>, a verified record you own, that counts with clients and, in time, with a bank.</p>"
+  },
+  {
+   "n": 7,
+   "title": "Getting paid",
+   "html": "<ul><li>The client’s payment is confirmed and held before you start, so you know the money is real.</li><li>Once your evidence is in and the client approves, you are paid <b>within 3 working days</b>: bank transfer, Lynk wallet or remittance pick-up, whichever you chose.</li><li>You can see what you are owed and what has been paid in your worker portal.</li><li>Payment is per stage, not one lump at the end. A stage signed off is a stage paid.</li></ul>"
+  },
+  {
+   "n": 8,
+   "title": "If something goes wrong",
+   "html": "<p>Disputes are reviewed by a person, not an algorithm, and they are free. <b>You are the first point of contact</b>, most things are a misunderstanding and get fixed in a day. If that does not resolve it, it escalates to Yaadly: a person reads the whole thread as it stands, neither side rewrites it, and nothing is released while it is open.</p><div class=\"callout\"><b>Site visits during a dispute.</b> Where a dispute needs eyes on site, Yaadly attends for a <b>visual review only</b>, we look, we record what we see, we do not certify and we do not adjudicate the trade craft. One visit is covered. <b>Any further site visit is chargeable</b>, because it was not agreed at the start of the job.</div>"
+  },
+  {
+   "n": 9,
+   "title": "Strikes: what loses you the platform",
+   "html": "<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody><tr><td>No-show without word</td><td>Strike; client rematched</td></tr><tr><td>Sharing contact details to arrange work off-platform</td><td>Warning, then removal</td></tr><tr><td>Side payments or off-platform deals with a Yaadly client</td><td>Removal</td></tr><tr><td>Evidence from a job that is not this job</td><td>Permanent removal</td></tr><tr><td>False document, or confirming an untrue Completion Report</td><td>Permanent removal</td></tr><tr><td>References who were never told we would call</td><td>Application refused; reviewed by a person</td></tr><tr><td>Disrespect or unsafe conduct on site</td><td>Reviewed by a person; can be removal</td></tr></tbody></table>"
+  }
+ ],
+ "client_guidelines": [
+  {
+   "n": 1,
+   "title": "What being a Yaadly client means",
+   "html": "<p>Yaadly gets property work done on evidence: verified workers, documented stages, and money that moves only when you approve what you can see. These guidelines are your side of that deal. Every protection you enjoy has a named counterpart the worker enjoys, and nobody carries the risk alone.</p>"
+  },
+  {
+   "n": 2,
+   "title": "Describing your job honestly",
+   "html": "<ul><li>Describe the site and the work as they really are. Workers can walk away from a mis-described site without penalty, so an honest pitch protects your own timeline.</li><li>Share what you know: access, occupancy, past repairs, anything already tried or quoted.</li><li>Your job card fields are what workers filter on. A blank field is a job that never reaches the right person.</li></ul>"
+  },
+  {
+   "n": 3,
+   "title": "Quotes and choosing",
+   "html": "<ul><li>Workers quote their own price. <b>Yaadly does not price work and does not publish a band for a job type</b>, we do project management and oversight, not price estimation.</li><li>Your own budget band is never shown to a worker. It exists so we can tell you early if what you want and what you have are not the same thing.</li><li>Do not beat workers down or ask them to shave the price off-platform. A fair yes or a clean no.</li><li>All work is engaged through Yaadly. Approaching a worker from this platform for a side deal removes the protection for both of you, and repeat side-dealing ends the account.</li></ul>"
+  },
+  {
+   "n": 4,
+   "title": "While the work runs",
+   "html": "<ul><li>Keep the access you promised. If your ground contact cannot open up on an agreed day, say so the day before.</li><li>Treat workers with respect, in messages and in person. They are verified professionals, and they see your conduct the way you see theirs.</li><li>Extra work you think of on site goes through Yaadly first, in writing, never negotiated at the gate.</li></ul>"
+  },
+  {
+   "n": 5,
+   "title": "Evidence, approval and money",
+   "html": "<ul><li>Review evidence when it lands, within 3 days where you can. A worker who has proven a stage is waiting on your word to be paid.</li><li>At sign-off you may approve from the evidence, book a live video walkthrough, or <b>book an independent reviewer to attend the site</b>, see section 6.</li><li>Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free and reviewed by a person, and nothing moves while one is open.</li><li>Yaadly’s <b>Guarantee &amp; Support fee is 15%</b> of the worker’s labour price, in the headline total, never charged on materials, subject to a small-job minimum of J$3,500 to J$4,500 by trade. It is itemised before you agree to anything. Where you pay in a currency other than Jamaican dollars, the conversion carries a margin of about 2%.</li><li>Pay through the agreed route only. Never pay a worker directly on the side, and never withhold approval to renegotiate a price already agreed.</li></ul><p class=\"amend\"><b>Added in v1.1.</b> Version 1.0 carried no fee clause at all, and clients signed it. This is the correction.</p>"
+  },
+  {
+   "n": 6,
+   "title": "Independent review at sign-off",
+   "html": "<p>You may have somebody attend the property before you release the final payment. Two levels, chosen when the job is set up and priced then, not after:</p><ul><li><b>Visual Check, £149</b> (£95 founding). A trained checker attends, records the finished work against the agreed scope, photographs anything visibly wrong, and files a one-page observation note in 72 hours. <b>They record. They do not rate, advise or certify.</b> Mirrors the UK property inspection report at £80 to 150.</li><li><b>Condition Report, £325</b> (£245 founding). The whole property recorded system by system, every finding rated Severe, Moderate or Low, issue summary on page one. Mirrors a <b>RICS Level 1</b> at £300 to 900, it tells you what is wrong and how bad, not what to do about it.</li><li><b>Technical Sign-off, £300</b> (£245 founding, £395 inside 48 hours). A qualified trade inspector assesses one stage against the trade standard and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion. Priced against a <b>UK structural engineer’s site visit at £300</b>.</li></ul><p><b style=\"color:var(--ink)\">Live viewing, £40, on any rung.</b> By default the inspection happens and you get the report afterwards. If you would rather be there, we call you in on video while the inspector is on site: you see what they see, you can ask them to look closer at something, and anything you raise goes in the report as your own note.</p><p class=\"tiny\" style=\"margin-top:8px\">Every rung is priced at or below the bottom of its UK band, because the scope is narrower, one property or one works package, not a whole pre-purchase survey. <b>A checker records. A trained inspector advises.</b> We tell you which one you are buying before you buy it.</p><div class=\"callout warn\"><b>Visits not agreed at the start are chargeable.</b> Where a dispute is raised we will attend for a visual review, and one visit is covered. Any further visit is charged, because it was not in the scope you agreed. We attend to look and record, certification is a matter for a PERB-registered engineer, and we will say so rather than guess.</div>"
+  },
+  {
+   "n": 7,
+   "title": "What loses the account",
+   "html": "<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody><tr><td>Side deals with platform workers</td><td>Warning, then removal</td></tr><tr><td>Abusive conduct toward a worker or staff</td><td>Reviewed by a person; can be removal</td></tr><tr><td>Withholding approval in bad faith to force a discount</td><td>Dispute ruled by a person; repeat ends the account</td></tr><tr><td>Knowingly false job descriptions</td><td>Warning, then removal</td></tr></tbody></table>"
+  }
+ ],
+ "completion_section6": "<div class=\"pksec\"><h5>6 \\u00b7 What this report is not</h5><p style=\"color:var(--coral)\">A record of physical works and costs, prepared by a construction project manager. <b>Nothing in it is legal advice or a legal opinion.</b> No title verified, no agreement interpreted, no boundary identified, no structure certified, those are matters for an attorney-at-law, a commissioned land surveyor and a PERB-registered engineer respectively. Findings are limited to what was visible and accessible on the dates stated.</p><p class=\"tiny\" style=\"margin-top:8px\">We carried out this service with reasonable care and skill, as section 49 of the Consumer Rights Act 2015 requires. Nothing here limits that duty or your rights under it.</p>"
+}

@@ -108,39 +108,12 @@ export default async function Board({
         <Link href="/ask" className="text-tealb underline-offset-2 hover:underline">Ask a Yaad, free answers from tradespeople</Link>
       </p>
 
-      <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5">
-        <span className="text-[10.5px] font-bold uppercase tracking-[.16em] text-dim">Viewing as</span>
-        <span className={"rounded-full border px-3 py-1.5 text-[12.5px] font-bold " + (vmode === "visitor" ? "border-coral/40 bg-coral/10 text-coral" : "border-line text-mute")}>
-          Visitor · public
-        </span>
-        <span className={"rounded-full border px-3 py-1.5 text-[12.5px] font-bold " + (vmode === "worker" ? "border-teal bg-soft text-tealb" : "border-line text-mute")}>
-          Vetted worker · signed in
-        </span>
-        <span className="min-w-[180px] flex-1 text-[12px] leading-snug text-dim">
-          {vmode === "worker"
-            ? "Vetted, profile published, Worker Guidelines signed. You can quote any open job and ask questions on it."
-            : "Anyone can browse. Quoting needs a published profile and a signed Worker Guidelines, the same rule clients meet."}
-        </span>
-        {vmode === "visitor" && (
-          <Link href="/portal/sign-in" className="rounded-full border border-line2 px-3.5 py-1.5 text-[12px] font-bold text-ink hover:border-teal hover:text-tealb">
-            Worker sign in
-          </Link>
-        )}
-      </div>
-
-      <div className="mt-3.5 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5">
-        <span className="text-[10.5px] font-bold uppercase tracking-[.16em] text-dim">Browse</span>
-        <Link href={keep("")} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (!showWorkers ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>
-          Open jobs
-        </Link>
-        <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (showWorkers ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>
-          Vetted workers
-        </Link>
-        <span className="min-w-[180px] flex-1 text-[12px] leading-snug text-dim">
-          {showWorkers
-            ? "Everyone published on Yaadly. Every profile is checked by hand before it goes live."
-            : "Every job the board is carrying right now. Quoting needs a published profile and a signed Worker Guidelines."}
-        </span>
+      <div className="mt-4 flex flex-wrap gap-2 text-[13px]">
+        <Link href={keep("")} className={!showWorkers ? "font-bold text-tealb" : "text-mute hover:text-tealb"}>Open jobs</Link>
+        <span className="text-dim">·</span>
+        <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={showWorkers ? "font-bold text-tealb" : "text-mute hover:text-tealb"}>The worker network</Link>
+        <span className="text-dim">·</span>
+        <Link href="/apply" className="text-mute hover:text-tealb">Join as a worker</Link>
       </div>
 
       {showWorkers ? (
