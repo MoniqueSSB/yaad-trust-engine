@@ -327,10 +327,8 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 .joinband .lead b{color:var(--ink)}
 
 /* hero */
-.hero-grid{display:grid;grid-template-columns:1.2fr 370px;gap:48px;align-items:center}
-@media(max-width:940px){.hero-grid{grid-template-columns:1fr;gap:36px}}
 .hpill{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mango);border:1px solid #3A3418;background:rgba(255,176,32,.06);padding:7px 14px;border-radius:100px;font-weight:700;margin-bottom:20px}
-#pane-site h1.hx{font-size:clamp(40px,5.7vw,74px);line-height:.96;margin:0}  /* capped so the longest line clears 1080 */
+#pane-site h1.hx{font-size:clamp(40px,7vw,78px);line-height:.96;margin:0}  /* full width now the phone is gone */
 #pane-site h1.hx span{display:block}
 .sub{font-size:clamp(15.5px,1.7vw,18px);color:var(--mute);max-width:50ch;margin-top:22px}
 .sub b{color:var(--ink);font-weight:700}
@@ -340,12 +338,15 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 .avail span b{color:var(--ink)}
 .avail span.now{background:rgba(80,200,150,.12);border-color:rgba(80,200,150,.4)}
 
-.strip3{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:22px}
-@media(max-width:760px){.strip3{grid-template-columns:1fr}}
-.strip3>div{background:var(--panel);padding:15px 16px}
-.strip3 b{display:block;font-family:var(--disp);font-size:23px;color:var(--tealb);line-height:1.1;font-weight:400;letter-spacing:.01em}
-.strip3 span{font-size:var(--t-tiny);color:var(--mute);line-height:1.5}
-.strip3 i{font-style:normal;color:var(--dim)}
+.searchcard{background:var(--panel);border:1px solid var(--line2);border-radius:var(--r-lg);padding:16px;margin-top:26px;box-shadow:0 20px 50px -30px #000}
+.searchrow{display:grid;grid-template-columns:1.6fr 1fr auto;gap:10px}
+@media(max-width:760px){.searchrow{grid-template-columns:1fr}}
+.searchcard label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.searchcard .f{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:13px 14px;color:var(--ink);font:inherit;font-size:15px}
+.searchcard .f::placeholder{color:var(--dim)}
+.searchcard .f:focus{border-color:var(--teal);outline:none}
+.searchcard .hnote{font-size:var(--t-tiny);color:var(--dim);line-height:1.55;margin-top:11px}
+.searchcard .hnote a{color:var(--tealb);cursor:pointer;text-decoration:underline}
 
 /* WhatsApp demo phone */
 .phone{background:#000;border-radius:36px;padding:11px;border:1px solid #232C34;box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px rgba(20,184,166,.12);margin:0 auto;max-width:370px;width:100%}
@@ -528,8 +529,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 
 <!-- ── hero ── -->
 <div class="sect first"><div class="wrap">
-  <div class="hero-grid">
-    <div>
+  <div class="herocol">
       <div class="hpill rv">● Yaadly Ltd · UK 17358077 · Jamaica · Kingston &amp; Portmore first</div>
       <h1 class="hx">
         <span class="rv">Everyone promises</span>
@@ -542,38 +542,31 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
         <span class="now" onclick="document.getElementById('book').scrollIntoView()">✅ <b>Available today:</b>&nbsp;free scoping call</span>
         <span onclick="go('services')">✅ <b>Prices published:</b>&nbsp;checks, sign-offs, oversight, full PM</span>
       </div>
-      <div class="cta-row rv d3">
-        <a class="btn" onclick="document.getElementById('startform').scrollIntoView()">Start your job →</a>
-        <a class="btn o" id="site-start">Or start on WhatsApp</a>
-      </div>
-      <div class="strip3 rv d3">
-        <div><b>US$3.49bn</b><span>sent home in 2025. Most of it moves blind. <i>Bank of Jamaica</i></span></div>
-        <div><b>No public price</b><span>exists for most Jamaican trades. We show what your quote is built from.</span></div>
-        <div><b>3 working days</b><span>from your approval to the worker paid.</span></div>
-      </div>
-      <div class="rule rv d3">⚖️ <b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div>
-    </div>
-    <div class="rv d1">
-      <div class="phone" id="phone-client">
-        <div class="screen">
-          <div class="wabar">
-            <div class="pav">Y</div>
-            <div><div class="nm">Yaadly ↔ You</div><div class="st">online</div></div>
+      <div class="searchcard rv d3">
+        <div class="searchrow">
+          <div>
+            <label class="fl" for="h-what">What do you need done?</label>
+            <input class="f" id="h-what" placeholder="e.g. Fix a leaking pipe under the kitchen sink">
           </div>
-          <div class="thread">
-            <div class="msg in">Evening. The zinc lift at my mum's place in Portmore and water a come in. I'm in London so I can't go look.<span class="t">19:42</span></div>
-            <div class="msg in"><div class="vn"><span class="play">▶</span><span class="wf"></span><span class="len">0:42</span></div>Or I can voice note it.<span class="t">19:43</span></div>
-            <div class="msg out">Got it, Andrea. Job card is up: minor roof repair, Portmore, urgent. You approve the checked price band before anyone is matched.<span class="t">19:51</span></div>
-            <div class="sysnote">Nothing is charged without you. Terms agreed in writing before work starts.</div>
-            <div class="msg out"><div class="shot">📷 Arrival photos ×3 · geotagged 09:41</div>Work has started. The site was documented first.<span class="t">Tue 09:52</span></div>
-            <div class="msg out"><div class="shot">🎬 Before / after + video · 22:38</div>Evidence is in, with your Completion Report. Approve when you are ready.<span class="t">Tue 22:41</span></div>
-            <div class="msg in">Reviewed it with my mum. The work look proper. Approved. 🙏<span class="t">Tue 22:58</span></div>
-            <div class="sysnote">Approved. The worker is paid and the job joins his Yaad Score.</div>
-            <div class="typing"><i></i><i></i><i></i></div>
+          <div>
+            <label class="fl" for="h-where">Where is it?</label>
+            <select class="f" id="h-where">
+              <option>Kingston 8, Barbican</option>
+              <option>Kingston 6, Liguanea</option>
+              <option>Kingston 10, Half Way Tree</option>
+              <option>Portmore, Greater Portmore</option>
+              <option>Portmore, Braeton</option>
+              <option>St Andrew, Stony Hill</option>
+              <option>Somewhere else in Jamaica</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            <button class="btn" style="width:100%" onclick="heroStart()">Post my job</button>
           </div>
         </div>
+        <p class="hnote">Free, and nothing is charged here. What you type carries straight down into the form below, so you never fill the same thing twice. Prefer to talk? <a id="site-start">Start on WhatsApp instead</a>.</p>
       </div>
-    </div>
+      <div class="rule rv d3">⚖️ <b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div>
   </div>
 </div></div>
 
@@ -1425,6 +1418,14 @@ const JOB_TEMPLATE = [
   "I will send photos of the area in this chat."
 ].join("\n");
 $("site-start").href = wa(JOB_TEMPLATE);
+function heroStart(){
+  var what = ($("h-what").value||"").trim();
+  var where = $("h-where").value||"";
+  if(what && $("in-desc") && !$("in-desc").value.trim()) $("in-desc").value = what;
+  if(where && $("in-where") && !$("in-where").value.trim()) $("in-where").value = (where==="Somewhere else in Jamaica" ? "" : where);
+  var f = $("startform"); if(f) f.scrollIntoView();
+  setTimeout(function(){ var t=$("in-name"); if(t) t.focus(); }, 400);
+}
 function startJob(){ window.open($("site-start").href, "_blank", "noopener"); }
 /* photo handling: shrink to max 1280px JPEG so they fit browser storage */
 function shrink(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>{ const im=new Image(); im.onload=()=>{ const M=1280, sc=Math.min(1, M/Math.max(im.width,im.height)); const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc); c.getContext("2d").drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",.72)); }; im.src=r.result; }; r.readAsDataURL(file); }); }
@@ -4010,7 +4011,6 @@ renderAll();
       }, {threshold:.3});
       pio.observe(root);
     }
-    wirePhone('phone-client');
     wirePhone('phone-worker');
   }catch(err){ revealAll(); }
 })();
