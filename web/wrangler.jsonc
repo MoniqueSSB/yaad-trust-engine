@@ -11,11 +11,9 @@
   "observability": {
     "enabled": true
   },
-  // The portal's real address. Activates on deploy once the yaadly.co.uk
-  // zone is live on Cloudflare (it is added and waiting on the Phase8
-  // nameserver change). Until then this line must stay commented or the
-  // deploy fails.
-  // "routes": [{ "pattern": "app.yaadly.co.uk", "custom_domain": true }]
+  // The portal's real address. The yaadly.co.uk zone went active on
+  // Cloudflare on 26 Aug 2026, so this deploys live.
+  "routes": [{ "pattern": "app.yaadly.co.uk", "custom_domain": true }]
   // Public env vars are set at build time from .env.local / .env.production.
   // Anything genuinely secret goes in `wrangler secret put NAME`, never here:
   // this file is committed to a public repository.
