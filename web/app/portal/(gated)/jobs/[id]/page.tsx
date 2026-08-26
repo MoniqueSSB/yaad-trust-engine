@@ -6,6 +6,7 @@ import { STAGES, jobStage } from "@/lib/portal/journey";
 import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
+import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,8 @@ type Evidence = {
   ok: boolean | null;
   created_at: string | null;
   uploaded_by: string | null;
+  sha256: string | null;
+  stage: number | null;
 };
 
 type Quote = {
@@ -98,7 +101,7 @@ export default async function JobRoom({
     await Promise.all([
       supabase
         .from("evidence")
-        .select("id,label,meta,img,ok,created_at,uploaded_by")
+        .select("id,label,meta,img,ok,created_at,uploaded_by,sha256,stage")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -129,6 +132,8 @@ export default async function JobRoom({
     .maybeSingle();
 
   const ev = (evidence ?? []) as Evidence[];
+  const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
+  const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
   const pk = (packs ?? []) as Pack[];
 
@@ -193,63 +198,93 @@ export default async function JobRoom({
 
       <section className="mt-8">
         <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-          Evidence · {ev.length} item{ev.length === 1 ? "" : "s"}
+          Evidence ledger · {ev.length} item{ev.length === 1 ? "" : "s"}
         </h2>
         <p className="mb-4 max-w-[62ch] text-[13px] leading-relaxed text-mute">
-          Money only moves against what is on this list. Nothing here can be
-          edited after upload.
+          Each stage has its own checklist, its own proof and its own release.
+          Money moves once per stage, never as one lump at the end.
         </p>
-        {ev.length === 0 ? (
-          <p className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] text-mute">
-            No evidence filed yet. It appears here the moment the first
-            arrival photos are uploaded.
-          </p>
-        ) : (
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ev.map((e) => (
-              <li
-                key={e.id}
-                className="overflow-hidden rounded-2xl border border-line bg-panel"
-              >
-                {e.img ? (
-                  // Stored inline in the evidence row as a data URI, so this
-                  // never fetches from a third party.
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={e.img}
-                    alt={e.label ?? "Evidence photo"}
-                    className="h-40 w-full object-cover"
-                  />
-                ) : (
-                  <div className="grid h-40 w-full place-items-center bg-panel2 text-[12px] text-dim">
-                    No image on this item
-                  </div>
-                )}
-                <div className="p-3.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <b className="text-[13.5px] leading-snug">
-                      {e.label ?? "Evidence"}
-                    </b>
-                    {e.ok != null && (
-                      <span
-                        className={
-                          "rounded-full px-2 py-0.5 text-[10px] font-bold " +
-                          (e.ok
-                            ? "bg-tealb/15 text-tealb"
-                            : "bg-mango/15 text-mango")
-                        }
-                      >
-                        {e.ok ? "Checked" : "Awaiting check"}
-                      </span>
-                    )}
-                  </div>
-                  {e.meta && (
-                    <p className="mt-1 text-[12px] text-dim">{e.meta}</p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
+
+        {stages.map((stageNo) => {
+          const items = ev.filter((e) => (e.stage ?? 1) === stageNo);
+          const state = stageNo < (job.stage ?? 0) ? "done" : stageNo === (job.stage ?? 0) || (job.stage ?? 0) === 0 ? "now" : "todo";
+          return (
+            <div
+              key={stageNo}
+              className={
+                "mb-3 rounded-2xl border p-4 " +
+                (state === "done"
+                  ? "border-softline bg-soft"
+                  : state === "now"
+                    ? "border-mango/40 bg-mango/5"
+                    : "border-line bg-panel opacity-70")
+              }
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <b className="text-[14px]">Stage {stageNo}</b>
+                <span
+                  className={
+                    "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide " +
+                    (state === "done"
+                      ? "bg-tealb/15 text-tealb"
+                      : state === "now"
+                        ? "bg-mango/15 text-mango"
+                        : "bg-panel2 text-dim")
+                  }
+                >
+                  {state === "done" ? "Signed off · released" : state === "now" ? "In progress" : "Not started"}
+                </span>
+                <span className="ml-auto text-[11.5px] text-dim">
+                  {items.length} item{items.length === 1 ? "" : "s"} filed
+                </span>
+              </div>
+
+              {items.length === 0 ? (
+                <p className="mt-2.5 text-[12.5px] text-dim">
+                  Nothing filed against this stage yet.
+                </p>
+              ) : (
+                <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {items.map((e) => (
+                    <li key={e.id} className="overflow-hidden rounded-xl border border-line bg-panel">
+                      {e.img ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={e.img} alt={e.label ?? "Evidence photo"} className="h-36 w-full object-cover" />
+                      ) : (
+                        <div className="grid h-16 w-full place-items-center bg-panel2 text-[11.5px] text-dim">
+                          Filed without an image
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <b className="text-[13px] leading-snug">{e.label ?? "Evidence"}</b>
+                          {e.ok != null && (
+                            <span className={"rounded-full px-2 py-0.5 text-[9.5px] font-bold " + (e.ok ? "bg-tealb/15 text-tealb" : "bg-mango/15 text-mango")}>
+                              {e.ok ? "Checked" : "Awaiting check"}
+                            </span>
+                          )}
+                        </div>
+                        {e.created_at && (
+                          <p className="mt-0.5 text-[11px] text-dim">
+                            {new Date(e.created_at).toISOString().slice(0, 16).replace("T", " ")}
+                          </p>
+                        )}
+                        {e.sha256 && (
+                          <p className="mt-1.5 break-all font-mono text-[9px] leading-relaxed text-dim">
+                            sha256 · {e.sha256}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+
+        {job.status !== "complete" && (
+          <EvidenceUpload jobId={job.id} maxStage={stages.length} />
         )}
       </section>
 
