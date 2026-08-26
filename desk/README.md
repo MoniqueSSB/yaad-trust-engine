@@ -17,6 +17,16 @@ lands here gets deleted from `docs/index.html`, and the public page gets
 smaller and quieter with every move.
 
 Invoicing was the first pane, because it was new and had nothing to migrate.
+Sketch packs followed, for the same reason.
+
+| Pane | State |
+|---|---|
+| Invoices | here |
+| Sketch packs | here |
+| Intake, Jobs, Services, Workers, Applications, Marketplace, Calls, Waiting list, Feedback, Kickoff packs | still in `docs/index.html` |
+
+The dashed tabs in the desk are that right-hand column. Each turns solid when
+its pane moves across.
 
 ## Running it
 

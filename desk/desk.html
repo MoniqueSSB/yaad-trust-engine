@@ -81,6 +81,16 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:10px;b
       border-radius:10px;font-size:14px;color:var(--mute)}
 .rule b{color:var(--ink)}
 .todo li{margin-bottom:7px;color:var(--mute);font-size:14px}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.thumb{position:relative;border:2px solid var(--line);border-radius:8px;overflow:hidden;background:#0A1512}
+.thumb.out{opacity:.28}
+.thumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+.thumb .n{position:absolute;top:5px;left:5px;background:var(--teal);color:#04120F;font-size:11px;
+  font-weight:700;border-radius:999px;padding:1px 8px}
+.thumb .x{position:absolute;top:5px;right:5px;background:rgba(8,17,15,.8);color:#fff;border:0;
+  border-radius:999px;width:22px;height:22px;font-size:13px;cursor:pointer;line-height:1}
+.thumb .cap{padding:6px 8px;font-size:11px;color:var(--mute);line-height:1.35}
+.sketchbox{background:#fff;border-radius:10px;padding:12px;margin:12px 0;overflow-x:auto}
 .hidden{display:none}
 </style>
 </head>
@@ -142,6 +152,68 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:10px;b
         <div class="card">
           <h2>Recent invoices</h2>
           <div class="list" id="list"></div>
+        </div>
+      </div>
+
+      <!-- ============ SKETCH PACKS ============ -->
+      <div id="pane-sketch" class="hidden">
+        <div class="card">
+          <h2>Site Sketch Pack</h2>
+          <div class="msg warn" style="margin-top:0">
+            Indicative only. This produces a record of what was filmed, never a survey.
+            No measurement goes in it, and the database will refuse to approve one that
+            slips through. If a client needs dimensions, they need a surveyor.
+          </div>
+          <div id="skMsg"></div>
+
+          <label>Walkthrough video</label>
+          <input id="skVideo" type="file" accept="video/*">
+          <div class="hint">The video stays on this machine. Only the stills you keep are ever sent anywhere.</div>
+
+          <div class="row" style="margin-top:14px">
+            <div><label>How many stills</label><input id="skCount" type="number" min="4" max="36" value="12"></div>
+            <div><label>Property label, no address</label><input id="skLabel" placeholder="The Portmore house"></div>
+          </div>
+          <div class="row">
+            <div><label>Client name</label><input id="skClient"></div>
+            <div><label>Parish</label><input id="skParish" placeholder="St Catherine"></div>
+          </div>
+          <div class="row">
+            <div><label>Date filmed</label><input id="skDate" type="date"></div>
+            <div><label>Walked by</label><input id="skWho" placeholder="Who was on site"></div>
+          </div>
+          <div class="row">
+            <div><label>Anything the reader should know, optional</label><input id="skContext" placeholder="Back bedroom was locked, could not get in"></div>
+          </div>
+          <button class="go" id="skPull">Pull the stills</button>
+        </div>
+
+        <div class="card hidden" id="skFramesCard">
+          <h2 id="skFramesTitle">Stills</h2>
+          <div class="hint" style="margin-top:0;margin-bottom:12px">Drop anything blurred, dark or pointing at nothing. Fewer good stills beat more bad ones.</div>
+          <div id="skThumbs" class="thumbs"></div>
+          <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="go sm" id="skDescribe">Describe what is in them</button>
+            <button class="ghost sm" id="skAssemble" disabled>Build the pack</button>
+          </div>
+          <div id="skProgress" class="hint"></div>
+        </div>
+
+        <div class="card hidden" id="skPackCard">
+          <h2 id="skPackTitle">Pack</h2>
+          <div id="skPackMsg"></div>
+          <div id="skPackBody"></div>
+        </div>
+
+        <div class="card hidden" id="skPreviewCard">
+          <h2>What the client reads</h2>
+          <button class="ghost sm" id="skPrint">Print or save as PDF</button>
+          <iframe id="skPreview"></iframe>
+        </div>
+
+        <div class="card">
+          <h2>Recent packs</h2>
+          <div class="list" id="skList"></div>
         </div>
       </div>
 
@@ -207,7 +279,8 @@ function startClient(){
 // ---------------------------------------------------------------- panes
 
 const PANES = [
-  { key:"invoices", label:"Invoices", live:true, load: loadInvoices },
+  { key:"invoices", label:"Invoices",     live:true, load: loadInvoices },
+  { key:"sketch",   label:"Sketch packs", live:true, load: loadSketchPacks },
   { key:"intake",   label:"Intake" },
   { key:"jobs",     label:"Jobs" },
   { key:"services", label:"Services" },
@@ -233,10 +306,10 @@ async function deskTab(key){
   currentPane = key;
   const pane = PANES.find(p => p.key === key);
   buildTabs();
-  show("pane-invoices", key === "invoices");
-  show("pane-pending", key !== "invoices");
+  for (const p of PANES) if (p.live) show("pane-" + p.key, p.key === key);
+  show("pane-pending", !(pane && pane.live));
   if (pane && pane.live && pane.load) await pane.load();
-  else $("pendingTitle").textContent = pane.label + ": still on the old desk";
+  else if (pane) $("pendingTitle").textContent = pane.label + ": still on the old desk";
 }
 
 $("oldDesk").addEventListener("click", () => window.open(OLD_DESK, "_blank", "noopener"));
@@ -474,6 +547,272 @@ async function loadInvoices(){
     CURRENT = { questions: [] };
     await reload(e.target.dataset.open);
     $("invCard").scrollIntoView({ behavior: "smooth" });
+  }));
+}
+
+// ---------------------------------------------------------------- sketch packs
+//
+// The video never leaves this machine. Frames are pulled here, in a canvas,
+// and only the stills she keeps are uploaded. That is a privacy decision as
+// much as a technical one: a walkthrough of somebody's home is not ours to
+// ship to a model wholesale.
+//
+// The measurement rule is enforced in three places and this is the first one
+// she sees: anything the model says with a number and a unit in it is scrubbed
+// server side and reported back here, in the open, rather than quietly fixed.
+
+const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
+let SK_FRAMES = [];     // [{n, t, data, keep}]
+let SK_DESCRIBED = [];  // what the vision model said
+let SK_PACK = null;
+
+async function skFn(payload){
+  const r = await fetch(SK_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+const mmss = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
+
+// Seek, draw, repeat. Downscaled and JPEG-compressed because a vision model
+// gains nothing from a 4K still and the upload has to survive Jamaican wifi.
+async function skExtract(file, count){
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.preload = "auto"; v.muted = true; v.playsInline = true; v.src = url;
+  try {
+    await new Promise((res, rej) => {
+      v.onloadedmetadata = res;
+      v.onerror = () => rej(new Error("That file could not be read as a video. Try an MP4 or a MOV."));
+      setTimeout(() => rej(new Error("That video took too long to open.")), 20000);
+    });
+    let dur = v.duration;
+    if (!isFinite(dur) || dur <= 0) throw new Error("That video has no readable length, so stills cannot be spaced through it.");
+
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 960 / Math.max(v.videoWidth || 960, v.videoHeight || 720));
+    canvas.width = Math.round((v.videoWidth || 960) * scale);
+    canvas.height = Math.round((v.videoHeight || 720) * scale);
+    const ctx = canvas.getContext("2d");
+
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const t = dur * (i + 0.5) / count;
+      await new Promise((res, rej) => {
+        v.onseeked = res;
+        v.onerror = () => rej(new Error("The video stopped part way through."));
+        setTimeout(res, 4000);          // a stubborn seek should not hang the desk
+        v.currentTime = t;
+      });
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      out.push({ n: i + 1, t, data: canvas.toDataURL("image/jpeg", 0.72), keep: true });
+      $("skProgress").textContent = `Pulling still ${i + 1} of ${count}.`;
+    }
+    return out;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function skRenderThumbs(){
+  const kept = SK_FRAMES.filter(f => f.keep).length;
+  $("skFramesTitle").textContent = `Stills, ${kept} kept of ${SK_FRAMES.length}`;
+  $("skThumbs").innerHTML = SK_FRAMES.map(f => {
+    const d = SK_DESCRIBED.find(x => x.n === f.n);
+    return `<div class="thumb ${f.keep ? "" : "out"}" data-n="${f.n}">
+      <span class="n">${f.n}</span>
+      <button class="x" title="${f.keep ? "drop this one" : "put it back"}">${f.keep ? "×" : "+"}</button>
+      <img src="${f.data}" alt="still ${f.n}">
+      <div class="cap">${esc(d ? (d.room || "") : mmss(f.t))}${d && d.visible ? "<br>" + esc(d.visible.slice(0, 90)) : ""}</div>
+    </div>`;
+  }).join("");
+  $("skThumbs").querySelectorAll(".x").forEach(b => b.addEventListener("click", (e) => {
+    const n = Number(e.target.closest(".thumb").dataset.n);
+    const f = SK_FRAMES.find(x => x.n === n);
+    f.keep = !f.keep;
+    skRenderThumbs();
+  }));
+}
+
+$("skPull").addEventListener("click", async () => {
+  const file = $("skVideo").files[0];
+  if (!file) return say("skMsg","err","Choose the walkthrough video first.");
+  if (!$("skLabel").value.trim()) return say("skMsg","err","Give the property a label. Not the address: something like 'The Portmore house'.");
+  const count = Math.max(4, Math.min(36, Number($("skCount").value) || 12));
+  $("skPull").disabled = true;
+  say("skMsg","ok","Reading the video. It is not being uploaded.");
+  try {
+    SK_FRAMES = await skExtract(file, count);
+    SK_DESCRIBED = []; SK_PACK = null;
+    show("skFramesCard", true); show("skPackCard", false); show("skPreviewCard", false);
+    $("skProgress").textContent = "";
+    $("skAssemble").disabled = true;
+    skRenderThumbs();
+    say("skMsg","ok",`${SK_FRAMES.length} stills pulled from ${mmss(SK_FRAMES[SK_FRAMES.length-1].t)} of footage. Nothing has left this machine.`);
+  } catch (e) {
+    say("skMsg","err", e.message);
+  }
+  $("skPull").disabled = false;
+});
+
+$("skDescribe").addEventListener("click", async () => {
+  const kept = SK_FRAMES.filter(f => f.keep);
+  if (!kept.length) return say("skMsg","err","Every still is dropped. Keep at least one.");
+  $("skDescribe").disabled = true;
+  SK_DESCRIBED = [];
+  const scrubs = [];
+  try {
+    // Six at a time. The batching is not politeness, it is what keeps each
+    // call inside the edge function's timeout.
+    for (let i = 0; i < kept.length; i += 6) {
+      const batch = kept.slice(i, i + 6);
+      $("skProgress").textContent = `Looking at stills ${batch[0].n} to ${batch[batch.length-1].n}, ${i + batch.length} of ${kept.length}.`;
+      const out = await skFn({
+        action: "frames",
+        images: batch.map(b => b.data),
+        start_at: batch[0].n,
+        context: $("skContext").value.trim(),
+      });
+      SK_DESCRIBED.push(...(out.frames || []));
+      scrubs.push(...(out.scrubbed || []));
+      skRenderThumbs();
+    }
+    $("skProgress").textContent = "";
+    $("skAssemble").disabled = false;
+    say("skMsg", scrubs.length ? "warn" : "ok",
+      scrubs.length
+        ? `${SK_DESCRIBED.length} stills described. ${scrubs.length} measurement phrase${scrubs.length > 1 ? "s were" : " was"} removed: the model tried to state a size it cannot know. That is the guard doing its job.`
+        : `${SK_DESCRIBED.length} stills described, no measurements attempted. Now build the pack.`);
+  } catch (e) {
+    $("skProgress").textContent = "";
+    say("skMsg","err", /NVIDIA_API_KEY/i.test(e.message)
+      ? "The NVIDIA key is not set as an Edge Function secret, so the vision model cannot be reached."
+      : e.message);
+  }
+  $("skDescribe").disabled = false;
+});
+
+$("skAssemble").addEventListener("click", async () => {
+  if (!SK_DESCRIBED.length) return say("skMsg","err","Describe the stills first.");
+  $("skAssemble").disabled = true;
+  say("skMsg","ok","Working out the rooms and drawing the sketch.");
+  try {
+    const out = await skFn({
+      action: "assemble",
+      frames: SK_DESCRIBED,
+      property_label: $("skLabel").value.trim(),
+      client_name: $("skClient").value.trim(),
+      parish: $("skParish").value.trim(),
+      visit_date: $("skDate").value || null,
+      captured_by: $("skWho").value.trim(),
+    });
+    SK_PACK = out.pack;
+    skRenderPack(out);
+    await loadSketchPacks();
+    say("skMsg","ok", `Draft ${out.pack.id} built. Read every room before you approve it.`);
+  } catch (e) {
+    say("skMsg","err", e.message);
+  }
+  $("skAssemble").disabled = false;
+});
+
+function skRenderPack(extra){
+  const p = SK_PACK;
+  if (!p) return show("skPackCard", false);
+  const rooms = p.rooms || [];
+  const draft = p.status === "draft";
+  const sev = { high:"#E5484D", medium:"var(--mango)", low:"var(--dim)" };
+
+  $("skPackTitle").innerHTML = esc(p.id) + ` <span class="pill ${p.status === "draft" ? "draft" : p.status === "void" ? "void" : "sent"}">${esc(p.status)}</span>`
+    + (p.rev > 1 ? ` <span class="pill draft">rev ${esc(p.rev)}</span>` : "");
+
+  $("skPackBody").innerHTML = `
+    <div style="color:var(--mute);font-size:14px">${esc(p.property_label)}${p.client_name ? " · " + esc(p.client_name) : ""}${p.parish ? " · " + esc(p.parish) : ""}</div>
+    ${p.sketch_svg ? `<div class="sketchbox">${p.sketch_svg}</div>` : ""}
+    <table>
+      <thead><tr><th>Room</th><th>Photos</th><th>What was seen</th></tr></thead>
+      <tbody>${rooms.map(r => `
+        <tr>
+          <td style="white-space:nowrap"><b>${esc(r.name)}</b>${r.level && r.level !== "ground" ? `<div style="color:var(--dim);font-size:11px">${esc(r.level)}</div>` : ""}</td>
+          <td style="white-space:nowrap;color:var(--dim)">${(r.frames||[]).join(", ") || "none"}</td>
+          <td>${(r.observations||[]).length ? (r.observations||[]).map(o =>
+            `<div style="padding:2px 0"><span style="color:${sev[o.severity]||"var(--dim)"}">■</span>
+             <b>${esc(String(o.category).replace("_"," "))}</b>, ${esc(o.severity)}. ${esc(o.note)}
+             ${o.recommend_professional ? '<span style="color:#E5484D"> Needs a qualified eye.</span>' : ""}</div>`).join("")
+            : '<span style="color:var(--dim)">Nothing notable visible.</span>'}</td>
+        </tr>`).join("")}</tbody>
+    </table>
+    ${(extra?.scrubbed || []).length ? `<div class="msg warn">${extra.scrubbed.length} measurement phrase${extra.scrubbed.length > 1 ? "s" : ""} removed from the model's wording before this was saved. What it tried to say: ${esc(extra.scrubbed.slice(0,3).join(" · "))}</div>` : ""}
+    ${(extra?.gaps || []).length ? `<div class="qs"><h3>What this pack does not cover</h3><ul>${extra.gaps.map(g => "<li>" + esc(g) + "</li>").join("")}</ul></div>` : ""}
+    <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ghost sm" id="skPreviewBtn">Preview</button>
+      ${draft ? `<button class="warn sm" id="skApprove">Approve it</button>` : ""}
+      ${p.status === "approved" ? `<button class="go sm" id="skIssue">Issue to the client</button>` : ""}
+      ${p.status === "approved" ? `<button class="ghost sm" id="skReopen">Reopen for edits</button>` : ""}
+      ${draft || p.status === "approved" ? `<button class="danger sm" id="skVoid">Void</button>` : ""}
+    </div>`;
+
+  show("skPackCard", true);
+
+  $("skPreviewBtn").addEventListener("click", async () => {
+    try {
+      const { html } = await skFn({ action:"render", pack_id: p.id, as:"json",
+        property_summary: extra?.pack?.property_summary || "", gaps: extra?.gaps || [] });
+      $("skPreview").srcdoc = html;
+      show("skPreviewCard", true);
+      $("skPreviewCard").scrollIntoView({ behavior:"smooth" });
+    } catch (e) { say("skPackMsg","err", e.message); }
+  });
+
+  const setStatus = async (status, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    const { error } = await sb.from("sketch_packs").update({ status }).eq("id", p.id);
+    if (error) return say("skPackMsg","err", error.message);
+    await skReload(p.id);
+  };
+
+  if ($("skApprove")) $("skApprove").addEventListener("click", () =>
+    setStatus("approved", "Approve " + p.id + "?\n\nYou are saying you have read every room and it matches what you saw. This freezes the content."));
+  if ($("skIssue")) $("skIssue").addEventListener("click", () =>
+    setStatus("issued", "Issue " + p.id + " to the client?\n\nIt becomes visible to them in the portal. It does not email anybody."));
+  if ($("skReopen")) $("skReopen").addEventListener("click", () =>
+    setStatus("draft", "Reopen " + p.id + "?\n\nThis clears the approval and starts a new revision."));
+  if ($("skVoid")) $("skVoid").addEventListener("click", () =>
+    setStatus("void", "Void " + p.id + "? It stays on the record, marked void."));
+}
+
+async function skReload(id){
+  const { data, error } = await sb.from("sketch_packs").select("*").eq("id", id).single();
+  if (error) return say("skPackMsg","err", error.message);
+  SK_PACK = data;
+  skRenderPack({});
+  await loadSketchPacks();
+}
+
+$("skPrint").addEventListener("click", () => $("skPreview").contentWindow.print());
+
+async function loadSketchPacks(){
+  const { data, error } = await sb.from("sketch_packs")
+    .select("id,property_label,client_name,status,created_at,rev")
+    .order("created_at", { ascending: false }).limit(15);
+  if (error) return;
+  $("skList").innerHTML = (data || []).map(p => `
+    <div class="item">
+      <div><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a>
+        <span class="pill ${p.status === "draft" ? "draft" : p.status === "void" ? "void" : "sent"}" style="margin-left:8px">${esc(p.status)}</span>
+        <div style="color:var(--dim);font-size:13px">${esc(p.property_label)}${p.client_name ? " · " + esc(p.client_name) : ""}</div></div>
+      <div style="color:var(--dim);font-size:13px">${esc(String(p.created_at).slice(0,10))}</div>
+    </div>`).join("") || '<div style="color:var(--dim)">Nothing yet.</div>';
+
+  $("skList").querySelectorAll("[data-skopen]").forEach(a => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await skReload(e.target.dataset.skopen);
+    $("skPackCard").scrollIntoView({ behavior:"smooth" });
   }));
 }
 
