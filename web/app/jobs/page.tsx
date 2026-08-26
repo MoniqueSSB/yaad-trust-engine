@@ -1,221 +1,277 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/auth";
+import { QuotePanel } from "@/components/QuotePanel";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The public marketplace at app.yaadly.co.uk/jobs, laid out to mirror the
- * old #market pane on the landing page, whose copy is decided and carried
- * over verbatim. Reads the redacted open_jobs view and the public
- * worker_profiles rows (anon SELECT where active, by design). Acting is
- * behind /portal.
+ * The marketplace board, MARKETPLACE-BUILD-SPEC v1.0, built at
+ * app.yaadly.co.uk/jobs per the founder's decision that the product lives
+ * in the app. Two independent switches: vmode (visitor or vetted worker,
+ * a REAL auth state here, derived server-side) and mtab (jobs/workers).
+ * Reads only the open_jobs and client_summary views plus public
+ * worker_profiles and job_photos. budget_band is never selected anywhere
+ * on this page; the view makes that structural.
  */
 
 type OpenJob = {
-  id: string;
-  title: string | null;
-  trade: string | null;
-  parish: string | null;
-  descr: string | null;
-  client_signed: boolean | null;
-  client_jobs_completed: number | null;
+  id: string; title: string | null; trade: string | null; parish: string | null;
+  descr: string | null; updated_at: string | null;
+  client_signed: boolean | null; client_jobs_completed: number | null;
+  job_type: string | null; size_band: string | null;
+  access_type: string | null; materials_by: string | null; urgency: string | null;
 };
-
-type Worker = {
-  name: string | null;
-  trade: string | null;
-  parish: string | null;
-  lane: string | null;
-  jobs_completed: number | null;
-};
+type Photo = { job_id: string; caption: string; img: string | null; position: number };
+type Worker = { name: string | null; trade: string | null; parish: string | null; lane: string | null; jobs_completed: number | null };
 
 export const metadata = {
   title: "The marketplace · Yaadly",
-  description:
-    "Open property jobs across Jamaica and the verified workers who do them. Money held until the work is proven.",
+  description: "Open property jobs across Jamaica and the verified workers who do them. Money held until the work is proven.",
 };
 
 const SITE = "https://yaadly.co.uk";
 
+function ago(iso: string | null): string {
+  if (!iso) return "";
+  const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return mins + " min ago";
+  const h = Math.round(mins / 60);
+  if (h < 24) return h + (h === 1 ? " hour ago" : " hours ago");
+  const days = Math.round(h / 24);
+  return days === 1 ? "yesterday" : days + " days ago";
+}
+
 export default async function Board({
   searchParams,
 }: {
-  searchParams: Promise<{ trade?: string }>;
+  searchParams: Promise<{ trade?: string; tab?: string; q?: string; pics?: string }>;
 }) {
-  const { trade } = await searchParams;
+  const { trade, tab, q, pics } = await searchParams;
   const supabase = await createClient();
+  const user = await getUser();
 
-  let jq = supabase
-    .from("open_jobs")
-    .select("id,title,trade,parish,descr,client_signed,client_jobs_completed")
-    .order("updated_at", { ascending: false });
+  // vmode is a real auth state: signed in, published profile, guidelines
+  // signed. The same three things jq_insert_vetted checks in Postgres.
+  let vmode: "visitor" | "worker" = "visitor";
+  if (user?.email) {
+    const email = user.email.toLowerCase();
+    const [{ data: wp }, { data: sig }] = await Promise.all([
+      supabase.from("worker_profiles").select("worker_email").eq("worker_email", email).eq("active", true).maybeSingle(),
+      supabase.from("doc_signatures").select("id").eq("doc_type", "worker_guidelines").ilike("signer_email", email).limit(1).maybeSingle(),
+    ]);
+    if (wp && sig) vmode = "worker";
+  }
+
+  let jq = supabase.from("open_jobs").select("*").order("updated_at", { ascending: false });
   if (trade) jq = jq.eq("trade", trade);
 
-  const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] =
-    await Promise.all([
-      jq,
-      supabase
-        .from("worker_profiles")
-        .select("name,trade,parish,lane,jobs_completed")
-        .eq("active", true)
-        .order("jobs_completed", { ascending: false }),
-      supabase.from("open_jobs").select("trade"),
-    ]);
+  const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] = await Promise.all([
+    jq,
+    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed").eq("active", true).order("jobs_completed", { ascending: false }),
+    supabase.from("open_jobs").select("trade"),
+  ]);
 
   const jobs = (jobsData ?? []) as OpenJob[];
+  const jobIds = jobs.map((j) => j.id);
+  const { data: photoData } = jobIds.length
+    ? await supabase.from("job_photos").select("job_id,caption,img,position").in("job_id", jobIds).order("position")
+    : { data: [] };
+  const photosByJob = new Map<string, Photo[]>();
+  for (const p of (photoData ?? []) as Photo[]) {
+    const l = photosByJob.get(p.job_id) ?? [];
+    l.push(p);
+    photosByJob.set(p.job_id, l);
+  }
+
   const workers = (workersData ?? []) as Worker[];
-  const trades = [
-    ...new Set((tradeRows ?? []).map((t) => t.trade).filter(Boolean)),
-  ] as string[];
+  const trades = [...new Set((tradeRows ?? []).map((t) => t.trade).filter(Boolean))] as string[];
+  const showWorkers = tab === "workers";
+  const keep = (extra: string) =>
+    `/jobs?${[trade && `trade=${encodeURIComponent(trade)}`, showWorkers && "tab=workers", extra].filter(Boolean).join("&")}`;
+  const newest = jobs[0]?.updated_at ? new Date(jobs[0].updated_at).getTime() : 0;
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-10">
       <h1 className="font-display text-[clamp(34px,6vw,64px)] uppercase leading-[0.97]">
-        The{" "}
-        <span className="bg-linear-to-r from-tealb to-teal bg-clip-text text-transparent">
-          marketplace.
-        </span>
+        The <span className="bg-linear-to-r from-tealb to-teal bg-clip-text text-transparent">marketplace.</span>
       </h1>
       <p className="mt-4 max-w-[68ch] text-[15.5px] leading-relaxed text-mute">
-        Open to everyone to look at: the jobs waiting for quotes, and the
-        verified workers who do them.{" "}
-        <b className="text-ink">Taking part is signed-on only.</b> Workers sign
-        in to quote. You become a client by creating your profile and signing
-        the Client Guidelines, then you can pitch jobs, and your completed jobs
-        build your own record, the same way a worker&apos;s do.
+        The public board. This is the <code className="font-mono text-[13px] text-tealb">open_jobs</code> view,
+        safe columns only, anyone can read it, and a job only appears here once
+        its client has signed the Client Guidelines. No addresses, no phone
+        numbers, ever.
       </p>
 
-      <div className="mt-4.5 flex flex-wrap gap-2.5">
-        <Link href="/portal/sign-in" className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-[#04211D] transition hover:brightness-110">
-          Become a client &rarr;
-        </Link>
-        <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-5 py-3 text-[14px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-          Apply as a worker
-        </a>
-        <Link href="/portal/sign-in" className="rounded-full border border-line2 px-5 py-3 text-[14px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-          Client sign in
-        </Link>
-        <Link href="/portal/sign-in" className="rounded-full border border-line2 px-5 py-3 text-[14px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-          Worker sign in
-        </Link>
-      </div>
-
-      <div className="mt-4.5 rounded-xl border border-softline bg-soft px-4 py-3 text-[13.5px] leading-relaxed text-[#BDE8DE]">
-        ⚖️ <b className="text-ink">How the door works:</b> anyone can look. To
-        quote you must be a verified, signed-in worker who has signed the
-        Worker Guidelines. To pitch a job you must have created your profile
-        and signed the Client Guidelines. Both sides sign the same kind of
-        promise, both sides build a scored record, and nobody carries the risk
-        alone.
-      </div>
-
-      <h2 className="mt-9 text-[11px] font-bold uppercase tracking-[.18em] text-tealb">
-        Jobs open for quotes
-      </h2>
-
-      {trades.length > 1 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/jobs" className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (!trade ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>
-            All trades
+      <div className="mt-5 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5">
+        <span className="text-[10.5px] font-bold uppercase tracking-[.16em] text-dim">Viewing as</span>
+        <span className={"rounded-full border px-3 py-1.5 text-[12.5px] font-bold " + (vmode === "visitor" ? "border-coral/40 bg-coral/10 text-coral" : "border-line text-mute")}>
+          Visitor · public
+        </span>
+        <span className={"rounded-full border px-3 py-1.5 text-[12.5px] font-bold " + (vmode === "worker" ? "border-teal bg-soft text-tealb" : "border-line text-mute")}>
+          Vetted worker · signed in
+        </span>
+        <span className="min-w-[180px] flex-1 text-[12px] leading-snug text-dim">
+          {vmode === "worker"
+            ? "Vetted, profile published, Worker Guidelines signed. You can quote any open job and ask questions on it."
+            : "Anyone can browse. Quoting needs a published profile and a signed Worker Guidelines, the same rule clients meet."}
+        </span>
+        {vmode === "visitor" && (
+          <Link href="/portal/sign-in" className="rounded-full border border-line2 px-3.5 py-1.5 text-[12px] font-bold text-ink hover:border-teal hover:text-tealb">
+            Worker sign in
           </Link>
-          {trades.map((t) => (
-            <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (trade === t ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>
-              {t}
-            </Link>
-          ))}
-        </div>
-      )}
+        )}
+      </div>
 
-      {jobs.length === 0 ? (
-        <p className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-          No jobs are open for quotes right now. Pitched jobs land here the
-          moment Yaadly opens them, so pitch yours and it can be next.
-        </p>
-      ) : (
-        <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
-          {jobs.map((j) => (
-            <div key={j.id} className="rounded-2xl border border-line bg-panel p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2.5">
-                <h3 className="text-[16px] font-bold leading-snug">
-                  {j.title ?? "Job"}
-                </h3>
-                <span className="rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-extrabold tracking-wide text-tealb">
-                  OPEN
-                </span>
-              </div>
-              <p className="mt-1 text-[12px] text-dim">
-                {j.parish ?? ""} · {j.id} ·{" "}
-                {j.client_signed
-                  ? `client signed on · ${j.client_jobs_completed ?? 0} completed ${(j.client_jobs_completed ?? 0) === 1 ? "job" : "jobs"}`
-                  : "client record pending"}
-              </p>
-              {j.descr && (
-                <p className="mt-2 text-[13px] leading-relaxed text-mute">
-                  {j.descr.slice(0, 180)}
-                  {j.descr.length > 180 ? "..." : ""}
-                </p>
-              )}
-              <Link href="/portal/sign-in" className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] transition hover:brightness-110">
-                Sign in as a worker to quote &rarr;
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="mt-3.5 flex flex-wrap items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5">
+        <span className="text-[10.5px] font-bold uppercase tracking-[.16em] text-dim">Browse</span>
+        <Link href={keep("")} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (!showWorkers ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>
+          Open jobs
+        </Link>
+        <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (showWorkers ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>
+          Vetted workers
+        </Link>
+        <span className="min-w-[180px] flex-1 text-[12px] leading-snug text-dim">
+          {showWorkers
+            ? "Everyone published on Yaadly. Every profile is checked by hand before it goes live."
+            : "Every job the board is carrying right now. Quoting needs a published profile and a signed Worker Guidelines."}
+        </span>
+      </div>
 
-      <h2 className="mt-9 text-[11px] font-bold uppercase tracking-[.18em] text-tealb">
-        The worker network
-      </h2>
-
-      {workers.length === 0 ? (
-        <p className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-          The worker network is being built parish by parish, and nobody is
-          listed before verification is complete: government photo ID on a
-          video call, references called, and a trial job. Profiles appear here
-          as workers pass.
-        </p>
+      {showWorkers ? (
+        <WorkerDirectory workers={workers} />
       ) : (
         <>
-          <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
-            Every person here passed Yaadly verification before their first
-            job: government photo ID seen on a video call, references called,
-            past work reviewed, and a trial job. The{" "}
-            <b className="text-mute">Yaad Score record</b> is verified jobs
-            completed on Yaadly: evidence-documented, client-approved, never
-            self-reported.
+          {trades.length > 1 && (
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link href={showWorkers ? "/jobs?tab=workers" : "/jobs"} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (!trade ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>All trades</Link>
+              {trades.map((t) => (
+                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (trade === t ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>{t}</Link>
+              ))}
+            </div>
+          )}
+
+          <p className="mt-3 text-[12.5px] text-dim">
+            {jobs.length} open job{jobs.length === 1 ? "" : "s"}
+            {trade ? " in " + trade : ""} · drafts and unsigned jobs are not
+            counted because they are not here
           </p>
-          <div className="mt-2.5 grid gap-2.5">
-            {workers.map((w, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-3.5 rounded-xl border border-line bg-panel2 px-4 py-3">
-                <span className="grid size-11 flex-none place-items-center rounded-full bg-linear-to-br from-coral to-[#E0525E] text-[16px] font-extrabold text-white">
-                  {(w.name ?? "W")[0].toUpperCase()}
-                </span>
-                <span className="min-w-0">
-                  <b className="block text-[15px]">{w.name}</b>
-                  <small className="block text-[12.5px] text-mute">
-                    {w.trade ?? "General trades"}
-                    {w.parish ? " · " + w.parish : ""}
-                  </small>
-                  <small className="block text-[12.5px] text-tealb">
-                    Yaad Score record: {w.jobs_completed ?? 0} verified{" "}
-                    {(w.jobs_completed ?? 0) === 1 ? "job" : "jobs"} completed
-                  </small>
-                </span>
-                <span className={"ml-auto rounded-full px-3 py-1.5 text-[10px] font-extrabold tracking-wide " + (w.lane === "cert" ? "border border-[#4A3A10] bg-[#2E2408] text-sand" : "border border-softline bg-soft text-tealb")}>
-                  {w.lane === "cert" ? "CERTIFIED PROFESSIONAL" : "EVIDENCE VETTED"}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
-            Workers are matched or shortlisted for your job by Yaadly, so you
-            never have a stranger at your gate. Want someone here for your next
-            job? Say so when your job is scoped.
-          </p>
+
+          {jobs.length === 0 ? (
+            <p className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
+              No jobs are open for quotes right now. Pitched jobs land here the
+              moment Yaadly opens them, so pitch yours and it can be next.
+            </p>
+          ) : (
+            <div className="mt-4 grid gap-3.5">
+              {jobs.map((j) => {
+                const ph = photosByJob.get(j.id) ?? [];
+                const expanded = pics === j.id;
+                const showPh = expanded ? ph : ph.slice(0, 3);
+                const fresh = !!j.updated_at && newest - new Date(j.updated_at).getTime() < 1000 * 60 * 60 * 6;
+                const sp = [j.job_type, j.size_band, j.access_type, j.materials_by].filter(Boolean) as string[];
+                const open = q === j.id;
+                return (
+                  <div key={j.id} className={"rounded-2xl border bg-panel p-5 " + (fresh ? "border-mango/50 bg-mango/[.045]" : "border-line")}>
+                    <div className="flex flex-wrap items-start gap-3">
+                      <h2 className="min-w-[220px] flex-1 text-[16.5px] font-bold leading-snug">{j.title ?? "Job"}</h2>
+                      <span className="flex flex-wrap gap-2">
+                        {fresh && <span className="rounded-full border border-mango/40 bg-mango/10 px-2.5 py-1 text-[11px] font-bold text-mango">Just posted</span>}
+                        {j.trade && <span className="rounded-full border border-softline bg-soft px-2.5 py-1 text-[11px] font-bold text-tealb">{j.trade}</span>}
+                      </span>
+                    </div>
+
+                    {sp.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-dim">
+                        {sp.map((x) => <span key={x}>{x}</span>)}
+                      </div>
+                    )}
+
+                    {j.descr && (
+                      <p className="mt-2 whitespace-pre-wrap text-[13.5px] leading-relaxed text-mute">
+                        {j.descr.slice(0, 260)}{j.descr.length > 260 ? "..." : ""}
+                      </p>
+                    )}
+
+                    {ph.length > 0 && (
+                      <>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {showPh.map((p, i) => (
+                            <figure key={i} className="relative h-16 overflow-hidden rounded-lg border border-softline bg-linear-to-br from-panel2 to-soft">
+                              {p.img && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={p.img} alt={p.caption} className="h-full w-full object-cover" />
+                              )}
+                              <figcaption className="absolute inset-x-0 bottom-0 bg-bg/70 px-1.5 py-0.5 text-[9.5px] leading-tight text-dim">{p.caption}</figcaption>
+                            </figure>
+                          ))}
+                          {ph.length > 3 && (
+                            <Link href={expanded ? keep("") : keep("pics=" + encodeURIComponent(j.id))} className="grid h-16 place-items-center rounded-lg border border-softline bg-soft text-[12px] font-bold text-tealb hover:border-teal">
+                              {expanded ? "Show less" : "+" + (ph.length - 3) + " more"}
+                            </Link>
+                          )}
+                        </div>
+                        <p className="mt-1.5 text-[11.5px] text-dim">
+                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client{expanded ? "" : ", first three shown"} · yaad-vision has read them all
+                        </p>
+                      </>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap gap-3.5 border-t border-line pt-3 text-[12.5px] text-dim">
+                      {j.parish && <b className="font-medium text-mute">{j.parish}</b>}
+                      {j.urgency && <span>{j.urgency}</span>}
+                      {ph.length > 0 && <span>{ph.length} photos</span>}
+                      <span>{ago(j.updated_at)}</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3.5 pt-1 text-[12.5px] text-dim">
+                      <span>{j.client_signed ? "✓ Client guidelines signed" : "Awaiting client signature"}</span>
+                      <span>
+                        {(j.client_jobs_completed ?? 0) > 0
+                          ? `Client · ${j.client_jobs_completed} job${j.client_jobs_completed === 1 ? "" : "s"} completed`
+                          : "no client score yet, first job on Yaadly"}
+                      </span>
+                      <span>{j.id}</span>
+                    </div>
+
+                    <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                      <Link
+                        href={open ? keep("") : keep("q=" + encodeURIComponent(j.id))}
+                        className={vmode === "worker"
+                          ? "rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+                          : "rounded-full border border-line2 px-4 py-2 text-[13px] font-bold text-ink transition hover:border-teal hover:text-tealb"}
+                      >
+                        {open ? "Close" : "Quote this job"}
+                      </Link>
+                      <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[11px] font-bold text-mute">
+                        Quote on the scope, no band shown
+                      </span>
+                    </div>
+
+                    {open && vmode !== "worker" && (
+                      <div className="mt-3.5 flex gap-2.5 rounded-xl border border-coral/25 bg-coral/[.07] p-3.5 text-[13px] leading-relaxed text-mute">
+                        <span>🔒</span>
+                        <span>
+                          <b className="text-coral">Quoting is for vetted workers.</b>{" "}
+                          The <code className="font-mono text-[11.5px] text-tealb">job_quotes</code> insert
+                          policy needs three things true at once: a published
+                          worker profile, a signed Worker Guidelines, and a job
+                          that is genuinely open. Browsing stays free for
+                          everyone.{" "}
+                          <Link href="/portal/sign-in" className="text-tealb underline">Worker sign in</Link>
+                        </span>
+                      </div>
+                    )}
+                    {open && vmode === "worker" && <QuotePanel jobId={j.id} />}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
-      <div className="mt-7 rounded-2xl border border-line bg-panel p-5">
+      <div className="mt-8 rounded-2xl border border-line bg-panel p-5">
         <h3 className="font-display text-[19px] uppercase">
           Want to be <span className="text-mango">part of it?</span>
         </h3>
@@ -226,20 +282,55 @@ export default async function Board({
           Worker Guidelines, and every job on this board is yours to quote.
         </p>
         <div className="mt-3.5 flex flex-wrap gap-2.5">
-          <Link href="/portal/sign-in" className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110">
-            Become a client &rarr;
-          </Link>
-          <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-            Join as a worker &rarr;
-          </a>
-          <a href={`${SITE}/#client`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-            Read the Client Guidelines
-          </a>
-          <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-            Read the Worker Guidelines
-          </a>
+          <Link href="/portal/sign-in" className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110">Become a client &rarr;</Link>
+          <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Join as a worker &rarr;</a>
+          <a href={`${SITE}/#client`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Client Guidelines</a>
+          <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Worker Guidelines</a>
         </div>
       </div>
+    </div>
+  );
+}
+
+function WorkerDirectory({ workers }: { workers: Worker[] }) {
+  if (workers.length === 0) {
+    return (
+      <p className="mt-5 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
+        The worker network is being built parish by parish, and nobody is
+        listed before verification is complete: government photo ID on a video
+        call, references called, and a trial job. Profiles appear here as
+        workers pass.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-5 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      {workers.map((w, i) => (
+        <div key={i} className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4">
+          <div className="flex flex-wrap items-start gap-3">
+            <span className="grid size-11 flex-none place-items-center rounded-xl bg-linear-to-br from-tealb to-teal font-display text-[18px] text-[#04211D]">
+              {(w.name ?? "W").split(" ").map((x) => x[0]).join("").slice(0, 2)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block text-[15px] leading-tight">{w.name}</b>
+              <small className="block text-[12.5px] text-mute">{w.trade ?? "General trades"}</small>
+              <small className="block text-[12px] text-dim">{w.parish}</small>
+            </span>
+            <span className="text-right">
+              <span className="block text-[12px] text-dim">{w.jobs_completed ?? 0} jobs</span>
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-bold text-mute">ID verified</span>
+            <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-bold " + (w.lane === "cert" ? "border border-[#4A3A10] bg-[#2E2408] text-sand" : "border border-softline bg-soft text-tealb")}>
+              {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[0, 1, 2, 3].map((k) => <span key={k} className="h-9 rounded-md border border-line bg-linear-to-br from-panel2 to-soft" />)}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

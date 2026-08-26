@@ -43,19 +43,19 @@ export type Side = "client" | "worker" | "service";
  * from imagination; anything unknown lands at the start rather than lying
  * about progress.
  */
+// The real vocabulary, read from the jobs_status_check constraint on 26
+// Aug rather than assumed: draft, awaiting_client_setup, open_for_quotes,
+// quoted, in_progress, complete, disputed, cancelled. The first mapping
+// here guessed at statuses that do not exist.
 const JOB_STATUS_STAGE: Record<string, number> = {
-  awaiting_client_setup: 0,
   draft: 0,
-  open: 0,
+  awaiting_client_setup: 0,
+  open_for_quotes: 0,
   quoted: 2,
-  scope_agreed: 3,
-  confirmed: 4,
-  kickoff: 5,
   in_progress: 6,
-  evidence: 7,
-  released: 8,
+  disputed: 7,
   complete: 11,
-  reviewed: 12,
+  cancelled: 0,
 };
 
 export function jobStage(status: string | null): number {
