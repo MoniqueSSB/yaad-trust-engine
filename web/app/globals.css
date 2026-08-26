@@ -18,6 +18,13 @@
   --color-soft: #0f2b26;
   --color-softline: #1e4a42;
 
+}
+
+/* Font tokens must be inline: next/font defines --font-anton and
+   --font-space-grotesk on body, not :root, so a plain @theme token never
+   resolves and every heading silently fell back to system fonts. Found by
+   reading the computed style on the live page, 26 Aug. */
+@theme inline {
   --font-display: var(--font-anton), Impact, sans-serif;
   --font-body: var(--font-space-grotesk), -apple-system, sans-serif;
 }
