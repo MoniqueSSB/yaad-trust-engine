@@ -202,7 +202,12 @@ async function boot(){
     CATALOGUE = catalogue;
   } catch (e) {
     show("authCard",true);
-    return say("authMsg","err", e.message === "Admin only." ? "That account is not a Yaadly admin." : e.message);
+    const who = data.session.user.email;
+    if (e.message === "Admin only.") {
+      return say("authMsg","err",
+        "Signed in as " + who + ", but that address is not on the Yaadly admin list, so invoicing is closed to it. Sign out and use your admin address instead.");
+    }
+    return say("authMsg","err", "Signed in as " + who + ", but the desk could not start: " + e.message);
   }
   show("authCard",false);
   show("draftCard",true);
@@ -233,7 +238,10 @@ $("draft").onclick = async () => {
       await loadList();
     }
   } catch (e) {
-    say("draftMsg","err", e.message);
+    let hint = e.message;
+    if (/MINIMAX_API_KEY/i.test(e.message)) hint = "The MiniMax key is not set as an Edge Function secret, so the agent cannot read your instruction. Everything else is working.";
+    if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
+    say("draftMsg","err", hint);
   }
   $("draft").disabled = false;
 };
