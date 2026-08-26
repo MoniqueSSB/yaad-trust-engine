@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -40,6 +41,11 @@ export default async function Portal() {
   // this to jobs where the signed-in email is the client or the worker. If
   // the filter lived in this file, a mistake in this file would be a data
   // leak. In Postgres, a mistake here is just a shorter list.
+  const svcQuery = supabase
+    .from("services")
+    .select("id,type,parish,price,stage,updated_at")
+    .order("updated_at", { ascending: false });
+
   const { data, error } = await supabase
     .from("jobs")
     .select(
@@ -47,6 +53,14 @@ export default async function Portal() {
     )
     .order("updated_at", { ascending: false });
 
+  const { data: svcData } = await svcQuery;
+  const services = (svcData ?? []) as {
+    id: string;
+    type: string | null;
+    parish: string | null;
+    price: string | null;
+    stage: number | null;
+  }[];
   const jobs = (data ?? []) as Job[];
   const email = (user.email ?? "").toLowerCase();
   const asClient = jobs.filter((j) => j.client_email?.toLowerCase() === email);
@@ -70,7 +84,7 @@ export default async function Portal() {
         </p>
       )}
 
-      {!error && jobs.length === 0 && (
+      {!error && jobs.length === 0 && services.length === 0 && (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-6">
           <b className="text-[15px]">Nothing here yet</b>
           <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
@@ -87,6 +101,35 @@ export default async function Portal() {
       {asWorker.length > 0 && (
         <JobList title="As the tradesperson" jobs={asWorker} />
       )}
+
+      {services.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
+            Professional services
+          </h2>
+          <ul className="grid gap-3">
+            {services.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={"/portal/services/" + encodeURIComponent(s.id)}
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-line2"
+                >
+                  <b className="text-[14.5px]">{s.type ?? "Service"}</b>
+                  <span className="text-[12.5px] text-dim">{s.id}</span>
+                  {s.parish && (
+                    <span className="text-[12.5px] text-dim">{s.parish}</span>
+                  )}
+                  {s.price && (
+                    <span className="ml-auto text-[13px] font-bold text-tealb">
+                      {s.price}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }
@@ -99,10 +142,11 @@ function JobList({ title, jobs }: { title: string; jobs: Job[] }) {
       </h2>
       <ul className="grid gap-3">
         {jobs.map((j) => (
-          <li
-            key={j.id}
-            className="rounded-2xl border border-line bg-panel p-4 transition hover:border-line2"
-          >
+          <li key={j.id}>
+            <Link
+              href={"/portal/jobs/" + encodeURIComponent(j.id)}
+              className="block rounded-2xl border border-line bg-panel p-4 transition hover:border-line2"
+            >
             <div className="flex flex-wrap items-start gap-3">
               <b className="min-w-[200px] flex-1 text-[15.5px] leading-snug">
                 {j.title ?? "Untitled job"}
@@ -117,6 +161,7 @@ function JobList({ title, jobs }: { title: string; jobs: Job[] }) {
               {j.parish && <span>{j.parish}</span>}
               {j.stage != null && <span>Stage {j.stage}</span>}
             </div>
+            </Link>
           </li>
         ))}
       </ul>
