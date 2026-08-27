@@ -1795,7 +1795,7 @@ async function runReport(id){
   const facts = "Job: "+(j.title||"")+" ("+j.id+")\nStage: "+(j.review?"In review":STAGES[j.stage||0])+"\nParish: "+(j.parish||"not stated")+"\nClient first name: "+(j.client||"not stated")+"\nWorker: "+((j.worker&&j.worker.name)||"not yet assigned")+"\nEvidence on file: "+((j.evidence||[]).map(e=>e.label).join(", ")||"none yet")+(extra?"\nNote from Yaadly to include: "+extra:"");
   const out = await askEngine("report", facts);
   if(out==null){ $("agent-out").innerHTML=""; return; }
-  $("agent-out").innerHTML = '<div class="mono">'+esc(out)+'</div><a class="btn o sm" style="margin-top:8px" target="_blank" rel="noopener" href="'+wa(out)+'">Send to client on WhatsApp →</a><p class="note">Drafted by the Reporting Agent. Read it before you send; nothing goes out by itself.</p>';
+  $("agent-out").innerHTML = '<div class="mono">'+esc(out)+'</div><div style="margin-top:8px">'+waBtn(j.clientPhone, out, "Send to client on WhatsApp →")+'</div><p class="note">Drafted by the Reporting Agent. Read it before you send; nothing goes out by itself.</p>';
 }
 /* ─────────── AI Photo Review (yaad-vision edge function) ─────────── */
 const SEV_COLOR = { low:"pass", medium:"gap", high:"block" };
@@ -2257,6 +2257,45 @@ function marketTable(){
   if(h && document.getElementById("pane-"+h)) go(h);
 })();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
+
+/* wa() opens a chat with Yaadly. That is right for a client pressing a button
+   on their own job, and wrong for every admin button, which wants to message
+   the person, not ourselves. Those buttons said "Reply on WhatsApp" and opened
+   a chat with our own number.
+
+   People write numbers the way they say them, "07878 877567" or
+   "876 555 0142", and wa.me needs full international digits. Stripping
+   non-digits alone sends a UK mobile to country code 0 and a Jamaican one to
+   country code 876, neither of which exists. So make the assumption explicit
+   rather than silently wrong:
+     starts with + or 00    already international, trust it
+     starts with 0          UK, which is where the diaspora clients are
+     876 or 658, 10 digits  Jamaica, which is +1 876 and +1 658
+   Anything else is passed through as typed and may simply not resolve, which
+   is better than confidently opening the wrong person's chat. */
+function waNumber(raw){
+  let n = String(raw||"").trim();
+  if(!n) return "";
+  const plus = n.startsWith("+");
+  n = n.replace(/[^0-9]/g,"");
+  if(!n) return "";
+  if(plus) return n;
+  if(n.startsWith("00")) return n.slice(2);
+  if(n.startsWith("0")) return "44" + n.slice(1);
+  if(n.length===10 && /^(876|658)/.test(n)) return "1" + n;
+  return n;
+}
+function waTo(raw, text){
+  const n = waNumber(raw);
+  return n ? "https://wa.me/" + n + "?text=" + encodeURIComponent(text) : "";
+}
+/* A button that cannot work should say so rather than look pressable. */
+function waBtn(raw, text, label){
+  const href = waTo(raw, text);
+  return href
+    ? '<a class="btn o sm" target="_blank" rel="noopener" href="'+href+'">'+label+'</a>'
+    : '<span class="note" style="align-self:center">No WhatsApp number on file</span>';
+}
 $("foot-wa").href = wa("Hello Yaadly, I have a question about:\n\n");
 /* What somebody types first decides how many rounds it takes.
    "Hi" is one message and four questions. This is one message and usually
@@ -3464,7 +3503,7 @@ function renderAdmin(){
       ((it.photos||[]).length?'<div class="thumbs">'+it.photos.map(p=>'<img src="'+p+'" alt="client photo">').join("")+'</div>':'')+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'+
       '<a class="btn sm" onclick="intakeToJob(\''+it.id+'\')">Create job from this →</a>'+
-      '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi "+it.name+", Yaadly here about your request "+it.id+" ("+it.type+"). ")+'">Reply on WhatsApp →</a>'+
+      waBtn(it.phone, "Hi "+it.name+", Yaadly here about your request "+it.id+" ("+it.type+"). ", "Reply on WhatsApp →")+
       '<a class="btn warn sm" onclick="intakeArchive(\''+it.id+'\')">Archive</a></div>';
     I.appendChild(d);
   });
@@ -3524,7 +3563,7 @@ function renderAdmin(){
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
       (allDone?'<a class="btn sm" onclick="approveApp(\''+a.id+'\',\'cert\')">Approve as Certified professional</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'vet\')">Approve as Evidence vetted</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'pro\')">Approve as Vetted professional</a>':'<span class="note">Approval unlocks when every check passes. Only you approve; the AI never does.</span>')+
       '<a class="btn warn sm" onclick="declineApp(\''+a.id+'\')">Decline</a>'+
-      '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi "+a.name+", Yaadly here about your application "+a.id+". ")+'">Message →</a></div>';
+      waBtn(a.phone, "Hi "+a.name+", Yaadly here about your application "+a.id+". ", "Message →")+'</div>';
     A.appendChild(d);
     loadVetDocs(a);
     loadVetReview(a, false);
@@ -3885,7 +3924,7 @@ function editJob(id){
     '<div id="vision-out">'+visionFindingsHTML(j)+'</div>'+
     '<div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap"><a class="btn sm" onclick="saveJob(\''+id+'\')">Save</a>'+
     '<a class="btn sm" onclick="crExport(\''+id+'\')">📄 Completion Report →</a>'+
-    '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. See it and approve here: https://yaadly.co.uk/#client"+(j.clientEmail?" Sign in with "+j.clientEmail+".":" Sign up with the email you gave us.")+(j.portalCode?" First time signing up? Your job code is "+j.portalCode+".":""))+'">Message client →</a>'+
+    waBtn(j.clientPhone, "Hi"+(j.client?" "+j.client:"")+", your Yaadly job "+j.id+" is updated. See it and approve here: https://yaadly.co.uk/#client"+(j.clientEmail?" Sign in with "+j.clientEmail+".":" Sign up with the email you gave us.")+(j.portalCode?" First time signing up? Your job code is "+j.portalCode+".":""), "Message client →")+
     '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Yaadly job "+j.id+(j.worker.name?" for "+j.worker.name:"")+". Scope and checklist here: https://yaadly.co.uk/#worker")+'">Message worker →</a>'+
     '<a class="btn warn sm" onclick="delJob(\''+id+'\')">Delete</a></div></div>';
   D.scrollIntoView({behavior:"smooth"});
