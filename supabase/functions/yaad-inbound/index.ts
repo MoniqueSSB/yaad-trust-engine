@@ -38,7 +38,25 @@ const bareEmail = (v: string) => (v.match(/<([^>]+)>/)?.[1] ?? v).trim();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-type Inbound = { channel: string; from: string; name: string; text: string; media: string[]; resendId?: string; subject?: string };
+type Media = { url: string; mime: string };
+type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string };
+
+/** photo, video, audio or file, from whatever Twilio says it is. */
+function mediaKind(mime: string): string {
+  if (mime.startsWith("image/")) return "photo";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  return "file";
+}
+function extFor(mime: string): string {
+  const m: Record<string, string> = {
+    "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic",
+    "video/mp4": "mp4", "video/3gpp": "3gp", "video/quicktime": "mov",
+    "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/amr": "amr", "audio/mp4": "m4a",
+    "application/pdf": "pdf",
+  };
+  return m[mime.split(";")[0].trim()] ?? "bin";
+}
 
 async function parseInbound(req: Request, raw: string): Promise<Inbound> {
   const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -47,11 +65,14 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
   // reach a Jamaican number today, so it is handled first.
   if (ct.includes("application/x-www-form-urlencoded")) {
     const f = new URLSearchParams(raw);
-    const media: string[] = [];
+    // Twilio sends MediaContentType alongside every MediaUrl. Ignoring it is
+    // how a photograph of a leaking roof ends up being posted to a speech to
+    // text model, failing, and being thrown away in silence.
+    const media: Media[] = [];
     const n = Number(f.get("NumMedia") ?? "0");
     for (let i = 0; i < n; i++) {
       const u = f.get(`MediaUrl${i}`);
-      if (u) media.push(u);
+      if (u) media.push({ url: u, mime: s(f.get(`MediaContentType${i}`)) || "application/octet-stream" });
     }
     // Twilio carries WhatsApp on the same webhook as SMS, distinguished only
     // by a prefix on the address: whatsapp:+447700900000. Worth telling apart,
@@ -101,7 +122,7 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
       from: s(j.from) || s((j.envelope as Record<string, unknown>)?.from),
       name: s(j.fromName),
       text: [s(j.subject), body].filter(Boolean).join("\n\n"),
-      media: Array.isArray(j.attachments) ? (j.attachments as string[]).slice(0, 8) : [],
+      media: Array.isArray(j.attachments) ? (j.attachments as string[]).slice(0, 8).map((u) => ({ url: u, mime: "" })) : [],
     };
   }
 
@@ -111,11 +132,28 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
     from: s(j.from),
     name: s(j.name),
     text: s(j.text),
-    media: one ? [one] : (Array.isArray(j.media) ? (j.media as string[]).slice(0, 8) : []),
+    media: one ? [{ url: one, mime: "" }] : (Array.isArray(j.media) ? (j.media as string[]).slice(0, 8).map((u) => ({ url: u, mime: "" })) : []),
   };
 }
 
 /** A voice note on any channel. Same transcriber the WhatsApp path uses. */
+/** Twilio media sits behind basic auth and disappears when Twilio prunes it.
+ *  Anything worth keeping has to be pulled through here first. */
+async function fetchMedia(url: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const headers: Record<string, string> = {};
+  if (sid && tok && url.includes("twilio.com")) headers.Authorization = "Basic " + btoa(`${sid}:${tok}`);
+  try {
+    const r = await fetch(url, { headers, signal: AbortSignal.timeout(45000) });
+    if (!r.ok) return null;
+    return {
+      bytes: new Uint8Array(await r.arrayBuffer()),
+      mime: (r.headers.get("content-type") ?? "").split(";")[0].trim(),
+    };
+  } catch (_) { return null; }
+}
+
 async function transcribeUrl(url: string, trace: Trace): Promise<string> {
   try {
     return await trace.span("transcribe voice note", SpanKind.CLIENT, { "yaadly.media.url": url.slice(0, 120) }, async (sp) => {
@@ -142,6 +180,69 @@ async function transcribeUrl(url: string, trace: Trace): Promise<string> {
       return s(j.text);
     });
   } catch (_) { return ""; }
+}
+
+/** Keep what they sent.
+ *
+ *  Twilio holds media for a while and then prunes it, and its URLs need our
+ *  credentials anyway, so a link in a job row is a link that dies. The bytes
+ *  come here into the private `intake` bucket, and the job gets a row pointing
+ *  at the object.
+ *
+ *  Private, always. These are photographs of the inside of somebody's house,
+ *  often an empty one, often with the address already on the job. A public
+ *  bucket would be a burglary catalogue.
+ *
+ *  Best effort on purpose: a failed upload must never cost the job. A missing
+ *  photo is recoverable by asking for it again, a lost job is not.
+ */
+/** Only the two calls this needs. Naming the whole client means fighting its
+ *  generics for no benefit, the same reason SettingsReader exists below. */
+type MediaWriter = {
+  storage: { from: (b: string) => {
+    upload: (path: string, body: Uint8Array, opts: { contentType: string; upsert: boolean })
+      => Promise<{ error: { message: string } | null }>;
+  } };
+  from: (t: string) => { insert: (row: Record<string, unknown>) => Promise<unknown> };
+};
+
+async function keepMedia(
+  supabase: MediaWriter,
+  jobId: string,
+  media: Media[],
+  startAt: number,
+  trace: Trace,
+): Promise<{ saved: number; kinds: string[] }> {
+  const kinds: string[] = [];
+  let saved = 0;
+  for (let i = 0; i < media.length && i < 10; i++) {
+    const m = media[i];
+    try {
+      await trace.span("store inbound media", SpanKind.INTERNAL, { "yaadly.media.mime": m.mime }, async (sp) => {
+        const got = await fetchMedia(m.url);
+        if (!got) { sp.recordError("media fetch failed"); return; }
+        const mime = m.mime || got.mime || "application/octet-stream";
+        const kind = mediaKind(mime);
+        const path = `whatsapp/${jobId}/${startAt + i}-${crypto.randomUUID()}.${extFor(mime)}`;
+        const up = await supabase.storage.from("intake")
+          .upload(path, got.bytes, { contentType: mime, upsert: false });
+        if (up.error) { sp.recordError(up.error.message); return; }
+        await supabase.from("job_photos").insert({
+          job_id: jobId,
+          caption: `Sent on WhatsApp`,
+          position: startAt + i,
+          storage_path: path,
+          mime,
+          bytes: got.bytes.length,
+          kind,
+          source: "whatsapp",
+        });
+        kinds.push(kind);
+        saved++;
+      });
+    } catch (_) { /* one bad attachment must not cost the job */ }
+  }
+  return { saved, kinds };
 }
 
 /** The intake agent, same prompt discipline as the job wizard: never money. */
@@ -224,6 +325,12 @@ Not every message is a job. Handle whatever arrives, and always write a reply:
   ask if they have work that needs doing. Do not be cold about it.
 - Somebody upset or worried about being ripped off. Take it seriously, do not
   be chirpy, and tell them the money part honestly using the facts below.
+
+A line like [they attached 2 photos] means those arrived and are already saved
+against the job. Acknowledge them in one short clause and never ask for what
+they have just sent. Photos and video are worth more to a quoting worker than
+any description, so if they have sent none and the work is visible, asking for
+one is a good use of a question.
 
 Facts you may state, and nothing beyond them:
 - Yaadly connects people abroad with vetted tradespeople in Jamaica.
@@ -548,8 +655,9 @@ Deno.serve(async (req: Request) => {
 
     // Voice first: it is how most of these actually arrive.
     let spoken = false;
-    if (!msg.text && msg.media.length) {
-      const said = await transcribeUrl(msg.media[0], trace);
+    const voice = msg.media.find((m) => m.mime.startsWith("audio/") || (!m.mime && !msg.text));
+    if (!msg.text && voice) {
+      const said = await transcribeUrl(voice.url, trace);
       if (said) { msg.text = said; spoken = true; }
     }
     if (!msg.text) msg.text = "[message with no readable text, review manually]";
@@ -571,9 +679,20 @@ Deno.serve(async (req: Request) => {
     const continuing = !!prior &&
       (Date.now() - new Date(prior.last_at as string).getTime()) < THREAD_HOURS * 3600_000;
 
+    // Tell the assistant what came with the message. Without this it thanks
+    // somebody for a photograph and then asks them to send a photograph.
+    const counts = msg.media.reduce((a, m) => {
+      const k = mediaKind(m.mime || (spoken ? "audio/ogg" : ""));
+      a[k] = (a[k] ?? 0) + 1; return a;
+    }, {} as Record<string, number>);
+    const attached = Object.entries(counts)
+      .filter(([k]) => k !== "audio")
+      .map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(" and ");
+    const thisTurn = [msg.text, attached ? `[they attached ${attached}]` : ""].filter(Boolean).join("\n");
+
     const transcript = continuing
-      ? `${prior!.transcript}\n\n${msg.text}`.slice(-8000)
-      : msg.text;
+      ? `${prior!.transcript}\n\n${thisTurn}`.slice(-8000)
+      : thisTurn;
 
     const card = await readTheJob(transcript, trace);
     const enough = card?.enough === true;
@@ -624,6 +743,14 @@ Deno.serve(async (req: Request) => {
       root.recordError(error.message);
       return json({ error: error.message }, 500);
     }
+
+    // Photographs are the single most useful thing a client can hand a worker,
+    // and until now they were fetched, mistaken for audio, and dropped.
+    const already = continuing ? Number(prior!.turns) * 10 : 0;
+    const kept = msg.media.length
+      ? await keepMedia(supabase as unknown as MediaWriter, jobId, msg.media, already, trace)
+      : { saved: 0, kinds: [] as string[] };
+    if (kept.saved) root.setAttributes({ "yaadly.inbound.media_saved": kept.saved });
 
     // Remember the conversation before replying. If the reply fails we would
     // rather have the thread than lose what they said.
