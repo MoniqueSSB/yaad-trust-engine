@@ -40,16 +40,7 @@ export default function SignIn() {
   }
 
   return (
-    <div className="mx-auto max-w-[420px] px-5 py-16">
-      <div className="mb-6 flex items-center gap-2.5">
-        <span className="grid size-8 place-items-center rounded-[9px] bg-teal font-display text-[17px] text-[#04211D]">
-          Y
-        </span>
-        <b className="text-[17px]">
-          Yaadly<span className="text-mango">Hub</span>
-        </b>
-      </div>
-
+    <div className="mx-auto max-w-[420px]">
       <h1 className="font-display text-[32px] uppercase leading-none">
         Your portal
       </h1>

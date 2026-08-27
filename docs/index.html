@@ -885,8 +885,10 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Marketplace</a>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
-    <a class="vbtn" href="https://app.yaadly.co.uk/portal">Client portal</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/portal">Worker portal</a>
+    <!-- One portal, not two. It shows "As the client" and "As the worker" off
+         the signed-in email, so two tabs pointing at the same URL was telling
+         people there were two places to go when there is one. -->
+    <a class="vbtn" href="https://app.yaadly.co.uk/portal">Portal</a>
   </div>
   <button class="navcta" onclick="postJob()">Post a job</button>
 </div></nav>
