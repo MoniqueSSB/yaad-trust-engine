@@ -25,3 +25,6 @@ backups/
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# wrangler's local build and state cache
+.wrangler/
