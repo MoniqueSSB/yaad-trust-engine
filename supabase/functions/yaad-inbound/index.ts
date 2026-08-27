@@ -147,7 +147,11 @@ async function transcribeUrl(url: string, trace: Trace): Promise<string> {
 /** The intake agent, same prompt discipline as the job wizard: never money. */
 async function readTheJob(text: string, trace: Trace) {
   const key = Deno.env.get("MINIMAX_API_KEY");
-  if (!key || text.length < 12) return null;
+  // No length gate. "Hi" is the most common first message a real person sends
+  // and it is exactly the one that needs a human sounding answer, not a
+  // fallback string. Skipping the model on short messages is how an intake
+  // ends up feeling like an answerphone.
+  if (!key || !text.trim()) return null;
   try {
     return await trace.span("chat MiniMax-M2.7", SpanKind.CLIENT, {
       "gen_ai.system": "minimax",
@@ -158,19 +162,79 @@ async function readTheJob(text: string, trace: Trace) {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "MiniMax-M2.7", temperature: 0.2, max_tokens: 900,
+          model: "MiniMax-M2.7", temperature: 0.3, max_tokens: 1100,
           messages: [
             { role: "system", content:
-`You read a property job described in plain words, often in Jamaican Patois,
-and return JSON only. Never invent facts. Never state a price, a budget or a
-cost. If something is not in the text, use "".
+`You are reading a WhatsApp conversation with somebody who needs property work
+done in Jamaica. They are usually abroad, often writing in Jamaican Patois, and
+they will not write a neat brief. Read the WHOLE conversation, oldest first,
+and treat later lines as answers to earlier ones.
+
+Return JSON only. Never invent facts. Never state a price, a budget or a cost,
+and never estimate one even if asked directly. If something is not in the
+conversation, use "".
+
 Return exactly:
-{"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""]}
+{"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""],"enough":false,"reply":""}
+
 trade: one of Plumbing, Roofing, Electrical, Tiling, Masonry & Concrete,
 Painting & Decorating, Grille & Gate Welding, Air Conditioning, Landscaping,
 General Handyman, Solar Install, Water Tank & Pump, Locks & Security Doors,
 Windows & Glazing, Carpentry & Joinery, Drainage & Septic, Fencing,
-CCTV & Alarms. Empty if unclear.` },
+CCTV & Alarms. Empty if unclear.
+
+"enough" is true only when you know all three of: what the work is, roughly
+where in Jamaica, and who can let a worker in. A greeting, "I have a problem",
+or a trade with no location is NOT enough.
+
+"reply" is the actual WhatsApp message sent back to them. Write it yourself.
+Rules for it:
+- Plain words, warm, no corporate tone, no emoji, no bullet points.
+- Never use a dash of any kind. Use a comma or a full stop.
+- Two or three short sentences, under 400 characters. This is a phone screen.
+- UNDERSTAND Patois perfectly. REPLY in clear standard English. Do not write
+  back in Patois and do not imitate how they speak. Half correct dialect from a
+  business reads as mockery, and this business is trusted with people's money.
+- Start by saying back what you understood, so they can see they were heard.
+  Use their own nouns, "the back bedroom", not "the affected area". If you
+  understood nothing yet, say so plainly rather than guessing.
+- If "enough" is false, ask for AT MOST TWO missing things, the two a worker
+  would refuse to quote without. Ask them the way a person would.
+- If "enough" is true, do not ask questions and do NOT say what happens next.
+  Reflect back what you understood and STOP on that sentence. The system adds
+  what happens next, word for word, every time. Forbidden endings include
+  "I will pass this on", "someone will be in touch", "we will get back to you"
+  and anything else about a next step. You are not able to promise those and
+  the sentence after yours already covers it.
+- Never promise a price, a date, a worker, or that anyone is on the way.
+- Never claim a person has already read it. A person reads it afterwards.
+
+Not every message is a job. Handle whatever arrives, and always write a reply:
+
+- A greeting on its own, "Hi", "Hello", "Good evening". Greet them back, say in
+  one line what Yaadly does, and ask what needs doing and where. Never answer a
+  greeting with a job reference or a promise.
+- A question about how it works. Answer it straight from the facts below, then
+  bring it back to what they need done.
+- A question about price. Say plainly that Yaadly does not price work, the
+  vetted workers quote against the written scope, and that is deliberate so
+  nobody is marking up their own estimate. Never give a number, a range or a
+  guess, even if pushed twice.
+- Something not about property at all. Say briefly what this number is for and
+  ask if they have work that needs doing. Do not be cold about it.
+- Somebody upset or worried about being ripped off. Take it seriously, do not
+  be chirpy, and tell them the money part honestly using the facts below.
+
+Facts you may state, and nothing beyond them:
+- Yaadly connects people abroad with vetted tradespeople in Jamaica.
+- Money is held and released stage by stage, only once work is proven with
+  evidence like photographs from the site.
+- Workers quote against a written scope. Yaadly does not price the work.
+- A person checks every job before any worker sees it.
+- Nothing is charged for describing a job or posting it.
+
+If you do not know something, say you will have it checked rather than
+guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
             { role: "user", content: text.slice(0, 6000) },
           ],
         }),
@@ -187,6 +251,24 @@ CCTV & Alarms. Empty if unclear.` },
       try { return JSON.parse(m[0]); } catch (_) { return null; }
     });
   } catch (_) { return null; }
+}
+
+
+/** Strip any promise the model tacked on the end.
+ *
+ *  The prompt tells it not to say what happens next, and it complies most of
+ *  the time and then slips in "I will post this for you" anyway. A prompt is a
+ *  strong preference, never a guarantee, and the one sentence Yaadly cannot
+ *  afford a model to improvise is the one about what it is going to do next.
+ *  So the promise lives in code, and anything the model writes that sounds
+ *  like one gets cut before it is sent.
+ */
+function stripPromises(reply: string): string {
+  const parts = reply.split(/(?<=[.!?])\s+/).filter(Boolean);
+  const promise =
+    /^\s*(i|we|somebody|someone|yaadly)\s*('?ll\b|will\b|am going to\b|are going to\b|gone\b)|^\s*let me (pass|send|forward|put)\b|^\s*(this|it) (will|'ll) be\b/i;
+  while (parts.length > 1 && promise.test(parts[parts.length - 1])) parts.pop();
+  return parts.join(" ").trim();
 }
 
 
@@ -472,27 +554,50 @@ Deno.serve(async (req: Request) => {
     }
     if (!msg.text) msg.text = "[message with no readable text, review manually]";
 
-    const card = await readTheJob(msg.text, trace);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // An intake is a conversation. Somebody writes "roof a leak", then two
+    // minutes later "it in Portland". Read against the whole thread or the
+    // second line is meaningless and they get asked the same thing twice.
+    //
+    // Twelve hours, because a client abroad answers when they wake up, and a
+    // brand new problem a week later is genuinely a new job.
+    const THREAD_HOURS = 12;
+    const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
+    const { data: prior } = await supabase.from("intake_threads")
+      .select("job_id,transcript,turns,last_at")
+      .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
+      .maybeSingle();
+    const continuing = !!prior &&
+      (Date.now() - new Date(prior.last_at as string).getTime()) < THREAD_HOURS * 3600_000;
+
+    const transcript = continuing
+      ? `${prior!.transcript}\n\n${msg.text}`.slice(-8000)
+      : msg.text;
+
+    const card = await readTheJob(transcript, trace);
+    const enough = card?.enough === true;
 
     // JOB-WHAT-… helps nobody. Name the door it came through.
     const CODE: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "EMAIL", generic: "WEB" };
-    const jobId = `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
+    const jobId = continuing ? String(prior!.job_id) : `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
+    const turns = continuing ? Number(prior!.turns) + 1 : 1;
+
     const descr = [
-      s(card?.scope) || msg.text,
+      s(card?.scope) || transcript,
       s(card?.access_note) ? `Access: ${s(card.access_note)}` : "",
       Array.isArray(card?.questions) && card.questions.filter(Boolean).length
         ? `Worth confirming before quoting: ${card.questions.filter(Boolean).map(s).join("; ")}` : "",
       "",
-      `In their own words: ${msg.text}`,
+      `In their own words:\n${transcript}`,
       spoken ? "Source: voice note, transcribed automatically. The wording is theirs." : "",
-      `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}.`,
+      `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}${turns > 1 ? `, over ${turns} messages` : ""}.`,
+      enough ? "" : "[Still gathering. The assistant has asked for what is missing and this stays a draft until it comes back.]",
       (s(card?.client_email) || msg.channel === "email") ? "" : "[No email yet. Reply on the same channel to get one, so they can see this in the client portal.]",
     ].filter(Boolean).join("\n");
 
-    const { data, error } = await supabase.from("jobs").insert({
-      id: jobId,
-      title: s(card?.title) || `Job from ${msg.channel}`,
+    const row = {
+      title: s(card?.title) || (enough ? `Job from ${msg.channel}` : `Someone writing in on ${msg.channel}`),
       parish: s(card?.parish),
       client_name: s(card?.client_name) || msg.name,
       // On email the sender address IS the client's email. The agent only
@@ -506,50 +611,124 @@ Deno.serve(async (req: Request) => {
       urgency: s(card?.urgency) || null,
       stage: 0,
       open: false,
-    }).select("portal_code").single();
+      // A greeting is not a job. Leaving it 'draft' keeps the board honest and
+      // keeps the desk's real queue free of things nobody can act on yet.
+      status: enough ? "awaiting_client_setup" : "draft",
+    };
+
+    const { data, error } = continuing
+      ? await supabase.from("jobs").update(row).eq("id", jobId).select("portal_code").single()
+      : await supabase.from("jobs").insert({ id: jobId, ...row }).select("portal_code").single();
 
     if (error) {
       root.recordError(error.message);
       return json({ error: error.message }, 500);
     }
 
-    const summary = notifyAdmin(supabase as unknown as SettingsReader, {
+    // Remember the conversation before replying. If the reply fails we would
+    // rather have the thread than lose what they said.
+    await supabase.from("intake_threads").upsert({
+      channel: threadKey.channel,
+      from_addr: threadKey.from_addr,
+      job_id: jobId,
+      transcript,
+      turns,
+      last_at: new Date().toISOString(),
+    }, { onConflict: "channel,from_addr" });
+
+    // Three pushes for one conversation is noise, and noise gets muted, and a
+    // muted phone loses a real job later. So: once when somebody first writes
+    // in, so a lead is never silently sitting there, and once when it becomes
+    // a real job. Nothing for the turns in between.
+    const HANDOFF_TURNS = 3;
+    const handingOver = !enough && turns >= HANDOFF_TURNS;
+    const worthTelling = enough || turns === 1 || handingOver;
+
+    const summary = worthTelling ? notifyAdmin(supabase as unknown as SettingsReader, {
       id: jobId,
       trade: s(card?.trade), parish: s(card?.parish), title: s(card?.title),
       urgency: s(card?.urgency), from: msg.from, channel: msg.channel, spoken,
       scope: s(card?.scope), access: s(card?.access_note),
       questions: Array.isArray(card?.questions) ? card.questions.filter(Boolean).map(s) : [],
-    }, trace);
+    }, trace) : null;
     const rt2 = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-    if (rt2?.waitUntil) rt2.waitUntil(summary);
+    if (summary && rt2?.waitUntil) rt2.waitUntil(summary);
 
     // Tell Monique on her phone too. No contact details leave for the relay.
     try {
-      const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+      const { data: st } = worthTelling
+        ? await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single()
+        : { data: null };
       if (st?.value) {
         await fetch(`https://ntfy.sh/${st.value}`, {
           method: "POST",
-          headers: { Title: `New ${msg.channel} job`, Priority: "high", Tags: "house" },
-          body: `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`,
+          headers: {
+            Title: enough
+              ? `New ${msg.channel} job`
+              : handingOver ? `Needs you: ${msg.channel}` : `Someone writing in on ${msg.channel}`,
+            Priority: enough || handingOver ? "high" : "default",
+            Tags: enough ? "house" : handingOver ? "raising_hand" : "speech_balloon",
+          },
+          body: enough
+            ? `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`
+            : handingOver
+              ? `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`
+              : `${jobId}: not enough to act on yet. The assistant has asked what is missing.`,
           signal: AbortSignal.timeout(4000),
         });
       }
     } catch (_) { /* never let a notification break intake */ }
 
-    root.setAttributes({ "yaadly.inbound.outcome": "job_created", "yaadly.job.id": jobId, "yaadly.inbound.spoken": spoken });
+    root.setAttributes({ "yaadly.inbound.outcome": enough ? "job_created" : "gathering", "yaadly.job.id": jobId, "yaadly.inbound.spoken": spoken, "yaadly.inbound.turns": turns });
 
     if (isTwilio) {
-      // Said in the same breath as the promise on the site: a person reads it,
-      // and nothing reaches a worker until they sign. No false "we are on it".
-      // TwiML answers WhatsApp and SMS alike when both run through Twilio.
+      // The assistant writes this, not a template. Somebody who says "I have a
+      // problem at my house" and gets a job reference and a 24 hour promise has
+      // been processed, not helped, and the card behind it is empty anyway.
+      // Asking the two things a worker would refuse to quote without is worth
+      // more to everyone than a tidy autoreply.
+      //
+      // Still bounded by what the site promises: a person checks it, nothing
+      // reaches a worker until it is signed, and no price is ever quoted here.
+      const written = s(card?.reply);
+      const safe = stripPromises(written.replace(/[\u2010-\u2015]/g, ",")).slice(0, 900);
+
+      // Asking twice is helping. Asking a fourth time is a phone tree, and the
+      // person on the other end is usually the one who most needs a human:
+      // older, upset, writing from a bad signal, or describing something the
+      // model genuinely cannot categorise. Hand over and say so out loud.
+      const HANDOFF_AFTER = 3;
+      if (!enough && turns >= HANDOFF_AFTER) {
+        // Drop the questions out of whatever it wrote. Asking again in the
+        // same breath as "I am giving this to a person" is the worst of both:
+        // they do not know whether to answer or wait.
+        const noQuestions = safe.split(/(?<=[.!?])\s+/).filter((x) => !x.trim().endsWith("?")).join(" ").trim();
+        return twiml(
+          (noQuestions ? noQuestions + " " : "") +
+          `I have not got quite enough to write this up properly, so I am passing it to Monique to read herself. She will come back to you on this number. Your reference is ${jobId}.`,
+        );
+      }
+
+      if (!enough) {
+        // No reference number yet, on purpose. A reference for a greeting
+        // teaches people the number means nothing.
+        return twiml(
+          safe ||
+          "Thanks for writing in. Yaadly gets property work done in Jamaica for people who are not there to watch it. Tell me what needs doing, whereabouts the property is, and who can let a worker in.",
+        );
+      }
+
+      // The assistant reflects; this sentence promises. Keeping the promise in
+      // code rather than in the model is the point: it is the same sentence
+      // every time, it matches the site word for word, and no model gets to
+      // improvise what Yaadly commits to.
       return twiml(
-        `Thanks, we have your message and it is saved as ${jobId}. ` +
-        `A person reads every job before anything is quoted, so you will hear back within 24 hours. ` +
-        `Nothing is charged and no worker can see this until you have signed off the details.`,
+        (safe || "Thanks, that is enough to write it up properly.") +
+        ` Saved as ${jobId}. A person checks it before any worker sees it, and nothing is charged yet.`,
       );
     }
 
-    return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, channel: msg.channel, transcribed: spoken });
+    return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, channel: msg.channel, transcribed: spoken, enough, turns });
   } catch (e) {
     root.recordError(e);
     return json({ error: "Inbound failed." }, 500);

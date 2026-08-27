@@ -1673,7 +1673,11 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <script>
 /* ─────────────── CONFIG: fill these two in ─────────────── */
 const CONFIG = {
-  whatsapp: "447767171858",   // Monique's WhatsApp, international format, digits only
+  // The Yaadly WhatsApp Business sender, not Monique's personal phone.
+  // Messages here land on the intake webhook, get read, and become a job.
+  // Her own number would just be a chat she has to type out by hand, which is
+  // the exact thing this replaces. Digits only, international format.
+  whatsapp: "447878877567",
   supabaseUrl: "https://leffyisvfvjwzilydlwf.supabase.co",
   supabaseKey: "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz"  // publishable key, safe to be public
 };
@@ -2253,20 +2257,34 @@ function marketTable(){
   if(h && document.getElementById("pane-"+h)) go(h);
 })();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
-$("foot-wa").href = wa("Hello Yaadly, I have a question about:");
+$("foot-wa").href = wa("Hello Yaadly, I have a question about:\n\n");
+/* What somebody types first decides how many rounds it takes.
+   "Hi" is one message and four questions. This is one message and usually
+   none, because the three things a worker refuses to quote without, what the
+   work is, where it is, and who opens the door, are already asked for here.
+   The examples matter as much as the labels: people copy the shape of an
+   example and freeze at a bare colon. */
 const JOB_TEMPLATE = [
-  "Hello Yaadly, I would like to start a job. Here are my details:",
+  "Hello Yaadly, I would like to start a job.",
   "",
-  "1. My name:",
-  "2. Property address (street and town):",
-  "3. Parish or area:",
-  "4. Who is at the property (name and number for access):",
-  "5. What needs doing (be as exact as you can):",
-  "6. When you want it done (a date, or as soon as possible):",
-  "7. Are you overseas or in Jamaica:",
-  "8. Anything already tried or quoted:",
+  "What needs doing:",
+  "   (e.g. the zinc lift off the back and water a run down the bedroom wall)",
   "",
-  "I will send photos of the area in this chat."
+  "Where the property is:",
+  "   (town and parish is enough, e.g. Portmore, St Catherine)",
+  "",
+  "Who can let a worker in:",
+  "   (name and number, e.g. my aunt next door, 876 555 0142)",
+  "",
+  "How soon you need it:",
+  "   (emergency, a few weeks, or just pricing it up)",
+  "",
+  "My name:",
+  "",
+  "I am writing from:",
+  "   (UK, US, Jamaica)",
+  "",
+  "Photos help a lot. Send them straight into this chat."
 ].join("\n");
 $("site-start").href = wa(JOB_TEMPLATE);
 $("ask-start").href = wa("Hello Yaadly, I have a question I would like a tradesperson to answer:\n\n");
