@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -93,9 +94,12 @@ export default function SignIn() {
       </form>
 
       <p className="mt-5 text-[12.5px] leading-relaxed text-dim">
-        No account yet? A portal is created for you when your job is set up,
-        and the code comes to you on WhatsApp or by email. Nothing here is
-        public.
+        No account yet? Your job code comes to you on WhatsApp or by email, and
+        it is what creates your portal.{" "}
+        <Link href="/portal/join" className="text-tealb underline">
+          Finish setting up your job
+        </Link>
+        . Nothing here is public.
       </p>
     </div>
   );
