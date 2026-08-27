@@ -243,11 +243,25 @@ Deno.serve(async (req: Request) => {
   const json = (b: unknown, status = 200) =>
     done(new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } }), status);
 
+  // Twilio reads the response body as TwiML. Hand it JSON and it logs an
+  // error on every single message, and the sender gets nothing back, which
+  // from their side is indistinguishable from the message vanishing.
+  const twiml = (reply: string) => {
+    const safe = reply.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
+    root.setAttributes({ "http.response.status_code": 200 });
+    root.end(); trace.flush();
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${safe}</Message></Response>`,
+      { status: 200, headers: { "Content-Type": "text/xml" } },
+    );
+  };
+
   try {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: "Not configured." }, 500);
 
     const raw = await req.text();
+    const isTwilio = (req.headers.get("content-type") ?? "").includes("application/x-www-form-urlencoded");
     const msg = await parseInbound(req, raw);
     root.setAttributes({ "yaadly.inbound.channel": msg.channel, "yaadly.inbound.chars": msg.text.length, "yaadly.inbound.media": msg.media.length });
 
@@ -263,7 +277,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (!msg.from && !msg.text) return json({ ok: true, note: "Nothing to do." });
+    if (!msg.from && !msg.text) {
+      return isTwilio ? twiml("Sorry, that message came through empty. Send it again and we will pick it up.")
+                      : json({ ok: true, note: "Nothing to do." });
+    }
 
     // Voice first: it is how most of these actually arrive.
     let spoken = false;
@@ -326,6 +343,17 @@ Deno.serve(async (req: Request) => {
     } catch (_) { /* never let a notification break intake */ }
 
     root.setAttributes({ "yaadly.inbound.outcome": "job_created", "yaadly.job.id": jobId, "yaadly.inbound.spoken": spoken });
+
+    if (isTwilio) {
+      // Said in the same breath as the promise on the site: a person reads it,
+      // and nothing reaches a worker until they sign. No false "we are on it".
+      return twiml(
+        `Thanks, we have your message and it is saved as ${jobId}. ` +
+        `A person reads every job before anything is quoted, so you will hear back within 24 hours. ` +
+        `Nothing is charged and no worker can see this until you have signed off the details.`,
+      );
+    }
+
     return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, channel: msg.channel, transcribed: spoken });
   } catch (e) {
     root.recordError(e);
