@@ -72,13 +72,29 @@ jobs:
       # The shared tracer is copied into each function directory because Supabase
       # deploys self-contained bundles. If a copy drifts from _shared, the thing
       # you tested is not the thing you deployed.
+      #
+      # The check keys off whether a function actually imports the tracer, not
+      # whether a file happens to be sitting there. The old version compared
+      # every yaad-* directory against _shared, so yaad-match, which has no otel
+      # import and correctly carries no copy, failed every run from the day it
+      # was added. Keying off the import also catches the opposite mistake: a
+      # stale otel.ts left behind in a function that no longer imports it.
       - name: Check the shared tracer copies are in sync
         run: |
           set -e
           fail=0
           for d in supabase/functions/yaad-*; do
-            if ! cmp -s supabase/functions/_shared/otel.ts "$d/otel.ts"; then
-              echo "::error file=$d/otel.ts::otel.ts has drifted from _shared/otel.ts. Run supabase/functions/sync-shared.sh"
+            [ -f "$d/index.ts" ] || continue
+            if grep -q 'from "./otel.ts"' "$d/index.ts"; then
+              if [ ! -f "$d/otel.ts" ]; then
+                echo "::error file=$d/index.ts::imports ./otel.ts but no copy is present. Run supabase/functions/sync-shared.sh"
+                fail=1
+              elif ! cmp -s supabase/functions/_shared/otel.ts "$d/otel.ts"; then
+                echo "::error file=$d/otel.ts::otel.ts has drifted from _shared/otel.ts. Run supabase/functions/sync-shared.sh"
+                fail=1
+              fi
+            elif [ -f "$d/otel.ts" ]; then
+              echo "::error file=$d/otel.ts::otel.ts is here but nothing imports it. Delete it, or import it."
               fail=1
             fi
           done
