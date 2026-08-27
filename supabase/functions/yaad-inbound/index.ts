@@ -38,7 +38,25 @@ const bareEmail = (v: string) => (v.match(/<([^>]+)>/)?.[1] ?? v).trim();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-type Inbound = { channel: string; from: string; name: string; text: string; media: string[]; resendId?: string; subject?: string };
+type Media = { url: string; mime: string };
+type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string };
+
+/** photo, video, audio or file, from whatever Twilio says it is. */
+function mediaKind(mime: string): string {
+  if (mime.startsWith("image/")) return "photo";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  return "file";
+}
+function extFor(mime: string): string {
+  const m: Record<string, string> = {
+    "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic",
+    "video/mp4": "mp4", "video/3gpp": "3gp", "video/quicktime": "mov",
+    "audio/ogg": "ogg", "audio/mpeg": "mp3", "audio/amr": "amr", "audio/mp4": "m4a",
+    "application/pdf": "pdf",
+  };
+  return m[mime.split(";")[0].trim()] ?? "bin";
+}
 
 async function parseInbound(req: Request, raw: string): Promise<Inbound> {
   const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -47,11 +65,14 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
   // reach a Jamaican number today, so it is handled first.
   if (ct.includes("application/x-www-form-urlencoded")) {
     const f = new URLSearchParams(raw);
-    const media: string[] = [];
+    // Twilio sends MediaContentType alongside every MediaUrl. Ignoring it is
+    // how a photograph of a leaking roof ends up being posted to a speech to
+    // text model, failing, and being thrown away in silence.
+    const media: Media[] = [];
     const n = Number(f.get("NumMedia") ?? "0");
     for (let i = 0; i < n; i++) {
       const u = f.get(`MediaUrl${i}`);
-      if (u) media.push(u);
+      if (u) media.push({ url: u, mime: s(f.get(`MediaContentType${i}`)) || "application/octet-stream" });
     }
     // Twilio carries WhatsApp on the same webhook as SMS, distinguished only
     // by a prefix on the address: whatsapp:+447700900000. Worth telling apart,
@@ -101,7 +122,7 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
       from: s(j.from) || s((j.envelope as Record<string, unknown>)?.from),
       name: s(j.fromName),
       text: [s(j.subject), body].filter(Boolean).join("\n\n"),
-      media: Array.isArray(j.attachments) ? (j.attachments as string[]).slice(0, 8) : [],
+      media: Array.isArray(j.attachments) ? (j.attachments as string[]).slice(0, 8).map((u) => ({ url: u, mime: "" })) : [],
     };
   }
 
@@ -111,11 +132,31 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
     from: s(j.from),
     name: s(j.name),
     text: s(j.text),
-    media: one ? [one] : (Array.isArray(j.media) ? (j.media as string[]).slice(0, 8) : []),
+    media: one ? [{ url: one, mime: "" }] : (Array.isArray(j.media) ? (j.media as string[]).slice(0, 8).map((u) => ({ url: u, mime: "" })) : []),
   };
 }
 
 /** A voice note on any channel. Same transcriber the WhatsApp path uses. */
+/** Twilio media sits behind basic auth and disappears when Twilio prunes it.
+ *  Anything worth keeping has to be pulled through here first. */
+async function fetchMedia(url: string): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const headers: Record<string, string> = {};
+  if (sid && tok && url.includes("twilio.com")) headers.Authorization = "Basic " + btoa(`${sid}:${tok}`);
+  try {
+    // Some hosts refuse a request with no User-Agent, and a media fetch that
+    // fails is a photograph nobody ever sees again.
+    headers["User-Agent"] = "Yaadly/1.0 (+https://yaadly.co.uk)";
+    const r = await fetch(url, { headers, redirect: "follow", signal: AbortSignal.timeout(45000) });
+    if (!r.ok) return null;
+    return {
+      bytes: new Uint8Array(await r.arrayBuffer()),
+      mime: (r.headers.get("content-type") ?? "").split(";")[0].trim(),
+    };
+  } catch (_) { return null; }
+}
+
 async function transcribeUrl(url: string, trace: Trace): Promise<string> {
   try {
     return await trace.span("transcribe voice note", SpanKind.CLIENT, { "yaadly.media.url": url.slice(0, 120) }, async (sp) => {
@@ -142,6 +183,70 @@ async function transcribeUrl(url: string, trace: Trace): Promise<string> {
       return s(j.text);
     });
   } catch (_) { return ""; }
+}
+
+/** Keep what they sent.
+ *
+ *  Twilio holds media for a while and then prunes it, and its URLs need our
+ *  credentials anyway, so a link in a job row is a link that dies. The bytes
+ *  come here into the private `intake` bucket, and the job gets a row pointing
+ *  at the object.
+ *
+ *  Private, always. These are photographs of the inside of somebody's house,
+ *  often an empty one, often with the address already on the job. A public
+ *  bucket would be a burglary catalogue.
+ *
+ *  Best effort on purpose: a failed upload must never cost the job. A missing
+ *  photo is recoverable by asking for it again, a lost job is not.
+ */
+/** Only the two calls this needs. Naming the whole client means fighting its
+ *  generics for no benefit, the same reason SettingsReader exists below. */
+type MediaWriter = {
+  storage: { from: (b: string) => {
+    upload: (path: string, body: Uint8Array, opts: { contentType: string; upsert: boolean })
+      => Promise<{ error: { message: string } | null }>;
+  } };
+  from: (t: string) => { insert: (row: Record<string, unknown>) => Promise<unknown> };
+};
+
+async function keepMedia(
+  supabase: MediaWriter,
+  jobId: string,
+  media: Media[],
+  startAt: number,
+  trace: Trace,
+): Promise<{ saved: number; kinds: string[] }> {
+  const kinds: string[] = [];
+  let saved = 0;
+  for (let i = 0; i < media.length && i < 10; i++) {
+    const m = media[i];
+    try {
+      await trace.span("store inbound media", SpanKind.INTERNAL, { "yaadly.media.mime": m.mime }, async (sp) => {
+        const got = await fetchMedia(m.url);
+        if (!got) { sp.recordError("media fetch failed"); return; }
+        const mime = m.mime || got.mime || "application/octet-stream";
+        const kind = mediaKind(mime);
+        const path = `whatsapp/${jobId}/${startAt + i}-${crypto.randomUUID()}.${extFor(mime)}`;
+        const up = await supabase.storage.from("intake")
+          .upload(path, got.bytes, { contentType: mime, upsert: false });
+        if (up.error) { sp.recordError(up.error.message); return; }
+        const ins = await supabase.from("job_photos").insert({
+          job_id: jobId,
+          caption: `Sent on WhatsApp`,
+          position: startAt + i,
+          storage_path: path,
+          mime,
+          bytes: got.bytes.length,
+          kind,
+          source: "whatsapp",
+        }) as { error?: { message: string } | null };
+        if (ins?.error) { sp.recordError(ins.error.message); return; }
+        kinds.push(kind);
+        saved++;
+      });
+    } catch (_) { /* one bad attachment must not cost the job */ }
+  }
+  return { saved, kinds };
 }
 
 /** The intake agent, same prompt discipline as the job wizard: never money. */
@@ -175,7 +280,7 @@ and never estimate one even if asked directly. If something is not in the
 conversation, use "".
 
 Return exactly:
-{"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""],"enough":false,"reply":""}
+{"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""],"enough":false,"confirmed":false,"wants_human":false,"reply":""}
 
 trade: one of Plumbing, Roofing, Electrical, Tiling, Masonry & Concrete,
 Painting & Decorating, Grille & Gate Welding, Air Conditioning, Landscaping,
@@ -186,6 +291,16 @@ CCTV & Alarms. Empty if unclear.
 "enough" is true only when you know all three of: what the work is, roughly
 where in Jamaica, and who can let a worker in. A greeting, "I have a problem",
 or a trade with no location is NOT enough.
+
+"confirmed" is true only when the LAST thing they said agrees that the summary
+you read back to them is right and complete. "yes", "that\u2019s it", "correct",
+"nothing else", "go ahead" are all confirmation. Adding another detail is NOT
+confirmation, it is more information. Silence is not confirmation. If you have
+not yet read the job back to them, "confirmed" is always false.
+
+"wants_human" is true when they ask to speak to a person, to Monique, to talk
+on the phone, or say they would rather explain it to somebody. Being annoyed
+is not the same as asking for a person; only set it when they actually ask.
 
 "reply" is the actual WhatsApp message sent back to them. Write it yourself.
 Rules for it:
@@ -200,12 +315,16 @@ Rules for it:
   understood nothing yet, say so plainly rather than guessing.
 - If "enough" is false, ask for AT MOST TWO missing things, the two a worker
   would refuse to quote without. Ask them the way a person would.
-- If "enough" is true, do not ask questions and do NOT say what happens next.
-  Reflect back what you understood and STOP on that sentence. The system adds
-  what happens next, word for word, every time. Forbidden endings include
-  "I will pass this on", "someone will be in touch", "we will get back to you"
-  and anything else about a next step. You are not able to promise those and
-  the sentence after yours already covers it.
+- If "enough" is true and you have not read the job back yet, read it back in
+  plain sentences, everything you have, and end by asking whether that is right
+  and whether there is anything else. That is the ONE question you always ask
+  before a job is written up, because nobody wants to find out afterwards that
+  the thing they thought they mentioned never landed.
+- If "confirmed" is true, do not ask anything and do NOT say what happens next.
+  Thank them in one short sentence and STOP. The system adds the rest, word for
+  word, every time. Forbidden endings include "I will pass this on", "someone
+  will be in touch", "we will get back to you" and anything else about a next
+  step. You cannot promise those and the sentence after yours covers it.
 - Never promise a price, a date, a worker, or that anyone is on the way.
 - Never claim a person has already read it. A person reads it afterwards.
 
@@ -224,6 +343,13 @@ Not every message is a job. Handle whatever arrives, and always write a reply:
   ask if they have work that needs doing. Do not be cold about it.
 - Somebody upset or worried about being ripped off. Take it seriously, do not
   be chirpy, and tell them the money part honestly using the facts below.
+
+A line like [they attached 2 photos] means those came through with the message.
+Say you can see them, in one short clause, and never ask for what they have
+just sent. Do not say they are saved or stored; you do not know that yet and
+saying it when it is not true is worse than saying nothing. Photos and video
+are worth more to a quoting worker than any description, so if they have sent
+none and the work is visible, asking for one is a good use of a question.
 
 Facts you may state, and nothing beyond them:
 - Yaadly connects people abroad with vetted tradespeople in Jamaica.
@@ -548,8 +674,9 @@ Deno.serve(async (req: Request) => {
 
     // Voice first: it is how most of these actually arrive.
     let spoken = false;
-    if (!msg.text && msg.media.length) {
-      const said = await transcribeUrl(msg.media[0], trace);
+    const voice = msg.media.find((m) => m.mime.startsWith("audio/") || (!m.mime && !msg.text));
+    if (!msg.text && voice) {
+      const said = await transcribeUrl(voice.url, trace);
       if (said) { msg.text = said; spoken = true; }
     }
     if (!msg.text) msg.text = "[message with no readable text, review manually]";
@@ -565,23 +692,55 @@ Deno.serve(async (req: Request) => {
     const THREAD_HOURS = 12;
     const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
     const { data: prior } = await supabase.from("intake_threads")
-      .select("job_id,transcript,turns,last_at")
+      .select("job_id,transcript,turns,last_at,stage")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
     const continuing = !!prior &&
       (Date.now() - new Date(prior.last_at as string).getTime()) < THREAD_HOURS * 3600_000;
 
+    // Tell the assistant what came with the message. Without this it thanks
+    // somebody for a photograph and then asks them to send a photograph.
+    const counts = msg.media.reduce((a, m) => {
+      const k = mediaKind(m.mime || (spoken ? "audio/ogg" : ""));
+      a[k] = (a[k] ?? 0) + 1; return a;
+    }, {} as Record<string, number>);
+    const attached = Object.entries(counts)
+      .filter(([k]) => k !== "audio")
+      .map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(" and ");
+    const thisTurn = [msg.text, attached ? `[they attached ${attached}]` : ""].filter(Boolean).join("\n");
+
     const transcript = continuing
-      ? `${prior!.transcript}\n\n${msg.text}`.slice(-8000)
-      : msg.text;
+      ? `${prior!.transcript}\n\n${thisTurn}`.slice(-8000)
+      : thisTurn;
 
     const card = await readTheJob(transcript, trace);
     const enough = card?.enough === true;
+    const wantsHuman = card?.wants_human === true;
+
+    // Three stages, and the client owns the last one. The assistant may decide
+    // it has enough; only they can say it is right and complete.
+    const wasStage = continuing ? String(prior!.stage ?? "gathering") : "gathering";
+    const confirmedNow = enough && wasStage === "confirming" && card?.confirmed === true;
+    const stage = confirmedNow || wasStage === "done" ? "done"
+      : enough ? "confirming"
+      : "gathering";
 
     // JOB-WHAT-… helps nobody. Name the door it came through.
     const CODE: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "EMAIL", generic: "WEB" };
     const jobId = continuing ? String(prior!.job_id) : `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
     const turns = continuing ? Number(prior!.turns) + 1 : 1;
+
+    // Photographs are the single most useful thing a client can hand a worker,
+    // and until now they were fetched, mistaken for audio, and dropped. Done
+    // before the description is written so a failure is visible on the job
+    // rather than silent.
+    const already = continuing ? Number(prior!.turns) * 10 : 0;
+    const wanted = msg.media.filter((m) => !m.mime.startsWith("audio/")).length;
+    const kept = msg.media.length
+      ? await keepMedia(supabase as unknown as MediaWriter, jobId, msg.media, already, trace)
+      : { saved: 0, kinds: [] as string[] };
+    const lostMedia = Math.max(0, wanted - kept.saved);
+    root.setAttributes({ "yaadly.inbound.media_saved": kept.saved, "yaadly.inbound.media_lost": lostMedia });
 
     const descr = [
       s(card?.scope) || transcript,
@@ -593,6 +752,7 @@ Deno.serve(async (req: Request) => {
       spoken ? "Source: voice note, transcribed automatically. The wording is theirs." : "",
       `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}${turns > 1 ? `, over ${turns} messages` : ""}.`,
       enough ? "" : "[Still gathering. The assistant has asked for what is missing and this stays a draft until it comes back.]",
+      lostMedia ? `[${lostMedia} attachment${lostMedia > 1 ? "s" : ""} came through but could not be stored. Ask them to send again.]` : "",
       (s(card?.client_email) || msg.channel === "email") ? "" : "[No email yet. Reply on the same channel to get one, so they can see this in the client portal.]",
     ].filter(Boolean).join("\n");
 
@@ -611,9 +771,10 @@ Deno.serve(async (req: Request) => {
       urgency: s(card?.urgency) || null,
       stage: 0,
       open: false,
-      // A greeting is not a job. Leaving it 'draft' keeps the board honest and
-      // keeps the desk's real queue free of things nobody can act on yet.
-      status: enough ? "awaiting_client_setup" : "draft",
+      // A greeting is not a job, and neither is a job the client has not agreed
+      // is right. Leaving it 'draft' until they confirm keeps the board honest
+      // and keeps the desk's real queue free of things nobody can act on yet.
+      status: stage === "done" ? "awaiting_client_setup" : "draft",
     };
 
     const { data, error } = continuing
@@ -625,6 +786,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: error.message }, 500);
     }
 
+
     // Remember the conversation before replying. If the reply fails we would
     // rather have the thread than lose what they said.
     await supabase.from("intake_threads").upsert({
@@ -633,6 +795,7 @@ Deno.serve(async (req: Request) => {
       job_id: jobId,
       transcript,
       turns,
+      stage,
       last_at: new Date().toISOString(),
     }, { onConflict: "channel,from_addr" });
 
@@ -641,8 +804,8 @@ Deno.serve(async (req: Request) => {
     // in, so a lead is never silently sitting there, and once when it becomes
     // a real job. Nothing for the turns in between.
     const HANDOFF_TURNS = 3;
-    const handingOver = !enough && turns >= HANDOFF_TURNS;
-    const worthTelling = enough || turns === 1 || handingOver;
+    const handingOver = wantsHuman || (!enough && turns >= HANDOFF_TURNS);
+    const worthTelling = stage === "done" || turns === 1 || handingOver;
 
     const summary = worthTelling ? notifyAdmin(supabase as unknown as SettingsReader, {
       id: jobId,
@@ -663,13 +826,13 @@ Deno.serve(async (req: Request) => {
         await fetch(`https://ntfy.sh/${st.value}`, {
           method: "POST",
           headers: {
-            Title: enough
+            Title: stage === "done"
               ? `New ${msg.channel} job`
               : handingOver ? `Needs you: ${msg.channel}` : `Someone writing in on ${msg.channel}`,
-            Priority: enough || handingOver ? "high" : "default",
-            Tags: enough ? "house" : handingOver ? "raising_hand" : "speech_balloon",
+            Priority: stage === "done" || handingOver ? "high" : "default",
+            Tags: stage === "done" ? "house" : handingOver ? "raising_hand" : "speech_balloon",
           },
-          body: enough
+          body: stage === "done"
             ? `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`
             : handingOver
               ? `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`
@@ -692,6 +855,42 @@ Deno.serve(async (req: Request) => {
       // reaches a worker until it is signed, and no price is ever quoted here.
       const written = s(card?.reply);
       const safe = stripPromises(written.replace(/[\u2010-\u2015]/g, ",")).slice(0, 900);
+
+      // They asked for a person. That is not a failure of the assistant, it is
+      // a reasonable thing to want when you are about to spend money on a
+      // house you cannot see, and the answer is yes.
+      if (wantsHuman) {
+        return twiml(
+          `Of course. I am passing this to Monique now and she will come back to you on this number herself. ` +
+          `Everything you have told me is saved${stage === "done" ? ` as ${jobId}` : ""}, so you will not have to say it twice.`,
+        );
+      }
+
+      // Read back, then wait. The assistant may believe it has enough; only
+      // the client can say it is right. Nobody wants to discover afterwards
+      // that the thing they thought they mentioned never landed.
+      if (stage === "confirming") {
+        return twiml(safe || "Let me read that back. Have I got it right, and is there anything else before I write it up?");
+      }
+
+      // Confirmed. This is the only point a link goes out, because it is the
+      // only point there is something finished to finish.
+      if (confirmedNow || (stage === "done" && wasStage !== "done")) {
+        const link = `https://app.yaadly.co.uk/portal/join?job=${encodeURIComponent(jobId)}${data?.portal_code ? `&code=${encodeURIComponent(String(data.portal_code))}` : ""}`;
+        return twiml(
+          (safe ? safe + " " : "") +
+          `Your job is ${jobId}. Last step, and it is short: ${link} ` +
+          `That sets up your portal and the agreement. Nothing reaches a worker until you have signed it, and nothing is charged.`,
+        );
+      }
+
+      // Already finished and still talking. Take the extra detail, do not
+      // re-send the link at them like a machine.
+      if (stage === "done") {
+        return twiml(
+          (safe ? safe + " " : "") + `Added to ${jobId}. If you still need the link to finish setting up, say "link".`,
+        );
+      }
 
       // Asking twice is helping. Asking a fourth time is a phone tree, and the
       // person on the other end is usually the one who most needs a human:
@@ -718,14 +917,10 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // The assistant reflects; this sentence promises. Keeping the promise in
-      // code rather than in the model is the point: it is the same sentence
-      // every time, it matches the site word for word, and no model gets to
-      // improvise what Yaadly commits to.
-      return twiml(
-        (safe || "Thanks, that is enough to write it up properly.") +
-        ` Saved as ${jobId}. A person checks it before any worker sees it, and nothing is charged yet.`,
-      );
+      // Should not be reached: every stage above returns. Kept as a floor so a
+      // future branch can never fall through to silence, which on WhatsApp
+      // looks exactly like being ignored.
+      return twiml(safe || "Thanks, I have that. What else can you tell me about the job?");
     }
 
     return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, channel: msg.channel, transcribed: spoken, enough, turns });
