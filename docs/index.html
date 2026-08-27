@@ -1609,61 +1609,6 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 </section>
 <!-- ═══════════════ CLIENT PORTAL ═══════════════ -->
 <!-- ═══════════════ ADMIN DESK ═══════════════ -->
-<section class="pane" id="pane-admin"><div class="wrap">
-  <div id="admin-lock" class="card" style="max-width:420px;margin:40px auto">
-    <h3>Admin <em>desk</em></h3>
-    <p class="note" style="margin-top:0">Sign in with your Yaadly account to continue.</p>
-    <div class="field"><label>Email</label><input id="gate-email" autocomplete="username"></div>
-    <div class="field"><label>Password</label><input id="gate-pass" type="password" autocomplete="current-password"></div>
-    <a class="btn" onclick="adminGateLogin()">Sign in</a>
-    <div id="gate-status"></div>
-  </div>
-  <div id="admin-ui" style="display:none">
-    <div class="kick" style="margin-top:20px">Admin desk</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <h1 class="hx" style="font-size:clamp(28px,4.5vw,48px)">Your <span class="g2">desk.</span></h1>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <span id="cloud-badge" style="font-size:11.5px;font-weight:700;color:var(--dim)">○ cloud off</span>
-        <button class="btn o sm" onclick="exportData()">⬇ Backup data</button>
-        <button class="btn o sm" onclick="exportCSV()">⬇ Spreadsheet (CSV)</button>
-        <button class="btn o sm" onclick="document.getElementById('imp').click()">⬆ Restore</button>
-        <input type="file" id="imp" style="display:none" accept=".json" onchange="importData(event)">
-        <button class="btn sm" onclick="newJob()">+ New job</button>
-      </div>
-    </div>
-    <div class="card" style="border-color:var(--softline)">
-      <h3>⚡ Start here: type it, <em>AI builds it</em></h3>
-      <p class="note" style="margin-top:0">Type or paste anything: a client's WhatsApp message, a voice note transcript, Patois, or your own rough notes. The Intake Agent turns it into a structured job card with the questions to ask. It drafts, you decide. Everything manual lives in the tabs below.</p>
-      <textarea id="ai-in" placeholder="e.g. Mi aunty roof a leak bad inna Portmore, water a come een when rain fall, need somebody fi fix it quick"></textarea>
-      <a class="btn" style="margin-top:10px" onclick="aiIntake()">⚡ Generate job card</a>
-      <div id="ai-out"></div>
-    </div>
-    <div class="tabs">
-      <button class="tab" data-at="intake" onclick="adminTab('intake')">Intake <span id="intake-n"></span></button>
-      <button class="tab on" data-at="jobs" onclick="adminTab('jobs')">Jobs</button>
-      <button class="tab" data-at="services" onclick="adminTab('services')">Services</button>
-      <button class="tab" data-at="workers" onclick="adminTab('workers')">Workers</button>
-      <button class="tab" data-at="apps" onclick="adminTab('apps')">Applications</button>
-      <button class="tab" data-at="market" onclick="adminTab('market')">Marketplace</button>
-      <button class="tab" data-at="calls" onclick="adminTab('calls')">Calls <span id="call-n"></span></button>
-      <button class="tab" data-at="waitlist" onclick="adminTab('waitlist')">Waiting list <span id="wl-n"></span></button>
-      <button class="tab" data-at="feedback" onclick="adminTab('feedback')">Feedback <span id="fb-n"></span></button>
-      <button class="tab" data-at="kickoff" onclick="adminTab('kickoff')">Kickoff packs</button>
-    </div>
-    <div id="at-intake" style="display:none"></div>
-    <div id="at-jobs"></div>
-    <div id="at-services" style="display:none"></div>
-    <div id="at-workers" style="display:none"></div>
-    <div id="at-apps" style="display:none"></div>
-    <div id="at-market" style="display:none"></div>
-    <div id="at-calls" style="display:none"></div>
-    <div id="at-waitlist" style="display:none"></div>
-    <div id="at-feedback" style="display:none"></div>
-    <div id="at-kickoff" style="display:none"></div>
-    <div id="admin-detail"></div>
-    <div class="rule">⚖️ <b>The governing rule holds here:</b> the agents draft and flag. Only you confirm a payout, and only after you have actually paid.</div>
-  </div>
-</div></section>
 <footer><div class="wrap"><div class="fgrid">
   <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
   <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
@@ -1683,13 +1628,32 @@ const CONFIG = {
 };
 /* ─────────── cloud database (Supabase, free tier) ─────────── */
 const sb = (CONFIG.supabaseUrl && window.supabase) ? window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey) : null;
+/* Only the removed admin gate ever set this true, so cloudPull(),
+   schedulePush() and cloudStatus() are now permanently inert. The app_state
+   blob this page used to write is history. */
 let cloudOn = false, pushTimer = null;
 // Declared here, ahead of the hash-routing IIFE below, because landing directly on a URL
 // like #admin or #client calls go() -> renderAll() -> renderClient() during initial script
 // execution, before a `let` declared later in the file would be reachable (temporal dead zone).
 let clientTabState = "overview";
 let clientSelectedId = null;
-let adminOpen = false;
+/* The admin desk was removed from this page on 27 Aug 2026. It lives on its
+   own hostname, behind Cloudflare Access, at concierge.yaadly.co.uk, and it
+   reads Postgres directly instead of keeping the business in this browser.
+   Two desks meant two answers to the same question, and this was the one
+   shipping its own admin markup to every visitor of yaadly.co.uk.
+   Frozen false rather than deleted: nothing can set it, so renderAdmin() and
+   everything guarded by it returns without running, and no leftover path can
+   throw. The dead render code below still ships and is a separate job. */
+const adminOpen = false;
+
+/* Two functions left in the dead admin code still call adminTab(): intakeToJob()
+   and koFromJob(). Both are only reachable from markup renderAdmin() generates,
+   and renderAdmin() now returns on its first line, so neither can run. A stub
+   is cheaper than that argument: it turns "unreachable, I am fairly sure" into
+   "harmless either way", and it is the difference between a page that cannot
+   throw and a page nobody has proved throws. */
+function adminTab(){ /* the desk moved to concierge.yaadly.co.uk */ }
 let clientOpen = false, clientAuthEmail = null;
 let workerOpen = false, workerAuthEmail = null;
 function schedulePush(){
@@ -1768,25 +1732,6 @@ async function askEngine(mode, text){
   const j = await r.json().catch(()=>({error:"bad response"}));
   if(j.error){ alert("Engine: "+j.error); return null; }
   return j.result;
-}
-async function aiIntake(){
-  const txt = ($("ai-in")?$("ai-in").value:"").trim();
-  if(!txt){ alert("Paste the client's message first."); return; }
-  $("ai-out").innerHTML = '<div class="mono">Intake Agent reading the message...</div>';
-  const out = await askEngine("intake", txt);
-  if(out==null){ $("ai-out").innerHTML=""; return; }
-  let card = null;
-  try{ card = JSON.parse((out.match(/\{[\s\S]*\}/)||["{}"])[0]); }catch(e){}
-  if(!card || !card.title){ $("ai-out").innerHTML = '<div class="mono">'+esc(out)+'</div>'; return; }
-  const jid = "JOB-"+String(DB.seq++).padStart(4,"0");
-  DB.jobs.push({ id:jid, title:card.title||"", parish:card.parish||"", client:card.client_name||"",
-    clientEmail:(card.client_email||"").trim(), clientPhone:(card.client_phone||"").trim(),
-    desc:(card.scope||"")+(card.urgency?"\nUrgency: "+card.urgency:"")+(card.preferred_date?"\nWanted by: "+card.preferred_date:"")+(card.trade?"\nTrade: "+card.trade:"")+(card.client_phone?"\nClient WhatsApp: "+card.client_phone:"")+"\n\n(Structured by the Intake Agent from the client's message. Verify before quoting.)",
-    stage:0, evidence:[], worker:{}, shortlist:[], open:false });
-  save();
-  const noEmailWarn = card.client_email ? "" : "\n\n⚠ No email was in the message. This job will not show in the client's portal until you add one on the job screen.";
-  $("ai-out").innerHTML = '<div class="mono">Job card created as '+jid+'.\n'+(card.questions&&card.questions.length?("Ask before quoting:\n· "+card.questions.slice(0,3).map(esc).join("\n· ")):"No open questions flagged.")+noEmailWarn+'\n\nThe agent drafted. You decide.</div>';
-  renderAdmin(); adminTab("jobs"); editJob(jid); syncJobToCloud(jid);
 }
 async function runReport(id){
   const j = DB.jobs.find(x=>x.id===id); if(!j) return;
@@ -1886,6 +1831,11 @@ function importData(ev){
 function toggleNav(){ var v=$("views"), t=$("nav-toggle"); if(!v||!t) return; var open=v.classList.toggle("open"); t.setAttribute("aria-expanded", open?"true":"false"); }
 function closeNav(){ var v=$("views"), t=$("nav-toggle"); if(v) v.classList.remove("open"); if(t) t.setAttribute("aria-expanded","false"); }
 function go(v){
+  // A hash that names no pane sends you to the front page rather than throwing.
+  // #admin used to name one. It does not any more, and an old bookmark or a
+  // link somebody saved should land somewhere, not break the page on the way.
+  const pane = $("pane-" + v);
+  if (!pane) { v = "site"; }
   document.querySelectorAll(".pane").forEach(p=>p.classList.remove("show"));
   $("pane-"+v).classList.add("show");
   document.querySelectorAll(".vbtn").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
@@ -3449,46 +3399,8 @@ async function restoreWorkerSession(){
   if(session && session.user && session.user.email) openWorkerPortal(session.user.email);
 }
 /* ───────────── ADMIN ───────────── */
-async function adminGateLogin(){
-  if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("gate-email").value.trim(), pw = $("gate-pass").value;
-  if(!em || !pw){ alert("Email and password needed."); return; }
-  $("gate-status").innerHTML = '<div class="mono">Signing in...</div>';
-  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
-  $("gate-pass").value = "";
-  if(error){ $("gate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
-  const {data:isAdmin} = await sb.rpc("is_admin");
-  if(!isAdmin){ await sb.auth.signOut(); $("gate-status").innerHTML = '<div class="note" style="color:var(--red)">That account is not an admin account.</div>'; return; }
-  adminOpen = true; cloudOn = true;
-  $("admin-lock").style.display = "none";
-  $("admin-ui").style.display = "block";
-  setCloudBadge("on");
-  renderAdmin();
-  await cloudPull(); schedulePush();
-}
-async function restoreAdminSession(){
-  if(!sb) return;
-  const {data:{session}} = await sb.auth.getSession();
-  if(!session) return;
-  const {data:isAdmin} = await sb.rpc("is_admin");
-  if(!isAdmin) return;
-  adminOpen = true; cloudOn = true; setCloudBadge("on"); await cloudPull(); schedulePush();
-  if(location.hash==="#admin"){ $("admin-lock").style.display="none"; $("admin-ui").style.display="block"; renderAdmin(); }
-}
-restoreAdminSession();
 restoreClientSession();
 restoreWorkerSession();
-function adminTab(t){
-  ["intake","jobs","services","workers","apps","market","calls","waitlist","feedback","kickoff"].forEach(x=>{ $("at-"+x).style.display = x===t?"block":"none"; });
-  if(t==="kickoff") renderKickoff();
-  document.querySelectorAll("[data-at]").forEach(b=>b.classList.toggle("on", b.dataset.at===t));
-  $("admin-detail").innerHTML="";
-}
-function newJob(){
-  const id = "JOB-"+String(DB.seq++).padStart(4,"0");
-  DB.jobs.push({id, title:"", parish:"", client:"", clientEmail:"", clientPhone:"", desc:"", stage:0, evidence:[], worker:{}, shortlist:[], open:false});
-  save(); renderAdmin(); editJob(id); syncJobToCloud(id);
-}
 function renderAdmin(){
   if(!adminOpen) return;
   const I = $("at-intake");
