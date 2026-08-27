@@ -29,7 +29,8 @@ npm run deploy --prefix desk-deploy
 Then, once, in the Cloudflare dashboard:
 
 1. Workers & Pages → `yaadly-desk` → Settings → Domains & Routes
-2. Add a custom domain: `desk.yaadly.co.uk`
+2. The custom domain `desk.yaadly.co.uk` is already bound in wrangler.jsonc,
+   so a deploy sets it up. The workers.dev address is disabled.
 3. Zero Trust → Access → Applications → add `desk.yaadly.co.uk`, policy
    "allow the one email that runs it"
 
