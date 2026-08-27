@@ -302,6 +302,86 @@ async function twilioSigned(req: Request, raw: string): Promise<{ ok: boolean; c
   return { ok: offered === expected, checked: true };
 }
 
+
+/** The nudge to Monique's own inbox.
+ *
+ *  Deliberately a summary and not a forward. A forward would land the client's
+ *  message in her mail app, she would reply from there, and the thread would
+ *  stop being on the record. That is the "a chat is a good front door and a
+ *  terrible filing cabinet" problem, aimed at her instead of at a client.
+ *
+ *  So: enough to judge whether it is urgent from a phone screen, and a link to
+ *  the place the work actually happens. No Reply-To, on purpose.
+ *
+ *  Fire and forget. A mail relay having a bad afternoon must never cost a job
+ *  that is already safely in the database.
+ */
+/** Only the one call this needs. Naming the whole client here means fighting
+ *  its generics for no benefit; this says what is actually used. */
+type SettingsReader = {
+  from: (t: string) => {
+    select: (cols: string) => {
+      in: (col: string, vals: string[]) => Promise<{ data: { key: string; value: string }[] | null }>;
+    };
+  };
+};
+
+async function notifyAdmin(
+  supabase: SettingsReader,
+  job: { id: string; trade: string; parish: string; title: string; urgency: string;
+         from: string; channel: string; spoken: boolean; scope: string;
+         access: string; questions: string[] },
+  trace: Trace,
+) {
+  const key = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!key) return;
+  try {
+    const { data: rows } = await supabase.from("app_settings")
+      .select("key,value").in("key", ["admin_email", "desk_url"]);
+    const cfg = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
+    const to = cfg.admin_email;
+    if (!to) return;
+    const desk = cfg.desk_url ?? "";
+
+    const bits = [job.trade || "trade unclear", job.parish || "parish not given"].join(", ");
+    const subject = `New job ${job.id}, ${bits}`;
+
+    const esc = (t: string) => t.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
+    const row = (k: string, v: string) =>
+      v ? `<tr><td style="padding:4px 14px 4px 0;color:#67807a;white-space:nowrap">${k}</td><td style="padding:4px 0;color:#0b1a16">${esc(v)}</td></tr>` : "";
+
+    const html = `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
+<p style="margin:0 0 14px"><b>${esc(job.title || "New job")}</b></p>
+<table style="border-collapse:collapse;font-size:14px;margin-bottom:16px">
+${row("Reference", job.id)}${row("Trade", job.trade)}${row("Parish", job.parish)}
+${row("Urgency", job.urgency)}${row("Arrived by", job.channel + (job.spoken ? ", voice note" : ""))}${row("From", job.from)}
+</table>
+${job.scope ? `<p style="margin:0 0 14px">${esc(job.scope)}</p>` : ""}
+${job.access ? `<p style="margin:0 0 14px"><b>Access.</b> ${esc(job.access)}</p>` : ""}
+${job.questions.length ? `<p style="margin:0 0 6px"><b>Worth confirming before quoting</b></p><ul style="margin:0 0 16px;padding-left:20px">${job.questions.map((q) => `<li>${esc(q)}</li>`).join("")}</ul>` : ""}
+${desk ? `<p style="margin:0 0 18px"><a href="${desk}" style="background:#14b8a6;color:#04211d;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:100px;display:inline-block">Open the desk</a></p>` : ""}
+<p style="margin:0;font-size:12.5px;color:#67807a">Reply in the desk, not here. This is a summary, so an answer sent from your mail app never reaches the client and never lands on the job.</p>
+</div>`;
+
+    await trace.span("resend.send admin summary", SpanKind.CLIENT, { "yaadly.job.id": job.id }, async (sp) => {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        // From in.yaadly.co.uk, not send.yaadly.co.uk. Resend still lists the
+        // latter as verified but its DKIM and SPF records are no longer in
+        // DNS, so mail from it would fail authentication and quietly land in
+        // spam. in.yaadly.co.uk has live DKIM, live SPF and a live MX.
+        body: JSON.stringify({ from: "Yaadly <jobs@in.yaadly.co.uk>", to: [to], subject, html }),
+        signal: AbortSignal.timeout(15000),
+      });
+      sp.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) sp.recordError(`resend send ${r.status}: ${(await r.text()).slice(0, 160)}`);
+    });
+  } catch (e) {
+    trace.startSpan("admin summary failed").recordError(String(e).slice(0, 200)).end();
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -409,7 +489,17 @@ Deno.serve(async (req: Request) => {
       return json({ error: error.message }, 500);
     }
 
-    // Tell Monique. No contact details leave for the relay.
+    const summary = notifyAdmin(supabase as unknown as SettingsReader, {
+      id: jobId,
+      trade: s(card?.trade), parish: s(card?.parish), title: s(card?.title),
+      urgency: s(card?.urgency), from: msg.from, channel: msg.channel, spoken,
+      scope: s(card?.scope), access: s(card?.access_note),
+      questions: Array.isArray(card?.questions) ? card.questions.filter(Boolean).map(s) : [],
+    }, trace);
+    const rt2 = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (rt2?.waitUntil) rt2.waitUntil(summary);
+
+    // Tell Monique on her phone too. No contact details leave for the relay.
     try {
       const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
       if (st?.value) {
