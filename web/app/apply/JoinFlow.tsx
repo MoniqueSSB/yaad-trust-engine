@@ -37,6 +37,11 @@ const FN = "yaad-vetting-upload";
 const STORE = "yaadly.application.v1";
 const GUIDELINES_VERSION = "v1";
 
+// Bump this whenever the wording of the AI review choice changes. A consent is
+// only worth anything tied to the sentence that earned it, and an old consent
+// must not be read as agreement to a newer, broader one.
+const AI_CONSENT_VERSION = "ai-review-v1";
+
 const TRADES = [
   "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
   "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
@@ -191,6 +196,11 @@ export function JoinFlow() {
   const [links, setLinks] = useState<string[]>([]);
   const [linkDraft, setLinkDraft] = useState("");
 
+  // Step 3. Deliberately starts empty rather than defaulting to "yes": consent
+  // that was pre-ticked is not consent, and a passport is not the document to
+  // be casual about it with.
+  const [aiConsent, setAiConsent] = useState<"" | "granted" | "declined">("");
+
   // Step 4
   const [policeStatus, setPoliceStatus] = useState("");
 
@@ -211,6 +221,7 @@ export function JoinFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentRef, setSentRef] = useState("");
+  const [sentConsent, setSentConsent] = useState<"granted" | "declined">("declined");
   const claimRef = useRef<Claim | null>(null);
 
   /* Restore a half-finished application. Losing the tab on mobile data must
@@ -230,6 +241,7 @@ export function JoinFlow() {
           setPhone(v.form.phone ?? ""); setEmail(v.form.email ?? "");
           setYears(v.form.years ?? ""); setWork(v.form.work ?? "");
           setLinks(v.form.links ?? []);
+          setAiConsent(v.form.aiConsent ?? "");
         }
       }
     } catch { /* a corrupt cache is not worth an error screen */ }
@@ -241,11 +253,11 @@ export function JoinFlow() {
         const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
         localStorage.setItem(STORE, JSON.stringify({
           ...cur, ...next,
-          form: { trades, parishes, tradeOther, name, phone, email, years, work, links },
+          form: { trades, parishes, tradeOther, name, phone, email, years, work, links, aiConsent },
         }));
       } catch { /* private browsing, carry on */ }
     },
-    [trades, parishes, tradeOther, name, phone, email, years, work, links],
+    [trades, parishes, tradeOther, name, phone, email, years, work, links, aiConsent],
   );
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
@@ -345,10 +357,16 @@ export function JoinFlow() {
         ref1: refLine(refs[0]), ref2: refLine(refs[1]), ref3: refLine(refs[2]),
         refsTold: refs.every((r) => r.told),
         policeStatus: policeStatus || "not_yet",
+        // Unanswered goes over as "declined". The server treats it that way too,
+        // but sending it explicitly means the row records a decision rather than
+        // a gap somebody could later read either way.
+        aiReviewConsent: aiConsent || "declined",
+        aiReviewConsentVersion: AI_CONSENT_VERSION,
         signedName: signed ? signedName.trim() : "",
         signedVersion: GUIDELINES_VERSION,
       });
       setSentRef(c.reference);
+      setSentConsent(aiConsent || "declined");
       try { localStorage.removeItem(STORE); } catch { /* fine */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : "That did not send. Try again.");
@@ -370,7 +388,10 @@ export function JoinFlow() {
     id3: has("proof_of_address"),
     police: has("police_check"),
     refs: refsDone,
-    agent: Boolean(sentRef),
+    // Declining the machine read is a complete answer to this row, not a gap
+    // in it. Leaving it on "Waiting" forever would read as an outstanding task
+    // and quietly punish the choice.
+    agent: Boolean(sentRef) || aiConsent === "declined",
     sign: signed && signedName.trim().length > 1,
     trial: false,
     live: false,
@@ -394,14 +415,25 @@ export function JoinFlow() {
         </h1>
         <div className="mt-6 max-w-[62ch] rounded-2xl border border-softline bg-soft p-6 text-[14.5px] leading-relaxed text-mute">
           <b className="text-ink">What happens next, in order.</b>
+          {sentConsent === "granted" ? (
+            <p className="mt-3">
+              Your documents are read first by software, for the things a person
+              skims past: whether the name matches across every document, whether
+              the dates are current, whether a certificate number is real. That
+              produces flags, never a decision.
+            </p>
+          ) : (
+            <p className="mt-3">
+              <b className="text-ink">You asked that no AI model read your
+              documents, and none will.</b> They go straight to a person, and
+              nothing about them is sent outside Yaadly. Allow{" "}
+              <b className="text-ink">within 48 hours</b>. Somebody reads every
+              page from cold, and it counts against you in no way at all.
+            </p>
+          )}
           <p className="mt-3">
-            Your documents are read first, by machine, for the things a person
-            skims past: whether the name matches across every document, whether
-            the dates are inside the window, whether a certificate number is
-            real. That produces flags, never a decision.
-          </p>
-          <p className="mt-3">
-            Then a person at the Yaadly desk opens the file, reads those flags,
+            {sentConsent === "granted" ? "Then a" : "A"} person at the Yaadly desk
+            opens the file{sentConsent === "granted" ? ", reads those flags," : ""}{" "}
             and telephones your three referees. That is the part nothing
             automates, and it is the reason a client believes the badge on your
             profile.
@@ -413,9 +445,9 @@ export function JoinFlow() {
           </p>
         </div>
         <p className="mt-4 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
-          Your identity documents are held in a private store no browser can
-          read, and they are destroyed on a clock once vetting is decided. What
-          survives is the decision, not your passport.
+          Your identity documents sit in a private store no browser can reach,
+          and they are destroyed ninety days after you sent them, whatever we
+          decide. What survives is the decision, not your passport.
         </p>
       </>
     );
@@ -605,10 +637,55 @@ export function JoinFlow() {
                   accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
 
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
-                  <b className="text-ink">These files never touch the public site.</b>{" "}
-                  They upload straight into a private store that only Yaadly admins
-                  can read, and they are destroyed once vetting is decided. What we
-                  keep forever is the decision, not your passport.
+                  <b className="text-ink">Where these files go.</b> They upload
+                  straight into a private store that no browser can reach. They are
+                  destroyed ninety days after you send them, whatever we decide, and
+                  what we keep forever is the decision, not your passport.
+                </div>
+
+                <div className="fgroup" style={{ marginBottom: 0 }}>
+                  <label className="fl">Who may read them</label>
+                  <p className="mb-2.5 text-[12.5px] leading-relaxed text-mute">
+                    A person at Yaadly reads your documents and decides. Before they
+                    do, we can have software read them first, to check the name is
+                    the same on every one, that the dates are current, and that
+                    nothing looks altered. It flags things for that person.{" "}
+                    <b className="text-ink">It never decides anything.</b>
+                  </p>
+                  <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
+                    To do that we send the images to an AI model run by NVIDIA,
+                    outside Yaadly. Plenty of people would rather that did not happen
+                    to a passport, and that is fair. Say no and only a person at
+                    Yaadly will ever open them.{" "}
+                    <b className="text-ink">Saying no counts against you in no way at
+                    all.</b> It is slower. That is the whole difference.
+                  </p>
+
+                  <div className="grid gap-2.5">
+                    {([
+                      ["granted", "Software may read them first, then a person decides",
+                        "Faster. The images go to NVIDIA's model to be read, and are not used to train anything."],
+                      ["declined", "A person only. Do not send my documents to any AI model",
+                        "Your files are never sent outside Yaadly. A person reads every page from cold, and you hear back within 48 hours."],
+                    ] as const).map(([value, title, sub]) => (
+                      <label key={value}
+                        className={"flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition "
+                          + (aiConsent === value ? "border-teal bg-soft" : "border-line bg-bg hover:border-line2")}>
+                        <input type="radio" name="aiconsent" className="mt-0.5 size-4 shrink-0 accent-teal"
+                          checked={aiConsent === value}
+                          onChange={() => setAiConsent(value)} />
+                        <span>
+                          <b className="block text-[13.5px] leading-snug">{title}</b>
+                          <span className="mt-1 block text-[12px] leading-relaxed text-dim">{sub}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
+                    Neither is ticked for you. If you send your application without
+                    choosing, we read that as no.
+                  </p>
                 </div>
               </div>
             )}
@@ -709,6 +786,15 @@ export function JoinFlow() {
                   a person at the Yaadly desk makes the call, then telephones your
                   referees. What the check buys you is speed, not a shortcut.
                 </div>
+                {aiConsent !== "granted" && (
+                  <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed text-mute">
+                    <b className="text-ink">This step will be skipped for you.</b> On
+                    step 3 you {aiConsent === "declined" ? "asked" : "have not yet agreed"}{" "}
+                    {aiConsent === "declined" ? "that no AI model reads your documents" : "to an AI model reading your documents"},
+                    so a person reads them from cold. You hear back within
+                    48 hours. Nothing else changes.
+                  </div>
+                )}
               </div>
             )}
 
@@ -755,13 +841,31 @@ export function JoinFlow() {
               <div className="grid gap-3">
                 <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
                   <b className="text-ink">Who reads this next.</b>
-                  <p className="mt-2">
-                    Your documents go to a machine first, which flags mismatched
-                    names, expired dates and certificate numbers that do not check
-                    out. Then a person at the Yaadly desk opens the file, reads the
-                    flags, and telephones your three referees. The machine never
-                    decides. The person always does.
-                  </p>
+                  {aiConsent === "granted" ? (
+                    <p className="mt-2">
+                      Software reads your documents first and flags mismatched
+                      names, out of date paperwork and certificate numbers that do
+                      not check out. Then a person at the Yaadly desk opens the
+                      file, reads the flags, and telephones your three referees.
+                      The software never decides. The person always does.
+                    </p>
+                  ) : (
+                    <p className="mt-2">
+                      <b className="text-ink">No AI model will read your
+                      documents.</b> They go straight to a person at the Yaadly
+                      desk, who opens the file and telephones your three referees.
+                      Nothing about them is sent outside Yaadly.{" "}
+                      <b className="text-ink">You hear back within 48 hours.</b> Somebody
+                      is reading every page from cold.
+                      {aiConsent === "" && (
+                        <>
+                          {" "}You did not answer the question on step 3, so we are
+                          reading that as no. Change it there if you meant
+                          otherwise.
+                        </>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 {outstanding.length > 0 && (

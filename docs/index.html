@@ -1738,6 +1738,7 @@ async function cloudPull(){
         years:row.years, cert:!!row.cert, certno:row.certno, work:row.work, links:row.links,
         ref1:row.ref1, ref2:row.ref2, ref3:row.ref3, refsTold:!!row.refs_told,
         policeStatus:row.police_status, signedName:row.signed_name, signedAt:row.signed_at,
+        aiConsent:row.ai_review_consent, aiConsentAt:row.ai_review_consent_at,
         status:row.status||"received" };
       const held = DB.applications.find(x=>x.cid===row.id);
       if(held) Object.assign(held, fields);
@@ -3491,9 +3492,15 @@ function renderAdmin(){
       (a.links?'<p style="font-size:12.5px;color:var(--dim)">Links: '+appLinks(a.links)+'</p>':'')+
       '<p style="font-size:12.5px;color:'+(a.refsTold?"var(--dim)":"var(--red)")+'">Refs: '+esc(a.ref1||"none")+' · '+esc(a.ref2||"none")+' · '+esc(a.ref3||"none")+' · '+(a.refsTold?"all three confirmed they were told we would call":"NOT confirmed as told we would call")+'</p>'+
       (a.signedName?'<p style="font-size:12.5px;color:var(--dim)">Worker Guidelines signed by '+esc(a.signedName)+' on '+esc((a.signedAt||"").slice(0,10))+'</p>':'<p style="font-size:12.5px;color:var(--red)">Worker Guidelines NOT signed</p>')+
+      '<p style="font-size:12.5px;color:var(--dim)">AI review of documents: '+
+        (a.aiConsent === "granted"
+          ? 'agreed on '+esc(String(a.aiConsentAt||"").slice(0,10))
+          : '<b style="color:var(--ink)">refused</b>. A person reads every page, and you promised them an answer within 48 hours')+'</p>'+
       '<div class="kick">Documents</div><div id="vd-'+a.id+'" style="font-size:12.5px;color:var(--dim)">Loading\u2026</div>'+
       '<div class="kick" style="display:flex;align-items:center;gap:10px">AI vetting review'+
-        '<a class="btn o sm" style="margin-left:auto" onclick="rerunVetReview(\''+a.id+'\')">Run the check again</a></div>'+
+        (a.aiConsent === "granted"
+          ? '<a class="btn o sm" style="margin-left:auto" onclick="rerunVetReview(\''+a.id+'\')">Run the check again</a>'
+          : '<span class="st gap" style="margin-left:auto">DECLINED BY APPLICANT</span>')+'</div>'+
       '<div id="vr-'+a.id+'" style="font-size:12.5px;color:var(--dim)">Loading\u2026</div>'+
       '<div class="kick">Vetting checklist</div><ul class="check">'+boxes+'</ul>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
@@ -3632,6 +3639,19 @@ async function loadVetReview(a, force){
   const box = document.getElementById("vr-"+a.id);
   if(!box) return;
   if(!sb || !cloudOn || !a.cid){ box.textContent = "Connect cloud to run the vetting agent."; return; }
+
+  // They were asked on step 3 whether an AI model could read their documents,
+  // and they said no. The edge function refuses this too, so pressing the
+  // button would only produce an error; better to not offer it and say why.
+  if(a.aiConsent !== "granted"){
+    box.innerHTML = '<p class="note" style="margin-top:0"><b style="color:var(--ink)">No machine read on this one, by their choice.</b> '+
+      (a.aiConsent === "declined"
+        ? 'They asked on step 3 that no AI model read their documents, so none has, and nothing was sent outside Yaadly. '
+        : 'They never answered the question on step 3, which counts as no. ')+
+      'You promised them an answer within 48 hours. Open the documents above and work through the checklist yourself.</p>';
+    return;
+  }
+
   try{
     if(!force){
       const {data} = await sb.from("vetting_reviews").select("*")
