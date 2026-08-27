@@ -1,3 +1,6 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 /**
@@ -11,9 +14,10 @@ import Link from "next/link";
  * except the browser's back button. It now uses this header too, and passes
  * the signed-in email and the sign-out action in so nothing is lost.
  *
- * There is one portal, not two. It shows "As the client" and "As the worker"
- * sections off the signed-in email, so the header says Portal once rather
- * than offering two tabs that lead to the same page.
+ * The client portal and the worker portal are two separate products, so they
+ * are two tabs. An existing tradesperson signing in to find their job must
+ * never be routed through "join as a pro": joining is a third, separate
+ * channel and it is not what they are there for.
  */
 const SITE = "https://yaadly.co.uk";
 
@@ -22,10 +26,21 @@ export function SiteNav({
   email,
   signOut,
 }: {
-  active?: "market" | "portal";
+  active?: "market" | "client" | "worker" | "join";
   email?: string | null;
   signOut?: () => Promise<void>;
 }) {
+  /* The layout renders this once for every /portal route, so it cannot know
+     which tab to light. The URL can. An explicit `active` still wins, for the
+     screens that are not under /portal. */
+  const path = usePathname() ?? "";
+  const here =
+    active ??
+    (path.startsWith("/portal/worker") ? "worker"
+      : path.startsWith("/apply") ? "join"
+      : path.startsWith("/jobs") ? "market"
+      : path.startsWith("/portal") ? "client"
+      : undefined);
   const tab = (on: boolean) =>
     "rounded-[9px] border px-3 py-1.5 text-[13px] transition " +
     (on
@@ -44,9 +59,11 @@ export function SiteNav({
         </a>
         <div className="ml-auto flex flex-wrap items-center gap-1">
           <a href={SITE} className={tab(false)}>Website</a>
-          <Link href="/jobs" className={tab(active === "market")}>Marketplace</Link>
+          <Link href="/jobs" className={tab(here === "market")}>Marketplace</Link>
           <a href={`${SITE}/#services`} className={tab(false)}>Services</a>
-          <Link href="/portal" className={tab(active === "portal")}>Portal</Link>
+          <Link href="/portal/client" className={tab(here === "client")}>Client portal</Link>
+          <Link href="/portal/worker" className={tab(here === "worker")}>Worker portal</Link>
+          <Link href="/apply" className={tab(here === "join")}>Join as a pro</Link>
         </div>
 
         {email ? (

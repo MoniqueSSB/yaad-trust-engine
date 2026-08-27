@@ -28,7 +28,6 @@ export default async function PortalShell({
   return (
     <div className="min-h-screen">
       <SiteNav
-        active="portal"
         email={user?.email}
         signOut={user ? signOut : undefined}
       />
