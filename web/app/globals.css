@@ -108,3 +108,33 @@ body {
 .sigbox b{display:block;font-size:13px;margin-bottom:4px}
 .sigbox span{font-size:11.5px;color:var(--dim);line-height:1.5;display:block}
 .sigbox.done b{color:var(--tealb)}
+
+/* Upload rows on the join flow. The pill is a <label> wrapping a hidden file
+   input, so the whole thing is a real tap target on a phone and the browser's
+   own picker does the work. The row states what it wants; the pill is the only
+   thing that looks pressable, because it is the only thing that is. */
+.upl{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--bg)}
+.upl.done{border-color:var(--softline);background:var(--soft)}
+.upl.bad{border-color:rgba(255,107,74,.45);background:rgba(255,107,74,.05)}
+.upl .uplb{flex:1;min-width:0}
+.upl b{display:block;font-size:13.5px;line-height:1.3}
+.upl.done b{color:var(--tealb)}
+.upl span{display:block;font-size:12px;color:var(--dim);line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
+.upl.bad span{color:var(--coral)}
+.upbtn{flex:0 0 auto;cursor:pointer;font-size:12px;font-weight:700;padding:9px 15px;border-radius:100px;border:1px solid var(--line2);color:var(--ink);background:var(--panel);transition:.13s;white-space:nowrap}
+.upbtn:hover{border-color:var(--teal);color:var(--tealb)}
+.upbtn input{display:none}
+@media(max-width:520px){.upl{flex-wrap:wrap}.upbtn{width:100%;text-align:center}}
+
+/* Links added on step 2. A chip you can remove, so it is obvious the link was
+   taken rather than typed into a box that forgot it. */
+.lnk{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.lnk .tag{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 10px;border-radius:9px;border:1px solid var(--softline);background:var(--soft);color:var(--tealb);max-width:100%}
+.lnk .tag>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
+.lnk .tag button{color:var(--dim);cursor:pointer;font-size:15px;line-height:1;padding:0 2px}
+.lnk .tag button:hover{color:var(--coral)}
+
+/* The vetting record rows are buttons now: each one jumps to the step that
+   would satisfy it, because a checklist you cannot act on is decoration. */
+.vitem{width:100%;text-align:left;background:none;cursor:pointer;transition:.13s}
+.vitem:hover b{color:var(--tealb)}

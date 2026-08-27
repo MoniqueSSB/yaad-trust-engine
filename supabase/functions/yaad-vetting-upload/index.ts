@@ -30,13 +30,31 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const BUCKET = "vetting";
-const MAX_BYTES = 26214400;                       // 25 MB, matches the bucket
+const MAX_BYTES = 52428800;                       // 50 MB, matches the bucket
 const KEEP_DAYS = 90;                             // purge clock on the file
-const DOC_TYPES = ["photo_id", "selfie_with_id", "police_check", "proof_of_address", "trn"];
-const MIME_OK = ["image/jpeg", "image/png", "image/heic", "image/webp", "application/pdf"];
+
+// Identity papers, and the work evidence from step 2. A CV and a portfolio are
+// documents like any other: same private bucket, same purge clock, same rule
+// that the server writes the row only after it has seen the bytes.
+const DOC_TYPES = [
+  "photo_id", "selfie_with_id", "face_video", "police_check", "proof_of_address", "trn",
+  "cv", "portfolio", "certificate",
+];
+
+// Video is here for one reason: the left-to-right face turn in step 3. A still
+// cannot prove a turn, so a still cannot be the check.
+const MIME_OK = [
+  "image/jpeg", "image/png", "image/heic", "image/webp", "application/pdf",
+  "video/mp4", "video/webm", "video/quicktime",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 const EXT: Record<string, string> = {
   "image/jpeg": "jpg", "image/png": "png", "image/heic": "heic",
   "image/webp": "webp", "application/pdf": "pdf",
+  "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
 };
 
 const CORS = {
@@ -94,13 +112,15 @@ Deno.serve(async (req: Request) => {
         app_id: "APP-" + crypto.randomUUID().slice(0, 6).toUpperCase(),
         name,
         trade,
-        parish: s(b.parish),
+        trade_other: s(b.tradeOther).slice(0, 120),
+        // parish stays the first one for the desk, which reads a single parish.
+        // parishes is the real answer, and it is the one matching will use.
+        parish:   s(b.parish),
+        parishes: s(b.parishes).slice(0, 400),
         phone:  s(b.phone),
         email:  s(b.email).toLowerCase(),
         years:  s(b.years),
         work:   s(b.work).slice(0, 2000),
-        ref1:   s(b.ref1),
-        ref2:   s(b.ref2),
         status: "started",
       }).select("id, app_id, upload_token").single();
 
@@ -113,7 +133,13 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!appId || !token) return json({ error: "This upload link is not valid." }, 400);
-    if (!DOC_TYPES.includes(docType)) return json({ error: "Unknown document type." }, 400);
+
+    // Only the two file actions name a document. `submit` names none, and
+    // demanding one here is what made every submit fail with "Unknown
+    // document type" for an application that was otherwise complete.
+    if ((action === "start" || action === "finish") && !DOC_TYPES.includes(docType)) {
+      return json({ error: "Unknown document type." }, 400);
+    }
 
     // The credential check. Both halves must match one row.
     const { data: app } = await admin
@@ -133,10 +159,10 @@ Deno.serve(async (req: Request) => {
       const mime = s(b.mime);
       const size = Number(b.bytes ?? 0);
       if (!MIME_OK.includes(mime)) {
-        return json({ error: "That file type is not accepted. Photos or a PDF." }, 400);
+        return json({ error: "That file type is not accepted. A photo, a video, a PDF or a Word document." }, 400);
       }
       if (!Number.isFinite(size) || size <= 0 || size > MAX_BYTES) {
-        return json({ error: "That file is too large. 25MB maximum." }, 400);
+        return json({ error: "That file is too large. 50MB maximum." }, 400);
       }
 
       // Path carries no personal data: an application id, not a name or email.
@@ -208,16 +234,34 @@ Deno.serve(async (req: Request) => {
 
     // ── submit: the applicant is done, hand it to the desk ──
     if (action === "submit") {
+      // Three references are asked for on screen, so three are stored. An
+      // application that names fewer, or that has not confirmed the referees
+      // were warned, is still accepted: it is the desk's job to decide, not
+      // this function's. What it must not do is quietly lose the answer.
+      const signedName = s(b.signedName).slice(0, 120);
       const { error } = await admin.from("applications").update({
         status: "received",
-        phone:  s(b.phone)  || undefined,
-        email:  s(b.email).toLowerCase() || undefined,
-        parish: s(b.parish) || undefined,
-        trade:  s(b.trade)  || undefined,
-        years:  s(b.years)  || undefined,
-        work:   s(b.work).slice(0, 2000) || undefined,
-        ref1:   s(b.ref1)   || undefined,
-        ref2:   s(b.ref2)   || undefined,
+        phone:    s(b.phone)  || undefined,
+        email:    s(b.email).toLowerCase() || undefined,
+        parish:   s(b.parish) || undefined,
+        parishes: s(b.parishes).slice(0, 400) || undefined,
+        trade:    s(b.trade)  || undefined,
+        trade_other: s(b.tradeOther).slice(0, 120) || undefined,
+        years:    s(b.years)  || undefined,
+        work:     s(b.work).slice(0, 2000) || undefined,
+        links:    s(b.links).slice(0, 1000) || undefined,
+        ref1:     s(b.ref1)   || undefined,
+        ref2:     s(b.ref2)   || undefined,
+        ref3:     s(b.ref3)   || undefined,
+        refs_told: b.refsTold === true,
+        police_status: s(b.policeStatus) || undefined,
+        // Signed once, at submit, with the name they typed. The timestamp is
+        // the server's, never the browser's: a signature dated by the thing
+        // being signed against is not a signature.
+        signed_name:    signedName || undefined,
+        signed_at:      signedName ? new Date().toISOString() : undefined,
+        signed_version: signedName ? s(b.signedVersion) || "v1" : undefined,
+        submitted_at:   new Date().toISOString(),
       }).eq("id", appId);
       if (error) { root.recordError(error.message); return json({ error: error.message }, 500); }
 

@@ -1726,11 +1726,23 @@ async function cloudPull(){
         photos:row.photos||[], status:row.status||"new" });
     });
     (ra.data||[]).forEach(row=>{
-      if(DB.applications.some(x=>x.cid===row.id)) return;
-      DB.applications.push({ id:"APP-C"+String(DB.applications.length+1).padStart(3,"0"), cid:row.id,
-        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, email:row.email, parish:row.parish,
-        trade:row.trade, years:row.years, cert:!!row.cert, certno:row.certno, work:row.work,
-        ref1:row.ref1, ref2:row.ref2, checks:{}, status:row.status||"received" });
+      // An application is opened at step 1 with status "started" and only turns
+      // "received" when the tradesperson actually sends it. Skipping rows the
+      // desk already holds meant one cached while still "started" stayed
+      // "started" here forever, so a completed application never reached the
+      // pending list. Refresh what the cloud owns; keep the checks, which are
+      // the desk's own work and live nowhere else.
+      const fields = {
+        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, email:row.email,
+        parish:row.parish, parishes:row.parishes, trade:row.trade, tradeOther:row.trade_other,
+        years:row.years, cert:!!row.cert, certno:row.certno, work:row.work, links:row.links,
+        ref1:row.ref1, ref2:row.ref2, ref3:row.ref3, refsTold:!!row.refs_told,
+        policeStatus:row.police_status, signedName:row.signed_name, signedAt:row.signed_at,
+        status:row.status||"received" };
+      const held = DB.applications.find(x=>x.cid===row.id);
+      if(held) Object.assign(held, fields);
+      else DB.applications.push(Object.assign({
+        id:"APP-C"+String(DB.applications.length+1).padStart(3,"0"), cid:row.id, checks:{} }, fields));
     });
     save(); renderAll();
   }catch(e){ console.warn("cloud pull:", e); setCloudBadge("error"); }
@@ -3468,21 +3480,25 @@ function renderAdmin(){
   const pend = DB.applications.filter(a=>a.status==="received");
   A.innerHTML = pend.length ? "" : '<div class="empty">No applications waiting. New applications from the worker portal land here for your vetting.</div>';
   pend.forEach(a=>{
-    const CHECKS = ["Government photo ID seen on video call and matched to face","Proof of address seen","Selfie holding ID received and matched","Police record check seen (required for occupied homes)","Portfolio reviewed","Reference one called","Reference two called", a.cert?"Certification verified with the issuing body":"", "Trial job assigned","Trial job passed"].filter(Boolean);
+    const CHECKS = ["Government photo ID seen and matched to the face video","Proof of address seen, dated within three months","TRN matched to the name on the ID","Police record check seen (required over \u00a3500 and for occupied homes)","Portfolio, CV or links reviewed","Reference one called","Reference two called","Reference three called", a.cert?"Certification verified with the issuing body":"", "Trial job assigned","Trial job passed"].filter(Boolean);
     const boxes = CHECKS.map((c,i)=>'<li><span class="st '+(a.checks[i]?"pass":"gap")+'">'+(a.checks[i]?"PASS":"OPEN")+'</span> '+c+' <a class="btn o sm" style="margin-left:auto" onclick="toggleCheck(\''+a.id+'\','+i+')">'+(a.checks[i]?"Undo":"Mark done")+'</a></li>').join("");
     const allDone = CHECKS.every((c,i)=>a.checks[i]);
     const d = document.createElement("div"); d.className="card";
     d.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3>'+esc(a.name)+' <em>'+esc(a.id)+'</em></h3><span class="pill hold">'+esc(a.when)+'</span></div>'+
-      '<p style="font-size:13px;color:var(--mute)">'+esc(a.trade)+' · '+esc(a.parish||"parish not given")+' · '+esc(a.years||"?")+' yrs · WhatsApp '+esc(a.phone)+' · '+esc(a.email||"no email given")+(a.cert?' · certified: '+esc(a.certno||"number not given"):' · experience based')+'</p>'+
-      '<p style="font-size:12.5px;color:'+((a.police||"").startsWith("No")?"var(--red)":"var(--dim)")+'">ID offered: '+esc(a.idtype||"not stated")+' · police check: '+esc(a.police||"not stated")+'</p>'+
+      '<p style="font-size:13px;color:var(--mute)">'+esc(a.trade)+(a.tradeOther?' + '+esc(a.tradeOther):'')+' · '+esc(a.parishes||a.parish||"parish not given")+' · '+esc(a.years||"?")+' yrs · WhatsApp '+esc(a.phone)+' · '+esc(a.email||"no email given")+(a.cert?' · certified: '+esc(a.certno||"number not given"):' · experience based')+'</p>'+
+      '<p style="font-size:12.5px;color:'+(a.policeStatus==="uploaded"?"var(--dim)":"var(--red)")+'">Police check: '+(a.policeStatus==="uploaded"?"sent, see documents below":a.policeStatus==="not_yet"?"NOT SENT, they accepted the £500 and occupied-home lockout":esc(a.police||"not stated"))+'</p>'+
       (a.work?'<p style="font-size:13px;color:var(--mute)">Past work: '+esc(a.work)+'</p>':'')+
-      '<p style="font-size:12.5px;color:var(--dim)">Refs: '+esc(a.ref1||"none")+' · '+esc(a.ref2||"none")+'</p>'+
+      (a.links?'<p style="font-size:12.5px;color:var(--dim)">Links: '+appLinks(a.links)+'</p>':'')+
+      '<p style="font-size:12.5px;color:'+(a.refsTold?"var(--dim)":"var(--red)")+'">Refs: '+esc(a.ref1||"none")+' · '+esc(a.ref2||"none")+' · '+esc(a.ref3||"none")+' · '+(a.refsTold?"all three confirmed they were told we would call":"NOT confirmed as told we would call")+'</p>'+
+      (a.signedName?'<p style="font-size:12.5px;color:var(--dim)">Worker Guidelines signed by '+esc(a.signedName)+' on '+esc((a.signedAt||"").slice(0,10))+'</p>':'<p style="font-size:12.5px;color:var(--red)">Worker Guidelines NOT signed</p>')+
+      '<div class="kick">Documents</div><div id="vd-'+a.id+'" style="font-size:12.5px;color:var(--dim)">Loading\u2026</div>'+
       '<div class="kick">Vetting checklist</div><ul class="check">'+boxes+'</ul>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
       (allDone?'<a class="btn sm" onclick="approveApp(\''+a.id+'\',\'cert\')">Approve as Certified professional</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'vet\')">Approve as Evidence vetted</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'pro\')">Approve as Vetted professional</a>':'<span class="note">Approval unlocks when every check passes. Only you approve; the AI never does.</span>')+
       '<a class="btn warn sm" onclick="declineApp(\''+a.id+'\')">Decline</a>'+
       '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi "+a.name+", Yaadly here about your application "+a.id+". ")+'">Message →</a></div>';
     A.appendChild(d);
+    loadVetDocs(a);
   });
   const M = $("at-market");
   const open = DB.jobs.filter(j=>j.open);
@@ -3557,6 +3573,77 @@ function intakeToJob(id){
 }
 function callDone(id){ const c=DB.calls.find(x=>x.id===id); if(c){ c.status="done"; save(); renderAdmin(); } }
 function intakeArchive(id){ const it=DB.intakes.find(x=>x.id===id); it.status="archived"; save(); cloudStatus("intakes", it.cid, "archived"); renderAdmin(); }
+/* ─────────── An application's documents, on the desk ───────────
+
+   The vetting bucket is private and no browser token can read it. What an
+   admin holds is a session that satisfies is_admin(), and the storage policy
+   grants that session read on the bucket. So the desk asks Postgres for the
+   rows, then mints a short-lived signed URL for the one file being opened.
+
+   Nothing is pre-signed into the page. A URL that exists before it is needed
+   is a URL that can be screenshotted, forwarded, or left in a support ticket.
+   These live sixty seconds and are minted on the click.                     */
+
+const VD_LABEL = {
+  photo_id:"Government photo ID", selfie_with_id:"Live photo", face_video:"Face turn video",
+  trn:"TRN", proof_of_address:"Proof of address", police_check:"JCF police check",
+  cv:"CV", portfolio:"Portfolio", certificate:"Trade certificate"
+};
+
+async function loadVetDocs(a){
+  const box = document.getElementById("vd-"+a.id);
+  if(!box) return;
+  if(!sb || !cloudOn || !a.cid){ box.textContent = "Connect cloud to see the documents."; return; }
+  try{
+    const {data, error} = await sb.from("vetting_documents")
+      .select("id,doc_type,storage_path,bytes,mime,sha256,purge_after,created_at")
+      .eq("application_id", a.cid).order("created_at");
+    if(error) throw error;
+    if(!data || !data.length){
+      box.innerHTML = '<span style="color:var(--red)">Nothing uploaded. They sent an application with no documents at all.</span>';
+      return;
+    }
+    box.innerHTML = data.map(d=>
+      '<div style="display:flex;gap:9px;align-items:center;padding:7px 0;border-top:1px solid var(--line)">'+
+      '<b style="font-size:13px;color:var(--ink)">'+esc(VD_LABEL[d.doc_type]||d.doc_type)+'</b>'+
+      '<span style="color:var(--dim)">'+Math.max(1,Math.round((d.bytes||0)/1024))+' KB · '+esc((d.mime||"").split("/").pop())+
+      ' · destroyed '+esc((d.purge_after||"").slice(0,10))+'</span>'+
+      '<a class="btn o sm" style="margin-left:auto" onclick="openVetDoc(this,\''+esc(d.storage_path)+'\')">Open</a>'+
+      '</div>').join("");
+  }catch(e){
+    console.warn("vetting documents:", e);
+    box.innerHTML = '<span style="color:var(--red)">Could not read the documents. Are you signed in as an admin?</span>';
+  }
+}
+
+async function openVetDoc(el, path){
+  el.textContent = "Opening…";
+  try{
+    const {data, error} = await sb.storage.from("vetting").createSignedUrl(path, 60);
+    if(error || !data) throw error || new Error("no url");
+    window.open(data.signedUrl, "_blank", "noopener");
+    el.textContent = "Open";
+  }catch(e){
+    console.warn("signed url:", e);
+    el.textContent = "Blocked";
+    alert("That file would not open. Only an admin session can read the vetting bucket.");
+  }
+}
+
+/* Applicant-supplied links. Rendered as links because reviewing a portfolio is
+   the point, but normalised first so a pasted "javascript:" or "data:" cannot
+   become a click target on the desk. */
+function appLinks(raw){
+  return String(raw||"").split(/[\n,\s]+/).filter(Boolean).map(u=>{
+    const withScheme = /^https?:\/\//i.test(u) ? u : "https://"+u;
+    let ok = false;
+    try{ const p = new URL(withScheme); ok = p.protocol==="http:" || p.protocol==="https:"; }catch(_){ ok = false; }
+    return ok
+      ? '<a href="'+esc(withScheme)+'" target="_blank" rel="noopener noreferrer">'+esc(u)+'</a>'
+      : esc(u);
+  }).join(" · ");
+}
+
 function toggleCheck(id,i){ const a=DB.applications.find(x=>x.id===id); a.checks[i]=!a.checks[i]; save(); renderAdmin(); }
 function approveApp(id,lane){
   const a = DB.applications.find(x=>x.id===id);
