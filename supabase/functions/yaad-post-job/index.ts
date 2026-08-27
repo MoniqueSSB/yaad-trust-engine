@@ -76,6 +76,79 @@ function cardCols(b: Record<string, unknown>) {
   };
 }
 
+
+// ── The intake agent ─────────────────────────────────────────────────────
+//
+// Runs HERE, on the server, not from the browser. The build sheet flags the
+// reason: firing an AI endpoint for somebody with no account and nothing at
+// stake is a bill waiting to happen. Calling it from inside the draft write
+// means the only way to reach the model is to actually be posting a job.
+//
+// It reviews what the person wrote and returns the fields a worker needs to
+// quote without a phone call first. It never invents money: budget and
+// materials are the client's to state, and a guess there would be Yaadly
+// pricing work, which is the one thing the founder rule excludes.
+//
+// If it fails, the draft still saves. A job with an untidied description is
+// worth far more than no job.
+const MINIMAX_API = "https://api.minimax.io/v1/chat/completions";
+const AGENT_MODEL = "MiniMax-M2.7";
+
+const AGENT_PROMPT = `You read a property job described in plain words, often
+in Jamaican Patois, and return JSON only. Never invent facts. Never state a
+price, a budget or a cost. If something is not in the text, use "".
+
+Return exactly:
+{"title":"", "scope":"", "trade":"", "job_type":"", "urgency":"",
+ "access_note":"", "questions":["",""]}
+
+title: six words maximum, what the job is.
+scope: the same facts rewritten so a tradesperson can quote from them. Keep
+  the client's meaning. Do not add work nobody asked for.
+trade: one of Plumbing, Roofing, Electrical, Tiling, Masonry & Concrete,
+  Painting & Decorating, Grille & Gate Welding, Air Conditioning, Landscaping,
+  General Handyman, Solar Install, Water Tank & Pump, Locks & Security Doors,
+  Windows & Glazing, Carpentry & Joinery, Drainage & Septic, Fencing,
+  CCTV & Alarms. Empty if genuinely unclear.
+urgency: Emergency, within 48 hours | Within two weeks | Within a month |
+  Flexible, planning ahead. Empty if not stated.
+questions: the two things a worker would ring up and ask before quoting.`;
+
+async function readTheJob(text: string, trace: Trace) {
+  const key = Deno.env.get("MINIMAX_API_KEY");
+  if (!key || text.length < 12) return null;
+  try {
+    return await trace.span(`chat ${AGENT_MODEL}`, SpanKind.CLIENT, {
+      "gen_ai.system": "minimax",
+      "gen_ai.operation.name": "chat",
+      "gen_ai.request.model": AGENT_MODEL,
+      "server.address": "api.minimax.io",
+    }, async (sp) => {
+      const r = await fetch(MINIMAX_API, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: AGENT_MODEL, temperature: 0.2, max_tokens: 900,
+          messages: [
+            { role: "system", content: AGENT_PROMPT },
+            { role: "user", content: text.slice(0, 6000) },
+          ],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const raw = await r.text();
+      sp.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) { sp.recordError(`minimax http ${r.status}`); return null; }
+      let j: any = {};
+      try { j = JSON.parse(raw); } catch (_) { return null; }
+      const content = j?.choices?.[0]?.message?.content ?? "";
+      const m = String(content).match(/\{[\s\S]*\}/);
+      if (!m) return null;
+      try { return JSON.parse(m[0]); } catch (_) { return null; }
+    });
+  } catch (_) { return null; }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -134,6 +207,30 @@ Deno.serve(async (req: Request) => {
       }
 
       const jobId = `JOB-WEB-${Date.now()}`;
+
+      // The agent reads it before it becomes a row. Anything it returns is a
+      // suggestion the client can still overwrite on the next screen; nothing
+      // it says about money is used, because it is not asked about money.
+      const read = await readTheJob(desc, trace);
+      if (read) {
+        root.setAttributes({ "yaadly.agent.read": true, "yaadly.agent.trade": String(read.trade ?? "") });
+        if (!row.trade && s(read.trade)) { row.trade = s(read.trade); row.trade_source = "model"; }  // jobs_trade_source_chk: wizard | model | regex | admin
+        if (!row.job_type && s(read.job_type)) row.job_type = s(read.job_type);
+        if (!row.urgency && s(read.urgency)) row.urgency = s(read.urgency);
+        if (s(read.title)) row.title = s(read.title);
+        const qs = Array.isArray(read.questions) ? read.questions.filter(Boolean).map(s) : [];
+        if (s(read.scope) || qs.length) {
+          row.descr = [
+            s(read.scope) || desc,
+            s(read.access_note) ? `Access: ${s(read.access_note)}` : "",
+            qs.length ? `Worth confirming before quoting: ${qs.join("; ")}` : "",
+            "",
+            `In the client's own words: ${desc}`,
+            row.descr.split("\n").slice(1).join("\n"),
+          ].filter(Boolean).join("\n");
+        }
+      }
+
       const { data, error } = await admin.from("jobs")
         .insert({ id: jobId, client_name: "", client_email: "", client_phone: "", ...row })
         .select("portal_code").single();

@@ -83,3 +83,16 @@ not the address. The interface was exposed. That is now closed.
 folder locally (see above) rather than reaching for a public URL. If it needs to
 be reachable remotely again, put it behind Cloudflare Access rather than
 publishing it into `docs/`.
+
+## Where it is deployed
+
+`desk-deploy/` serves this file as a Cloudflare Worker on its own hostname,
+away from `yaadly.co.uk` and `app.yaadly.co.uk`. Edit `desk.html` here, then:
+
+```
+cp desk/desk.html desk-deploy/public/index.html
+npm run deploy --prefix desk-deploy
+```
+
+See `desk-deploy/README.md` for why it is a separate origin and for the
+Cloudflare Access step that still needs doing.

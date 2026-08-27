@@ -123,6 +123,37 @@ async function maybeSendReply(toWaId: string, body: string, trace: Trace) {
   });
 }
 
+
+// A voice note is the most common way a real job arrives. Somebody standing
+// in front of the damage describes it far better than they will type it.
+// Until this existed those messages landed as "review manually" and waited
+// for a person, which is the manual work this whole pipeline is meant to end.
+//
+// If transcription fails the message still becomes a job, carrying a note
+// that says a human needs to listen. Losing the job would be worse than
+// transcribing it badly.
+async function transcribe(mediaId: string, trace: Trace): Promise<string> {
+  try {
+    return await trace.span("transcribe voice note", SpanKind.CLIENT, {
+      "yaadly.media.id": mediaId,
+    }, async (sp) => {
+      const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/yaad-transcribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({ mediaId }),
+        signal: AbortSignal.timeout(70000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) { sp.recordError(j?.error ?? `transcribe http ${r.status}`); return ""; }
+      sp.setAttributes({ "yaadly.transcribe.chars": String(j.text ?? "").length });
+      return String(j.text ?? "");
+    });
+  } catch (_) { return ""; }
+}
+
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
 
@@ -184,15 +215,29 @@ Deno.serve(async (req: Request) => {
 
     const fromWaId: string = message.from ?? "";
     const contactName: string = contact?.profile?.name ?? "";
-    const text: string = message.text?.body ?? (message.type && message.type !== "text" ? `[${message.type} message, no text, review manually]` : "");
-    root.setAttributes({ "yaadly.message.type": message.type ?? "text", "yaadly.message.chars": text.length });
+    // Voice first: it is how most of these actually arrive.
+    let text: string = message.text?.body ?? "";
+    let spoken = false;
+    if (!text && (message.type === "audio" || message.type === "voice")) {
+      const mediaId = message.audio?.id ?? message.voice?.id ?? "";
+      if (mediaId) {
+        const said = await transcribe(mediaId, trace);
+        if (said) { text = said; spoken = true; }
+      }
+      if (!text) text = "[voice note received, could not be transcribed, listen to it]";
+    }
+    if (!text && message.type && message.type !== "text") {
+      text = `[${message.type} message, no text, review manually]`;
+    }
+    root.setAttributes({ "yaadly.message.type": message.type ?? "text", "yaadly.message.chars": text.length, "yaadly.message.spoken": spoken });
 
     const card = await structureJob(text, trace);
 
     const jobId = `JOB-WA-${Date.now()}`;
     const title = card?.title || (contactName ? `WhatsApp job from ${contactName}` : "WhatsApp job, needs review");
     const noEmailNote = card?.client_email ? "" : "\n\n[NO EMAIL, client came in via WhatsApp. Reply on WhatsApp to get their email so they can see this in the client portal.]";
-    const descr = [card?.scope || text, card?.urgency ? `Urgency: ${card.urgency}` : "", card?.preferred_date ? `Wanted by: ${card.preferred_date}` : "", card?.trade ? `Trade: ${card.trade}` : "", `Raw message: ${text}`].filter(Boolean).join("\n") + noEmailNote;
+    const descr = [card?.scope || text, card?.urgency ? `Urgency: ${card.urgency}` : "", card?.preferred_date ? `Wanted by: ${card.preferred_date}` : "", card?.trade ? `Trade: ${card.trade}` : "", `Raw message: ${text}`,
+      spoken ? "Source: voice note, transcribed automatically. The wording is the client's own." : ""].filter(Boolean).join("\n") + noEmailNote;
 
     const { inserted, insertError } = await trace.span("db.insert jobs", SpanKind.CLIENT, {
       "db.system.name": "postgresql",

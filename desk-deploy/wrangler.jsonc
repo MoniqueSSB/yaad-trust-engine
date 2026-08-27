@@ -1,0 +1,21 @@
+{
+  // The admin desk, deployed on its own Worker and its own hostname.
+  //
+  // Separate from yaadly.co.uk and from app.yaadly.co.uk on purpose. The desk
+  // reads client addresses, worker vetting status and money. It has no
+  // business sharing an origin with the marketing site, where a single bad
+  // script tag would be sitting next to it, or with the client app, where
+  // every signed-in client is already executing code.
+  //
+  // Separate origin also means separate cookies. Nothing the desk stores can
+  // be read by anything on the other two hosts, and vice versa.
+  //
+  // What protects the data is still the sign-in gate plus is_admin() and RLS
+  // underneath. This removes the shared blast radius; it does not replace the
+  // lock. Put Cloudflare Access in front of this hostname and it stops being
+  // reachable at all without an identity check first.
+  "name": "yaadly-desk",
+  "compatibility_date": "2026-08-01",
+  "assets": { "directory": "./public" },
+  "observability": { "enabled": true }
+}

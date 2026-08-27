@@ -74,12 +74,46 @@ Deno.serve(async (req: Request) => {
     const token   = s(b.uploadToken);
     const docType = s(b.docType);
 
-    if (!appId || !token) return json({ error: "This upload link is not valid." }, 400);
-    if (!DOC_TYPES.includes(docType)) return json({ error: "Unknown document type." }, 400);
-
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // ── apply: open the application, and hand back the claim token once ──
+    //
+    // Done here rather than by the browser writing to `applications` itself,
+    // because the row needs to come back with its upload_token and the table
+    // is deliberately unreadable to anyone who is not an admin. One audited
+    // path in, nothing readable out.
+    if (action === "apply") {
+      const name  = s(b.name);
+      const trade = s(b.trade);
+      if (!name)  return json({ error: "Your name is needed." }, 400);
+      if (!trade) return json({ error: "Pick at least one trade." }, 400);
+
+      const { data, error } = await admin.from("applications").insert({
+        app_id: "APP-" + crypto.randomUUID().slice(0, 6).toUpperCase(),
+        name,
+        trade,
+        parish: s(b.parish),
+        phone:  s(b.phone),
+        email:  s(b.email).toLowerCase(),
+        years:  s(b.years),
+        work:   s(b.work).slice(0, 2000),
+        ref1:   s(b.ref1),
+        ref2:   s(b.ref2),
+        status: "started",
+      }).select("id, app_id, upload_token").single();
+
+      if (error || !data) {
+        root.recordError(error?.message ?? "no application row");
+        return json({ error: "Could not start your application." }, 500);
+      }
+      root.setAttributes({ "yaadly.vetting.outcome": "application_started" });
+      return json({ ok: true, applicationId: data.id, reference: data.app_id, uploadToken: data.upload_token });
+    }
+
+    if (!appId || !token) return json({ error: "This upload link is not valid." }, 400);
+    if (!DOC_TYPES.includes(docType)) return json({ error: "Unknown document type." }, 400);
 
     // The credential check. Both halves must match one row.
     const { data: app } = await admin
@@ -170,6 +204,40 @@ Deno.serve(async (req: Request) => {
 
       root.setAttributes({ "yaadly.vetting.outcome": "stored", "yaadly.vetting.bytes": buf.byteLength });
       return json({ ok: true, docType, bytes: buf.byteLength, sha256: hash, purgeAfter: purge });
+    }
+
+    // ── submit: the applicant is done, hand it to the desk ──
+    if (action === "submit") {
+      const { error } = await admin.from("applications").update({
+        status: "received",
+        phone:  s(b.phone)  || undefined,
+        email:  s(b.email).toLowerCase() || undefined,
+        parish: s(b.parish) || undefined,
+        trade:  s(b.trade)  || undefined,
+        years:  s(b.years)  || undefined,
+        work:   s(b.work).slice(0, 2000) || undefined,
+        ref1:   s(b.ref1)   || undefined,
+        ref2:   s(b.ref2)   || undefined,
+      }).eq("id", appId);
+      if (error) { root.recordError(error.message); return json({ error: error.message }, 500); }
+
+      // Tell Monique. No contact details leave for the relay.
+      try {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+        if (st?.value) {
+          const { count } = await admin.from("vetting_documents")
+            .select("id", { count: "exact", head: true }).eq("application_id", appId);
+          await fetch(`https://ntfy.sh/${st.value}`, {
+            method: "POST",
+            headers: { Title: "New Yaadly pro application", Priority: "default", Tags: "hammer" },
+            body: `${s(b.trade) || "trade"}, ${s(b.parish) || "parish not given"}. ${count ?? 0} document(s) on file.`,
+            signal: AbortSignal.timeout(4000),
+          });
+        }
+      } catch (_) { /* never let a notification break an application */ }
+
+      root.setAttributes({ "yaadly.vetting.outcome": "submitted" });
+      return json({ ok: true });
     }
 
     return json({ error: "Unknown action." }, 400);
