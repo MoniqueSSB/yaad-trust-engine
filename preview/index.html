@@ -875,6 +875,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
       <button class="nl" data-go="portal">Portals</button>
       <button class="nl" data-go="join">Join as a pro</button>
       <button class="nl" data-go="wa">WhatsApp intake</button>
+      <button class="nl" data-go="build">How it's wired</button>
     </div>
     <button class="navcta" data-go="post">Post a job, free</button>
   </div>
@@ -1393,6 +1394,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 
     <div class="wnav" style="margin-top:30px">
       <button class="btn" data-go="market">See your job on the board</button>
+      <button class="btn ghost" data-go="build">See how this is wired</button>
       <button class="btn ghost" data-go="home">Back to home</button>
     </div>
   </div>
@@ -1414,14 +1416,14 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
     <div class="sec">
       <p class="kick m">Run by me</p>
       <h3 class="hx">Available now</h3>
-      <p class="lead" style="margin-top:10px">Fixed fee, paid up front, no percentage. <b>Reach out and we talk first</b>, a free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote before anything starts. <b>Every line shows the full price and the founding price</b>, because under the DMCCA 2024 a discount off a price nobody can actually buy is a misleading action, and because your own pricing rule says publish the real number first.</p>
+      <p class="lead" style="margin-top:10px">Fixed fee, paid up front, no percentage. <b>Reach out and we talk first</b>, a free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote before anything starts. <b>Every line shows the full price and the founding price</b> \u2014 because under the DMCCA 2024 a discount off a price nobody can actually buy is a misleading action, and because your own pricing rule says publish the real number first.</p>
       <div class="grid g2c" style="margin-top:22px" id="svcremote"></div>
     </div>
 
     <div class="sec">
       <p class="kick m">On the ground, someone attends</p>
       <h3 class="hx">The inspection ladder</h3>
-      <p class="lead" style="margin-top:10px">Built to the shape the UK market already uses, because that is the market your clients benchmark against. <b>A checker records what is there. A trained inspector tells you what it means.</b> That is the Level 1 to Level 2 line and it is where the price steps. Three families, whole-property reports, in-job sign-offs, and recurring care, each anchored to a published UK price. The table is below.</p>
+      <p class="lead" style="margin-top:10px">Built to the shape the UK market already uses, because that is the market your clients benchmark against. <b>A checker records what is there. A trained inspector tells you what it means.</b> That is the Level 1 to Level 2 line and it is where the price steps. Three families \u2014 whole-property reports, in-job sign-offs, and recurring care \u2014 each anchored to a published UK price. The table is below.</p>
       <div class="grid g2c" style="margin-top:22px" id="svcground"></div>
       <div id="mkttable"></div>
     </div>
@@ -1844,6 +1846,84 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
   </div>
 </section>
 
+<!-- ========================= BUILD / WIRING ========================= -->
+<section class="screen" id="s-build">
+  <div class="wrap">
+    <p class="kick">How it's wired</p>
+    <h2 class="hx">What's real, what's a hop,<br>what's a fight</h2>
+    <p class="lead">Two questions here. Can the agents live inside the web app rather than beside it? Yes, and four of the five already exist. And where does the guidelines signature sit? At go-live, which is where your database already puts it. The awkward part is neither of those, it is that steps 2 and 3 hand admin-only AI endpoints to people with no account.</p>
+
+    <div class="sec" style="margin-top:40px">
+      <p class="kick m">Agent by agent</p>
+      <div class="tw">
+        <table>
+          <thead><tr><th>Where in the flow</th><th>Function</th><th>Status today</th><th>What it needs</th></tr></thead>
+          <tbody>
+            <tr><td>Step 2, tidy the description, ask the two missing questions <span class="st b">signed clients only</span></td><td><code>yaad-agent</code> v12</td><td><span class="st a">Exists</span></td><td>Swap the <code>is_admin()</code> check for a signed-guidelines check. Same shape, different predicate.</td></tr>
+            <tr><td>Step 3, read the photos; later, check evidence at each stage <span class="st b">signed clients only</span></td><td><code>yaad-vision</code> v5</td><td><span class="st a">Exists</span></td><td>Same predicate swap, plus a hard cap on images per job.</td></tr>
+            <tr><td>Step 5, save the draft; step 6, flip it live on signature</td><td><code>yaad-website-intake</code> v4</td><td><span class="st a">Live &amp; public</span></td><td>Wizard fields, a <code>draft</code> status, and a resume link. Small.</td></tr>
+            <tr><td>After posting, alert matching workers</td><td><code>yaad-match</code></td><td><span class="st c">Doesn't exist</span></td><td>New. A SQL match on trade + parish + published profile, then ntfy and email. Half a day.</td></tr>
+            <tr><td>On confirm, Kickoff Pack, stages, QA sheet</td><td><code>yaad-kickoff</code> v13</td><td><span class="st a">Exists</span></td><td>Trigger it from the client's confirm, not the admin desk.</td></tr>
+            <tr><td>On completion, Completion Report</td><td><code>yaad-completion</code> v1</td><td><span class="st a">Exists</span></td><td>Nothing. Already fits.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">The abuse risk, resolved</p>
+      <div class="card" style="border-color:var(--softline);background:var(--soft)">
+        <h3 class="hx" style="font-size:22px">You closed this one yourself</h3>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">The earlier draft of this flow fired <code style="font-family:var(--mono);font-size:12px">yaad-agent</code> and <code style="font-family:var(--mono);font-size:12px">yaad-vision</code> at step 2 and step 3 for someone with no account and nothing at stake. That is a MiniMax bill waiting to happen and it would have needed Turnstile, IP caps and a kill switch before going public.</p>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Locking the agents behind the signature removes the problem instead of defending against it. Every model call now belongs to a known account with a signed guidelines row, so you rate-limit per client, not per IP, and an abuser has to sign your terms under a real email before they can cost you a penny. The security posture from commit 29e87b2 stays intact: the check just moves from <code style="font-family:var(--mono);font-size:12px">is_admin()</code> to "has a <code style="font-family:var(--mono);font-size:12px">doc_signatures</code> row for the current guidelines version".</p>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Still worth doing: a per-account monthly call budget in <code style="font-family:var(--mono);font-size:12px">app_settings</code>, a hard character cap on model input, and a kill switch you can flip without a deploy. Reuse the <code style="font-family:var(--mono);font-size:12px">yaad-kickoff</code> v8 background-drafting pattern so the 150-second worker cull can't hand you another empty pack.</p>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">The cost you have accepted in exchange: the first job any client posts is fully manual, so it is the roughest brief you will ever receive from them, and it is also their first impression. Someone reads those. Budget for that.</p>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">The gate, decided</p>
+      <div class="card">
+        <h3 class="hx" style="font-size:22px">Build free, sign to go live</h3>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Decided 25 Aug: anyone can build a job with no account. It saves as a draft. To put it in the marketplace you sign up <em>and</em> confirm the Client Guidelines, no signature, no listing. This is what <code style="font-family:var(--mono);font-size:12px">trg_enforce_signed_before_open</code> already enforces, so the database side is done. What changes is where the person meets it: at the end of a wizard they have already invested six screens in, instead of on a cold form.</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>Point in the flow</th><th>What the person does</th><th>Job state</th><th>Enforced by</th></tr></thead>
+            <tbody>
+              <tr><td>Steps 1 to 4</td><td>Nothing. No account, no email, no reading.</td><td><span class="st b">Nothing saved yet</span></td><td>,</td></tr>
+              <tr><td>End of step 5</td><td>Creates an account: name, email, password or one-tap link.</td><td><span class="st b">Draft</span> <code>open = false</code></td><td>Auth + <code>yaad-website-intake</code></td></tr>
+              <tr><td>Step 6</td><td>Reads and confirms Client Guidelines v1.0, types their name to sign.</td><td><span class="st a">Live</span> <code>open = true</code></td><td><code>doc_signatures</code> row → <code>trg_enforce_signed_before_open</code></td></tr>
+              <tr><td>Picks a worker</td><td>Agrees stages in writing, funds stage one.</td><td><span class="st c">Confirmed</span></td><td><code>yaad-kickoff</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin-top:14px;color:var(--mute);font-size:14.5px;line-height:1.7">The draft row is the part worth building properly. If someone bails at step 5 you still have their job, their trade, their parish and their tidied description, that is a recoverable lead and an email you can send. MyBuilder loses those people entirely. Keep a <code style="font-family:var(--mono);font-size:12px">jobs.status</code> of <span style="font-family:var(--mono);font-size:12px">draft</span> and a resume link, and the friction you just added starts paying you back.</p>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">One thing to watch: signature at go-live means every listing on your board comes from someone who has read the rules, which is exactly the standard you want to hold workers to. Measure the drop-off between step 5 and step 6. If more than a third of drafts never go live, the guidelines are too long, not the gate wrong.</p>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">What I'd leave on MyBuilder's side of the fence</p>
+      <div class="grid g2c" style="margin-top:18px">
+        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Pay-per-lead</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">Their whole revenue model. It's also why workers there chase and clients get eight calls in an hour. Charging your workers to see a job undercuts the thing you're selling.</p></div>
+        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Unlimited interest</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">Their volume makes a free-for-all work. With 142 workers, cap it at five interested per job and it reads as curation instead of a thin list.</p></div>
+        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">"Post free" as the whole promise</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">Free posting is the door, not the pitch. Yours is money held until proof. Say the free bit small and the held bit loud.</p></div>
+        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Review-count bragging</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.6">2.8 million reviews is their moat and you can't fake a number near it. Lead on evidence per job instead, a thing they don't have at all.</p></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">Order I'd build it in</p>
+      <div class="grid steps s4" style="margin-top:22px">
+        <div class="step"><h4>Wizard + draft state</h4><p>Six steps against the existing intake function, saving a draft at step 5 and flipping <code style="font-family:var(--mono);font-size:11px">open</code> on signature. No agents yet.</p></div>
+        <div class="step"><h4>Trades grid + profiles</h4><p>Both read from tables you already have. Mostly front-end.</p></div>
+        <div class="step"><h4>Match &amp; alert</h4><p>The new function. Without it nobody responds and the wizard is theatre.</p></div>
+        <div class="step"><h4>Agents, behind Turnstile</h4><p>Tidy-up first, vision second. Only after the abuse controls exist.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div class="backdrop" id="wlback" role="dialog" aria-modal="true" aria-labelledby="wltitle">
   <div class="modal" id="wlmodal">
     <button class="xbtn" id="wlclose" aria-label="Close">×</button>
@@ -1911,7 +1991,7 @@ var TRADES=[
 ];
 
 var WKX={
- 'Delroy Campbell':{yrs:9,about:'Plumbing and water systems. Most of my work is leaks, re-pipes, tanks and pumps in Kingston 6, 8 and 10. I do not take on tiling or electrics, I will tell you who does.',areas:'Kingston 8, 6, 10',checks:['Government photo ID on video call','TRN verified','Proof of address','JCF police record check, required, works over \u00a3500','3 trade references called','Walkthrough call completed','Trial job before first client'],
+ 'Delroy Campbell':{yrs:9,about:'Plumbing and water systems. Most of my work is leaks, re-pipes, tanks and pumps in Kingston 6, 8 and 10. I do not take on tiling or electrics, I will tell you who does.',areas:'Kingston 8, 6, 10',checks:['Government photo ID on video call','TRN verified','Proof of address','JCF police record check \u2014 required, works over \u00a3500','3 trade references called','Walkthrough call completed','Trial job before first client'],
   port:[['Bathroom re-pipe, Liguanea','Jul 2026','2 stages · 6 evidence items'],['Water tank and pump install, Barbican','Jun 2026','3 stages · 11 evidence items'],['Leak trace, upstairs bathroom, Stony Hill','Apr 2026','1 stage · 4 evidence items'],['Kitchen waste re-run, Half Way Tree','May 2026','2 stages · 7 evidence items']]},
  'Everton Blake':{yrs:12,about:'Electrical and solar. Consumer units, rewires, inverter and battery installs. Certified, and the certificate is checked with the issuing body, not just photographed.',areas:'Portmore, Kingston',checks:['Government photo ID on video call','TRN verified','Certification checked with the issuing body','Police record check','4 trade references called','Walkthrough call completed'],
   port:[['Consumer unit replacement, Liguanea','Aug 2026','2 stages · 9 evidence items'],['Inverter and battery, Braeton','Jul 2026','3 stages · 12 evidence items'],['Verandah power and lighting, Barbican','Jun 2026','1 stage · 5 evidence items'],['Full rewire, Greater Portmore','Mar 2026','5 stages · 21 evidence items']]},
@@ -2008,32 +2088,36 @@ S('#faqmore').addEventListener('click',function(){
 
 /* ---------- services ---------- */
 var SVC_REMOTE=[
- {n:'Deposit Protection Check',d:'Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates, payment structure, deposit exposure, works scope, red flags. Written go or no-go, back in 72 hours.',f:'\u00a3149',fu:'\u00a3249',u:'fixed fee',star:1,note:'Money, works, evidence and process only. No title, no contract interpretation.',src:'Checked against the market 26 Aug, correctly priced',keep:'\u00a3249 sits just under JAMCO\u2019s \u00a3263, the only direct Jamaica-facing competitor selling the same deliverable, and at the bottom of the UK QS early-cost-advice band of \u00a3300 to 1,000. This one was right. Headroom exists to \u00a3299 later; no reason to move it now.',warn:'The framing risk, not the price: <b>MyBuildAlly reviews a UK builder\u2019s quote for \u00a310</b>, automated. A client who has seen that needs to be told in one line why yours is \u00a3249, a person, Jamaican material costs and day rates a UK tool does not hold, a written go or no-go, and PI cover behind the opinion. Say it on the page rather than hoping they work it out.'},
-  {n:'Oversight Retainer',d:'Documented site visits, a monthly cost-and-progress report, a contractor accountability call, and a WhatsApp line to me. <b>Pick your frequency.</b> Your contractor knows somebody is watching, and how often.',
+ {n:'Deposit Protection Check',d:'Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates \u2014 payment structure, deposit exposure, works scope, red flags. Written go or no-go, back in 72 hours.',f:'\u00a3149',fu:'\u00a3249',u:'fixed fee',star:1,note:'Money, works, evidence and process only. No title, no contract interpretation.',src:'Checked against the market 26 Aug \u2014 correctly priced',keep:'\u00a3249 sits just under JAMCO\u2019s \u00a3263, the only direct Jamaica-facing competitor selling the same deliverable, and at the bottom of the UK QS early-cost-advice band of \u00a3300\u20131,000. This one was right. Headroom exists to \u00a3299 later; no reason to move it now.',warn:'The framing risk, not the price: <b>MyBuildAlly reviews a UK builder\u2019s quote for \u00a310</b>, automated. A client who has seen that needs to be told in one line why yours is \u00a3249 \u2014 a person, Jamaican material costs and day rates a UK tool does not hold, a written go or no-go, and PI cover behind the opinion. Say it on the page rather than hoping they work it out.'},
+  {n:'Oversight Retainer',d:'Documented site visits, a monthly cost-and-progress report, a contractor accountability call, and a WhatsApp line to me. <b>Pick your frequency.</b> Your contractor knows somebody is watching \u2014 and how often.',
   f:'\u00a3595',fu:'\u00a31,095',u:'per month',star:1,
   tiers:[['Fortnightly','2 visits a month','\u00a3495','\u00a3595'],['Weekly','4 visits a month','\u00a3895','\u00a31,095']],
-  src:'One UK monitoring surveyor visit is \u00a3500 to 1,500. This is 2 or 4 visits, a report and a call.',
+  src:'One UK monitoring surveyor visit is \u00a3500\u20131,500. This is 2 or 4 visits, a report and a call.',
   fix:'Was \u00a3350 flat. Two visits at the \u00a3149 ladder rate are \u00a3298, so \u00a3350 charged \u00a352 for the report, the call, the WhatsApp line and carrying the job in my head for a month. Fortnightly at \u00a3595 charges \u00a3297 for the oversight; weekly at \u00a31,095 charges \u00a3499 against \u00a3596 of visits. Proportionate, not an arbitrary jump.',
-  note:'Weekly is for an active build, anything on a programme, or a contractor you are not yet sure about. Fortnightly is the standard watch, enough that nothing goes two weeks unseen. Founder-attended from December.'},
- {n:'Full Project Management',d:'The whole build. Scope and specification, contractor sourcing and vetting, staged payments, programme, site inspections, handover and aftercare. Paid in milestones alongside the build, never up front.',f:'12 to 15%',u:'of build cost',min:'Minimum fee \u00a32,500',dec:'From December 2026',src:'Buildathon Logbook \u00b7 decided 13 Aug',note:'The minimum bites more often than you think. On a \u00a317,000 renovation 12% is \u00a32,040, the client pays \u00a32,500, an effective 14.7%. Say so on the page before they work it out themselves.'}
+  note:'Weekly is for an active build, anything on a programme, or a contractor you are not yet sure about. Fortnightly is the standard watch \u2014 enough that nothing goes two weeks unseen. Founder-attended from December.'},
+ {n:'Full Project Management',d:'The whole build. Scope and specification, contractor sourcing and vetting, staged payments, programme, site inspections, handover and aftercare. Paid in milestones alongside the build, never up front.',f:'12\u201315%',u:'of build cost',min:'Minimum fee \u00a32,500',dec:'From December 2026',src:'Buildathon Logbook \u00b7 decided 13 Aug',note:'The minimum bites more often than you think. On a \u00a317,000 renovation 12% is \u00a32,040 \u2014 the client pays \u00a32,500, an effective 14.7%. Say so on the page before they work it out themselves.'}
 ];
 var SVC_GROUND=[
  {n:'Visual Check',d:'A trained checker attends, photographs the property or the stage against a written checklist, and files a one-page observation note in 72 hours. They record what is there. They do not rate it, advise on it, or certify it.',
-  f:'\u00a395',fu:'\u00a3149',u:'per visit',site:1,src:'Mirrors the UK property inspection report, \u00a380 to 150',
-  note:'Short notice, inside 48 hours: \u00a3185. The UK same-day band is \u00a3130 to 180.',
+  f:'\u00a395',fu:'\u00a3149',u:'per visit',site:1,src:'Mirrors the UK property inspection report, \u00a380\u2013150',
+  note:'Short notice, inside 48 hours: \u00a3185. The UK same-day band is \u00a3130\u2013180.',
   fix:'Absorbs Property Check In, Eyes On It and the visual reviewer. One product, one price.'},
- {n:'Condition Report',d:'The whole property recorded system by system, roof and hurricane fixings, structure, water and tank, electrics and inverter, drainage and septic, termites, security. Every finding rated Severe, Moderate or Low, issue summary on page one.',
-  f:'\u00a3245',fu:'\u00a3325',u:'fixed fee',site:1,src:'Mirrors RICS Level 1 Condition Report, \u00a3300 to 900',
-  note:'Like a Level 1, it tells you what is wrong and how bad, not what to do about it.',
+
+ {n:'Condition Report',d:'The whole property recorded system by system \u2014 roof and hurricane fixings, structure, water and tank, electrics and inverter, drainage and septic, termites, security. Every finding rated Severe, Moderate or Low, issue summary on page one.',
+  f:'\u00a3245',fu:'\u00a3325',u:'fixed fee',site:1,src:'Mirrors RICS Level 1 Condition Report, \u00a3300\u2013900',
+  note:'Like a Level 1, it tells you what is wrong and how bad \u2014 not what to do about it.',
   fix:'Absorbs Site Verification Visit and Property Condition Report.'},
+
  {n:'Technical Sign-off',d:'A qualified trade inspector assesses one stage or one works package against the trade standard for that job type, and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record.',
   f:'\u00a3245',fu:'\u00a3300',u:'per sign-off',site:1,star:1,src:'Mirrors a UK structural engineer\u2019s site visit, \u00a3300',
   note:'Short notice, inside 48 hours: \u00a3395. A technical person attending, priced against a technical person attending.'},
+
+ 
  {n:'Property Care',d:'Recurring visits on a schedule, the same checklist every time, so change is visible visit to visit. An empty or elder-occupied home, checked and documented while you are four thousand miles away.',
   f:'\u00a375',fu:'\u00a395',u:'per visit, standard',site:1,
-  alt:'Large or rental \u00a3135 \u00b7 villa \u00a3175 \u00b7 setup \u00a395 to 125',
+  alt:'Large or rental \u00a3135 \u00b7 villa \u00a3175 \u00b7 setup \u00a395\u2013125',
   src:'Mirrors the UK periodic property inspection, \u00a380 + VAT per visit',
-  fix:'Was \u00a345. A UK periodic inspection is \u00a380 plus VAT for a 20 to 40 minute visit with time-stamped photos and a report, the same product. \u00a345 was half the market rate for identical work.',
+  fix:'Was \u00a345. A UK periodic inspection is \u00a380 plus VAT for a 20\u201340 minute visit with time-stamped photos and a report \u2014 the same product. \u00a345 was half the market rate for identical work.',
   note:'Local J$ menu unchanged: J$7,500 / 12,000 / 18,000 per visit, no FX. A Jamaican client buying in J$ is a different market with a different cost base.'}
 ];
 function svcCard(v){
@@ -2041,7 +2125,7 @@ function svcCard(v){
    ? esc(v.u)+', paid in milestones'
    : esc(v.u||'service');
  var price;
- if(v.tiers){ price = '<p class="tiny" style="margin-top:8px">Both rates are founding prices for the first five, dated, and a real discount off a price you can actually buy.</p>'; }
+ if(v.tiers){ price = '<p class="tiny" style="margin-top:8px">Both rates are founding prices for the first five \u2014 dated, and a real discount off a price you can actually buy.</p>'; }
  else price = '<div class="prices"><span class="pnow">'+v.f+(v.u==='per month'?'<s>/mo</s>':'')+'</span>'+
    '<span class="pfull">'+unit+
    (v.fu?'<br><b class="pf2">Full price '+v.fu+(v.u==='per month'?' a month':'')+'</b><br><span class="tiny">'+v.f+' is the founding price for the first five. Dated, and a real discount off a price you can actually buy.</span>':'')+
@@ -2061,7 +2145,7 @@ function svcCard(v){
     return '<div class="freq"><b>'+esc(t[0])+'</b><span>'+esc(t[1])+'</span>'+
      '<i>'+t[3]+'</i><em>'+t[2]+' founding</em></div>'}).join('')+'</div>':'')+
   (v.note?'<p class="tiny" style="color:var(--coral)">'+v.note+'</p>':'')+
-  (v.keep?'<div class="fixed"><b>Checked, keeping it.</b> '+v.keep+'</div>':'')+(v.fix?'<div class="fixed"><b>Corrected.</b> '+v.fix+'</div>':'')+
+  (v.keep?'<div class="fixed"><b>Checked \u2014 keeping it.</b> '+v.keep+'</div>':'')+(v.fix?'<div class="fixed"><b>Corrected.</b> '+v.fix+'</div>':'')+
   (v.warn?'<div class="flag" style="margin-top:0"><b>Your call.</b> '+v.warn+'</div>':'')+
   price+
   (v.src?'<p class="srcline">'+esc(v.src)+'</p>':'')+'</div>';
@@ -2136,8 +2220,8 @@ function setProfile(m){
 
 /* ---------- marketplace ---------- */
 var JOBS=[
- {id:'JB-4471',sp:['Leak trace and repair','One room affected','Single storey','Worker supplies, invoiced'],t:'Plumbing',ti:'Leak on the supply pipe under a kitchen sink',a:'Barbican, Kingston 8',d:'Repair an active leak beneath a kitchen sink in a single-storey home. Running roughly one week; the cupboard base below has softened and will likely need replacing. Access arranged with a family member on site.',ago:'just now',ph:4,w:'Within two weeks',n:0,cs:true,cj:0,cscore:', ',lo:14000,hi:26000,fresh:true,pics:['Under the sink, cupboard doors open','The joint, close up, water beading','Cupboard base, swelling along the front edge','Shut-off valve under the counter']},
- {id:'JB-4468',sp:['Consumer unit or board','Medium, one to two days','Two storey','Worker supplies, invoiced'],t:'Electrical',ti:'Consumer unit replacement, three-bedroom house',a:'Liguanea, Kingston 6',d:'Existing board is original to the house and trips under load. Wants it replaced with RCD protection and the circuits labelled. Owner on site weekdays.',ago:'2 hours ago',ph:6,w:'Within two weeks',n:4,cs:true,cj:2,cscore:'4.7',lo:65000,hi:110000,pics:['Consumer unit, cover on','Consumer unit, cover off','Meter and service entry','The board label, unreadable','Kitchen ring, where it trips','Cupboard the board sits in']},
+ {id:'JB-4471',sp:['Leak trace and repair','One room affected','Single storey','Worker supplies, invoiced'],t:'Plumbing',ti:'Leak on the supply pipe under a kitchen sink',a:'Barbican, Kingston 8',d:'Repair an active leak beneath a kitchen sink in a single-storey home. Running roughly one week; the cupboard base below has softened and will likely need replacing. Access arranged with a family member on site.',ago:'just now',ph:4,w:'Within two weeks',n:0,cs:true,cj:0,cscore:',',lo:14000,hi:26000,fresh:true,pics:['Under the sink, cupboard doors open','The joint, close up, water beading','Cupboard base \u2014 swelling along the front edge','Shut-off valve under the counter']},
+ {id:'JB-4468',sp:['Consumer unit or board','Medium, one to two days','Two storey','Worker supplies, invoiced'],t:'Electrical',ti:'Consumer unit replacement, three-bedroom house',a:'Liguanea, Kingston 6',d:'Existing board is original to the house and trips under load. Wants it replaced with RCD protection and the circuits labelled. Owner on site weekdays.',ago:'2 hours ago',ph:6,w:'Within two weeks',n:4,cs:true,cj:2,cscore:'4.7',lo:65000,hi:110000,pics:['Consumer unit, cover on','Consumer unit, cover off','Meter and service entry','The board label, unreadable','Kitchen ring \u2014 where it trips','Cupboard the board sits in']},
  {id:'JB-4465',sp:['Replace lifted or damaged sheets','1 to 2 sheets','Single storey','Worker supplies, invoiced'],t:'Roofing',ti:'Two sheets of zinc lifted after the last storm',a:'Stony Hill, St Andrew',d:'Rear section of the roof, two sheets lifted and one purlin looks split. Water coming into the back bedroom. Photos from ground level only.',ago:'5 hours ago',ph:3,w:'Urgent, 48 hours',n:7,cs:true,cj:5,cscore:'4.9',pics:['Rear roof from the yard','The two lifted sheets','Back bedroom ceiling, water stain']},
  {id:'JB-4461',sp:['Boundary wall rebuild','Medium, one to two days','Not applicable','Split, agree item by item'],t:'Masonry',ti:'Rebuild a section of boundary wall, about 20 feet',a:'Greater Portmore',d:'Wall came down where a tree root pushed it. Client wants the same block and finish as the rest. Materials to be quoted separately from labour.',ago:'yesterday',ph:5,w:'Flexible',n:3,cs:true,cj:1,cscore:'5.0',lo:90000,hi:150000,pics:['The gap where the wall came down','Tree root at the base','The rest of the wall for the block match','Along the boundary line','The gate end']},
  {id:'JB-4459',sp:['Floor and half-height walls','Medium, one to two days','Single storey','Client supplies tiles'],t:'Tiling',ti:'Retile a bathroom floor and half-height walls',a:'Half Way Tree, Kingston 10',d:'Roughly 60 sq ft floor plus wall to waist height. Old tiles already removed. Client is in Florida, sister handles access.',ago:'yesterday',ph:7,w:'Within two weeks',n:5,cs:true,cj:3,cscore:'4.8',lo:55000,hi:95000,pics:['Bathroom floor, tiles already off','Wall to waist height','Doorway and threshold','The old tiles stacked outside','Shower tray edge','Window reveal','Tape measure on the floor for scale']},
@@ -2200,21 +2284,23 @@ var JOBS=[
 var revPick='visual', liveView=false;
 var LIVEVIEW={fee:'\u00a340',
  t:'Watch it happen, live',
- d:'By default the inspection happens, and you get the report and the sign-off afterwards. That is how most people want it, you are asleep, or at work, or four thousand miles and six hours away.',
+ d:'By default the inspection happens, and you get the report and the sign-off afterwards. That is how most people want it \u2014 you are asleep, or at work, or four thousand miles and six hours away.',
  d2:'If you would rather be there, add live viewing and we call you in on video while the inspector is on site. You see what they see, in real time, and you can ask them to point the camera at something. <b>\u00a340, on any rung.</b>',
  got:['A video call opened from site at the agreed time','You see the inspection as it happens, not a summary of it','Ask them to look closer at anything, while they are still standing there','Anything you raise goes in the report as your own note','The recording is filed with the evidence']};
 var REVIEWERS={
  none:{n:'No reviewer',fee:'Included',sub:'You approve from the evidence pack', who:'You',
   d:'You read the evidence, look at the before and after side by side, and release. Free, and right for a small job where the photos genuinely tell the whole story.',
   got:['The evidence pack as filed, with fingerprints','A live video walkthrough with the worker, free, if you want one','Your own eyes, and as long as you need']},
+
  visual:{n:'Visual Check',fee:'\u00a3149',f2:'\u00a395 founding',sub:'B1 \u00b7 a trained checker attends',
-  uk:'UK property inspection report, <b>\u00a380 to 150</b>, non-chartered, 15 to 20 minutes on site.',
+  uk:'UK property inspection report \u2014 <b>\u00a380\u2013150</b>, non-chartered, 15\u201320 minutes on site.',
   who:'A trained Yaadly checker. Not a surveyor, and we never say otherwise.',
   d:'Somebody attends, photographs the work against the agreed scope, records anything visibly wrong, and files a one-page observation note. <b>They record what is there. They do not rate it, advise on it, or certify it.</b>',
-  got:['Address proof, gate number or street sign as the first frame','Arrival photos, geotagged','The finished work against the agreed scope, item by item','Anything visibly wrong, close up','Walk-round clip of the whole job','One-page written observation note in 72 hours'],
-  note:'Short notice, inside 48 hours: <b>\u00a3185</b>. The UK emergency band is \u00a3130 to 180.'},
+  got:['Address proof \u2014 gate number or street sign as the first frame','Arrival photos, geotagged','The finished work against the agreed scope, item by item','Anything visibly wrong, close up','Walk-round clip of the whole job','One-page written observation note in 72 hours'],
+  note:'Short notice, inside 48 hours: <b>\u00a3185</b>. The UK emergency band is \u00a3130\u2013180.'},
+
  tech:{n:'Technical Sign-off',fee:'\u00a3300',f2:'\u00a3245 founding',sub:'B2 \u00b7 a qualified trade inspector',
-  uk:'<b>A UK structural engineer charges \u00a3300 for the site visit alone</b>, and \u00a3100 to 200 an hour. This is a technical person attending, so it is priced against a technical person attending.',
+  uk:'<b>A UK structural engineer charges \u00a3300 for the site visit alone</b>, and \u00a3100\u2013200 an hour. This is a technical person attending, so it is priced against a technical person attending.',
   who:'A qualified inspector in that trade, named on the report.',
   d:'The work assessed <b>against the trade standard for that job type</b>, with a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record.',
   got:['Everything in a Visual Check','Assessment against the trade standard for the job type','Readings and tests where the trade requires them','A pass, a fail, or a written list of what to put right','Advice on what to do next, and who to instruct if it is outside our scope'],
@@ -2222,62 +2308,62 @@ var REVIEWERS={
 };
 
 var MARKET=[
- ['<b>Basic, not a surveyor</b>','',''],
- ['UK property inspection report','\u00a380 to 150','gvec.co.uk, 2026'],
- ['\u2003same-day / emergency','\u00a3130 to 180','gvec.co.uk, 2026'],
+ ['<b>Basic \u2014 not a surveyor</b>','',''],
+ ['UK property inspection report','\u00a380\u2013150','gvec.co.uk, 2026'],
+ ['\u2003same-day / emergency','\u00a3130\u2013180','gvec.co.uk, 2026'],
  ['UK periodic property inspection, <b>per visit</b>','\u00a380 + VAT','Leisure Guard, 2026'],
- ['UK snagging survey, 3-bed house','\u00a3449','HomeOwners Alliance, 2026'],
- ['UK snagging <b>re-inspection</b>, flat','\u00a3290 to 350','HomeOwners Alliance, 2026'],
+ ['UK snagging survey \u2014 3-bed house','\u00a3449','HomeOwners Alliance, 2026'],
+ ['UK snagging <b>re-inspection</b> \u2014 flat','\u00a3290\u2013350','HomeOwners Alliance, 2026'],
  ['<b>Carried out by a trained professional</b>','',''],
- ['<b>RICS Level 1</b>, Condition Report, no advice','\u00a3300 to 900','HomeOwners Alliance, 2026'],
- ['<b>RICS Level 2</b>, HomeBuyer, with repair advice','\u00a3400 to 1,000','HomeOwners Alliance, 2026'],
- ['<b>RICS Level 3</b>, Building Survey, with repair costs','\u00a3630 to 1,500+','HomeOwners Alliance, 2026'],
- ['Structural engineer, site visit only','\u00a3300','Checkatrade, 2026'],
- ['Structural engineer, visit + report','\u00a31,000','Checkatrade, 2026'],
- ['Structural engineer, hourly','\u00a3100 to 200','Checkatrade, 2026'],
+ ['<b>RICS Level 1</b> \u2014 Condition Report, no advice','\u00a3300\u2013900','HomeOwners Alliance, 2026'],
+ ['<b>RICS Level 2</b> \u2014 HomeBuyer, with repair advice','\u00a3400\u20131,000','HomeOwners Alliance, 2026'],
+ ['<b>RICS Level 3</b> \u2014 Building Survey, with repair costs','\u00a3630\u20131,500+','HomeOwners Alliance, 2026'],
+ ['Structural engineer \u2014 site visit only','\u00a3300','Checkatrade, 2026'],
+ ['Structural engineer \u2014 visit + report','\u00a31,000','Checkatrade, 2026'],
+ ['Structural engineer \u2014 hourly','\u00a3100\u2013200','Checkatrade, 2026'],
  ['<b>Ongoing oversight</b>','',''],
- ['UK monitoring surveyor, <b>per visit</b>','\u00a3500 to 1,500','Construction Capital, 2026'],
- ['\u2003smaller schemes','\u00a3600 to 800','Construction Capital, 2026'],
- ['UK monitoring, desk-top review, one-off','\u00a3750 to 2,000','Construction Capital, 2026'],
- ['<b>Advisory, quote review and project setup</b>','',''],
- ['QS, early cost advice','\u00a3300 to 1,000','Homebuilding & Renovating, 2026'],
- ['Building surveyor, specific defect report','\u00a3300 to 600','Survey Merchant, 2026'],
+ ['UK monitoring surveyor \u2014 <b>per visit</b>','\u00a3500\u20131,500','Construction Capital, 2026'],
+ ['\u2003smaller schemes','\u00a3600\u2013800','Construction Capital, 2026'],
+ ['UK monitoring \u2014 desk-top review, one-off','\u00a3750\u20132,000','Construction Capital, 2026'],
+ ['<b>Advisory \u2014 quote review and project setup</b>','',''],
+ ['QS \u2014 early cost advice','\u00a3300\u20131,000','Homebuilding & Renovating, 2026'],
+ ['Building surveyor \u2014 specific defect report','\u00a3300\u2013600','Survey Merchant, 2026'],
  ['Average quantity surveying job','\u00a3400','Kingsmead Consultants, 2026'],
- ['Building surveyor, hourly','\u00a360 to 150','Survey Merchant, 2026'],
- ['QS, <b>full cost control and tendering</b>','\u00a32,000 to 10,000+','Homebuilding & Renovating, 2026'],
- ['Project manager, % of build cost','3 to 7%','Homebuilding & Renovating, 2026'],
- ['Project manager, typical total','\u00a310,000 to 30,000+','Homebuilding & Renovating, 2026'],
- ['QS, % of construction value','0.5 to 2%','Designing Buildings, RICS wiki'],
- ['Professional fees, whole self-build','8 to 15% of build','Homebuilding & Renovating, 2026'],
- ['MyBuildAlly, automated quote comparison','\u00a310','mybuildally.co.uk'],
+ ['Building surveyor \u2014 hourly','\u00a360\u2013150','Survey Merchant, 2026'],
+ ['QS \u2014 <b>full cost control and tendering</b>','\u00a32,000\u201310,000+','Homebuilding & Renovating, 2026'],
+ ['Project manager \u2014 % of build cost','3\u20137%','Homebuilding & Renovating, 2026'],
+ ['Project manager \u2014 typical total','\u00a310,000\u201330,000+','Homebuilding & Renovating, 2026'],
+ ['QS \u2014 % of construction value','0.5\u20132%','Designing Buildings, RICS wiki'],
+ ['Professional fees, whole self-build','8\u201315% of build','Homebuilding & Renovating, 2026'],
+ ['MyBuildAlly \u2014 automated quote comparison','\u00a310','mybuildally.co.uk'],
  ['<b>Diaspora comparables</b>','',''],
- ['JAMCO, Before You Build Audit <b>(direct competitor)</b>','\u2248\u00a3263','buildingjamaica.ca'],
- ['JAMCO, Build Smart, setup + oversight','\u2248\u00a32,384','buildingjamaica.ca'],
- ['IndiaForNRI, property report','\u2248\u00a3186','indiafornri.com'],
- ['NaijaSight, monitoring, per visit','\u2248\u00a374','naijasight.com'],
- ['SimpleXD, virtual inspection','\u2248\u00a327','simplexd.co']
+ ['JAMCO \u2014 Before You Build Audit <b>(direct competitor)</b>','\u2248\u00a3263','buildingjamaica.ca'],
+ ['JAMCO \u2014 Build Smart, setup + oversight','\u2248\u00a32,384','buildingjamaica.ca'],
+ ['IndiaForNRI \u2014 property report','\u2248\u00a3186','indiafornri.com'],
+ ['NaijaSight \u2014 monitoring, per visit','\u2248\u00a374','naijasight.com'],
+ ['SimpleXD \u2014 virtual inspection','\u2248\u00a327','simplexd.co']
 ];
 
 var LADDER=[
- ['h','A \u00b7 Whole-property reports, one-off','','','','',''],
- ['A1','Visual Check','A trained checker','Records. No rating, no advice.','\u00a395','\u00a3149','UK property inspection report \u00a380 to 150'],
- ['A2','Condition Report','A trained inspector','Severity-rated, system by system. Still no advice.','\u00a3245','\u00a3325','RICS Level 1 \u00a3300 to 900'],
- ['A3','Full Report, with advice','A qualified inspector','Defects, advice, and what to do about them.','\u00a3445','\u00a3595','RICS Level 2 \u00a3400 to 1,000'],
- ['h','B \u00b7 In-job sign-offs, per milestone','','','','',''],
- ['B1','Visual Check','A trained checker','Records the stage. No opinion.','\u00a395','\u00a3149','UK property inspection report \u00a380 to 150'],
+ ['h','A \u00b7 Whole-property reports \u2014 one-off','','','','',''],
+ ['A1','Visual Check','A trained checker','Records. No rating, no advice.','\u00a395','\u00a3149','UK property inspection report \u00a380\u2013150'],
+ ['A2','Condition Report','A trained inspector','Severity-rated, system by system. Still no advice.','\u00a3245','\u00a3325','RICS Level 1 \u00a3300\u2013900'],
+ ['A3','Full Report, with advice','A qualified inspector','Defects, advice, and what to do about them.','\u00a3445','\u00a3595','RICS Level 2 \u00a3400\u20131,000'],
+ ['h','B \u00b7 In-job sign-offs \u2014 per milestone','','','','',''],
+ ['B1','Visual Check','A trained checker','Records the stage. No opinion.','\u00a395','\u00a3149','UK property inspection report \u00a380\u2013150'],
  ['B2','<b>Technical Sign-off</b>','A qualified trade inspector','Against the trade standard. Pass, fail, or put-right list.','\u00a3245','\u00a3300','Structural engineer site visit \u00a3300'],
  ['h','Add-on \u00b7 any rung','','','','',''],
- ['+','Live viewing','The inspector, on video','Watch the inspection happen instead of reading it after.',', ','\u00a340',', '],
- ['h','C \u00b7 Recurring, per visit or per month','','','','',''],
- ['C1','Property Care, standard','A trained checker','Same checklist every visit, so change is visible.','\u00a375','\u00a395','UK periodic inspection \u00a380+VAT'],
- ['C2','Property Care, large or rental','A trained checker','Bigger property, longer visit.','\u00a3110','\u00a3135',', '],
- ['C3','Property Care, villa','A trained checker','Grounds, pool, outbuildings.','\u00a3145','\u00a3175',', '],
- ['C4','Oversight Retainer, <b>fortnightly</b>','Monique','2 documented visits a month, report, accountability call.','\u00a3495/mo','\u00a3595/mo','UK monitoring surveyor \u00a3500 to 1,500 <b>per visit</b>'],
- ['C5','Oversight Retainer, <b>weekly</b>','Monique','4 documented visits a month. Same everything, double the frequency.','\u00a3895/mo','\u00a31,095/mo',', ']
+ ['+','Live viewing','The inspector, on video','Watch the inspection happen instead of reading it after.','\u2014','\u00a340','\u2014'],
+ ['h','C \u00b7 Recurring \u2014 per visit or per month','','','','',''],
+ ['C1','Property Care \u2014 standard','A trained checker','Same checklist every visit, so change is visible.','\u00a375','\u00a395','UK periodic inspection \u00a380+VAT'],
+ ['C2','Property Care \u2014 large or rental','A trained checker','Bigger property, longer visit.','\u00a3110','\u00a3135','\u2014'],
+ ['C3','Property Care \u2014 villa','A trained checker','Grounds, pool, outbuildings.','\u00a3145','\u00a3175','\u2014'],
+ ['C4','Oversight Retainer \u2014 <b>fortnightly</b>','Monique','2 documented visits a month, report, accountability call.','\u00a3495/mo','\u00a3595/mo','UK monitoring surveyor \u00a3500\u20131,500 <b>per visit</b>'],
+ ['C5','Oversight Retainer \u2014 <b>weekly</b>','Monique','4 documented visits a month. Same everything, double the frequency.','\u00a3895/mo','\u00a31,095/mo','\u2014']
 ];
 function marketTable(){
  return '<div class="pk legal" style="margin-top:14px"><div class="dochd"><div><h3>The ladder, and what it mirrors</h3>'+
- '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Researched 26 Aug 2026, every figure is a published price from a live market.</p></div></div>'+
+ '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Researched 26 Aug 2026 \u2014 every figure is a published price from a live market.</p></div></div>'+
 
  '<div class="pksec" style="margin-top:14px;padding-top:0;border-top:0"><h5><span class="dnum">1</span>Yaadly\u2019s ladder</h5>'+
  '<div style="overflow-x:auto"><table><thead><tr><th>Rung</th><th>What it is</th><th>Who does it</th><th>Founding</th><th>Full price</th><th>Mirrors</th></tr></thead><tbody>'+
@@ -2299,14 +2385,14 @@ function marketTable(){
  }).join('')+'</tbody></table></div></div>'+
 
  '<div class="callout"><b>The one distinction the UK market is built on, and we copy it exactly.</b> A <b>Level 1</b> tells you what is wrong and how bad. A <b>Level 2</b> tells you what to do about it. That is the line between a record and an opinion, and it is why Level 2 costs more. Our rungs 1 and 2 record. Rungs 3 and 4 advise. We say which one you are buying, on the page, before you buy it.</div>'+
- '<div class="callout warn"><b>Where we deliberately sit low.</b> Every rung is priced at or below the bottom of its UK band, because the scope is narrower, one property or one works package, not a whole pre-purchase survey. That is a defensible discount. \u00a340 to 60 for a site attendance was not: it sat below a US insurance 4-point check.</div>'+
- '<div class="callout"><b>Why not the Nigerian price level.</b> NaijaSight at \u00a374 and SimpleXD at \u00a327 are priced against a Nigerian cost base with local staff. Yaadly Ltd is a UK company carrying UK professional indemnity cover with territorial reach into Jamaica and jurisdiction including the USA and Canada, the expensive end of that market. Their prices are right for their cost base. They are not right for ours.</div></div>';
+ '<div class="callout warn"><b>Where we deliberately sit low.</b> Every rung is priced at or below the bottom of its UK band, because the scope is narrower \u2014 one property or one works package, not a whole pre-purchase survey. That is a defensible discount. \u00a340\u201360 for a site attendance was not: it sat below a US insurance 4-point check.</div>'+
+ '<div class="callout"><b>Why not the Nigerian price level.</b> NaijaSight at \u00a374 and SimpleXD at \u00a327 are priced against a Nigerian cost base with local staff. Yaadly Ltd is a UK company carrying UK professional indemnity cover with territorial reach into Jamaica and jurisdiction including the USA and Canada \u2014 the expensive end of that market. Their prices are right for their cost base. They are not right for ours.</div></div>';
 }
 function reviewPicker(){
  var R=REVIEWERS[revPick];
  return '<div class="card" style="margin-top:14px"><div class="chd" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
  '<p class="kick m" style="margin-bottom:0">Before you release the last payment</p><span class="pill n">Chosen at setup, priced then</span></div>'+
- '<p class="tiny" style="margin-bottom:10px">You can have somebody attend before you sign off. Decide now, while it is part of the agreed scope, not after, when it is an extra visit.</p>'+
+ '<p class="tiny" style="margin-bottom:10px">You can have somebody attend before you sign off. Decide now, while it is part of the agreed scope \u2014 not after, when it is an extra visit.</p>'+
  '<div class="tierbar">'+['none','visual','tech'].map(function(k){
    return '<button data-rev="'+k+'" class="'+(revPick===k?'on':'')+'">'+esc(REVIEWERS[k].n)+' \u00b7 '+REVIEWERS[k].fee+'</button>'}).join('')+'</div>'+
  '<div class="jcard" style="margin-top:12px"><div class="jcbadge"><span><b style="color:var(--ink)">'+esc(R.n)+'</b></span>'+
@@ -2328,7 +2414,7 @@ function reviewPicker(){
    LIVEVIEW.got.map(function(x){return '<li style="font-size:12.5px;color:var(--mute);line-height:1.6;margin-bottom:3px">'+esc(x)+'</li>'}).join('')+'</ul></div>':'')+
  '<p style="margin-top:12px"><button class="btn'+(liveView?'':' ghost')+' sm" data-liveview="1">'+(liveView?'\u2713 Live viewing added \u00b7 \u00a340':'Add live viewing \u00b7 \u00a340')+'</button>'+
  (liveView?'<span class="sp" style="margin-left:10px">On this visit only. Add it again next time, or not.</span>':'')+'</p></div>'+
- '<div class="callout warn" style="margin-top:12px"><b>Visits not agreed at the start are chargeable.</b> If a dispute is raised we attend for a <b>visual review</b> and the first visit is covered. Any visit after that is charged, because it was never in the scope you agreed. And we attend to look and record, we do not certify. Certification is a matter for a PERB-registered engineer and we will say so rather than guess.</div>'+
+ '<div class="callout warn" style="margin-top:12px"><b>Visits not agreed at the start are chargeable.</b> If a dispute is raised we attend for a <b>visual review</b> and the first visit is covered. Any visit after that is charged, because it was never in the scope you agreed. And we attend to look and record \u2014 we do not certify. Certification is a matter for a PERB-registered engineer and we will say so rather than guess.</div>'+
  '</div>';
 }
 
@@ -2343,13 +2429,13 @@ function wgDoc(){
 
  dsec(1,'What Yaadly is, and what you are agreeing to',
  '<p>Yaadly connects vetted tradespeople with property owners, most of them overseas, and holds every job to one standard: <b>work is proven with evidence, and money moves when the client approves that evidence.</b> These guidelines are the rules of working with us. They exist to protect you as much as the client. Every rule here has a named counterpart on the other side, and nobody carries the risk alone.</p>'+
- '<div class="callout"><b>What Yaadly charges you:</b> <b>12% of your agreed labour price</b> on a completed job, taken at the point you are paid, so you keep <b>88%</b>. Remote digital work carries 10% instead. Materials are never charged a fee, at cost is at cost. <b>What you never pay:</b> joining is free, quoting is free, there are no lead fees whether you win the job or not, and there is no subscription.</div>'+
- '<p class="amend"><b>Amended in v1.1.</b> Version 1.0 stated that workers are never charged. That was wrong. It is corrected here rather than quietly, and no signature against v1.0 is carried over onto this wording, everyone re-signs.</p>')+
+ '<div class="callout"><b>What Yaadly charges you:</b> <b>12% of your agreed labour price</b> on a completed job, taken at the point you are paid, so you keep <b>88%</b>. Remote digital work carries 10% instead. Materials are never charged a fee \u2014 at cost is at cost. <b>What you never pay:</b> joining is free, quoting is free, there are no lead fees whether you win the job or not, and there is no subscription.</div>'+
+ '<p class="amend"><b>Amended in v1.1.</b> Version 1.0 stated that workers are never charged. That was wrong. It is corrected here rather than quietly, and no signature against v1.0 is carried over onto this wording \u2014 everyone re-signs.</p>')+
 
  dsec(2,'Verification, before your first job',
- '<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide a <b>live photo and a short video turning your face left to right</b>, proof of address dated within three months, and your TRN. You give <b>three references we will call</b>, and you confirm each one has been told we are calling. Certified trades have their certification checked with the body that issued it.</p>'+
- '<div class="callout warn"><b>Police record check, Jamaica Constabulary Force.</b> Mandatory for any job over <b>&pound;500</b>, any work inside an occupied home, and any job where you hold keys or attend an empty property. Optional below &pound;500 with the owner present, and a client may still require it. Without a current check on file you cannot be matched to any job in the mandatory categories.</div>'+
- '<p><b>Your first job carries an independent reviewer on site, at Yaadly\u2019s cost.</b> They walk the work with you and their notes join the record. This is not a probation you can fail quietly, it is how a brand-new profile carries the same promise as a worker with thirty jobs behind them.</p>')+
+ '<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide a <b>live photo and a short video turning your face left to right</b>, proof of address dated within three months, and your TRN. You give <b>three references we will call</b> \u2014 and you confirm each one has been told we are calling. Certified trades have their certification checked with the body that issued it.</p>'+
+ '<div class="callout warn"><b>Police record check \u2014 Jamaica Constabulary Force.</b> Mandatory for any job over <b>&pound;500</b>, any work inside an occupied home, and any job where you hold keys or attend an empty property. Optional below &pound;500 with the owner present, and a client may still require it. Without a current check on file you cannot be matched to any job in the mandatory categories.</div>'+
+ '<p><b>Your first job carries an independent reviewer on site, at Yaadly\u2019s cost.</b> They walk the work with you and their notes join the record. This is not a probation you can fail quietly \u2014 it is how a brand-new profile carries the same promise as a worker with thirty jobs behind them.</p>')+
 
  dsec(3,'Quoting',
  '<ul><li>You set your own price. Yaadly does not price your work and never shows you a band to quote against.</li>'+
@@ -2360,19 +2446,19 @@ function wgDoc(){
  dsec(4,'On site: conduct',
  '<ul><li>Turn up when you said, or say so before the day, not on it.</li>'+
  '<li>Treat the client, their family and anyone giving you access with respect. They see your conduct the way you see theirs.</li>'+
- '<li>Extra work found on site is raised through Yaadly with a photo and a price <b>before</b> it is done. Unagreed work is not payable, which protects you as much as them.</li>'+
+ '<li>Extra work found on site is raised through Yaadly with a photo and a price <b>before</b> it is done. Unagreed work is not payable \u2014 which protects you as much as them.</li>'+
  '<li>Never ask for a side payment and never accept one. It voids the protection for both of you.</li>'+
  '<li>Leave the site clean and show the waste has gone.</li></ul>')+
 
  dsec(5,'Evidence: how your work gets proven',
- '<p>Every stage has a checklist issued in the Kickoff Pack or Job Sheet. You file evidence against it and you write no paperwork. Evidence is timestamped and fingerprinted on upload, that is what makes it proof rather than photographs.</p>'+
+ '<p>Every stage has a checklist issued in the Kickoff Pack or Job Sheet. You file evidence against it and you write no paperwork. Evidence is timestamped and fingerprinted on upload \u2014 that is what makes it proof rather than photographs.</p>'+
  '<ul><li>Document the site on arrival, before anything is touched.</li>'+
  '<li>Photograph materials with the receipt.</li>'+
  '<li>Nothing gets covered over before it has been photographed.</li>'+
  '<li>Evidence from another job, reused, is a permanent removal. There is no second version of that conversation.</li></ul>')+
 
  dsec(6,'The Completion Report and your Yaad Score',
- '<p>At the end of the job a Completion Report is drafted for you from your evidence. You read it and confirm one thing: <b>what is written is what was done.</b> Signing something untrue is treated the same as a false document. Every completed, documented job builds your <b>Yaad Score</b>, a verified record you own, that counts with clients and, in time, with a bank.</p>')+
+ '<p>At the end of the job a Completion Report is drafted for you from your evidence. You read it and confirm one thing: <b>what is written is what was done.</b> Signing something untrue is treated the same as a false document. Every completed, documented job builds your <b>Yaad Score</b> \u2014 a verified record you own, that counts with clients and, in time, with a bank.</p>')+
 
  dsec(7,'Getting paid',
  '<ul><li>The client\u2019s payment is confirmed and held before you start, so you know the money is real.</li>'+
@@ -2381,8 +2467,8 @@ function wgDoc(){
  '<li>Payment is per stage, not one lump at the end. A stage signed off is a stage paid.</li></ul>')+
 
  dsec(8,'If something goes wrong',
- '<p>Disputes are reviewed by a person, not an algorithm, and they are free. <b>You are the first point of contact</b>, most things are a misunderstanding and get fixed in a day. If that does not resolve it, it escalates to Yaadly: a person reads the whole thread as it stands, neither side rewrites it, and nothing is released while it is open.</p>'+
- '<div class="callout"><b>Site visits during a dispute.</b> Where a dispute needs eyes on site, Yaadly attends for a <b>visual review only</b>, we look, we record what we see, we do not certify and we do not adjudicate the trade craft. One visit is covered. <b>Any further site visit is chargeable</b>, because it was not agreed at the start of the job.</div>')+
+ '<p>Disputes are reviewed by a person, not an algorithm, and they are free. <b>You are the first point of contact</b> \u2014 most things are a misunderstanding and get fixed in a day. If that does not resolve it, it escalates to Yaadly: a person reads the whole thread as it stands, neither side rewrites it, and nothing is released while it is open.</p>'+
+ '<div class="callout"><b>Site visits during a dispute.</b> Where a dispute needs eyes on site, Yaadly attends for a <b>visual review only</b> \u2014 we look, we record what we see, we do not certify and we do not adjudicate the trade craft. One visit is covered. <b>Any further site visit is chargeable</b>, because it was not agreed at the start of the job.</div>')+
 
  dsec(9,'Strikes: what loses you the platform',
  '<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody>'+
@@ -2395,7 +2481,7 @@ function wgDoc(){
  '<tr><td>Disrespect or unsafe conduct on site</td><td>Reviewed by a person; can be removal</td></tr>'+
  '</tbody></table>')+
 
- '<div class="notice">These guidelines are issued by Yaadly Ltd (England and Wales, no. 17358077) and may be updated; workers are told when they change and re-sign. They do not create employment, you work for yourself, on jobs you choose to quote for.</div>'+
+ '<div class="notice">These guidelines are issued by Yaadly Ltd (England and Wales, no. 17358077) and may be updated; workers are told when they change and re-sign. They do not create employment \u2014 you work for yourself, on jobs you choose to quote for.</div>'+
 
  '<div class="sigblock"><h5><span class="dnum">\u2713</span>Acknowledgement</h5>'+
  '<p>I have read these guidelines in full and I agree to work to them on every Yaadly job.</p>'+
@@ -2421,7 +2507,7 @@ function cgDoc(){
  '<li>Your job card fields are what workers filter on. A blank field is a job that never reaches the right person.</li></ul>')+
 
  dsec(3,'Quotes and choosing',
- '<ul><li>Workers quote their own price. <b>Yaadly does not price work and does not publish a band for a job type</b>, we do project management and oversight, not price estimation.</li>'+
+ '<ul><li>Workers quote their own price. <b>Yaadly does not price work and does not publish a band for a job type</b> \u2014 we do project management and oversight, not price estimation.</li>'+
  '<li>Your own budget band is never shown to a worker. It exists so we can tell you early if what you want and what you have are not the same thing.</li>'+
  '<li>Do not beat workers down or ask them to shave the price off-platform. A fair yes or a clean no.</li>'+
  '<li>All work is engaged through Yaadly. Approaching a worker from this platform for a side deal removes the protection for both of you, and repeat side-dealing ends the account.</li></ul>')+
@@ -2433,7 +2519,7 @@ function cgDoc(){
 
  dsec(5,'Evidence, approval and money',
  '<ul><li>Review evidence when it lands, within 3 days where you can. A worker who has proven a stage is waiting on your word to be paid.</li>'+
- '<li>At sign-off you may approve from the evidence, book a live video walkthrough, or <b>book an independent reviewer to attend the site</b>, see section 6.</li>'+
+ '<li>At sign-off you may approve from the evidence, book a live video walkthrough, or <b>book an independent reviewer to attend the site</b> \u2014 see section 6.</li>'+
  '<li>Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free and reviewed by a person, and nothing moves while one is open.</li>'+
  '<li>Yaadly\u2019s <b>Guarantee &amp; Support fee is 15%</b> of the worker\u2019s labour price, in the headline total, never charged on materials, subject to a small-job minimum of J$3,500 to J$4,500 by trade. It is itemised before you agree to anything. Where you pay in a currency other than Jamaican dollars, the conversion carries a margin of about 2%.</li>'+
  '<li>Pay through the agreed route only. Never pay a worker directly on the side, and never withhold approval to renegotiate a price already agreed.</li></ul>'+
@@ -2441,9 +2527,9 @@ function cgDoc(){
 
  dsec(6,'Independent review at sign-off',
  '<p>You may have somebody attend the property before you release the final payment. Two levels, chosen when the job is set up and priced then, not after:</p>'+
- '<ul><li><b>Visual Check, \u00a3149</b> (\u00a395 founding). A trained checker attends, records the finished work against the agreed scope, photographs anything visibly wrong, and files a one-page observation note in 72 hours. <b>They record. They do not rate, advise or certify.</b> Mirrors the UK property inspection report at \u00a380 to 150.</li>'+'<li><b>Condition Report, \u00a3325</b> (\u00a3245 founding). The whole property recorded system by system, every finding rated Severe, Moderate or Low, issue summary on page one. Mirrors a <b>RICS Level 1</b> at \u00a3300 to 900, it tells you what is wrong and how bad, not what to do about it.</li>'+
- '<li><b>Technical Sign-off, \u00a3300</b> (\u00a3245 founding, \u00a3395 inside 48 hours). A qualified trade inspector assesses one stage against the trade standard and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion. Priced against a <b>UK structural engineer\u2019s site visit at \u00a3300</b>.</li>'+'</ul>'+'<p><b style="color:var(--ink)">Live viewing, \u00a340, on any rung.</b> By default the inspection happens and you get the report afterwards. If you would rather be there, we call you in on video while the inspector is on site: you see what they see, you can ask them to look closer at something, and anything you raise goes in the report as your own note.</p>'+'<p class="tiny" style="margin-top:8px">Every rung is priced at or below the bottom of its UK band, because the scope is narrower, one property or one works package, not a whole pre-purchase survey. <b>A checker records. A trained inspector advises.</b> We tell you which one you are buying before you buy it.</p>'+
- '<div class="callout warn"><b>Visits not agreed at the start are chargeable.</b> Where a dispute is raised we will attend for a visual review, and one visit is covered. Any further visit is charged, because it was not in the scope you agreed. We attend to look and record, certification is a matter for a PERB-registered engineer, and we will say so rather than guess.</div>')+
+ '<ul><li><b>Visual Check \u2014 \u00a3149</b> (\u00a395 founding). A trained checker attends, records the finished work against the agreed scope, photographs anything visibly wrong, and files a one-page observation note in 72 hours. <b>They record. They do not rate, advise or certify.</b> Mirrors the UK property inspection report at \u00a380\u2013150.</li>'+'<li><b>Condition Report \u2014 \u00a3325</b> (\u00a3245 founding). The whole property recorded system by system, every finding rated Severe, Moderate or Low, issue summary on page one. Mirrors a <b>RICS Level 1</b> at \u00a3300\u2013900 \u2014 it tells you what is wrong and how bad, not what to do about it.</li>'+
+ '<li><b>Technical Sign-off \u2014 \u00a3300</b> (\u00a3245 founding, \u00a3395 inside 48 hours). A qualified trade inspector assesses one stage against the trade standard and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion. Priced against a <b>UK structural engineer\u2019s site visit at \u00a3300</b>.</li>'+'</ul>'+'<p><b style="color:var(--ink)">Live viewing \u2014 \u00a340, on any rung.</b> By default the inspection happens and you get the report afterwards. If you would rather be there, we call you in on video while the inspector is on site: you see what they see, you can ask them to look closer at something, and anything you raise goes in the report as your own note.</p>'+'<p class="tiny" style="margin-top:8px">Every rung is priced at or below the bottom of its UK band, because the scope is narrower \u2014 one property or one works package, not a whole pre-purchase survey. <b>A checker records. A trained inspector advises.</b> We tell you which one you are buying before you buy it.</p>'+
+ '<div class="callout warn"><b>Visits not agreed at the start are chargeable.</b> Where a dispute is raised we will attend for a visual review, and one visit is covered. Any further visit is charged, because it was not in the scope you agreed. We attend to look and record \u2014 certification is a matter for a PERB-registered engineer, and we will say so rather than guess.</div>')+
 
  dsec(7,'What loses the account',
  '<table><thead><tr><th>Action</th><th>Consequence</th></tr></thead><tbody>'+
@@ -2468,31 +2554,31 @@ function cgDoc(){
 var jStep=0;
 var J_STEPS=[
  {n:'1 \u00b7 Apply', h:'Your trades, and every parish you cover',
-  p:'Take as many trades as you actually do, and name one yourself if it is not on our list. Pick every parish you will travel to, a job in a parish you have not ticked never reaches you.',
+  p:'Take as many trades as you actually do, and name one yourself if it is not on our list. Pick every parish you will travel to \u2014 a job in a parish you have not ticked never reaches you.',
   body:'form', note:'Your trades and job types come from the same list a client picks from. That is the only reason a client\u2019s roofing job and your roofing profile can find each other at all.'},
- {n:'2 \u00b7 Your work', h:'Show us the work, however you have it',
-  p:'A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.',
+ {n:'2 \u00b7 Your work', h:'Show us the work \u2014 however you have it',
+  p:'A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it \u2014 we verify it with the body that issued it, not just look at the picture.',
   body:'port', note:'We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it.'},
  {n:'3 \u00b7 Identity', h:'A live photo and a live video, not an upload',
-  p:'Government photo ID, a <b>live photo</b> taken in the moment, and a <b>short video where you turn your face slowly left to right</b>. The turn is the check, a photograph of a photograph cannot do it. Then your TRN and proof of address dated within three months.',
+  p:'Government photo ID, a <b>live photo</b> taken in the moment, and a <b>short video where you turn your face slowly left to right</b>. The turn is the check \u2014 a photograph of a photograph cannot do it. Then your TRN and proof of address dated within three months.',
   body:'id', note:'An upload proves somebody has a document. A live turn proves the person holding it is you, now.'},
- {n:'4 \u00b7 Police check', h:'JCF record check, required over \u00a3500',
+ {n:'4 \u00b7 Police check', h:'JCF record check \u2014 required over \u00a3500',
   p:'A current police record check from the Jamaica Constabulary Force. <b>Mandatory</b> for any job over \u00a3500, any work inside an occupied home, and any time you hold keys or attend an empty property. Get it once and it covers every job you take.',
-  body:'police', note:'Without it your profile still publishes, but you are locked out of every job over \u00a3500 and every occupied-home job. That is most of the money on the board.'},
+  body:'police', note:'Without it your profile still publishes \u2014 but you are locked out of every job over \u00a3500 and every occupied-home job. That is most of the money on the board.'},
  {n:'5 \u00b7 References', h:'Three people who know we are calling',
-  p:'Past clients, or trades you have worked alongside. We phone them, an emailed reference is a form somebody filled in. <b>You must confirm each one has been told we will call.</b> If we ring and they have no idea who we are, that is not a reference, and it does not count.',
+  p:'Past clients, or trades you have worked alongside. We phone them \u2014 an emailed reference is a form somebody filled in. <b>You must confirm each one has been told we will call.</b> If we ring and they have no idea who we are, that is not a reference, and it does not count.',
   body:'refs', note:'This rule exists because a name on a form is not a referee. Somebody who was never asked cannot vouch for you, and putting them down is a mark against the application, not a neutral.'},
  {n:'6 \u00b7 Documents checked', h:'yaad-docs reads the file before a person does',
   p:'An agent checks the pack is actually complete and internally consistent before it reaches the vetting queue: is the address proof in date, does the name on the TRN match the ID, is the certificate current and issued to you, is the police check the right document, is the video a real turn.',
   body:'agent', note:'It never approves anybody. It only says what is missing or does not match, so you fix it in an hour instead of losing two days to a queue.'},
- {n:'7 \u00b7 Sign', h:'Worker Guidelines v1.1, the real document',
-  p:'A nine-section signed agreement, not a tickbox. It is the document we hold you to and the one we reach for if anything goes wrong on site. Read it properly, the fee clause changed in v1.1 and you are signing the version with it in.',
+ {n:'7 \u00b7 Sign', h:'Worker Guidelines v1.1 \u2014 the real document',
+  p:'A nine-section signed agreement, not a tickbox. It is the document we hold you to and the one we reach for if anything goes wrong on site. Read it properly \u2014 the fee clause changed in v1.1 and you are signing the version with it in.',
   body:'sign', note:'Signed against the exact version you read, stored immutably. If we change the wording you re-sign; we never move an old signature onto new terms.'},
  {n:'8 \u00b7 Trial job', h:'A real job, with somebody watching',
-  p:'Your first job carries an <b>independent reviewer on site</b>, at Yaadly\u2019s cost, not yours. They are not there to catch you out, they are there so the first client on your record has a second pair of eyes, and so we see how you actually work.',
+  p:'Your first job carries an <b>independent reviewer on site</b>, at Yaadly\u2019s cost, not yours. They are not there to catch you out \u2014 they are there so the first client on your record has a second pair of eyes, and so we see how you actually work.',
   body:'trial', note:'Every worker\u2019s first job is reviewed on site. It is the only way a brand-new profile can carry the same promise as a worker with thirty jobs behind them.'},
  {n:'9 \u00b7 Live', h:'You are on the board',
-  p:'Profile public, quoting free every time, and yaad-match alerts you the moment a job in your trades and parishes is posted. Your Yaad Score starts building, and it only moves on signed-off jobs.',
+  p:'Profile public, quoting free every time, and yaad-match alerts you the moment a job in your trades and parishes is posted. Your Yaad Score starts building \u2014 and it only moves on signed-off jobs.',
   body:'live', note:'The Yaad Score is yours. A verified work record a bank can finally see, which is the part nobody else in this market gives you.'}
 ];
 
@@ -2503,7 +2589,7 @@ var J_CHECKS=[
  {k:'TRN verified', d:'Matched to the name on the ID', at:3},
  {k:'Proof of address', d:'Dated within three months', at:3},
  {k:'JCF police record check', d:'Required over \u00a3500 and for any occupied home', at:4, req:1},
- {k:'3 references, confirmed and called', d:'Each one told in advance that we would call', at:5, req:1},
+ {k:'3 references \u2014 confirmed and called', d:'Each one told in advance that we would call', at:5, req:1},
  {k:'Document check by yaad-docs', d:'Complete, in date, and matching each other', at:6},
  {k:'Worker Guidelines v1.1 signed', d:'Immutable, against the version you read', at:7},
  {k:'Trial job, reviewed on site', d:'Independent reviewer, at our cost', at:8}
@@ -2526,7 +2612,7 @@ function jBody(kind){
   var n=Object.keys(wTrades).filter(function(k){return wTrades[k]}).length;
   var pn=Object.keys(wParish).filter(function(k){return wParish[k]}).length;
   var first=Object.keys(wTrades).filter(function(k){return wTrades[k]})[0];
-  return '<div class="fgroup"><label class="fl">Your trades, tick every one you take <span class="src ok">'+n+' selected</span></label>'+
+  return '<div class="fgroup"><label class="fl">Your trades \u2014 tick every one you take <span class="src ok">'+n+' selected</span></label>'+
    '<div class="chips">'+all.map(function(t){
      return '<button data-wt="'+esc(t)+'" class="'+(wTrades[t]?'on':'')+'">'+(wTrades[t]?'\u2713 ':'+ ')+esc(t)+'</button>'}).join('')+
    '<button data-wtadd="1" style="border-style:dashed">+ Add your own trade</button></div>'+
@@ -2548,15 +2634,15 @@ function jBody(kind){
   var have=wDocs.cv+wDocs.port+wDocs.site+wDocs.photos;
   return '<p class="tiny" style="margin-bottom:10px">Any one of these is enough to start. Tap to attach.</p>'+
   '<div class="grid g2c" style="gap:11px">'+
-   '<div class="upl'+(wDocs.cv?' done':'')+'" data-wd="cv"><div class="ue">\ud83d\udcc4</div><h6>'+(wDocs.cv?'\u2713 delroy-campbell-cv.pdf':'Attach a CV')+'</h6><p>PDF or Word. We do accept CVs, most people have never been asked for one in this trade.</p></div>'+
+   '<div class="upl'+(wDocs.cv?' done':'')+'" data-wd="cv"><div class="ue">\ud83d\udcc4</div><h6>'+(wDocs.cv?'\u2713 delroy-campbell-cv.pdf':'Attach a CV')+'</h6><p>PDF or Word. We do accept CVs \u2014 most people have never been asked for one in this trade.</p></div>'+
    '<div class="upl'+(wDocs.port?' done':'')+'" data-wd="port"><div class="ue">\ud83d\uddc2\ufe0f</div><h6>'+(wDocs.port?'\u2713 portfolio.pdf':'Attach a portfolio')+'</h6><p>A PDF of past work, or a folder of job photos.</p></div>'+
-   '<div class="upl'+(wDocs.site?' done':'')+'" data-wd="site"><div class="ue">\ud83d\udd17</div><h6>'+(wDocs.site?'\u2713 Link added':'Link a site or profile')+'</h6><p>Your website, Instagram, Facebook page, anywhere your work already lives.</p></div>'+
+   '<div class="upl'+(wDocs.site?' done':'')+'" data-wd="site"><div class="ue">\ud83d\udd17</div><h6>'+(wDocs.site?'\u2713 Link added':'Link a site or profile')+'</h6><p>Your website, Instagram, Facebook page \u2014 anywhere your work already lives.</p></div>'+
    '<div class="upl'+(wDocs.cert?' done':'')+'" data-wd="cert"><div class="ue">\ud83c\udf93</div><h6>'+(wDocs.cert?'\u2713 Certificate uploaded':'Certificate, if you hold one')+'</h6><p>We verify it with the issuing body. A photo of a certificate is not a certificate.</p></div>'+
   '</div>'+
   '<div class="fgroup" style="margin-top:14px"><label class="fl">Or paste a link</label><input class="f" placeholder="instagram.com/yourwork  \u00b7  yoursite.com" value=""></div>'+
   '<p class="kick m" style="margin:14px 0 8px">Finished jobs</p>'+
   '<div class="thumbs">'+['Bathroom re-pipe, Liguanea','Tank and pump, Barbican','Leak trace, Stony Hill','Kitchen waste re-run'].map(function(x){return '<i>'+esc(x)+'</i>'}).join('')+'</div>'+
-  '<div class="fixed" style="margin-top:12px"><b>'+(have?have+' of 4 attached. That is enough.':'Nothing attached yet.')+'</b> Before and after, same angle, is what clients look at, and it is the habit that makes your job evidence good later.</div>';
+  '<div class="fixed" style="margin-top:12px"><b>'+(have?have+' of 4 attached. That is enough.':'Nothing attached yet.')+'</b> Before and after, same angle, is what clients look at \u2014 and it is the habit that makes your job evidence good later.</div>';
  }
 
  if(kind==='id') return '<div class="grid g2c" style="gap:11px">'+
@@ -2572,8 +2658,8 @@ function jBody(kind){
  if(kind==='police') return '<div class="pcrule">'+
   '<div class="pcbox must"><div class="pch">Over \u00a3500</div><p>Mandatory. No client opt-out.</p></div>'+
   '<div class="pcbox must"><div class="pch">Inside a home</div><p>Mandatory at any value. Keys or empty property too.</p></div>'+
-  '<div class="pcbox"><div class="pch">Under \u00a3500</div><p>Optional with the owner present, the client can still ask.</p></div></div>'+
-  '<div class="flag" style="margin-top:12px"><b>Skip it and you are still on the board</b>, but locked out of every job over \u00a3500 and every occupied-home job. On this board that is most of the money.</div>';
+  '<div class="pcbox"><div class="pch">Under \u00a3500</div><p>Optional with the owner present \u2014 the client can still ask.</p></div></div>'+
+  '<div class="flag" style="margin-top:12px"><b>Skip it and you are still on the board</b> \u2014 but locked out of every job over \u00a3500 and every occupied-home job. On this board that is most of the money.</div>';
 
  if(kind==='refs') return '<p class="tiny" style="margin-bottom:4px">Three people we can phone. For each one, confirm you have told them we will be calling.</p>'+
   wRefs.map(function(r,i){
@@ -2586,18 +2672,18 @@ function jBody(kind){
   '<div class="'+(refsOk()===3?'fixed':'flag')+'" style="margin-top:12px">'+
    (refsOk()===3
     ? '<b>All three confirmed.</b> We will call within two working days and ask one question every time: would you have him back? The pause before the answer tells us more than the answer.'
-    : '<b>'+(3-refsOk())+' still unconfirmed.</b> If we ring somebody who has no idea who we are, they are not a reference, the line does not count, and an application built on names that were never asked is a mark against you, not a neutral.')+
+    : '<b>'+(3-refsOk())+' still unconfirmed.</b> If we ring somebody who has no idea who we are, they are not a reference \u2014 the line does not count, and an application built on names that were never asked is a mark against you, not a neutral.')+
   '</div>';
 
  if(kind==='agent') return '<div class="aout"><div class="ah">\u2726 yaad-docs \u00b7 checked 9 items</div>'+
-  '<p>Reads the pack before a person does. It approves nobody, it only finds what is missing or does not line up.</p></div>'+
+  '<p>Reads the pack before a person does. It approves nobody \u2014 it only finds what is missing or does not line up.</p></div>'+
   '<div class="vrec" style="margin-top:12px">'+
   [['ok','Name consistency','TRN, photo ID and proof of address all read Delroy A. Campbell.','Match'],
    ['ok','ID in date','Expires Mar 2029.','Valid'],
    ['gap','Proof of address','Dated 4 months ago. We need one inside three. Send a newer bill and this clears on its own.','Fix this'],
    ['ok','Liveness video','A genuine left-to-right turn, not a still or a screen.','Real'],
    ['ok','Police check','Correct JCF document, issued Jun 2026, in date.','Valid'],
-   ['gap','Certificate','Uploaded but not yet confirmed with the issuing body. We are writing to them, nothing for you to do.','With them'],
+   ['gap','Certificate','Uploaded but not yet confirmed with the issuing body. We are writing to them \u2014 nothing for you to do.','With them'],
    ['ok','References','Three named, three confirmed as notified.','Ready'],
    ['ok','Trades and parishes','2 trades, 2 parishes, all mapped to live job types.','Set'],
    ['ok','Guidelines','v1.1 is the current version and it is the one queued for you.','Current']
@@ -2606,18 +2692,18 @@ function jBody(kind){
   }).join('')+'</div>'+
   '<div class="verdict gap"><b>Two things, and neither is a rejection</b>One is a document you can replace in an hour. One is us waiting on a third party. You are told both now rather than finding out after two days of silence.</div>';
 
- if(kind==='sign') return '<div class="fixed"><b>Not a tickbox, a signed agreement.</b> Nine sections, an acknowledgement block, a version reference, and a signature stored against the exact wording you read. It is the document we reach for if anything goes wrong on site.</div>'+
+ if(kind==='sign') return '<div class="fixed"><b>Not a tickbox \u2014 a signed agreement.</b> Nine sections, an acknowledgement block, a version reference, and a signature stored against the exact wording you read. It is the document we reach for if anything goes wrong on site.</div>'+
   '<p style="margin-top:14px"><button class="btn sm" data-opendoc="wg">\ud83d\udcc4 Open Worker Guidelines v1.1</button>'+
   '<button class="btn ghost sm" data-opendoc="cg" style="margin-left:8px">See the client\u2019s side</button></p>'+
   '<div id="docslot" style="margin-top:14px"></div>';
 
- if(kind==='trial') return '<div class="fixed"><b>An independent reviewer attends your first job, we pay for it.</b> Not a test you can fail quietly. They walk the work with you, and their notes go on the record alongside your evidence.</div>'+
+ if(kind==='trial') return '<div class="fixed"><b>An independent reviewer attends your first job \u2014 we pay for it.</b> Not a test you can fail quietly. They walk the work with you, and their notes go on the record alongside your evidence.</div>'+
   '<div class="isteps" style="grid-template-columns:1fr 1fr;margin-top:12px">'+
   '<div class="ist"><div class="ih">\ud83d\udc41\ufe0f</div><h4>What they look at</h4><p>Does the evidence match the checklist without being chased. Did you turn up when you said. How you answered a question you did not like.</p></div>'+
-  '<div class="ist"><div class="ih">\ud83e\uddfe</div><h4>What it costs you</h4><p>Nothing. The reviewer on a trial job is at Yaadly\u2019s cost, your first client is the hardest one you will ever get.</p></div></div>'+
+  '<div class="ist"><div class="ih">\ud83e\uddfe</div><h4>What it costs you</h4><p>Nothing. The reviewer on a trial job is at Yaadly\u2019s cost \u2014 your first client is the hardest one you will ever get.</p></div></div>'+
   '<div class="thumbs" style="margin-top:12px">'+['Arrival, geotagged','Before','After, same angle','Reviewer notes'].map(function(x){return '<i>'+esc(x)+'</i>'}).join('')+'</div>';
 
- return '<div class="verdict pass"><b>Published, you are on the board</b>Profile public, quoting free every time, and yaad-match alerts you the moment a job in your trades and parishes is posted. Your Yaad Score starts at your first signed-off job and only moves on signed-off jobs.</div>'+
+ return '<div class="verdict pass"><b>Published \u2014 you are on the board</b>Profile public, quoting free every time, and yaad-match alerts you the moment a job in your trades and parishes is posted. Your Yaad Score starts at your first signed-off job and only moves on signed-off jobs.</div>'+
   '<div class="isteps" style="grid-template-columns:1fr 1fr;margin-top:12px">'+
   '<div class="ist"><div class="ih">\ud83d\udd14</div><h4>Alerts, not scrolling</h4><p>Every trade and parish you ticked. You never sit refreshing a board.</p></div>'+
   '<div class="ist"><div class="ih">\ud83d\udcc8</div><h4>A record you own</h4><p>Verified jobs a bank can finally see.</p></div></div>';
@@ -2731,7 +2817,7 @@ function jobSheet(){
  return '<div class="pk"><div class="chd" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:9px">'+
  '<div><h3>Scope of Works &amp; Job Sheet</h3><p class="tiny">Rev 1 \u00b7 JB-4471 \u00b7 one stage \u00b7 issued the moment you accepted the quote</p></div>'+
  '<span class="pill m" style="margin-left:auto">Both signed</span></div>'+ pkTierBar()+
- '<div class="fixed"><b>Small job, one page, and it is just what you both agreed.</b> No programme, no materials schedule, no variation procedure running to half a page. This is the quote you accepted, written down so neither of you can remember it differently in a fortnight. That is the whole job of this document.</div>'+
+ '<div class="fixed"><b>Small job \u2014 one page, and it is just what you both agreed.</b> No programme, no materials schedule, no variation procedure running to half a page. This is the quote you accepted, written down so neither of you can remember it differently in a fortnight. That is the whole job of this document.</div>'+
 
  '<div class="pksec"><h5>The quote you accepted</h5>'+
  '<div class="sdrow"><span class="sk">Worker</span><span class="sv">'+esc(A.who)+'<small>'+A.sc+'\u2605 \u00b7 '+A.jobs+' jobs completed \u00b7 ID verified, police record checked</small></span></div>'+
@@ -2741,19 +2827,19 @@ function jobSheet(){
  '<div class="sdrow"><span class="sk"><b style="color:var(--ink)">Total</b></span><span class="sv"><b style="color:var(--tealb);font-size:16px">'+esc(A.all)+'</b><small>Held, and released by you when you have seen the proof.</small></span></div>'+
  '<div class="sdrow"><span class="sk">On site</span><span class="sv">'+esc(A.days)+', starting '+esc(A.start)+'<small>Booked into your calendar. He confirmed it.</small></span></div></div>'+
 
- '<div class="pksec"><h5>What he is doing, from his own quote</h5><ul>'+
+ '<div class="pksec"><h5>What he is doing \u2014 from his own quote</h5><ul>'+
  A.inc.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>'+
 
  '<div class="pksec"><h5>What he is <span style="color:var(--coral)">not</span> doing</h5>'+
  '<p>Copied straight from his exclusions. If it is not on the list above, it is on this one.</p><ul>'+
  A.exc.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul>'+
- '<p class="tiny" style="margin-top:8px">Anything found once he starts is raised with a photo and a price <b>before</b> it is worked on. Unagreed work is not payable, which protects him as much as you.</p></div>'+
+ '<p class="tiny" style="margin-top:8px">Anything found once he starts is raised with a photo and a price <b>before</b> it is worked on. Unagreed work is not payable \u2014 which protects him as much as you.</p></div>'+
 
  '<div class="pksec"><h5>Proof required before the money moves</h5>'+
- '<p>'+esc(one.ttl)+', releases '+one.pct+'% on:</p><ul>'+
+ '<p>'+esc(one.ttl)+' \u2014 releases '+one.pct+'% on:</p><ul>'+
  one.req.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></div>'+
 
- '<div class="pksec"><h5>Access</h5><p>Winston S. (your father), on site, contactable on the day. The worker does not hold a key. Working window 08:00 to 17:00.</p></div>'+
+ '<div class="pksec"><h5>Access</h5><p>Winston S. (your father), on site, contactable on the day. The worker does not hold a key. Working window 08:00\u201317:00.</p></div>'+
 
  '<div class="pksec"><h5>Signatures</h5>'+
  '<div class="pkgrid"><p><b style="color:var(--tealb)">\u2713 You</b><br>Accepted the quote 26 Aug 2026, 21:02.</p>'+
@@ -2771,13 +2857,13 @@ function kickoffPack(){
   '<span class="pill m" style="margin-left:auto">Both sides signed</span></div>'+ pkTierBar();
 
  var why = w==='sheet'
-  ? '<div class="fixed"><b>Small job, a Job Sheet, not a pack.</b> One visit, one release, nothing bought up front. A twelve-page document for a tap washer is theatre, and it makes people stop reading the ones that matter. This is the scope, the exclusions, the proof and the price. One page.</div>'
+  ? '<div class="fixed"><b>Small job \u2014 a Job Sheet, not a pack.</b> One visit, one release, nothing bought up front. A twelve-page document for a tap washer is theatre, and it makes people stop reading the ones that matter. This is the scope, the exclusions, the proof and the price. One page.</div>'
   : w==='pack'
-  ? '<div class="fixed"><b>Standard job, the full Kickoff Pack.</b> Two or three releases means money moves before the work is finished, so the schedule, the evidence per stage and the variation rule all have to be written down before anybody starts.</div>'
-  : '<div class="fixed" style="border-color:rgba(255,176,32,.35);background:rgba(255,176,32,.06)"><b style="color:var(--mango)">Major works, pack plus programme.</b> Four or more releases, or the client\'s money buying materials up front. Everything in the standard pack, plus a dated programme, a materials schedule with receipts against it, and a named professional for anything outside our scope.</div>';
+  ? '<div class="fixed"><b>Standard job \u2014 the full Kickoff Pack.</b> Two or three releases means money moves before the work is finished, so the schedule, the evidence per stage and the variation rule all have to be written down before anybody starts.</div>'
+  : '<div class="fixed" style="border-color:rgba(255,176,32,.35);background:rgba(255,176,32,.06)"><b style="color:var(--mango)">Major works \u2014 pack plus programme.</b> Four or more releases, or the client\'s money buying materials up front. Everything in the standard pack, plus a dated programme, a materials schedule with receipts against it, and a named professional for anything outside our scope.</div>';
 
  var scope='<div class="pksec"><h5>1 \u00b7 What is being done</h5>'+
-  '<p>Written from the scope both sides agreed. It is the only description that counts, not the chat, not the phone call.</p>'+
+  '<p>Written from the scope both sides agreed. It is the only description that counts \u2014 not the chat, not the phone call.</p>'+
   '<ul><li>Replace the two lifted zinc sheets on the rear slope, and the split purlin beneath them</li>'+
   '<li>Re-fix the adjacent sheets either side where the fixings have pulled</li>'+
   '<li>Make good the ceiling line inside the back bedroom where water has run</li></ul></div>'+
@@ -2805,19 +2891,19 @@ function kickoffPack(){
  var extra = (w==='sheet') ? '' :
   '<div class="pksec"><h5>6 \u00b7 Access, dates and who is on site</h5>'+
    '<div class="pkgrid"><p><b style="color:var(--ink)">Access</b><br>Winston S. (client\'s father), on site, contactable on the day. The worker does not hold a key.</p>'+
-   '<p><b style="color:var(--ink)">Working window</b><br>08:00 to 17:00, Monday to Saturday. Any visit outside that is agreed in the portal first.</p></div></div>'+
-  '<div class="pksec"><h5>7 \u00b7 Variations, how a change gets agreed</h5>'+
+   '<p><b style="color:var(--ink)">Working window</b><br>08:00\u201317:00, Monday to Saturday. Any visit outside that is agreed in the portal first.</p></div></div>'+
+  '<div class="pksec"><h5>7 \u00b7 Variations \u2014 how a change gets agreed</h5>'+
    '<p>Nobody does extra work and asks for the money after. A variation is raised in the portal with a photo and a price, the client accepts or declines it in writing, and only then does it become part of the job. An unagreed variation is not payable, and that protects both of you.</p></div>'+
   '<div class="pksec"><h5>8 \u00b7 If something goes wrong</h5>'+
-   '<p>Raise it before you approve. First point of contact is the worker, most things are a misunderstanding and get fixed in a day. If that does not resolve it, escalate to Yaadly: a person reads the whole thread as it stands, neither side rewrites it, and nothing is released while it is open.</p></div>';
+   '<p>Raise it before you approve. First point of contact is the worker \u2014 most things are a misunderstanding and get fixed in a day. If that does not resolve it, escalate to Yaadly: a person reads the whole thread as it stands, neither side rewrites it, and nothing is released while it is open.</p></div>';
 
  var major = (w!=='major') ? '' :
   '<div class="pksec"><h5>9 \u00b7 Programme</h5>'+
    '<p>Dated, with each milestone against a working week, and the dependencies named. Slippage is reported in the portal when it happens, not at the end.</p></div>'+
   '<div class="pksec"><h5>10 \u00b7 Materials schedule</h5>'+
-   '<p>Every material line the client\'s money buys, with the supplier, the quantity and the receipt filed against it. Reconciled at the end, anything unspent comes back.</p></div>'+
+   '<p>Every material line the client\'s money buys, with the supplier, the quantity and the receipt filed against it. Reconciled at the end \u2014 anything unspent comes back.</p></div>'+
   '<div class="pksec"><h5>11 \u00b7 Named professionals outside our scope</h5>'+
-   '<p>Boundary or survey, a commissioned land surveyor. Structural certification, a PERB-registered engineer. Title or contract, an attorney-at-law admitted in Jamaica. Named here in advance so nobody has to find one mid-job.</p></div>';
+   '<p>Boundary or survey \u2014 a commissioned land surveyor. Structural certification \u2014 a PERB-registered engineer. Title or contract \u2014 an attorney-at-law admitted in Jamaica. Named here in advance so nobody has to find one mid-job.</p></div>';
 
  var foot='<div class="pksec"><h5>Signatures</h5>'+
   '<div class="pkgrid"><p><b style="color:var(--tealb)">\u2713 Client</b><br>Signed 26 Aug 2026, 20:07. Immutable.</p>'+
@@ -2837,16 +2923,16 @@ function completionReport(kind){
  '<div class="fixed"><b>The worker writes no paperwork.</b> They file one evidence package. This is drafted from it, they confirm it is true, a person reviews it, then it comes to you. That is why it actually gets done.</div>'+
 
  '<div class="pksec"><h5>1 \u00b7 What was done</h5>'+
- '<p>Two lifted zinc sheets and one split purlin replaced on the rear slope. Adjacent fixings re-secured either side. Ceiling line in the back bedroom made good where water had run. Works carried out 27 to 28 August 2026 by Delroy Campbell, ID verified, police record checked.</p></div>'+
+ '<p>Two lifted zinc sheets and one split purlin replaced on the rear slope. Adjacent fixings re-secured either side. Ceiling line in the back bedroom made good where water had run. Works carried out 27\u201328 August 2026 by Delroy Campbell, ID verified, police record checked.</p></div>'+
 
  '<div class="pksec"><h5>2 \u00b7 Before and after</h5>'+
  '<p class="tiny">Same angle, same distance. That is the standard, and it is why they are worth looking at.</p>'+
- '<div class="ba"><i>Rear slope, before, 27 Aug 08:41</i><i>Rear slope, after, 28 Aug 16:22</i>'+
- '<i>Split purlin, before</i><i>New purlin fixed, after</i>'+
- '<i>Back bedroom ceiling, before</i><i>Back bedroom ceiling, after</i></div></div>'+
+ '<div class="ba"><i>Rear slope \u2014 before, 27 Aug 08:41</i><i>Rear slope \u2014 after, 28 Aug 16:22</i>'+
+ '<i>Split purlin \u2014 before</i><i>New purlin fixed \u2014 after</i>'+
+ '<i>Back bedroom ceiling \u2014 before</i><i>Back bedroom ceiling \u2014 after</i></div></div>'+
 
  '<div class="pksec"><h5>3 \u00b7 Evidence index</h5>'+
- '<p>Every file, when it was taken, and its fingerprint. The fingerprint is what makes it provable rather than merely photographic, change one pixel and it stops matching.</p>'+
+ '<p>Every file, when it was taken, and its fingerprint. The fingerprint is what makes it provable rather than merely photographic \u2014 change one pixel and it stops matching.</p>'+
  '<div class="sdrow"><span class="sk">Stage 1</span><span class="sv">6 files \u00b7 27 Aug<small>3 arrival photos geotagged, damaged area, purlin underneath, materials with receipt</small></span></div>'+
  '<div class="sdrow"><span class="sk">Stage 2</span><span class="sv">5 files \u00b7 28 Aug<small>Sheets laid and fixed, wide shot, walk-round clip, ceiling made good \u00d72</small></span></div>'+
  '<p class="hashline">bundle sha256 \u00b7 c81f5a90d7be24361ac0f9e5b7d3128e64ab0f27c95d3e10b8a6f4d29c073e5b</p></div>'+
@@ -2862,11 +2948,11 @@ function completionReport(kind){
  '<p><b style="color:var(--tealb)">\u2713 Payment</b><br>Released on approval. Worker paid within 3 working days, method of their choosing.</p></div></div>'+
 
  '<div class="pksec"><h5>6 \u00b7 What this report is not</h5>'+
- '<p style="color:var(--coral)">A record of physical works and costs, prepared by a construction project manager. <b>Nothing in it is legal advice or a legal opinion.</b> No title verified, no agreement interpreted, no boundary identified, no structure certified, those are matters for an attorney-at-law, a commissioned land surveyor and a PERB-registered engineer respectively. Findings are limited to what was visible and accessible on the dates stated.</p>'+
+ '<p style="color:var(--coral)">A record of physical works and costs, prepared by a construction project manager. <b>Nothing in it is legal advice or a legal opinion.</b> No title verified, no agreement interpreted, no boundary identified, no structure certified \u2014 those are matters for an attorney-at-law, a commissioned land surveyor and a PERB-registered engineer respectively. Findings are limited to what was visible and accessible on the dates stated.</p>'+
  '<p class="tiny" style="margin-top:8px">We carried out this service with reasonable care and skill, as section 49 of the Consumer Rights Act 2015 requires. Nothing here limits that duty or your rights under it.</p></div>'+
 
  '<div class="pksec"><h5>7 \u00b7 Aftercare</h5>'+
- '<p>Any defect in this work, raised within 12 months, is put right at the worker\'s cost. Keep this report with the house papers. Forward it to family, or show it to the next contractor, it is the only proof most Jamaican property work never generates.</p>'+
+ '<p>Any defect in this work, raised within 12 months, is put right at the worker\'s cost. Keep this report with the house papers. Forward it to family, or show it to the next contractor \u2014 it is the only proof most Jamaican property work never generates.</p>'+
  '<p style="margin-top:12px"><button class="btn sm">Download the PDF</button><button class="btn ghost sm" style="margin-left:8px">Send it to somebody</button></p></div>'+
  '</div>';
 }
@@ -3066,15 +3152,15 @@ function drawWzDate(){
  }
  var panel;
  if(wzFlex){
-  panel='<div class="wzpick"><h5>No fixed date</h5><p>The job goes on the board as flexible. You will get more replies this way, and usually better prices, a worker can slot it into a gap.</p></div>';
+  panel='<div class="wzpick"><h5>No fixed date</h5><p>The job goes on the board as flexible. You will get more replies this way, and usually better prices \u2014 a worker can slot it into a gap.</p></div>';
  } else if(wzSel){
   var free=!!avail[wzSel];
   panel='<div class="wzpick"><h5>'+wzLabel()+'</h5><p>'+
-   (free?'At least one matching worker already has this day open. That is a good sign, not a booking, nothing is held until you choose somebody and both of you agree the scope.'
-        :'No matching worker has flagged this day open yet. You can still ask for it, workers will either take it or offer you the nearest day they have.')+
+   (free?'At least one matching worker already has this day open. That is a good sign, not a booking \u2014 nothing is held until you choose somebody and both of you agree the scope.'
+        :'No matching worker has flagged this day open yet. You can still ask for it \u2014 workers will either take it or offer you the nearest day they have.')+
    '</p><p style="margin-top:9px;color:var(--dim)">This is your preferred start, not a commitment. The actual visit gets booked into the calendar in your portal once you have picked a worker.</p></div>';
  } else {
-  panel='<div class="wzpick"><h5>No date picked</h5><p>Tap a day, or say you are flexible. Either is fine, flexible usually gets you more quotes.</p></div>';
+  panel='<div class="wzpick"><h5>No date picked</h5><p>Tap a day, or say you are flexible. Either is fine \u2014 flexible usually gets you more quotes.</p></div>';
  }
  box.innerHTML=
   '<div class="cal"><div class="cal-h"><h4>'+MONTHS[wzM].slice(0,3)+' '+wzY+'</h4>'+
@@ -3083,7 +3169,7 @@ function drawWzDate(){
   '<div class="cal-grid">'+g+'</div></div>'+
   '<div>'+panel+
   '<div class="pills" style="margin-top:11px">'+
-   '<button class="pill'+(wzFlex?' m':' n')+'" data-wzflex style="cursor:pointer;padding:8px 13px">No fixed date, I am flexible</button>'+
+   '<button class="pill'+(wzFlex?' m':' n')+'" data-wzflex style="cursor:pointer;padding:8px 13px">No fixed date \u2014 I am flexible</button>'+
    (wzSel?'<button class="pill n" data-wzclear style="cursor:pointer;padding:8px 13px">Clear</button>':'')+
   '</div></div>';
 }
@@ -3195,7 +3281,7 @@ setProfile('wk');
 function drawDir(){
  var el=S('#wkdir'); if(!el)return;
  el.innerHTML=WORKERS.map(function(w,i){
-  var x=WKX[w.n]||{yrs:', ',areas:w.a,port:[]};
+  var x=WKX[w.n]||{yrs:',',areas:w.a,port:[]};
   var init=w.n.split(' ').map(function(y){return y[0]}).join('');
   return '<button class="wk" data-wk="'+i+'" style="text-align:left;cursor:pointer">'+
    '<div class="wk-top"><div class="av" style="background:'+GRAD[w.g]+'">'+init+'</div>'+
@@ -3994,36 +4080,47 @@ service:[
  {b:'Paid · nothing to do',h:'Oversight Retainer booked',p:'Portal link and code emailed the moment it cleared. Same portal as a marketplace job.',
   t:[['Paid','£595','','First month, no fee on top'],['Reference','SV-0113','m','Yours'],['Milestones','3','','Each with its own release'],['Next','Intake','','3 questions']],
   x:'svc-portal',a:[['Open the intake',1],['Book a call first',0]]},
+
  {b:'3 questions',h:'What I need from you',p:'Their quote, whatever photos you have, and one line on what you were told verbally.',
   t:[['Questions','3','m','Two minutes'],['Documents','0 of 2','','Quote and photos'],['Clock','Not started','','Starts on receipt'],['Held','£595','','Against milestone 1']],
   x:'svc-intake',a:[['Upload their quote',1],['Send on WhatsApp instead',0]]},
+
  {b:'Agree before I start',h:'Service Agreement',p:'What is in, what is out, milestones, evidence, money. Same document as a Works Agreement. Both of us tick it.',
   t:[['Scope','1 page','','Plain words'],['Milestones','3','m','40 / 40 / 20'],['Exclusions','4','','Compulsory'],['Agreed by','0 of 2','m','You and me']],
   x:'svc-scope',a:[['Start milestone one','gate'],['Ask for a change',0]]},
+
  {b:'Read it, then it starts',h:'Kickoff Pack rev 1 is yours',p:'Scope, all three milestones, the evidence checklist for each, and what I am held to. Drafted, reviewed, issued.',
   t:[['Held','£159.60','','Milestone 1'],['Milestones','3','m','Each proved'],['Documents','3','','Yours to keep'],['Start','Tomorrow','','Confirmed']],
   x:'svc-kickoff',a:[['Open the Kickoff Pack',1],['Ask for a change',0]]},
+
  {b:'Nothing to do',h:'Milestone 1, scope being written',p:'Works scope drafted, exclusions named, going to you for sign-off before anything else moves.',
   t:[['Held','£159.60','','Milestone 1'],['Milestone','1 of 3','m','In progress'],['Proof so far','2 of 3','','Scope, exclusions'],['Due','2 Sep','','On track']],
   x:'svc-m1-live',a:[['Ask how it is going',0],['Book a call',0]]},
+
  {b:'Waiting on you',h:'Milestone 1 evidence is in',p:'Three items against the checklist. Approving releases 40%.',
   t:[['Waiting on you','3','m','M1 items'],['Held','£159.60','','Releases on approval'],['Checklist','3 of 3','','Complete'],['You have','5 days','','Then auto-approves']],
   x:'svc-m1-ev',a:[['Approve and release milestone 1',1],['Book a walkthrough first',0]]},
+
  {b:'Milestone 1 done',h:'£159.60 released. Milestone 2 funded.',p:'Same again, I work, I prove it, you sign it off. Three releases on this service, not one.',
   t:[['Released','£159.60','','M1'],['Now held','£159.60','m','M2'],['Remaining','2','','Milestones'],['Next','Stages &amp; protocol','','Starts today']],
   x:'svc-led-1',a:[['See the milestone 1 record',0],['Message me',0]]},
+
  {b:'Nothing to do',h:'Milestone 2, stages and evidence protocol',p:'Payment schedule, evidence checklist per stage, contractor briefed on a recorded call.',
   t:[['Held','£159.60','','Milestone 2'],['Milestone','2 of 3','m','In progress'],['Proof so far','3 of 4','','Briefing clip pending'],['Due','9 Sep','','On track']],
   x:'svc-m2-live',a:[['Ask how it is going',0],['Sit in on the briefing call',0]]},
+
  {b:'Waiting on you',h:'Milestone 2 evidence is in',p:'Four items including the contractor briefing. Approving releases another 40%.',
   t:[['Waiting on you','4','m','M2 items'],['Held','£159.60','','Releases on approval'],['Checklist','4 of 4','','Complete'],['You have','5 days','','Then auto-approves']],
   x:'svc-m2-ev',a:[['Approve and release milestone 2',1],['Send back with a note',0]]},
+
  {b:'Waiting on you',h:'Milestone 3, handover pack',p:'Everything as one PDF, a walkthrough call, and your confirmation you understand it. Final 20%.',
   t:[['Waiting on you','2','m','M3 items'],['Held','£79.80','','Final release'],['Pack','24 pages','','Yours forever'],['Walkthrough','Done','','12 Sep, 30 min']],
   x:'svc-m3-ev',a:[['Approve and release the balance',1],['Ask a question on the pack',0]]},
+
  {b:'Done',h:'All three released. Service closed.',p:'£595 paid across three milestones against three evidence sets, each signed by you.',
   t:[['Total paid','£595','','Three releases'],['Evidence sets','3','','One per milestone'],['Documents','5','m','Yours to keep'],['Now','Board-ready','','Scope written']],
   x:'svc-led-3',a:[['Download the pack',1],['See the payment record',0]]},
+
  {b:'Two ways from here',h:'So what do you do with it?',p:'You have a written scope and named exclusions. That is a board-ready job, or a retainer to manage against.',
   x:'svc-next',a:[]}
 ],
@@ -4031,39 +4128,50 @@ client:[
  {b:'Nothing to do yet',h:'Your job is on the board',p:'Eleven vetted workers alerted. Your address and number were not included.',
   t:[['Live','4 min','','Since you signed'],['Interested','0','m','No replies yet'],['Held','£0','','Nothing charged'],['Stage','0 of 2','','Not started']],
   a:[['View my job',1],['Invite more workers',0]]},
+
  {b:'Nothing to do',h:'They are writing your quotes',p:'A quote is not a number in a text message. Each worker builds it against your brief and your photos, and cannot send it until it says what is included and what is not. That is what you will be comparing.',
   t:[['Building','3','m','Workers drafting'],['First one due','~2 hrs','','Typical in Kingston'],['Held','£0','','Nothing charged'],['You do','Nothing','','Wait for the alert']],
   a:[['See who is interested',0],['Invite more workers',0]]},
  {b:'3 quotes waiting on you',h:'Three workers put their hand up',p:'Tap a quote to read it in full. Chat here, no numbers or emails pass, either way.',
   t:[['Interested','3','m','Capped at 5 per job'],['Quotes in','3','m','All-in totals'],['Lowest','£299','','Below the band'],['Held','£0','','Still nothing charged']],
   x:'quotes',a:[['Compare all three side by side',0],['Ask a question on the job',0]]},
+
  {b:'Agree it before you choose',h:'Nobody is chosen on a price alone',p:'One page: what is in, what is out, access, stages, evidence, money. Both tick it. Until then there is no Choose button.',
   t:[['Scope','1 page','','Plain words'],['Stages','2','m','60 / 40'],['Exclusions','4','','Compulsory'],['Agreed by','0 of 2','m','You and them']],
   x:'scope',a:[['Choose this worker','gate'],['Ask for a change',0]]},
+
  {b:'Fund stage one to start',h:'You picked Delroy',p:'Fund stage one only. Stage two funds when stage one is signed off.',
   t:[['Stage 1','£207','m','Fund now'],['Stage 2','£138','','Later, on sign-off'],['Total all in','£345','','Never added to'],['Held','£0','','Until you fund']],
   x:'fee-client',a:[['Fund stage one',1],['Change something first',0]]},
+
  {b:'Read it, then it starts',h:'Kickoff Pack rev 1 is yours',p:'Scope, both stages, an evidence checklist each, and the QA sheet he is held to.',
   t:[['Held','£207','','Stage one'],['Stages','2','m','Each with its own proof'],['Documents','3','','Yours to keep'],['Start','Tue','','Confirmed']],
   x:'docs-client',a:[['Open the Kickoff Pack',1],['Ask for a change',0]]},
+
  {b:'Nothing to do',h:'Stage one, Delroy is on site',p:'Arrival photos in before anything was touched. Ask him anything from here.',
   t:[['Held','£207','','Stage one'],['Stage','1 of 2','m','On site'],['Arrival proof','3','','09:41'],['Stage 1 needs','4 items','','Per the checklist']],
   x:'stage1-live',a:[['Ask how it is going',0],['Book a video walkthrough',0]]},
+
  {b:'Waiting on you, stage one',h:'Stage one evidence is in',p:'Six items against a four-item checklist. Approving is a signature bound to a fingerprint of exactly these files. If it is not right, do not approve it, raise it with Delroy below.',
   t:[['Waiting on you','6','m','Stage 1 items'],['Held','£207','','Releases on approval'],['Checklist','4 of 4','','All required proof in'],['You have','5 days','','Then it auto-approves']],
   x:'stage1-ev',a:[['Approve and release stage one',1],['Book a walkthrough first',0]]},
+
  {b:'Stage one done',h:'£207 released. Stage two funded.',p:'He has £158.40. Stage two is funded and held. Two releases, not one lump.',
   t:[['Released','£207','','Stage 1'],['Now held','£138','m','Stage 2'],['Worker paid','£158.40','','Stage 1 share'],['Remaining','1 stage','','Base out and clean']],
   x:'ledger-1',a:[['See the stage one record',0],['Message Delroy',0]]},
+
  {b:'Nothing to do',h:'Stage two, back on site',p:'Own checklist, own sign-off. Nothing from stage one is reopened.',
   t:[['Held','£138','','Stage two'],['Stage','2 of 2','m','On site'],['Stage 2 needs','4 items','','Per the checklist'],['In so far','2','','base-before, cupboard-empty']],
   x:'stage2-live',a:[['Ask how it is going',0],['Book a walkthrough',0]]},
+
  {b:'Waiting on you, stage two',h:'Stage two evidence is in',p:'Four items, checklist complete. Same rules, same route if something is wrong.',
   t:[['Waiting on you','4','m','Stage 2 items'],['Held','£138','','Releases on approval'],['Checklist','4 of 4','','Complete'],['You have','5 days','','Then it auto-approves']],
   x:'stage2-ev',a:[['Approve and release stage two',1],['Book a walkthrough first',0]]},
+
  {b:'Done',h:'Both stages released. Job closed.',p:'Two releases, two evidence sets, both signed by you. The report carries both.',
   t:[['Total paid','£345','','Two releases'],['Delroy received','£264','','88% of labour'],['Evidence sets','2','','One per stage'],['Report','Ready','m','PDF, both stages']],
   x:'ledger-2',a:[['Download the Completion Report',1],['See the payment record',0]]},
+
  {b:'One thing left',h:'Review Delroy',p:'You can review this job once, and only this job. Sealed until he writes his, or fourteen days.',
   x:'rev-c',a:[['Write your review',1],['Skip for now',0]]}
 ],
@@ -4071,39 +4179,50 @@ worker:[
  {b:'New job in your trade',h:'Leak repair, Barbican',p:'On the board four minutes. Free to see, free to quote, no lead fee.',
   t:[['Open jobs','7','','In your parishes'],['In your trade','2','m','Plumbing'],['Your score','4.8','','31 completed'],['Quotes out','2','','Awaiting decision']],
   a:[['Quote this job',1],['Ask a question on it',0]]},
+
  {b:'Build it, then send it',h:'You are not typing this from scratch',p:'Every line is proposed, from her brief, the photo check, or the plumbing task list. Tap what applies. Exclusions are compulsory.',
   t:[['Lines proposed','13','m','7 in, 6 out'],['You typed','0','','So far'],['Exclusions','4','m','Minimum 3'],['Time to build','~90 sec','','Not 20 minutes']],
   x:'qb',a:[]},
  {b:'Quote submitted',h:'Your quote is with the client',p:'Labour and materials separate, the fee is on labour only. Exclusions compulsory.',
   t:[['Your labour','£300','','Fee applies here'],['Materials','£0','','Never fee\'d'],['You would get','£264','m','88%'],['Band','Inside','','Advisory only']],
   x:'quote-mine',a:[['Edit while it is still submitted',0],['Withdraw',0]]},
+
  {b:'Agree it before you are chosen',h:'Read it properly, then tick it',p:'What is out binds as hard as what is in. Anything else is a new stage at a new price.',
   t:[['Scope','1 page','','Plain words'],['Stages','2','m','60 / 40'],['Exclusions','4','','Yours, binding'],['Agreed by','0 of 2','m','You and her']],
   x:'scope',a:[['Ask for a change',0]]},
+
  {b:'You got the job',h:'Stage one money is confirmed',p:'Funded before you lift a tool. Stage two funds on stage one sign-off.',
   t:[['Held for you','£158.40','m','Stage 1 share'],['Then','£105.60','','Stage 2 share'],['Start','Tue','','Confirm it'],['Client','4.9','','3 jobs, pays on time']],
   a:[['Accept and confirm the start date',1],['Decline this job',0]]},
+
  {b:'Read the QA sheet',h:'What you have to prove, per stage',p:'Four items each stage. Arrival photos first. No paperwork at the end.',
   t:[['Stages','2','','Agreed in writing'],['Stage 1 items','4','m','Required'],['Stage 2 items','4','','Required'],['Start','Tomorrow','','09:00']],
   x:'docs-worker',a:[['Open the QA sheet',1],['Message the client',0]]},
+
  {b:'On site, stage one',h:'Document first, then work',p:'Arrival set uploaded and timestamped. That is what protects you later.',
   t:[['Uploaded','3','m','Arrival set'],['Stage 1 still needs','3','','Before, after, test clip'],['Held for you','£158.40','','Releases on sign-off'],['On site','2 hrs','','Since 09:41']],
   x:'stage1-live',a:[['Upload stage one evidence',1],['Message the client',0]]},
+
  {b:'With the client, stage one',h:'Waiting on stage one sign-off',p:'Six in against four required. If she raises something you hear it first, with 48 hours.',
   t:[['Submitted','6','','Stage 1'],['Checklist','4 of 4','m','Complete'],['Held for you','£158.40','','Cleared on approval'],['Client has','5 days','','Then it auto-approves']],
   x:'stage1-ev',a:[['Add anything else',0],['Message the client',0]]},
+
  {b:'Stage one paid',h:'£158.40 released to you',p:'Paid on stage one, not at the end. Stage two is already held.',
   t:[['Paid','£158.40','m','Stage 1'],['Now held','£105.60','','Stage 2'],['Method','Lynk','','Your choice'],['Next','Stage 2','','Base out and clean']],
   x:'ledger-1',a:[['See the payout record',0],['Confirm stage two date',1]]},
+
  {b:'On site, stage two',h:'Second visit, second set of proof',p:'Own four items. Nothing you already proved can be argued again.',
   t:[['Uploaded','2','m','base-before, cupboard-empty'],['Still needs','2','','Waste away, clean-down clip'],['Held for you','£105.60','','Stage 2'],['On site','1 hr','','Since 08:55']],
   x:'stage2-live',a:[['Upload stage two evidence',1],['Message the client',0]]},
+
  {b:'With the client, stage two',h:'Waiting on final sign-off',p:'Four items in, checklist complete. Once she signs this off the job closes and your Yaad Score moves.',
   t:[['Submitted','4','','Stage 2'],['Checklist','4 of 4','m','Complete'],['Held for you','£105.60','','Cleared on approval'],['Client has','5 days','','Then it auto-approves']],
   x:'stage2-ev',a:[['Add anything else',0],['Message the client',0]]},
+
  {b:'Paid in full',h:'£264 across two releases',p:'You keep 88%, materials untouched, paid twice rather than once at the end.',
   t:[['Total paid','£264','m','Two releases'],['Stage 1','£158.40','','25 Aug'],['Stage 2','£105.60','','27 Aug'],['Jobs completed','32','','Was 31']],
   x:'ledger-2',a:[['See the payout record',1],['Download the Completion Report',0]]},
+
  {b:'Your turn',h:'Review the client',p:'Access, clarity, how fast they approved, fair to deal with. Sealed until she writes hers, or fourteen days.',
   x:'rev-w',a:[['Write your review',1],['Skip for now',0]]}
 ]};
