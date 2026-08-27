@@ -32,7 +32,13 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //   assemble  all batches, turned into rooms, a sketch and a stored draft
 //   render    a pack, turned into the document a client reads
 
-const VISION_MODEL = Deno.env.get("NVIDIA_VISION_MODEL") || "nvidia/nemotron-nano-12b-v2-vl";
+// nvidia/nemotron-nano-12b-v2-vl reached end of life on 26 Aug 2026 and now
+// returns HTTP 410. Verified working replacement, checked against a real still
+// on the day: it described the shot correctly and refused to call a phone in
+// somebody's hand a room, which is the behaviour that matters here.
+// Override with the NVIDIA_VISION_MODEL secret; that same secret is read by
+// yaad-vision, so setting it fixes both at once.
+const VISION_MODEL = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-90b-vision-instruct";
 const VISION_API = "https://integrate.api.nvidia.com/v1/chat/completions";
 const TEXT_MODEL = "MiniMax-M2.7";
 const TEXT_API = "https://api.minimax.io/v1/chat/completions";
@@ -382,21 +388,42 @@ Deno.serve(async (req) => {
             max_tokens: 1800, temperature: 0.2,
           }),
         });
-        const j = await r.json();
+        const body = await r.text();
+        let j: any = {};
+        try { j = JSON.parse(body); } catch (_) { /* keep the raw text */ }
         s.setAttributes({
           "http.response.status_code": r.status,
           "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
           "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
         });
-        if (!r.ok) s.recordError(`nvidia http ${r.status}`);
-        return j?.choices?.[0]?.message?.content ?? "";
+        if (!r.ok) s.recordError(`nvidia http ${r.status}: ${body.slice(0, 200)}`);
+        // A failed model call must never come back looking like "the model saw
+        // nothing". That reads as a clean result and it is not one.
+        return { ok: r.ok, status: r.status, body, content: j?.choices?.[0]?.message?.content ?? "" };
       });
+
+      if (!raw.ok) {
+        root.setAttributes({ "yaadly.sketch.outcome": "model_error" });
+        return fail(`The vision model refused the request (HTTP ${raw.status}). It said: ${raw.body.slice(0, 300)}`, 502);
+      }
+      if (!String(raw.content).trim()) {
+        root.setAttributes({ "yaadly.sketch.outcome": "empty_response" });
+        return fail(`The vision model returned an empty answer. Raw response: ${raw.body.slice(0, 300)}`, 502);
+      }
 
       let parsed: any = {};
       try {
-        const m = String(raw).match(/\{[\s\S]*\}/);
-        parsed = m ? JSON.parse(m[0]) : {};
-      } catch (_) { return fail("The vision model did not return usable JSON for this batch.", 502); }
+        const m = String(raw.content).match(/\{[\s\S]*\}/);
+        if (!m) throw new Error("no JSON object in the answer");
+        parsed = JSON.parse(m[0]);
+      } catch (_) {
+        root.setAttributes({ "yaadly.sketch.outcome": "unparseable" });
+        return fail(`The vision model answered, but not in JSON. It said: ${String(raw.content).slice(0, 300)}`, 502);
+      }
+      if (!Array.isArray(parsed.frames) || !parsed.frames.length) {
+        root.setAttributes({ "yaadly.sketch.outcome": "no_frames" });
+        return fail(`The vision model returned no frame entries. It said: ${String(raw.content).slice(0, 300)}`, 502);
+      }
 
       const hits: string[] = [];
       const out = (parsed.frames || []).map((f: any, i: number) => ({
@@ -443,21 +470,29 @@ Deno.serve(async (req) => {
             ],
           }),
         });
-        const j = await r.json();
+        const body = await r.text();
+        let j: any = {};
+        try { j = JSON.parse(body); } catch (_) { /* keep the raw text */ }
         s.setAttributes({
           "http.response.status_code": r.status,
           "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
           "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
         });
-        if (!r.ok) s.recordError(`minimax http ${r.status}`);
-        return j?.choices?.[0]?.message?.content ?? "";
+        if (!r.ok) s.recordError(`minimax http ${r.status}: ${body.slice(0, 200)}`);
+        return { ok: r.ok, status: r.status, body, content: j?.choices?.[0]?.message?.content ?? "" };
       });
+
+      if (!raw.ok) return fail(`The assembly model refused the request (HTTP ${raw.status}). It said: ${raw.body.slice(0, 300)}`, 502);
+      if (!String(raw.content).trim()) return fail(`The assembly model returned an empty answer. Raw response: ${raw.body.slice(0, 300)}`, 502);
 
       let parsed: any = {};
       try {
-        const m = String(raw).match(/\{[\s\S]*\}/);
-        parsed = m ? JSON.parse(m[0]) : {};
-      } catch (_) { return fail("The assembly step did not return usable JSON.", 502); }
+        const m = String(raw.content).match(/\{[\s\S]*\}/);
+        if (!m) throw new Error("no JSON object in the answer");
+        parsed = JSON.parse(m[0]);
+      } catch (_) {
+        return fail(`The assembly model answered, but not in JSON. It said: ${String(raw.content).slice(0, 300)}`, 502);
+      }
 
       const hits: string[] = [];
       const seenKeys = new Set<string>();

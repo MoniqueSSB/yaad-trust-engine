@@ -21,6 +21,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- The job taxonomy: 18 trades, 97 job types, keyed Trade|Type. Source of truth
+     for every dropdown on the job card. Kept as its own file rather than inlined
+     so it caches separately and stays a straight copy of data/job-taxonomy.js. -->
+<script src="job-taxonomy.js" defer></script>
 <!-- ─── Error monitoring (Sentry). Loaded first so it sees failures in everything after it. ───
      There was no global error handler on this page at all before this. The admin sign-in
      crash of 17-18 August was found by walking into it; this is so that does not happen twice.
@@ -567,6 +571,310 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 .kt tr.tot td{border-top:2px solid var(--line);border-bottom:0;color:var(--ink);font-weight:700}
 .kt .hi{color:var(--red);font-weight:800}
 .kt .med{color:var(--mango);font-weight:700}
+
+/* ═══════════ SITE PANE · Stage 2: the homepage visual map ═══════════
+   Built to docs/HOMEPAGE-VISUAL-MAP.md v1.0, 26 Aug 2026.
+   Every rule below is scoped to #pane-site or uses a class name that
+   appears nowhere else in this file, so the portals and the admin desk
+   are untouched, same contract as Stage 1 above.
+
+   Semantic colour is load-bearing and never decorative:
+     mango  money is held, or a decision is owed to you
+     coral  blocked, or excluded
+     teal   proven
+   One animated moment on the page (the trust engine). Nothing else moves. */
+
+/* ── rhythm ── */
+#pane-site .sec{margin-top:64px}
+#pane-site .sec:first-child{margin-top:0}
+
+/* ── type ── */
+#pane-site .hx{font-family:var(--disp);font-weight:400;text-transform:uppercase;line-height:.95;letter-spacing:.005em;text-wrap:balance;margin:0}
+#pane-site h2.hx{font-size:clamp(28px,4.2vw,50px)}
+#pane-site h2.hx .g1{background:linear-gradient(90deg,#2DD4BF,#14B8A6);-webkit-background-clip:text;background-clip:text;color:transparent}
+#pane-site h2.hx .g2{background:linear-gradient(90deg,#FFB020,#FF6B4A);-webkit-background-clip:text;background-clip:text;color:transparent}
+#pane-site .lead{color:var(--mute);font-size:16.5px;max-width:62ch;margin-top:14px}
+#pane-site .lead b{color:var(--ink);font-weight:700}
+#pane-site .tiny{font-size:var(--t-tiny);color:var(--mute);line-height:1.55}
+#pane-site .mono{font-family:var(--mono)}
+
+/* ── pills. The global .pill is the admin desk's, so this one is scoped. ── */
+#pane-site .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+#pane-site .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:0;padding:5px 11px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);color:var(--tealb);white-space:normal}
+#pane-site .pill.m{background:rgba(255,176,32,.11);border-color:rgba(255,176,32,.32);color:var(--mango)}
+#pane-site .pill.n{background:var(--panel2);border-color:var(--line);color:var(--mute)}
+
+/* ── hero availability chips ── */
+#pane-site .av2{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:100px;border:1px solid var(--softline);background:var(--soft);color:var(--tealb)}
+#pane-site .av2.soon{background:rgba(255,176,32,.09);border-color:rgba(255,176,32,.3);color:var(--mango)}
+#pane-site .av2.link{cursor:pointer}
+#pane-site .av2.link:hover{border-color:var(--teal)}
+
+/* ── stat strip. The dividers ARE the 1px grid gaps showing the --line
+      background through. Do not draw borders between the cells. ── */
+#pane-site .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:22px}
+#pane-site .strip>div{background:var(--panel);padding:15px 16px}
+#pane-site .strip b{display:block;font-family:var(--disp);font-size:23px;color:var(--tealb);line-height:1.1;font-weight:400}
+#pane-site .strip span{font-size:12.5px;color:var(--mute);line-height:1.5}
+#pane-site .strip cite{display:block;font-style:normal;font-size:11px;color:var(--dim);margin-top:5px}
+@media(max-width:760px){#pane-site .strip{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:420px){#pane-site .strip{grid-template-columns:1fr}}
+
+/* ── grid utilities ── */
+#pane-site .grid{display:grid;gap:14px}
+#pane-site .g2c{grid-template-columns:repeat(2,1fr)}
+#pane-site .g3c{grid-template-columns:repeat(3,1fr)}
+#pane-site .g4c{grid-template-columns:repeat(4,1fr)}
+@media(max-width:860px){#pane-site .g3c,#pane-site .g4c{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){#pane-site .g2c,#pane-site .g3c{grid-template-columns:1fr}#pane-site .g4c{grid-template-columns:repeat(2,1fr)}}
+
+/* ── ghost button, to sit beside the gradient primary ── */
+#pane-site .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+#pane-site .btn.ghost:hover{border-color:var(--teal);color:var(--tealb);filter:none}
+#pane-site .ctarow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
+
+/* ── the gate card in the WhatsApp lane. Mango, because it is the point
+      where the decision passes to you. ── */
+#pane-site .ist.gate{border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.045)}
+#pane-site .ist.gate .ih{color:var(--mango)}
+
+/* ── section 2 · the WhatsApp lane ──
+      One phone, deliberately. Two WhatsApp mockups as the emotional centre
+      told visitors the product is a chat with Monique. It is not. */
+#pane-site .walane{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;margin-top:22px}
+@media(max-width:820px){#pane-site .walane{grid-template-columns:1fr}}
+#pane-site .wafone{background:#060D0B;border:1px solid var(--line2);border-radius:24px;padding:10px;width:100%;max-width:330px;margin:0 auto}
+#pane-site .wafone .wt{display:flex;align-items:center;gap:9px;padding:7px 8px 10px}
+#pane-site .wafone .wt i{width:29px;height:29px;border-radius:50%;background:#25D366;display:grid;place-items:center;color:#04211D;font-size:14px;font-style:normal;font-weight:700}
+#pane-site .wafone .wt b{font-size:13px;display:block;line-height:1.2}
+#pane-site .wafone .wt span{font-size:10px;color:#25D366}
+#pane-site .wabody{background:var(--bg);border-radius:16px;padding:11px;display:flex;flex-direction:column;gap:7px}
+#pane-site .wb{max-width:88%;padding:8px 11px;border-radius:13px;font-size:12.5px;line-height:1.5}
+#pane-site .wb.them{background:var(--panel2);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:5px}
+#pane-site .wb.me{background:var(--soft);border:1px solid var(--softline);align-self:flex-end;border-bottom-right-radius:5px}
+#pane-site .wb.sys{background:rgba(255,176,32,.08);border:1px solid rgba(255,176,32,.24);color:var(--sand);align-self:center;max-width:97%;font-size:11px;text-align:center;line-height:1.45}
+#pane-site .wb em{display:block;font-style:normal;font-size:9.5px;color:var(--dim);margin-top:4px}
+#pane-site .wb .clip{display:inline-block;background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:3px 8px;font-size:10.5px;color:var(--tealb);margin-bottom:4px}
+
+/* ── section 5 · Ask a Yaad ── */
+#pane-site .qa{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px}
+#pane-site .qa h4{font-size:15px;margin:0 0 7px;line-height:1.35;color:var(--ink)}
+#pane-site .qa p{font-size:13.5px;color:var(--mute);line-height:1.6;margin:0}
+#pane-site .qa .by{margin-top:11px;font-size:12px;color:var(--dim);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+
+/* ── section 6 · route cards ── */
+#pane-site .route{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column}
+#pane-site .route.mine{border-color:rgba(255,176,32,.35);background:rgba(255,176,32,.045)}
+#pane-site .route h4{font-size:16px;margin:0 0 8px;color:var(--ink)}
+#pane-site .route p{font-size:13.5px;color:var(--mute);line-height:1.6;margin:0}
+#pane-site .route .go{margin-top:auto;padding-top:14px}
+
+/* ── section 7 · feedback trust scale ── */
+#pane-site .fbrow{display:flex;gap:7px;flex-wrap:wrap}
+#pane-site .fbtn{flex:1;min-width:74px;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 6px;text-align:center;transition:var(--tr);cursor:pointer;font:inherit;color:var(--ink)}
+#pane-site .fbtn:hover{border-color:var(--teal)}
+#pane-site .fbtn.on{border-color:var(--mango);background:rgba(255,176,32,.09)}
+#pane-site .fbtn b{display:block;font-size:19px;line-height:1.3}
+#pane-site .fbtn span{font-size:10.5px;color:var(--dim);display:block;margin-top:1px;min-height:13px}
+#pane-site .fbtn.on span{color:var(--mango)}
+#pane-site .fgroup{margin-bottom:16px}
+#pane-site .fgroup .fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+#pane-site .fgroup .f{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:13px 14px;color:var(--ink);font:inherit;font-size:15px}
+#pane-site .fgroup textarea.f{min-height:80px;resize:vertical}
+#pane-site .wnav{display:flex;gap:10px;margin-top:24px;align-items:center;flex-wrap:wrap}
+#pane-site .wnav .sp{margin-left:auto;font-size:12.5px;color:var(--dim)}
+
+/* ── section 7 · FAQ accordion. Replaces the old <details> list: six open,
+      six behind the button, so the tallest section still reads short. ── */
+#pane-site .faq{border-top:1px solid var(--line);margin-top:20px}
+#pane-site .faq .fq{border-bottom:1px solid var(--line)}
+#pane-site .faq .fq>button{width:100%;text-align:left;display:flex;gap:14px;align-items:flex-start;padding:16px 0;font:inherit;font-size:15px;font-weight:700;line-height:1.4;color:var(--ink);background:none;border:0;cursor:pointer}
+#pane-site .faq .fq>button .cv{margin-left:auto;color:var(--tealb);font-size:19px;line-height:1;flex:0 0 auto;transition:.2s}
+#pane-site .faq .fq.open>button .cv{transform:rotate(45deg)}
+#pane-site .faq .fq .ans{display:none;padding:0 0 18px;font-size:13.5px;color:var(--mute);line-height:1.7;max-width:76ch}
+#pane-site .faq .fq.open .ans{display:block}
+#pane-site .faq .fq .ans b{color:var(--ink)}
+#pane-site .faq .fq .ans a{color:var(--tealb);cursor:pointer}
+#pane-site .faq .fq .ans .ex{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:11px;font-variant-numeric:tabular-nums;font-size:13px}
+#pane-site .faq .fq .ans .ex div{display:flex;justify-content:space-between;gap:14px;padding:3px 0}
+#pane-site .faq .fq .ans .ex .t{border-top:1px solid var(--line);margin-top:5px;padding-top:7px;font-weight:700;color:var(--ink)}
+
+/* ── section 7 · founder ── */
+#pane-site .founder{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:start}
+@media(max-width:640px){#pane-site .founder{grid-template-columns:1fr}}
+#pane-site .fav{width:88px;height:88px;border-radius:20px;background:linear-gradient(135deg,#FFB020,#FF6B4A);display:grid;place-items:center;font-family:var(--disp);font-size:34px;color:#04211D}
+#pane-site .fbul{margin-top:14px;display:flex;flex-direction:column;gap:7px}
+#pane-site .fbul span{font-size:13.5px;color:var(--mute);line-height:1.5}
+#pane-site .fbul span b{color:var(--ink)}
+#pane-site .quote{font-family:var(--disp);text-transform:uppercase;font-size:clamp(20px,3vw,28px);line-height:1.05;color:var(--sand);margin:18px 0 14px;text-wrap:balance}
+
+/* ── One shadow on this page, and it belongs to .searchcard. The intake form
+      is already lifted off the ground by the joinband behind it, so it does
+      not need a second one competing for the same trick. ── */
+#pane-site .formcard{box-shadow:none;border:1px solid rgba(0,0,0,.10)}
+
+/* ── cards on this page carry the 14px corner, like everything else ── */
+#pane-site .card{border-radius:var(--r)}
+
+
+/* ═══════════ POST A JOB · the six-step wizard ═══════════
+   Built to docs/POST-A-JOB-FLOW-SPEC.md v1.0.
+
+   The rule the whole flow exists to enforce:
+     anyone can build a job with no account, it saves as a draft, and it
+     reaches the marketplace only once they have an account AND have signed
+     the current Client Guidelines. The database enforces the same rule from
+     underneath (enforce_signed_before_open + client_cleared_for_golive), so
+     this is the polite version of a constraint that is real either way.
+
+   Guest path only. There is no mode toggle on the public site: a visitor
+   here has no session, so the first job is always the manual intake, and
+   no agent runs until the guidelines are signed. */
+
+#pane-post{padding:34px 0 90px}
+#pane-post .wrap{max-width:920px}
+
+/* ── progress ── */
+.prog{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
+.prog i{height:4px;border-radius:100px;background:var(--line);transition:.3s}
+.prog i.done{background:var(--teal)}
+.prog i.now{background:var(--grad)}
+.proglab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:9px;font-size:12.5px;color:var(--dim)}
+.proglab b{color:var(--tealb);font-size:12px;font-weight:700}
+
+/* ── steps ── */
+.wstep{display:none;margin-top:26px}
+.wstep.show{display:block}
+.wq{font-family:var(--disp);font-weight:400;text-transform:uppercase;font-size:clamp(26px,4vw,40px);line-height:.98;letter-spacing:.005em;margin:0;text-wrap:balance}
+.wsub{color:var(--mute);font-size:15.5px;max-width:62ch;margin-top:12px;line-height:1.6}
+.wnav{display:flex;gap:10px;margin-top:26px;align-items:center;flex-wrap:wrap}
+.wnav .sp{margin-left:auto;font-size:12.5px;color:var(--dim)}
+.wnav .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+
+/* ── fields ── */
+#pane-post .fgroup{margin-bottom:16px}
+#pane-post .fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+#pane-post .f{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-md);padding:13px 14px;color:var(--ink);font:inherit;font-size:15px}
+#pane-post textarea.f{min-height:120px;resize:vertical;line-height:1.6}
+#pane-post .f:focus{outline:none;border-color:var(--teal)}
+#pane-post .grid{display:grid;gap:14px}
+#pane-post .g2c{grid-template-columns:repeat(2,1fr)}
+#pane-post .g3c{grid-template-columns:repeat(3,1fr)}
+@media(max-width:640px){#pane-post .g2c,#pane-post .g3c{grid-template-columns:1fr}}
+#pane-post .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-top:0}
+#pane-post .card.soft{background:var(--soft);border-color:var(--softline)}
+#pane-post .tiny{font-size:12.5px;color:var(--mute);line-height:1.55}
+#pane-post .kick{margin-top:0;font-size:10.5px;letter-spacing:.2em}
+#pane-post .kick.m{color:var(--mango)}
+#pane-post .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+#pane-post .btn.ghost:hover{border-color:var(--teal);color:var(--tealb);filter:none}
+
+/* ── the manual note. Guest mode is not a degraded funnel, it is the
+      honest description of what actually happens on a first job. ── */
+.manualnote{background:var(--soft);border:1px solid var(--softline);border-radius:12px;padding:14px 16px;margin-top:14px;font-size:13.5px;color:var(--mute);line-height:1.6}
+.manualnote b{color:var(--ink)}
+
+/* ── step 1 · trade picker ── */
+.wtrades{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
+@media(max-width:760px){.wtrades{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:460px){.wtrades{grid-template-columns:1fr}}
+.wtrade{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 13px;transition:var(--tr);text-align:left;width:100%;font:inherit;color:var(--ink);cursor:pointer}
+.wtrade:hover{border-color:var(--teal);background:var(--panel2)}
+.wtrade.on{border-color:var(--mango);background:rgba(255,176,32,.07)}
+.wtrade .ic{width:34px;height:34px;border-radius:9px;background:var(--soft);border:1px solid var(--softline);display:grid;place-items:center;flex:0 0 auto}
+.wtrade b{display:block;font-size:13.5px;line-height:1.25}
+.wtrade span span{font-size:11px;color:var(--dim)}
+
+/* ── step 2 · the job card ──
+      Eleven fields, five sections. The badge on each label says where the
+      value came from, and coral means nobody has answered it yet. Nothing
+      reaches the board with a coral field: that is the difference between
+      a marketplace and a group chat. ── */
+.jcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.jcbadge{display:flex;flex-wrap:wrap;gap:7px 14px;padding:12px 16px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)}
+.jcbadge b{color:var(--ink)}
+.jcsec{padding:16px;border-bottom:1px solid var(--line)}
+.jcsec:last-child{border-bottom:0}
+.jclab{font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--tealb);margin:0 0 10px}
+.jfrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.jfrow{grid-template-columns:1fr}}
+.jfield label{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--mute);margin-bottom:6px}
+.jsel{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;color:var(--ink);font:inherit;font-size:14px}
+.jsel:focus{outline:none;border-color:var(--teal)}
+.jsel.empty{border-color:rgba(255,107,74,.45)}
+.jsel.guess{border-color:rgba(255,176,32,.45)}
+.src{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:100px;white-space:nowrap}
+.src.ok{background:rgba(45,212,191,.13);color:var(--tealb)}
+.src.guess{background:rgba(255,176,32,.14);color:var(--mango)}
+.src.empty{background:rgba(255,107,74,.14);color:var(--coral)}
+.evpick{display:flex;flex-wrap:wrap;gap:7px}
+.evpick button{font:inherit;font-size:11.5px;padding:7px 11px;border-radius:100px;border:1px dashed var(--line2);background:transparent;color:var(--mute);cursor:pointer;transition:var(--tr)}
+.evpick button:hover{border-color:var(--teal)}
+.evpick button.on{border-style:solid;border-color:rgba(45,212,191,.45);background:rgba(45,212,191,.07);color:var(--tealb)}
+.flag{background:rgba(255,107,74,.07);border:1px solid rgba(255,107,74,.28);border-radius:11px;padding:12px 14px;font-size:12.5px;color:var(--mute);line-height:1.55}
+.flag b{color:var(--coral)}
+.fixed{background:rgba(45,212,191,.06);border:1px solid rgba(45,212,191,.28);border-radius:11px;padding:12px 14px;font-size:12.5px;color:var(--mute);line-height:1.55}
+.fixed b{color:var(--tealb)}
+
+/* ── step 3 · photos ── */
+.drop{display:block;width:100%;background:var(--panel);border:1px dashed var(--line2);border-radius:var(--r);padding:30px 20px;text-align:center;color:var(--mute);cursor:pointer;transition:var(--tr);font:inherit;margin-top:20px}
+.drop:hover{border-color:var(--teal);background:var(--panel2)}
+.drop input{display:none}
+#pane-post .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+#pane-post .thumbs img{width:78px;height:78px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)}
+
+/* ── step 4 · when ── */
+.choice{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer;transition:var(--tr)}
+.choice:hover{border-color:var(--teal)}
+.choice .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;margin-top:2px;transition:var(--tr)}
+.choice.on{border-color:var(--mango);background:rgba(255,176,32,.055)}
+.choice.on .dot{border-color:var(--mango);background:var(--mango);box-shadow:inset 0 0 0 3px var(--panel)}
+.choice .tiny{color:var(--dim)}
+
+/* ── step 4 · the calendar ── */
+.wzdate{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px;margin-top:10px}
+.wzhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.wzhead b{font-size:14px}
+.wzhead button{font:inherit;font-size:15px;line-height:1;width:30px;height:30px;border-radius:9px;border:1px solid var(--line2);background:transparent;color:var(--ink);cursor:pointer}
+.wzhead button:hover{border-color:var(--teal);color:var(--tealb)}
+.wzgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.wzgrid u{font-style:normal;text-decoration:none;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:center;padding-bottom:4px}
+.wzgrid button{font:inherit;font-size:13px;aspect-ratio:1;border-radius:9px;border:1px solid transparent;background:var(--panel2);color:var(--ink);cursor:pointer;transition:var(--tr);padding:0}
+.wzgrid button:hover:not(:disabled){border-color:var(--teal)}
+.wzgrid button:disabled{opacity:.22;cursor:not-allowed}
+.wzgrid button.free{border-color:rgba(45,212,191,.4);background:rgba(45,212,191,.09);color:var(--tealb)}
+.wzgrid button.on{border-color:var(--mango);background:rgba(255,176,32,.16);color:var(--mango);font-weight:700}
+.wzgrid span{aspect-ratio:1}
+.wznote{margin-top:11px;font-size:12.5px;color:var(--mute);line-height:1.55}
+.wzflex{margin-top:11px}
+.wzflex button{font:inherit;font-size:12.5px;padding:8px 14px;border-radius:100px;border:1px solid var(--line2);background:transparent;color:var(--mute);cursor:pointer}
+.wzflex button.on{border-color:var(--mango);background:rgba(255,176,32,.09);color:var(--mango)}
+@media(max-width:460px){.wzgrid{gap:3px}.wzgrid button{font-size:12px}}
+
+/* ── step 6 · review and the gate ── */
+.rvsplit{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.rvsplit .h{font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;margin-bottom:7px}
+.rvsplit.pub .h{color:var(--tealb)}
+.rvsplit.priv .h{color:var(--mango)}
+.rvsplit p{font-size:13.5px;color:var(--mute);line-height:1.6;margin:0}
+.rvsplit dl{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:13px;margin:0}
+.rvsplit dt{color:var(--dim)}
+.rvsplit dd{margin:0;color:var(--mute)}
+.gscroll{max-height:210px;overflow-y:auto;padding-right:10px;font-size:13px;color:var(--mute);line-height:1.65;margin-bottom:14px}
+.gscroll h6{font-size:12.5px;color:var(--ink);margin:13px 0 4px;font-weight:700}
+.gscroll h6:first-child{margin-top:0}
+.tick{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;color:var(--mute);line-height:1.55;cursor:pointer}
+.tick input{margin-top:2px;width:17px;height:17px;accent-color:var(--teal);flex:0 0 auto}
+
+/* ── the done screen ── */
+.nextlist{counter-reset:nx;margin-top:12px}
+.nx{display:flex;gap:13px;align-items:flex-start;padding:13px 0;border-top:1px solid var(--line)}
+.nx:first-child{border-top:0}
+.nx .num{counter-increment:nx;flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--soft);border:1px solid var(--softline);color:var(--tealb);font-family:var(--mono);font-size:11px;display:grid;place-items:center}
+.nx .num::before{content:counter(nx)}
+.nx h4{font-size:14.5px;margin:0 0 4px;color:var(--ink)}
+.nx p{font-size:13px;color:var(--mute);line-height:1.6;margin:0}
+
 </style>
 </head>
 <body>
@@ -580,7 +888,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <a class="vbtn" href="https://app.yaadly.co.uk/portal">Client portal</a>
     <a class="vbtn" href="https://app.yaadly.co.uk/portal">Worker portal</a>
   </div>
-  <button class="navcta" onclick="go('site');setTimeout(function(){var e=document.getElementById('startform');if(e)e.scrollIntoView()},60)">Post a job</button>
+  <button class="navcta" onclick="postJob()">Post a job</button>
 </div></nav>
 <div id="wl-modal" style="display:none;position:fixed;right:16px;bottom:16px;left:16px;z-index:999;max-width:400px;margin-left:auto;box-shadow:0 12px 40px rgba(0,0,0,0.5)">
   <div class="card" style="position:relative;margin:0">
@@ -606,256 +914,227 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <!-- ═══════════════ WEBSITE ═══════════════ -->
 <section class="pane show" id="pane-site">
 
-<!-- ── hero ── -->
+<!-- ════════ 0 · HERO ════════ -->
 <div class="sect first"><div class="wrap">
-  <div class="herocol">
-      <div class="hpill rv">● Yaadly Ltd · UK 17358077 · Jamaica · Kingston &amp; Portmore first</div>
-      <h1 class="hx">
-        <span class="rv">Everyone promises</span>
-        <span class="g1 rv d1">proof.</span>
-        <span class="rv d2">Here, money moves</span>
-        <span class="g2 rv d3">when you see it.</span>
-      </h1>
-      <p class="sub rv d2"><b>Vetted tradespeople.</b> Payment <b>held and released only when you approve the evidence.</b> Fair local pricing wherever you are paying from. <b>Property work across Jamaica</b>, launching first in Kingston and Portmore.</p>
-      <div class="avail rv d3">
-        <span class="now" onclick="document.getElementById('book').scrollIntoView()">✅ <b>Available today:</b>&nbsp;free scoping call</span>
-        <span onclick="go('services')">✅ <b>Prices published:</b>&nbsp;checks, sign-offs, oversight, full PM</span>
-      </div>
-      <div class="searchcard rv d3">
-        <div class="searchrow">
-          <div>
-            <label class="fl" for="h-what">What do you need done?</label>
-            <input class="f" id="h-what" placeholder="e.g. Fix a leaking pipe under the kitchen sink">
-          </div>
-          <div>
-            <label class="fl" for="h-where">Where is it?</label>
-            <select class="f" id="h-where">
-              <option>Kingston 8, Barbican</option>
-              <option>Kingston 6, Liguanea</option>
-              <option>Kingston 10, Half Way Tree</option>
-              <option>Portmore, Greater Portmore</option>
-              <option>Portmore, Braeton</option>
-              <option>St Andrew, Stony Hill</option>
-              <option>Somewhere else in Jamaica</option>
-            </select>
-          </div>
-          <div style="display:flex;align-items:flex-end">
-            <button class="btn" style="width:100%" onclick="heroStart()">Post my job</button>
-          </div>
-        </div>
-        <p class="hnote">Free, and nothing is charged here. What you type carries straight down into the form below, so you never fill the same thing twice. Prefer to talk? <a id="site-start">Start on WhatsApp instead</a>.</p>
-      </div>
-      <div class="rule rv d3">⚖️ <b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div>
+  <div class="pills">
+    <span class="pill">Yaadly Ltd · UK 17358077</span>
+    <span class="pill n">Jamaica · Kingston &amp; Portmore first</span>
   </div>
-</div></div>
+  <h1 class="hx">
+    <span>Everyone promises</span>
+    <span class="g1">proof.</span>
+    <span>Money moves</span>
+    <span class="g2">when you see it.</span>
+  </h1>
+  <p class="lead">Vetted tradespeople. Money held until you approve the proof. <b>Property work across Jamaica</b>, Kingston and Portmore first.</p>
 
-<!-- ── stat strip ── -->
-<div class="wrap"><div class="stats">
-  <div class="stat rv"><b>US$3.49bn</b><span>sent home to Jamaica in 2025, a record. Most of it moves blind: no proof, no recourse.</span><cite>Bank of Jamaica, gross remittances</cite></div>
-  <div class="stat rv d1"><b>No public price</b><span>exists for most trades in Jamaica. Where that is true we say so out loud, rather than guess.</span><cite>Which is what makes the farrin price possible</cite></div>
-  <div class="stat rv d2"><b>3 working days</b><span>from your approval to the worker being paid. Free to join, free to quote, always.</span><cite>Bank transfer, Lynk or remittance</cite></div>
-</div></div>
-
-<!-- ── the trust engine ── -->
-<div class="sect"><div class="wrap">
-  <div class="kick rv">What you're paying for</div>
-  <h2 class="h2 rv d1">Money moves <em>when the proof lands.</em></h2>
-  <p class="lead rv d2">Not when they ask. Not when you hope. Watch it.</p>
-    <div class="engine" id="engine">
-      <div class="eng-stage">
-        <div class="eng-box"><div class="who">You</div><div class="amt" id="eng-you">J$66,800</div><div class="st2" id="eng-you2">Funding stage one</div></div>
-        <div class="eng-mid">
-          <div class="lockw" id="eng-lock"><span class="lockem">🔒</span></div>
-          <small id="eng-lab">Held</small>
-        </div>
-        <div class="eng-box paid"><div class="who">Delroy, the worker</div><div class="amt" id="eng-w">J$0</div><div class="st2" id="eng-w2">Can see the money is real</div></div>
-      </div>
-
-      <div class="eng-ev" id="eng-ev">
-        <i><svg class="gl" viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Arrival</span></i>
-        <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>Before</span></i>
-        <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span>Receipt</span></i>
-        <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>After</span></i>
-        <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5 21 7v10l-6-3.5v-3Z"/></svg><span>Walk-round</span></i>
-        <i><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></i>
-      </div>
-
-      <div class="eng-cap"><span class="eng-dot"></span><span id="eng-cap"><b>Nothing has moved.</b> He starts because he can see the money is real, not because you sent it.</span></div>
-    </div>
-
-  </div></div>
-
-<!-- ── the verified job loop ── -->
-<div class="sect"><div class="wrap">
-  <div class="kick rv">The verified job loop</div>
-  <h2 class="h2 rv d1">Six steps. <u>Proven,</u> <em>not promised.</em></h2>
-    <div class="isteps">
-      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg><b>01</b></div><h4>Tell us what needs doing</h4><p>Form, WhatsApp, voice note, Patois. No app.</p><span class="tag">🤖 AI reads it</span></div>
-      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><b>02</b></div><h4>An itemised quote</h4><p>Labour split from materials, checked before it reaches you.</p><span class="tag">🤖 AI drafts · 🧍 we confirm</span></div>
-      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3.2"/><path d="M5 7v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V7"/><path d="M5 12v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-5"/></svg><b>03</b></div><h4>Money held, not sent</h4><p>Agreed in writing before a tool is lifted.</p><span class="tag">🧍 you confirm</span></div>
-      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><b>04</b></div><h4>Every stage documented</h4><p>Before, after, video. Timestamped and geotagged.</p><span class="tag">🤖 AI checks · 🧍 we confirm</span></div>
-      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><b>05</b></div><h4>You approve, from anywhere</h4><p>Or walk the site on video first and raise it live.</p><span class="tag">🧍 you decide</span></div>
-      <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><b>06</b></div><h4>Worker paid in 3 days</h4><p>And the job builds a record a bank can finally see.</p><span class="tag">🧍 released on your say so</span></div>
-    </div>
-  <div class="rule rv d2">💷 <b>On payments today:</b> online payment holding opens shortly. Until then the quote and payment terms are agreed with you directly, in writing, before work starts. Same rule either way: nothing is charged without you.</div>
-</div></div>
-
-<!-- ── the farrin price ── -->
-<div class="sect band"><div class="wrap">
-  <div class="kick rv">The end of the farrin price</div>
-  <h2 class="h2 rv d1">A client overseas pays<br><em>what a client in Jamaica pays.</em></h2>
-  <p class="lead rv d2">Property work in Jamaica is priced privately, in DMs. <b>There is no public price</b> for painting, bathrooms, septic or block walls anywhere in the country, and that silence is exactly what lets an overseas owner be quoted more than the neighbour for identical work.</p>
-  <div class="card rv d2" style="margin-top:22px;max-width:760px">
-    <div style="font-size:12.5px;color:var(--mute);margin-bottom:4px">Example · ceiling leak investigation &amp; repair, St. Catherine</div>
-    <div style="height:8px;border-radius:6px;background:var(--soft);position:relative;margin:14px 0 8px">
-      <i style="position:absolute;height:100%;border-radius:6px;background:var(--grad);left:24%;width:34%"></i>
-      <u style="position:absolute;top:-4px;width:2px;height:16px;background:var(--coral);left:79%"></u>
-    </div>
-    <div style="display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--dim);flex-wrap:wrap"><span>J$8,000</span><span style="color:var(--tealb);font-weight:700">fair band J$16,000 to 24,000</span><span style="color:var(--coral)">J$38,000: a real quote to an overseas payer</span></div>
-    <p class="note" style="margin-top:12px">Every Yaadly quote is checked against a band built from real material costs, real day rates and real completed jobs. Distance is not a price penalty.</p>
+  <div class="avail">
+    <span class="av2 link" onclick="document.getElementById('book').scrollIntoView()">✅ Available today: free scoping call, checks and oversight</span>
+    <span class="av2 soon">🕓 Opening shortly: online payment holding</span>
   </div>
+
+  <div class="searchcard">
+    <div class="searchrow">
+      <div>
+        <label class="fl" for="h-what">What do you need done?</label>
+        <input class="f" id="h-what" placeholder="e.g. Fix a leaking pipe under the kitchen sink">
+      </div>
+      <div>
+        <label class="fl" for="h-where">Where is it?</label>
+        <select class="f" id="h-where">
+          <option>Kingston 8, Barbican</option>
+          <option>Kingston 6, Liguanea</option>
+          <option>Kingston 10, Half Way Tree</option>
+          <option>Portmore, Greater Portmore</option>
+          <option>Portmore, Braeton</option>
+          <option>St Andrew, Stony Hill</option>
+          <option>Somewhere else in Jamaica</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn" style="width:100%" onclick="postJob()">Post my job</button>
+      </div>
+    </div>
+    <p class="hnote">Free, and nothing is charged here. What you type carries straight down into the form below, so you never fill the same thing twice. Prefer to talk? <a id="site-start">Start on WhatsApp instead</a>.</p>
+  </div>
+
+  <div class="strip">
+    <div><b>US$3.49bn</b><span>sent home in 2025, a record. Most of it moves blind.</span><cite>Bank of Jamaica, gross remittances</cite></div>
+    <div><b>No public price</b><span>exists for most Jamaican trades. We show what your quote is built from.</span></div>
+    <div><b>3 working days</b><span>from your approval to the worker paid.</span></div>
+    <div><b>Free to join</b><span>for tradespeople. Free to quote, always, win or lose.</span></div>
+  </div>
+
+  <div class="rule"><span>🤖</span><div><b>The governing rule:</b> AI intakes, prices, verifies and drafts. A human confirms every step that moves money or changes a reputation.</div></div>
 </div></div>
 
-<!-- ── the worker's side ── -->
-<div class="sect"><div class="wrap">
-  <div class="wgrid">
-    <div class="rv d1">
-      <div class="phone" id="phone-worker">
-        <div class="screen">
-          <div class="wabar">
-            <div class="pav">Y</div>
-            <div><div class="nm">Yaadly ↔ Worker</div><div class="st">online</div></div>
-          </div>
-          <div class="thread">
-            <div class="msg in">New job open for your quote: minor roof repair, Portmore. Quoting is free, always. Reply with labour, materials and earliest start.<span class="t">08:14</span></div>
-            <div class="msg out">Labour 45,000. Materials 28,500 with receipts. Can start Tuesday.<span class="t">08:31</span></div>
-            <div class="sysnote">Quote goes to the client with Yaadly's fair-price indicator beside it.</div>
-            <div class="msg in">You got the job. The payment is agreed and confirmed, so start when ready. Document the site first: three arrival photos minimum.<span class="t">Mon 17:02</span></div>
-            <div class="msg out"><div class="shot">📷 Arrival photos ×3 · 09:41</div>On site. Zinc coming off now.<span class="t">Tue 09:52</span></div>
-            <div class="msg in">Checklist: PASS ✓ Evidence complete. Your Completion Report is drafted, just confirm it is true.<span class="t">Tue 22:45</span></div>
-            <div class="sysnote">Client approved. Paid within 3 working days. Job added to your Yaad Score.</div>
-            <div class="typing"><i></i><i></i><i></i></div>
-          </div>
+<!-- ════════ 1 · THE VERIFIED JOB LOOP ════════ -->
+<div class="wrap sec">
+  <p class="kick">The verified job loop</p>
+  <h2 class="hx">Six steps. Proven, <span class="g2">not promised.</span></h2>
+  <div class="isteps">
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg><b>01</b></div><h4>Tell us what needs doing</h4><p>Form, WhatsApp, voice note, Patois. No app.</p><span class="tag">🤖 AI reads it</span></div>
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><b>02</b></div><h4>An itemised quote</h4><p>Labour split from materials, checked before it reaches you.</p><span class="tag">🤖 AI drafts · 🧍 we confirm</span></div>
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3.2"/><path d="M5 7v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V7"/><path d="M5 12v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-5"/></svg><b>03</b></div><h4>Money held, not sent</h4><p>Agreed in writing before a tool is lifted.</p><span class="tag">🧍 you confirm</span></div>
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><b>04</b></div><h4>Every stage documented</h4><p>Before, after, video. Timestamped and geotagged.</p><span class="tag">🤖 AI checks · 🧍 we confirm</span></div>
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><b>05</b></div><h4>You approve, from anywhere</h4><p>Or walk the site on video first and raise it live.</p><span class="tag">🧍 you decide</span></div>
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><b>06</b></div><h4>Worker paid in 3 days</h4><p>And the job builds a record a bank can finally see.</p><span class="tag">🧍 released on your say so</span></div>
+  </div>
+  <div class="rule" style="margin-top:16px"><span>💷</span><div><b>On payments today:</b> online payment holding opens shortly. Until then the quote and payment terms are agreed with you directly, in writing, before work starts. Same rule either way: nothing is charged without you.</div></div>
+</div>
+
+<!-- ════════ 2 · START WHERE YOU ALREADY ARE ════════ -->
+<div class="wrap sec">
+  <p class="kick m">Start where you already are</p>
+  <h2 class="hx">Begin on WhatsApp.<br><span class="g2">Finish on the site.</span></h2>
+  <p class="lead">A voice note in patois and three photos become a job card. <b>But a card is all it is</b>, it reaches the marketplace only when you sign the guidelines here.</p>
+
+  <div class="walane">
+    <div>
+      <div class="wafone">
+        <div class="wt"><i>Y</i><div><b>Yaadly</b><span>typically replies in minutes</span></div></div>
+        <div class="wabody">
+          <div class="wb them"><span class="clip">▶ 0:38 voice note</span>Evening. Di zinc lift at mi mother place inna Portmore an water a come in. Mi deh a foreign so mi cyaa go look.<em>19:42</em></div>
+          <div class="wb them"><span class="clip">📷 3 photos</span><em>19:43</em></div>
+          <div class="wb me">Got it. I have read the voice note and the photos. Before I write this up, is the back bedroom the only room taking water, and is anybody in the house now?<em>19:47</em></div>
+          <div class="wb them">Just di back room. Mi mother deh deh, she can open di gate.<em>19:51</em></div>
+          <div class="wb me">Your job card is drafted: <b>roofing, Portmore, urgent</b>, access via your mother on site. Open it here to check it and put it live 👇<span class="clip" style="margin:6px 0 0">yaadly.co.uk/j/d8f2</span><em>19:52</em></div>
+          <div class="wb sys">Saved as a draft. No worker can see this job yet.</div>
         </div>
       </div>
     </div>
-    <div class="wcopy">
-      <div class="kick rv">The worker's side</div>
-      <h2 class="h2 rv d1">Same thread. <em>Fair deal.</em></h2>
-      <ul class="chk rv d2">
-        <li><b>Quote in the thread.</b> Free to see, free to quote, never a lead fee</li>
-        <li><b>The money is real</b> and confirmed before a tool is lifted</li>
-        <li><b>One evidence package</b> at the end of the day. No daytime tracking, ever</li>
-        <li><b>No paperwork.</b> The Completion Report is drafted from your evidence, you just confirm it</li>
-      </ul>
-      <a class="btn rv d2" style="margin-top:20px;background:linear-gradient(90deg,var(--coral),var(--melon));color:#fff" href="https://app.yaadly.co.uk/apply">Apply to join</a>
-    </div>
-  </div>
-</div></div>
 
-<!-- ── two sides, one deal ── -->
-<div class="sect"><div class="wrap">
-  <div class="kick rv">Two sides, one deal</div>
-  <h2 class="h2 rv d1">Fair for the <u>owner.</u><br>Fair for the <em>worker.</em></h2>
-  <p class="lead rv d2">Read the two columns across. Every protection on the left has a named counterpart on the right.</p>
-    <div class="icmp">
-      <div class="icol">
-        <p class="kick m" style="margin-bottom:8px">For property owners</p>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>You press release</b>, here, after you have looked</span></div>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>An itemised quote</b>, labour split from materials</span></div>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>ID on video.</b> JCF police check required over &pound;500</span></div>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Disputes read by a person.</b> Nothing moves while it is open</span></div>
+    <div>
+      <div class="isteps" style="grid-template-columns:1fr 1fr;margin-top:0">
+        <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg><b>01</b></div><h4>You message us</h4><p>Voice note, photos, patois. Any of it.</p></div>
+        <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/><path d="M18.5 16.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/></svg><b>02</b></div><h4>The agent reads it</h4><p>Pulls the fields, asks what a worker would ask.</p></div>
+        <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><b>03</b></div><h4>A draft appears</h4><p><b>Not on the board.</b> Nobody is alerted.</p></div>
+        <div class="ist gate"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M14 6.5l3.5 3.5"/></svg><b>04</b></div><h4>You sign, here</h4><p>The signature is what puts it live. Always.</p></div>
       </div>
-      <div class="icol">
-        <p class="kick m" style="margin-bottom:8px">For tradespeople</p>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>Paid in 3 working days</b> once the client approves</span></div>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>Free to join.</b> Never charged to quote, ever</span></div>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>The money is real</b> and confirmed before you start</span></div>
-        <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Walk away</b> from a mis-described site, no penalty</span></div>
-      </div>
-    </div>
 
-  </div></div>
-
-<!-- ── popular trades ── -->
-<div class="sect"><div class="wrap">
-  <div class="kick rv">Popular trades</div>
-  <h2 class="h2 rv d1">What people are <em>hiring for</em></h2>
-  <div class="grid-trades rv d2" id="tradegrid"></div>
-  <p class="rv d2" style="margin-top:16px"><a class="btn o sm" href="https://app.yaadly.co.uk/trades">See all 18 trades →</a></p>
-</div></div>
-
-<!-- ── professional services ── -->
-<div class="sect band"><div class="wrap">
-  <div class="kick rv" id="svc">Professional services</div>
-  <h2 class="h2 rv d1">Eyes on the ground, <em>on the record.</em></h2>
-  <p class="lead rv d2">Property checks, site verification, monthly oversight and full project management, delivered by trained project managers. Right now that is the founder doing every visit herself, with the roster growing behind her.</p>
-  <div class="svcgrid rv d2">
-    <div class="svc"><h4>Deposit Protection Check</h4><p class="price">&pound;149<small>Founding rate, first five clients. <b>Full price &pound;249.</b> Fixed fee, back in 72 hours.</small></p><p>Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates. Written go or no go. No site visit needed.</p></div>
-    <div class="svc"><h4>Visual Check</h4><p class="price">&pound;95<small>Founding rate, first five clients. <b>Full price &pound;149 per visit.</b></small></p><p><span class="rung">Someone attends</span>A trained checker photographs the property or the stage against a written checklist and files a one page observation note. They record what is there. They do not rate it, advise on it, or certify it.</p></div>
-    <div class="svc"><h4>Condition Report</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;325.</b></small></p><p><span class="rung">Someone attends</span>The whole property recorded system by system, every finding rated Severe, Moderate or Low, issue summary on page one. It tells you what is wrong and how bad, not what to do about it.</p></div>
-    <div class="svc"><h4>Technical Sign-off</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;300 per sign-off.</b></small></p><p><span class="rung">Someone attends</span>A qualified trade inspector assesses one stage against the trade standard and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record.</p></div>
-    <div class="svc"><h4>Oversight Retainer</h4><p class="price">&pound;495<small>Founding rate, first five clients. <b>Full price &pound;595 a month.</b> Weekly visits from &pound;895.</small></p><p>Two documented site visits a month, a monthly cost and progress report, a contractor accountability call, and a direct line to Monique. Enough that nothing goes two weeks unseen.</p></div>
-    <div class="svc"><h4>Full Project Management</h4><p class="price">12 to 15%<small>Of build cost. <b>Minimum fee &pound;2,500.</b> Paid in milestones alongside the build, never up front. From December 2026.</small></p><p>The whole build. Scope and specification, contractor sourcing and vetting, staged payments, programme, site inspections, handover and aftercare.</p></div>
-  </div>
-  <a class="btn o rv d2" style="margin-top:20px" onclick="go('services')">See all services and what's included →</a>
-</div></div>
-
-<!-- ── start your job (intake form) ── -->
-<div class="sect joinband"><div class="wrap">
-  <div class="kick rv" id="startform">Start your job right here</div>
-  <h2 class="h2 rv d1">Tell us what <em>needs doing.</em></h2>
-  <p class="lead rv d2">This form saves your job right away, no need to also message us. <b>You get a client portal link and code straight after sending it</b>, and it goes to workers once you have created your profile and signed the Client Guidelines there. No obligation, no payment now.</p>
-  <div class="formcard rv d2">
-    <div class="grid2">
-      <div class="field"><label>Your name</label><input id="in-name"></div>
-      <div class="field"><label>Your WhatsApp number</label><input id="in-phone" placeholder="+44... or 876..."></div>
-    </div>
-    <div class="field"><label>Your email <span style="font-weight:500;text-transform:none">(this becomes your client portal login)</span></label><input id="in-email" type="email" placeholder="you@email.com"></div>
-    <div class="grid2">
-      <div class="field"><label>Type of work</label>
-        <select id="in-type"><option>Plumbing</option><option>Painting</option><option>Roofing</option><option>Tiling</option><option>Masonry and walls</option><option>Electrical</option><option>Carpentry</option><option>General repairs</option><option>Renovation project</option><option>Professional service</option><option>Something else</option></select>
+      <div class="ctarow">
+        <button class="btn sm" onclick="startJob()">Start on WhatsApp</button>
+        <button class="btn ghost sm" onclick="postJob()">Or type it in here</button>
       </div>
-      <div class="field"><label>Are you overseas or in Jamaica?</label>
-        <select id="in-loc"><option>Overseas (UK, US, Canada, other)</option><option>In Jamaica</option></select>
-      </div>
-    </div>
-    <div class="field"><label>What needs doing, as exactly as you can</label><textarea id="in-desc" placeholder="Which rooms or areas, what is wrong, roughly what size. Anything already tried or quoted. Voice notes can follow on WhatsApp."></textarea></div>
-    <div class="field"><label>Photos of the problem</label>
-      <label class="filebtn">📷 Add photos<input type="file" multiple accept="image/*" onchange="intakePhotos(event)"></label>
-      <span class="note" style="margin-left:10px">Up to 8. Phone photos are fine, we shrink them automatically.</span>
-      <div class="thumbs" id="in-thumbs"></div>
-    </div>
-    <a onclick="toggleBox('in-more', this)" data-open-label="Fewer details ▲" data-closed-label="Add the property details now, or send them later on WhatsApp ▾" style="display:inline-block;margin:4px 0 10px;font-size:13.5px;color:#6B5A33;font-weight:700;cursor:pointer">Add the property details now, or send them later on WhatsApp ▾</a>
-    <div id="in-more" style="display:none">
-      <div class="grid2">
-        <div class="field"><label>Property address, street and town</label><input id="in-addr" placeholder="e.g. 12 Gregory Park Road, Gregory Park"></div>
-        <div class="field"><label>Parish or area</label><input id="in-where" placeholder="Portmore, Kingston..."></div>
-      </div>
-      <div class="grid2">
-        <div class="field"><label>Who is at the property, name and number</label><input id="in-access" placeholder="e.g. my aunt Sonia, 876 555 0100"></div>
-        <div class="field"><label>When should the work happen?</label>
-          <input id="in-date" type="date">
-          <span class="note">Pick a date, or leave it empty for as soon as possible.</span>
+
+      <div class="icmp" style="margin-top:16px">
+        <div class="icol">
+          <p class="kick m" style="margin-bottom:8px">Stays on WhatsApp</p>
+          <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg><span>Your first message, however messy</span></div>
+          <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M18 15V10a6 6 0 1 0-12 0v5l-1.6 2.5h15.2L18 15Z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg><span>A worker replied · evidence landed · approve when ready</span></div>
+          <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M8 20V9.5a1.5 1.5 0 0 1 3 0V5.2a1.6 1.6 0 0 1 3.2 0v4.3a1.5 1.5 0 0 1 3 0v1a1.5 1.5 0 0 1 2.8.8v3.2c0 3-2.4 5.5-5.4 5.5H8Z"/><path d="M8 20 4.5 15"/></svg><span>Updates from your worker, relayed both ways</span></div>
+        </div>
+        <div class="icol warn">
+          <p class="kick m" style="margin-bottom:8px">Only on the site</p>
+          <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M14 6.5l3.5 3.5"/></svg><span><b>Signing</b> and going live</span></div>
+          <div class="iline"><svg class="gl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3.2"/><path d="M5 7v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V7"/><path d="M5 12v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-5"/></svg><span><b>Funding a stage</b> and pressing release</span></div>
+          <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Disputes</b> and reviews</span></div>
         </div>
       </div>
+      <p class="tiny" style="margin-top:11px">A chat is a good front door and a terrible filing cabinet. Anything that has to be provable later lives here, where it cannot be edited or lost with a phone.</p>
     </div>
-    <a class="btn" onclick="submitIntake()">Send my request →</a>
-    <p class="note">A project manager reviews it before anything is quoted. You will hear from us within 24 hours.</p>
-    <div id="in-status"></div>
   </div>
-</div></div>
+</div>
 
-<!-- ── talk to us / waitlist / feedback ── -->
-<div class="sect"><div class="wrap">
-  <div class="kick rv" id="book">Talk to us first</div>
-  <h2 class="h2 rv d1">Book a free call <em>before you pay.</em></h2>
-  <p class="lead rv d2">No charge, no obligation. A call is optional: if you already know what you need, go straight to the service and we pick it up from there.</p>
-  <div class="cta-row rv d2">
-    <a class="btn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">📅 Pick a time now · 15 min</a>
-    <a class="btn o" href="https://cal.com/yaadly/30min" target="_blank" rel="noopener">📅 Longer conversation · 30 min</a>
+<!-- ════════ 3 · WHAT YOU'RE PAYING FOR · the trust engine ════════ -->
+<div class="wrap sec">
+  <p class="kick m">What you're paying for</p>
+  <h2 class="hx">Money moves <span class="g1">when the proof lands.</span></h2>
+  <p class="lead">Not when they ask. Not when you hope. Watch it.</p>
+
+  <div class="engine" id="engine">
+    <div class="eng-stage">
+      <div class="eng-box"><div class="who">You</div><div class="amt" id="eng-you">J$66,800</div><div class="st2" id="eng-you2">Funding stage one</div></div>
+      <div class="eng-mid">
+        <div class="lockw" id="eng-lock"><span class="lockem">🔒</span></div>
+        <small id="eng-lab">Held</small>
+      </div>
+      <div class="eng-box paid"><div class="who">Delroy, the worker</div><div class="amt" id="eng-w">J$0</div><div class="st2" id="eng-w2">Can see the money is real</div></div>
+    </div>
+
+    <div class="eng-ev" id="eng-ev">
+      <i><svg class="gl" viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Arrival</span></i>
+      <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>Before</span></i>
+      <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span>Receipt</span></i>
+      <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>After</span></i>
+      <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5 21 7v10l-6-3.5v-3Z"/></svg><span>Walk-round</span></i>
+      <i><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></i>
+    </div>
+
+    <div class="eng-cap"><span class="eng-dot"></span><span id="eng-cap"><b>Nothing has moved.</b> He starts because he can see the money is real, not because you sent it.</span></div>
   </div>
-  <a class="rv d2" onclick="toggleBox('book-more', this)" data-open-label="Hide ▲" data-closed-label="Or tell us your availability, and we'll suggest a time ▾" style="display:inline-block;margin-top:14px;font-size:13.5px;color:var(--tealb);cursor:pointer">Or tell us your availability, and we'll suggest a time ▾</a>
+
+  <p class="lead" style="margin-top:20px">That is the whole product. <b>You could do this yourself</b>, a cousin who checks in, a bank transfer on trust. What you cannot build yourself is the tool.</p>
+
+  <div class="icmp">
+    <div class="icol">
+      <p class="kick m" style="margin-bottom:8px">For property owners</p>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>You press release</b>, here, after you have looked</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>An itemised quote</b>, labour split from materials</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>ID on video.</b> JCF police check required over &pound;500</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Disputes read by a person.</b> Nothing moves while it is open</span></div>
+    </div>
+    <div class="icol">
+      <p class="kick m" style="margin-bottom:8px">For tradespeople</p>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>Paid in 3 working days</b> once the client approves</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>Free to join.</b> Never charged to quote, ever</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>The money is real</b> and confirmed before you start</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Walk away</b> from a mis-described site, no penalty</span></div>
+    </div>
+  </div>
+
+  <div class="rule" style="margin-top:14px"><span><svg class="gl" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8.5 8 5 11.5 8.5 15"/><path d="M15.5 8 19 11.5 15.5 15"/></svg></span><div><b>The Mirror Rule.</b> Every protection has a named counterpart on the other side, so nobody carries the risk alone.</div></div>
+  <div class="rule" style="margin-top:10px"><span>⚖️</span><div><b>We know the edge of our scope.</b> Boundaries go to a land surveyor, structures to a PERB engineer, title to an attorney. In writing, never guessed. Yaadly Ltd, UK <b>17358077</b>.</div></div>
+
+  <div class="ctarow">
+    <button class="btn sm" onclick="postJob()">Start a job</button>
+    <button class="btn ghost sm" onclick="go('services')">Or bring your own contractor</button>
+  </div>
+</div>
+
+<!-- ════════ 4 · POPULAR TRADES ════════ -->
+<div class="wrap sec">
+  <p class="kick m">Popular trades</p>
+  <h2 class="hx">What people are hiring for</h2>
+  <div class="grid g4c" style="margin-top:22px" id="tradegrid"></div>
+  <p style="margin-top:16px"><a class="btn ghost sm" href="https://app.yaadly.co.uk/trades">See all 18 trades</a></p>
+</div>
+
+<!-- ════════ 5 · ASK A YAAD ════════ -->
+<div class="wrap sec">
+  <p class="kick m">Ask a Yaad</p>
+  <h2 class="hx">Free answers from tradespeople</h2>
+  <p class="lead">Not sure it's a job at all? Ask first, vetted workers answer publicly.</p>
+  <div class="grid g2c" style="margin-top:22px" id="askgrid"></div>
+  <p style="margin-top:16px"><a class="btn ghost sm" id="ask-start">Ask a question</a></p>
+</div>
+
+<!-- ════════ 6 · THREE WAYS IN ════════ -->
+<div class="wrap sec">
+  <p class="kick m">Three ways in</p>
+  <h2 class="hx">Whichever you need</h2>
+  <div class="grid g3c" style="margin-top:20px">
+    <div class="route">
+      <p class="kick" style="margin-bottom:6px">Marketplace</p>
+      <h4>Post a job, pick a vetted worker</h4>
+      <p>Free to build. Money held until the work is proven.</p>
+      <p class="go"><button class="btn ghost sm" onclick="postJob()">Post a job</button></p>
+    </div>
+    <div class="route mine">
+      <p class="kick m" style="margin-bottom:6px">Or have me run it</p>
+      <h4>I project manage it myself</h4>
+      <p>Already have a contractor? Checks, visits, setup packs, monthly oversight. Prices are published, and we talk it through before you commit to anything.</p>
+      <p class="go"><button class="btn ghost sm" onclick="go('services')">See the services</button></p>
+    </div>
+    <div class="route">
+      <p class="kick" style="margin-bottom:6px">Not sure yet</p>
+      <h4>Book a free call first</h4>
+      <p>15 or 30 minutes, no obligation. By the end you will know whether you need me. <a onclick="openWlModal()" style="color:var(--tealb);cursor:pointer">Or join the waiting list</a>.</p>
+      <p class="go" id="book"><a class="btn ghost sm" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Pick a time</a></p>
+    </div>
+  </div>
+
+  <a onclick="toggleBox('book-more', this)" data-open-label="Hide ▲" data-closed-label="Cannot use the calendar? Tell us your availability and we will suggest a time ▾" style="display:inline-block;margin-top:16px;font-size:13.5px;color:var(--tealb);cursor:pointer">Cannot use the calendar? Tell us your availability and we will suggest a time ▾</a>
   <div id="book-more" class="card" style="display:none;margin-top:14px">
     <div class="grid2">
       <div class="field"><label>Your name</label><input id="bk-name"></div>
@@ -883,88 +1162,262 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <p class="note">Either way we come back within 24 hours. Calls are on WhatsApp or phone, whichever you prefer.</p>
     <div id="bk-status"></div>
   </div>
+</div>
 
-  <div class="grid2" style="margin-top:34px">
-    <div class="card rv" id="waitlist" style="margin-top:0">
-      <h3>Be first when <em>full service opens</em></h3>
-      <p class="note" style="margin:0 0 14px">The full managed job service opens in Jamaica shortly, starting with Kingston and Portmore. No obligation and nothing to pay.</p>
-      <a class="btn" onclick="openWlModal()">Join the waiting list</a>
-    </div>
-    <div class="card rv d1" id="feedback" style="margin-top:0">
-      <h3>Your honest <em>opinion</em></h3>
-      <p class="note" style="margin:0 0 14px">Yaadly is new and built in the open. If something confused you or made you hesitate, say it plainly. No name needed.</p>
-      <a class="btn o" onclick="openBox('feedback-form')">Give feedback</a>
-    </div>
-  </div>
-  <div id="feedback-form" class="card" style="display:none">
-    <div class="field"><label>How much do you trust this so far?</label>
-      <div class="rate" id="fb-rate">
-        <button type="button" class="rbtn" data-v="1" onclick="setRate(1)">1</button>
-        <button type="button" class="rbtn" data-v="2" onclick="setRate(2)">2</button>
-        <button type="button" class="rbtn" data-v="3" onclick="setRate(3)">3</button>
-        <button type="button" class="rbtn" data-v="4" onclick="setRate(4)">4</button>
-        <button type="button" class="rbtn" data-v="5" onclick="setRate(5)">5</button>
-        <span class="note" style="margin-left:8px">1 not at all, 5 completely</span>
+<!-- ════════ 7 · STRAIGHT ANSWERS ════════ -->
+<div class="wrap sec">
+
+  <div class="card" id="feedback">
+    <div class="pills"><span class="pill m">Built in the open</span><span class="pill n">No name needed</span></div>
+    <h2 class="hx" style="font-size:clamp(24px,3.4vw,34px)">Your honest opinion</h2>
+    <p class="lead" style="margin-top:10px;margin-bottom:18px">Something made you hesitate? Say it plainly.</p>
+
+    <div class="fgroup">
+      <label class="fl">How much do you trust this so far?</label>
+      <div class="fbrow" id="fb-rate">
+        <button type="button" class="fbtn rbtn" data-v="1" onclick="setRate(1)"><b>1</b><span>Not at all</span></button>
+        <button type="button" class="fbtn rbtn" data-v="2" onclick="setRate(2)"><b>2</b><span></span></button>
+        <button type="button" class="fbtn rbtn" data-v="3" onclick="setRate(3)"><b>3</b><span></span></button>
+        <button type="button" class="fbtn rbtn" data-v="4" onclick="setRate(4)"><b>4</b><span></span></button>
+        <button type="button" class="fbtn rbtn" data-v="5" onclick="setRate(5)"><b>5</b><span>Completely</span></button>
       </div>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Who are you?</label>
-        <select id="fb-who"><option>Property owner overseas</option><option>Property owner in Jamaica</option><option>Tradesperson</option><option>Just looking around</option><option>Industry or investor</option></select>
-      </div>
-      <div class="field"><label>What brought you here?</label><input id="fb-why" placeholder="e.g. mum's roof needs fixing"></div>
+
+    <div class="grid g2c">
+      <div class="fgroup"><label class="fl" for="fb-who">Who are you?</label>
+        <select class="f" id="fb-who">
+          <option>Property owner overseas</option>
+          <option>Property owner in Jamaica</option>
+          <option>Tradesperson</option>
+          <option>Just looking around</option>
+          <option>Industry or investor</option>
+        </select></div>
+      <div class="fgroup"><label class="fl" for="fb-why">What brought you here?</label><input class="f" id="fb-why" placeholder="A TikTok, a friend, searching for a plumber…"></div>
     </div>
-    <div class="field"><label>What would make you trust or use Yaadly more?</label><textarea id="fb-better" placeholder="Anything missing, unclear, or off-putting. Be blunt, it helps."></textarea></div>
-    <div class="grid2">
-      <div class="field"><label>Anything you liked?</label><input id="fb-liked"></div>
-      <div class="field"><label>Email or WhatsApp, only if you want a reply</label><input id="fb-contact"></div>
+
+    <div class="fgroup">
+      <label class="fl" for="fb-better">What would make you trust or use Yaadly more?</label>
+      <textarea class="f" id="fb-better" placeholder="Say it plain. What put you off? What did you not believe?"></textarea>
     </div>
-    <a class="btn" onclick="submitFeedback()">Send feedback</a>
+
+    <div class="grid g2c">
+      <div class="fgroup" style="margin-bottom:0"><label class="fl" for="fb-liked">Anything you liked?</label><input class="f" id="fb-liked"></div>
+      <div class="fgroup" style="margin-bottom:0"><label class="fl" for="fb-contact">Email or WhatsApp, only if you want a reply</label><input class="f" id="fb-contact" placeholder="Leave it blank and stay anonymous"></div>
+    </div>
+
+    <div class="wnav">
+      <button class="btn sm" onclick="submitFeedback()">Send feedback</button>
+      <span class="sp">Goes straight to me, not a support queue</span>
+    </div>
     <div id="fb-status"></div>
   </div>
-</div></div>
 
-<!-- ── FAQ ── -->
-<div class="sect band"><div class="wrap">
-  <div class="kick rv" style="text-align:center">Straight answers</div>
-  <h2 class="h2 rv d1" style="text-align:center">Questions people <em>actually ask.</em></h2>
-  <div class="faqwrap rv d2">
-    <details class="faq" open><summary>How do I start a job?</summary><div class="a">Two ways, both free. Fill in the form on this page and it creates your job straight away, with a client portal link and code sent to you on the spot. Or message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English, and we reply within 24 hours. No app to download either way.</div></details>
-    <details class="faq"><summary>Where do you operate?</summary><div class="a">Yaadly is built for property work across <b>Jamaica</b>. We are <b>launching in Kingston and Portmore first</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Elsewhere in Jamaica today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish.</div></details>
-    <details class="faq"><summary>How does the money side work?</summary><div class="a"><b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Yaadly's own fee is separate from the worker's price, itemised on your quote, and explained in full below. Online holding opens shortly; until then the terms are agreed with you directly in writing before work starts.</div></details>
-    <details class="faq"><summary>What does it cost?</summary><div class="a"><b>Professional services are priced on the page.</b> Every one shows the full price and the founding rate side by side, because a discount off a price nobody can actually buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024. Deposit Protection Check from <b>&pound;149</b>, Visual Check from <b>&pound;95</b> a visit, Condition Report from <b>&pound;245</b>, Technical Sign-off from <b>&pound;245</b>, Certified Milestone Sign-off from <b>&pound;550</b>, Oversight Retainer from <b>&pound;495</b> a month, Full Project Management 12 to 15% of build cost. Founding rates are limited to the first five clients per service. <a onclick="go('services')" style="color:var(--tealb);cursor:pointer">See the full list and what each one is priced against &rarr;</a><br><br><b>Property work through the marketplace</b> gets a written quote from the worker, benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no "farrin price": a client overseas pays what a client in Jamaica pays.</div></details>
-    <details class="faq"><summary>What does Yaadly charge? Show me the breakdown.</summary><div class="a">Yaadly is not free to run and you should see the cost before you commit, not after. On a marketplace job there are two fees, and both are charged <b>on labour only, never on materials</b>.<br><br><b>You pay a Guarantee &amp; Support fee of 15%</b> on top of the worker's labour price. That is what pays for vetting the worker, holding your money, checking the evidence, running a dispute if you raise one, and a person to call.<br><br><b>The worker pays 12%</b> of their labour price, so they keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave a worker, and they are never charged to join, never charged to quote, and never charged for a lead they did not win.<br><br><b>A &pound;300 labour job, in full:</b><br>Worker's labour price: <b>&pound;300</b><br>Your Guarantee &amp; Support fee, 15%: <b>&pound;45</b><br>You pay: <b>&pound;345</b><br>Worker's fee, 12%: <b>&pound;36</b><br>Worker receives: <b>&pound;264</b><br><br>The rest, plainly. If we advance cash for materials there is a disclosed 5% admin charge. On very small jobs a minimum Guarantee &amp; Support fee applies, J$3,500 to J$4,500 depending on the trade, so on a small job the fee works out as a higher percentage. If you pay from abroad, the exchange rate we use carries a margin of about 2%. Paying from Jamaica in J$ skips that entirely. Inspections, Property Care visits and project management are priced separately and always shown before you book. Every fee that applies to your job is on your quote, itemised, before you agree to anything.</div></details>
-    <details class="faq"><summary>What do I actually get at the end of a job?</summary><div class="a">A <b>signed Completion Report</b>, as a PDF that is yours to keep: the job summary, before and after photographs side by side, the verification record, the worker's own confirmation that what is written is what was done, and your approval with the payment record on the final page. It is drafted automatically from the evidence (the worker files one evidence package and writes no paperwork), confirmed by them, reviewed by a person, then delivered to you. Forward it to family, keep it with the house papers, show it to the next contractor.</div></details>
-    <details class="faq"><summary>Can I see the site live before I approve?</summary><div class="a">Yes. At sign-off you can approve from the evidence package, or book a <b>live video walkthrough</b>: the worker walks the whole site with you on WhatsApp video, Google Meet or Zoom, whichever suits you. You raise anything you see on the spot, the notes are recorded, <b>you confirm them in your portal</b>, and both land on your Completion Report. On builds and larger works we also require a continuous <b>site overview video</b> as part of the evidence itself.</div></details>
-    <details class="faq"><summary>What if I am not happy with the work?</summary><div class="a">Raise it before you approve. Disputes are reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved.</div></details>
-    <details class="faq"><summary>Do I need to be in Jamaica?</summary><div class="a">No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point.</div></details>
-    <details class="faq"><summary>How are workers vetted? Who is coming to my property?</summary><div class="a">Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address dated within three months, and their TRN. They also give a <b>live photo taken in the moment</b> and a <b>short video turning their face slowly left, then right</b>. An upload proves somebody has a document. A live turn proves the person holding it is them, now.<br><br>A <b>police record check from the Jamaica Constabulary Force</b> is <b>mandatory</b> on any job over <b>&pound;500</b>, on any work inside an occupied home, and any time the worker holds keys or attends an empty property. Below &pound;500 with the owner present it is optional, and you can still require it at no cost to you. That line is drawn at &pound;500 because that is roughly where a job stops being a call-out and starts being someone's savings.<br><br>On top of that: references called rather than emailed, past work reviewed, and a trial job with <b>an independent reviewer on site at Yaadly's cost</b> before they are trusted with yours. Certified trades have their certification checked with the body that issued it. You are told who is coming, and you see their record before they arrive.</div></details>
-    <details class="faq"><summary>I am a tradesperson. What does it cost to join, and how do I get paid?</summary><div class="a">Joining is free, quoting is free, and you are never charged for a lead, win or lose. <b>The one charge is 12% of your labour price on a completed job</b>, taken when you are paid, so you keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave you, your materials are never touched, and Founding Pros pay nothing at all for their first 90 days. Remote digital work carries 10% instead. The client pays their own separate fee on top of your price, so their total is higher than your quote, but not a cent of your 88% goes anywhere else. The client's money is confirmed before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own.</div></details>
-    <details class="faq"><summary>What kinds of work do you handle?</summary><div class="a">Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits.</div></details>
+  <div class="card" style="margin-top:16px">
+    <p class="kick" style="margin-bottom:4px">Straight answers</p>
+    <h2 class="hx" style="font-size:clamp(24px,3.4vw,34px)">Questions people actually ask.</h2>
+    <div class="faq" id="faq"></div>
   </div>
-</div></div>
 
-<!-- ── founder ── -->
-<div class="sect"><div class="wrap">
-  <div class="founder">
-    <div class="fbox rv">
-      <div class="nm">Monique Sewell-Bennett</div>
-      <div class="rl">Founder, Yaadly</div>
-      <ul>
-        <li><b>7+ years</b> managing construction and energy projects in London</li>
-        <li><b>London born Jamaican</b>, family roots in St Thomas and Portmore</li>
-        <li><b>Every visit today</b> is run by Monique personally</li>
-        <li><b>Yaadly Ltd</b>, England and Wales, no. 17358077</li>
-      </ul>
-    </div>
-    <div>
-      <div class="kick rv">Why this exists</div>
-      <div class="fq rv d1">"A trust engine for everyone <em>investing back</em> into Jamaica."</div>
-      <p class="ftext rv d2">My family has sent money home for repairs and prayed, same as thousands of diaspora families. <b>No proof, no protection, no recourse.</b> Yaadly is seven years of holding London contractors to their word, built for the place my family is from. Fair pricing is part of that trust, never the headline.</p>
+  <div class="card" style="margin-top:16px">
+    <div class="founder">
+      <div class="fav">MS</div>
+      <div>
+        <p class="kick m" style="margin-bottom:6px">Why this exists</p>
+        <h3 class="hx" style="font-size:24px">Monique Sewell-Bennett</h3>
+        <p class="tiny" style="margin-top:5px;font-size:13px;color:var(--dim)">Founder, Yaadly</p>
+        <div class="fbul">
+          <span><b>7+ years</b> managing construction and energy projects in London</span>
+          <span><b>London born Jamaican</b>, family roots in St Thomas and Portmore</span>
+          <span>Every visit today is run by <b>Monique personally</b></span>
+          <span><b>Yaadly Ltd</b>, England and Wales, no. 17358077</span>
+        </div>
+        <p class="quote">"A trust engine for everyone investing back into Jamaica."</p>
+        <p style="font-size:14px;color:var(--mute);line-height:1.7">My family has sent money home for repairs and prayed, same as thousands of diaspora families. <b style="color:var(--ink)">No proof, no protection, no recourse.</b> Yaadly is seven years of holding London contractors to their word, built for the place my family is from. <b style="color:var(--ink)">Fair pricing is part of that trust, never the headline.</b></p>
+      </div>
     </div>
   </div>
-</div></div>
+
+</div>
+
+<div style="height:76px"></div>
 
 </section>
+<!-- ═══════════════ POST A JOB · the wizard ═══════════════
+     Six steps, guest path. Built to docs/POST-A-JOB-FLOW-SPEC.md v1.0.
+     The job row is written at step 2, so somebody who closes the tab at
+     step 4 has a saved draft to come back to rather than an empty form. -->
+<section class="pane" id="pane-post"><div class="wrap">
+
+  <div class="prog" id="prog"></div>
+  <div class="proglab"><span id="plab">Step 1 of 6, Trade</span><b id="pfree">Free to post</b></div>
+
+  <!-- 1 ───────────────────────────────────────────── -->
+  <div class="wstep show" data-step="1">
+    <h2 class="wq">What do you need done?</h2>
+    <p class="wsub">Pick the closest trade. If it's more than one, pick the main one, we'll sort the rest out from your description.</p>
+    <div class="wtrades" id="wtrades"></div>
+    <div class="wnav">
+      <button class="btn" id="n1" disabled>Continue</button>
+      <span class="sp" id="h1">No account needed yet</span>
+    </div>
+  </div>
+
+  <!-- 2 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="2">
+    <h2 class="wq">Tell us about the job</h2>
+    <p class="wsub">Plain words are fine. Write it how you'd say it, a person reads it before it reaches the board.</p>
+    <div class="fgroup">
+      <label class="fl" for="w-desc">Describe the job</label>
+      <textarea class="f" id="w-desc" placeholder="e.g. Water leaking from the pipe under the kitchen sink, been going about a week. Cupboard floor is soft now. House is my father's in Barbican, I'm in London."></textarea>
+    </div>
+    <div class="manualnote"><b>No assistant on this one.</b> Write it however you'd say it out loud, a person reads every job before it reaches the board. Once you've signed the Client Guidelines and have a profile, the intake assistant tidies your wording and asks the questions workers always come back with.</div>
+
+    <div class="card soft" style="margin-top:16px">
+      <p class="kick m" style="margin-bottom:6px">Then the same job card everybody gets</p>
+      <p class="tiny" style="margin-bottom:2px">Pick from the lists rather than typing. It takes under a minute, and it is the reason every job on the board can be filtered, matched and quoted without a phone call first.</p>
+    </div>
+    <div id="wizcard" style="margin-top:12px"></div>
+
+    <div class="wnav">
+      <button class="btn ghost" data-back>Back</button>
+      <button class="btn" id="n2">Continue</button>
+      <span class="sp" id="h2h"></span>
+    </div>
+  </div>
+
+  <!-- 3 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="3">
+    <h2 class="wq">Add photos or a short video</h2>
+    <p class="wsub">Jobs with pictures get roughly three times the responses, and far fewer "I'd have to come see it first" replies.</p>
+    <label class="drop" id="w-drop">
+      <div style="font-size:26px;line-height:1">＋</div>
+      <div style="font-weight:700;margin-top:6px">Add photos or video</div>
+      <div class="tiny" style="margin-top:4px">Up to 8. Phone photos are fine, we shrink them automatically.</div>
+      <input type="file" multiple accept="image/*" onchange="wzPhotos(event)">
+    </label>
+    <div class="thumbs" id="w-thumbs"></div>
+    <div class="manualnote"><b>Photos go up as they are.</b> Nothing reads them yet. From your second job on, the photo check tells you what a worker can and can't see before you post, and it checks the worker's evidence at every stage after that.</div>
+    <div class="wnav">
+      <button class="btn ghost" data-back>Back</button>
+      <button class="btn" id="n3">Continue</button>
+      <span class="sp">You can skip this and add them later</span>
+    </div>
+  </div>
+
+  <!-- 4 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="4">
+    <h2 class="wq">Where and when</h2>
+    <p class="wsub">The full address is never shown on the public board. Workers only see the area until you choose one of them.</p>
+    <div class="grid g2c">
+      <div class="fgroup"><label class="fl" for="w-parish">Parish</label>
+        <select class="f" id="w-parish">
+          <option value="">Choose…</option>
+          <option>Kingston 6, Liguanea</option>
+          <option>Kingston 8, Barbican</option>
+          <option>Kingston 10, Half Way Tree</option>
+          <option>St Andrew, Stony Hill</option>
+          <option>St Catherine, Portmore</option>
+          <option>St Catherine, Greater Portmore</option>
+          <option>Somewhere else in Jamaica</option>
+        </select></div>
+      <div class="fgroup"><label class="fl" for="w-addr">Street address</label>
+        <input class="f" id="w-addr" placeholder="Kept private, never on the board"></div>
+    </div>
+    <div class="fgroup"><label class="fl" for="w-access">Who lets the worker in?</label>
+      <input class="f" id="w-access" placeholder="Name and number of the person on the ground"></div>
+
+    <label class="fl" style="margin-top:6px">When do you need it done?</label>
+    <div class="grid" style="gap:8px">
+      <button class="choice" data-when="Urgent, within 48 hours"><span class="dot"></span><span><b>Urgent, within 48 hours</b><br><span class="tiny">Water is still running, it can't wait</span></span></button>
+      <button class="choice on" data-when="Within the next two weeks"><span class="dot"></span><span><b>Within the next two weeks</b><br><span class="tiny">Soon, but I can wait for the right person</span></span></button>
+      <button class="choice" data-when="Flexible, just pricing it up"><span class="dot"></span><span><b>I'm flexible / just pricing it up</b><br><span class="tiny">Planning ahead</span></span></button>
+    </div>
+
+    <label class="fl" style="margin-top:16px">Is there an exact date you want it started?</label>
+    <p class="tiny" style="margin-bottom:2px">Optional, but it changes who replies. Workers see it on the job and can say yes or offer the nearest day they have. Days already open in a matching worker's diary are highlighted.</p>
+    <div class="wzdate" id="wzdate"></div>
+
+    <div class="wnav">
+      <button class="btn ghost" data-back>Back</button>
+      <button class="btn" id="n4">Continue</button>
+      <span class="sp" id="h4"></span>
+    </div>
+  </div>
+
+  <!-- 5 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="5">
+    <h2 class="wq">Create your account</h2>
+    <p class="wsub">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
+    <div class="grid g2c">
+      <div class="fgroup"><label class="fl" for="w-name">Your name</label><input class="f" id="w-name"></div>
+      <div class="fgroup"><label class="fl" for="w-email">Email</label><input class="f" id="w-email" type="email"></div>
+    </div>
+    <div class="fgroup"><label class="fl" for="w-phone">Phone or WhatsApp</label><input class="f" id="w-phone" placeholder="+44… or 876…">
+      <p class="tiny" style="margin-top:7px">Hidden from workers until you start a chat with one. You control when it's shared.</p></div>
+    <div class="fgroup"><label class="fl" for="w-pw">Choose a password</label><input class="f" id="w-pw" type="password" autocomplete="new-password">
+      <p class="tiny" style="margin-top:7px">At least 8 characters. This is what gets you into your client portal.</p></div>
+    <div class="card soft">
+      <p style="font-size:13.5px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">One screen left.</b> Your job stays a draft until you confirm the Client Guidelines next. That is what puts it in the marketplace, nothing reaches a worker before it.</p>
+    </div>
+    <div class="wnav">
+      <button class="btn ghost" data-back>Back</button>
+      <button class="btn" id="n5">Continue</button>
+      <span class="sp" id="h5"></span>
+    </div>
+  </div>
+
+  <!-- 6 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="6">
+    <h2 class="wq">Confirm and go live</h2>
+    <p class="wsub">This is what workers will see. The private bits stay private. Confirm the Client Guidelines and your job enters the marketplace.</p>
+    <div class="card" id="w-review"></div>
+
+    <div class="card" id="gblock" style="margin-top:14px;background:var(--soft);border-color:var(--softline)">
+      <p class="kick" style="margin-bottom:9px">Client Guidelines <span id="gver">v1.0</span>, required to go live</p>
+      <div class="gscroll">
+        <h6>1. What Yaadly does</h6>Yaadly holds your payment for each agreed stage and releases it only when you have seen the evidence and signed it off. Yaadly is not the tradesperson and does not price the work.
+        <h6>2. What you agree to</h6>Describe the job honestly, give safe and timely access to the property, and respond to evidence within five working days. Silence past five days counts as approval.
+        <h6>3. Off-platform payment</h6>Paying a worker directly ends the protection on that stage. We cannot hold or recover money that never reached us.
+        <h6>4. Your details</h6>Your address and phone number stay off the public board. They are shared with one worker only when you choose to share them.
+        <h6>5. Disputes</h6>Where evidence does not match what was agreed in writing, the stage is not released and the job goes to review. Decisions are made on the written scope and the evidence, nothing else.
+      </div>
+      <label class="tick" for="gtick"><input type="checkbox" id="gtick"><span>I have read and agree to the Client Guidelines <span class="gverx">v1.0</span>, and I understand my job is not visible to any worker until I confirm this.</span></label>
+      <div class="fgroup" style="margin-top:13px;margin-bottom:0"><label class="fl" for="w-sig">Type your full name to sign</label><input class="f" id="w-sig" placeholder="Your full name">
+        <p class="tiny" style="margin-top:7px">Written to <span class="mono" style="font-size:12px">doc_signatures</span> with a timestamp and the exact consent text. No edit, no delete.</p></div>
+    </div>
+
+    <div class="wnav">
+      <button class="btn ghost" data-back>Back</button>
+      <button class="btn" id="n6" disabled>Confirm &amp; go live</button>
+      <span class="sp" id="n6hint">Tick the box and sign to continue</span>
+    </div>
+    <div id="w-status"></div>
+  </div>
+
+  <!-- done ───────────────────────────────────────── -->
+  <div class="wstep" data-step="7">
+    <div class="pills" style="margin-bottom:14px" id="d-pills"></div>
+    <h2 class="wq" id="d-head">Your job is saved.</h2>
+    <p class="wsub" id="d-lead"></p>
+
+    <div class="card" style="margin-top:26px">
+      <p class="kick" style="margin-bottom:2px">Next steps</p>
+      <div class="nextlist" id="d-next"></div>
+    </div>
+
+    <div class="card soft" style="margin-top:16px">
+      <p class="kick" style="margin-bottom:2px">Where your money sits</p>
+      <p style="font-size:14px;color:var(--mute);line-height:1.65;margin-top:6px">You pay Yaadly, not the worker. We hold each stage until you've seen the evidence and signed it off. If the work doesn't match what was agreed in writing, it doesn't get released. <b style="color:var(--ink)">Online holding opens shortly</b>, until then stages are agreed with you in writing before work starts.</p>
+    </div>
+
+    <div class="wnav" style="margin-top:30px">
+      <a class="btn" href="https://app.yaadly.co.uk/portal">Open your client portal</a>
+      <button class="btn ghost" onclick="go('site')">Back to home</button>
+    </div>
+  </div>
+
+</div></section>
+
 <!-- ═══════════════ MARKETPLACE (public) ═══════════════ -->
 <!-- ═══════════════ SERVICES PAGE ═══════════════ -->
 <section class="pane" id="pane-services"><div class="wrap">
@@ -1360,13 +1813,81 @@ var svg=function(k){return '<svg class="i" viewBox="0 0 24 24">'+(IC[k]||IC.hand
 
 
 (function(){
-  var POPULAR=[["Plumbing","pipe"],["Roofing","roof"],["Electrical","bolt"],["Masonry & Concrete","brick"],["Painting & Decorating","brush"],["General Handyman","hand"]];
+  /* Eight, not six: the grid is four across, so six leaves a ragged second row. */
+  var POPULAR=[["Plumbing","pipe"],["Roofing","roof"],["Electrical","bolt"],["Tiling","tile"],
+               ["Masonry & Concrete","brick"],["Painting & Decorating","brush"],["Air Conditioning","snow"],["General Handyman","hand"]];
   var box=document.getElementById('tradegrid'); if(!box) return;
   box.innerHTML=POPULAR.map(function(t){
-    return '<a class="trade" href="https://app.yaadly.co.uk/jobs?trade='+encodeURIComponent(t[0].toLowerCase())+'">'
-      +'<span class="ic">'+svg(t[1])+'</span><span><b>'+t[0]+'</b><span>See the open jobs</span></span></a>';
+    /* Straight into the wizard with the trade already chosen. Somebody who
+       came in via "Roofing" should not then be asked what trade they want. */
+    return '<button type="button" class="trade" onclick="postJob('+JSON.stringify(t[0]).replace(/"/g,'&quot;')+')">'
+      +'<span class="ic">'+svg(t[1])+'</span><span><b>'+t[0]+'</b><span>Start a job in this trade</span></span></button>';
   }).join('');
 })();
+/* ---------- Ask a Yaad ----------
+   Public questions answered by vetted workers, so somebody who is not sure
+   they even have a job has a way in that costs nothing. */
+(function(){
+ var ASKS=[
+  {q:'Is a soft cupboard floor under a leaking sink always a replace job?',
+   a:'Not always. If it is chipboard and it has swelled, it will not dry back, that one is a replace. Plywood you can sometimes dry out and seal. Get a picture of the underside before anybody quotes you.',
+   by:'Delroy Campbell · Plumbing · Kingston 8', ai:false},
+  {q:'My mother is in Portmore and I am in Birmingham. Can I pay a worker directly?',
+   a:'You can, and people do, but that is exactly the point where the money goes and the work does not. On Yaadly the stage is held until you have seen the evidence and signed it off.',
+   by:'Yaadly assistant · labelled answer', ai:true}
+ ];
+ var box=document.getElementById('askgrid'); if(!box) return;
+ var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+ box.innerHTML=ASKS.map(function(x){
+  return '<div class="qa"><h4>'+esc(x.q)+'</h4><p>'+esc(x.a)+'</p><div class="by">'
+   +(x.ai?'<span class="pill m">AI</span>':'<span class="pill">Verified worker</span>')
+   +esc(x.by)+'</div></div>';
+ }).join('');
+})();
+
+/* ---------- the FAQ ----------
+   Six open, six behind the button. Same twelve answers as before, including
+   the pricing and vetting wording, which is there for compliance reasons and
+   is not to be trimmed for length. */
+(function(){
+ var FAQ=[
+  ["How do I start a job?", "Two ways, both free. Fill in the form on this page and it creates your job straight away, with a client portal link and code sent to you on the spot. Or message us on WhatsApp with where the property is and what needs doing, in text, photos or a voice note, Patois or English, and we reply within 24 hours. No app to download either way."],
+  ["Where do you operate?", "Yaadly is built for property work across <b>Jamaica</b>. We are <b>launching in Kingston and Portmore first</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Elsewhere in Jamaica today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish."],
+  ["How does the money side work?", "<b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Yaadly's own fee is separate from the worker's price, itemised on your quote, and explained in full below. Online holding opens shortly; until then the terms are agreed with you directly in writing before work starts."],
+  ["What does it cost?", "<b>Professional services are priced on the page.</b> Every one shows the full price and the founding rate side by side, because a discount off a price nobody can actually buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024. Deposit Protection Check from <b>&pound;149</b>, Visual Check from <b>&pound;95</b> a visit, Condition Report from <b>&pound;245</b>, Technical Sign-off from <b>&pound;245</b>, Certified Milestone Sign-off from <b>&pound;550</b>, Oversight Retainer from <b>&pound;495</b> a month, Full Project Management 12 to 15% of build cost. Founding rates are limited to the first five clients per service. <a onclick=\"go('services')\" style=\"color:var(--tealb);cursor:pointer\">See the full list and what each one is priced against &rarr;</a><br><br><b>Property work through the marketplace</b> gets a written quote from the worker, benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no \"farrin price\": a client overseas pays what a client in Jamaica pays."],
+  ["What does Yaadly charge? Show me the breakdown.", "Yaadly is not free to run and you should see the cost before you commit, not after. On a marketplace job there are two fees, and both are charged <b>on labour only, never on materials</b>.<br><br><b>You pay a Guarantee &amp; Support fee of 15%</b> on top of the worker's labour price. That is what pays for vetting the worker, holding your money, checking the evidence, running a dispute if you raise one, and a person to call.<br><br><b>The worker pays 12%</b> of their labour price, so they keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave a worker, and they are never charged to join, never charged to quote, and never charged for a lead they did not win.<br><br><b>A &pound;300 labour job, in full:</b><div class=\"ex\"><div><span>Worker's labour price</span><span>&pound;300</span></div><div><span>Your Guarantee &amp; Support fee, 15%</span><span>&pound;45</span></div><div class=\"t\"><span>You pay</span><span>&pound;345</span></div><div><span>Worker's fee, 12%</span><span>&pound;36</span></div><div class=\"t\"><span>Worker receives</span><span>&pound;264</span></div></div><br>The rest, plainly. If we advance cash for materials there is a disclosed 5% admin charge. On very small jobs a minimum Guarantee &amp; Support fee applies, J$3,500 to J$4,500 depending on the trade, so on a small job the fee works out as a higher percentage. If you pay from abroad, the exchange rate we use carries a margin of about 2%. Paying from Jamaica in J$ skips that entirely. Inspections, Property Care visits and project management are priced separately and always shown before you book. Every fee that applies to your job is on your quote, itemised, before you agree to anything."],
+  ["What do I actually get at the end of a job?", "A <b>signed Completion Report</b>, as a PDF that is yours to keep: the job summary, before and after photographs side by side, the verification record, the worker's own confirmation that what is written is what was done, and your approval with the payment record on the final page. It is drafted automatically from the evidence (the worker files one evidence package and writes no paperwork), confirmed by them, reviewed by a person, then delivered to you. Forward it to family, keep it with the house papers, show it to the next contractor."],
+  ["Can I see the site live before I approve?", "Yes. At sign-off you can approve from the evidence package, or book a <b>live video walkthrough</b>: the worker walks the whole site with you on WhatsApp video, Google Meet or Zoom, whichever suits you. You raise anything you see on the spot, the notes are recorded, <b>you confirm them in your portal</b>, and both land on your Completion Report. On builds and larger works we also require a continuous <b>site overview video</b> as part of the evidence itself."],
+  ["What if I am not happy with the work?", "Raise it before you approve. Disputes are reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved."],
+  ["Do I need to be in Jamaica?", "No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point."],
+  ["How are workers vetted? Who is coming to my property?", "Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address dated within three months, and their TRN. They also give a <b>live photo taken in the moment</b> and a <b>short video turning their face slowly left, then right</b>. An upload proves somebody has a document. A live turn proves the person holding it is them, now.<br><br>A <b>police record check from the Jamaica Constabulary Force</b> is <b>mandatory</b> on any job over <b>&pound;500</b>, on any work inside an occupied home, and any time the worker holds keys or attends an empty property. Below &pound;500 with the owner present it is optional, and you can still require it at no cost to you. That line is drawn at &pound;500 because that is roughly where a job stops being a call-out and starts being someone's savings.<br><br>On top of that: references called rather than emailed, past work reviewed, and a trial job with <b>an independent reviewer on site at Yaadly's cost</b> before they are trusted with yours. Certified trades have their certification checked with the body that issued it. You are told who is coming, and you see their record before they arrive."],
+  ["I am a tradesperson. What does it cost to join, and how do I get paid?", "Joining is free, quoting is free, and you are never charged for a lead, win or lose. <b>The one charge is 12% of your labour price on a completed job</b>, taken when you are paid, so you keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave you, your materials are never touched, and Founding Pros pay nothing at all for their first 90 days. Remote digital work carries 10% instead. The client pays their own separate fee on top of your price, so their total is higher than your quote, but not a cent of your 88% goes anywhere else. The client's money is confirmed before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own."],
+  ["What kinds of work do you handle?", "Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits."]
+ ];
+ var box=document.getElementById('faq'); if(!box) return;
+ var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+ function rows(list,off){
+  return list.map(function(f,i){
+   return '<div class="fq" data-fq="'+(i+off)+'"><button type="button">'+esc(f[0])
+    +'<span class="cv">+</span></button><div class="ans">'+f[1]+'</div></div>';
+  }).join('');
+ }
+ box.innerHTML=rows(FAQ.slice(0,6),0)
+  +'<div id="faqrest" style="display:none">'+rows(FAQ.slice(6),6)+'</div>'
+  +'<p style="padding-top:16px"><button class="btn ghost sm" id="faqmore">Show the other 6 questions</button></p>';
+ box.addEventListener('click',function(e){
+  var b=e.target.closest('.fq>button'); if(!b) return;
+  b.parentNode.classList.toggle('open');
+ });
+ var more=document.getElementById('faqmore');
+ more.addEventListener('click',function(){
+  var r=document.getElementById('faqrest');
+  var open=r.style.display==='none';
+  r.style.display=open?'block':'none';
+  this.textContent=open?'Show fewer':'Show the other 6 questions';
+ });
+})();
+
 /* ---------- the trust engine ---------- */
 (function(){
  var EV=[
@@ -1441,52 +1962,458 @@ const JOB_TEMPLATE = [
   "I will send photos of the area in this chat."
 ].join("\n");
 $("site-start").href = wa(JOB_TEMPLATE);
-function heroStart(){
-  var what = ($("h-what").value||"").trim();
-  var where = $("h-where").value||"";
-  if(what && $("in-desc") && !$("in-desc").value.trim()) $("in-desc").value = what;
-  if(where && $("in-where") && !$("in-where").value.trim()) $("in-where").value = (where==="Somewhere else in Jamaica" ? "" : where);
-  var f = $("startform"); if(f) f.scrollIntoView();
-  setTimeout(function(){ var t=$("in-name"); if(t) t.focus(); }, 400);
-}
+$("ask-start").href = wa("Hello Yaadly, I have a question I would like a tradesperson to answer:\n\n");
 function startJob(){ window.open($("site-start").href, "_blank", "noopener"); }
 /* photo handling: shrink to max 1280px JPEG so they fit browser storage */
 function shrink(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>{ const im=new Image(); im.onload=()=>{ const M=1280, sc=Math.min(1, M/Math.max(im.width,im.height)); const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc); c.getContext("2d").drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",.72)); }; im.src=r.result; }; r.readAsDataURL(file); }); }
 async function filesToPhotos(list){ const out=[]; for(const f of Array.from(list).slice(0,8)){ out.push(await shrink(f)); } return out; }
-let pendingPhotos = [];
-async function intakePhotos(ev){
-  pendingPhotos = await filesToPhotos(ev.target.files);
-  $("in-thumbs").innerHTML = pendingPhotos.map(p=>'<img src="'+p+'" alt="photo">').join("");
-}
-const WEBSITE_INTAKE_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-website-intake";
+/* The job wizard posts here twice: once at step 2 to save the draft, once at
+   step 6 with the signature. Both go to the same function so there is one
+   place that knows how a job is built.
+
+   It records the signature. It does not open the job: jobs.open is guarded by
+   enforce_signed_before_open, which needs an active client_profiles row as
+   well as the signature, and that row is created in the portal once the
+   client has confirmed their email. The invariant stays in Postgres. */
+const POST_JOB_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-post-job";
+const WEBSITE_INTAKE_URL = POST_JOB_URL;
+const GOLIVE_URL = POST_JOB_URL;
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
-async function submitIntake(){
-  const g = id => ($(id).value||"").trim();
-  if(!g("in-name") || !g("in-phone") || !g("in-email") || !g("in-desc")){ alert("Name, WhatsApp number, email and a description are needed. The email is what unlocks your client portal login later."); return; }
-  const btn = document.querySelector('#pane-site [onclick="submitIntake()"]');
-  if(btn) btn.style.pointerEvents = "none";
-  $("in-status").innerHTML = '<div class="rule mono" style="margin-top:14px">Sending your request...</div>';
-  const payload = {
-    name:g("in-name"), phone:g("in-phone"), email:g("in-email"), parish:g("in-where"), addr:g("in-addr"), access:g("in-access"),
-    workType:$("in-type").value, desc:g("in-desc"), urgency:($("in-date").value ? "Wanted by "+$("in-date").value : "As soon as possible"),
-    clientLocation:$("in-loc").value, photos:pendingPhotos
-  };
-  let result = null;
-  try{
-    const r = await fetch(WEBSITE_INTAKE_URL, { method:"POST", headers:{ "Content-Type":"application/json", "apikey":SUPABASE_PUBLISHABLE_KEY }, body:JSON.stringify(payload) });
-    result = await r.json();
-    if(!r.ok || result.error) throw new Error(result.error || "Request failed");
-  }catch(e){
-    if(btn) btn.style.pointerEvents = "";
-    $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">Something went wrong sending that (' + esc(e.message||String(e)) + '). Try again, or message us directly: <a href="'+wa("New job request. Name: "+payload.name+". Email: "+payload.email+". Work: "+payload.workType+". Details: "+payload.desc)+'" target="_blank" rel="noopener">WhatsApp us instead</a>.</div>';
-    return;
+/* ═══════════ POST A JOB · the six-step wizard ═══════════
+   docs/POST-A-JOB-FLOW-SPEC.md v1.0.
+
+   The rule the flow enforces, and the reason it is six screens and not one:
+     anyone can build a job with no account, it saves as a draft, and it
+     reaches the marketplace only once they have an account AND have signed
+     the current Client Guidelines.
+
+   Guest path only. A visitor on yaadly.co.uk has no session, so no agent
+   runs here: the first job is a genuinely manual intake, and the assistant
+   turns on in the portal once the guidelines are signed. The member path
+   lives in docs/preview/index.html for testing.
+
+   The database enforces the same rule underneath. enforce_signed_before_open
+   refuses to set jobs.open until client_cleared_for_golive() is true, which
+   needs an active client_profiles row AND a doc_signatures row against the
+   current client_guidelines version. Nothing here can talk its way past that,
+   which is the point. */
+(function(){
+ var root=document.getElementById('pane-post'); if(!root) return;
+
+ var TOTAL=6;
+ var step=1;
+ var chosen=null;          // trade, picked at step 1
+ var wzSel=null;           // exact start date, 'y-m-d'
+ var wzFlex=false;
+ var wzMonth=null;         // first of the month on show
+ var photos=[];
+ var when='Within the next two weeks';
+ var draftId=null;         // the job row, written at step 2
+ var portalCode=null;
+
+ var RAIL=['Trade','Details','Photos','Where & when','Create account','Guidelines & go live'];
+ var S=function(s){return root.querySelector(s)};
+
+ /* ---------- the job card ----------
+    Eleven fields, five sections, keyed Trade|Type off the taxonomy so a
+    duplicate type name under two trades never collides. In guest mode
+    nothing is inferred, so every field starts coral except the trade the
+    visitor picked themselves. */
+ var JC_PROP=['Detached house','Semi-detached','Townhouse or scheme','Apartment','Commercial or shop','Land or yard only'];
+ var JC_STOREY=['Single storey','Two storey','Three storey or more','Ground floor only','Roof or high level access'];
+ var JC_URG=['Emergency, within 48 hours','Within two weeks','Within a month','Flexible, planning ahead'];
+ var JC_ACCESS=['I am on site myself','Family member on site','Neighbour holds a key','Tenant is in the property','Caretaker or gardener','Property is empty, key with an agent'];
+ var JC_MAT=['Worker supplies and invoices with receipts','I supply the materials','Split, agree item by item','Not sure, worker to advise'];
+ var JC_BUDGET=['Under J$25,000','J$25,000 to J$60,000','J$60,000 to J$150,000','J$150,000 to J$400,000','Over J$400,000','I would rather the worker tell me'];
+ var JC_PARISH=['Kingston','St Andrew','St Catherine','Clarendon','Manchester','St Elizabeth','Westmoreland','Hanover','St James','Trelawny','St Ann','St Mary','Portland','St Thomas'];
+ var JC_GENERIC_SIZE=['Small, half a day','Medium, one to two days','Large, three days or more','Not sure, worker to assess'];
+
+ var JC={ trade:{v:'',src:'empty'}, type:{v:'',src:'empty'}, prop:{v:'',src:'empty'},
+          parish:{v:'',src:'empty'}, size:{v:'',src:'empty'}, storey:{v:'',src:'empty'},
+          urg:{v:'',src:'empty'}, access:{v:'',src:'empty'}, mat:{v:'',src:'empty'},
+          budget:{v:'',src:'empty'} };
+ var jcEv=[];
+
+ var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+
+ function ck(){ return JC.trade.v+'|'+JC.type.v }
+ function typeOpts(){ return (window.JC_TYPES&&JC_TYPES[JC.trade.v])||['General repair','Inspection only','Other, describe it'] }
+ function sizeOpts(){ return (window.JC_SIZE&&JC_SIZE[ck()])||JC_GENERIC_SIZE }
+ function evOpts(){ return (window.JC_EV&&(JC_EV[ck()]||JC_EV['default']))||[] }
+ function jcStages(){ return (window.JC_STAGES&&JC_STAGES[ck()])||2 }
+ function jcGaps(){ var n=0; for(var k in JC){ if(!JC[k].v) n++ } return n }
+
+ function srcTag(k){
+  var m={ok:['ok','From your message'],guess:['guess','Best guess, check it'],empty:['empty','You need to pick']};
+  return '<span class="src '+m[k][0]+'">'+m[k][1]+'</span>';
+ }
+ function jcSel(id,opts,f,lab){
+  var cls='jsel'+(f.src==='guess'?' guess':f.v?'':' empty');
+  var o='<option value="">Choose…</option>'+opts.map(function(x){
+    return '<option'+(x===f.v?' selected':'')+'>'+esc(x)+'</option>'}).join('');
+  return '<div class="jfield"><label>'+lab+srcTag(f.v?f.src:'empty')+'</label>'+
+         '<select class="'+cls+'" data-jc="'+id+'">'+o+'</select></div>';
+ }
+ function drawCard(){
+  var gaps=jcGaps(), st=jcStages(), box=S('#wizcard'); if(!box) return;
+  box.innerHTML='<div class="jcard">'+
+   '<div class="jcbadge"><span>Job card'+(draftId?' <b>'+esc(draftId)+'</b>':'')+'</span>'+
+    '<span>'+st+' stage'+(st>1?'s':'')+'</span>'+
+    '<span>'+jcEv.length+' evidence items</span>'+
+    (gaps?'<span style="color:var(--coral)">'+gaps+' field'+(gaps>1?'s':'')+' to pick</span>'
+         :'<span style="color:var(--tealb)">All fields confirmed</span>')+
+   '</div>'+
+   '<div class="jcsec"><p class="jclab">What and where</p><div class="jfrow">'+
+     jcSel('trade',(window.JC_TRADES||[]),JC.trade,'Trade')+jcSel('type',typeOpts(),JC.type,'Job type')+'</div>'+
+    '<div class="jfrow" style="margin-top:12px">'+
+     jcSel('prop',JC_PROP,JC.prop,'Property type')+jcSel('parish',JC_PARISH,JC.parish,'Parish')+'</div></div>'+
+   '<div class="jcsec"><p class="jclab">Scale</p><div class="jfrow">'+
+     jcSel('size',sizeOpts(),JC.size,'How much work')+jcSel('storey',JC_STOREY,JC.storey,'Access height')+'</div></div>'+
+   '<div class="jcsec"><p class="jclab">When and access</p><div class="jfrow">'+
+     jcSel('urg',JC_URG,JC.urg,'How soon')+jcSel('access',JC_ACCESS,JC.access,'Who lets the worker in')+'</div></div>'+
+   '<div class="jcsec"><p class="jclab">Money and materials</p><div class="jfrow">'+
+     jcSel('mat',JC_MAT,JC.mat,'Who supplies materials')+
+     jcSel('budget',JC_BUDGET,JC.budget,'Your budget band')+'</div>'+
+    '<div class="flag" style="margin-top:12px"><b>This one is yours alone.</b> Your budget band is <b>never</b> shown to a worker, on the board or in a quote. It exists so we can tell you early if what you want and what you have are not the same thing. Workers quote on the scope, blind, because a band a worker can see is a band a worker quotes to, and Yaadly does not price work.</div></div>'+
+   '<div class="jcsec"><p class="jclab">Evidence required · '+st+' stage'+(st>1?'s':'')+'</p>'+
+    '<p class="tiny" style="margin-bottom:9px">Set from the job type. Tap to add or drop an item, this is what the worker must upload before any money moves.</p>'+
+    '<div class="evpick">'+evOpts().map(function(x){
+      return '<button type="button" data-ev="'+esc(x)+'" class="'+(jcEv.indexOf(x)>-1?'on':'')+'">'+(jcEv.indexOf(x)>-1?'✓ ':'+ ')+esc(x)+'</button>'}).join('')+'</div></div>'+
+   '<div class="jcsec">'+(gaps
+     ? '<div class="flag"><b>'+gaps+' still to pick.</b> Nothing goes on the board with a blank field, that is the difference between a marketplace and a group chat.</div>'
+     : '<div class="fixed"><b>Ready.</b> Every field is confirmed. Sign the Client Guidelines and this goes live in the marketplace, structured, filterable and quotable first time.</div>')+
+   '</div></div>';
+  hint2();
+ }
+ /* Cascading: trade changes the type list; type changes size bands, stage
+    count and the evidence checklist. Keyed Trade|Type, never Type alone. */
+ root.addEventListener('change',function(e){
+  var sel=e.target.closest('[data-jc]'); if(!sel) return;
+  var k=sel.dataset.jc; JC[k].v=sel.value; JC[k].src=sel.value?'ok':'empty';
+  if(k==='trade'){ JC.type.v=''; JC.size.v=''; jcEv=[]; chosen=sel.value; paintTrades() }
+  if(k==='type'){ JC.size.v=''; jcEv=evOpts().slice(0,6) }
+  drawCard();
+ });
+ root.addEventListener('click',function(e){
+  var b=e.target.closest('[data-ev]'); if(!b) return;
+  var v=b.dataset.ev, i=jcEv.indexOf(v);
+  if(i>-1) jcEv.splice(i,1); else jcEv.push(v);
+  drawCard();
+ });
+
+ /* ---------- step 1 · trades ---------- */
+ var TRADE_IC={'Plumbing':'pipe','Roofing':'roof','Electrical':'bolt','Tiling':'tile','Masonry & Concrete':'brick','Painting & Decorating':'brush','Grille & Gate Welding':'gate','Air Conditioning':'snow','Landscaping':'leaf','General Handyman':'hand','Solar Install':'sun','Water Tank & Pump':'tank','Locks & Security Doors':'lock','Windows & Glazing':'win','Carpentry & Joinery':'wood','Drainage & Septic':'drain','Fencing':'fence','CCTV & Alarms':'cctv'};
+ function paintTrades(){
+  var box=S('#wtrades'); if(!box) return;
+  box.innerHTML=(window.JC_TRADES||[]).map(function(t){
+    return '<button type="button" class="wtrade'+(t===chosen?' on':'')+'" data-trade="'+esc(t)+'">'+
+      '<span class="ic">'+svg(TRADE_IC[t]||'hand')+'</span><span><b>'+esc(t)+'</b>'+
+      '<span>'+((window.JC_TYPES&&JC_TYPES[t])?JC_TYPES[t].length+' job types':'See the work')+'</span></span></button>';
+  }).join('');
+  var n1=S('#n1'); if(n1) n1.disabled=!chosen;
+  var h=S('#h1'); if(h) h.textContent=chosen?'Trade selected, continue when ready':'Pick a trade to continue';
+ }
+ root.addEventListener('click',function(e){
+  var b=e.target.closest('[data-trade]'); if(!b) return;
+  chosen=b.dataset.trade;
+  JC.trade.v=chosen; JC.trade.src='ok';
+  JC.type.v=''; JC.size.v=''; jcEv=[];
+  paintTrades(); drawCard();
+ });
+
+ /* ---------- progress ---------- */
+ function paintProg(){
+  var p=S('#prog'); if(!p) return;
+  var h='';
+  for(var i=1;i<=TOTAL;i++) h+='<i class="'+(i<step?'done':i===step?'now':'')+'"></i>';
+  p.innerHTML=h;
+  var lab=S('#plab');
+  if(lab) lab.textContent = step>TOTAL ? 'Done' : 'Step '+step+' of '+TOTAL+', '+RAIL[step-1];
+ }
+ function setStep(n){
+  step=n;
+  root.querySelectorAll('.wstep').forEach(function(el){
+    el.classList.toggle('show', Number(el.dataset.step)===n) });
+  paintProg();
+  if(n===6) drawReview();
+  window.scrollTo({top:0});
+ }
+ root.addEventListener('click',function(e){
+  if(e.target.closest('[data-back]')) setStep(Math.max(1,step-1));
+ });
+
+ /* ---------- validation. A disabled Continue always says what is missing. ---------- */
+ function hint2(){
+  var h=S('#h2h'), n2=S('#n2'); if(!h||!n2) return;
+  var d=(S('#w-desc').value||'').trim(), gaps=jcGaps();
+  var bad = !d ? 'Describe the job to continue'
+          : gaps ? gaps+' job card field'+(gaps>1?'s':'')+' still to pick'
+          : '';
+  n2.disabled=!!bad; h.textContent=bad||'';
+ }
+ function hint4(){
+  var h=S('#h4'), n4=S('#n4'); if(!h||!n4) return;
+  var bad = !S('#w-parish').value ? 'Pick a parish to continue'
+          : !(S('#w-access').value||'').trim() ? 'We need who lets the worker in'
+          : '';
+  n4.disabled=!!bad; h.textContent=bad||'';
+ }
+ function hint5(){
+  var h=S('#h5'), n5=S('#n5'); if(!h||!n5) return;
+  var g=function(i){return (S(i).value||'').trim()};
+  var bad = !g('#w-name') ? 'Your name is needed'
+          : !g('#w-email') || g('#w-email').indexOf('@')<0 ? 'A valid email is needed'
+          : !g('#w-phone') ? 'A phone or WhatsApp number is needed'
+          : g('#w-pw').length<8 ? 'Password needs at least 8 characters'
+          : '';
+  n5.disabled=!!bad; h.textContent=bad||'';
+ }
+ root.addEventListener('input',function(e){
+  if(e.target.id==='w-desc') hint2();
+  if(e.target.id==='w-access') hint4();
+  if(['w-name','w-email','w-phone','w-pw'].indexOf(e.target.id)>-1) hint5();
+  if(e.target.id==='w-sig') gateCheck();
+ });
+ root.addEventListener('change',function(e){ if(e.target.id==='w-parish') hint4() });
+
+ /* ---------- step 4 · when ---------- */
+ root.addEventListener('click',function(e){
+  var b=e.target.closest('[data-when]'); if(!b) return;
+  when=b.dataset.when;
+  root.querySelectorAll('[data-when]').forEach(function(x){x.classList.toggle('on',x===b)});
+ });
+
+ /* ---------- step 4 · calendar ----------
+    Teal days are days a matching worker already has open. It is a signal,
+    not a booking: nothing is held until a worker is chosen and both sides
+    agree the scope. */
+ var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+ function key(d){ return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate() }
+ function freeDay(d){ var n=d.getDate(); return d.getDay()!==0 && (n%3===1||n%7===2) }
+ function drawCal(){
+  var box=S('#wzdate'); if(!box) return;
+  var today=new Date(); today.setHours(0,0,0,0);
+  if(!wzMonth) wzMonth=new Date(today.getFullYear(),today.getMonth(),1);
+  var first=new Date(wzMonth), pad=(first.getDay()+6)%7;
+  var days=new Date(wzMonth.getFullYear(),wzMonth.getMonth()+1,0).getDate();
+  var h='<div class="wzhead"><button type="button" data-mv="-1" aria-label="Previous month">‹</button>'+
+        '<b>'+MON[wzMonth.getMonth()]+' '+wzMonth.getFullYear()+'</b>'+
+        '<button type="button" data-mv="1" aria-label="Next month">›</button></div><div class="wzgrid">'+
+        ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(function(d){return '<u>'+d[0]+'</u>'}).join('');
+  for(var i=0;i<pad;i++) h+='<span></span>';
+  for(var n=1;n<=days;n++){
+   var d=new Date(wzMonth.getFullYear(),wzMonth.getMonth(),n);
+   var past=d<today, k=key(d), free=!past&&freeDay(d);
+   h+='<button type="button" data-day="'+k+'"'+(past?' disabled':'')+
+      ' class="'+(wzSel===k?'on':free?'free':'')+'">'+n+'</button>';
   }
-  pendingPhotos = []; $("in-thumbs").innerHTML=""; if(btn) btn.style.pointerEvents = "";
-  $("in-status").innerHTML = '<div class="rule" style="margin-top:14px">✅ <b>Job '+esc(result.jobId)+' saved.</b> It stays private until you send it: create your profile and sign the Client Guidelines, then it can go to workers for quotes. A project manager reviews every request, and nothing is booked and no money moves until you agree in writing.<br><br>'+
-    'Track it any time in your <a href="#client" onclick="go(\'client\')"><b>client portal</b></a>: create your profile with <b>'+esc(payload.email)+'</b>, sign the Client Guidelines, and your job is ready to go to workers.<br><br>'+
-    'The full managed job service opens shortly in Jamaica, starting with Kingston and Portmore. <a href="#waitlist" onclick="document.getElementById(\'waitlist\').scrollIntoView()"><b>Join the waiting list</b></a> to be contacted first.</div>';
-  ["in-name","in-phone","in-email","in-where","in-addr","in-access","in-desc"].forEach(i=>$(i).value="");
-}
+  h+='</div>';
+  h+='<p class="wznote" id="wznote">'+(
+     wzFlex ? 'No fixed date. You will get more replies this way, and usually better prices, a worker can slot it into a gap.'
+   : wzSel ? (freeDay(new Date(wzSel.split('-')[0],wzSel.split('-')[1]-1,wzSel.split('-')[2]))
+       ? 'At least one matching worker already has this day open. That is a good sign, not a booking, nothing is held until you choose somebody and both of you agree the scope.'
+       : 'No matching worker has flagged this day open yet. You can still ask for it, workers will either take it or offer you the nearest day they have.')
+   : 'Teal days are already open in a matching worker\'s diary.')+'</p>';
+  h+='<div class="wzflex"><button type="button" id="wzflexb" class="'+(wzFlex?'on':'')+'">No fixed date, I am flexible</button></div>';
+  box.innerHTML=h;
+ }
+ root.addEventListener('click',function(e){
+  var mv=e.target.closest('[data-mv]');
+  if(mv){ wzMonth=new Date(wzMonth.getFullYear(),wzMonth.getMonth()+Number(mv.dataset.mv),1); drawCal(); return }
+  var d=e.target.closest('[data-day]');
+  if(d){ wzSel = wzSel===d.dataset.day ? null : d.dataset.day; wzFlex=false; drawCal(); return }
+  if(e.target.id==='wzflexb'){ wzFlex=!wzFlex; if(wzFlex) wzSel=null; drawCal(); return }
+ });
+
+ /* ---------- step 3 · photos ---------- */
+ window.wzPhotos=async function(ev){
+  photos=await filesToPhotos(ev.target.files);
+  S('#w-thumbs').innerHTML=photos.map(function(p){return '<img src="'+p+'" alt="">'}).join('');
+ };
+
+ /* ---------- step 6 · review ---------- */
+ function niceDate(k){
+  if(!k) return '';
+  var p=k.split('-'); return p[2]+' '+MON[p[1]-1]+' '+p[0];
+ }
+ function drawReview(){
+  var box=S('#w-review'); if(!box) return;
+  var pills='<div class="pills" style="margin-bottom:14px">'+
+   '<span class="pill">'+esc(JC.trade.v||'Trade')+'</span>'+
+   '<span class="pill n">'+esc(S('#w-parish').value||JC.parish.v||'Area')+'</span>'+
+   '<span class="pill">'+esc(when)+'</span>'+
+   (wzSel?'<span class="pill m">Start '+esc(niceDate(wzSel))+'</span>':'')+
+   (wzFlex?'<span class="pill m">Flexible date</span>':'')+'</div>';
+  box.innerHTML=pills+
+   '<div class="rvsplit pub"><p class="h">Public, workers see this</p>'+
+     '<p>'+esc((S('#w-desc').value||'').trim())+'</p>'+
+     (photos.length?'<p class="tiny" style="margin-top:8px">'+photos.length+' photo'+(photos.length>1?'s':'')+' attached</p>':'')+
+     '<dl style="margin-top:10px">'+
+      '<dt>Job type</dt><dd>'+esc(JC.type.v)+'</dd>'+
+      '<dt>How much work</dt><dd>'+esc(JC.size.v)+'</dd>'+
+      '<dt>Stages</dt><dd>'+jcStages()+', '+jcEv.length+' evidence items</dd>'+
+     '</dl></div>'+
+   '<div class="rvsplit priv"><p class="h">Private, never on the board</p><dl>'+
+      '<dt>Street address</dt><dd>'+esc(S('#w-addr').value||'not given')+'</dd>'+
+      '<dt>Your phone</dt><dd>'+esc(S('#w-phone').value||'not given')+'</dd>'+
+      '<dt>Access contact</dt><dd>'+esc(S('#w-access').value||'not given')+'</dd>'+
+      '<dt>Your budget band</dt><dd>'+esc(JC.budget.v||'not given')+'</dd>'+
+     '</dl></div>';
+ }
+
+ /* ---------- the gate ----------
+    Not a checkbox. The signature is the row that makes the job visible. */
+ function gateCheck(){
+  var t=S('#gtick'), s=S('#w-sig'), b=S('#n6'), h=S('#n6hint');
+  if(!t||!s||!b) return;
+  var ok = t.checked && (s.value||'').trim().length>2;
+  b.disabled=!ok;
+  h.textContent = ok ? 'Signature captured, this is what makes it live' : 'Tick the box and sign to continue';
+  h.style.color = ok ? 'var(--tealb)' : '';
+ }
+ root.addEventListener('change',function(e){ if(e.target.id==='gtick') gateCheck() });
+
+ /* ---------- continues ---------- */
+ S('#n1').addEventListener('click',function(){ if(chosen) setStep(2) });
+ S('#n2').addEventListener('click',async function(){
+  if(this.disabled) return;
+  this.disabled=true; var h=S('#h2h'); h.textContent='Saving your draft…';
+  var ok=await saveDraft();
+  this.disabled=false;
+  h.textContent = ok ? '' : 'Saved locally, we will retry when you continue';
+  drawCard(); setStep(3);
+ });
+ S('#n3').addEventListener('click',function(){ setStep(4) });
+ S('#n4').addEventListener('click',function(){ if(!this.disabled) setStep(5) });
+ S('#n5').addEventListener('click',function(){ if(!this.disabled) setStep(6) });
+ S('#n6').addEventListener('click',goLive);
+
+ /* ---------- the draft row, written at step 2 ----------
+    Somebody who closes the tab at step 4 comes back to a saved job, not an
+    empty form. open:false, so sync_job_status parks it at
+    awaiting_client_setup until the signature exists. */
+ async function saveDraft(){
+  try{
+   var r=await fetch(WEBSITE_INTAKE_URL,{method:'POST',
+     headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'apikey':SUPABASE_PUBLISHABLE_KEY},
+     body:JSON.stringify(payload('draft'))});
+   var j=await r.json();
+   if(j&&j.jobId){ draftId=j.jobId; portalCode=j.portalCode||null;
+     try{ localStorage.setItem('yaadly-draft',JSON.stringify({id:draftId,code:portalCode})) }catch(e){}
+     return true }
+  }catch(e){ console.warn('draft save:',e) }
+  return false;
+ }
+ function payload(mode){
+  var g=function(i){var el=S(i);return el?(el.value||'').trim():''};
+  return {
+   mode:mode, jobId:draftId,
+   name:g('#w-name')||'Draft, name to follow',
+   phone:g('#w-phone')||'not given yet',
+   email:g('#w-email')||'',
+   desc:g('#w-desc'),
+   parish:g('#w-parish')||JC.parish.v,
+   addr:g('#w-addr'), access:g('#w-access'),
+   workType:JC.trade.v, urgency:when,
+   startDate: wzFlex ? 'Flexible' : (wzSel?niceDate(wzSel):''),
+   jobType:JC.type.v, propertyType:JC.prop.v, sizeBand:JC.size.v,
+   storey:JC.storey.v, accessType:JC.access.v, materialsBy:JC.mat.v,
+   budgetBand:JC.budget.v, stages:jcStages(), evidence:jcEv,
+   photos:photos
+  };
+ }
+
+ /* ---------- step 6 · sign, then go live ---------- */
+ async function goLive(){
+  var b=S('#n6'), st=S('#w-status');
+  b.disabled=true; S('#n6hint').textContent='Creating your account and recording the signature…';
+  var body=payload('golive');
+  body.signature=(S('#w-sig').value||'').trim();
+  body.password=S('#w-pw').value||'';
+  body.guidelinesVersion=(S('#gver')?S('#gver').textContent:'v1.0').replace(/^v/,'');
+  body.consentText='I have read and agree to the Client Guidelines '+(S('#gver')?S('#gver').textContent:'v1.0')+', and I understand my job is not visible to any worker until I confirm this.';
+  try{
+   var r=await fetch(GOLIVE_URL,{method:'POST',
+     headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'apikey':SUPABASE_PUBLISHABLE_KEY},
+     body:JSON.stringify(body)});
+   var j=await r.json();
+   if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
+   draftId=j.jobId||draftId;
+   done(j);
+  }catch(e){
+   b.disabled=false; S('#n6hint').textContent='';
+   st.innerHTML='<div class="flag" style="margin-top:14px"><b>That did not go through.</b> '+esc(e.message)+
+     ' Your job is saved as a draft'+(draftId?' ('+esc(draftId)+')':'')+', nothing is lost. Try again, or message us on WhatsApp and we will finish it with you.</div>';
+  }
+ }
+
+ /* ---------- the done screen ----------
+    Not a thank-you page, a what-happens-next page. It is honest about the
+    one hop left: the account is created unconfirmed on purpose, so the job
+    opens to workers when the email is confirmed, not before. */
+ function done(j){
+  var live=!!j.open;
+  S('#d-pills').innerHTML=
+   '<span class="pill">'+esc(draftId||'Job saved')+(live?' live in the marketplace':' saved')+'</span>'+
+   '<span class="pill m">Guidelines '+esc(j.guidelinesVersion||'v1.0')+' signed</span>'+
+   '<span class="pill n">'+esc(JC.trade.v)+' · '+esc(S('#w-parish').value||JC.parish.v)+'</span>';
+  S('#d-head').textContent='Hello '+((S('#w-name').value||'').trim().split(' ')[0]||'there')+', '+(live?'your job is live.':'your job is signed and saved.');
+  S('#d-lead').innerHTML = live
+   ? 'Your signature on the Client Guidelines is what took it out of draft. Your <b>'+esc(JC.trade.v)+'</b> job is now in the marketplace and we will help you find available workers near <b>'+esc(S('#w-parish').value||JC.parish.v)+'</b>.'
+   : 'Your signature is recorded. One thing left: <b>confirm your email</b>. We sent a link to <b>'+esc(S('#w-email').value)+'</b>, and clicking it is what opens your job to workers. That step exists so nobody can post a job in your name.';
+  var steps = live ? [
+   ['We sent your job to relevant workers near '+(S('#w-parish').value||JC.parish.v),'Vetted workers in your trade and area were alerted just now. Your address and phone number were not included.'],
+   ['We email and WhatsApp you when a worker expresses interest','Usually within a few hours in Kingston. You will see their Yaad Score, jobs completed and evidence from past work before you reply to anyone.'],
+   ['Start a chat to share contact details','Chat on Yaadly, or hand over your number and take it to WhatsApp. Your choice, your timing, nothing is shared until you say so.'],
+   ['Choose your worker, agree the stages, fund stage one','No more paperwork, the guidelines are already signed. You agree the stages in writing, fund stage one, and Yaadly holds it. Nothing releases until photo and video evidence is signed off.'],
+   ['Evidence, sign-off, review','The worker uploads proof at each stage. You approve or send it back. When it is done you leave a review and their Yaad Score moves.']
+  ] : [
+   ['Confirm your email','We sent a link to '+(S('#w-email').value)+'. Clicking it proves the mailbox is yours, and that is what lets your job go to workers.'],
+   ['Your job is held as a draft until then','It is saved with everything you filled in. No worker can see it, and nothing is charged.'],
+   ['We alert matching workers the moment it opens','By trade and parish. Your address and phone number are never included.'],
+   ['Choose your worker, agree the stages, fund stage one','You agree the stages in writing, fund stage one, and Yaadly holds it. Nothing releases until evidence is signed off.'],
+   ['Evidence, sign-off, review','The worker uploads proof at each stage. You approve or send it back, then leave a review.']
+  ];
+  S('#d-next').innerHTML=steps.map(function(s){
+   return '<div class="nx"><b class="num"></b><div><h4>'+esc(s[0])+'</h4><p>'+esc(s[1])+'</p></div></div>' }).join('');
+  setStep(7);
+  root.querySelectorAll('.wstep').forEach(function(el){
+    el.classList.toggle('show', el.dataset.step==='7') });
+  S('#prog').innerHTML=''; S('#plab').textContent=live?'Live':'Signed, one step left';
+  window.scrollTo({top:0});
+ }
+
+ /* ---------- entry points ----------
+    A trade card anywhere on the site pre-selects that trade and jumps to
+    step 2: somebody who arrived via "Roofing" should not be asked what
+    trade they want. */
+ window.postJob=function(trade){
+  go('post');
+  if(trade && (window.JC_TRADES||[]).indexOf(trade)>-1){
+   chosen=trade; JC.trade.v=trade; JC.trade.src='ok';
+   JC.type.v=''; JC.size.v=''; jcEv=[];
+   paintTrades(); drawCard(); setStep(2);
+  } else { paintTrades(); drawCard(); setStep(1) }
+ };
+
+ /* ---------- boot ---------- */
+ function boot(){
+  paintTrades(); drawCard(); drawCal(); paintProg();
+  hint2(); hint4(); hint5(); gateCheck();
+  var d=S('#w-desc');
+  if(d && !d.value){
+   /* whatever they typed in the hero search card carries down, so they
+      never fill the same thing in twice */
+   var hw=document.getElementById('h-what');
+   if(hw && hw.value.trim()) d.value=hw.value.trim();
+   hint2();
+  }
+ }
+ if(window.JC_TRADES) boot();
+ else window.addEventListener('DOMContentLoaded',boot);
+})();
+
 function bookCall(){
   const g = id => ($(id).value||"").trim();
   if(!g("bk-name") || !g("bk-contact")){ alert("Name and a way to reach you are needed."); return; }
@@ -1530,7 +2457,7 @@ function closeWlModal(){
      fires (they are leaving anyway) unless they have already typed something. */
   function typing(){
     try{
-      const ids = ["in-name","in-phone","in-email","in-addr","in-where","in-access","in-desc"];
+      const ids = ["w-desc","w-name","w-email","w-phone","w-addr","w-access"];
       for (let i=0;i<ids.length;i++){
         const el = document.getElementById(ids[i]);
         if (el && el.value && el.value.trim()) return true;
@@ -1540,10 +2467,10 @@ function closeWlModal(){
   }
   function formOnScreen(){
     try{
-      const c = document.querySelector("#pane-site .formcard");
-      if (!c) return false;
-      const r = c.getBoundingClientRect();
-      return r.bottom > 0 && r.top < window.innerHeight;
+      /* The wizard is the conversion now. If somebody is anywhere inside it,
+         the modal waits: interrupting a six-step form is how you lose a job. */
+      const p = document.getElementById("pane-post");
+      return !!(p && p.classList.contains("show"));
     }catch(e){ return false; }
   }
   function showModal(force){
@@ -1564,7 +2491,8 @@ function closeWlModal(){
   document.addEventListener("DOMContentLoaded", ()=>{
     document.addEventListener("mouseout", onExitIntent);
     /* exit intent only: a timer or scroll trigger interrupts people who
-       are reading, and the in-page waitlist card already exists */
+       are reading, and "Join the waiting list" sits in the Three ways in
+       card, so there is always a deliberate way in without the modal */
   });
 })();
 let fbRate = 0;
@@ -3821,7 +4749,7 @@ async function renderMarketplace(){
         '<div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"General trades")+(w.parish?' · '+esc(w.parish):'')+'</small>'+
         '<small style="color:var(--tealb)">Yaad Score record: '+Number(w.jobs_completed||0)+' verified '+(Number(w.jobs_completed||0)===1?'job':'jobs')+'</small></div>'+laneB+'</div>';
       }).join("")+
-      '<a class="btn sm" style="margin-top:12px" onclick="go(\'site\');setTimeout(()=>document.getElementById(\'startform\').scrollIntoView(),100)">Pitch a job to hire from this network →</a>';
+      '<a class="btn sm" style="margin-top:12px" onclick="postJob()">Pitch a job to hire from this network →</a>';
   }
 }
 /* ── Client Guidelines: the client's side of the deal ─────────
@@ -3897,7 +4825,7 @@ async function cgCheckGate(){
   if(current){
     box.style.display="block";
     box.innerHTML = '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px"><span class="pill ok">CLIENT · GUIDELINES SIGNED</span>'+
-      '<a class="btn sm" onclick="go(\'site\');setTimeout(()=>{const e=$(\'in-email\');if(e&&clientAuthEmail)e.value=clientAuthEmail;document.getElementById(\'startform\').scrollIntoView();},120)">+ Pitch a new job</a></div>';
+      '<a class="btn sm" onclick="postJob();setTimeout(()=>{const e=$(\'w-email\');if(e&&clientAuthEmail)e.value=clientAuthEmail},120)">+ Pitch a new job</a></div>';
     $("client-dash").style.display=""; return;
   }
   const older = (data||[]).length > 0;
@@ -4035,7 +4963,6 @@ renderAll();
       }, {threshold:.3});
       pio.observe(root);
     }
-    wirePhone('phone-worker');
   }catch(err){ revealAll(); }
 })();
 </script>
