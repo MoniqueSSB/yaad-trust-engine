@@ -1628,43 +1628,15 @@ const CONFIG = {
 };
 /* ─────────── cloud database (Supabase, free tier) ─────────── */
 const sb = (CONFIG.supabaseUrl && window.supabase) ? window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey) : null;
-/* Only the removed admin gate ever set this true, so cloudPull(),
-   schedulePush() and cloudStatus() are now permanently inert. The app_state
-   blob this page used to write is history. */
-let cloudOn = false, pushTimer = null;
-// Declared here, ahead of the hash-routing IIFE below, because landing directly on a URL
-// like #admin or #client calls go() -> renderAll() -> renderClient() during initial script
-// execution, before a `let` declared later in the file would be reachable (temporal dead zone).
-let clientTabState = "overview";
-let clientSelectedId = null;
-/* The admin desk was removed from this page on 27 Aug 2026. It lives on its
-   own hostname, behind Cloudflare Access, at concierge.yaadly.co.uk, and it
-   reads Postgres directly instead of keeping the business in this browser.
-   Two desks meant two answers to the same question, and this was the one
-   shipping its own admin markup to every visitor of yaadly.co.uk.
-   Frozen false rather than deleted: nothing can set it, so renderAdmin() and
-   everything guarded by it returns without running, and no leftover path can
-   throw. The dead render code below still ships and is a separate job. */
-const adminOpen = false;
-
-/* Two functions left in the dead admin code still call adminTab(): intakeToJob()
-   and koFromJob(). Both are only reachable from markup renderAdmin() generates,
-   and renderAdmin() now returns on its first line, so neither can run. A stub
-   is cheaper than that argument: it turns "unreachable, I am fairly sure" into
-   "harmless either way", and it is the difference between a page that cannot
-   throw and a page nobody has proved throws. */
-let clientOpen = false, clientAuthEmail = null;
-let workerOpen = false, workerAuthEmail = null;
-function schedulePush(){
-  if(!sb || !cloudOn) return;
-  clearTimeout(pushTimer);
-  pushTimer = setTimeout(()=>{ sb.from("app_state").upsert({key:"main", data:DB, updated_at:new Date().toISOString()}).then(r=>{ if(r.error) console.warn("cloud push:", r.error.message); setCloudBadge(r.error?"error":"on"); }); }, 1500);
-}
-function setCloudBadge(state){
-  const el = document.getElementById("cloud-badge"); if(!el) return;
-  el.textContent = state==="on"?"● cloud synced":state==="error"?"● cloud error":"○ cloud off";
-  el.style.color = state==="on"?"var(--tealb)":state==="error"?"var(--red)":"var(--dim)";
-}
+/* The app_state push went with the admin desk. Only its sign-in gate ever
+   switched cloud sync on, so once that left, this page could not write the
+   blob even in principle. Removed rather than left sitting there inert: the
+   concierge reads Postgres directly and is the only answer now. */
+/* The admin desk left this page on 27 Aug 2026 for concierge.yaadly.co.uk,
+   behind Cloudflare Access, reading Postgres directly instead of keeping the
+   business in one browser. The client and worker portals had already moved to
+   app.yaadly.co.uk. What is left here is the marketing site and nothing else:
+   no desk, no portals, no signed-in state to track. */
 /* ─────────── AI agents (MiniMax via the yaad-agent edge function) ─────────── */
 /* ─────────── AI Photo Review (yaad-vision edge function) ─────────── */
 const SEV_COLOR = { low:"pass", medium:"gap", high:"block" };
@@ -1685,7 +1657,7 @@ const $ = id => document.getElementById(id);
 const DB_KEY = "yaadly-platform-v1";
 let DB = load();
 function load(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)) || seed(); }catch(e){ return seed(); } }
-function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ alert("Browser storage is full, mostly photos. Press Backup data to save everything to a file, then remove photos from old completed jobs."); } schedulePush(); }
+function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ alert("Browser storage is full, mostly photos. Press Backup data to save everything to a file, then remove photos from old completed jobs."); } }
 function seed(){ return { jobs:[], services:[], workers:[], applications:[], intakes:[], feedback:[], waitlist:[], seq:1, svcSeq:1, inSeq:1, fbSeq:1, wlSeq:1 }; }
 DB.intakes = DB.intakes || []; DB.inSeq = DB.inSeq || 1;
 DB.feedback = DB.feedback || []; DB.fbSeq = DB.fbSeq || 1;
@@ -2721,11 +2693,11 @@ if($("ap-cert")) $("ap-cert").addEventListener("change", ()=>{ $("ap-certrow").s
 /* ───────────── CLIENT / WORKER AUTH ───────────── */
 /* ───────────── ADMIN ───────────── */
 /* The client and worker portals moved to app.yaadly.co.uk. Their panes, their
-   sign-in gates and every element they rendered into are gone from this page,
-   so these two restores had nothing left to restore. Worse than nothing:
-   openClientPortal() reaches straight for $("client-lock").style.display, and
-   #client with a signed-in session threw a TypeError on this page rather than
-   doing anything. Removed with the tree behind them. */
+   sign-in gates and every element they rendered into went with them, so the
+   session restores that used to run here had nothing left to restore. Worse
+   than nothing: openClientPortal() reached straight for client-lock, so
+   #client with a signed-in session threw a TypeError rather than doing
+   anything at all. Removed, along with the 145 functions behind them. */
 /* ─────────── The vetting agent's read, on the desk ───────────
 
    Step 6 of the join flow promises that a machine reads the documents before
