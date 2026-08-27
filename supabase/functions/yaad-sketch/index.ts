@@ -470,16 +470,20 @@ Deno.serve(async (req) => {
             ],
           }),
         });
-        const body = await r.text();
+        // Named rawText, not body: the request payload is already called `body`
+        // in this scope, and shadowing it here put the reference on the line
+        // above into the temporal dead zone. That threw a ReferenceError every
+        // time assemble ran, before the model was ever called.
+        const rawText = await r.text();
         let j: any = {};
-        try { j = JSON.parse(body); } catch (_) { /* keep the raw text */ }
+        try { j = JSON.parse(rawText); } catch (_) { /* keep the raw text */ }
         s.setAttributes({
           "http.response.status_code": r.status,
           "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
           "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
         });
-        if (!r.ok) s.recordError(`minimax http ${r.status}: ${body.slice(0, 200)}`);
-        return { ok: r.ok, status: r.status, body, content: j?.choices?.[0]?.message?.content ?? "" };
+        if (!r.ok) s.recordError(`minimax http ${r.status}: ${rawText.slice(0, 200)}`);
+        return { ok: r.ok, status: r.status, body: rawText, content: j?.choices?.[0]?.message?.content ?? "" };
       });
 
       if (!raw.ok) return fail(`The assembly model refused the request (HTTP ${raw.status}). It said: ${raw.body.slice(0, 300)}`, 502);
