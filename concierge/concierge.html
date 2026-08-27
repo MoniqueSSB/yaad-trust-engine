@@ -1367,7 +1367,10 @@ async function loadOverview(){
   setCount("invoices", invDraft, false);
   setCount("sketch", pkDraft + pkAppr, false);
   setCount("kick", kickDraft, false);
-  setCount("jobs", disputesOpen, true);
+  // Deliberately no count on Jobs. It used to carry the open-dispute total,
+  // which put a coral badge on a link that does not go to disputes. On this
+  // desk a colour is a claim about the thing it sits on, so a badge that means
+  // something else is worse than no badge. Disputes have their own tile above.
 }
 
 $("calPrev").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
@@ -1558,6 +1561,11 @@ function renderInvoice(){
   }));
 
   if ($("addLine")) $("addLine").addEventListener("click", async () => {
+    // boot() empties CATALOGUE when the service list cannot be fetched, and
+    // carries on so the rest of the desk still opens. Without this guard that
+    // deliberate degradation turns into a TypeError here and the button does
+    // nothing at all, silently, which is the worst of both.
+    if (!CATALOGUE.length) return say("invMsg","err","Your service list could not be loaded, so a line cannot be priced or added. Reload the page, and if it keeps happening the invoicing function is the thing to look at.");
     const c = CATALOGUE[0];
     const { error } = await sb.from("invoice_lines").insert({
       invoice_id: inv.id, catalogue_id: c.id, description: c.name, qty: 1,
@@ -1821,6 +1829,42 @@ $("skAssemble").addEventListener("click", async () => {
   $("skAssemble").disabled = false;
 });
 
+// The sketch is drawn by a model and stored, then rendered here as live
+// markup, because escaping it would print the source instead of the drawing.
+// That makes it the one stored value on this page that is not escaped, and so
+// the one worth sanitising: this origin holds a signed-in Supabase client with
+// write access, so a script that ran here would run as the admin.
+//
+// Parsed as XML rather than pattern-matched. A regex over markup loses to
+// nesting, entities and stray angle brackets; a parser does not.
+function safeSvg(raw){
+  try {
+    const doc = new DOMParser().parseFromString(String(raw), "image/svg+xml");
+    if (doc.querySelector("parsererror")) return `<p class="hint">The sketch could not be read as valid SVG, so it is not being drawn.</p>`;
+    const BANNED = new Set(["script","foreignobject","iframe","object","embed","use","image","link","style","animate","set","handler"]);
+    const walk = (node) => {
+      for (const child of Array.from(node.children)) {
+        if (BANNED.has(child.tagName.toLowerCase())) { child.remove(); continue; }
+        for (const at of Array.from(child.attributes)) {
+          const n = at.name.toLowerCase(), v = String(at.value);
+          // every on* handler, and anything that can carry a URL scheme
+          if (n.startsWith("on")) { child.removeAttribute(at.name); continue; }
+          if (/(^|:)href$|^src$|^xlink:href$/.test(n) && !/^#/.test(v.trim())) { child.removeAttribute(at.name); continue; }
+          if (/javascript:|data:text\/html|<script/i.test(v)) child.removeAttribute(at.name);
+        }
+        walk(child);
+      }
+    };
+    const root = doc.documentElement;
+    if (!root || root.tagName.toLowerCase() !== "svg") return `<p class="hint">That sketch is not an SVG, so it is not being drawn.</p>`;
+    for (const at of Array.from(root.attributes)) if (at.name.toLowerCase().startsWith("on")) root.removeAttribute(at.name);
+    walk(root);
+    return new XMLSerializer().serializeToString(root);
+  } catch {
+    return `<p class="hint">The sketch could not be read, so it is not being drawn.</p>`;
+  }
+}
+
 function skRenderPack(extra){
   const p = SK_PACK;
   if (!p) return show("skPackCard", false);
@@ -1833,7 +1877,7 @@ function skRenderPack(extra){
 
   $("skPackBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}${p.parish ? " &middot; " + esc(p.parish) : ""}</p>
-    ${p.sketch_svg ? `<div class="sketchbox">${p.sketch_svg}</div>` : ""}
+    ${p.sketch_svg ? `<div class="sketchbox">${safeSvg(p.sketch_svg)}</div>` : ""}
     <div class="tw"><table>
       <thead><tr><th>Room</th><th>Photos</th><th>What was seen</th></tr></thead>
       <tbody>${rooms.map(r => `
