@@ -1038,8 +1038,8 @@ function paintKill(){
   b.classList.toggle("off", AGENTS_PAUSED);
   b.textContent = AGENTS_PAUSED ? "Agents: paused" : "Agents: live";
   b.title = AGENTS_PAUSED
-    ? "Paused. This desk will not call an agent. Inbound WhatsApp and website intake are not covered by this switch."
-    : "Live. Drafting an invoice or describing stills calls a model. Inbound WhatsApp and website intake run whatever this says.";
+    ? "Paused. Nothing this desk starts will call a model. yaad-inbound and yaad-whatsapp-webhook are not covered and still reply to incoming messages."
+    : "Live. Drafting an invoice or describing stills calls a model. yaad-inbound and yaad-whatsapp-webhook run whatever this says.";
 }
 
 async function setAgentsPaused(next){
@@ -1380,7 +1380,7 @@ function panelSvc(rows){
 // Every row says what reads it. A row nothing reads is said to be a row
 // nothing reads, because that is the difference between a switch and a label.
 const SETTING_META = {
-  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. It does not reach everything: <b>inbound WhatsApp and website intake keep running whatever this row says.</b>", true],
+  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. It does not reach everything. <b>yaad-inbound and yaad-whatsapp-webhook answer people on their own and never read this row</b>, so an incoming message is still replied to while this is on.", true],
   worker_guidelines_version: ["Worker Guidelines in force", "current_doc_version() reads this, and the quote policy refuses an insert from anybody signed on an older version. Bumping it stops quoting until they re-sign.", false],
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
@@ -1625,7 +1625,7 @@ document.addEventListener("click", (e) => {
   if (kill) {
     const next = !AGENTS_PAUSED;
     if (!confirm(next
-      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. Inbound WhatsApp and website intake do not read this row yet, so they keep running."
+      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. yaad-inbound and yaad-whatsapp-webhook are not covered and keep replying to incoming messages."
       : "Let this desk call agents again?")) return;
     setAgentsPaused(next);
     return;
@@ -1896,7 +1896,7 @@ async function loadOverview(){
   setCount("kick", kickDraft, false);
   if (AGENTS_PAUSED) {
     $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
-      "This desk will not call a model, so invoice drafting and sketch description are off. Inbound WhatsApp and website intake do not read that row yet and are still running.",
+      "Invoice drafting and sketch description are off. yaad-inbound and yaad-whatsapp-webhook are not covered by this switch and are still replying to people who write in.",
       "Open settings","set"));
   }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
@@ -1999,7 +1999,7 @@ async function loadHealth(){
     "The whole promise of this desk is that an approval binds to the exact files. A row with no sha256 cannot be bound to anything, so signing it off is a signature on air.");
 
   if (AGENTS_PAUSED) add("warn","Agents are paused, and the pause does not reach everything",
-    "This desk will not call a model. Inbound WhatsApp and website intake run in edge functions that do not read app_settings.agents_paused yet, so they are still answering people. Wiring that row into yaad-inbound and yaad-website-intake is what would make the switch mean what it says.");
+    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. Two functions are not covered, because nothing here starts them: yaad-inbound and yaad-whatsapp-webhook are woken by an incoming message and call a model before this desk knows the message exists. Reading app_settings.agents_paused at the top of those two is what would make the switch mean everything it looks like it means.");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
     "client_user is null, so the go-live check refuses to put them on the board however complete they look. They are at the top of the Intake view.");

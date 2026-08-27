@@ -96,13 +96,19 @@ this desk makes to a model goes through the one guard behind it, in `fn()` and
 `skFn()`. Paused means invoice drafting and sketch description refuse to send
 anything.
 
-**It does not reach everything, and it says so.** Inbound WhatsApp and website
-intake run in edge functions that do not read that row yet, so they keep
-answering people whatever the switch says. Settings says it, Health says it,
-and the Overview says it while the pause is on. Wiring `agents_paused` into
-`yaad-inbound` and `yaad-website-intake` is what would make the switch mean
-everything it appears to mean; until then the desk is precise about its reach
-rather than quiet about it.
+**It does not reach everything, and it names what it misses.** Two functions
+call a model without this desk starting them: `yaad-inbound` and
+`yaad-whatsapp-webhook` are woken by an incoming message and have replied to
+somebody before the desk knows the message exists. Neither reads
+`agents_paused`. Settings says so, Health says so, and the Overview says so
+while the pause is on.
+
+Reading that row at the top of those two is the whole remaining job. There is
+already a per-person gate, `may_use_agents(email)`, which `yaad-agent` and
+`yaad-vision` both call, so a global pause folded into it would reach further
+still. Until that is done, the desk is precise about its reach rather than
+quiet about it, because **a switch that claims more than it does is worse than
+no switch.**
 
 ## Settings read empty for a while, and the table was full
 
