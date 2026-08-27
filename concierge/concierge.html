@@ -54,9 +54,11 @@ a{color:var(--tealb);text-decoration:none}
 .srch:focus{border-color:var(--teal);outline:none}
 .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mute)}
 .who .av{width:27px;height:27px;border-radius:8px;background:linear-gradient(135deg,#FFB020,#FF6B4A);display:grid;place-items:center;color:#04211D;font-weight:700;font-size:11px}
-.kill{font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:100px;border:1px solid rgba(255,107,74,.35);color:var(--coral);transition:.14s}
-.kill:hover{background:rgba(255,107,74,.1)}
-.kill.off{border-color:var(--softline);color:var(--dim)}
+.kill{font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:100px;border:1px solid rgba(45,212,191,.4);color:var(--tealb);transition:.14s;white-space:nowrap}
+.kill:hover{background:rgba(45,212,191,.1)}
+.kill.off{border-color:rgba(255,107,74,.42);color:var(--coral)}
+.kill.off:hover{background:rgba(255,107,74,.1)}
+.kill:disabled{opacity:.5;cursor:progress}
 
 .body{padding:22px;flex:1;max-width:1180px;width:100%}
 .view{display:none}
@@ -336,6 +338,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   <div class="main">
     <header class="top">
       <input class="srch" id="srch" placeholder="Search this view&hellip;">
+      <button class="kill hidden" id="kill">Agents&hellip;</button>
       <div class="who" id="who"></div>
     </header>
 
@@ -367,10 +370,10 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 
   <div class="tiles" id="ovTiles"></div>
 
-  <div class="sechd">Needs you now</div>
+  <div class="sechd">Needs a decision</div>
   <div id="ovNeeds"></div>
 
-  <div class="sechd">Running</div>
+  <div class="sechd">Moving on its own</div>
   <div id="ovRunning"></div>
 </section>
 
@@ -591,6 +594,7 @@ const VIEWS = [
     select:"*",
     order:"created_at", search:["req_id","name","place","work_type","descr"],
     empty:["Nothing in the queue","When somebody fills in the form on yaadly.co.uk it lands here."],
+    pre: preIntake, panel: panelIntake,
     cols:[
       {h:"Reference", f:r => id_(r.req_id || r.id) + sub_((r.descr || "").slice(0,60))},
       {h:"Work & area", f:r => esc(r.work_type || "Unclear") + sub_(r.place || "Not given")},
@@ -648,6 +652,7 @@ const VIEWS = [
     select:"*",
     order:"created_at", search:["job_id","label","uploaded_by"],
     empty:["No evidence filed","Workers upload from their portal. Nothing has been filed against a job yet."],
+    pre: preEvidence, panel: panelEvidence,
     cols:[
       {h:"Job", f:r => id_(r.job_id) + sub_("stage " + (r.stage ?? "none"))},
       {h:"Item", f:r => esc(r.label || "unlabelled") + sub_(r.mime || "")},
@@ -663,6 +668,7 @@ const VIEWS = [
     select:"*",
     order:"created_at", search:["job_id","worker_name","worker_email"],
     empty:["No quotes in","Workers quote from the board. Nothing has been submitted yet."],
+    panel: panelQuotes,
     cols:[
       {h:"Job", f:r => id_(r.job_id)},
       {h:"Worker", f:r => esc(r.worker_name || r.worker_email || "unknown")},
@@ -670,6 +676,7 @@ const VIEWS = [
       {h:"Materials", n:true, f:r => jmd(r.materials_jmd)},
       {h:"Client sees", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 1.15) + Number(r.materials_jmd||0))},
       {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.88) + Number(r.materials_jmd||0))},
+      {h:"Against the others", f:r => quoteBand(r, ROWS.quotes || [])},
       {h:"State", f:r => tone_(r.status)},
     ],
     actions:[
@@ -687,6 +694,7 @@ const VIEWS = [
     select:"*",
     order:"created_at", search:["app_id","name","email","trade","parish"],
     empty:["No applications","Workers apply at yaadly.co.uk/apply."],
+    pre: preApps, panel: panelApps,
     cols:[
       {h:"Applicant", f:r => esc(r.name || "no name") + sub_(r.email || r.phone || "")},
       {h:"Trade & area", f:r => esc(r.trade || "not said") + sub_(r.parish || "")},
@@ -721,6 +729,7 @@ const VIEWS = [
       {h:"Trade & area", f:r => esc(r.trade || "") + sub_(r.parish || "")},
       {h:"Lane", f:r => r.lane ? chip_("mute", r.lane) : mute_("none")},
       {h:"Jobs done", n:true, f:r => String(r.jobs_completed ?? 0)},
+      {h:"Guidelines", f:r => guidelinesChip(r.worker_email, "worker_guidelines", "WG")},
       {h:"State", f:r => r.active ? chip_("ok","active") : chip_("warn","cannot quote")},
     ]},
 
@@ -733,6 +742,7 @@ const VIEWS = [
     cols:[
       {h:"Client", f:r => esc(r.name || "no name") + sub_(r.email || "")},
       {h:"Jobs done", n:true, f:r => Number(r.jobs_completed ?? 0) || chip_("ok","first job")},
+      {h:"Guidelines", f:r => guidelinesChip(r.email, "client_guidelines", "CG")},
       {h:"State", f:r => r.active ? chip_("ok","active") : chip_("mute","inactive")},
       {h:"Joined", f:r => mute_(day_(r.created_at))},
     ]},
@@ -748,6 +758,7 @@ const VIEWS = [
       {h:"Direction", f:r => esc(r.direction || "")},
       {h:"Stars", n:true, f:r => String(r.stars ?? "")},
       {h:"Extract", f:r => esc(String(r.body || "").slice(0,90)) + sub_(r.reply ? "replied" : "no reply")},
+      {h:"The other side", f:r => reviewCounterpart(r, ROWS.reviews || [])},
       {h:"Written", f:r => mute_(day_(r.created_at))},
     ]},
 
@@ -757,6 +768,7 @@ const VIEWS = [
     select:"*", hide:["docs","intake"],
     order:"created_at", search:["id","job_id","project_title","client_name"],
     empty:["No packs","A pack is drafted against a job once its scope is agreed."],
+    pre: preKick, panel: panelKick,
     cols:[
       {h:"Pack", f:r => id_(r.id) + sub_(r.model || "")},
       {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
@@ -779,6 +791,12 @@ const VIEWS = [
       {h:"Signer", f:r => esc(r.signer_name || "no name") + sub_(r.signer_email || "")},
       {h:"Document", f:r => esc(r.doc_type || "")},
       {h:"Version", f:r => `<span class="mono">${esc(r.doc_version || "none")}</span>`},
+      {h:"Still current?", f:r => {
+        const want = currentVersion(r.doc_type);
+        if (!want) return chip_("mute","no version in force");
+        return String(r.doc_version) === String(want) ? chip_("ok","current")
+             : chip_("crit","stale, must re-sign");
+      }},
       {h:"Signed", f:r => mute_(day_(r.signed_at))},
     ]},
 
@@ -788,10 +806,11 @@ const VIEWS = [
 
   { k:"svc", g:"Services", label:"Services", icon:"tools",
     title:"Services", table:"services",
-    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee quoted on a call before anything starts.",
+    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee quoted on a call before anything starts. This is the lane the October Gate is counted from.",
     select:"*",
     order:"updated_at", search:["id","type","client_name","parish"],
     empty:["No service bookings","Deposit Protection Checks and Project Setup Packs land here."],
+    panel: panelSvc,
     cols:[
       {h:"Ref", f:r => id_(r.id)},
       {h:"Service", f:r => esc(r.type || "") + sub_(r.parish || "")},
@@ -873,7 +892,8 @@ const VIEWS = [
     title:"Settings", table:"app_settings",
     sub:"Every switch you can flip without a deploy. These are the live rows in app_settings, not a picture of them.",
     select:"key,value", order:"key", asc:true, search:["key"],
-    empty:["No settings rows","app_settings is empty."],
+    empty:["No settings rows","app_settings is empty. Until 27 August this view also read empty when the table was full, because row level security was on with no policy behind it. That is fixed; if you are seeing this now, the table really is empty."],
+    panel: panelSet,
     cols:[
       {h:"Key", f:r => `<span class="mono" style="color:var(--tealb)">${esc(r.key)}</span>`},
       {h:"Value", f:r => {
@@ -941,6 +961,470 @@ function stageBar(stage){
   return out + "</div>";
 }
 
+// ---------------------------------------------------------------- side data
+//
+// Some panels need a second table to say anything true. A view declares
+// pre(rows) to fetch it once, and panel(rows) to draw from what pre() stashed.
+// Nothing below invents a number: if the side fetch fails, the panel says so
+// rather than drawing an empty shape that looks like an answer.
+
+let SETTINGS = [];          // app_settings, the real rows
+let AGENTS_PAUSED = false;  // mirror of app_settings.agents_paused
+const SIGS = {};            // lower(email) -> { doc_type: version }
+const VET  = {};            // application id -> latest vetting_reviews row
+const VDOC = {};            // application id -> [vetting_documents]
+let   EVID_CTX = null;      // { group, job, pack, error } for the evidence panel
+let   KICK_CTX = null;      // { pack, error } for the kickoff panel
+let   INTAKE_DRAFTS = [];   // jobs built but never signed for
+
+const softFail = (what, msg) =>
+  `<div class="alert warn"><span class="ic">!</span><div><b>${esc(what)} could not be read</b><p>${esc(msg)}</p></div></div>`;
+
+// The version each document is on right now, from app_settings. The database
+// has its own current_doc_version() and that is what actually gates quoting;
+// this is only so the desk can show the same answer without a round trip.
+const currentVersion = (docType) => {
+  const row = SETTINGS.find(r => r.key === docType.replace(/s$/, "") + "s_version"
+                              || r.key === docType + "_version");
+  return row ? String(row.value || "").replace(/^"|"$/g, "") : null;
+};
+
+async function loadSettings(){
+  const { data, error } = await sb.from("app_settings").select("key,value").order("key");
+  if (error) { SETTINGS = []; return error.message; }
+  SETTINGS = data || [];
+  const p = SETTINGS.find(r => r.key === "agents_paused");
+  AGENTS_PAUSED = p ? /^"?true"?$/i.test(String(p.value)) : false;
+  return null;
+}
+
+// A signature map, so Workers and Clients can show which version somebody is
+// on without a join the client library cannot express.
+async function loadSignatures(){
+  const { data } = await sb.from("doc_signatures").select("signer_email,doc_type,doc_version,signed_at").limit(1000);
+  for (const k in SIGS) delete SIGS[k];
+  for (const r of data || []) {
+    const e = String(r.signer_email || "").toLowerCase();
+    if (!e) continue;
+    (SIGS[e] = SIGS[e] || {})[r.doc_type] = r.doc_version;
+  }
+}
+
+// teal when they are on the version in force, coral when they are behind it,
+// mango when they have never signed. Behind is coral because the database
+// refuses to let them quote, which is a block, not a wait.
+function guidelinesChip(email, docType, short){
+  const sig = SIGS[String(email || "").toLowerCase()];
+  const have = sig && sig[docType];
+  const want = currentVersion(docType);
+  if (!have) return chip_("warn", "not signed");
+  if (want && String(have) !== String(want)) return chip_("crit", short + " v" + have + ", stale");
+  return chip_("ok", short + " v" + have);
+}
+
+// ---------------------------------------------------------------- the agents switch
+//
+// This pauses every agent THIS DESK starts: invoice drafting, sketch
+// description, anything else behind the fn() call below. It does not stop the
+// WhatsApp and website intake agents, which run in edge functions that do not
+// read this row yet. The Settings view says so in as many words, because a
+// switch that claims more reach than it has is worse than no switch.
+
+function paintKill(){
+  const b = $("kill");
+  if (!b) return;
+  b.classList.remove("hidden");
+  b.disabled = false;
+  b.classList.toggle("off", AGENTS_PAUSED);
+  b.textContent = AGENTS_PAUSED ? "Agents: paused" : "Agents: live";
+  b.title = AGENTS_PAUSED
+    ? "Paused. This desk will not call an agent. Inbound WhatsApp and website intake are not covered by this switch."
+    : "Live. Drafting an invoice or describing stills calls a model. Inbound WhatsApp and website intake run whatever this says.";
+}
+
+async function setAgentsPaused(next){
+  const b = $("kill");
+  b.disabled = true;
+  const { error } = await sb.from("app_settings")
+    .upsert({ key: "agents_paused", value: next ? "true" : "false" }, { onConflict: "key" });
+  if (error) { b.disabled = false; alert("The database refused that.\n\n" + error.message); return; }
+  AGENTS_PAUSED = next;
+  const row = SETTINGS.find(r => r.key === "agents_paused");
+  if (row) row.value = next ? "true" : "false";
+  else SETTINGS.push({ key: "agents_paused", value: next ? "true" : "false" });
+  paintKill();
+  if (currentView === "set") loadTableView("set");
+}
+
+async function writeSetting(key, value, el){
+  el.style.opacity = ".5";
+  const { error } = await sb.from("app_settings").upsert({ key, value }, { onConflict:"key" });
+  el.style.opacity = "";
+  if (error) { alert("The database refused that.\n\n" + error.message); return; }
+  const row = SETTINGS.find(r => r.key === key);
+  if (row) row.value = value; else SETTINGS.push({ key, value });
+  if (currentView === "set") loadTableView("set");
+}
+
+// ---------------------------------------------------------------- panels
+
+// ---- Intake: the drafts that stopped before anybody signed.
+//
+// A job with no client account behind it is somebody who built the whole thing
+// and walked away at sign-up. The trade, the parish and their own words are all
+// still here, which makes it a lead rather than a loss.
+async function preIntake(){
+  const { data } = await sb.from("jobs")
+    .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at")
+    .is("client_user", null).order("updated_at", { ascending:false }).limit(50);
+  INTAKE_DRAFTS = data || [];
+}
+
+function panelIntake(){
+  if (!INTAKE_DRAFTS.length) return "";
+  const rows = INTAKE_DRAFTS.map(r =>
+    `<tr><td>${id_(r.id)}${sub_(r.title || "")}</td>`
+  + `<td>${esc(r.trade || "not classified")}${sub_(r.parish || "")}</td>`
+  + `<td>${esc(r.client_name || "no name")}${sub_(r.client_phone || r.client_email || "no way to reply")}</td>`
+  + `<td>${tone_(r.status)}</td>`
+  + `<td>${mute_(ago_(r.updated_at))}</td></tr>`).join("");
+  return `<div class="sechd">Built a job, never signed</div>`
+    + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send.</p>`
+    + `<div class="card pad0"><div class="tw"><table><thead><tr><th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th></tr></thead><tbody>${rows}</tbody></table></div></div>`
+    + `<p class="hint">${INTAKE_DRAFTS.length} row${INTAKE_DRAFTS.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">client_user</span> is null. These are not in the queue below; they are already jobs.</p>`
+    + `<div class="sechd">The queue</div>`;
+}
+
+// ---- Evidence: the review card the framework puts at the top of this view.
+//
+// You look before the client does. The card shows the newest stage that has
+// something unchecked in it: what the pack asked for, what actually arrived,
+// the fingerprint the approval binds to, and what money moves if you pass it.
+async function preEvidence(rows){
+  EVID_CTX = null;
+  const waiting = (rows || []).filter(r => r.ok === false);
+  if (!waiting.length) return;
+
+  // Newest first, then everything filed against that same job and stage.
+  const head = waiting[0];
+  const group = (rows || []).filter(r => r.job_id === head.job_id && (r.stage ?? null) === (head.stage ?? null));
+
+  const [jobR, packR] = await Promise.all([
+    sb.from("jobs").select("id,title,parish,stage,owed,worker_name,client_name,status").eq("id", head.job_id).maybeSingle(),
+    sb.from("kickoff_packs").select("id,status,docs").eq("job_id", head.job_id).order("rev", { ascending:false }).limit(1).maybeSingle(),
+  ]);
+  EVID_CTX = { group, job: jobR.data || null, pack: packR.data || null,
+               error: jobR.error ? jobR.error.message : (packR.error ? packR.error.message : null) };
+}
+
+// The evidence checklist arrives as prose. Its bullet lines are the checkable
+// part; the paragraphs around them are context. Anything that is not a bullet
+// is left alone rather than guessed at.
+function checklistLines(text){
+  return String(text || "").split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => /^([-*•–]|\d+[.)])\s+/.test(l))
+    .map(l => l.replace(/^([-*•–]|\d+[.)])\s+/, "").replace(/\*\*/g, "").replace(/^\[[ xX]\]\s*/, "").trim())
+    .filter(l => l.length > 3 && l.length < 160)
+    .slice(0, 16);
+}
+
+const STOP = new Set(["the","a","an","and","or","of","to","in","on","at","for","with","before","after","is","are","be","been","was","were","photo","photos","video","image","clear","showing","show","shows","one","two","each","all","any","that","this","it","its","from","by","as","not"]);
+const words = (t) => new Set(String(t || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(w => w.length > 2 && !STOP.has(w)));
+
+// Matched on the words in the label, not on the picture. That is a real limit
+// and the panel says it out loud underneath.
+//
+// Two shared words is the bar for a wordy label. A file called
+// "board-before.jpg" only carries one noun, so a short label matches on one:
+// demanding two from a filename that cannot hold two would mark everything
+// missing, and a checklist that always says missing is not a checklist.
+function checklistMatch(line, labels){
+  const want = words(line);
+  if (!want.size) return false;
+  for (const lab of labels) {
+    const got = words(String(lab).replace(/\.(jpe?g|png|heic|webp|gif|mp4|mov|m4v|pdf)$/i, ""));
+    let hit = 0;
+    for (const w of want) if (got.has(w)) hit++;
+    if (!hit) continue;
+    if (hit >= 2 || got.size <= 3 || want.size === 1) return true;
+  }
+  return false;
+}
+
+const JOURNEY = ["Scope agreed","Chosen and funded","Kickoff issued","On site","Evidence in","Signed off","Paid","Closed"];
+
+function journeyRail(stage){
+  const s = Number(stage) || 0;
+  return '<div class="jrn">' + JOURNEY.map((t, i) => {
+    const n = i + 1;
+    const cls = n < s ? "jst done" : n === s ? "jst now" : "jst";
+    return `<div class="${cls}"><span class="jn">${String(n).padStart(2,"0")}</span><span class="jt">${esc(t)}</span></div>`;
+  }).join("") + "</div>";
+}
+
+function panelEvidence(rows){
+  if (!(rows || []).length) return "";
+  if (!EVID_CTX) {
+    return `<div class="alert ok"><span class="ic">&#10003;</span><div><b>Nothing is waiting on your eyes</b><p>Every set filed against a job has been signed off. New uploads land at the top of this view and this card comes back.</p></div></div>`;
+  }
+  const { group, job, pack, error } = EVID_CTX;
+  const labels = group.map(r => r.label || "");
+  const filed = group.length;
+  const stage = group[0].stage;
+
+  const list = checklistLines(pack && pack.docs && pack.docs.evidence_checklist);
+  const req = list.length
+    ? `<p class="sechd" style="margin:16px 0 0">Asked for, from the kickoff pack</p><div class="reqlist">`
+      + list.map(l => {
+          const ok = checklistMatch(l, labels);
+          return `<div class="reqrow ${ok ? "ok" : "miss"}"><i>${ok ? "&#10003;" : ""}</i>${esc(l)}${ok ? "" : " &mdash; <b>not matched</b>"}</div>`;
+        }).join("")
+      + `</div><p class="conseq">Matched on the words in the file label, never on the picture. <b>A miss here can be the label rather than the work</b>, so read the stills before you take it as missing.</p>`
+    : pack
+      ? `<p class="conseq" style="margin-top:14px">Pack <span class="mono">${esc(pack.id)}</span> carries no bulleted evidence checklist, so there is nothing to check these against. What arrived is below.</p>`
+      : `<p class="conseq" style="margin-top:14px">No kickoff pack exists for this job, so nothing states what this stage was supposed to produce. That is the gap, not the photographs.</p>`;
+
+  const thumbs = `<p class="sechd" style="margin:16px 0 0">What arrived</p><div class="thumbs">`
+    + group.slice(0, 12).map(r => `<i title="${esc(r.label || "unlabelled")}">${esc(r.label || "unlabelled")}</i>`).join("")
+    + `</div>`;
+
+  const prints = group.filter(r => r.sha256).map(r => String(r.sha256));
+  const fp = prints.length
+    ? `<div class="fp">sha256 &middot; ${esc(prints.slice(0,3).join("  "))}${prints.length > 3 ? "  and " + (prints.length - 3) + " more" : ""}</div>`
+    : `<div class="fp">No fingerprint recorded against these files. An approval bound to nothing is a signature on air.</div>`;
+
+  const owed = job && Number(job.owed) ? jmd(job.owed) : null;
+
+  return `<div class="card">
+      <div class="chd"><h3>${esc(job ? (job.title || job.id) : group[0].job_id)}${stage != null ? " &middot; stage " + esc(stage) : ""}</h3>`
+    + `<span class="chip warn dot">${filed} item${filed === 1 ? "" : "s"}</span>`
+    + `<span class="sp">${esc(group[0].uploaded_by || "unknown")} &middot; ${esc(ago_(group[0].created_at))} ago</span></div>`
+    + (error ? softFail("The job or its pack", error) : "")
+    + journeyRail(job ? job.stage : null)
+    + req + thumbs + fp
+    + `<p class="conseq">Signing off binds your approval to those exact fingerprints. ${owed ? `Passing it to the client is what releases <b>${owed}</b> on this job.` : "Nothing is recorded as owed on this job yet, so passing it releases no money."} Open any row below to sign one off.</p>`
+    + `</div>`;
+}
+
+// ---- Applications: the vetting record, as the join journey words it.
+//
+// PASS, GAP and BLOCK are yours. The agent reads the documents and flags. The
+// count of flags is shown, the decision is not.
+async function preApps(rows){
+  const ids = (rows || []).map(r => r.id).filter(Boolean).slice(0, 60);
+  for (const k in VET) delete VET[k];
+  for (const k in VDOC) delete VDOC[k];
+  if (!ids.length) return;
+  const [rev, doc] = await Promise.all([
+    sb.from("vetting_reviews").select("application_id,model,summary,checks,flag_count,created_at,error")
+      .in("application_id", ids).order("created_at", { ascending:false }).limit(200),
+    sb.from("vetting_documents").select("application_id,doc_type,outcome,verified_at,purged_at,created_at")
+      .in("application_id", ids).limit(400),
+  ]);
+  for (const r of rev.data || []) if (!VET[r.application_id]) VET[r.application_id] = r;   // newest wins
+  for (const d of doc.data || []) (VDOC[d.application_id] = VDOC[d.application_id] || []).push(d);
+}
+
+const VERDICT = { pass:["ok","&#10003;","Pass"], flag:["gap","!","Gap"], unclear:["gap","?","Unclear"], block:["block","&times;","Block"], fail:["block","&times;","Fail"] };
+
+function panelApps(rows){
+  const waiting = (rows || []).filter(r => ["submitted","reviewing"].includes(String(r.status || "")));
+  if (!waiting.length) return "";
+  const a = waiting[0];
+  const v = VET[a.id];
+  const docs = VDOC[a.id] || [];
+
+  let body;
+  if (!v) {
+    body = `<p class="conseq">No agent review has been run against this application, so nothing has read the documents yet. ${docs.length ? docs.length + " document" + (docs.length === 1 ? " is" : "s are") + " on file." : "No documents are on file either."} Your judgement is the only thing standing here.</p>`;
+  } else if (v.error) {
+    body = softFail("The last agent run", v.error);
+  } else {
+    const checks = Array.isArray(v.checks) ? v.checks : [];
+    body = `<div class="vrec">` + checks.map(c => {
+      const [cls, ic, label] = VERDICT[String(c.verdict || "").toLowerCase()] || ["gap","?","Unclear"];
+      return `<div class="vitem ${cls}"><span class="vi">${ic}</span>`
+           + `<div><h6>${esc(c.name || "unnamed check")}</h6><p>${esc(c.note || "")}</p></div>`
+           + `<span class="vs">${label}</span></div>`;
+    }).join("") + `</div>`
+    + (v.summary ? `<p class="conseq" style="margin-top:12px">${esc(v.summary)}</p>` : "");
+  }
+
+  const flags = v ? (v.flag_count || 0) : 0;
+  return `<div class="card">
+      <div class="chd"><h3>${esc(a.name || a.app_id || "Application")}</h3>`
+    + (v ? `<span class="chip ${flags ? "warn" : "ok"} dot">${flags} flag${flags === 1 ? "" : "s"}</span>` : `<span class="chip mute dot">not reviewed</span>`)
+    + `<span class="sp">${esc(a.trade || "trade not said")} &middot; ${esc(a.parish || "parish not said")} &middot; applied ${esc(ago_(a.created_at))} ago</span></div>`
+    + body
+    + `<p class="conseq"><b>The agent flags, a person decides.</b> ${v ? esc(v.model || "The model") + " read " + docs.length + " document" + (docs.length === 1 ? "" : "s") + " and raised " + flags + "." : "Nothing has read these documents."} It never approves anybody. Open the row below to record Pass, Gap or Block, and each one says what it does before it does it.</p>`
+    + `</div>`;
+}
+
+// ---- Quotes: where a quote sits against the others on the same job.
+//
+// There is no published price book to benchmark against, and inventing a fair
+// band from nothing would be exactly the guess this business exists to stop.
+// What is real is the spread: what else came in for this same job.
+function quoteBand(r, all){
+  const peers = (all || []).filter(x => x.job_id === r.job_id && x.id !== r.id);
+  if (!peers.length) return chip_("mute", "only quote in");
+  const mine = Number(r.labour_jmd || 0) + Number(r.materials_jmd || 0);
+  const tot  = peers.map(x => Number(x.labour_jmd || 0) + Number(x.materials_jmd || 0));
+  const low = Math.min(...tot), high = Math.max(...tot);
+  if (!mine) return chip_("mute", "no figure");
+  if (mine <= low) return chip_("ok", "lowest of " + (peers.length + 1));
+  if (mine >= high) return chip_("warn", "highest of " + (peers.length + 1));
+  return chip_("mute", "middle of " + (peers.length + 1));
+}
+
+function panelQuotes(rows){
+  if (!(rows || []).length) return "";
+  const jobs = new Set(rows.map(r => r.job_id));
+  return `<div class="alert ok"><span class="ic">&#10003;</span><div><b>${rows.length} quote${rows.length === 1 ? "" : "s"} across ${jobs.size} job${jobs.size === 1 ? "" : "s"}</b>`
+    + `<p>The comparison column is against the other quotes on the same job, and nothing else. Yaadly has no published price book to benchmark against, and a band invented from nothing would be the same guess this business exists to stop. Yaadly does project management and oversight, not price estimation.</p></div></div>`;
+}
+
+// ---- Reviews: which side is still waiting.
+function reviewCounterpart(r, all){
+  const other = (all || []).find(x => x.job_id === r.job_id && x.direction !== r.direction);
+  if (other) return chip_("ok", "both in");
+  return chip_("warn", "waiting on the other side");
+}
+
+// ---- Kickoff packs: what is actually in the newest draft.
+const KICK_DOCS = [
+  ["scope_of_works","Works scope"], ["payment_schedule","Payment stages"],
+  ["evidence_checklist","Evidence checklist"], ["risk_register","Risk register"],
+  ["timeline","Timeline"], ["document_pack","Document pack"],
+  ["communications_list","Who to call"], ["open_questions","Open questions"],
+  ["human_review_notes","Notes for you"], ["cover_note","Cover note"],
+];
+
+async function preKick(rows){
+  KICK_CTX = null;
+  const draft = (rows || []).find(r => r.status === "draft") || (rows || [])[0];
+  if (!draft) return;
+  const { data, error } = await sb.from("kickoff_packs").select("*").eq("id", draft.id).maybeSingle();
+  KICK_CTX = { pack: data || null, error: error ? error.message : null };
+}
+
+function panelKick(rows){
+  if (!(rows || []).length || !KICK_CTX) return "";
+  const { pack, error } = KICK_CTX;
+  if (error) return softFail("The newest pack", error);
+  if (!pack) return "";
+  const docs = pack.docs || {};
+  const chars = Object.keys(docs).reduce((t, k) => t + String(docs[k] || "").length, 0);
+  const present = KICK_DOCS.filter(d => String(docs[d[0]] || "").trim().length > 40);
+
+  // Anything the writing rule forbids, and anything left over from a model
+  // that answers in another script. Counted, not assumed.
+  const all = Object.values(docs).map(v => String(v || "")).join("\n");
+  const dashes = (all.match(/[–—]/g) || []).length;
+  const cjk = (all.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length;
+
+  const rowsHtml = KICK_DOCS.map(d => {
+    const n = String(docs[d[0]] || "").trim().length;
+    const ok = n > 40;
+    return `<div class="reqrow ${ok ? "ok" : "miss"}"><i>${ok ? "&#10003;" : ""}</i>${esc(d[1])}`
+         + (ok ? ` <span class="mono" style="color:var(--dim)">${n.toLocaleString("en-GB")} chars</span>` : " &mdash; <b>missing</b>") + `</div>`;
+  }).join("");
+
+  return `<div class="card">
+      <div class="chd"><h3>${esc(pack.id)}${pack.job_id ? " &middot; " + esc(pack.job_id) : ""}</h3>`
+    + tone_(pack.status)
+    + `<span class="sp">${esc(pack.model || "no model recorded")} &middot; ${chars.toLocaleString("en-GB")} chars &middot; rev ${esc(String(pack.rev ?? 1))}</span></div>`
+    + `<div class="grid2"><div><div class="reqlist">${rowsHtml}</div></div>`
+    + `<div><div class="kv">`
+    + `<span class="k2">Documents present</span><span class="v2">${present.length} of ${KICK_DOCS.length}</span>`
+    + `<span class="k2">Em and en dashes</span><span class="v2">${dashes ? `<span class="chip crit">${dashes} to strip</span>` : `<span class="chip ok">none</span>`}</span>`
+    + `<span class="k2">Characters from another script</span><span class="v2">${cjk ? `<span class="chip crit">${cjk} found</span>` : `<span class="chip ok">none</span>`}</span>`
+    + `<span class="k2">Project</span><span class="v2">${esc(pack.project_title || "not named")}</span>`
+    + `<span class="k2">Client</span><span class="v2">${esc(pack.client_name || "not named")}</span>`
+    + `<div class="hr"></div>`
+    + `<span class="k2 tot">Approved</span><span class="v2 tot">${pack.approved_at ? esc(day_(pack.approved_at)) + " by " + esc(pack.approved_by || "unknown") : "not yet"}</span>`
+    + `</div>`
+    + `<p class="conseq" style="margin-top:11px">The database refuses to save or approve a pack whose documents are null. Read it end to end before approving: <b>approving is what lets it reach a client.</b></p>`
+    + `</div></div></div>`;
+}
+
+// ---- Services: the PM pipeline, and the October Gate it is being counted against.
+function panelSvc(rows){
+  const live = (rows || []).filter(r => Number(r.stage || 0) > 0 && Number(r.stage || 0) < 5);
+  const done = (rows || []).filter(r => Number(r.stage || 0) >= 5);
+  // Retainers are the only recurring line, and only the ones actually running
+  // count towards the gate. A booked-but-unstarted retainer is not committed money.
+  const retainers = (rows || []).filter(r => /retainer/i.test(String(r.type || "")) && Number(r.stage || 0) > 0);
+  const monthly = retainers.reduce((t, r) => {
+    const n = Number(String(r.price || "").replace(/[^0-9.]/g, ""));
+    return t + (isFinite(n) ? n : 0);
+  }, 0);
+  const GATE = 1200;
+  const short = Math.max(0, GATE - monthly);
+
+  return `<div class="tiles">`
+    + tile(monthly >= GATE ? "ok" : "warn", "Committed monthly", "£" + monthly.toLocaleString("en-GB"), "Counted from retainers that have actually started")
+    + tile(retainers.length ? "ok" : "warn", "Retainers running", String(retainers.length), retainers.length ? "Each one is recurring money" : "None started")
+    + tile(short ? "warn" : "ok", "Short of the gate", "£" + short.toLocaleString("en-GB"), "The October Gate wants £1,200 a month committed")
+    + tile("", "Delivered", String(done.length), live.length + " still in flight")
+    + `</div>`
+    + `<div class="alert ${short ? "warn" : "ok"}"><span class="ic">${short ? "?" : "&#10003;"}</span><div>`
+    + `<b>${short ? "The gate is not covered yet" : "The gate is covered"}</b>`
+    + `<p>The October Gate is £1,200 a month committed, plus the settlement banked, plus childcare and housing. This tile only counts the first of those four, and only from retainers that have started. ${short ? "Three at £350 is £1,050 and misses it; three at £395 plus one visit clears it. Same selling effort either way." : "Money is only one of the four. The other three are not in this database."}</p>`
+    + `</div></div>`;
+}
+
+// ---- Settings: switches, not a key and value dump.
+//
+// Every row says what reads it. A row nothing reads is said to be a row
+// nothing reads, because that is the difference between a switch and a label.
+const SETTING_META = {
+  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. It does not reach everything: <b>inbound WhatsApp and website intake keep running whatever this row says.</b>", true],
+  worker_guidelines_version: ["Worker Guidelines in force", "current_doc_version() reads this, and the quote policy refuses an insert from anybody signed on an older version. Bumping it stops quoting until they re-sign.", false],
+  client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
+  trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
+  ntfy_topic:           ["Where intake alerts go", "yaad-inbound pushes to this topic. Reference, trade and parish only, never personal data.", false],
+  desk_url:             ["This desk's address", "Written into the links the functions send you.", false],
+  admin_email:          ["The address this desk answers to", "is_admin() is what actually gates the data. This row is for the functions to write to.", false],
+  sketch_stamp:         ["The stamp on every sketch pack", "sketch_guard_approval puts this on the document and refuses to approve a pack carrying a measurement.", false],
+  purge_cron_secret_sha256: ["Deletion clock secret, hashed", "A SHA-256, never the secret itself. yaad-vetting-purge compares against it so a caller cannot run the deletion clock without the real value.", false],
+};
+const SETTING_GROUP = {
+  agents_paused:"Agents", trade_list:"Agents",
+  worker_guidelines_version:"Documents in force", client_guidelines_version:"Documents in force", sketch_stamp:"Documents in force",
+  ntfy_topic:"Notifications and addresses", desk_url:"Notifications and addresses", admin_email:"Notifications and addresses",
+};
+
+const isBool = (v) => /^"?(true|false)"?$/i.test(String(v));
+const boolOf = (v) => /^"?true"?$/i.test(String(v));
+const clean  = (v) => String(v ?? "").replace(/^"|"$/g, "");
+
+function panelSet(rows){
+  if (!(rows || []).length) return "";
+  const groups = {};
+  for (const r of rows) {
+    const g = SETTING_GROUP[r.key] || "Everything else";
+    (groups[g] = groups[g] || []).push(r);
+  }
+  const order = ["Agents","Documents in force","Notifications and addresses","Everything else"];
+  const cards = order.filter(g => groups[g]).map(g => {
+    const body = groups[g].map(r => {
+      const meta = SETTING_META[r.key] || [r.key, "Nothing in this codebase reads this row. It is a note to yourself, not a switch.", false];
+      const val = clean(r.value);
+      const control = isBool(r.value)
+        ? `<div class="sw${boolOf(r.value) ? " on" : ""}" data-set="${esc(r.key)}" role="switch" tabindex="0" aria-checked="${boolOf(r.value)}" aria-label="${esc(meta[0])}"></div>`
+        : `<span class="chip ${val ? "ok" : "mute"}" title="${esc(val)}">${esc(val.length > 30 ? val.slice(0,30) + "…" : (val || "empty"))}</span>`;
+      return `<div class="tg"><div><b>${esc(meta[0])}</b><span>${meta[1]}</span>`
+           + `<span class="mono" style="color:var(--dim);letter-spacing:0;text-transform:none;font-size:10px">${esc(r.key)}</span></div>${control}</div>`;
+    }).join("");
+    return `<div class="card"><div class="chd"><h3>${esc(g)}</h3></div>${body}</div>`;
+  });
+  return `<div class="grid2">${cards.join("")}</div>`
+    + `<p class="conseq">These are the live rows in <span class="mono">app_settings</span>, not a picture of them. A switch writes the row the moment you click it. Anything without a switch is text: change it in the table below, or in the function that reads it.</p>`
+    + `<div class="sechd">Every row, as it is stored</div>`;
+}
+
 // ---------------------------------------------------------------- shell build
 
 function buildRail(){
@@ -996,6 +1480,12 @@ async function loadTableView(k){
     return;
   }
   ROWS[k] = (data || []).map((r, i) => Object.assign(r, { __i: i }));
+
+  // A view that needs a second table fetches it once, here, before anything is
+  // drawn. If that fetch fails the panel says so; the table underneath is
+  // unaffected, because the rows are already in hand.
+  if (v.pre) { try { await v.pre(ROWS[k]); } catch (e) { console.warn(v.table + " side fetch:", e.message); } }
+
   renderTableView(k);
   setCount(k, ROWS[k].length, false);
 }
@@ -1006,9 +1496,12 @@ function renderTableView(k){
   const rows = term && v.search
     ? all.filter(r => v.search.some(f => String(r[f] ?? "").toLowerCase().includes(term)))
     : all;
-  $("v-" + k).innerHTML = term && !rows.length
+  // The panel is drawn from everything loaded, not from the filtered rows. A
+  // search box is for finding one row, not for changing what is true.
+  const panel = v.panel ? v.panel(all) : "";
+  $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
-    : tableCard(v, rows);
+    : tableCard(v, rows));
 }
 
 function setCount(k, n, hot){
@@ -1128,6 +1621,22 @@ function go(v){
 }
 
 document.addEventListener("click", (e) => {
+  const kill = e.target.closest("#kill");
+  if (kill) {
+    const next = !AGENTS_PAUSED;
+    if (!confirm(next
+      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. Inbound WhatsApp and website intake do not read this row yet, so they keep running."
+      : "Let this desk call agents again?")) return;
+    setAgentsPaused(next);
+    return;
+  }
+  const sw = e.target.closest("[data-set]");
+  if (sw) {
+    const key = sw.dataset.set, on = sw.classList.contains("on");
+    if (key === "agents_paused") { setAgentsPaused(!on); return; }
+    writeSetting(key, on ? "false" : "true", sw);
+    return;
+  }
   const r = e.target.closest("[data-v]");
   if (r) { go(r.dataset.v); return; }
   const tr = e.target.closest("tr[data-i]");
@@ -1150,6 +1659,11 @@ async function token(){
 }
 
 async function fn(payload){
+  // The switch in the top bar is only true if this is here. Everything the
+  // desk asks a model to do goes through this one call.
+  if (AGENTS_PAUSED && ["draft","describe","assemble"].includes(payload && payload.action)) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
   const r = await fetch(FN, {
     method: "POST",
     headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
@@ -1202,10 +1716,19 @@ async function boot(){
     console.warn("service catalogue unavailable:", e.message);
   }
 
+  // The settings and the signature map are wanted by more than one view, so
+  // they are read once, here. A failure is loud rather than silently empty:
+  // app_settings spent a while with row level security on and no policy behind
+  // it, which read as an empty table from every view that touched it.
+  const setErr = await loadSettings();
+  await loadSignatures();
+
   $("who").innerHTML = `<span class="av">${esc(initials(who))}</span>${esc(who)} <button class="btn g" id="signOut" style="margin-left:4px">Sign out</button>`;
   $("signOut").addEventListener("click", signOut);
   show("gate",false); show("desk",true);
+  paintKill();
   buildRail(); buildSections();
+  if (setErr) console.warn("app_settings:", setErr);
   go("over");
 }
 
@@ -1294,7 +1817,7 @@ async function loadOverview(){
   renderCal();
 
   const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
-         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft] = await Promise.all([
+         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned] = await Promise.all([
     countOf("intakes",     q => q.in("status", ["new","triaged"])),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
     countOf("evidence",    q => q.eq("ok", false)),
@@ -1309,6 +1832,7 @@ async function loadOverview(){
     countOf("waitlist",    null),
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
+    countOf("jobs",        q => q.is("client_user", null)),
   ]);
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
@@ -1322,6 +1846,7 @@ async function loadOverview(){
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked"),
     tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
     tile("", "Jobs on the board", String(jobsOpen), "Open to workers"),
+    tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every job has a client"),
     tile("", "Waiting list", String(waitN), "People to write to"),
     tile("", "Feedback", String(fbN), "Unprompted, from the site"),
   ].join("");
@@ -1347,6 +1872,8 @@ async function loadOverview(){
     "Approved is not sent. The client still cannot see these.", "Issue them", "sketch"));
   if (kickDraft) needs.push(alertRow("warn","?", kickDraft + (kickDraft === 1 ? " kickoff pack is in draft" : " kickoff packs are in draft"),
     "Read it before it goes to a client. Approving freezes it.", "Open packs", "kick"));
+  if (unsigned) needs.push(alertRow("warn","?", unsigned + (unsigned === 1 ? " job was built and never signed for" : " jobs were built and never signed for"),
+    "Somebody described the work, chose the parish and stopped at sign-up. It cannot reach the board without a client account, and you still have everything they typed. That is a lead, not a loss.", "Open intake", "intake"));
 
   $("ovNeeds").innerHTML = needs.length ? needs.join("")
     : alertRow("ok","✓","Nothing is waiting on you","No open dispute, no unchecked evidence, no untriaged intake, nothing half sent. The rail is clear.",null,null);
@@ -1367,6 +1894,11 @@ async function loadOverview(){
   setCount("invoices", invDraft, false);
   setCount("sketch", pkDraft + pkAppr, false);
   setCount("kick", kickDraft, false);
+  if (AGENTS_PAUSED) {
+    $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
+      "This desk will not call a model, so invoice drafting and sketch description are off. Inbound WhatsApp and website intake do not read that row yet and are still running.",
+      "Open settings","set"));
+  }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
   // which put a coral badge on a link that does not go to disputes. On this
   // desk a colour is a claim about the thing it sits on, so a badge that means
@@ -1426,35 +1958,73 @@ async function loadMoney(){
 async function loadHealth(){
   const host = $("v-health");
   host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Counting.</div></div>';
-  const [staleSigs, unvetted, blob, noTrade, orphanQuotes] = await Promise.all([
-    countOf("doc_signatures", q => q.in("doc_type", ["worker_guidelines","client_guidelines"]).neq("doc_version", "1.1")),
+
+  // The version in force comes from app_settings, not from a number typed into
+  // this page. This check used to compare against a hard-coded "1.1" while the
+  // table said 1.0, so it flagged every signature on the version that was
+  // actually current. A check that is wrong is worse than no check.
+  const wgV = currentVersion("worker_guidelines");
+  const cgV = currentVersion("client_guidelines");
+
+  const [staleW, staleC, unvetted, blob, noTrade, orphanQuotes, unsigned, evidNoPrint] = await Promise.all([
+    wgV ? countOf("doc_signatures", q => q.eq("doc_type","worker_guidelines").neq("doc_version", wgV)) : Promise.resolve(0),
+    cgV ? countOf("doc_signatures", q => q.eq("doc_type","client_guidelines").neq("doc_version", cgV)) : Promise.resolve(0),
     countOf("applications", q => q.in("status", ["submitted","reviewing"])),
     countOf("app_state", null),
     countOf("jobs", q => q.is("trade", null)),
     countOf("job_quotes", q => q.is("worker_user", null)),
+    countOf("jobs", q => q.is("client_user", null)),
+    countOf("evidence", q => q.is("sha256", null)),
   ]);
+  const staleSigs = staleW + staleC;
 
   const rows = [];
-  if (blob) rows.push(["crit","1","The old desk's data blob is still in the database",
-    "app_state holds a JSON copy of the whole business, written by the localStorage desk on yaadly.co.uk. Two stores means two answers to the same question. This desk reads the real tables, so that row is now history, not truth. Delete it once you are satisfied nothing needs recovering from it."]);
-  if (staleSigs) rows.push(["crit","2", staleSigs + " signature" + (staleSigs === 1 ? " is" : "s are") + " on an old version of the guidelines",
-    "The predicate that clears go-live and quoting checks the document type and ignores the version, so bumping to v1.1 asks nobody to re-sign. Until that changes these keep working."]);
-  if (noTrade) rows.push(["warn","3", noTrade + " job" + (noTrade === 1 ? " has" : "s have") + " no trade classified",
-    "yaad-match routes on trade. A job without one reaches nobody."]);
-  if (orphanQuotes) rows.push(["warn","4", orphanQuotes + " quote" + (orphanQuotes === 1 ? " has" : "s have") + " no worker account attached",
-    "worker_user is null, so the quote cannot be tied back to a vetted profile."]);
-  if (unvetted) rows.push(["warn","5", unvetted + " application" + (unvetted === 1 ? " is" : "s are") + " part way through vetting",
-    "Not a fault, just work outstanding. It clears when each one is passed or blocked."]);
+  let n = 0;
+  const add = (tone, title, text) => rows.push([tone, String(++n), title, text]);
+
+  if (!SETTINGS.length) add("crit","app_settings is reading empty from this desk",
+    "Either the table is empty or row level security is refusing it. It spent a while with RLS switched on and not one policy written against it, which reads exactly like an empty table from here and is not one. Settings, the guidelines versions and the agents switch all depend on this.");
+
+  if (blob) add("crit","The old desk's data blob is still in the database",
+    "app_state holds a JSON copy of the whole business, written by the localStorage desk on yaadly.co.uk. Two stores means two answers to the same question. This desk reads the real tables, so that row is now history, not truth. Delete it once you are satisfied nothing needs recovering from it.");
+
+  if (!wgV || !cgV) add("crit","No version is recorded as being in force",
+    "current_doc_version() reads app_settings. With no row there, the quote policy has nothing to compare a signature against and lets every version through. Set worker_guidelines_version and client_guidelines_version.");
+
+  if (staleSigs) add("crit", staleSigs + " signature" + (staleSigs === 1 ? " is" : "s are") + " behind the version in force",
+    "The database does enforce this: jq_insert_vetted compares each signature against current_doc_version(), so these people cannot quote until they sign again. That is the gate working. What it also means is that bumping a version silently stops somebody working, so tell them before you bump it, not after."
+    + (wgV ? " Worker Guidelines in force: v" + wgV + "." : "") + (cgV ? " Client Guidelines: v" + cgV + "." : ""));
+
+  if (evidNoPrint) add("crit", evidNoPrint + " evidence item" + (evidNoPrint === 1 ? " has" : "s have") + " no fingerprint",
+    "The whole promise of this desk is that an approval binds to the exact files. A row with no sha256 cannot be bound to anything, so signing it off is a signature on air.");
+
+  if (AGENTS_PAUSED) add("warn","Agents are paused, and the pause does not reach everything",
+    "This desk will not call a model. Inbound WhatsApp and website intake run in edge functions that do not read app_settings.agents_paused yet, so they are still answering people. Wiring that row into yaad-inbound and yaad-website-intake is what would make the switch mean what it says.");
+
+  if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
+    "client_user is null, so the go-live check refuses to put them on the board however complete they look. They are at the top of the Intake view.");
+
+  if (noTrade) add("warn", noTrade + " job" + (noTrade === 1 ? " has" : "s have") + " no trade classified",
+    "yaad-match routes on trade. A job without one reaches nobody.");
+
+  if (orphanQuotes) add("warn", orphanQuotes + " quote" + (orphanQuotes === 1 ? " has" : "s have") + " no worker account attached",
+    "worker_user is null, so the quote cannot be tied back to a vetted profile.");
+
+  if (unvetted) add("warn", unvetted + " application" + (unvetted === 1 ? " is" : "s are") + " part way through vetting",
+    "Not a fault, just work outstanding. It clears when each one is passed or blocked.");
 
   host.innerHTML = (rows.length
       ? `<div class="sechd">Wants attention</div>` + rows.map(r => alertRow(r[0], r[1], r[2], r[3], null, null)).join("")
-      : alertRow("ok","✓","Nothing flagged","No stale signatures, no unclassified jobs, no orphan quotes.",null,null))
+      : alertRow("ok","✓","Nothing flagged","Every signature is on the version in force, every job has a trade and a client, every quote has a worker, and every evidence item carries a fingerprint.",null,null))
     + `<div class="sechd">Standing</div>
        <div class="card"><div class="kv">
          <span class="k2">This desk reads</span><span class="v2"><span class="chip ok">Postgres directly</span></span>
          <span class="k2">Admin check</span><span class="v2"><span class="chip ok">is_admin() plus RLS</span></span>
          <span class="k2">Service role key in this page</span><span class="v2"><span class="chip ok">none</span></span>
          <span class="k2">Published on the public site</span><span class="v2"><span class="chip ok">no</span></span>
+         <span class="k2">Quoting checks the signature version</span><span class="v2"><span class="chip ok">yes, in jq_insert_vetted</span></span>
+         <span class="k2">Settings readable from here</span><span class="v2">${SETTINGS.length ? `<span class="chip ok">${SETTINGS.length} rows</span>` : `<span class="chip crit">nothing</span>`}</span>
+         <span class="k2">Agents this desk starts</span><span class="v2">${AGENTS_PAUSED ? `<span class="chip warn">paused</span>` : `<span class="chip ok">live</span>`}</span>
          <span class="k2">Identity check in front of this page</span><span class="v2"><span class="chip mute">ask the address bar</span></span>
        </div>
        <p class="conseq">This page cannot tell you whether Cloudflare Access is in front of it, because if it were, you would have signed in before it loaded. <b>If you reached this without an identity check, there is none.</b> Access binds to a hostname, not to the Worker, so renaming the route leaves the new host open until a new Access application names it. That is what happened on 27 August. Check a host with <span class="mono">curl -I</span>: a 302 to cloudflareaccess.com means it is covered, a 200 means it is not.</p></div>`;
@@ -1675,6 +2245,11 @@ let SK_DESCRIBED = [];  // what the vision model said
 let SK_PACK = null;
 
 async function skFn(payload){
+  // Same rule as fn(): pausing agents has to stop the sketch describer too, or
+  // the switch only covers half of what it says it covers.
+  if (AGENTS_PAUSED && ["describe","assemble"].includes(payload && payload.action)) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. No still left this machine.");
+  }
   const r = await fetch(SK_FN, {
     method: "POST",
     headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
