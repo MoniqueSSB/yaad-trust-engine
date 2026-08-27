@@ -1,6 +1,6 @@
-# The admin desk, on its own hostname
+# The concierge, on its own hostname
 
-`desk/desk.html` is the source. This folder is the deployment: a Cloudflare
+`concierge/concierge.html` is the source. This folder is the deployment: a Cloudflare
 Worker serving that one file as static assets, on a hostname of its own.
 
 ## Why it is separate
@@ -23,25 +23,28 @@ removes shared blast radius; it does not replace the lock.
 ## Deploying
 
 ```
-npm run deploy --prefix desk-deploy
+npm run deploy --prefix concierge-deploy
 ```
 
 Then, once, in the Cloudflare dashboard:
 
-1. Workers & Pages → `yaadly-desk` → Settings → Domains & Routes
-2. The custom domain `desk.yaadly.co.uk` is already bound in wrangler.jsonc,
+1. Workers & Pages → `yaadly-concierge` → Settings → Domains & Routes
+2. The custom domain `concierge.yaadly.co.uk` is already bound in wrangler.jsonc,
    so a deploy sets it up. The workers.dev address is disabled.
-3. Zero Trust → Access → Applications → add `desk.yaadly.co.uk`, policy
+3. Zero Trust → Access → Applications → add `concierge.yaadly.co.uk`, policy
    "allow the one email that runs it"
 
-Step 3 is the one that matters. Without it the desk is reachable by anyone who
-guesses the hostname, and `noindex` keeps it out of search results but nothing
-keeps it out of a wordlist.
+Step 3 is the one that matters, and it is per hostname. Rename the route and
+the old Access application does not follow it: the new host is served openly
+until a new application names it. Without it the desk is reachable by anyone who
+finds the hostname, and `noindex` keeps it out of search results, and the name
+carries no clue, but neither of those is a control: the hostname is published
+to the Certificate Transparency logs the moment its certificate is issued.
 
 ## Keeping it in step
 
-`desk/desk.html` is the source of truth. After editing it:
+`concierge/concierge.html` is the source of truth. After editing it:
 
 ```
-cp desk/desk.html desk-deploy/public/index.html
+cp concierge/concierge.html concierge-deploy/public/index.html
 ```
