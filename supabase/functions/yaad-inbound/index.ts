@@ -33,10 +33,12 @@ const CORS = {
 };
 
 const s = (v: unknown) => String(v ?? "").trim();
+/** "Sonia Campbell <sonia@x.com>" is a From header, not an address. */
+const bareEmail = (v: string) => (v.match(/<([^>]+)>/)?.[1] ?? v).trim();
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-type Inbound = { channel: string; from: string; name: string; text: string; media: string[] };
+type Inbound = { channel: string; from: string; name: string; text: string; media: string[]; resendId?: string; subject?: string };
 
 async function parseInbound(req: Request, raw: string): Promise<Inbound> {
   const ct = (req.headers.get("content-type") ?? "").toLowerCase();
@@ -66,6 +68,22 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
   // Vonage
   if (j.msisdn || j.messageId) {
     return { channel: "sms", from: s(j.msisdn), name: "", text: s(j.text), media: [] };
+  }
+
+  // Resend, which is already the sending side, so inbound needs no new
+  // vendor. Recognised by its event envelope rather than by a header, so a
+  // replayed or forwarded payload still parses the same way.
+  if (s(j.type) === "email.received" || (j.data && (j.data as Record<string, unknown>).email_id)) {
+    const d = (j.data ?? {}) as Record<string, unknown>;
+    return {
+      channel: "email",
+      from: s(Array.isArray(d.from) ? (d.from as string[])[0] : d.from),
+      name: "",
+      text: "",                       // fetched below, the webhook has no body
+      media: [],
+      resendId: s(d.email_id),
+      subject: s(d.subject),
+    } as Inbound;
   }
 
   // Email, from any forwarder that can POST JSON
@@ -164,6 +182,55 @@ CCTV & Alarms. Empty if unclear.` },
   } catch (_) { return null; }
 }
 
+
+/** Resend's email.received webhook carries metadata only, never the body.
+ *  That is deliberate on their side, so a large attachment cannot blow the
+ *  request-body limit of whatever serverless thing is listening. It does mean
+ *  the text has to be fetched back before anything can read the job. */
+async function fetchResendEmail(id: string, trace: Trace) {
+  const key = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!key) return null;
+  try {
+    return await trace.span("resend.retrieve", SpanKind.CLIENT, {
+      "server.address": "api.resend.com", "yaadly.email.id": id,
+    }, async (sp) => {
+      const r = await fetch(`https://api.resend.com/emails/receiving/${id}`, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(20000),
+      });
+      sp.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) { sp.recordError(`resend ${r.status}`); return null; }
+      return await r.json();
+    });
+  } catch (_) { return null; }
+}
+
+/** HTML is a fallback: most senders include a text part, some do not. */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** A reply keeps quoting the whole thread. Only the new part is the job. */
+function topOfThread(text: string): string {
+  const cuts = [/^On .+ wrote:$/m, /^-{2,}\s*Original Message/mi, /^_{5,}$/m, /^From:\s/m, /^>{1,}\s/m];
+  let out = text;
+  for (const c of cuts) {
+    const m = out.match(c);
+    if (m && m.index && m.index > 40) out = out.slice(0, m.index);
+  }
+  return out.trim();
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -183,6 +250,18 @@ Deno.serve(async (req: Request) => {
     const raw = await req.text();
     const msg = await parseInbound(req, raw);
     root.setAttributes({ "yaadly.inbound.channel": msg.channel, "yaadly.inbound.chars": msg.text.length, "yaadly.inbound.media": msg.media.length });
+
+    if (msg.resendId) {
+      const full = await fetchResendEmail(msg.resendId, trace);
+      if (full) {
+        const body = s(full.text) || stripHtml(s(full.html));
+        msg.from = msg.from || s(Array.isArray(full.from) ? full.from[0] : full.from);
+        msg.text = [s(full.subject) || msg.subject || "", topOfThread(body)].filter(Boolean).join("\n\n");
+      } else {
+        root.recordError("resend body could not be fetched");
+        msg.text = msg.subject ? `${msg.subject}\n\n[Body could not be fetched, open it in Resend.]` : "";
+      }
+    }
 
     if (!msg.from && !msg.text) return json({ ok: true, note: "Nothing to do." });
 
@@ -218,7 +297,7 @@ Deno.serve(async (req: Request) => {
       // On email the sender address IS the client's email. The agent only
       // reads the body, and correctly returns nothing when it is not written
       // there, so take it from the envelope rather than losing it.
-      client_email: (s(card?.client_email) || (msg.channel === "email" ? msg.from : "")).toLowerCase(),
+      client_email: (s(card?.client_email) || (msg.channel === "email" ? bareEmail(msg.from) : "")).toLowerCase(),
       client_phone: msg.channel === "email" ? "" : msg.from,
       descr,
       trade: s(card?.trade) || null,
