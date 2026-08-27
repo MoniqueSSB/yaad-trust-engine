@@ -875,6 +875,49 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 .nx h4{font-size:14.5px;margin:0 0 4px;color:var(--ink)}
 .nx p{font-size:13px;color:var(--mute);line-height:1.6;margin:0}
 
+
+/* ═══════════ SERVICES · the project management page ═══════════
+   Aligned to specs/PRICING.md, decided 26 Aug 2026.
+
+   Every rung shows the full price first and the founding price beside it.
+   That order is not decoration: under DMCCA 2024 s226 a reference price
+   nobody can actually buy is a misleading action, so the real number leads
+   and the discount is dated and genuinely purchasable.
+
+   Every service carries three ways to reach a human, because the page sells
+   judgment and nobody buys judgment from a form. */
+
+#pane-services .svchead{background:var(--panel);border:1px solid var(--line2);border-radius:var(--r);padding:22px;margin-top:22px}
+#pane-services .svcstrip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:18px}
+#pane-services .svcstrip>div{background:var(--panel);padding:14px 15px}
+#pane-services .svcstrip b{display:block;font-family:var(--disp);font-size:20px;color:var(--tealb);line-height:1.15;font-weight:400}
+#pane-services .svcstrip span{font-size:12px;color:var(--mute);line-height:1.45}
+@media(max-width:760px){#pane-services .svcstrip{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:420px){#pane-services .svcstrip{grid-template-columns:1fr}}
+
+/* ── availability badge, so nobody buys something that opens in December ── */
+.svc .avail-tag{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:3px 8px;border-radius:100px;margin-bottom:9px}
+.svc .avail-tag.now{background:rgba(45,212,191,.13);color:var(--tealb)}
+.svc .avail-tag.focus{background:rgba(255,176,32,.14);color:var(--mango)}
+.svc .avail-tag.later{background:rgba(255,107,74,.13);color:var(--coral)}
+
+/* ── the two-tier price block, used by the Oversight Retainer ── */
+.svc .tiers{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 4px}
+@media(max-width:520px){.svc .tiers{grid-template-columns:1fr}}
+.svc .tier{background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:11px 12px}
+.svc .tier .n{display:block;font-size:12px;font-weight:700;color:var(--ink)}
+.svc .tier .sub{display:block;font-size:11px;color:var(--dim);margin-bottom:5px}
+.svc .tier .full{display:block;font-family:var(--disp);font-size:20px;color:var(--ink);line-height:1.1;font-weight:400}
+.svc .tier .found{display:block;font-size:11.5px;color:var(--tealb);margin-top:2px}
+
+/* ── three ways to start, on every service ── */
+.svc .reach{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)}
+.svc .reach a{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;font-weight:700;padding:7px 12px;border-radius:100px;border:1px solid var(--line2);color:var(--ink);cursor:pointer;text-decoration:none;transition:var(--tr);white-space:nowrap}
+.svc .reach a:hover{border-color:var(--teal);color:var(--tealb)}
+.svc .reach a.wa{border-color:rgba(37,211,102,.4);color:#25D366}
+.svc .reach a.wa:hover{background:rgba(37,211,102,.08)}
+.svc .reach .lab{width:100%;font-size:11px;color:var(--dim);margin-bottom:1px}
+
 </style>
 </head>
 <body>
@@ -1423,8 +1466,28 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <!-- ═══════════════ MARKETPLACE (public) ═══════════════ -->
 <!-- ═══════════════ SERVICES PAGE ═══════════════ -->
 <section class="pane" id="pane-services"><div class="wrap">
-  <h1 class="hx">Project management, <span class="g1">from London</span> to your gate.</h1>
-  <p class="lead">Yaadly is a hub: a marketplace of verified tradespeople, and the professional oversight that makes using them safe. This page is the oversight, delivered by trained project managers, held to the same evidence standard on every job. Founded by <b>Monique Sewell-Bennett</b>, construction project manager, seven years running projects in London, family roots in St Thomas and Portmore. Every visit today is run by Monique personally; as the network grows, oversight is delivered by vetted professionals to the same standard.</p>
+  <div class="kick">Project management services</div>
+  <h1 class="hx">You don't have to<br><span class="g1">use the marketplace</span></h1>
+  <p class="lead">Building back home and already have your own contractor? These are the services where <b>I project manage your job myself</b>, a BEng-qualified construction project manager, seven years of heat pump, solar and energy projects. Separate from the marketplace. Same evidence standard. Reach out to me and we will work out what you actually need, before you pay for anything.</p>
+
+  <div class="svcstrip">
+    <div><b>72 hrs</b><span>turnaround, every report</span></div>
+    <div><b>Fixed</b><span>price, quoted before I start</span></div>
+    <div><b>Talk first</b><span>free call before you pay anything</span></div>
+    <div><b>Run by me</b><span>every visit, personally</span></div>
+  </div>
+
+  <div class="svchead">
+    <span class="avail-tag now">Available now</span>
+    <p style="font-size:14.5px;color:var(--mute);line-height:1.7;margin-top:4px">Fixed fee, paid up front, no percentage. <b style="color:var(--ink)">Reach out and we talk first</b>, a free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote before anything starts.</p>
+    <p style="font-size:14.5px;color:var(--mute);line-height:1.7;margin-top:10px">Every line shows the <b style="color:var(--ink)">full price and the founding price</b>, because under the DMCCA 2024 a discount off a price nobody can actually buy is a misleading action, and because the real number should come first.</p>
+    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
+      <a class="btn sm" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book the free call</a>
+      <a class="btn o sm" onclick="requestService('I am not sure which service I need')">Ask on WhatsApp</a>
+      <a class="btn o sm" id="svc-email-top">Email me</a>
+    </div>
+  </div>
+
   <div class="rule">👁️ <b>What we do, plainly:</b> we observe, document and oversee. We report what we saw, on the day, with photographs, and we hold contractors to what was agreed. We do not carry out structural surveys, valuations or quantity surveying, and we do not replace a licensed surveyor or engineer where one is needed. Every decision stays yours.</div>
   <div class="rule">🪪 <b>Nobody unverified attends your property.</b> Government photo ID checked on video, proof of address, TRN, a live photo and a left to right turn video, and a <b>police record check that is mandatory on any job over &pound;500</b>, any work inside an occupied home, and any time keys are held or an empty property is attended.</div>
   <div class="kick">Who this is for</div>
@@ -1459,7 +1522,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div class="svc"><h4>Condition Report</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;325.</b> Fixed fee.</small></p><p><span class="rung">A trained inspector</span>The whole property recorded system by system: roof and hurricane fixings, structure, water and tank, electrics and inverter, drainage and septic, termites, security. Every finding rated Severe, Moderate or Low, issue summary on page one. Like a RICS Level 1, it tells you what is wrong and how bad, not what to do about it.</p><a class="btn sm" onclick="requestService('Condition Report')">Request this</a></div>
     <div class="svc"><h4>Technical Sign-off</h4><p class="price">&pound;245<small>Founding rate, first five clients. <b>Full price &pound;300 per sign-off.</b> Short notice inside 48 hours, &pound;395.</small></p><p><span class="rung">A qualified trade inspector</span>Assesses one stage or one works package against the trade standard for that job type, and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record. Right for anything structural or electrical, and any stage about to be covered over.</p><a class="btn sm" onclick="requestService('Technical Sign-off')">Request this</a></div>
     <div class="svc"><h4>Property Care</h4><p class="price">&pound;75<small>Founding rate, first five clients. <b>Full price &pound;95 per visit, standard.</b> Large or rental &pound;135, villa &pound;175.</small></p><p><span class="rung">A trained checker</span>Recurring visits on a schedule, the same checklist every time, so change is visible visit to visit. An empty or elder occupied home, checked and documented while you are four thousand miles away. Paying in Jamaica, in J$: J$7,500, J$12,000 or J$18,000 per visit, no exchange rate margin at all.</p><a class="btn sm" onclick="requestService('Property Care')">Request this</a></div>
-    <div class="svc"><h4>Oversight Retainer</h4><p class="price">&pound;495<small>Founding rate, first five clients. <b>Full price &pound;595 a month.</b> Weekly visits &pound;895 founding, &pound;1,095 full.</small></p><p><b>Two documented site visits a month</b>, a monthly cost and progress report, a contractor accountability call, and a direct line to Monique. Weekly is four visits a month, for an active build or a contractor you are not yet sure about. Still under a quarter of what one UK monitoring surveyor charges for a single visit.</p><a class="btn sm" onclick="requestService('Oversight Retainer')">Request this</a></div>
+    <div class="svc"><h4>Oversight Retainer</h4><p class="price">&pound;595<small>a month, full price. <b>Founding &pound;495</b> for the first five. Pick your frequency below.</small></p><p>Documented site visits, a <b>monthly cost and progress report</b>, a contractor accountability call, and a WhatsApp line to me. Your contractor knows somebody is watching, and how often.</p><div class="tiers"><div class="tier"><span class="n">Fortnightly</span><span class="sub">2 visits a month</span><span class="full">&pound;595</span><span class="found">&pound;495 founding</span></div><div class="tier"><span class="n">Weekly</span><span class="sub">4 visits a month</span><span class="full">&pound;1,095</span><span class="found">&pound;895 founding</span></div></div><p style="font-size:12.5px;color:var(--mute);line-height:1.55;margin-top:10px"><b>Weekly</b> is for an active build, anything on a programme, or a contractor you are not yet sure about. <b>Fortnightly</b> is the standard watch, enough that nothing goes two weeks unseen. Founder-attended from December.</p><p class="note">One UK monitoring surveyor visit is &pound;500 to &pound;1,500. This is 2 or 4 visits, a report and a call.</p></div>
   </div>
 
   <div class="card" style="margin-top:14px;border-color:var(--softline)">
@@ -1824,6 +1887,83 @@ var svg=function(k){return '<svg class="i" viewBox="0 0 24 24">'+(IC[k]||IC.hand
       +'<span class="ic">'+svg(t[1])+'</span><span><b>'+t[0]+'</b><span>Start a job in this trade</span></span></button>';
   }).join('');
 })();
+
+/* ---------- services: availability, and three ways to start ----------
+   Every service on this page gets the same footer: WhatsApp, a booked call,
+   and email. The page sells judgment, and nobody buys judgment from a form,
+   so there is always a person one tap away.
+
+   Built here rather than typed into each card so the seven cards cannot
+   drift apart, and so adding a service cannot mean forgetting the links. */
+const SVC_EMAIL = "jobs@yaadly.co.uk";
+(function(){
+ var WHEN = {
+  "Deposit Protection Check": ["focus","August focus"],
+  "Oversight Retainer":       ["focus","August focus"],
+  "Technical Sign-off":       ["focus","August focus"],
+  "Visual Check":             ["now","On your site now"],
+  "Condition Report":         ["now","On your site now"],
+  "Property Care":            ["now","On your site now"],
+  "Full Project Management":  ["later","From December 2026"]
+ };
+ /* Thirty minutes for the things with a shape to talk through, fifteen for
+    a single visit or a check. */
+ var LONG = {"Oversight Retainer":1,"Full Project Management":1};
+
+ document.querySelectorAll("#pane-services .svc").forEach(function(card){
+  var h=card.querySelector("h4"); if(!h) return;
+  var name=h.textContent.trim();
+
+  var w=WHEN[name];
+  if(w && !card.querySelector(".avail-tag")){
+   var tag=document.createElement("span");
+   tag.className="avail-tag "+w[0]; tag.textContent=w[1];
+   card.insertBefore(tag, h);
+  }
+
+  /* the old single "Request this" button is replaced by the row */
+  var old=card.querySelector("a.btn"); if(old) old.remove();
+  if(card.querySelector(".reach")) return;
+
+  var subject="Yaadly: "+name;
+  var body=[
+   "Hello Monique,","",
+   "I would like to start a quote for: "+name+".","",
+   "1. My name:",
+   "2. Where the property is (parish and town):",
+   "3. What I need help with:",
+   "4. Stage of the project:",
+   "5. When I need it by:","",
+   "Thank you."
+  ].join("\n");
+
+  var row=document.createElement("div");
+  row.className="reach";
+  row.innerHTML='<span class="lab">Start this, or ask first</span>';
+
+  var wa=document.createElement("a");
+  wa.className="wa"; wa.textContent="WhatsApp";
+  wa.onclick=function(){ requestService(name) };
+  row.appendChild(wa);
+
+  var call=document.createElement("a");
+  call.href="https://cal.com/yaadly/"+(LONG[name]?"30min":"15min");
+  call.target="_blank"; call.rel="noopener";
+  call.textContent="Book a call";
+  row.appendChild(call);
+
+  var mail=document.createElement("a");
+  mail.href="mailto:"+SVC_EMAIL+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+  mail.textContent="Email";
+  row.appendChild(mail);
+
+  card.appendChild(row);
+ });
+
+ var top=document.getElementById("svc-email-top");
+ if(top) top.href="mailto:"+SVC_EMAIL+"?subject="+encodeURIComponent("Yaadly: which service do I need?");
+})();
+
 /* ---------- Ask a Yaad ----------
    Public questions answered by vetted workers, so somebody who is not sure
    they even have a job has a way in that costs nothing. */
