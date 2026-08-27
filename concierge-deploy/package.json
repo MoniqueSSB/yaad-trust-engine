@@ -1,5 +1,5 @@
 {
-  "name": "yaadly-desk",
+  "name": "yaadly-concierge",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",

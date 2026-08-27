@@ -28,3 +28,8 @@ supabase/.temp/
 
 # wrangler's local build and state cache
 .wrangler/
+
+# npm. web/ has had its own rule since it was created; concierge-deploy needs
+# one too, and a repo-wide rule means the next folder with a package.json is
+# covered before anybody runs install in it.
+node_modules/

@@ -99,4 +99,4 @@ Marketplace fee is unchanged: 27% blended on labour only, never on materials, 15
 ## Not in here
 
 No Supabase auth, no live payments, no admin desk, no service worker. Those live in
-`docs/index.html` and `desk/desk.html`.
+`docs/index.html` and `concierge/concierge.html`.

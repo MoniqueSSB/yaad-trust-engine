@@ -14,12 +14,12 @@
   // underneath. This removes the shared blast radius; it does not replace the
   // lock. Put Cloudflare Access in front of this hostname and it stops being
   // reachable at all without an identity check first.
-  "name": "yaadly-desk",
+  "name": "yaadly-concierge",
   "compatibility_date": "2026-08-01",
   // A real hostname in the zone, because Cloudflare Access cannot be applied
   // to a workers.dev address. This is the thing that lets the desk sit behind
   // an identity check rather than behind a URL nobody has guessed yet.
-  "routes": [{ "pattern": "desk.yaadly.co.uk", "custom_domain": true }],
+  "routes": [{ "pattern": "concierge.yaadly.co.uk", "custom_domain": true }],
   "assets": { "directory": "./public" },
   "observability": { "enabled": true }
 }

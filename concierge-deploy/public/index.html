@@ -1,0 +1,1736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Yaadly Concierge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#08110F; --panel:#0F1B17; --panel2:#14231E; --rail:#0B1613;
+  --line:#1F332C; --line2:#284439;
+  --ink:#F2FAF7; --mute:#9DB8AE; --dim:#67807A;
+  --teal:#14B8A6; --tealb:#2DD4BF; --mango:#FFB020; --coral:#FF6B4A; --sand:#FDE68A;
+  --soft:#0F2B26; --softline:#1E4A42;
+  --r:14px;
+  --grad:linear-gradient(90deg,#14B8A6,#FFB020);
+  --disp:'Anton',Impact,Haettenschweiler,sans-serif;
+  --body:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.55 var(--body);-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+a{color:var(--tealb);text-decoration:none}
+:focus-visible{outline:2px solid var(--tealb);outline-offset:2px;border-radius:5px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.mono{font-family:var(--mono);font-size:12px}
+.hidden{display:none!important}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;min-width:0}
+.brand{display:flex;align-items:center;gap:9px;padding:4px 8px 16px}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--teal);display:grid;place-items:center;color:#04211D;font-family:var(--disp);font-size:16px}
+.brand b{font-size:15px;letter-spacing:-.01em;line-height:1.1;display:block}
+.brand span{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);display:block}
+.rgrp{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:14px 10px 6px}
+.rlink{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 10px;border-radius:9px;color:var(--mute);font-size:13.5px;transition:.14s;position:relative}
+.rlink:hover{background:var(--panel2);color:var(--ink)}
+.rlink.on{background:var(--soft);color:var(--tealb);font-weight:700}
+.rlink svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.rlink.demo{opacity:.62}
+.rlink.demo:hover{opacity:1}
+
+/* ---------- topbar ---------- */
+.main{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding:12px 22px;border-bottom:1px solid var(--line);background:rgba(8,17,15,.94);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.srch{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--ink);font:inherit;font-size:13px}
+.srch::placeholder{color:var(--dim)}
+.srch:focus{border-color:var(--teal);outline:none}
+.who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mute)}
+.who .av{width:27px;height:27px;border-radius:8px;background:linear-gradient(135deg,#FFB020,#FF6B4A);display:grid;place-items:center;color:#04211D;font-weight:700;font-size:11px}
+.kill{font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:100px;border:1px solid rgba(255,107,74,.35);color:var(--coral);transition:.14s}
+.kill:hover{background:rgba(255,107,74,.1)}
+.kill.off{border-color:var(--softline);color:var(--dim)}
+
+.body{padding:22px;flex:1;max-width:1180px;width:100%}
+.view{display:none}
+.view.on{display:block;animation:fade .3s ease}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* ---------- headings ---------- */
+h1.vh{font-family:var(--disp);text-transform:uppercase;font-weight:400;font-size:clamp(24px,3vw,32px);line-height:.95;letter-spacing:.005em}
+.vsub{color:var(--mute);font-size:13.5px;margin-top:7px;max-width:74ch;line-height:1.6}
+.sechd{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--tealb);margin:26px 0 10px;display:flex;align-items:center;gap:10px}
+.sechd::after{content:'';flex:1;height:1px;background:var(--line)}
+
+/* ---------- tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:11px;margin-top:18px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;position:relative;overflow:hidden}
+.tile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line2)}
+.tile.ok::before{background:var(--tealb)}
+.tile.warn::before{background:var(--mango)}
+.tile.crit::before{background:var(--coral)}
+.tile .k{font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.tile .v{font-family:var(--disp);font-size:30px;line-height:1.05;margin-top:7px;font-weight:400;font-variant-numeric:tabular-nums}
+.tile.ok .v{color:var(--tealb)} .tile.warn .v{color:var(--mango)} .tile.crit .v{color:var(--coral)}
+.tile .d{font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.45}
+.spark{display:flex;align-items:flex-end;gap:2px;height:22px;margin-top:9px}
+.spark i{flex:1;background:var(--line2);border-radius:1px;min-height:2px}
+.spark i.hi{background:var(--teal)}
+
+/* ---------- cards / tables ---------- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-top:12px}
+.card.pad0{padding:0;overflow:hidden}
+.card h3,.modal h3{font-family:var(--disp);font-weight:400;text-transform:uppercase;line-height:.95;letter-spacing:.005em;font-size:19px}
+.chd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.chd .sp{margin-left:auto;font-size:11.5px;color:var(--dim)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{background:var(--panel2);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:700;white-space:nowrap}
+tbody tr:hover{background:var(--panel2)}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+td .id{font-family:var(--mono);font-size:11.5px;color:var(--tealb)}
+td .sub{display:block;font-size:11px;color:var(--dim);margin-top:2px}
+tr.unpriced td{background:rgba(255,176,32,.07)}
+
+/* ---------- chips ---------- */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:100px;white-space:nowrap}
+.chip.ok{background:rgba(45,212,191,.13);color:var(--tealb)}
+.chip.warn{background:rgba(255,176,32,.13);color:var(--mango)}
+.chip.crit{background:rgba(255,107,74,.13);color:var(--coral)}
+.chip.mute{background:var(--panel2);color:var(--dim)}
+.chip.ai{background:rgba(179,157,255,.14);color:#B39DFF}
+.chip.dot::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:12.5px;padding:8px 15px;border-radius:100px;background:var(--grad);color:#04211D;transition:.14s}
+.btn:hover{filter:brightness(1.1)}
+.btn.g{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+.btn.g:hover{border-color:var(--teal);color:var(--tealb);filter:none}
+.btn.d{background:rgba(255,107,74,.12);border:1px solid rgba(255,107,74,.4);color:var(--coral)}
+.btn.d:hover{background:rgba(255,107,74,.2);filter:none}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+.brow{display:flex;gap:7px;flex-wrap:wrap}
+
+/* ---------- stage rail ---------- */
+.jrn{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+.jst{display:flex;flex-direction:column;gap:2px;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);min-width:64px}
+.jst .jn{font-family:var(--mono);font-size:8.5px;color:var(--dim)}
+.jst .jt{font-size:10px;color:var(--mute);line-height:1.25}
+.jst.done{border-color:rgba(45,212,191,.4);background:rgba(45,212,191,.07)}
+.jst.done .jn,.jst.done .jt{color:var(--tealb)}
+.jst.now{border-color:var(--mango);background:rgba(255,176,32,.1)}
+.jst.now .jn,.jst.now .jt{color:var(--mango)}
+.stg{display:flex;gap:3px;width:104px}
+.stg i{flex:1;height:5px;border-radius:3px;background:var(--line)}
+.stg i.d{background:var(--teal)}
+.stg i.n{background:var(--mango)}
+
+/* ---------- alerts ---------- */
+.alert{display:flex;gap:12px;padding:13px 15px;border-radius:12px;margin-top:9px;border:1px solid;align-items:flex-start}
+.alert.crit{background:rgba(255,107,74,.06);border-color:rgba(255,107,74,.28)}
+.alert.warn{background:rgba(255,176,32,.06);border-color:rgba(255,176,32,.28)}
+.alert.ok{background:rgba(45,212,191,.05);border-color:rgba(45,212,191,.24)}
+.alert .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;font-size:12px;font-weight:700}
+.alert.crit .ic{background:rgba(255,107,74,.16);color:var(--coral)}
+.alert.warn .ic{background:rgba(255,176,32,.16);color:var(--mango)}
+.alert.ok .ic{background:rgba(45,212,191,.16);color:var(--tealb)}
+.alert b{display:block;font-size:13px;margin-bottom:3px}
+.alert p{font-size:12.5px;color:var(--mute);line-height:1.55}
+.alert .act{margin-left:auto;flex:0 0 auto}
+
+/* ---------- calendar band ---------- */
+.calband{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-top:16px}
+.cal{width:262px}
+.cal-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.cal-h h4{font-family:var(--disp);text-transform:uppercase;font-weight:400;font-size:15px;letter-spacing:.01em}
+.cal-nav{margin-left:auto;display:flex;gap:6px}
+.cal-nav button{width:26px;height:26px;border-radius:8px;border:1px solid var(--line);color:var(--mute);font-size:13px;line-height:1;background:transparent}
+.cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:4px}
+.cal-dow span{text-align:center;font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:2px 0}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.cd{min-height:32px;border-radius:7px;border:1px solid var(--line);background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;color:var(--mute);position:relative;padding:2px}
+.cd.pad{border-color:transparent;background:transparent}
+.cd.today{box-shadow:inset 0 0 0 1px var(--mango)}
+.cd.today .dn{color:var(--mango);font-weight:700}
+.cd.booked{background:rgba(255,176,32,.12);border-color:rgba(255,176,32,.4)}
+.cd.booked .dn{color:var(--mango);font-weight:700}
+.cd.pending{background:rgba(255,107,74,.1);border-color:rgba(255,107,74,.35)}
+.cd.pending .dn{color:var(--coral)}
+.cd.clash{background:rgba(255,107,74,.2);border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
+.cd .dt{display:flex;gap:2px}
+.cd .dt i{width:3px;height:3px;border-radius:50%;background:var(--mango)}
+.cd.pending .dt i{background:var(--coral)}
+.cal-key{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid var(--softline);font-size:10px;color:var(--dim)}
+.cal-key span{display:flex;align-items:center;gap:4px}
+.cal-key i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.nextup{display:grid;gap:8px}
+.nu{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12px;color:var(--mute);line-height:1.5}
+.nu b{display:block;color:var(--ink);font-size:12.5px;margin-bottom:2px}
+.nu.pend{border-color:rgba(255,107,74,.35);background:rgba(255,107,74,.05)}
+.nu.clash{border-color:var(--coral);background:rgba(255,107,74,.1)}
+.calside h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+
+/* ---------- evidence ---------- */
+.thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
+.thumbs>i{height:74px;border-radius:9px;background:linear-gradient(135deg,#14231E,#0F2B26);border:1px solid var(--softline);display:flex;align-items:flex-end;padding:6px;font-size:9.5px;color:var(--dim);font-style:normal;line-height:1.3}
+.fp{font-family:var(--mono);font-size:9.5px;color:var(--dim);word-break:break-all;margin-top:9px;padding-top:9px;border-top:1px solid var(--softline)}
+.reqlist{margin-top:10px}
+.reqrow{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-top:1px solid var(--softline);font-size:12.5px;color:var(--mute);line-height:1.5}
+.reqlist .reqrow:first-child{border-top:0}
+.reqrow i{width:15px;height:15px;border-radius:50%;border:1px solid var(--line);flex:0 0 auto;display:grid;place-items:center;font-size:9px;font-style:normal;margin-top:1px;color:transparent}
+.reqrow.ok i{border-color:var(--tealb);background:rgba(45,212,191,.16);color:var(--tealb)}
+.reqrow.ok{color:var(--ink)}
+.reqrow.miss i{border-color:var(--coral)}
+.reqrow.miss{color:var(--coral)}
+
+/* ---------- vetting ---------- */
+.vrec{margin-top:10px}
+.vitem{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--softline)}
+.vrec .vitem:first-child{border-top:0}
+.vitem .vi{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--dim)}
+.vitem.ok .vi{border-color:rgba(45,212,191,.45);background:rgba(45,212,191,.1);color:var(--tealb)}
+.vitem.gap .vi{border-color:rgba(255,176,32,.45);background:rgba(255,176,32,.1);color:var(--mango)}
+.vitem.block .vi{border-color:rgba(255,107,74,.5);background:rgba(255,107,74,.1);color:var(--coral)}
+.vitem h6{font-size:12.5px;color:var(--ink);margin-bottom:2px}
+.vitem p{font-size:11.5px;color:var(--mute);line-height:1.45}
+.vitem .vs{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap;padding-top:3px}
+.vitem.ok .vs{color:var(--tealb)}.vitem.gap .vs{color:var(--mango)}.vitem.block .vs{color:var(--coral)}
+
+/* ---------- kv / empty / toggle ---------- */
+.kv{display:grid;grid-template-columns:1fr auto;gap:9px 16px;font-size:13px}
+.kv .k2{color:var(--mute)}
+.kv .v2{text-align:right;font-variant-numeric:tabular-nums}
+.kv .hr{grid-column:1/-1;height:1px;background:var(--line);margin:3px 0}
+.kv .tot{font-weight:700}
+.empty{text-align:center;padding:34px 20px;color:var(--dim);font-size:13px}
+.empty b{display:block;color:var(--mute);font-size:14px;margin-bottom:5px}
+.tg{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.tg:last-child{border-bottom:0}
+.tg b{display:block;font-size:13.5px}
+.tg span{font-size:12px;color:var(--dim);display:block;margin-top:2px;line-height:1.5}
+.sw{width:42px;height:24px;border-radius:100px;background:var(--line);position:relative;flex:0 0 auto;transition:.16s}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--dim);transition:.16s}
+.sw.on{background:rgba(45,212,191,.3)}
+.sw.on::after{left:21px;background:var(--tealb)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:840px){.grid2{grid-template-columns:1fr}}
+.conseq{font-size:11.5px;color:var(--mute);margin-top:8px;line-height:1.5}
+.conseq b{color:var(--mango)}
+
+/* ---------- rail counts ---------- */
+.cnt{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);color:var(--dim)}
+.cnt.wait{background:rgba(255,176,32,.14);border-color:rgba(255,176,32,.4);color:var(--mango)}
+.cnt.hot{background:rgba(255,107,74,.14);border-color:rgba(255,107,74,.42);color:var(--coral)}
+h1.vh .cnt{margin-left:10px;vertical-align:middle}
+
+/* ---------- forms ---------- */
+label{display:block;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:0 0 6px;font-weight:700}
+input,textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:10px 12px;font:14px var(--body)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--teal)}
+textarea{min-height:104px;resize:vertical;line-height:1.5}
+input[type=file]{padding:9px 11px;font-size:12.5px}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:13px}
+.row>div{flex:1 1 220px}
+td input,td select{padding:6px 9px;font-size:13px}
+.hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.5}
+.msg{padding:11px 14px;border-radius:12px;font-size:12.5px;margin-bottom:12px;border:1px solid;line-height:1.55}
+.msg.err{background:rgba(229,72,77,.08);border-color:rgba(229,72,77,.35);color:#FFB3B3}
+.msg.ok{background:rgba(45,212,191,.05);border-color:rgba(45,212,191,.24);color:var(--tealb)}
+.msg.warn{background:rgba(255,176,32,.06);border-color:rgba(255,176,32,.28);color:var(--mango)}
+.grand{font-family:var(--disp);font-size:28px;letter-spacing:.01em;text-align:right;margin-top:10px;font-variant-numeric:tabular-nums}
+.qs{margin:13px 0 0;padding:13px 15px;background:rgba(255,176,32,.06);border:1px solid rgba(255,176,32,.28);border-radius:12px}
+.qs h4{margin:0 0 7px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--mango);font-weight:700}
+.qs ul{margin:0;padding-left:17px;font-size:12.5px;color:var(--mute);line-height:1.6}
+.note{font-size:12.5px;color:var(--mute);background:var(--bg);border-left:2px solid var(--teal);padding:11px 13px;border-radius:0 10px 10px 0;margin-top:13px;white-space:pre-wrap;line-height:1.6}
+.list .item{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.list .item:last-child{border-bottom:0}
+.list a{color:var(--tealb);font-weight:700}
+iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px}
+.sketchbox{background:#fff;border-radius:12px;padding:12px;margin:12px 0;overflow-x:auto}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.pthumb{position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--bg)}
+.pthumb.out{opacity:.28}
+.pthumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+.pthumb .n{position:absolute;top:5px;left:5px;background:var(--teal);color:#04211D;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px;font-family:var(--mono)}
+.pthumb .x{position:absolute;top:5px;right:5px;background:rgba(8,17,15,.82);color:#fff;border-radius:100px;width:22px;height:22px;font-size:13px;line-height:1}
+.pthumb .cap{padding:6px 8px;font-size:10.5px;color:var(--mute);line-height:1.35}
+
+/* ---------- gate ---------- */
+.gate{min-height:100vh;display:grid;place-items:center;padding:22px}
+.gate .card{width:100%;max-width:420px;margin:0}
+.gate .brand{padding:0 0 16px}
+.gatefoot{font-size:11.5px;color:var(--dim);text-align:center;margin-top:16px;line-height:1.6}
+.spin{display:inline-block;width:11px;height:11px;border:2px solid var(--softline);border-top-color:var(--tealb);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---------- rule ---------- */
+.rule{margin-top:26px;padding:14px 18px;background:var(--soft);border:1px solid var(--softline);border-radius:12px;font-size:12.5px;color:var(--mute);line-height:1.6}
+.rule b{color:var(--ink)}
+
+/* ---------- mobile ---------- */
+@media(max-width:820px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;overflow:visible}
+  .rgrp{display:none}
+  .rail .brand{margin-bottom:8px;padding-bottom:8px}
+  .railnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;min-width:0;max-width:100%}
+  .rlink{width:auto;flex:0 0 auto;white-space:nowrap;padding:7px 11px}
+  .body{padding:16px}
+  .calband{grid-template-columns:1fr}
+  .cal{width:100%}
+  .top{padding:10px 16px}
+}
+@media(max-width:700px){.thumbs{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ gate -->
+<div class="gate" id="gate">
+  <div>
+    <div class="card">
+      <div class="brand"><div class="mark">Y</div><div><b>Yaadly Concierge</b><span>Admin &middot; back office</span></div></div>
+      <div id="authMsg"></div>
+      <div id="bootMsg" class="hint" style="margin:0 0 12px"><span class="spin"></span>Scripts have not run. If this line never changes, this page is being shown as a preview rather than opened in a browser.</div>
+      <div class="row"><div><label>Email</label><input id="email" type="email" autocomplete="username"></div></div>
+      <div class="row"><div><label>Password</label><input id="password" type="password" autocomplete="current-password"></div></div>
+      <button class="btn" id="signIn" style="width:100%;padding:11px">Sign in</button>
+    </div>
+    <p class="gatefoot">Your Yaadly admin login. This is admin only, sits on its own hostname, and is published nowhere.</p>
+  </div>
+</div>
+
+<!-- ============================================================ desk -->
+<div class="shell hidden" id="desk">
+  <aside class="rail">
+    <div class="brand"><div class="mark">Y</div><div><b>Yaadly Concierge</b><span>Admin &middot; back office</span></div></div>
+    <div class="railnav" id="railnav"></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <input class="srch" id="srch" placeholder="Search this view&hellip;">
+      <div class="who" id="who"></div>
+    </header>
+
+    <div class="body">
+
+<!-- ============================================ OVERVIEW -->
+<section class="view on" data-view="over">
+  <h1 class="vh" id="ovDate">Overview</h1>
+  <p class="vsub" id="ovSub">Reading your invoices and sketch packs.</p>
+
+  <div class="calband">
+    <div class="cal">
+      <div class="cal-h"><h4 id="calTitle">&nbsp;</h4>
+        <div class="cal-nav"><button id="calPrev" aria-label="Previous month">&lsaquo;</button><button id="calNext" aria-label="Next month">&rsaquo;</button></div></div>
+      <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="cal-key">
+        <span><i style="background:rgba(255,176,32,.4)"></i>Booked</span>
+        <span><i style="background:rgba(255,107,74,.35)"></i>Awaiting confirmation</span>
+        <span><i style="background:rgba(255,107,74,.5);box-shadow:0 0 0 1px #FF6B4A"></i>Clash</span>
+        <span><i style="background:transparent;box-shadow:inset 0 0 0 1px #FFB020"></i>Today</span>
+      </div>
+    </div>
+    <div class="calside">
+      <h5>Every visit, every job</h5>
+      <div class="nextup" id="calSide"></div>
+    </div>
+  </div>
+
+  <div class="tiles" id="ovTiles"></div>
+
+  <div class="sechd">Needs you now</div>
+  <div id="ovNeeds"></div>
+
+  <div class="sechd">Running</div>
+  <div id="ovRunning"></div>
+</section>
+
+<!-- ============================================ INVOICES -->
+<section class="view" data-view="invoices">
+  <h1 class="vh">Invoices</h1>
+  <p class="vsub">The agent drafts and flags. Prices come from your service list, never from the model, and anything it cannot recognise comes back unpriced rather than guessed. Only you send one, and only you mark one paid.</p>
+
+  <div class="card">
+    <div class="chd"><h3>What are you billing for?</h3></div>
+    <div id="draftMsg"></div>
+    <label>Say it the way you would say it out loud</label>
+    <textarea id="text" placeholder="Marcia's August retainer at the founding price, plus two extra site visits to the Portmore house"></textarea>
+    <div class="row" style="margin-top:13px">
+      <div><label>Client name</label><input id="clientName" placeholder="Marcia Brown"></div>
+      <div><label>Client email</label><input id="clientEmail" type="email" placeholder="marcia@example.com"></div>
+    </div>
+    <div class="row"><div><label>Client address, optional</label><input id="clientAddress"></div></div>
+    <div class="brow"><button class="btn" id="draft">Draft it</button></div>
+    <p class="conseq">Drafting writes a numbered invoice to your record straight away. It emails nobody and sends nothing.</p>
+  </div>
+
+  <div class="card hidden" id="invCard">
+    <div class="chd"><h3 id="invTitle">Draft</h3></div>
+    <div id="invMsg"></div>
+    <div id="invBody"></div>
+  </div>
+
+  <div class="card hidden" id="previewCard">
+    <div class="chd"><h3>What the client sees</h3><span class="sp"><button class="btn g" id="printBtn">Print or save as PDF</button></span></div>
+    <iframe id="preview" title="Invoice preview"></iframe>
+  </div>
+
+  <div class="card">
+    <div class="chd"><h3>Recent invoices</h3></div>
+    <div class="list" id="list"></div>
+  </div>
+</section>
+
+<!-- ============================================ SKETCH PACKS -->
+<section class="view" data-view="sketch">
+  <h1 class="vh">Sketch packs</h1>
+  <p class="vsub">A record of what was filmed, never a survey. No measurement goes in one, and the database refuses to approve any that slips through. If a client needs dimensions, they need a surveyor.</p>
+
+  <div class="card">
+    <div class="chd"><h3>Site Sketch Pack</h3><span class="chip warn dot">Indicative only</span></div>
+    <div id="skMsg"></div>
+
+    <label>Walkthrough video</label>
+    <input id="skVideo" type="file" accept="video/*">
+    <p class="hint">The video stays on this machine. Only the stills you keep are ever sent anywhere.</p>
+
+    <div class="row" style="margin-top:13px">
+      <div><label>How many stills</label><input id="skCount" type="number" min="4" max="36" value="12"></div>
+      <div><label>Property label, no address</label><input id="skLabel" placeholder="The Portmore house"></div>
+    </div>
+    <div class="row">
+      <div><label>Client name</label><input id="skClient"></div>
+      <div><label>Parish</label><input id="skParish" placeholder="St Catherine"></div>
+    </div>
+    <div class="row">
+      <div><label>Date filmed</label><input id="skDate" type="date"></div>
+      <div><label>Walked by</label><input id="skWho" placeholder="Who was on site"></div>
+    </div>
+    <div class="row">
+      <div><label>Anything the reader should know, optional</label><input id="skContext" placeholder="Back bedroom was locked, could not get in"></div>
+    </div>
+    <div class="brow"><button class="btn" id="skPull">Pull the stills</button></div>
+    <p class="conseq">Pulling reads the video here, in this browser. <b>Nothing is uploaded at this step.</b></p>
+  </div>
+
+  <div class="card hidden" id="skFramesCard">
+    <div class="chd"><h3 id="skFramesTitle">Stills</h3></div>
+    <p class="hint" style="margin:0 0 12px">Drop anything blurred, dark or pointing at nothing. Fewer good stills beat more bad ones.</p>
+    <div id="skThumbs" class="pgrid"></div>
+    <div class="brow" style="margin-top:15px">
+      <button class="btn" id="skDescribe">Describe what is in them</button>
+      <button class="btn g" id="skAssemble" disabled>Build the pack</button>
+    </div>
+    <p class="conseq" id="skProgress"></p>
+    <p class="conseq">Describing sends <b>only the stills you kept</b> to the vision model. The video itself never leaves.</p>
+  </div>
+
+  <div class="card hidden" id="skPackCard">
+    <div class="chd"><h3 id="skPackTitle">Pack</h3></div>
+    <div id="skPackMsg"></div>
+    <div id="skPackBody"></div>
+  </div>
+
+  <div class="card hidden" id="skPreviewCard">
+    <div class="chd"><h3>What the client reads</h3><span class="sp"><button class="btn g" id="skPrint">Print or save as PDF</button></span></div>
+    <iframe id="skPreview" title="Pack preview"></iframe>
+  </div>
+
+  <div class="card">
+    <div class="chd"><h3>Recent packs</h3></div>
+    <div class="list" id="skList"></div>
+  </div>
+</section>
+
+      <div class="rule">&#9878;&#65039; <b>The governing rule holds here:</b> the agents draft and flag.
+        Prices come from your service list, not from the model. Only you send an invoice,
+        and only you mark one paid.</div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// Yaadly Concierge
+//
+// The whole admin desk, on its own hostname, off the public site. It answers
+// to concierge.yaadly.co.uk rather than anything with "admin" or "desk" in
+// the name. That is tidiness, not a lock: every TLS certificate is published
+// to the public Certificate Transparency logs the moment it is issued, so any
+// hostname is findable whatever it is called. Cloudflare Access in front of
+// this origin is the control. is_admin() and RLS underneath are the lock.
+//
+// Everything reads Postgres directly. The old desk kept the business in
+// localStorage under "yaadly-platform-v1" and pushed a JSON blob at
+// app_state, which meant the truth lived in one browser on one laptop. It
+// does not any more. Every view below names the table it reads, and an empty
+// view means an empty table, not a lost file.
+//
+// ADDING A VIEW: add one entry to VIEWS. The rail link, the section, the
+// heading, the loader, the search box and the empty state are all built from
+// it. Bespoke views (overview, invoices, sketch) opt out with bespoke:true
+// and own their own markup.
+
+const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
+const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
+
+const $ = (id) => document.getElementById(id);
+const show = (id, on) => $(id).classList.toggle("hidden", !on);
+const money = (p) => "£" + (p / 100).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
+const jmd = (n) => "J$" + Number(n || 0).toLocaleString("en-JM");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function say(where, kind, text){ $(where).innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; }
+
+// ---- cell helpers, used by the column definitions below
+const id_   = (v) => `<span class="id">${esc(v)}</span>`;
+const sub_  = (v) => v ? `<span class="sub">${esc(v)}</span>` : "";
+const chip_ = (tone, text) => `<span class="chip ${tone} dot">${esc(text)}</span>`;
+const mute_ = (v) => `<span style="color:var(--dim)">${esc(v)}</span>`;
+const day_  = (v) => v ? String(v).slice(0, 10) : "";
+const ago_  = (v) => {
+  if (!v) return "";
+  const mins = Math.floor((Date.now() - new Date(v).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + " min";
+  if (mins < 1440) return Math.floor(mins / 60) + " hr";
+  const d = Math.floor(mins / 1440);
+  return d + (d === 1 ? " day" : " days");
+};
+// Teal is proven, mango is waiting on somebody, coral is blocked, mute is a
+// neutral fact. Nothing else gets a colour. A tone is a claim about state.
+const TONE = {
+  // intakes
+  new:"warn", triaged:"warn", converted:"ok", binned:"mute",
+  // jobs / services
+  open:"warn", live:"warn", quoting:"warn", done:"ok", closed:"mute", cancelled:"mute",
+  // applications
+  submitted:"warn", reviewing:"warn", passed:"ok", approved:"warn", declined:"mute", blocked:"crit",
+  // quotes
+  sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
+  // invoices / packs
+  draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok",
+  // calls / waitlist
+  requested:"warn", booked:"ok", held:"warn",
+  // disputes
+  raised:"crit", answered:"warn", resolved:"ok",
+};
+const tone_ = (s) => chip_(TONE[String(s || "").toLowerCase()] || "mute", s || "none");
+
+// The Supabase library loads from a CDN. Creating the client at the top of this
+// script would throw if it never arrived, and then NOTHING below would run,
+// including the click handlers. Lazy, and loud about its absence.
+let sb = null;
+function startClient(){
+  if (sb) return true;
+  if (!(window.supabase && window.supabase.createClient)) return false;
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  return true;
+}
+
+// ---------------------------------------------------------------- the views
+
+const ICON = {
+  grid:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  inbox:'<path d="M4 4h16v5H4zM4 12h16v8H4z"/><path d="M8 16h8"/>',
+  case:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  photo:'<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m3 17 5-4 4 3 3-2 6 5"/>',
+  money:'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  people:'<circle cx="9" cy="8" r="3.4"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M17 8.5a3 3 0 0 1 0 5M18 20a5.5 5.5 0 0 0-2-4.3"/>',
+  home:'<path d="M3 11 12 4l9 7"/><path d="M6 11v8h12v-8"/><path d="M10 19v-4h4v4"/>',
+  star:'<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.2L12 17l-5.4 3 1-6.2L3.2 9.5l6.1-.9z"/>',
+  doc:'<path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"/><path d="M14 2v5h5M9 13h6M9 17h4"/>',
+  pen:'<path d="M4 20s2-1 2-3 3-2 3-2l8-8 2 2-8 8s0 3-2 3-5 0-5 0z"/><path d="M15 5l4 4"/>',
+  card:'<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 11h20"/><path d="M6 15h4"/>',
+  bill:'<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+  cam:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l5-4 4 3 3-2 6 5"/><circle cx="8.5" cy="8.5" r="1.4"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4z"/>',
+  pulse:'<path d="M3 12h4l2.5-6 4 12 2.5-6h5"/>',
+  board:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M3 10h18"/>',
+  phone:'<path d="M5 3h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 12l5 2v4a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 3z"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  chat:'<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
+  tools:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.4"/>',
+};
+
+const VIEWS = [
+  { k:"over", g:"Run the day", label:"Overview", icon:"grid", hand:true },
+
+  { k:"intake", g:"Run the day", label:"Intake", icon:"inbox",
+    title:"Intake queue", table:"intakes",
+    sub:"Everything that came in through the website form, WhatsApp or a DM. Read it, decide if it is real, then open it to the board or bin it.",
+    select:"id,created_at,req_id,name,phone,place,work_type,descr,urgency,status,email",
+    order:"created_at", search:["req_id","name","place","work_type","descr"],
+    empty:["Nothing in the queue","When somebody fills in the form on yaadly.co.uk it lands here."],
+    cols:[
+      {h:"Reference", f:r => id_(r.req_id || r.id) + sub_((r.descr || "").slice(0,60))},
+      {h:"Work & area", f:r => esc(r.work_type || "Unclear") + sub_(r.place || "Not given")},
+      {h:"Contact", f:r => esc(r.name || "No name") + sub_(r.email || r.phone || "")},
+      {h:"Urgency", f:r => r.urgency ? chip_(/urgent|emergency/i.test(r.urgency) ? "crit" : "mute", r.urgency) : mute_("not said")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Age", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",
+    title:"Jobs", table:"jobs",
+    sub:"Every job and where it has got to. A budget band is the client's private figure and is never shown here.",
+    select:"id,title,parish,client_name,worker_name,stage,owed,open,status,trade,updated_at",
+    order:"updated_at", search:["id","title","parish","client_name","worker_name","trade"],
+    empty:["No jobs yet","A job appears here once an intake is opened to the board."],
+    cols:[
+      {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
+      {h:"Where", f:r => esc(r.parish || "") + sub_(r.trade || "")},
+      {h:"Client", f:r => esc(r.client_name || "none")},
+      {h:"Worker", f:r => r.worker_name ? esc(r.worker_name) : mute_("not chosen")},
+      {h:"Stage", f:r => stageBar(r.stage)},
+      {h:"Owed", n:true, f:r => r.owed ? jmd(r.owed) : mute_("none")},
+      {h:"State", f:r => tone_(r.status || (r.open ? "open" : "closed"))},
+    ]},
+
+  { k:"evid", g:"Run the day", label:"Evidence", icon:"photo",
+    title:"Evidence", table:"evidence",
+    sub:"You look before the client does. Every set is bound to a SHA-256 fingerprint of the exact files, so if one changes afterwards the portal says so and this desk warns you before payout.",
+    select:"id,job_id,label,stage,ok,sha256,bytes,mime,created_at,uploaded_by",
+    order:"created_at", search:["job_id","label","uploaded_by"],
+    empty:["No evidence filed","Workers upload from their portal. Nothing has been filed against a job yet."],
+    cols:[
+      {h:"Job", f:r => id_(r.job_id) + sub_("stage " + (r.stage ?? "none"))},
+      {h:"Item", f:r => esc(r.label || "unlabelled") + sub_(r.mime || "")},
+      {h:"Uploaded by", f:r => esc(r.uploaded_by || "unknown")},
+      {h:"Checked", f:r => r.ok ? chip_("ok","signed off") : chip_("warn","waiting on you")},
+      {h:"Fingerprint", f:r => r.sha256 ? `<span class="mono" style="color:var(--dim)">${esc(String(r.sha256).slice(0,16))}&hellip;</span>` : mute_("none")},
+      {h:"Filed", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"quotes", g:"Run the day", label:"Quotes", icon:"money",
+    title:"Quotes", table:"job_quotes",
+    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 12%, materials at cost. Materials are never fee'd on either side.",
+    select:"id,job_id,worker_name,worker_email,labour_jmd,materials_jmd,days_estimate,earliest_start,status,created_at",
+    order:"created_at", search:["job_id","worker_name","worker_email"],
+    empty:["No quotes in","Workers quote from the board. Nothing has been submitted yet."],
+    cols:[
+      {h:"Job", f:r => id_(r.job_id)},
+      {h:"Worker", f:r => esc(r.worker_name || r.worker_email || "unknown")},
+      {h:"Labour", n:true, f:r => jmd(r.labour_jmd)},
+      {h:"Materials", n:true, f:r => jmd(r.materials_jmd)},
+      {h:"Client sees", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 1.15) + Number(r.materials_jmd||0))},
+      {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.88) + Number(r.materials_jmd||0))},
+      {h:"State", f:r => tone_(r.status)},
+    ]},
+
+  { k:"apps", g:"People", label:"Applications", icon:"people",
+    title:"Applications", table:"applications",
+    sub:"Vetting is by hand and stays that way. The agent reads documents and flags what is missing or does not line up. It never approves anybody: PASS, GAP and BLOCK are your words, not its.",
+    select:"id,created_at,app_id,name,email,phone,parish,trade,years,status,police_status,signed_at,submitted_at",
+    order:"created_at", search:["app_id","name","email","trade","parish"],
+    empty:["No applications","Workers apply at yaadly.co.uk/apply."],
+    cols:[
+      {h:"Applicant", f:r => esc(r.name || "no name") + sub_(r.email || r.phone || "")},
+      {h:"Trade & area", f:r => esc(r.trade || "not said") + sub_(r.parish || "")},
+      {h:"Years", n:true, f:r => r.years ? esc(r.years) : mute_("none")},
+      {h:"Police check", f:r => r.police_status ? tone_(r.police_status) : chip_("warn","not started")},
+      {h:"Signed", f:r => r.signed_at ? chip_("ok", day_(r.signed_at)) : chip_("warn","not signed")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Applied", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"workers", g:"People", label:"Workers", icon:"tools",
+    title:"Workers", table:"worker_profiles",
+    sub:"A published profile is what lets somebody quote. The trigger checks it on every insert, so publishing is the switch, not a label.",
+    select:"worker_email,name,trade,parish,lane,jobs_completed,active,slug,years,updated_at",
+    order:"updated_at", search:["name","worker_email","trade","parish"],
+    empty:["No published workers","Publishing an application puts a worker here and lets them quote."],
+    cols:[
+      {h:"Worker", f:r => esc(r.name || "no name") + sub_(r.worker_email || "")},
+      {h:"Trade & area", f:r => esc(r.trade || "") + sub_(r.parish || "")},
+      {h:"Lane", f:r => r.lane ? chip_("mute", r.lane) : mute_("none")},
+      {h:"Jobs done", n:true, f:r => String(r.jobs_completed ?? 0)},
+      {h:"State", f:r => r.active ? chip_("ok","active") : chip_("warn","cannot quote")},
+    ]},
+
+  { k:"clients", g:"People", label:"Clients", icon:"home",
+    title:"Clients", table:"client_profiles",
+    sub:"Score comes from workers who actually did their jobs. A first-timer shows as a first-timer, never as a low score they never earned.",
+    select:"user_id,email,name,jobs_completed,active,created_at",
+    order:"created_at", search:["name","email"],
+    empty:["No client profiles","A profile is created when somebody signs the Client Guidelines."],
+    cols:[
+      {h:"Client", f:r => esc(r.name || "no name") + sub_(r.email || "")},
+      {h:"Jobs done", n:true, f:r => Number(r.jobs_completed ?? 0) || chip_("ok","first job")},
+      {h:"State", f:r => r.active ? chip_("ok","active") : chip_("mute","inactive")},
+      {h:"Joined", f:r => mute_(day_(r.created_at))},
+    ]},
+
+  { k:"reviews", g:"People", label:"Reviews", icon:"star",
+    title:"Reviews", table:"reviews",
+    sub:"Both directions, both tied to a completed job. You cannot delete one. You can hold one that breaks the rules and you must say why, and that note is kept.",
+    select:"id,job_id,direction,author_email,subject_email,stars,body,reply,created_at",
+    order:"created_at", search:["job_id","author_email","subject_email","body"],
+    empty:["No reviews","A review can only be written against a job that completed."],
+    cols:[
+      {h:"Job", f:r => id_(r.job_id)},
+      {h:"Direction", f:r => esc(r.direction || "")},
+      {h:"Stars", n:true, f:r => String(r.stars ?? "")},
+      {h:"Extract", f:r => esc(String(r.body || "").slice(0,90)) + sub_(r.reply ? "replied" : "no reply")},
+      {h:"Written", f:r => mute_(day_(r.created_at))},
+    ]},
+
+  { k:"kick", g:"Documents & money", label:"Kickoff packs", icon:"doc",
+    title:"Kickoff packs", table:"kickoff_packs",
+    sub:"Drafting runs in the background and answers in under a second with an id. Every failure path writes a status and a reason, so a dead draft is visible rather than silent.",
+    select:"id,job_id,project_title,client_name,parish,status,model,rev,created_at,approved_at",
+    order:"created_at", search:["id","job_id","project_title","client_name"],
+    empty:["No packs","A pack is drafted against a job once its scope is agreed."],
+    cols:[
+      {h:"Pack", f:r => id_(r.id) + sub_(r.model || "")},
+      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
+      {h:"Project", f:r => esc(r.project_title || "") + sub_(r.client_name || "")},
+      {h:"Rev", n:true, f:r => String(r.rev ?? 1)},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Built", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
+  { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
+
+  { k:"docs", g:"Documents & money", label:"Signatures", icon:"pen",
+    title:"Signatures", table:"doc_signatures",
+    sub:"Immutable records. No update policy, no delete policy, not even for you. Each one stores the exact consent text that was on screen, so what somebody agreed to can always be reconstructed.",
+    select:"id,signer_email,signer_name,doc_type,doc_version,signed_at",
+    order:"signed_at", search:["signer_email","signer_name","doc_type"],
+    empty:["No signatures","A signature is written when somebody signs the Client or Worker Guidelines."],
+    cols:[
+      {h:"Signer", f:r => esc(r.signer_name || "no name") + sub_(r.signer_email || "")},
+      {h:"Document", f:r => esc(r.doc_type || "")},
+      {h:"Version", f:r => `<span class="mono">${esc(r.doc_version || "none")}</span>`},
+      {h:"Signed", f:r => mute_(day_(r.signed_at))},
+    ]},
+
+  { k:"money", g:"Documents & money", label:"Money", icon:"card", bespoke:true,
+    title:"Money",
+    sub:"Nothing here is a bank balance. Holding goes live once PI insurance is in force. Until then these are amounts agreed in writing before work started, and what your own invoicing has actually done." },
+
+  { k:"svc", g:"Services", label:"Services", icon:"tools",
+    title:"Services", table:"services",
+    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee quoted on a call before anything starts.",
+    select:"id,type,client_name,client_email,parish,price,provider,stage,updated_at",
+    order:"updated_at", search:["id","type","client_name","parish"],
+    empty:["No service bookings","Deposit Protection Checks and Project Setup Packs land here."],
+    cols:[
+      {h:"Ref", f:r => id_(r.id)},
+      {h:"Service", f:r => esc(r.type || "") + sub_(r.parish || "")},
+      {h:"Client", f:r => esc(r.client_name || "") + sub_(r.client_email || "")},
+      {h:"Price", n:true, f:r => r.price ? esc(r.price) : mute_("not set")},
+      {h:"Stage", f:r => tone_(r.stage)},
+    ]},
+
+  { k:"market", g:"Services", label:"Marketplace", icon:"board",
+    title:"Marketplace board", table:"jobs",
+    sub:"What a worker sees when they open the board. The address and the phone number are scrubbed out of this view by the database, not by this page.",
+    select:"id,title,parish,trade,stage,open,status,updated_at",
+    order:"updated_at", filter:["open", true], search:["id","title","parish","trade"],
+    empty:["Nothing on the board","A job reaches the board when it is opened to workers."],
+    cols:[
+      {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
+      {h:"Trade", f:r => esc(r.trade || "not classified")},
+      {h:"Parish", f:r => esc(r.parish || "")},
+      {h:"Stage", f:r => stageBar(r.stage)},
+      {h:"State", f:r => tone_(r.status || "open")},
+    ]},
+
+  { k:"calls", g:"Inbox", label:"Calls", icon:"phone",
+    title:"Call requests", table:"calls",
+    sub:"Somebody asked to speak to you. Each one names the slots that suit them and the timezone they are in, because most of them are not on Jamaican time.",
+    select:"id,created_at,name,contact,svc,tz,slots,note,status",
+    order:"created_at", search:["name","contact","svc"],
+    empty:["No calls requested","The booking form on the site writes here."],
+    cols:[
+      {h:"Who", f:r => esc(r.name || "no name") + sub_(r.contact || "")},
+      {h:"About", f:r => esc(r.svc || "not said")},
+      {h:"Their time", f:r => esc(r.tz || "not said") + sub_(r.slots || "")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Asked", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"waitlist", g:"Inbox", label:"Waiting list", icon:"list",
+    title:"Waiting list", table:"waitlist",
+    sub:"People who asked to be told when Yaadly opens where they are. This is the list you write to first, and the only list you have.",
+    select:"id,created_at,name,contact,place,need",
+    order:"created_at", search:["name","contact","place","need"],
+    empty:["Nobody waiting","The popup on the homepage writes here."],
+    cols:[
+      {h:"Who", f:r => esc(r.name || "no name") + sub_(r.contact || "")},
+      {h:"Where", f:r => esc(r.place || "not said")},
+      {h:"What they need", f:r => esc(String(r.need || "").slice(0,90))},
+      {h:"Joined", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"feedback", g:"Inbox", label:"Feedback", icon:"chat",
+    title:"Feedback", table:"feedback",
+    sub:"What people said about the site, unprompted. A low rating with a reason is worth more than a high one without.",
+    select:"id,created_at,rating,who,why,better,liked,contact",
+    order:"created_at", search:["who","why","better","liked"],
+    empty:["No feedback","The feedback form on the site writes here."],
+    cols:[
+      {h:"Rating", n:true, f:r => r.rating != null ? chip_(Number(r.rating) >= 4 ? "ok" : Number(r.rating) <= 2 ? "crit" : "warn", String(r.rating)) : mute_("none")},
+      {h:"Who", f:r => esc(r.who || "anonymous") + sub_(r.contact || "")},
+      {h:"Why", f:r => esc(String(r.why || "").slice(0,90))},
+      {h:"What would be better", f:r => esc(String(r.better || "").slice(0,90))},
+      {h:"When", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"set", g:"System", label:"Settings", icon:"gear",
+    title:"Settings", table:"app_settings",
+    sub:"Every switch you can flip without a deploy. These are the live rows in app_settings, not a picture of them.",
+    select:"key,value", order:"key", asc:true, search:["key"],
+    empty:["No settings rows","app_settings is empty."],
+    cols:[
+      {h:"Key", f:r => `<span class="mono" style="color:var(--tealb)">${esc(r.key)}</span>`},
+      {h:"Value", f:r => {
+        const v = r.value;
+        if (v === true || v === "true")  return chip_("ok","on");
+        if (v === false || v === "false") return chip_("mute","off");
+        return `<span class="mono">${esc(typeof v === "object" ? JSON.stringify(v) : v)}</span>`;
+      }},
+    ]},
+
+  { k:"health", g:"System", label:"Health", icon:"pulse", bespoke:true,
+    title:"Health",
+    sub:"What is true right now and should not be. Counted from the tables themselves, so it goes quiet on its own when a thing is fixed." },
+];
+
+const VIEW = Object.fromEntries(VIEWS.map(v => [v.k, v]));
+
+// A stage number rendered as the platform's segmented bar. Teal is done,
+// mango is where it is now, and the rest is empty.
+function stageBar(stage){
+  const s = Number(stage) || 0, n = 5;
+  let out = '<div class="stg">';
+  for (let i = 1; i <= n; i++) out += `<i class="${i < s ? "d" : i === s ? "n" : ""}"></i>`;
+  return out + "</div>";
+}
+
+// ---------------------------------------------------------------- shell build
+
+function buildRail(){
+  let out = "", group = null;
+  for (const v of VIEWS) {
+    if (v.g !== group) { group = v.g; out += `<div class="rgrp">${esc(group)}</div>`; }
+    out += `<button class="rlink${v.k === currentView ? " on" : ""}" data-v="${v.k}">`
+        +  `<svg viewBox="0 0 24 24">${ICON[v.icon] || ""}</svg>${esc(v.label)}`
+        +  `<span class="cnt hidden" id="cnt-${v.k}"></span></button>`;
+  }
+  $("railnav").innerHTML = out;
+}
+
+// Generic views get their whole section built from the registry. Only the
+// three bespoke ones own markup in the document.
+function buildSections(){
+  const host = document.querySelector(".body");
+  const anchor = host.querySelector(".rule");
+  let out = "";
+  for (const v of VIEWS) {
+    if (v.hand) continue;
+    out += `<section class="view" data-view="${v.k}">`
+        +  `<h1 class="vh">${esc(v.title)}</h1>`
+        +  `<p class="vsub">${esc(v.sub)}</p>`
+        +  `<div id="v-${v.k}"></div></section>`;
+  }
+  anchor.insertAdjacentHTML("beforebegin", out);
+}
+
+function tableCard(v, rows){
+  if (!rows.length) {
+    return `<div class="card"><div class="empty"><b>${esc(v.empty[0])}</b>${esc(v.empty[1])}</div></div>`;
+  }
+  const head = v.cols.map(c => `<th${c.n ? ' class="num"' : ""}>${esc(c.h)}</th>`).join("");
+  const body = rows.map(r =>
+    "<tr>" + v.cols.map(c => `<td${c.n ? ' class="num"' : ""}>${c.f(r)}</td>`).join("") + "</tr>"
+  ).join("");
+  return `<div class="card pad0"><div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
+       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.table)}</span>.</p>`;
+}
+
+const ROWS = {};   // last loaded rows per view, so search can filter without refetching
+
+async function loadTableView(k){
+  const v = VIEW[k];
+  const host = $("v-" + k);
+  host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
+  let q = sb.from(v.table).select(v.select).order(v.order, { ascending: !!v.asc }).limit(200);
+  if (v.filter) q = q.eq(v.filter[0], v.filter[1]);
+  const { data, error } = await q;
+  if (error) {
+    host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>${esc(v.table)} could not be read</b><p>${esc(error.message)}</p></div></div>`;
+    return;
+  }
+  ROWS[k] = data || [];
+  renderTableView(k);
+  setCount(k, ROWS[k].length, false);
+}
+
+function renderTableView(k){
+  const v = VIEW[k], all = ROWS[k] || [];
+  const term = ($("srch").value || "").trim().toLowerCase();
+  const rows = term && v.search
+    ? all.filter(r => v.search.some(f => String(r[f] ?? "").toLowerCase().includes(term)))
+    : all;
+  $("v-" + k).innerHTML = term && !rows.length
+    ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
+    : tableCard(v, rows);
+}
+
+function setCount(k, n, hot){
+  const el = $("cnt-" + k);
+  if (!el) return;
+  el.className = "cnt" + (n ? (hot ? " hot" : " wait") : " hidden");
+  el.textContent = n || "";
+}
+
+// ---------------------------------------------------------------- router
+
+const BESPOKE = { over: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth };
+let currentView = "over";
+
+function go(v){
+  currentView = v;
+  document.querySelectorAll(".rlink").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.dataset.view === v));
+  window.scrollTo({ top:0, behavior:"instant" });
+  const b = BESPOKE[v];
+  if (b) b(); else if (VIEW[v] && VIEW[v].table) loadTableView(v);
+}
+
+document.addEventListener("click", (e) => {
+  const r = e.target.closest("[data-v]");
+  if (r) { go(r.dataset.v); return; }
+});
+
+// The search box only filters the view you are looking at, and only what is
+// already loaded. It does not pretend to search the whole business.
+$("srch").addEventListener("input", () => {
+  if (currentView === "invoices") return renderInvoiceList();
+  if (currentView === "sketch") return renderSkList();
+  if (VIEW[currentView] && VIEW[currentView].table && ROWS[currentView]) renderTableView(currentView);
+});
+
+// ---------------------------------------------------------------- auth
+
+async function token(){
+  const { data } = await sb.auth.getSession();
+  return data?.session?.access_token || "";
+}
+
+async function fn(payload){
+  const r = await fetch(FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+let CATALOGUE = [];
+let CURRENT = null;
+
+async function doSignIn(){
+  if (!startClient()) return say("authMsg","err","The Supabase library has not loaded, so sign in cannot run. Check you are online and reload the page.");
+  say("authMsg","ok","Signing in.");
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  if (error) return say("authMsg","err",error.message);
+  await boot();
+}
+
+$("signIn").addEventListener("click", doSignIn);
+$("password").addEventListener("keydown", e => { if (e.key === "Enter") doSignIn(); });
+$("email").addEventListener("keydown", e => { if (e.key === "Enter") $("password").focus(); });
+
+async function signOut(){ if (sb) await sb.auth.signOut(); location.reload(); }
+
+const initials = (s) => String(s || "").replace(/@.*/,"").split(/[.\s_-]+/).filter(Boolean).slice(0,2).map(w => w[0].toUpperCase()).join("") || "Y";
+
+async function boot(){
+  if (!startClient()) return;
+  const { data } = await sb.auth.getSession();
+  if (!data?.session) { show("gate",true); show("desk",false); return; }
+  const who = data.session.user.email;
+
+  // is_admin() is the same predicate row level security uses, so this asks the
+  // database the question rather than trusting the page. RLS still refuses the
+  // rows on its own if this were ever bypassed.
+  const { data: admin, error: adminErr } = await sb.rpc("is_admin");
+  if (adminErr || !admin) {
+    show("gate",true); show("desk",false);
+    return say("authMsg","err","Signed in as " + who + ", but that address is not on the Yaadly admin list, so this is closed to it. Sign out and use your admin address.");
+  }
+
+  try {
+    const { catalogue } = await fn({ action: "catalogue" });
+    CATALOGUE = catalogue || [];
+  } catch (e) {
+    CATALOGUE = [];   // invoicing degrades; the rest of the desk still opens
+    console.warn("service catalogue unavailable:", e.message);
+  }
+
+  $("who").innerHTML = `<span class="av">${esc(initials(who))}</span>${esc(who)} <button class="btn g" id="signOut" style="margin-left:4px">Sign out</button>`;
+  $("signOut").addEventListener("click", signOut);
+  show("gate",false); show("desk",true);
+  buildRail(); buildSections();
+  go("over");
+}
+
+// ---------------------------------------------------------------- overview
+
+const DAYNAME = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTH = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+let calY = null, calM = null, VISITS = [];
+
+// The admin calendar is the only one that sees every visit, on every job, for
+// every worker. A clash is two visits wanting the same person in the same slot
+// on the same day. It is coral because it is blocked: one of them has to move.
+function renderCal(){
+  const now = new Date();
+  if (calY === null) { calY = now.getFullYear(); calM = now.getMonth(); }
+  $("calTitle").textContent = MONTH[calM].slice(0,3) + " " + calY;
+
+  const byDay = {}, clashDays = new Set();
+  for (const v of VISITS) {
+    const d = String(v.day || "");
+    (byDay[d] = byDay[d] || []).push(v);
+  }
+  for (const d in byDay) {
+    const seen = {};
+    for (const v of byDay[d]) {
+      const key = (v.owner_email || "") + "|" + (v.slot || "");
+      if (seen[key]) clashDays.add(d);
+      seen[key] = true;
+    }
+  }
+
+  const days = new Date(calY, calM + 1, 0).getDate();
+  const pad = (new Date(calY, calM, 1).getDay() + 6) % 7;
+  const iso = (d) => calY + "-" + String(calM + 1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+  let out = "";
+  for (let i = 0; i < pad; i++) out += '<button class="cd pad" disabled></button>';
+  for (let d = 1; d <= days; d++) {
+    const key = iso(d), on = byDay[key] || [];
+    let cls = "cd";
+    if (clashDays.has(key)) cls += " clash";
+    else if (on.some(v => v.state !== "confirmed")) cls += " pending";
+    else if (on.length) cls += " booked";
+    if (calY === now.getFullYear() && calM === now.getMonth() && d === now.getDate()) cls += " today";
+    const dots = on.length ? '<span class="dt">' + on.slice(0,4).map(() => "<i></i>").join("") + "</span>" : "";
+    const title = on.map(v => [v.slot, v.what, v.job_id].filter(Boolean).join(" · ")).join(" / ");
+    out += `<button class="${cls}" title="${esc(title)}"><span class="dn">${d}</span>${dots}</button>`;
+  }
+  $("calGrid").innerHTML = out;
+
+  const soon = VISITS
+    .filter(v => String(v.day || "") >= new Date().toISOString().slice(0,10))
+    .sort((a,b) => String(a.day + (a.slot||"")).localeCompare(String(b.day + (b.slot||""))))
+    .slice(0, 5);
+
+  $("calSide").innerHTML = soon.length
+    ? soon.map(v => {
+        const clash = clashDays.has(String(v.day));
+        const cls = clash ? "nu clash" : v.state !== "confirmed" ? "nu pend" : "nu";
+        return `<div class="${cls}"><b>${esc(day_(v.day))}${v.slot ? " " + esc(v.slot) : ""}</b>`
+             + `${esc(v.what || v.kind || "visit")}${v.job_id ? " &middot; " + esc(v.job_id) : ""}`
+             + `${v.owner_email ? " &middot; " + esc(v.owner_email) : ""} &middot; ${esc(v.state || "unconfirmed")}`
+             + `${clash ? " &middot; clash, one of these has to move" : ""}</div>`;
+      }).join("")
+    : '<div class="nu"><b>No visits booked</b>Nothing is in the diary. When workers open days and clients take slots, every one of them lands here, across every job, and a worker booked twice in one slot shows as a clash.</div>';
+}
+
+const tile = (cls, k, v, d) => `<div class="tile ${cls}"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d)}</div></div>`;
+const alertRow = (kind, ic, title, text, btn, view) =>
+  `<div class="alert ${kind}"><span class="ic">${ic}</span><div><b>${esc(title)}</b><p>${esc(text)}</p></div>` +
+  (btn ? `<span class="act"><button class="btn ${kind === "crit" ? "d" : "g"}" data-v="${view}">${esc(btn)}</button></span>` : "") +
+  `</div>`;
+
+const countOf = (t, build) => {
+  let q = sb.from(t).select("*", { count:"exact", head:true });
+  if (build) q = build(q);
+  return q.then(r => r.count || 0).catch(() => 0);
+};
+
+async function loadOverview(){
+  const now = new Date();
+  $("ovDate").textContent = DAYNAME[now.getDay()] + " " + now.getDate() + " " + MONTH[now.getMonth()];
+
+  const vis = await sb.from("visits").select("id,owner_email,kind,job_id,day,slot,what,state").limit(400);
+  VISITS = vis.data || [];
+  renderCal();
+
+  const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
+         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft] = await Promise.all([
+    countOf("intakes",     q => q.in("status", ["new","triaged"])),
+    countOf("applications",q => q.in("status", ["submitted","reviewing"])),
+    countOf("evidence",    q => q.eq("ok", false)),
+    countOf("job_quotes",  q => q.eq("status", "sent")),
+    countOf("calls",       q => q.eq("status", "requested")),
+    countOf("disputes",    q => q.neq("state", "resolved")),
+    countOf("invoices",    q => q.eq("status", "draft")),
+    countOf("invoices",    q => q.eq("status", "sent")),
+    countOf("sketch_packs",q => q.eq("status", "draft")),
+    countOf("sketch_packs",q => q.eq("status", "approved")),
+    countOf("jobs",        q => q.eq("open", true)),
+    countOf("waitlist",    null),
+    countOf("feedback",    null),
+    countOf("kickoff_packs", q => q.eq("status", "draft")),
+  ]);
+
+  $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
+
+  $("ovTiles").innerHTML = [
+    tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute"),
+    tile(evidWaiting ? "warn" : "ok", "Evidence to check", String(evidWaiting), evidWaiting ? "Waiting on your eyes" : "Nothing waiting"),
+    tile(intakeNew ? "warn" : "ok", "Intake to triage", String(intakeNew), intakeNew ? "Read it and decide" : "Queue is clear"),
+    tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting"),
+    tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held"),
+    tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked"),
+    tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
+    tile("", "Jobs on the board", String(jobsOpen), "Open to workers"),
+    tile("", "Waiting list", String(waitN), "People to write to"),
+    tile("", "Feedback", String(fbN), "Unprompted, from the site"),
+  ].join("");
+
+  const needs = [];
+  if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
+    "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
+  if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
+    "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
+  if (intakeNew) needs.push(alertRow("warn","?", intakeNew + (intakeNew === 1 ? " intake is untriaged" : " intakes are untriaged"),
+    "Somebody asked for help and nobody has read it yet. That is the clock people judge you on.", "Open intake", "intake"));
+  if (appsWaiting) needs.push(alertRow("warn","?", appsWaiting + (appsWaiting === 1 ? " application is part way through vetting" : " applications are part way through vetting"),
+    "The agent flags what is missing. A person decides. Nothing auto-passes.", "Open applications", "apps"));
+  if (quotesOut) needs.push(alertRow("warn","?", quotesOut + (quotesOut === 1 ? " quote is sitting with you" : " quotes are sitting with you"),
+    "A worker has priced the job and the client has not seen it yet.", "Open quotes", "quotes"));
+  if (callsNew) needs.push(alertRow("warn","?", callsNew + (callsNew === 1 ? " call is unanswered" : " calls are unanswered"),
+    "Each one names the slots that suit them and the timezone they are in.", "Open calls", "calls"));
+  if (invDraft) needs.push(alertRow("warn","?", invDraft + (invDraft === 1 ? " invoice draft is unsent" : " invoice drafts are unsent"),
+    "Marking one as sent freezes it. It emails nobody, so sending it is still on you.", "Open invoices", "invoices"));
+  if (pkDraft) needs.push(alertRow("warn","?", pkDraft + (pkDraft === 1 ? " sketch pack is unread" : " sketch packs are unread"),
+    "Approving says you have read every room and it matches what you saw. Nothing approves itself.", "Read them", "sketch"));
+  if (pkAppr) needs.push(alertRow("warn","?", pkAppr + (pkAppr === 1 ? " approved pack has not been issued" : " approved packs have not been issued"),
+    "Approved is not sent. The client still cannot see these.", "Issue them", "sketch"));
+  if (kickDraft) needs.push(alertRow("warn","?", kickDraft + (kickDraft === 1 ? " kickoff pack is in draft" : " kickoff packs are in draft"),
+    "Read it before it goes to a client. Approving freezes it.", "Open packs", "kick"));
+
+  $("ovNeeds").innerHTML = needs.length ? needs.join("")
+    : alertRow("ok","✓","Nothing is waiting on you","No open dispute, no unchecked evidence, no untriaged intake, nothing half sent. The rail is clear.",null,null);
+
+  const running = [];
+  if (jobsOpen) running.push(alertRow("ok","✓", jobsOpen + (jobsOpen === 1 ? " job is on the board" : " jobs are on the board"),
+    "Open to workers. The address and the phone number are scrubbed out of that view by the database.", "See the board", "market"));
+  if (invSent) running.push(alertRow("ok","✓", invSent + (invSent === 1 ? " invoice is out and awaiting payment" : " invoices are out and awaiting payment"),
+    "Frozen and with the client. Nothing to do until the money lands.", "Open money", "money"));
+  if (!jobsOpen && !invSent) running.push(alertRow("ok","✓","Nothing in flight","No job on the board and no invoice awaiting payment.",null,null));
+  $("ovRunning").innerHTML = running.join("");
+
+  setCount("intake", intakeNew, false);
+  setCount("apps", appsWaiting, false);
+  setCount("evid", evidWaiting, false);
+  setCount("quotes", quotesOut, false);
+  setCount("calls", callsNew, false);
+  setCount("invoices", invDraft, false);
+  setCount("sketch", pkDraft + pkAppr, false);
+  setCount("kick", kickDraft, false);
+  setCount("jobs", disputesOpen, true);
+}
+
+$("calPrev").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
+$("calNext").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
+
+// ---------------------------------------------------------------- money
+
+async function loadMoney(){
+  const host = $("v-money");
+  host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
+  const [invR, svcR, jobR] = await Promise.all([
+    sb.from("invoices").select("id,client_name,status,total_pence,created_at").limit(400),
+    sb.from("services").select("id,type,client_name,price,stage").limit(200),
+    sb.from("jobs").select("id,owed,status,open").limit(400),
+  ]);
+  if (invR.error) {
+    host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>invoices could not be read</b><p>${esc(invR.error.message)}</p></div></div>`;
+    return;
+  }
+  const inv = invR.data || [], jobs = jobR.data || [];
+  const sum = (a) => a.reduce((t,i) => t + (i.total_pence || 0), 0);
+  const drafts = inv.filter(i => i.status === "draft");
+  const sent   = inv.filter(i => i.status === "sent");
+  const mKey   = new Date().toISOString().slice(0,7);
+  const paidM  = inv.filter(i => i.status === "paid" && String(i.created_at || "").slice(0,7) === mKey);
+  const owed   = jobs.reduce((t,j) => t + (Number(j.owed) || 0), 0);
+
+  host.innerHTML = `
+    <div class="tiles">
+      ${tile(sent.length ? "warn" : "ok", "Awaiting payment", money(sum(sent)), sent.length + (sent.length === 1 ? " invoice out" : " invoices out"))}
+      ${tile(drafts.length ? "warn" : "ok", "Drafted, unsent", money(sum(drafts)), drafts.length + (drafts.length === 1 ? " draft" : " drafts"))}
+      ${tile("", "Paid this month", money(sum(paidM)), paidM.length + (paidM.length === 1 ? " invoice" : " invoices"))}
+      ${tile(owed ? "warn" : "ok", "Owed on jobs", jmd(owed), "Agreed in writing, not held")}
+    </div>
+    <div class="sechd">Fee model in force</div>
+    <div class="card">
+      <div class="kv">
+        <span class="k2">Client, Guarantee and Support</span><span class="v2">15% on labour</span>
+        <span class="k2">Worker</span><span class="v2">12%, keeps 88%</span>
+        <span class="k2">Blended</span><span class="v2">27%</span>
+        <span class="k2">Materials</span><span class="v2">never fee'd</span>
+        <span class="k2">Yaadly Remote, digital</span><span class="v2">10%</span>
+        <span class="k2">Founding Pros, 90 days</span><span class="v2" style="color:var(--tealb)">worker side 0%</span>
+      </div>
+      <p class="conseq">These are the rates the pricing book fixed on 30 July. They are written here, not read from a table, because nothing enforces them in the database yet.</p>
+    </div>
+    <div class="alert warn"><span class="ic">!</span><div><b>None of this is a bank balance</b><p>Yaadly holds no money today. Holding starts when PI insurance is in force. Until then every figure above is an amount agreed in writing, or an invoice you raised yourself.</p></div></div>
+    ${svcR.data && svcR.data.length ? `<div class="sechd">Service bookings</div>` + tableCard(VIEW.svc, svcR.data) : ""}`;
+}
+
+// ---------------------------------------------------------------- health
+
+async function loadHealth(){
+  const host = $("v-health");
+  host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Counting.</div></div>';
+  const [staleSigs, unvetted, blob, noTrade, orphanQuotes] = await Promise.all([
+    countOf("doc_signatures", q => q.in("doc_type", ["worker_guidelines","client_guidelines"]).neq("doc_version", "1.1")),
+    countOf("applications", q => q.in("status", ["submitted","reviewing"])),
+    countOf("app_state", null),
+    countOf("jobs", q => q.is("trade", null)),
+    countOf("job_quotes", q => q.is("worker_user", null)),
+  ]);
+
+  const rows = [];
+  if (blob) rows.push(["crit","1","The old desk's data blob is still in the database",
+    "app_state holds a JSON copy of the whole business, written by the localStorage desk on yaadly.co.uk. Two stores means two answers to the same question. This desk reads the real tables, so that row is now history, not truth. Delete it once you are satisfied nothing needs recovering from it."]);
+  if (staleSigs) rows.push(["crit","2", staleSigs + " signature" + (staleSigs === 1 ? " is" : "s are") + " on an old version of the guidelines",
+    "The predicate that clears go-live and quoting checks the document type and ignores the version, so bumping to v1.1 asks nobody to re-sign. Until that changes these keep working."]);
+  if (noTrade) rows.push(["warn","3", noTrade + " job" + (noTrade === 1 ? " has" : "s have") + " no trade classified",
+    "yaad-match routes on trade. A job without one reaches nobody."]);
+  if (orphanQuotes) rows.push(["warn","4", orphanQuotes + " quote" + (orphanQuotes === 1 ? " has" : "s have") + " no worker account attached",
+    "worker_user is null, so the quote cannot be tied back to a vetted profile."]);
+  if (unvetted) rows.push(["warn","5", unvetted + " application" + (unvetted === 1 ? " is" : "s are") + " part way through vetting",
+    "Not a fault, just work outstanding. It clears when each one is passed or blocked."]);
+
+  host.innerHTML = (rows.length
+      ? `<div class="sechd">Wants attention</div>` + rows.map(r => alertRow(r[0], r[1], r[2], r[3], null, null)).join("")
+      : alertRow("ok","✓","Nothing flagged","No stale signatures, no unclassified jobs, no orphan quotes.",null,null))
+    + `<div class="sechd">Standing</div>
+       <div class="card"><div class="kv">
+         <span class="k2">This desk reads</span><span class="v2"><span class="chip ok">Postgres directly</span></span>
+         <span class="k2">Admin check</span><span class="v2"><span class="chip ok">is_admin() plus RLS</span></span>
+         <span class="k2">Service role key in this page</span><span class="v2"><span class="chip ok">none</span></span>
+         <span class="k2">Published on the public site</span><span class="v2"><span class="chip ok">no</span></span>
+         <span class="k2">Identity check in front of this page</span><span class="v2"><span class="chip mute">ask the address bar</span></span>
+       </div>
+       <p class="conseq">This page cannot tell you whether Cloudflare Access is in front of it, because if it were, you would have signed in before it loaded. <b>If you reached this without an identity check, there is none.</b> Access binds to a hostname, not to the Worker, so renaming the route leaves the new host open until a new Access application names it. That is what happened on 27 August. Check a host with <span class="mono">curl -I</span>: a 302 to cloudflareaccess.com means it is covered, a 200 means it is not.</p></div>`;
+}
+
+// ---------------------------------------------------------------- invoices
+
+// Teal is proven, mango is waiting on somebody, coral is blocked. A sent
+// invoice is waiting on money, so it is mango, not teal. Only paid is teal.
+const INV_CHIP = { draft:"warn", sent:"warn", paid:"ok", void:"mute" };
+const SK_CHIP  = { draft:"warn", approved:"warn", issued:"ok", void:"mute" };
+const chipFor = (map, s) => `<span class="chip ${map[s] || "mute"} dot">${esc(s)}</span>`;
+
+$("draft").addEventListener("click", async () => {
+  const text = $("text").value.trim();
+  if (!text) return say("draftMsg","err","Tell it what you are billing for first.");
+  $("draft").disabled = true;
+  say("draftMsg","ok","Drafting. The agent is reading it against your service list.");
+  try {
+    const out = await fn({
+      action: "draft", text,
+      client_name: $("clientName").value.trim(),
+      client_email: $("clientEmail").value.trim(),
+      client_address: $("clientAddress").value.trim()
+    });
+    if (out.needs === "client") {
+      say("draftMsg","warn", out.message);
+    } else {
+      say("draftMsg","ok","Draft " + out.invoice.id + " written. Read it before it goes anywhere.");
+      CURRENT = { invoice: out.invoice, lines: out.lines, questions: out.questions };
+      renderInvoice();
+      await loadInvoices();
+    }
+  } catch (e) {
+    let hint = e.message;
+    if (/MINIMAX_API_KEY/i.test(e.message)) hint = "The MiniMax key is not set as an Edge Function secret, so the agent cannot read your instruction. Everything else is working.";
+    if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
+    say("draftMsg","err", hint);
+  }
+  $("draft").disabled = false;
+});
+
+async function reload(id){
+  const [{ data: inv }, { data: lines }] = await Promise.all([
+    sb.from("invoices").select("*").eq("id", id).single(),
+    sb.from("invoice_lines").select("*").eq("invoice_id", id).order("sort").order("id")
+  ]);
+  CURRENT = { invoice: inv, lines: lines || [], questions: CURRENT?.questions || [] };
+  renderInvoice();
+  await loadInvoices();
+}
+
+function renderInvoice(){
+  if (!CURRENT?.invoice) return show("invCard", false);
+  const inv = CURRENT.invoice, lines = CURRENT.lines, draft = inv.status === "draft";
+  const unpriced = lines.filter(l => l.price_source === "needs_price").length;
+
+  $("invTitle").innerHTML = esc(inv.id) + " " + chipFor(INV_CHIP, inv.status)
+    + (inv.drafted_by === "ai" ? ' <span class="chip ai">drafted by the agent</span>' : '');
+
+  const opts = (sel) => CATALOGUE.map(c => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+
+  const rows = lines.map(l => `
+    <tr class="${l.price_source === "needs_price" ? "unpriced" : ""}" data-id="${l.id}">
+      <td>${draft ? `<input class="d" value="${esc(l.description)}">` : esc(l.description)}</td>
+      <td style="width:150px">${draft ? `<select class="c"><option value="">not on the list</option>${opts(l.catalogue_id)}</select>` : esc(l.catalogue_id || "bespoke")}</td>
+      <td style="width:110px">${draft ? `<select class="t">
+          <option value="catalogue_founding"${l.price_source === "catalogue_founding" ? " selected" : ""}>founding</option>
+          <option value="catalogue_full"${l.price_source === "catalogue_full" ? " selected" : ""}>full</option>
+        </select>` : ""}</td>
+      <td class="num" style="width:70px">${draft ? `<input class="q" type="number" min="0.5" step="0.5" value="${Number(l.qty)}">` : Number(l.qty)}</td>
+      <td class="num">${l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : money(l.unit_amount_pence)}</td>
+      <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.line_total_pence)}</td>
+      <td class="num">${draft ? `<button class="btn d rm">Remove</button>` : ""}</td>
+    </tr>`).join("");
+
+  $("invBody").innerHTML = `
+    <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}</p>
+    <div class="tw"><table>
+      <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th><th></th></tr></thead>
+      <tbody id="lineRows">${rows}</tbody>
+    </table></div>
+    <div class="grand">${money(inv.total_pence)}</div>
+    ${unpriced ? `<div class="alert crit"><span class="ic">!</span><div><b>${unpriced} line${unpriced > 1 ? "s" : ""} the agent could not price</b><p>It will not guess. Pick a service off your list for each one, or remove it. This invoice cannot be marked as sent until they are gone.</p></div></div>` : ""}
+    ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
+    ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
+    <div class="brow" style="margin-top:16px">
+      ${draft ? `<button class="btn g" id="addLine">Add a line</button>` : ""}
+      ${draft ? `<button class="btn g" id="saveLines">Save changes</button>` : ""}
+      <button class="btn g" id="previewBtn">Preview</button>
+      ${draft ? `<button class="btn" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent</button>` : ""}
+      ${inv.status === "sent" ? `<button class="btn" id="paidBtn">Mark as paid</button>` : ""}
+      ${draft || inv.status === "sent" ? `<button class="btn d" id="voidBtn">Void</button>` : ""}
+    </div>
+    ${draft ? `<p class="conseq">Marking as sent <b>freezes ${esc(inv.id)} at ${money(inv.total_pence)}</b> and you cannot edit a line afterwards. It emails nobody: you still send it yourself.</p>` : ""}
+    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${money(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}`;
+
+  show("invCard", true);
+
+  $("invBody").querySelectorAll(".rm").forEach(b => b.addEventListener("click", async (e) => {
+    const { error } = await sb.from("invoice_lines").delete().eq("id", e.target.closest("tr").dataset.id);
+    if (error) return say("invMsg","err",error.message);
+    await reload(inv.id);
+  }));
+
+  if ($("addLine")) $("addLine").addEventListener("click", async () => {
+    const c = CATALOGUE[0];
+    const { error } = await sb.from("invoice_lines").insert({
+      invoice_id: inv.id, catalogue_id: c.id, description: c.name, qty: 1,
+      price_source: "catalogue_founding", sort: CURRENT.lines.length
+    });
+    if (error) return say("invMsg","err",error.message);
+    await reload(inv.id);
+  });
+
+  if ($("saveLines")) $("saveLines").addEventListener("click", async () => {
+    say("invMsg","","");
+    for (const tr of $("lineRows").querySelectorAll("tr")) {
+      const cid = tr.querySelector(".c").value;
+      const { error } = await sb.from("invoice_lines").update({
+        description: tr.querySelector(".d").value,
+        qty: Number(tr.querySelector(".q").value) || 1,
+        catalogue_id: cid || null,
+        price_source: cid ? tr.querySelector(".t").value : "needs_price"
+      }).eq("id", tr.dataset.id);
+      if (error) return say("invMsg","err",error.message);
+    }
+    say("invMsg","ok","Saved. Prices were taken from your service list, not from what was typed.");
+    await reload(inv.id);
+  });
+
+  $("previewBtn").addEventListener("click", async () => {
+    try {
+      const { html } = await fn({ action: "render", invoice_id: inv.id, as: "json" });
+      $("preview").srcdoc = html;
+      show("previewCard", true);
+      $("previewCard").scrollIntoView({ behavior: "smooth" });
+    } catch (e) { say("invMsg","err",e.message); }
+  });
+
+  if ($("sendBtn")) $("sendBtn").addEventListener("click", async () => {
+    if (!confirm("Mark " + inv.id + " as sent?\n\nThis freezes the invoice at " + money(inv.total_pence) + ". It does not email anybody: you still send it yourself.")) return;
+    const { error } = await sb.from("invoices").update({ status: "sent" }).eq("id", inv.id);
+    if (error) return say("invMsg","err",error.message);
+    say("invMsg","ok","Marked as sent and frozen. Now email or WhatsApp it to them.");
+    await reload(inv.id);
+  });
+
+  if ($("paidBtn")) $("paidBtn").addEventListener("click", async () => {
+    const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
+    if (ref === null) return;
+    const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", inv.id);
+    if (error) return say("invMsg","err",error.message);
+    say("invMsg","ok","Money in. Logged against " + inv.id + ".");
+    await reload(inv.id);
+  });
+
+  if ($("voidBtn")) $("voidBtn").addEventListener("click", async () => {
+    if (!confirm("Void " + inv.id + "? It stays on the record, marked void.")) return;
+    const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", inv.id);
+    if (error) return say("invMsg","err",error.message);
+    await reload(inv.id);
+  });
+}
+
+$("printBtn").addEventListener("click", () => $("preview").contentWindow.print());
+
+let INV_LIST = [];
+
+function renderInvoiceList(){
+  const q = ($("srch").value || "").trim().toLowerCase();
+  const rows = q ? INV_LIST.filter(i => (i.id + " " + i.client_name).toLowerCase().includes(q)) : INV_LIST;
+  $("list").innerHTML = rows.map(i => `
+    <div class="item">
+      <div><a href="#" data-open="${esc(i.id)}">${esc(i.id)}</a> ${chipFor(INV_CHIP, i.status)}
+        <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(i.client_name)} &middot; ${esc(i.issue_date)}</div></div>
+      <div style="font-weight:700;font-variant-numeric:tabular-nums">${money(i.total_pence)}</div>
+    </div>`).join("")
+    || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
+          : '<div class="empty"><b>Nothing yet</b>Draft your first invoice above.</div>');
+
+  $("list").querySelectorAll("[data-open]").forEach(a => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    CURRENT = { questions: [] };
+    await reload(e.target.dataset.open);
+    $("invCard").scrollIntoView({ behavior: "smooth" });
+  }));
+}
+
+async function loadInvoices(){
+  const { data, error } = await sb.from("invoices")
+    .select("id,client_name,status,total_pence,issue_date,drafted_by")
+    .order("created_at", { ascending: false }).limit(15);
+  if (error) return;
+  INV_LIST = data || [];
+  renderInvoiceList();
+}
+
+// ---------------------------------------------------------------- sketch packs
+//
+// The video never leaves this machine. Frames are pulled here, in a canvas,
+// and only the stills she keeps are uploaded. That is a privacy decision as
+// much as a technical one: a walkthrough of somebody's home is not ours to
+// ship to a model wholesale.
+//
+// The measurement rule is enforced in three places and this is the first one
+// she sees: anything the model says with a number and a unit in it is scrubbed
+// server side and reported back here, in the open, rather than quietly fixed.
+
+const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
+let SK_FRAMES = [];     // [{n, t, data, keep}]
+let SK_DESCRIBED = [];  // what the vision model said
+let SK_PACK = null;
+
+async function skFn(payload){
+  const r = await fetch(SK_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+const mmss = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
+
+// Seek, draw, repeat. Downscaled and JPEG-compressed because a vision model
+// gains nothing from a 4K still and the upload has to survive Jamaican wifi.
+async function skExtract(file, count){
+  const url = URL.createObjectURL(file);
+  const v = document.createElement("video");
+  v.preload = "auto"; v.muted = true; v.playsInline = true; v.src = url;
+  try {
+    await new Promise((res, rej) => {
+      v.onloadedmetadata = res;
+      v.onerror = () => rej(new Error("That file could not be read as a video. Try an MP4 or a MOV."));
+      setTimeout(() => rej(new Error("That video took too long to open.")), 20000);
+    });
+    let dur = v.duration;
+    if (!isFinite(dur) || dur <= 0) throw new Error("That video has no readable length, so stills cannot be spaced through it.");
+
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 960 / Math.max(v.videoWidth || 960, v.videoHeight || 720));
+    canvas.width = Math.round((v.videoWidth || 960) * scale);
+    canvas.height = Math.round((v.videoHeight || 720) * scale);
+    const ctx = canvas.getContext("2d");
+
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const t = dur * (i + 0.5) / count;
+      await new Promise((res, rej) => {
+        v.onseeked = res;
+        v.onerror = () => rej(new Error("The video stopped part way through."));
+        setTimeout(res, 4000);          // a stubborn seek should not hang the desk
+        v.currentTime = t;
+      });
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      out.push({ n: i + 1, t, data: canvas.toDataURL("image/jpeg", 0.72), keep: true });
+      $("skProgress").textContent = `Pulling still ${i + 1} of ${count}.`;
+    }
+    return out;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function skRenderThumbs(){
+  const kept = SK_FRAMES.filter(f => f.keep).length;
+  $("skFramesTitle").textContent = `Stills, ${kept} kept of ${SK_FRAMES.length}`;
+  $("skThumbs").innerHTML = SK_FRAMES.map(f => {
+    const d = SK_DESCRIBED.find(x => x.n === f.n);
+    return `<div class="pthumb ${f.keep ? "" : "out"}" data-n="${f.n}">
+      <span class="n">${f.n}</span>
+      <button class="x" title="${f.keep ? "drop this one" : "put it back"}">${f.keep ? "×" : "+"}</button>
+      <img src="${f.data}" alt="still ${f.n}">
+      <div class="cap">${esc(d ? (d.room || "") : mmss(f.t))}${d && d.visible ? "<br>" + esc(d.visible.slice(0, 90)) : ""}</div>
+    </div>`;
+  }).join("");
+  $("skThumbs").querySelectorAll(".x").forEach(b => b.addEventListener("click", (e) => {
+    const n = Number(e.target.closest(".pthumb").dataset.n);
+    const f = SK_FRAMES.find(x => x.n === n);
+    f.keep = !f.keep;
+    skRenderThumbs();
+  }));
+}
+
+$("skPull").addEventListener("click", async () => {
+  const file = $("skVideo").files[0];
+  if (!file) return say("skMsg","err","Choose the walkthrough video first.");
+  if (!$("skLabel").value.trim()) return say("skMsg","err","Give the property a label. Not the address: something like 'The Portmore house'.");
+  const count = Math.max(4, Math.min(36, Number($("skCount").value) || 12));
+  $("skPull").disabled = true;
+  say("skMsg","ok","Reading the video. It is not being uploaded.");
+  try {
+    SK_FRAMES = await skExtract(file, count);
+    SK_DESCRIBED = []; SK_PACK = null;
+    show("skFramesCard", true); show("skPackCard", false); show("skPreviewCard", false);
+    $("skProgress").textContent = "";
+    $("skAssemble").disabled = true;
+    skRenderThumbs();
+    say("skMsg","ok",`${SK_FRAMES.length} stills pulled from ${mmss(SK_FRAMES[SK_FRAMES.length-1].t)} of footage. Nothing has left this machine.`);
+  } catch (e) {
+    say("skMsg","err", e.message);
+  }
+  $("skPull").disabled = false;
+});
+
+$("skDescribe").addEventListener("click", async () => {
+  const kept = SK_FRAMES.filter(f => f.keep);
+  if (!kept.length) return say("skMsg","err","Every still is dropped. Keep at least one.");
+  $("skDescribe").disabled = true;
+  SK_DESCRIBED = [];
+  const scrubs = [];
+  try {
+    // Six at a time. The batching is not politeness, it is what keeps each
+    // call inside the edge function's timeout.
+    for (let i = 0; i < kept.length; i += 6) {
+      const batch = kept.slice(i, i + 6);
+      $("skProgress").textContent = `Looking at stills ${batch[0].n} to ${batch[batch.length-1].n}, ${i + batch.length} of ${kept.length}.`;
+      const out = await skFn({
+        action: "frames",
+        images: batch.map(b => b.data),
+        start_at: batch[0].n,
+        context: $("skContext").value.trim(),
+      });
+      SK_DESCRIBED.push(...(out.frames || []));
+      scrubs.push(...(out.scrubbed || []));
+      skRenderThumbs();
+    }
+    $("skProgress").textContent = "";
+    $("skAssemble").disabled = false;
+    say("skMsg", scrubs.length ? "warn" : "ok",
+      scrubs.length
+        ? `${SK_DESCRIBED.length} stills described. ${scrubs.length} measurement phrase${scrubs.length > 1 ? "s were" : " was"} removed: the model tried to state a size it cannot know. That is the guard doing its job.`
+        : `${SK_DESCRIBED.length} stills described, no measurements attempted. Now build the pack.`);
+  } catch (e) {
+    $("skProgress").textContent = "";
+    say("skMsg","err", /NVIDIA_API_KEY/i.test(e.message)
+      ? "The NVIDIA key is not set as an Edge Function secret, so the vision model cannot be reached."
+      : e.message);
+  }
+  $("skDescribe").disabled = false;
+});
+
+$("skAssemble").addEventListener("click", async () => {
+  if (!SK_DESCRIBED.length) return say("skMsg","err","Describe the stills first.");
+  $("skAssemble").disabled = true;
+  say("skMsg","ok","Working out the rooms and drawing the sketch.");
+  try {
+    const out = await skFn({
+      action: "assemble",
+      frames: SK_DESCRIBED,
+      property_label: $("skLabel").value.trim(),
+      client_name: $("skClient").value.trim(),
+      parish: $("skParish").value.trim(),
+      visit_date: $("skDate").value || null,
+      captured_by: $("skWho").value.trim(),
+    });
+    SK_PACK = out.pack;
+    skRenderPack(out);
+    await loadSketchPacks();
+    say("skMsg","ok", `Draft ${out.pack.id} built. Read every room before you approve it.`);
+  } catch (e) {
+    say("skMsg","err", e.message);
+  }
+  $("skAssemble").disabled = false;
+});
+
+function skRenderPack(extra){
+  const p = SK_PACK;
+  if (!p) return show("skPackCard", false);
+  const rooms = p.rooms || [];
+  const draft = p.status === "draft";
+  const sev = { high:"var(--coral)", medium:"var(--mango)", low:"var(--dim)" };
+
+  $("skPackTitle").innerHTML = esc(p.id) + " " + chipFor(SK_CHIP, p.status)
+    + (p.rev > 1 ? ` <span class="chip mute">rev ${esc(p.rev)}</span>` : "");
+
+  $("skPackBody").innerHTML = `
+    <p class="vsub" style="margin:0 0 10px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}${p.parish ? " &middot; " + esc(p.parish) : ""}</p>
+    ${p.sketch_svg ? `<div class="sketchbox">${p.sketch_svg}</div>` : ""}
+    <div class="tw"><table>
+      <thead><tr><th>Room</th><th>Photos</th><th>What was seen</th></tr></thead>
+      <tbody>${rooms.map(r => `
+        <tr>
+          <td style="white-space:nowrap"><b>${esc(r.name)}</b>${r.level && r.level !== "ground" ? `<span class="sub">${esc(r.level)}</span>` : ""}</td>
+          <td style="white-space:nowrap;color:var(--dim)" class="mono">${(r.frames||[]).join(", ") || "none"}</td>
+          <td>${(r.observations||[]).length ? (r.observations||[]).map(o =>
+            `<div style="padding:2px 0"><span style="color:${sev[o.severity]||"var(--dim)"}">&#9632;</span>
+             <b>${esc(String(o.category).replace("_"," "))}</b>, ${esc(o.severity)}. ${esc(o.note)}
+             ${o.recommend_professional ? '<span style="color:var(--coral)"> Needs a qualified eye.</span>' : ""}</div>`).join("")
+            : '<span style="color:var(--dim)">Nothing notable visible.</span>'}</td>
+        </tr>`).join("")}</tbody>
+    </table></div>
+    ${(extra?.scrubbed || []).length ? `<div class="alert warn"><span class="ic">!</span><div><b>${extra.scrubbed.length} measurement phrase${extra.scrubbed.length > 1 ? "s" : ""} removed before this was saved</b><p>What the model tried to say: ${esc(extra.scrubbed.slice(0,3).join(" · "))}</p></div></div>` : ""}
+    ${(extra?.gaps || []).length ? `<div class="qs"><h4>What this pack does not cover</h4><ul>${extra.gaps.map(g => "<li>" + esc(g) + "</li>").join("")}</ul></div>` : ""}
+    <div class="brow" style="margin-top:16px">
+      <button class="btn g" id="skPreviewBtn">Preview</button>
+      ${draft ? `<button class="btn" id="skApprove">Approve it</button>` : ""}
+      ${p.status === "approved" ? `<button class="btn" id="skIssue">Issue to the client</button>` : ""}
+      ${p.status === "approved" ? `<button class="btn g" id="skReopen">Reopen for edits</button>` : ""}
+      ${draft || p.status === "approved" ? `<button class="btn d" id="skVoid">Void</button>` : ""}
+    </div>
+    ${draft ? `<p class="conseq">Approving is you saying you have <b>read every one of the ${rooms.length} room${rooms.length === 1 ? "" : "s"}</b> and it matches what you saw on site. It freezes the content. It does not send anything.</p>` : ""}
+    ${p.status === "approved" ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>` : ""}`;
+
+  show("skPackCard", true);
+
+  $("skPreviewBtn").addEventListener("click", async () => {
+    try {
+      const { html } = await skFn({ action:"render", pack_id: p.id, as:"json",
+        property_summary: extra?.pack?.property_summary || "", gaps: extra?.gaps || [] });
+      $("skPreview").srcdoc = html;
+      show("skPreviewCard", true);
+      $("skPreviewCard").scrollIntoView({ behavior:"smooth" });
+    } catch (e) { say("skPackMsg","err", e.message); }
+  });
+
+  const setStatus = async (status, confirmText) => {
+    if (confirmText && !confirm(confirmText)) return;
+    const { error } = await sb.from("sketch_packs").update({ status }).eq("id", p.id);
+    if (error) return say("skPackMsg","err", error.message);
+    await skReload(p.id);
+  };
+
+  if ($("skApprove")) $("skApprove").addEventListener("click", () =>
+    setStatus("approved", "Approve " + p.id + "?\n\nYou are saying you have read every room and it matches what you saw. This freezes the content."));
+  if ($("skIssue")) $("skIssue").addEventListener("click", () =>
+    setStatus("issued", "Issue " + p.id + " to the client?\n\nIt becomes visible to them in the portal. It does not email anybody."));
+  if ($("skReopen")) $("skReopen").addEventListener("click", () =>
+    setStatus("draft", "Reopen " + p.id + "?\n\nThis clears the approval and starts a new revision."));
+  if ($("skVoid")) $("skVoid").addEventListener("click", () =>
+    setStatus("void", "Void " + p.id + "? It stays on the record, marked void."));
+}
+
+async function skReload(id){
+  const { data, error } = await sb.from("sketch_packs").select("*").eq("id", id).single();
+  if (error) return say("skPackMsg","err", error.message);
+  SK_PACK = data;
+  skRenderPack({});
+  await loadSketchPacks();
+}
+
+$("skPrint").addEventListener("click", () => $("skPreview").contentWindow.print());
+
+let SK_LIST = [];
+
+function renderSkList(){
+  const q = ($("srch").value || "").trim().toLowerCase();
+  const rows = q ? SK_LIST.filter(p => (p.id + " " + p.property_label + " " + (p.client_name||"")).toLowerCase().includes(q)) : SK_LIST;
+  $("skList").innerHTML = rows.map(p => `
+    <div class="item">
+      <div><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
+        <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}</div></div>
+      <div style="color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
+    </div>`).join("")
+    || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
+          : '<div class="empty"><b>Nothing yet</b>Pull the stills from a walkthrough above.</div>');
+
+  $("skList").querySelectorAll("[data-skopen]").forEach(a => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await skReload(e.target.dataset.skopen);
+    $("skPackCard").scrollIntoView({ behavior:"smooth" });
+  }));
+}
+
+async function loadSketchPacks(){
+  const { data, error } = await sb.from("sketch_packs")
+    .select("id,property_label,client_name,status,created_at,rev")
+    .order("created_at", { ascending: false }).limit(15);
+  if (error) return;
+  SK_LIST = data || [];
+  renderSkList();
+}
+
+// ---------------------------------------------------------------- start
+
+let triedFallback = false;
+function start(tries){
+  if (startClient()) { $("bootMsg").textContent = ""; return boot(); }
+  if (tries === 12 && !triedFallback) {
+    triedFallback = true;
+    $("bootMsg").innerHTML = '<span class="spin"></span>Still loading. Trying a second source.';
+    const alt = document.createElement("script");
+    alt.src = "https://unpkg.com/@supabase/supabase-js@2";
+    document.head.appendChild(alt);
+  }
+  if (tries <= 0) {
+    return say("authMsg","err","The Supabase library did not load, so sign in cannot work. You are either offline, or this page is being shown as a preview that does not run scripts. Save the file and open it in Chrome.");
+  }
+  $("bootMsg").innerHTML = '<span class="spin"></span>Loading.';
+  setTimeout(() => start(tries - 1), 250);
+}
+start(24);
+</script>
+</body>
+</html>
