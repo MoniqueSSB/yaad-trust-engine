@@ -1666,56 +1666,6 @@ function setCloudBadge(state){
   el.textContent = state==="on"?"● cloud synced":state==="error"?"● cloud error":"○ cloud off";
   el.style.color = state==="on"?"var(--tealb)":state==="error"?"var(--red)":"var(--dim)";
 }
-async function cloudPull(){
-  if(!sb || !cloudOn) return;
-  try{
-    const [ri, ra, rf, rw] = await Promise.all([
-      sb.from("intakes").select("*").order("created_at"),
-      sb.from("applications").select("*").order("created_at"),
-      sb.from("feedback").select("*").order("created_at"),
-      sb.from("waitlist").select("*").order("created_at")
-    ]);
-    (rw.data||[]).forEach(row=>{
-      if(DB.waitlist.some(x=>x.cid===row.id)) return;
-      DB.waitlist.push({ id:"WL-C"+String(DB.wlSeq++).padStart(3,"0"), cid:row.id,
-        when:(row.created_at||"").slice(0,10), name:row.name, contact:row.contact, where:row.place, need:row.need });
-    });
-    (rf.data||[]).forEach(row=>{
-      if(DB.feedback.some(x=>x.cid===row.id)) return;
-      DB.feedback.push({ id:"FB-C"+String(DB.fbSeq++).padStart(3,"0"), cid:row.id,
-        when:(row.created_at||"").slice(0,10), rating:row.rating, who:row.who, why:row.why,
-        better:row.better, liked:row.liked, contact:row.contact });
-    });
-    (ri.data||[]).forEach(row=>{
-      if(DB.intakes.some(x=>x.cid===row.id)) return;
-      DB.intakes.push({ id:"REQ-C"+String(DB.inSeq++).padStart(3,"0"), cid:row.id,
-        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, email:row.email, where:row.place,
-        addr:row.addr, access:row.access, type:row.work_type, desc:row.descr, urgency:row.urgency, loc:row.loc,
-        photos:row.photos||[], status:row.status||"new" });
-    });
-    (ra.data||[]).forEach(row=>{
-      // An application is opened at step 1 with status "started" and only turns
-      // "received" when the tradesperson actually sends it. Skipping rows the
-      // desk already holds meant one cached while still "started" stayed
-      // "started" here forever, so a completed application never reached the
-      // pending list. Refresh what the cloud owns; keep the checks, which are
-      // the desk's own work and live nowhere else.
-      const fields = {
-        when:(row.created_at||"").slice(0,10), name:row.name, phone:row.phone, email:row.email,
-        parish:row.parish, parishes:row.parishes, trade:row.trade, tradeOther:row.trade_other,
-        years:row.years, cert:!!row.cert, certno:row.certno, work:row.work, links:row.links,
-        ref1:row.ref1, ref2:row.ref2, ref3:row.ref3, refsTold:!!row.refs_told,
-        policeStatus:row.police_status, signedName:row.signed_name, signedAt:row.signed_at,
-        aiConsent:row.ai_review_consent, aiConsentAt:row.ai_review_consent_at,
-        status:row.status||"received" };
-      const held = DB.applications.find(x=>x.cid===row.id);
-      if(held) Object.assign(held, fields);
-      else DB.applications.push(Object.assign({
-        id:"APP-C"+String(DB.applications.length+1).padStart(3,"0"), cid:row.id, checks:{} }, fields));
-    });
-    save(); renderAll();
-  }catch(e){ console.warn("cloud pull:", e); setCloudBadge("error"); }
-}
 function cloudStatus(table, cid, status){
   if(sb && cloudOn && cid) sb.from(table).update({status:status}).eq("id", cid).then(r=>{ if(r.error) console.warn(r.error.message); });
 }
@@ -1804,11 +1754,6 @@ DB.intakes = DB.intakes || []; DB.inSeq = DB.inSeq || 1;
 DB.feedback = DB.feedback || []; DB.fbSeq = DB.fbSeq || 1;
 DB.waitlist = DB.waitlist || []; DB.wlSeq = DB.wlSeq || 1;
 DB.calls = DB.calls || []; DB.callSeq = DB.callSeq || 1;
-function exportData(){
-  const blob = new Blob([JSON.stringify(DB,null,2)], {type:"application/json"});
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-  a.download = "yaadly-backup-" + new Date().toISOString().slice(0,10) + ".json"; a.click();
-}
 function exportCSV(){
   const q = v => '"'+String(v==null?"":v).replace(/"/g,'""').replace(/\n/g," ")+'"';
   const rows = [["Record","ID","Title / Type","Name","Parish / Where","Status","Worker / Provider","Phone","Details","Date"]];
@@ -1842,7 +1787,6 @@ function go(v){
   window.scrollTo({top:0});
   history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
   closeNav();
-  renderAll();
 }
 function openBox(id){
   const el = $(id); if(!el) return;
@@ -3179,29 +3123,8 @@ function jobDetailHTML(j){
 }
 function laneBadge(l){ return l==="cert"?'<span class="lane cert">CERTIFIED PROFESSIONAL</span>':l==="pro"?'<span class="lane pro">VETTED PROFESSIONAL</span>':l?'<span class="lane vet">EVIDENCE VETTED</span>':""; }
 /* ───────────── WORKER PORTAL ───────────── */
-function workerTab(t){
-  go2("worker");
-  ["jobs","pay","open","apply"].forEach(x=>{ $("wt-"+x).style.display = x===t?"block":"none"; });
-  document.querySelectorAll("[data-wt]").forEach(b=>b.classList.toggle("on", b.dataset.wt===t));
-}
 function go2(v){ if(!$("pane-"+v).classList.contains("show")) go(v); }
 if($("ap-cert")) $("ap-cert").addEventListener("change", ()=>{ $("ap-certrow").style.display = $("ap-cert").value==="yes"?"block":"none"; });  // the apply form moved to app.yaadly.co.uk/apply
-function submitApplication(){
-  const g = id => ($(id).value||"").trim();
-  if(!g("ap-name") || !g("ap-phone") || !g("ap-email") || !g("ap-trade")){ alert("Name, WhatsApp number, email and trade are needed. The email is what unlocks your worker portal login later."); return; }
-  if(!$("ap-consent").checked){ alert("The consent tick is needed so Yaadly can verify your details."); return; }
-  const ap = { id:"APP-"+String(DB.applications.length+1).padStart(3,"0"), when:new Date().toISOString().slice(0,10),
-    name:g("ap-name"), phone:g("ap-phone"), email:g("ap-email"), parish:g("ap-parish"), trade:g("ap-trade"), years:g("ap-years"),
-    cert:$("ap-cert").value==="yes", certno:g("ap-certno"), work:g("ap-work"), ref1:g("ap-ref1"), ref2:g("ap-ref2"),
-    idtype:$("ap-idtype").value, police:$("ap-police").value,
-    payMethod:$("ap-pay").value, payName:g("ap-payname"),
-    checks:{}, status:"received" };
-  DB.applications.push(ap); save();
-  if(sb) sb.from("applications").insert({app_id:ap.id, name:ap.name, phone:ap.phone, email:ap.email, parish:ap.parish, trade:ap.trade, years:ap.years, cert:ap.cert, certno:ap.certno, work:ap.work, ref1:ap.ref1, ref2:ap.ref2, status:"received"}).then(r=>{ if(r.error) console.warn("application cloud:", r.error.message); });
-  $("ap-status").innerHTML = '<div class="card"><h3>Application <em>received</em></h3><p style="color:var(--mute);font-size:14px">Yaadly reviews every application personally: ID check, references called, and a trial job with an independent reviewer on site at our cost. You will hear back on WhatsApp. Joining is free, quoting is free, and there are no lead fees. The one charge is 12% of your labour price on completed work.</p></div>';
-  ["ap-name","ap-phone","ap-email","ap-parish","ap-trade","ap-years","ap-certno","ap-work","ap-ref1","ap-ref2"].forEach(i=>$(i).value="");
-  $("ap-consent").checked = false;
-}
 function renderWorker(){
   const J = $("wt-jobs"), O = $("wt-open"), P0 = $("wt-pay");
   if(!J) return;  // the worker pane moved to app.yaadly.co.uk/portal
@@ -3268,43 +3191,6 @@ function renderWorker(){
   wqMarketplace(O);
 }
 /* ───────────── CLIENT / WORKER AUTH ───────────── */
-async function clientGateLogin(){
-  if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value;
-  if(!em || !pw){ alert("Email and password needed."); return; }
-  $("cgate-status").innerHTML = '<div class="mono">Signing in...</div>';
-  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
-  $("cgate-pass").value = "";
-  if(error){ $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
-  openClientPortal(em);
-}
-async function clientGateSignup(){
-  if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("cgate-email").value.trim(), pw = $("cgate-pass").value, cd = ($("cgate-code")?$("cgate-code").value:"").trim();
-  if(!em || !pw){ alert("Email and password needed."); return; }
-  if(pw.length<8){ alert("Password needs to be at least 8 characters."); return; }
-  if(!cd){ alert("Your job code is needed the first time. It is on the message Yaadly sent you."); return; }
-  $("cgate-status").innerHTML = '<div class="mono">Checking your job code...</div>';
-  // Accounts are created server-side by yaad-portal-signup, behind the code
-  // check. Public sign-up is switched off in Auth, so this is the only door.
-  let res;
-  try{
-    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-portal-signup", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+CONFIG.supabaseKey },
-      body: JSON.stringify({ email:em, password:pw, code:cd, role:"client" })
-    });
-    res = await r.json();
-    if(!r.ok || res.error) throw new Error(res.error || "Could not create the profile.");
-  }catch(e){
-    $("cgate-status").innerHTML = '<div class="note" style="color:var(--red)">'+esc(e.message||String(e))+'</div>';
-    return;
-  }
-  // The account is created unconfirmed. They must click the link in the email
-  // before they can sign in, which is what proves they own the mailbox.
-  $("cgate-pass").value = ""; if($("cgate-code")) $("cgate-code").value = "";
-  $("cgate-status").innerHTML = '<div class="note">'+esc(res.message || ("Check "+em+" for a confirmation link, then sign in above."))+' The Client Guidelines are waiting for you inside.</div>';
-}
 async function pullMyCloudJobs(email){
   if(!sb || !email) return;
   const {data, error} = await sb.from("jobs").select("*");
@@ -3350,40 +3236,6 @@ async function restoreClientSession(){
   if(!sb || location.hash!=="#client") return;
   const {data:{session}} = await sb.auth.getSession();
   if(session && session.user && session.user.email) openClientPortal(session.user.email);
-}
-async function workerGateLogin(){
-  if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("wgate-email").value.trim(), pw = $("wgate-pass").value;
-  if(!em || !pw){ alert("Email and password needed."); return; }
-  $("wgate-status").innerHTML = '<div class="mono">Signing in...</div>';
-  const {error} = await sb.auth.signInWithPassword({email:em, password:pw});
-  $("wgate-pass").value = "";
-  if(error){ $("wgate-status").innerHTML = '<div class="note" style="color:var(--red)">Sign in failed: '+esc(error.message)+'</div>'; return; }
-  openWorkerPortal(em);
-}
-async function workerGateSignup(){
-  if(!sb){ alert("Cloud is not configured."); return; }
-  const em = $("wgate-email").value.trim(), pw = $("wgate-pass").value;
-  if(!em || !pw){ alert("Email and password needed."); return; }
-  if(pw.length<8){ alert("Password needs to be at least 8 characters."); return; }
-  $("wgate-status").innerHTML = '<div class="mono">Checking your application...</div>';
-  // Worker accounts only open once Yaadly has vetted them and created their
-  // worker profile. Checked server-side in yaad-portal-signup.
-  let res;
-  try{
-    const r = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-portal-signup", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+CONFIG.supabaseKey },
-      body: JSON.stringify({ email:em, password:pw, role:"worker" })
-    });
-    res = await r.json();
-    if(!r.ok || res.error) throw new Error(res.error || "Could not create the account.");
-  }catch(e){
-    $("wgate-status").innerHTML = '<div class="note" style="color:var(--red)">'+esc(e.message||String(e))+'</div>';
-    return;
-  }
-  $("wgate-pass").value = "";
-  $("wgate-status").innerHTML = '<div class="note">'+esc(res.message || ("Check "+em+" for a confirmation link, then sign in above."))+'</div>';
 }
 async function openWorkerPortal(email){
   workerOpen = true; workerAuthEmail = email;
@@ -5193,36 +5045,6 @@ async function wpPublish(){
    The shop window. Jobs and workers load anonymously from the
    safe public surfaces (open_jobs view, published profiles).
    Every card ends at the same door: sign on to take part. */
-async function renderMarketplace(){
-  const JB = $("mp-jobs"), WD = $("mp-workers");
-  if(!JB) return;
-  if(!sb){ JB.innerHTML = WD.innerHTML = '<div class="empty">The marketplace needs the cloud connection.</div>'; return; }
-  const [jr, wr] = await Promise.all([
-    sb.from("open_jobs").select("*").order("updated_at",{ascending:false}),
-    sb.from("worker_profiles").select("name,trade,parish,lane,jobs_completed").eq("active",true).order("jobs_completed",{ascending:false})
-  ]);
-  if(jr.error || !jr.data || !jr.data.length){
-    JB.innerHTML = '<div class="empty">No jobs are open for quotes right now. Pitched jobs land here the moment Yaadly opens them, so pitch yours and it can be next.</div>';
-  } else {
-    JB.innerHTML = '<div class="grid2">'+jr.data.map(j=>
-      '<div class="card" style="margin-top:0"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h3 style="font-size:16px">'+esc(j.title||"Job")+'</h3><span class="pill hold">OPEN</span></div>'+
-      '<p class="note" style="margin:4px 0 8px">'+esc(j.parish||"")+' · '+esc(j.id)+' · '+(j.client_signed?'client signed on · '+Number(j.client_jobs_completed||0)+' completed '+(Number(j.client_jobs_completed||0)===1?'job':'jobs'):'client record pending')+'</p>'+
-      '<p style="font-size:13px;color:var(--mute)">'+esc(String(j.descr||"").slice(0,180))+(String(j.descr||"").length>180?'...':'')+'</p>'+
-      '<a class="btn sm" style="margin-top:10px" onclick="go(\'worker\')">Sign in as a worker to quote →</a></div>').join("")+'</div>';
-  }
-  if(wr.error || !wr.data || !wr.data.length){
-    WD.innerHTML = '<div class="empty">The worker network is being built parish by parish. Nobody is listed before verification: government photo ID on a video call, references called, and a trial job.</div>';
-  } else {
-    WD.innerHTML = '<p class="note" style="margin-top:0">Every worker here passed Yaadly verification before their first job. The <b>Yaad Score record</b> is verified jobs completed on Yaadly: evidence-documented, client-approved, never self-reported.</p>'+
-      wr.data.map(w=>{
-        const laneB = w.lane==="cert" ? '<span class="lane cert">CERTIFIED PROFESSIONAL</span>' : '<span class="lane vet">EVIDENCE VETTED</span>';
-        return '<div class="wcard"><div class="av">'+esc((w.name||"W")[0].toUpperCase())+'</div>'+
-        '<div><b>'+esc(w.name)+'</b><small>'+esc(w.trade||"General trades")+(w.parish?' · '+esc(w.parish):'')+'</small>'+
-        '<small style="color:var(--tealb)">Yaad Score record: '+Number(w.jobs_completed||0)+' verified '+(Number(w.jobs_completed||0)===1?'job':'jobs')+'</small></div>'+laneB+'</div>';
-      }).join("")+
-      '<a class="btn sm" style="margin-top:12px" onclick="postJob()">Pitch a job to hire from this network →</a>';
-  }
-}
 /* ── Client Guidelines: the client's side of the deal ─────────
    The mirror of the Worker Guidelines. Signed electronically at
    profile creation: a client account is not complete until the
@@ -5353,8 +5175,11 @@ async function cgSubmitSign(){
   await sb.from("client_profiles").upsert({ user_id: session.user.id, email: session.user.email, name, jobs_completed: 0, active: true }, {onConflict:"user_id"});
   cgCheckGate();
 }
-function renderAll(){ renderClient(); renderWorker(); if(adminOpen) renderAdmin(); }
-renderAll();
+/* renderAll() used to fan out to the client dashboard, the worker dashboard
+   and the admin desk. All three are gone from this page: the portals moved to
+   app.yaadly.co.uk and each render function returned on a missing mount point,
+   and the admin desk moved to concierge.yaadly.co.uk. It had become a call
+   that did nothing, three times over, on every navigation. */
 </script>
 <script>
 /* ─────────────────────────────────────────────────────────────
