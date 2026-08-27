@@ -296,10 +296,34 @@ async function twilioSigned(req: Request, raw: string): Promise<{ ok: boolean; c
   if (!offered) return { ok: false, checked: true };
   const params = new URLSearchParams(raw);
   const sorted = [...params.keys()].sort();
-  let msg = req.url;
-  for (const k of sorted) msg += k + params.get(k);
-  const expected = b64(await hmac(new TextEncoder().encode(token), msg, "SHA-1"));
-  return { ok: offered === expected, checked: true };
+
+  // Twilio signs the URL it posted to. Inside the edge runtime `req.url` is
+  // NOT that URL: it comes through as
+  //   http://<ref>.supabase.co/yaad-inbound
+  // with the scheme downgraded and the /functions/v1 prefix stripped by the
+  // gateway. Signing over it rejects every genuine Twilio message with a 403,
+  // and the only way to notice is to send a correctly signed request, because
+  // a forged one is refused either way and looks like the check working.
+  //
+  // So rebuild the public URL and check against that, keeping `req.url` as a
+  // candidate for local dev where it is the real one. Twilio also signs
+  // whatever is typed into the console, so a trailing slash gets its own
+  // candidate rather than a support ticket.
+  const slug = new URL(req.url).pathname.replace(/^\/+/, "").replace(/^functions\/v1\//, "");
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  const candidates = [
+    `${base}/functions/v1/${slug}`,
+    `${base}/functions/v1/${slug}/`,
+    req.url,
+  ];
+
+  const key = new TextEncoder().encode(token);
+  for (const url of candidates) {
+    let msg = url;
+    for (const k of sorted) msg += k + params.get(k);
+    if (offered === b64(await hmac(key, msg, "SHA-1"))) return { ok: true, checked: true };
+  }
+  return { ok: false, checked: true };
 }
 
 
