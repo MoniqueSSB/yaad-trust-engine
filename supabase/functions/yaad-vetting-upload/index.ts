@@ -239,8 +239,18 @@ Deno.serve(async (req: Request) => {
       // were warned, is still accepted: it is the desk's job to decide, not
       // this function's. What it must not do is quietly lose the answer.
       const signedName = s(b.signedName).slice(0, 120);
+
+      // Consent to a machine reading their identity documents. Opt in only:
+      // anything that is not the word "granted" is a no, including a browser
+      // that never sent the field. Silence is not consent, and the safe reading
+      // of a missing answer is the one that sends the passport nowhere.
+      const aiConsent = s(b.aiReviewConsent) === "granted" ? "granted" : "declined";
+
       const { error } = await admin.from("applications").update({
         status: "received",
+        ai_review_consent: aiConsent,
+        ai_review_consent_at: new Date().toISOString(),
+        ai_review_consent_version: s(b.aiReviewConsentVersion).slice(0, 40) || "ai-review-v1",
         phone:    s(b.phone)  || undefined,
         email:    s(b.email).toLowerCase() || undefined,
         parish:   s(b.parish) || undefined,
@@ -274,7 +284,8 @@ Deno.serve(async (req: Request) => {
           await fetch(`https://ntfy.sh/${st.value}`, {
             method: "POST",
             headers: { Title: "New Yaadly pro application", Priority: "default", Tags: "hammer" },
-            body: `${s(b.trade) || "trade"}, ${s(b.parish) || "parish not given"}. ${count ?? 0} document(s) on file.`,
+            body: `${s(b.trade) || "trade"}, ${s(b.parish) || "parish not given"}. ${count ?? 0} document(s) on file.`
+              + (aiConsent === "granted" ? "" : " No AI read, they refused. You promised an answer within 48 hours."),
             signal: AbortSignal.timeout(4000),
           });
         }
@@ -290,7 +301,12 @@ Deno.serve(async (req: Request) => {
       // "Run the check again" button, and yaad-vetting-review writes its own
       // failures down rather than leaving a silence that reads like a clean
       // result.
-      try {
+      //
+      // Unless they said no. An applicant who declined the machine read must
+      // not have it run anyway because a background job was already wired up.
+      // yaad-vetting-review checks the same column itself, so this is the first
+      // of two gates rather than the only one.
+      if (aiConsent === "granted") try {
         const review = fetch(`${SUPABASE_URL}/functions/v1/yaad-vetting-review`, {
           method: "POST",
           headers: {

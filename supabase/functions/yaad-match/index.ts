@@ -15,7 +15,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_KEY   = Deno.env.get("RESEND_API_KEY") ?? "";       // optional
-const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "monique@yaadly.co.uk";
+// Must be an address on a domain Resend has verified for SENDING, which is
+// in.yaadly.co.uk. monique@yaadly.co.uk is where mail comes IN, on names.co.uk,
+// and Resend refuses to send from a domain it does not hold. send.yaadly.co.uk
+// still shows as verified there but its DKIM and SPF records are gone from
+// DNS, so anything from it fails authentication and lands in spam silently.
+const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
 const SITE         = Deno.env.get("YAAD_SITE") ?? "https://yaadly.co.uk";
 
 const cors = {

@@ -333,9 +333,31 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
 
   const { data: app, error: appErr } = await admin
     .from("applications")
-    .select("id, app_id, name, trade, trade_other, parish, parishes, years, police_status, signed_name")
+    .select("id, app_id, name, trade, trade_other, parish, parishes, years, police_status, signed_name, ai_review_consent")
     .eq("id", appId).maybeSingle();
   if (appErr || !app) return { body: { error: "No such application." }, status: 404 };
+
+  // ── the consent gate ──
+  //
+  // Step 3 lets an applicant refuse to have their identity documents read by
+  // an AI model. This is where that refusal is actually enforced, and it is
+  // enforced here rather than only at the caller because the desk has a "Run
+  // the check again" button and a button must not be able to override a
+  // promise made to somebody handing over their passport.
+  //
+  // NULL counts as declined. Consent is opt in, so an application that predates
+  // the question, or one where the field never arrived, does not get read.
+  if (app.ai_review_consent !== "granted") {
+    root.setAttributes({ "yaadly.vetting.review": "consent_declined" });
+    return {
+      body: {
+        ok: false,
+        declined: true,
+        error: "This applicant asked that no AI model read their documents. Nothing was sent.",
+      },
+      status: 409,
+    };
+  }
 
   const { data: docs } = await admin
     .from("vetting_documents")

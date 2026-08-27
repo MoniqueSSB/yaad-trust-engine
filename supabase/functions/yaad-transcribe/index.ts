@@ -19,10 +19,11 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // suspected that, which is why they proposed benchmarking Scribe, AssemblyAI
 // and Deepgram against real Patois rather than assuming.
 //
-// Whisper is first by choice. Add OPENAI_API_KEY and voice works everywhere,
-// the job form and every inbound channel, with no code change. The others are
-// failover: whichever key is present next takes over if Whisper is down or
-// returns nothing, so one provider having a bad day does not lose a job.
+// Cloudflare Workers AI is first: it runs Whisper on an account Yaadly is
+// already on, inside a free allowance, so voice costs nothing to switch on.
+// OpenAI, Deepgram, Scribe and AssemblyAI follow as failover, and whichever
+// key is present next takes over if the one before it is down or returns
+// nothing. One provider having a bad afternoon must not lose a job.
 //
 // Patois is stated to every provider rather than left to be guessed. A model
 // told to expect English quietly "corrects" Patois into something the client
@@ -45,6 +46,57 @@ type Provider = { name: string; run: (b: Uint8Array, f: string) => Promise<strin
 
 function providers(): Provider[] {
   const out: Provider[] = [];
+
+  // Cloudflare Workers AI runs Whisper on the account Yaadly already pays
+  // nothing for. The free allowance covers a small operation comfortably, and
+  // there is no second vendor, no second bill and no second key to rotate.
+  // First in the chain for exactly that reason.
+  //
+  // Two models, tried in order. whisper-large-v3-turbo is the better one and
+  // takes base64 in JSON; plain whisper takes the raw bytes and is the
+  // fallback when the turbo model is busy or unavailable in the region.
+  const cfAccount = Deno.env.get("CLOUDFLARE_ACCOUNT_ID") ?? "";
+  const cfToken = Deno.env.get("CLOUDFLARE_API_TOKEN") ?? "";
+  if (cfAccount && cfToken) {
+    const base = `https://api.cloudflare.com/client/v4/accounts/${cfAccount}/ai/run`;
+    out.push({
+      name: "cloudflare-whisper",
+      run: async (bytes) => {
+        let b64 = "";
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+          b64 += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        b64 = btoa(b64);
+
+        // turbo first
+        const turbo = await fetch(`${base}/@cf/openai/whisper-large-v3-turbo`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${cfToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ audio: b64, task: "transcribe", language: "en" }),
+          signal: AbortSignal.timeout(90000),
+        });
+        if (turbo.ok) {
+          const j = await turbo.json();
+          const t = String(j?.result?.text ?? "").trim();
+          if (t) return t;
+        }
+
+        // then the plain model, which takes the bytes directly
+        const plain = await fetch(`${base}/@cf/openai/whisper`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${cfToken}` },
+          body: bytes as unknown as BodyInit,
+          signal: AbortSignal.timeout(90000),
+        });
+        if (!plain.ok) {
+          throw new Error(`cloudflare ${turbo.status}/${plain.status}: ${(await plain.text()).slice(0, 160)}`);
+        }
+        const j2 = await plain.json();
+        return String(j2?.result?.text ?? "").trim();
+      },
+    });
+  }
 
   const openai = Deno.env.get("OPENAI_API_KEY") ?? "";
   if (openai) {
@@ -209,7 +261,7 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: false,
         error: "No speech provider is configured.",
-        detail: "Set any one of DEEPGRAM_API_KEY, ELEVENLABS_API_KEY, OPENAI_API_KEY or ASSEMBLYAI_API_KEY and voice works everywhere, with no code change.",
+        detail: "Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, which costs nothing on the account Yaadly already uses, and voice works on every channel with no code change. OPENAI_API_KEY, DEEPGRAM_API_KEY, ELEVENLABS_API_KEY and ASSEMBLYAI_API_KEY are accepted as failover.",
       }, 503);
     }
 
