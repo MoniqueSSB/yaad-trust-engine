@@ -66,18 +66,20 @@ The tab router, the auth gate and the styling are already done. The ten dashed
 tabs are the migration checklist: they are the real tab list from the old desk,
 and each one turns solid when its pane moves across.
 
-## It is temporarily on the public site
+## It is no longer on the public site
 
-`docs/desk.html` is a copy of `desk.html`, published at
-`https://yaadly.co.uk/desk.html` so it can be tested from a phone and from a
-signed-in browser without serving it locally.
+`docs/desk.html` was a copy published at `https://yaadly.co.uk/desk.html` so the
+desk could be tested from a phone without serving it locally. That copy came
+down on 27 Aug 2026, once the names.co.uk zone file had been exported, which was
+the condition set for removing it.
 
-Be clear about what that costs. The page itself is now reachable by anyone who
-finds the URL, and a URL is always findable: `noindex` keeps it out of search
-results but nothing keeps it out of a wordlist. What protects the business is
-not the address, it is the sign-in gate on the page and `is_admin()` plus RLS
-underneath it. No data is exposed. The interface is.
+What it cost while it was up: the page was reachable by anyone who found the
+URL, and a URL is always findable. `noindex` keeps it out of search results but
+nothing keeps it out of a wordlist. No data was ever exposed, because what
+protects the business is the sign-in gate plus `is_admin()` and RLS underneath,
+not the address. The interface was exposed. That is now closed.
 
-This copy should come down, or move behind Cloudflare Access, once the
-names.co.uk zone file has been exported. Delete `docs/desk.html` and it is
-gone; `desk/desk.html` stays as the source.
+`desk/desk.html` is the source and is unchanged. To use the desk, serve this
+folder locally (see above) rather than reaching for a public URL. If it needs to
+be reachable remotely again, put it behind Cloudflare Access rather than
+publishing it into `docs/`.

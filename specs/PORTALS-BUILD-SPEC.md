@@ -1,7 +1,7 @@
 # Build spec — Client, Worker and Service portals
 
 **For:** Claude Code, building into `docs/index.html` (the single-file app that serves yaadly.co.uk)
-**Reference implementation:** `docs/preview/index.html` — every component named here exists there, working, and can be lifted
+**Reference implementation:** `preview/index.html` — every component named here exists there, working, and can be lifted
 **Version:** 1.0 · 26 August 2026
 
 ---

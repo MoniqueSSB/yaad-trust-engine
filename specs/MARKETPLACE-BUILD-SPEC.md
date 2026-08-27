@@ -1,10 +1,10 @@
 # Build spec — Marketplace, worker profiles, client profiles
 
 **For:** Claude Code, building into `docs/index.html`
-**Reference implementation:** `docs/preview/index.html` — screens `#s-market`, `#s-worker`,
+**Reference implementation:** `preview/index.html` — screens `#s-market`, `#s-worker`,
 `#s-trades`, `#s-ask`. Every function named here exists there, working, and can be lifted.
 **Version:** 1.0 · 26 August 2026
-**Companion:** `docs/PORTALS-BUILD-SPEC.md` (what happens after a worker is chosen)
+**Companion:** `specs/PORTALS-BUILD-SPEC.md` (what happens after a worker is chosen)
 
 ---
 

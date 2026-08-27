@@ -36,7 +36,7 @@ Then backfill: `select * from backfill_missing_trades(false);` (dry run said 2 j
 | File | What it is |
 |---|---|
 | `data/job-taxonomy.js` | 18 trades, 97 job types, 84 size bands, 23 evidence checklists, stage count per type |
-| `docs/JOB-TAXONOMY.md` | The same, human-readable, for review and editing |
+| `specs/JOB-TAXONOMY.md` | The same, human-readable, for review and editing |
 
 Keyed **`Trade\|Type`**, never `Type` alone, two trades share a type name and a flat key
 silently gave the wrong evidence to the wrong trade:
@@ -51,7 +51,7 @@ working, on video**) · louvre repair · remote viewing set up for an overseas o
 
 ## 4 · Pricing, decided, with sources
 
-`docs/PRICING.md` carries the full ladder and every UK comparable behind it.
+`specs/PRICING.md` carries the full ladder and every UK comparable behind it.
 
 Headline changes:
 
@@ -75,8 +75,8 @@ band is client-side only.
 
 ## 5 · Prototype preview, new
 
-`docs/preview/index.html` publishes to **yaadly.co.uk/preview/**. A separate path, so
-`docs/index.html` (production) is untouched. `docs/preview/README.md` records the product
+`preview/index.html` publishes to **yaadly.co.uk/preview/**. A separate path, so
+`docs/index.html` (production) is untouched. `preview/README.md` records the product
 decisions it carries.
 
 ## 6 · Guidelines, needs a production edit

@@ -1,6 +1,6 @@
 # Build spec: Client, Worker and Service portals
 **Version 1.0, 26 August 2026. Authored by Monique. Canonical.**
-**Reference implementation:** `docs/preview/index.html`. Every component named here exists there, working, and is lifted from there. The copy in the reference is decided; lift it verbatim (the repo copy of the reference is already dash-scrubbed per the house rule and is the canonical wording).
+**Reference implementation:** `preview/index.html`. Every component named here exists there, working, and is lifted from there. The copy in the reference is decided; lift it verbatim (the repo copy of the reference is already dash-scrubbed per the house rule and is the canonical wording).
 
 **Implementation target, amended 26 Aug by Monique's later decision:** the portals are built in `web/` (Next.js on Cloudflare Workers), NOT in `docs/index.html`. Her words: the portal is confidential and lives in a different room behind the cloud layer; the website is the visual front door only. Everything else in this spec (stages, components, rules, copy, data mapping, acceptance tests) is binding as written. The single-render `drawJourney()` architecture translates to React components; the functional behaviour must match this spec exactly.
 
@@ -37,7 +37,7 @@ Booked & paid · Intake · Scope agreed · Kickoff issued · M1 working · M1 ev
 Job shapes: tap (1 stage, 100%), std (2, 60/40), roof (3, 30/40/30), reno (5). Service shapes: check (1, 100%), retainer (3, 40/40/20), fullpm (5, 15/15/25/25/20). Shapes are demo affordances; production reads `kickoff_packs.stages`.
 
 ## Stage to component map
-See `docs/preview/index.html` `drawJourney()` for the authoritative mapping (svc-portal through svc-next, quotes through rev-c, qb through rev-w). Worker side substitutes `disputeWorkerBlock()` for `disputeBlock()` and NEVER renders a band.
+See `preview/index.html` `drawJourney()` for the authoritative mapping (svc-portal through svc-next, quotes through rev-c, qb through rev-w). Worker side substitutes `disputeWorkerBlock()` for `disputeBlock()` and NEVER renders a band.
 
 ## Shared components (all exist in the reference)
 - **calBand**: three views of one calendar. Worker sees own diary and toggles days open or closed. Client sees only days the worker opened, only their own job, and requests a slot. Service sees Monique's open days and books 15 min, 30 min, or half day on site. Day states: free (teal), booked (mango), pending (coral), today (ring), sel, pad, disabled past. A confirmed slot closes the day for everybody else. Tables: `worker_availability(worker_id, day, open)`, `visits(job_id, day, slot, what, who, where, state)`. Needs the max-width 460px media rule or the grid overflows.

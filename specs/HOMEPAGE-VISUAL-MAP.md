@@ -1,7 +1,7 @@
 # Visual map — Homepage
 
 **For:** Claude Code, updating `docs/index.html`
-**Reference implementation:** `docs/preview/index.html`, screen `#s-home`
+**Reference implementation:** `preview/index.html`, screen `#s-home`
 **Version:** 1.0 · 26 August 2026
 
 Eight sections, 1,358 words, 5,543px at 1280. Cut down from 1,966 words and 6,528px — the

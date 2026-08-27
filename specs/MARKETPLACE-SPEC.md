@@ -1,6 +1,6 @@
 # Build spec: Marketplace, worker profiles, client profiles
 **Version 1.0, 26 August 2026. Authored by Monique. Canonical.**
-**Reference implementation:** `docs/preview/index.html`, screens s-market, s-worker, s-trades, s-ask. Copy decided; the repo reference is already dash-scrubbed and is the canonical wording. Companion: `docs/PORTAL-SPEC.md`.
+**Reference implementation:** `preview/index.html`, screens s-market, s-worker, s-trades, s-ask. Copy decided; the repo reference is already dash-scrubbed and is the canonical wording. Companion: `specs/PORTAL-SPEC.md`.
 **Implementation target, amended per Monique's same-day decision:** the marketplace is built at `app.yaadly.co.uk/jobs` in `web/`, wearing the site header so it reads as a tab of one Yaadly site. Everything else binds as written.
 
 ## The two-toggle model

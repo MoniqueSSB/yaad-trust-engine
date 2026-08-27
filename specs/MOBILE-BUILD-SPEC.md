@@ -1,7 +1,7 @@
 # Build spec — Mobile app: marketplace, worker profiles, client profiles
 
 **For:** Claude Code
-**Reference implementation:** `docs/preview/index.html` — the marketplace, worker profile and review
+**Reference implementation:** `preview/index.html` — the marketplace, worker profile and review
 system exist there working, at web scale. This spec adapts them to a phone and adds what a phone
 can do that a browser cannot.
 **Version:** 1.0 · 26 August 2026

@@ -1,9 +1,9 @@
 # Build spec — Post a job, step by step
 
 **For:** Claude Code, building into `docs/index.html`
-**Reference implementation:** `docs/preview/index.html`, screens `#s-post` and `#s-done`
+**Reference implementation:** `preview/index.html`, screens `#s-post` and `#s-done`
 **Version:** 1.0 · 26 August 2026
-**Companions:** `docs/MARKETPLACE-BUILD-SPEC.md` (where the job lands) · `docs/PORTALS-BUILD-SPEC.md` (what happens next)
+**Companions:** `specs/MARKETPLACE-BUILD-SPEC.md` (where the job lands) · `specs/PORTALS-BUILD-SPEC.md` (what happens next)
 
 ---
 
@@ -131,7 +131,7 @@ Below the description, the same card everybody fills, guest or member:
 > a minute, and it is the reason every job on the board can be filtered, matched and quoted without
 > a phone call first. Anything the assistant worked out from your description is already filled in.
 
-Eleven dropdown fields in five sections — see `docs/MARKETPLACE-BUILD-SPEC.md` §2.3 and
+Eleven dropdown fields in five sections — see `specs/MARKETPLACE-BUILD-SPEC.md` §2.3 and
 `data/job-taxonomy.js`. Every field carries a source badge:
 
 | Badge | Meaning |
