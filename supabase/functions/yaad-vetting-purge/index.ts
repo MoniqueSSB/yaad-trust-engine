@@ -56,6 +56,32 @@ Deno.serve(async (req: Request) => {
     const presented = String(body.secret ?? "");
     let allowed = Boolean(CRON_SECRET) && presented === CRON_SECRET;
 
+    // The scheduler that actually runs this lives in Postgres, as a pg_cron
+    // job calling out through pg_net. It has no access to this function's
+    // environment, so it cannot be handed YAAD_CRON_SECRET.
+    //
+    // So it presents its own secret and this checks it against a SHA-256 HASH
+    // held in app_settings. The database therefore stores nothing usable: the
+    // only copy of the plaintext is inside the cron job definition, and the
+    // cron schema is not exposed through PostgREST.
+    if (!allowed && presented) {
+      const { data: st } = await admin
+        .from("app_settings").select("value")
+        .eq("key", "purge_cron_secret_sha256").maybeSingle();
+      const expected = String(st?.value ?? "").toLowerCase();
+      if (expected) {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(presented));
+        const got = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        // Compared in constant time. A byte-at-a-time timing difference is a
+        // slow way to guess a secret, but it is still a way.
+        if (got.length === expected.length) {
+          let diff = 0;
+          for (let i = 0; i < got.length; i++) diff |= got.charCodeAt(i) ^ expected.charCodeAt(i);
+          allowed = diff === 0;
+        }
+      }
+    }
+
     if (!allowed) {
       const jwt = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       if (jwt) {

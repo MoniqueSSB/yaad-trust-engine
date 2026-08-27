@@ -3686,20 +3686,31 @@ async function loadVetDocs(a){
   if(!sb || !cloudOn || !a.cid){ box.textContent = "Connect cloud to see the documents."; return; }
   try{
     const {data, error} = await sb.from("vetting_documents")
-      .select("id,doc_type,storage_path,bytes,mime,sha256,purge_after,created_at")
+      .select("id,doc_type,storage_path,bytes,mime,sha256,purge_after,purged_at,created_at")
       .eq("application_id", a.cid).order("created_at");
     if(error) throw error;
     if(!data || !data.length){
       box.innerHTML = '<span style="color:var(--red)">Nothing uploaded. They sent an application with no documents at all.</span>';
       return;
     }
-    box.innerHTML = data.map(d=>
-      '<div style="display:flex;gap:9px;align-items:center;padding:7px 0;border-top:1px solid var(--line)">'+
-      '<b style="font-size:13px;color:var(--ink)">'+esc(VD_LABEL[d.doc_type]||d.doc_type)+'</b>'+
-      '<span style="color:var(--dim)">'+Math.max(1,Math.round((d.bytes||0)/1024))+' KB · '+esc((d.mime||"").split("/").pop())+
-      ' · destroyed '+esc((d.purge_after||"").slice(0,10))+'</span>'+
-      '<a class="btn o sm" style="margin-left:auto" onclick="openVetDoc(this,\''+esc(d.storage_path)+'\')">Open</a>'+
-      '</div>').join("");
+    box.innerHTML = data.map(d=>{
+      // The deletion clock destroys the file and keeps the row. A purged
+      // document still proves the check happened, so it stays on the list,
+      // but there is nothing left to open and offering a button that cannot
+      // work would be worse than saying so.
+      const gone = !!d.purged_at || !d.storage_path;
+      const meta = gone
+        ? 'destroyed '+esc(String(d.purged_at||"").slice(0,10))+' · the record stays, the file does not'
+        : Math.max(1,Math.round((d.bytes||0)/1024))+' KB · '+esc(String(d.mime||"").split("/").pop())+
+          ' · due for destruction '+esc(String(d.purge_after||"").slice(0,10));
+      return '<div style="display:flex;gap:9px;align-items:center;padding:7px 0;border-top:1px solid var(--line)">'+
+        '<b style="font-size:13px;color:'+(gone?"var(--dim)":"var(--ink)")+'">'+esc(VD_LABEL[d.doc_type]||d.doc_type)+'</b>'+
+        '<span style="color:var(--dim)">'+meta+'</span>'+
+        (gone
+          ? '<span class="st pass" style="margin-left:auto">PURGED</span>'
+          : '<a class="btn o sm" style="margin-left:auto" onclick="openVetDoc(this,\''+esc(d.storage_path)+'\')">Open</a>')+
+        '</div>';
+    }).join("");
   }catch(e){
     console.warn("vetting documents:", e);
     box.innerHTML = '<span style="color:var(--red)">Could not read the documents. Are you signed in as an admin?</span>';
