@@ -9,6 +9,8 @@ import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
+import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
+import { FeeBreakdown } from "@/components/portal/FeeBreakdown";
 import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 
@@ -157,6 +159,63 @@ export default async function JobRoom({
     : null;
   const pk = (packs ?? []) as Pack[];
 
+  /* The accepted quote is what the money panels read from. Before a worker is
+     chosen there is no agreed number, and the panels stay away rather than
+     inventing one. */
+  const won =
+    qs.find((q) => q.status === "accepted") ??
+    (job.worker_email
+      ? qs.find(
+          (q) =>
+            (q as { worker_email?: string }).worker_email?.toLowerCase() ===
+            job.worker_email?.toLowerCase(),
+        )
+      : undefined);
+
+  const money = (n: number | null | undefined) =>
+    n == null ? null : "J$" + Math.round(n).toLocaleString("en-JM");
+
+  const labour = won?.labour_jmd ?? null;
+  const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);
+  const takeHome = labour == null ? null : Math.round(labour * 0.88) + (won?.materials_jmd ?? 0);
+
+  const evidenceThisStage = ev.filter((e) => (e.stage ?? 1) === Math.max(job.stage ?? 1, 1)).length;
+
+  const tiles: Tile[] = [
+    {
+      label: role === "client" ? "You pay, all in" : "You receive",
+      value: (role === "client" ? money(allIn) : money(takeHome)) ?? "Not agreed yet",
+      held: job.status !== "complete",
+      note:
+        labour == null
+          ? "Agreed once you choose a quote"
+          : job.status === "complete"
+            ? "Released"
+            : "Held until you approve the evidence",
+    },
+    {
+      label: "Stage",
+      value: String(Math.max(job.stage ?? 0, 0)) + " of " + String(stageCount),
+      note: STAGES[current] ?? "",
+    },
+    {
+      label: "Evidence on this stage",
+      value: String(evidenceThisStage),
+      note: evidenceThisStage === 0 ? "Nothing uploaded yet" : "Timestamped and fingerprinted",
+    },
+    {
+      label: "Waiting on",
+      value:
+        job.status === "complete"
+          ? "Nobody"
+          : job.status === "evidence"
+            ? role === "client" ? "You" : "The client"
+            : job.worker_email ? "The work" : "Quotes",
+      held: job.status === "evidence" && role === "client",
+      note: job.status === "complete" ? "Closed and paid" : "",
+    },
+  ];
+
   return (
     <>
       <Link
@@ -203,6 +262,16 @@ export default async function JobRoom({
         current={current}
         viewing={viewing}
         base={"/portal/jobs/" + encodeURIComponent(job.id)}
+      />
+
+      <PortalTiles tiles={tiles} />
+
+      <FeeBreakdown
+        side={role === "worker" ? "worker" : "client"}
+        labour={labour}
+        materials={won?.materials_jmd ?? null}
+        materialsAtCost={won?.materials_at_cost ?? null}
+        workerName={won?.worker_name ?? job.worker_name}
       />
 
       {job.descr && (
