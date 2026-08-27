@@ -19,9 +19,10 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // suspected that, which is why they proposed benchmarking Scribe, AssemblyAI
 // and Deepgram against real Patois rather than assuming.
 //
-// Add any one key below and voice starts working everywhere, WhatsApp and the
-// job form both, with no code change. Add several and the first present wins,
-// the rest are failover.
+// Whisper is first by choice. Add OPENAI_API_KEY and voice works everywhere,
+// the job form and every inbound channel, with no code change. The others are
+// failover: whichever key is present next takes over if Whisper is down or
+// returns nothing, so one provider having a bad day does not lose a job.
 //
 // Patois is stated to every provider rather than left to be guessed. A model
 // told to expect English quietly "corrects" Patois into something the client
@@ -44,6 +45,28 @@ type Provider = { name: string; run: (b: Uint8Array, f: string) => Promise<strin
 
 function providers(): Provider[] {
   const out: Provider[] = [];
+
+  const openai = Deno.env.get("OPENAI_API_KEY") ?? "";
+  if (openai) {
+    out.push({
+      name: "whisper",
+      run: async (bytes, filename) => {
+        const form = new FormData();
+        form.append("file", new Blob([bytes as unknown as BlobPart]), filename);
+        form.append("model", "whisper-1");
+        form.append("prompt", PATOIS_HINT);
+        const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${openai}` },
+          body: form,
+          signal: AbortSignal.timeout(90000),
+        });
+        if (!r.ok) throw new Error(`whisper ${r.status}: ${(await r.text()).slice(0, 160)}`);
+        const j = await r.json();
+        return String(j?.text ?? "").trim();
+      },
+    });
+  }
 
   const deepgram = Deno.env.get("DEEPGRAM_API_KEY") ?? "";
   if (deepgram) {
@@ -86,28 +109,6 @@ function providers(): Provider[] {
           signal: AbortSignal.timeout(90000),
         });
         if (!r.ok) throw new Error(`elevenlabs ${r.status}: ${(await r.text()).slice(0, 160)}`);
-        const j = await r.json();
-        return String(j?.text ?? "").trim();
-      },
-    });
-  }
-
-  const openai = Deno.env.get("OPENAI_API_KEY") ?? "";
-  if (openai) {
-    out.push({
-      name: "whisper",
-      run: async (bytes, filename) => {
-        const form = new FormData();
-        form.append("file", new Blob([bytes as unknown as BlobPart]), filename);
-        form.append("model", "whisper-1");
-        form.append("prompt", PATOIS_HINT);
-        const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${openai}` },
-          body: form,
-          signal: AbortSignal.timeout(90000),
-        });
-        if (!r.ok) throw new Error(`whisper ${r.status}: ${(await r.text()).slice(0, 160)}`);
         const j = await r.json();
         return String(j?.text ?? "").trim();
       },
