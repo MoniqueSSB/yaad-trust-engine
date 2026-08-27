@@ -93,6 +93,7 @@ Return STRICT JSON only, no markdown fences, exactly this shape:
 
 Rules:
 - You will be told what the document is SUPPOSED to be. "matches_label" is whether it actually is that. A page filed as a police check that is plainly a payslip is the single most important thing you can catch.
+- Copy dates EXACTLY as printed and do not convert, reformat or interpret them. Something else does the arithmetic. Your only job with a date is to read it correctly.
 - Never invent a name, a date or a number. If you cannot read it, leave it out and set "readable" honestly.
 - Copy names and numbers exactly as printed, including middle names and initials. Do not tidy them up.
 - "concerns" is for what you can SEE. Do not speculate about forgery you have no visual evidence for. An empty array is a fine answer.
@@ -115,15 +116,12 @@ Rules:
 
 /* ── pass 3: put it together ───────────────────────────────────────────── */
 
-const SYNTH_PROMPT = `You are the Vetting Reviewer for Yaadly, a trust-first property works service in Jamaica. You are given what an applicant typed, what a vision model read off each of their documents separately, and a face comparison. You produce the note a human reviewer reads before opening the file.
+const SYNTH_PROMPT = `You are the Vetting Reviewer for Yaadly, a trust-first property works service in Jamaica. You are given what an applicant typed, what a vision model read off each of their documents separately, a face comparison, and date arithmetic that has already been calculated for you. You produce the note a human reviewer reads before opening the file.
 
 You never decide. You do not approve, decline, or recommend approving or declining. You produce flags and questions for a person to act on.
 
-Today's date will be given to you. Use it for anything time-sensitive.
-
 Cover these, but only where there is something to say:
 - Name match. Is the name the same across every document, and does it match what the applicant typed? A middle name on one document and not another is worth a note, not a flag. A different surname with no explanation is a flag.
-- Dates in window. Proof of address must be dated within the last three months of today's date. A police record check should be current. An ID must not be expired. Do the arithmetic properly.
 - Face match. Report what the comparison said, including its confidence.
 - Document is what it claims. Any document where matches_label is "no" or "unsure" is a flag, and the most serious one.
 - Legibility. Anything that came back partly readable or unreadable needs re-sending, and that is a question for the applicant, not a flag against them.
@@ -157,6 +155,102 @@ function b64(buf: ArrayBuffer): string {
   // multi-megabyte photograph.
   for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode(...bytes.subarray(i, i + 8192));
   return btoa(out);
+}
+
+/* ── dates are arithmetic, so code does them ───────────────────────────────
+   The model was asked to judge whether a proof of address was inside its three
+   month window. Shown a bill dated 03 January and told today was 27 August, it
+   answered that the bill was within the last three months. It was seven months
+   old.
+   That is not a prompt that needs tightening. Language models are bad at date
+   arithmetic and no amount of "do the arithmetic properly" fixes it. So the
+   model is asked only to READ the dates off the page, which it does well, and
+   the arithmetic happens here where it is deterministic and checkable. */
+
+const DAY = 86400000;
+const ADDRESS_MAX_DAYS = 92;    // "within three months", generously
+const POLICE_MAX_DAYS = 365;    // a check much older than a year is stale
+
+/** Parse a date as printed on a document. Returns null rather than guessing. */
+function parseDocDate(v: unknown): { at: Date } | { ambiguous: true } | null {
+  const t = s(v).replace(/(\d+)(st|nd|rd|th)/gi, "$1").trim();
+  if (!t) return null;
+
+  // All-numeric with separators is genuinely ambiguous: 03/01/2026 is the
+  // third of January in Jamaica and the first of March to a US date parser.
+  // Saying so beats picking one and being wrong half the time.
+  if (/^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}$/.test(t)) {
+    const p = t.split(/[\/.\-]/).map(Number);
+    if (p[0] > 12 || p[1] > 12) {
+      const [a, b, c] = p;
+      const day = a > 12 ? a : b, mon = a > 12 ? b : a;
+      const year = c < 100 ? 2000 + c : c;
+      const d = new Date(Date.UTC(year, mon - 1, day));
+      return isNaN(d.getTime()) ? null : { at: d };
+    }
+    return { ambiguous: true };
+  }
+
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? null : { at: d };
+}
+
+type Extraction = { doc: string; dates?: { label?: string; value?: string }[] };
+
+/** Deterministic date checks, and the note that explains each one. */
+function dateChecks(extracted: Extraction[]): { name: string; verdict: string; note: string }[] {
+  const now = Date.now();
+  const out: { name: string; verdict: string; note: string }[] = [];
+
+  const pick = (doc: string, re: RegExp) => {
+    const e = extracted.find((x) => x.doc === doc);
+    for (const d of e?.dates ?? []) {
+      if (!re.test(s(d.label))) continue;
+      const p = parseDocDate(d.value);
+      if (p) return { printed: s(d.value), label: s(d.label), parsed: p };
+    }
+    return null;
+  };
+
+  const age = pick("proof_of_address", /bill|statement|issue|date|period/i);
+  if (age) {
+    if ("ambiguous" in age.parsed) {
+      out.push({
+        name: "Proof of address age, computed", verdict: "unclear",
+        note: `The date reads "${age.printed}", which could be day-month or month-day. Check it yourself: the three month window turns on which it is.`,
+      });
+    } else {
+      const days = Math.floor((now - age.parsed.at.getTime()) / DAY);
+      out.push(days > ADDRESS_MAX_DAYS
+        ? { name: "Proof of address age, computed", verdict: "flag",
+            note: `Dated ${age.printed}, which is ${days} days ago. The window is three months, so this is ${days - ADDRESS_MAX_DAYS} days past it and needs re-sending.` }
+        : { name: "Proof of address age, computed", verdict: "pass",
+            note: `Dated ${age.printed}, ${days} days ago, inside the three month window.` });
+    }
+  }
+
+  for (const doc of ["photo_id", "trn", "certificate"]) {
+    const exp = pick(doc, /expir|valid until|valid to/i);
+    if (!exp || "ambiguous" in exp.parsed) continue;
+    const days = Math.floor((exp.parsed.at.getTime() - now) / DAY);
+    out.push(days < 0
+      ? { name: `${DOC_LABEL[doc] ?? doc} expiry, computed`, verdict: "flag",
+          note: `Expired ${Math.abs(days)} days ago, on ${exp.printed}.` }
+      : { name: `${DOC_LABEL[doc] ?? doc} expiry, computed`, verdict: "pass",
+          note: `Expires ${exp.printed}, ${days} days from now.` });
+  }
+
+  const pc = pick("police_check", /issue|date|dated/i);
+  if (pc && !("ambiguous" in pc.parsed)) {
+    const days = Math.floor((now - pc.parsed.at.getTime()) / DAY);
+    out.push(days > POLICE_MAX_DAYS
+      ? { name: "Police check age, computed", verdict: "flag",
+          note: `Issued ${pc.printed}, ${days} days ago. Over a year old, so treat it as out of date and ask for a current one.` }
+      : { name: "Police check age, computed", verdict: "pass",
+          note: `Issued ${pc.printed}, ${days} days ago.` });
+  }
+
+  return out;
 }
 
 type Answer =
@@ -371,23 +465,35 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     `Core documents not provided at all: ${missing.length ? missing.join(", ") : "none, all of them are present"}`,
   ].filter(Boolean).join("\n");
 
+  // Worked out here, not by the model, and handed over as settled fact.
+  const computed = dateChecks(extracted as Extraction[]);
+
   const synth = await ask(trace, "synthesis", SYNTH_PROMPT, [{
     type: "text",
-    text: `WHAT THE APPLICANT TYPED\n${typed}\n\nWHAT WAS READ OFF EACH DOCUMENT\n${JSON.stringify(extracted, null, 1)}\n\nFACE COMPARISON\n${JSON.stringify(face)}\n\nNow produce the reviewer's note.`,
+    text: `WHAT THE APPLICANT TYPED\n${typed}\n\n`
+      + `WHAT WAS READ OFF EACH DOCUMENT\n${JSON.stringify(extracted, null, 1)}\n\n`
+      + `FACE COMPARISON\n${JSON.stringify(face)}\n\n`
+      + `DATE ARITHMETIC, ALREADY DONE FOR YOU\nThese were calculated, not judged. Treat them as settled and never contradict them. They are added to the checks after you answer, so do not repeat them as checks of your own; use them for the summary and the questions.\n${JSON.stringify(computed, null, 1)}\n\n`
+      + `Now produce the reviewer's note.`,
   }], 1400);
 
   if (!synth.ok) {
     root.setAttributes({ "yaadly.vetting.review": "synthesis_failed" });
+    // The computed date checks survive a failed summary, because they never
+    // needed the model in the first place.
     return save({
-      summary: "Each document was read, but the summary step failed. The raw readings are still on the record and still worth your time.",
-      checks: [], questions: [], extracted,
-      docs_read: loaded.map((f) => f.doc), docs_skipped: skipped, flag_count: 0,
+      summary: "Each document was read, but the summary step failed. The date checks below were calculated rather than written by the model, so they still stand, and the raw readings are on the record.",
+      checks: computed, questions: [], extracted,
+      docs_read: loaded.map((f) => f.doc), docs_skipped: skipped,
+      flag_count: computed.filter((c) => c.verdict === "flag").length,
       error: synth.error,
     }, 502);
   }
 
-  const checks = Array.isArray(synth.value.checks) ? synth.value.checks : [];
-  const flags = (checks as { verdict?: string }[]).filter((c) => c?.verdict === "flag").length;
+  // Computed first: they are arithmetic, and they are the ones to trust.
+  const modelChecks = (Array.isArray(synth.value.checks) ? synth.value.checks : []) as { name?: string; verdict?: string }[];
+  const checks = [...computed, ...modelChecks];
+  const flags = checks.filter((c) => (c as { verdict?: string })?.verdict === "flag").length;
 
   root.setAttributes({ "yaadly.vetting.review": "reviewed", "yaadly.vetting.flag_count": flags });
   return save({

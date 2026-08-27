@@ -53,9 +53,16 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
       const u = f.get(`MediaUrl${i}`);
       if (u) media.push(u);
     }
+    // Twilio carries WhatsApp on the same webhook as SMS, distinguished only
+    // by a prefix on the address: whatsapp:+447700900000. Worth telling apart,
+    // because the reply rules and the cost are different, and because a job
+    // that says it arrived by WhatsApp is telling the truth about where the
+    // client actually is.
+    const rawFrom = s(f.get("From"));
+    const isWa = rawFrom.startsWith("whatsapp:");
     return {
-      channel: "sms",
-      from: s(f.get("From")),
+      channel: isWa ? "whatsapp" : "sms",
+      from: isWa ? rawFrom.slice("whatsapp:".length) : rawFrom,
       name: s(f.get("ProfileName")),
       text: s(f.get("Body")),
       media,
@@ -364,7 +371,9 @@ Deno.serve(async (req: Request) => {
     const card = await readTheJob(msg.text, trace);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    const jobId = `JOB-${msg.channel.toUpperCase().slice(0, 4)}-${Date.now()}`;
+    // JOB-WHAT-… helps nobody. Name the door it came through.
+    const CODE: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "EMAIL", generic: "WEB" };
+    const jobId = `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
     const descr = [
       s(card?.scope) || msg.text,
       s(card?.access_note) ? `Access: ${s(card.access_note)}` : "",
@@ -418,6 +427,7 @@ Deno.serve(async (req: Request) => {
     if (isTwilio) {
       // Said in the same breath as the promise on the site: a person reads it,
       // and nothing reaches a worker until they sign. No false "we are on it".
+      // TwiML answers WhatsApp and SMS alike when both run through Twilio.
       return twiml(
         `Thanks, we have your message and it is saved as ${jobId}. ` +
         `A person reads every job before anything is quoted, so you will hear back within 24 hours. ` +
