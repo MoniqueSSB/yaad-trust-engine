@@ -11,6 +11,8 @@ import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
 import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { FeeBreakdown } from "@/components/portal/FeeBreakdown";
+import { PortalCard } from "@/components/portal/PortalCard";
+import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 
@@ -90,7 +92,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date",
+      "id,title,trade,parish,stage,status,descr,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code",
     )
     .eq("id", id)
     .maybeSingle();
@@ -178,6 +180,33 @@ export default async function JobRoom({
   const labour = won?.labour_jmd ?? null;
   const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);
   const takeHome = labour == null ? null : Math.round(labour * 0.88) + (won?.materials_jmd ?? 0);
+
+  const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
+  const approvedPack = pk.find((x) => x.status === "approved") ?? pk[0];
+  const docs: Doc[] = [
+    {
+      icon: "\u2713",
+      title: "Client Guidelines",
+      note: "Signed, immutable",
+    },
+    {
+      icon: "\ud83d\udcc4",
+      title: approvedPack ? "Kickoff Pack" : "Kickoff Pack",
+      note: approvedPack
+        ? "Scope, milestones and the evidence checklist"
+        : "Written once a worker is chosen and the scope is agreed",
+      href: approvedPack ? jobBase + "/pack" : undefined,
+    },
+    {
+      icon: job.status === "complete" ? "\ud83d\udcc4" : "\u25cb",
+      title: "Completion Report",
+      note:
+        job.status === "complete"
+          ? "Before and after, the evidence record and your approval"
+          : "Written when the job closes",
+      href: job.status === "complete" ? jobBase + "/completion" : undefined,
+    },
+  ];
 
   const evidenceThisStage = ev.filter((e) => (e.stage ?? 1) === Math.max(job.stage ?? 1, 1)).length;
 
@@ -273,6 +302,17 @@ export default async function JobRoom({
         materialsAtCost={won?.materials_at_cost ?? null}
         workerName={won?.worker_name ?? job.worker_name}
       />
+
+      <DocStrip docs={docs} />
+
+      {role === "client" && (
+        <PortalCard
+          reference={job.id}
+          code={job.portal_code ?? null}
+          href={"app.yaadly.co.uk" + jobBase}
+          kind="job"
+        />
+      )}
 
       {job.descr && (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-5">

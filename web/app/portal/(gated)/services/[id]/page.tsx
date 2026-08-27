@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { STAGES_SVC, svcStage } from "@/lib/portal/journey";
+import { PortalCard } from "@/components/portal/PortalCard";
+import { ServiceNext } from "@/components/portal/ServiceNext";
 import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
 
@@ -43,7 +45,7 @@ export default async function ServiceRoom({
 
   const { data: svc } = await supabase
     .from("services")
-    .select("id,type,parish,price,provider,stage,notes,updated_at")
+    .select("id,type,parish,price,provider,stage,notes,updated_at,portal_code")
     .eq("id", id)
     .maybeSingle();
 
@@ -146,6 +148,24 @@ export default async function ServiceRoom({
           })}
         </ol>
       </section>
+
+      <PortalCard
+        reference={svc.id}
+        code={svc.portal_code ?? null}
+        href={"app.yaadly.co.uk/portal/services/" + encodeURIComponent(svc.id)}
+        kind="service"
+      />
+
+      {/* Only once it is finished. Before that, "what next" is noise on a
+          page whose job is to show the clock. */}
+      {current >= STAGES_SVC.length - 2 && (
+        <section className="mt-7">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
+            Where this goes next
+          </h2>
+          <ServiceNext />
+        </section>
+      )}
 
       {svc.notes && (
         <section className="mt-7 rounded-2xl border border-line bg-panel p-5">
