@@ -231,6 +231,70 @@ function topOfThread(text: string): string {
   return out.trim();
 }
 
+
+// ── Who is allowed to post here ───────────────────────────────────────────
+//
+// This endpoint cannot require a Supabase JWT: Resend and Twilio call it and
+// neither of them holds one. Turning that check off is what made the webhook
+// work, and it is also what put the endpoint on the open internet, so the
+// signature check below is not optional decoration, it is the replacement.
+//
+// Same convention the WhatsApp webhook already uses: if the relevant secret
+// is not set yet, the request is allowed through and recorded as unverified
+// rather than rejected, so this can be wired up and tested before every key
+// exists. Once the secret is set, an unsigned request is refused.
+//
+// Worst case if someone does find the URL before the secrets are in: they can
+// create a draft job. It cannot be opened to workers, no money moves, and it
+// lands in the desk looking exactly like the spam it is.
+
+async function hmac(keyBytes: Uint8Array, msg: string, hash: "SHA-256" | "SHA-1"): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey("raw", keyBytes as unknown as BufferSource, { name: "HMAC", hash }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(msg));
+  return new Uint8Array(sig);
+}
+const b64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
+
+/** Resend signs with Svix: HMAC-SHA256 over id.timestamp.body */
+async function resendSigned(req: Request, raw: string): Promise<{ ok: boolean; checked: boolean }> {
+  const secret = Deno.env.get("RESEND_WEBHOOK_SECRET") ?? "";
+  if (!secret) return { ok: true, checked: false };
+  const id = req.headers.get("svix-id") ?? "";
+  const ts = req.headers.get("svix-timestamp") ?? "";
+  const sigHeader = req.headers.get("svix-signature") ?? "";
+  if (!id || !ts || !sigHeader) return { ok: false, checked: true };
+
+  // Replay window. A signature stays valid forever otherwise.
+  const age = Math.abs(Date.now() / 1000 - Number(ts));
+  if (!Number.isFinite(age) || age > 300) return { ok: false, checked: true };
+
+  const rawSecret = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+  let keyBytes: Uint8Array;
+  try {
+    const bin = atob(rawSecret);
+    keyBytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) keyBytes[i] = bin.charCodeAt(i);
+  } catch (_) { keyBytes = new TextEncoder().encode(rawSecret); }
+
+  const expected = b64(await hmac(keyBytes, `${id}.${ts}.${raw}`, "SHA-256"));
+  const offered = sigHeader.split(" ").map((p) => p.split(",").pop() ?? "");
+  return { ok: offered.includes(expected), checked: true };
+}
+
+/** Twilio signs with HMAC-SHA1 over the full URL plus sorted POST params */
+async function twilioSigned(req: Request, raw: string): Promise<{ ok: boolean; checked: boolean }> {
+  const token = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  if (!token) return { ok: true, checked: false };
+  const offered = req.headers.get("x-twilio-signature") ?? "";
+  if (!offered) return { ok: false, checked: true };
+  const params = new URLSearchParams(raw);
+  const sorted = [...params.keys()].sort();
+  let msg = req.url;
+  for (const k of sorted) msg += k + params.get(k);
+  const expected = b64(await hmac(new TextEncoder().encode(token), msg, "SHA-1"));
+  return { ok: offered === expected, checked: true };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -262,6 +326,13 @@ Deno.serve(async (req: Request) => {
 
     const raw = await req.text();
     const isTwilio = (req.headers.get("content-type") ?? "").includes("application/x-www-form-urlencoded");
+
+    const sig = isTwilio ? await twilioSigned(req, raw) : await resendSigned(req, raw);
+    root.setAttributes({ "yaadly.inbound.signature_checked": sig.checked, "yaadly.inbound.signature_ok": sig.ok });
+    if (sig.checked && !sig.ok) {
+      root.setAttributes({ "yaadly.inbound.outcome": "bad_signature" });
+      return json({ error: "Signature check failed." }, 403);
+    }
     const msg = await parseInbound(req, raw);
     root.setAttributes({ "yaadly.inbound.channel": msg.channel, "yaadly.inbound.chars": msg.text.length, "yaadly.inbound.media": msg.media.length });
 

@@ -280,6 +280,31 @@ Deno.serve(async (req: Request) => {
         }
       } catch (_) { /* never let a notification break an application */ }
 
+      // Hand it to the vetting reviewer straight away, so the machine read is
+      // already sitting on the application by the time the desk opens it. That
+      // is the whole point of it: nobody should have to run a prompt by hand
+      // before they can start closing the file.
+      //
+      // waitUntil, not await: the applicant should not watch a spinner while a
+      // vision model reads five photographs. If it fails, the desk carries a
+      // "Run the check again" button, and yaad-vetting-review writes its own
+      // failures down rather than leaving a silence that reads like a clean
+      // result.
+      try {
+        const review = fetch(`${SUPABASE_URL}/functions/v1/yaad-vetting-review`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SERVICE_KEY}`,
+            apikey: SERVICE_KEY,
+          },
+          body: JSON.stringify({ applicationId: appId }),
+          signal: AbortSignal.timeout(120000),
+        }).catch(() => { /* the desk can re-run it */ });
+        const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+        if (rt?.waitUntil) rt.waitUntil(review);
+      } catch (_) { /* never let the reviewer break an application */ }
+
       root.setAttributes({ "yaadly.vetting.outcome": "submitted" });
       return json({ ok: true });
     }

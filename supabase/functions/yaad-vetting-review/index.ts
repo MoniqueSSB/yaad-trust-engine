@@ -1,0 +1,458 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+
+// The vetting reviewer.
+//
+// Step 6 of the join flow has always said "a machine reads the file before a
+// person does". Until now that was copy. This is the machine.
+//
+// It never decides. There is no code path here that approves, declines, or
+// touches an application's status, and that is deliberate rather than
+// unfinished. A person approves on the desk, having read this. The row it
+// writes is a record of what the machine said, not a verdict it reached.
+//
+// ── Why it reads one document at a time ──
+//
+// The obvious build is one call with every document attached, asking the model
+// to cross-check them. It was built that way first and the model refused: the
+// vision model on this project is llama-3.2-90b-vision-instruct, which accepts
+// exactly one image per request.
+//
+// Rather than pin the whole feature to whichever model happens to allow five,
+// it runs in three passes:
+//
+//   1. read      one call per document, in parallel. What does this page say.
+//   2. face      one call with the ID and the live photo together, IF the
+//                model will take two images. If it will not, face match comes
+//                back "cannot tell" naming the cause, which is the honest
+//                answer and tells whoever reads it what to change.
+//   3. synthesis one text-only call over everything pass 1 read, plus what the
+//                applicant typed. This is where name mismatches and stale
+//                dates are actually caught.
+//
+// Reading a document on its own is also simply more accurate than asking one
+// prompt to juggle five, and pass 1's raw readings are stored, so when the
+// desk disagrees with a flag it can see which page produced it.
+//
+// ── Who waits ──
+//
+// The desk gets the finished review, because a person is watching. A submit
+// gets an immediate 202 and the work happens afterwards. See the comment at
+// the dispatch below: that split is load-bearing, not tidiness.
+//
+// PRIVACY. This sends identity documents to NVIDIA's hosted model. The join
+// page tells applicants their documents are readable only by Yaadly admins,
+// which stops being true the moment this runs. That is a decision for the
+// privacy wording, not something this function can fix, but it is written here
+// so nobody discovers it by accident.
+
+const SUPABASE_URL   = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const ANON_KEY       = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") ?? "";
+
+// Its own model setting, falling back to the photo reviewer's. Vetting and
+// defect-spotting are different jobs and should be able to move apart without
+// one retuning the other.
+const MODEL = Deno.env.get("NVIDIA_VETTING_MODEL")
+  || Deno.env.get("NVIDIA_VISION_MODEL")
+  || "meta/llama-3.2-90b-vision-instruct";
+
+const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+const BUCKET = "vetting";
+
+// Only images reach a vision model. A PDF, a Word CV and the face-turn video
+// are listed as skipped with the reason, never quietly counted as read.
+const READABLE = ["image/jpeg", "image/png", "image/webp"];
+
+const MAX_DOCS = 5;
+const MAX_BYTES_EACH = 8 * 1024 * 1024;
+const CALL_TIMEOUT = 60000;
+
+const DOC_LABEL: Record<string, string> = {
+  photo_id: "Government photo ID",
+  selfie_with_id: "Live photo taken in the moment",
+  face_video: "Video of the face turning left to right",
+  trn: "TRN document",
+  proof_of_address: "Proof of address",
+  police_check: "JCF police record check",
+  cv: "CV",
+  portfolio: "Portfolio or photos of finished work",
+  certificate: "Trade certificate",
+};
+
+const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address", "police_check"];
+
+/* ── pass 1: read one document ─────────────────────────────────────────── */
+
+const READ_PROMPT = `You are reading ONE document uploaded by a tradesperson applying to join Yaadly, a property works service in Jamaica. You report only what is visible on this page. You are not deciding anything about the application.
+
+Return STRICT JSON only, no markdown fences, exactly this shape:
+{"appears_to_be":"what this document actually is, in your own words","matches_label":"yes|no|unsure","readable":"yes|partly|no","names":["every personal name printed on it, exactly as written"],"dates":[{"label":"what the date is for, e.g. expiry, issued, bill date","value":"as printed"}],"numbers":[{"label":"what the number is, e.g. licence number, TRN, certificate number","value":"as printed"}],"address":"any postal address printed on it, or empty string","concerns":["anything that looks wrong: mismatched fonts, uneven edges, text not sitting on the background, a photograph of a screen rather than a document, a crop that hides part of the page"],"notes":"one sentence a human reviewer would want to know"}
+
+Rules:
+- You will be told what the document is SUPPOSED to be. "matches_label" is whether it actually is that. A page filed as a police check that is plainly a payslip is the single most important thing you can catch.
+- Never invent a name, a date or a number. If you cannot read it, leave it out and set "readable" honestly.
+- Copy names and numbers exactly as printed, including middle names and initials. Do not tidy them up.
+- "concerns" is for what you can SEE. Do not speculate about forgery you have no visual evidence for. An empty array is a fine answer.
+- Do not comment on the person's appearance, race, age or gender.
+- Output ONLY the JSON object.`;
+
+/* ── pass 2: do these two faces match ──────────────────────────────────── */
+
+const FACE_PROMPT = `You are shown two images from one person's application to join Yaadly: first their government photo ID, second a live photo they took in the moment. Say whether they appear to be the same person.
+
+Return STRICT JSON only, no markdown fences, exactly this shape:
+{"same_person":"likely|unlikely|cannot_tell","confidence":"high|medium|low","note":"one or two sentences on what you based that on and what limited you"}
+
+Rules:
+- "cannot_tell" is the right answer whenever lighting, image quality, angle, or the age of the ID photo stop you being sure. Prefer it to guessing.
+- A person can age, change weight, grow or shave a beard, and change their hair. None of those on their own make it a different person.
+- Never comment on race or ethnicity. Never describe the person beyond what the comparison needs.
+- You are producing a flag for a human, not an identification. Say so in the note if you are anything short of confident.
+- Output ONLY the JSON object.`;
+
+/* ── pass 3: put it together ───────────────────────────────────────────── */
+
+const SYNTH_PROMPT = `You are the Vetting Reviewer for Yaadly, a trust-first property works service in Jamaica. You are given what an applicant typed, what a vision model read off each of their documents separately, and a face comparison. You produce the note a human reviewer reads before opening the file.
+
+You never decide. You do not approve, decline, or recommend approving or declining. You produce flags and questions for a person to act on.
+
+Today's date will be given to you. Use it for anything time-sensitive.
+
+Cover these, but only where there is something to say:
+- Name match. Is the name the same across every document, and does it match what the applicant typed? A middle name on one document and not another is worth a note, not a flag. A different surname with no explanation is a flag.
+- Dates in window. Proof of address must be dated within the last three months of today's date. A police record check should be current. An ID must not be expired. Do the arithmetic properly.
+- Face match. Report what the comparison said, including its confidence.
+- Document is what it claims. Any document where matches_label is "no" or "unsure" is a flag, and the most serious one.
+- Legibility. Anything that came back partly readable or unreadable needs re-sending, and that is a question for the applicant, not a flag against them.
+- Signs of alteration. Report concerns raised on any document.
+- Numbers to verify. List certificate, licence and reference numbers that were read, so a person can check them with the issuing body. State plainly that they have NOT been verified.
+- Missing documents. Say what was not provided at all.
+
+Return STRICT JSON only, no markdown fences, exactly this shape:
+{"summary":"at most three plain sentences on what a person should know before opening these documents","checks":[{"name":"short check name","verdict":"pass|flag|unclear","note":"one or two sentences"}],"questions":["a specific question to put to the applicant, only if something needs asking"]}
+
+Rules:
+- verdict "pass" means nothing visibly wrong, NOT that the document is genuine. You cannot establish that, and you must not imply it.
+- verdict "unclear" is correct whenever the readings do not let you be sure. Prefer it to guessing.
+- Never invent a name, a date or a number that is not in the readings you were given.
+- Never comment on the applicant's appearance, race, age or gender.
+- Never estimate a price and never comment on their skill.
+- Output ONLY the JSON object.`;
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const s = (v: unknown) => String(v ?? "").trim();
+
+function b64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let out = "";
+  // Chunked, because String.fromCharCode(...wholeArray) blows the stack on a
+  // multi-megabyte photograph.
+  for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(out);
+}
+
+type Answer =
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; error: string };
+
+/** One call to the model, parsed. Never throws. */
+async function ask(
+  trace: Trace, pass: string, system: string, content: unknown, maxTokens: number,
+): Promise<Answer> {
+  try {
+    const r = await trace.span(`chat ${MODEL}`, SpanKind.CLIENT, {
+      "gen_ai.system": "nvidia_nim",
+      "gen_ai.operation.name": "chat",
+      "gen_ai.request.model": MODEL,
+      "gen_ai.request.max_tokens": maxTokens,
+      "gen_ai.request.temperature": 0.1,
+      "server.address": "integrate.api.nvidia.com",
+      "yaadly.agent.name": "vetting_review",
+      "yaadly.vetting.pass": pass,
+    }, async (sp) => {
+      const res = await fetch(NV_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "system", content: system }, { role: "user", content }],
+          max_tokens: maxTokens,
+          temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(CALL_TIMEOUT),
+      });
+      sp.setAttributes({ "http.response.status_code": res.status });
+      if (!res.ok) sp.recordError(`nvidia http ${res.status}`);
+      return res;
+    });
+
+    if (!r.ok) return { ok: false, error: `HTTP ${r.status}: ${(await r.text()).slice(0, 240)}` };
+    const j = await r.json();
+    const raw = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(raw).match(/\{[\s\S]*\}/);
+    if (!m) return { ok: false, error: `Answer was not JSON: ${String(raw).slice(0, 240)}` };
+    return { ok: true, value: JSON.parse(m[0]) };
+  } catch (e) {
+    return { ok: false, error: String(e).slice(0, 240) };
+  }
+}
+
+/** The desk's own session, or this project's service role calling itself. */
+async function callerAllowed(req: Request): Promise<"admin" | "internal" | null> {
+  const tok = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!tok) return null;
+  if (SERVICE_KEY && tok === SERVICE_KEY) return "internal";
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/is_admin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: ANON_KEY, Authorization: `Bearer ${tok}` },
+      body: "{}",
+    });
+    if (r.ok && (await r.json()) === true) return "admin";
+  } catch (_) { /* fall through to refusal */ }
+  return null;
+}
+
+type Result = { body: Record<string, unknown>; status: number };
+
+/** Read one application's documents and write down what was seen. */
+async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId: string): Promise<Result> {
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const save = async (row: Record<string, unknown>, status = 200): Promise<Result> => {
+    const full = { application_id: appId, model: MODEL, ...row };
+    const { error } = await admin.from("vetting_reviews").insert(full);
+    if (error) root.recordError(error.message);
+    return { body: { ok: status === 200, review: full }, status };
+  };
+
+  const { data: app, error: appErr } = await admin
+    .from("applications")
+    .select("id, app_id, name, trade, trade_other, parish, parishes, years, police_status, signed_name")
+    .eq("id", appId).maybeSingle();
+  if (appErr || !app) return { body: { error: "No such application." }, status: 404 };
+
+  const { data: docs } = await admin
+    .from("vetting_documents")
+    .select("doc_type, storage_path, mime, bytes")
+    .eq("application_id", appId).order("created_at");
+
+  // Nothing to look at. Record that plainly rather than calling the model with
+  // an empty hand and letting it fill the silence.
+  if (!docs || !docs.length) {
+    root.setAttributes({ "yaadly.vetting.review": "no_documents" });
+    return save({
+      summary: "No documents were uploaded with this application, so there was nothing to read.",
+      checks: [{ name: "Documents", verdict: "unclear", note: "The application arrived with no files attached at all." }],
+      questions: ["Ask them to send a photo ID, a proof of address and their TRN before this goes any further."],
+      extracted: [], docs_read: [], docs_skipped: [], flag_count: 0,
+    });
+  }
+
+  if (!NVIDIA_API_KEY) return { body: { error: "NVIDIA_API_KEY is not set on this function." }, status: 500 };
+
+  /* ── fetch the files ──────────────────────────────────────────────────
+     Inlined as base64 rather than handed over as signed URLs: a signed URL
+     given to a third party is a passport sitting on a fetchable address for as
+     long as that URL lives. */
+  const skipped: { doc: string; why: string }[] = [];
+  const loaded: { doc: string; label: string; dataUrl: string }[] = [];
+
+  for (const d of docs) {
+    const doc = s(d.doc_type);
+    if (!READABLE.includes(s(d.mime))) {
+      skipped.push({ doc, why: `${s(d.mime) || "unknown type"}, which a vision model cannot read. Open it yourself.` });
+      continue;
+    }
+    if (loaded.length >= MAX_DOCS) { skipped.push({ doc, why: "Over the five-document limit for one run." }); continue; }
+    if (Number(d.bytes ?? 0) > MAX_BYTES_EACH) { skipped.push({ doc, why: "Too large to send to the model." }); continue; }
+
+    const { data: file, error: dlErr } = await admin.storage.from(BUCKET).download(s(d.storage_path));
+    if (dlErr || !file) { skipped.push({ doc, why: "The file could not be read out of storage." }); continue; }
+
+    loaded.push({
+      doc,
+      label: DOC_LABEL[doc] ?? doc,
+      dataUrl: `data:${s(d.mime)};base64,${b64(await file.arrayBuffer())}`,
+    });
+  }
+
+  root.setAttributes({
+    "yaadly.vetting.docs_read": loaded.length,
+    "yaadly.vetting.docs_skipped": skipped.length,
+  });
+
+  if (!loaded.length) {
+    return save({
+      summary: "Nothing on this application could be machine read. Every file is a PDF, a document or a video, so all of it needs your eyes.",
+      checks: [{ name: "Documents", verdict: "unclear", note: "No readable image was attached. " + skipped.map((x) => `${DOC_LABEL[x.doc] ?? x.doc}: ${x.why}`).join(" ") }],
+      questions: [], extracted: [], docs_read: [], docs_skipped: skipped, flag_count: 0,
+    });
+  }
+
+  /* ── pass 1: read each document on its own, in parallel ─────────────── */
+
+  const extracted = await Promise.all(loaded.map(async (f) => {
+    const out = await ask(trace, `read:${f.doc}`, READ_PROMPT, [
+      { type: "text", text: `This document was filed as: ${f.label}. Read it and report what is on it.` },
+      { type: "image_url", image_url: { url: f.dataUrl } },
+    ], 900);
+    return out.ok
+      ? { doc: f.doc, label: f.label, ...out.value }
+      : { doc: f.doc, label: f.label, read_failed: out.error };
+  }));
+
+  const failed = extracted.filter((e) => "read_failed" in e) as { read_failed: string }[];
+  if (failed.length === extracted.length) {
+    root.setAttributes({ "yaadly.vetting.review": "all_reads_failed" });
+    return save({
+      summary: "The review could not run. Every document failed to reach the model.",
+      checks: [], questions: [], extracted,
+      docs_read: loaded.map((f) => f.doc), docs_skipped: skipped, flag_count: 0,
+      error: s(failed[0].read_failed).slice(0, 400),
+    }, 502);
+  }
+
+  /* ── pass 2: face match, only if both photos are here ───────────────── */
+
+  const idImg = loaded.find((f) => f.doc === "photo_id");
+  const selfie = loaded.find((f) => f.doc === "selfie_with_id");
+  let face: Record<string, unknown>;
+
+  if (!idImg || !selfie) {
+    face = {
+      same_person: "cannot_tell", confidence: "low",
+      note: !idImg && !selfie
+        ? "Neither the photo ID nor the live photo was readable, so there was nothing to compare."
+        : !idImg
+        ? "No readable photo ID, so there was nothing to compare the live photo against."
+        : "No live photo was readable, so there was nothing to compare the ID against.",
+    };
+  } else {
+    const out = await ask(trace, "face", FACE_PROMPT, [
+      { type: "text", text: "First image: the government photo ID. Second image: the live photo. Are they the same person?" },
+      { type: "image_url", image_url: { url: idImg.dataUrl } },
+      { type: "image_url", image_url: { url: selfie.dataUrl } },
+    ], 400);
+    face = out.ok ? out.value : {
+      same_person: "cannot_tell", confidence: "low",
+      // The usual cause is a model that takes one image per request. Naming it
+      // beats a bare failure: it tells whoever reads this what to change rather
+      // than only that something broke.
+      note: `The face comparison did not run, so nobody has checked the ID photo against the live photo. Compare them yourself. Cause: ${s(out.error).slice(0, 160)}`,
+    };
+  }
+
+  /* ── pass 3: synthesis, text only ───────────────────────────────────── */
+
+  const missing = CORE_DOCS.filter((t) => !docs.some((d) => d.doc_type === t)).map((t) => DOC_LABEL[t]);
+
+  const typed = [
+    `Today's date: ${new Date().toISOString().slice(0, 10)}`,
+    `Name as typed by the applicant: ${s(app.name) || "not given"}`,
+    `Trade: ${s(app.trade) || "not given"}${s(app.trade_other) ? ", plus " + s(app.trade_other) : ""}`,
+    `Parishes: ${s(app.parishes) || s(app.parish) || "not given"}`,
+    `Years at the trade: ${s(app.years) || "not given"}`,
+    s(app.signed_name) ? `Name typed as a signature on the Worker Guidelines: ${s(app.signed_name)}` : "",
+    app.police_status === "not_yet" ? "They stated they do not have a police record check yet." : "",
+    skipped.length
+      ? `Files nobody machine read: ${skipped.map((x) => `${DOC_LABEL[x.doc] ?? x.doc} (${x.why})`).join("; ")}`
+      : "",
+    `Core documents not provided at all: ${missing.length ? missing.join(", ") : "none, all of them are present"}`,
+  ].filter(Boolean).join("\n");
+
+  const synth = await ask(trace, "synthesis", SYNTH_PROMPT, [{
+    type: "text",
+    text: `WHAT THE APPLICANT TYPED\n${typed}\n\nWHAT WAS READ OFF EACH DOCUMENT\n${JSON.stringify(extracted, null, 1)}\n\nFACE COMPARISON\n${JSON.stringify(face)}\n\nNow produce the reviewer's note.`,
+  }], 1400);
+
+  if (!synth.ok) {
+    root.setAttributes({ "yaadly.vetting.review": "synthesis_failed" });
+    return save({
+      summary: "Each document was read, but the summary step failed. The raw readings are still on the record and still worth your time.",
+      checks: [], questions: [], extracted,
+      docs_read: loaded.map((f) => f.doc), docs_skipped: skipped, flag_count: 0,
+      error: synth.error,
+    }, 502);
+  }
+
+  const checks = Array.isArray(synth.value.checks) ? synth.value.checks : [];
+  const flags = (checks as { verdict?: string }[]).filter((c) => c?.verdict === "flag").length;
+
+  root.setAttributes({ "yaadly.vetting.review": "reviewed", "yaadly.vetting.flag_count": flags });
+  return save({
+    summary: s(synth.value.summary).slice(0, 1200),
+    checks,
+    questions: Array.isArray(synth.value.questions) ? synth.value.questions : [],
+    extracted,
+    docs_read: loaded.map((f) => f.doc),
+    docs_skipped: skipped,
+    flag_count: flags,
+  });
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  const trace = new Trace("yaad-vetting-review", req);
+  const root = trace.startSpan(`${req.method} /yaad-vetting-review`, SpanKind.SERVER, httpAttrs(req));
+  const done = (res: Response, status: number) => {
+    root.setAttributes({ "http.response.status_code": status });
+    root.end(); trace.flush(); return res;
+  };
+  const json = (b: unknown, status = 200) =>
+    done(new Response(JSON.stringify(b), { status, headers: { ...CORS, "Content-Type": "application/json" } }), status);
+
+  try {
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: "Not configured." }, 500);
+
+    const who = await callerAllowed(req);
+    if (!who) {
+      root.setAttributes({ "yaadly.auth.outcome": "rejected" });
+      return json({ error: "Admin sign in required." }, 403);
+    }
+    root.setAttributes({ "yaadly.auth.outcome": "authenticated", "yaadly.auth.caller": who });
+
+    const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+    const appId = s(body.applicationId);
+    if (!appId) return json({ error: "Which application?" }, 400);
+
+    // ── who waits, and who does not ──
+    //
+    // Called by the desk, this answers with the finished review, because a
+    // person is sitting there watching and wants the answer.
+    //
+    // Called by yaad-vetting-upload on submit, it answers immediately and does
+    // the work afterwards. That is not politeness, it is the only thing that
+    // works. The first build held the caller's connection open for the whole
+    // review; the caller's isolate was torn down at eighteen seconds, that
+    // killed the connection, and the connection dying killed the review. It
+    // booted, ran for seventy seconds, wrote nothing and logged nothing.
+    // Answering first lets the caller finish cleanly and leaves this run
+    // depending on nobody.
+    if (who === "internal" && body.wait !== true) {
+      const work = (async () => { try { await review(trace, root, appId); } catch (_) { /* the row records it */ } })();
+      const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (rt?.waitUntil) rt.waitUntil(work); else await work;
+      root.setAttributes({ "yaadly.vetting.review": "started" });
+      return json({ ok: true, status: "started" }, 202);
+    }
+
+    const out = await review(trace, root, appId);
+    return json(out.body, out.status);
+  } catch (e) {
+    root.recordError(e);
+    return json({ error: String(e).slice(0, 300) }, 500);
+  }
+});
