@@ -3492,6 +3492,9 @@ function renderAdmin(){
       '<p style="font-size:12.5px;color:'+(a.refsTold?"var(--dim)":"var(--red)")+'">Refs: '+esc(a.ref1||"none")+' · '+esc(a.ref2||"none")+' · '+esc(a.ref3||"none")+' · '+(a.refsTold?"all three confirmed they were told we would call":"NOT confirmed as told we would call")+'</p>'+
       (a.signedName?'<p style="font-size:12.5px;color:var(--dim)">Worker Guidelines signed by '+esc(a.signedName)+' on '+esc((a.signedAt||"").slice(0,10))+'</p>':'<p style="font-size:12.5px;color:var(--red)">Worker Guidelines NOT signed</p>')+
       '<div class="kick">Documents</div><div id="vd-'+a.id+'" style="font-size:12.5px;color:var(--dim)">Loading\u2026</div>'+
+      '<div class="kick" style="display:flex;align-items:center;gap:10px">AI vetting review'+
+        '<a class="btn o sm" style="margin-left:auto" onclick="rerunVetReview(\''+a.id+'\')">Run the check again</a></div>'+
+      '<div id="vr-'+a.id+'" style="font-size:12.5px;color:var(--dim)">Loading\u2026</div>'+
       '<div class="kick">Vetting checklist</div><ul class="check">'+boxes+'</ul>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">'+
       (allDone?'<a class="btn sm" onclick="approveApp(\''+a.id+'\',\'cert\')">Approve as Certified professional</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'vet\')">Approve as Evidence vetted</a><a class="btn sm" onclick="approveApp(\''+a.id+'\',\'pro\')">Approve as Vetted professional</a>':'<span class="note">Approval unlocks when every check passes. Only you approve; the AI never does.</span>')+
@@ -3499,6 +3502,7 @@ function renderAdmin(){
       '<a class="btn o sm" target="_blank" rel="noopener" href="'+wa("Hi "+a.name+", Yaadly here about your application "+a.id+". ")+'">Message →</a></div>';
     A.appendChild(d);
     loadVetDocs(a);
+    loadVetReview(a, false);
   });
   const M = $("at-market");
   const open = DB.jobs.filter(j=>j.open);
@@ -3573,6 +3577,92 @@ function intakeToJob(id){
 }
 function callDone(id){ const c=DB.calls.find(x=>x.id===id); if(c){ c.status="done"; save(); renderAdmin(); } }
 function intakeArchive(id){ const it=DB.intakes.find(x=>x.id===id); it.status="archived"; save(); cloudStatus("intakes", it.cid, "archived"); renderAdmin(); }
+/* ─────────── The vetting agent's read, on the desk ───────────
+
+   Step 6 of the join flow promises that a machine reads the documents before
+   a person does. yaad-vetting-review is that machine. It runs by itself when
+   an application is sent, so by the time this pane opens the read is usually
+   already sitting in vetting_reviews and there is nothing to wait for.
+
+   Usually, not always. It runs in the background of an edge function, and
+   background work is a best effort rather than a promise. So when there is no
+   review on file this runs one now instead of showing an empty box: worst case
+   she waits half a minute while reading the rest of the card, and it is on
+   file from then on.
+
+   Nothing here approves anything. flag_count is triage, not a verdict, and the
+   approve buttons stay hers.                                                */
+
+const VR_CLASS = { pass:"pass", flag:"block", unclear:"gap" };
+
+function vetReviewHTML(r, running){
+  if(running) return '<div class="mono">The vetting agent is reading the documents. It reads each one separately, so give it up to a minute. No need to click again.</div>';
+  if(!r) return '<p class="note">No machine read on file, and one could not be run. Use the button to try again.</p>';
+
+  const when = String(r.created_at||"").slice(0,16).replace("T"," ");
+  const head = '<p class="note" style="margin-top:0">'+
+    (r.flag_count ? '<b style="color:var(--red)">'+r.flag_count+' flag'+(r.flag_count===1?'':'s')+' to look at.</b> '
+                  : '<b style="color:var(--tealb)">No flags raised.</b> ')+
+    'This is what a model could see in the images, nothing more. It has verified nothing and decided nothing. '+
+    '<span class="mono" style="font-size:11px">'+esc(r.model||"")+' · '+esc(when)+'</span></p>';
+
+  if(r.error) return head + '<p class="note" style="color:var(--red)">The run did not finish: '+esc(r.error)+'</p>';
+
+  const checks = (r.checks||[]).map(c=>
+    '<li><span class="st '+(VR_CLASS[c.verdict]||"gap")+'">'+esc(String(c.verdict||"?").toUpperCase())+'</span> <b>'+esc(c.name||"Check")+'</b>'+
+    '<br><span style="width:100%;display:block;color:var(--mute);font-size:12.5px">'+esc(c.note||"")+'</span></li>').join("");
+
+  const qs = (r.questions||[]).length
+    ? '<div class="kick" style="margin-top:12px">Worth asking them</div><ul class="check">'+
+      (r.questions||[]).map(q=>'<li><span class="st gap">ASK</span> '+esc(String(q))+'</li>').join("")+'</ul>'
+    : "";
+
+  const skipped = (r.docs_skipped||[]).length
+    ? '<p class="note" style="color:var(--dim)">No machine read on these, so you are the only one who has looked: '+
+      (r.docs_skipped||[]).map(x=>esc((VD_LABEL[x.doc]||x.doc)+" ("+x.why+")")).join(", ")+'</p>'
+    : "";
+
+  return head
+    + (r.summary ? '<p style="font-size:13.5px;color:var(--ink);line-height:1.6">'+esc(r.summary)+'</p>' : "")
+    + (checks ? '<ul class="check">'+checks+'</ul>' : '<p class="note">The model returned no checks.</p>')
+    + qs + skipped;
+}
+
+async function loadVetReview(a, force){
+  const box = document.getElementById("vr-"+a.id);
+  if(!box) return;
+  if(!sb || !cloudOn || !a.cid){ box.textContent = "Connect cloud to run the vetting agent."; return; }
+  try{
+    if(!force){
+      const {data} = await sb.from("vetting_reviews").select("*")
+        .eq("application_id", a.cid).order("created_at",{ascending:false}).limit(1);
+      if(data && data.length){ box.innerHTML = vetReviewHTML(data[0], false); return; }
+    }
+    // Nothing on file, or she asked for a fresh one. Run it in the foreground
+    // and wait: that is the path that does not depend on background work
+    // having survived.
+    box.innerHTML = vetReviewHTML(null, true);
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session){ box.innerHTML = '<p class="note" style="color:var(--red)">Sign in to the admin desk first. The vetting agent only answers to your signed in session.</p>'; return; }
+    const res = await fetch(CONFIG.supabaseUrl+"/functions/v1/yaad-vetting-review", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:CONFIG.supabaseKey, Authorization:"Bearer "+session.access_token },
+      body: JSON.stringify({ applicationId: a.cid, wait: true })
+    });
+    const out = await res.json().catch(()=>({error:"the agent sent something that was not JSON"}));
+    if(out.error){ box.innerHTML = '<p class="note" style="color:var(--red)">Vetting agent: '+esc(out.error)+'</p>'; return; }
+    box.innerHTML = vetReviewHTML(out.review || null, false);
+  }catch(e){
+    console.warn("vetting review:", e);
+    box.innerHTML = '<p class="note" style="color:var(--red)">The vetting agent could not be reached: '+esc(String(e))+'</p>';
+  }
+}
+
+function rerunVetReview(id){
+  const a = DB.applications.find(x=>x.id===id);
+  if(a) loadVetReview(a, true);
+}
+
 /* ─────────── An application's documents, on the desk ───────────
 
    The vetting bucket is private and no browser token can read it. What an

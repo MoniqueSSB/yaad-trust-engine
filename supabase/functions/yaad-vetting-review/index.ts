@@ -28,8 +28,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //                back "cannot tell" naming the cause, which is the honest
 //                answer and tells whoever reads it what to change.
 //   3. synthesis one text-only call over everything pass 1 read, plus what the
-//                applicant typed. This is where name mismatches and stale
-//                dates are actually caught.
+//                applicant typed.
 //
 // Reading a document on its own is also simply more accurate than asking one
 // prompt to juggle five, and pass 1's raw readings are stored, so when the
@@ -38,8 +37,8 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // ── Who waits ──
 //
 // The desk gets the finished review, because a person is watching. A submit
-// gets an immediate 202 and the work happens afterwards. See the comment at
-// the dispatch below: that split is load-bearing, not tidiness.
+// tries to run it in the background so the read is already there. That attempt
+// is best effort and known to be: see the dispatch at the bottom.
 //
 // PRIVACY. This sends identity documents to NVIDIA's hosted model. The join
 // page tells applicants their documents are readable only by Yaadly admins,
@@ -68,7 +67,7 @@ const READABLE = ["image/jpeg", "image/png", "image/webp"];
 
 const MAX_DOCS = 5;
 const MAX_BYTES_EACH = 8 * 1024 * 1024;
-const CALL_TIMEOUT = 60000;
+const CALL_TIMEOUT = 45000;
 
 const DOC_LABEL: Record<string, string> = {
   photo_id: "Government photo ID",
@@ -128,6 +127,8 @@ Cover these, but only where there is something to say:
 - Signs of alteration. Report concerns raised on any document.
 - Numbers to verify. List certificate, licence and reference numbers that were read, so a person can check them with the issuing body. State plainly that they have NOT been verified.
 - Missing documents. Say what was not provided at all.
+
+DO NOT produce any check about how old a document is, or whether a date is inside a window, or whether something has expired. That arithmetic has been done for you and is added to the checks separately. Use it in your summary and your questions, never contradict it, and never restate it as a check of your own.
 
 Return STRICT JSON only, no markdown fences, exactly this shape:
 {"summary":"at most three plain sentences on what a person should know before opening these documents","checks":[{"name":"short check name","verdict":"pass|flag|unclear","note":"one or two sentences"}],"questions":["a specific question to put to the applicant, only if something needs asking"]}
@@ -475,7 +476,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
       + `FACE COMPARISON\n${JSON.stringify(face)}\n\n`
       + `DATE ARITHMETIC, ALREADY DONE FOR YOU\nThese were calculated, not judged. Treat them as settled and never contradict them. They are added to the checks after you answer, so do not repeat them as checks of your own; use them for the summary and the questions.\n${JSON.stringify(computed, null, 1)}\n\n`
       + `Now produce the reviewer's note.`,
-  }], 1400);
+  }], 1000);
 
   if (!synth.ok) {
     root.setAttributes({ "yaadly.vetting.review": "synthesis_failed" });
@@ -548,11 +549,39 @@ Deno.serve(async (req: Request) => {
     // Answering first lets the caller finish cleanly and leaves this run
     // depending on nobody.
     if (who === "internal" && body.wait !== true) {
-      const work = (async () => { try { await review(trace, root, appId); } catch (_) { /* the row records it */ } })();
+      // A thrown error here used to vanish: the catch swallowed it, no row was
+      // written, and the desk saw the same empty box it sees when nothing has
+      // run. Silence and "the machine found nothing" must never look alike, so
+      // a failure writes itself down.
+      const work = (async () => {
+        try {
+          await review(trace, root, appId);
+        } catch (e) {
+          try {
+            await createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
+              .from("vetting_reviews").insert({
+                application_id: appId, model: MODEL,
+                summary: "The automatic run failed. Press Run the check again on the desk.",
+                checks: [], questions: [], extracted: [], docs_read: [], docs_skipped: [], flag_count: 0,
+                error: String(e).slice(0, 400),
+              });
+          } catch (_) { /* nothing left to try */ }
+        }
+      })();
+
       const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-      if (rt?.waitUntil) rt.waitUntil(work); else await work;
-      root.setAttributes({ "yaadly.vetting.review": "started" });
-      return json({ ok: true, status: "started" }, 202);
+      if (rt?.waitUntil) {
+        rt.waitUntil(work);
+        root.setAttributes({ "yaadly.vetting.review": "started" });
+        return json({ ok: true, status: "started" }, 202);
+      }
+
+      // No waitUntil in this runtime. Awaiting would hold the response open for
+      // the whole review and the isolate gets killed around the minute mark, so
+      // do not pretend: say the automatic run is unavailable and let the desk,
+      // which has a real person waiting on a real connection, do it properly.
+      root.setAttributes({ "yaadly.vetting.review": "no_background" });
+      return json({ ok: false, status: "not_started", reason: "This runtime has no background execution. The desk runs the review when the application is opened." }, 202);
     }
 
     const out = await review(trace, root, appId);
