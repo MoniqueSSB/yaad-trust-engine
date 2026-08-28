@@ -43,12 +43,31 @@ Return STRICT JSON only, exactly this shape:
  "closing_note": "1-2 warm sentences to the owner about the record they now hold"
 }`;
 
-function callerRole(req: Request): string {
+// Who is calling, asked of Supabase rather than read off the token.
+//
+// This used to decode the JWT payload with atob() and trust the role it found.
+// Forging {"role":"authenticated"} is trivial. Nothing was exploitable, because
+// the function is deployed with verify_jwt = true and the platform checks the
+// signature first, but that made the check safe by accident rather than by
+// design. The README in this folder tells a future reader some functions "must
+// stay false"; applying that here would have left this as the only check, and
+// it does not work. getUser() asks the auth server, so it is right either way.
+async function callerIsSignedIn(req: Request): Promise<boolean | "misconfigured"> {
+  const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const url = Deno.env.get("SUPABASE_URL"), anon = Deno.env.get("SUPABASE_ANON_KEY");
+  // Distinguish "we cannot check" from "they are not signed in". Collapsing the
+  // two would turn a missing environment variable into a silent 401 for every
+  // real user, which looks like a permissions bug and is not one.
+  if (!url || !anon) return "misconfigured";
+  if (!tok) return false;
   try {
-    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const p = JSON.parse(atob(tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return p.role || "";
-  } catch (_) { return ""; }
+    const r = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: anon, Authorization: `Bearer ${tok}` },
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return Boolean(u?.id);
+  } catch (_) { return false; }
 }
 
 function stripNoise(s: string): string {
@@ -81,7 +100,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-    if (callerRole(req) !== "authenticated") {
+    const signedIn = await callerIsSignedIn(req);
+    if (signedIn === "misconfigured") {
+      root.recordError("SUPABASE_URL or SUPABASE_ANON_KEY missing; cannot verify the caller");
+      return json({ error: "Sign in cannot be checked right now. This is a Yaadly problem, not yours." }, 503);
+    }
+    if (!signedIn) {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return json({ error: "Sign in required." }, 401);
     }

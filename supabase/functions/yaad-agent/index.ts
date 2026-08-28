@@ -16,26 +16,43 @@ Rules. The value of "trade" MUST be copied character for character from the TRAD
   report: `You are the Reporting Agent for Yaadly. Draft a short, warm WhatsApp update from Yaadly to the client using ONLY the facts given. Plain text, no markdown. Never promise dates or amounts that are not in the facts. Never mention percentages or fees. End with one clear next step for the client. Sign off as Yaadly.`
 };
 
-function callerRole(req: Request): string {
+// Who is calling, asked of Supabase rather than read off the token.
+//
+// This used to decode the JWT payload with atob() and trust what it said, in
+// two places: callerRole() for the role, and callerEmail() for the email that
+// was then handed to may_use_agents() as the thing being authorised. The
+// second is the worse of the two, because a self-reported email as the input
+// to a permission check means the caller nominates who they are.
+//
+// Nothing was exploitable: this function is deployed with verify_jwt = true,
+// so the platform checks the signature before the code runs. But that made an
+// unverified decode safe by accident rather than by design, and the README in
+// this folder tells a future reader that some functions "must stay false".
+// Anyone applying that here would have turned a belt-and-braces check into the
+// only check, and it does not work. getUser() asks the auth server, so it is
+// right either way.
+async function callerIdentity(req: Request): Promise<{ email: string } | null | "misconfigured"> {
+  const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const url = Deno.env.get("SUPABASE_URL"), anon = Deno.env.get("SUPABASE_ANON_KEY");
+  // "We cannot check" is not "they are not signed in". See yaad-completion.
+  if (!url || !anon) return "misconfigured";
+  if (!tok) return null;
   try {
-    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const payload = JSON.parse(atob(tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return payload.role || "";
-  } catch (_) { return ""; }
-}
-
-function callerEmail(req: Request): string {
-  try {
-    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const payload = JSON.parse(atob(tok.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return payload.email || "";
-  } catch (_) { return ""; }
+    const r = await fetch(`${url}/auth/v1/user`, {
+      headers: { apikey: anon, Authorization: `Bearer ${tok}` },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    const email = String(u?.email ?? "").trim();
+    return email ? { email } : null;
+  } catch (_) { return null; }
 }
 
 // Who may use the agents: the Yaadly admin, or a client who has a profile and
 // has signed the CURRENT Client Guidelines version. The rule lives in Postgres
-// (may_use_agents) so it cannot drift between here and yaad-vision.
-async function callerMayUse(req: Request): Promise<boolean> {
+// (may_use_agents) so it cannot drift between here and yaad-vision. The email
+// passed in is the verified one, never the one the caller typed.
+async function callerMayUse(req: Request, email: string): Promise<boolean> {
   try {
     const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
     const url = Deno.env.get("SUPABASE_URL"), anon = Deno.env.get("SUPABASE_ANON_KEY");
@@ -43,7 +60,7 @@ async function callerMayUse(req: Request): Promise<boolean> {
     const r = await fetch(`${url}/rest/v1/rpc/may_use_agents`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${tok}` },
-      body: JSON.stringify({ p_email: callerEmail(req) }),
+      body: JSON.stringify({ p_email: email }),
     });
     return r.ok && (await r.json()) === true;
   } catch (_) { return false; }
@@ -67,11 +84,16 @@ Deno.serve(async (req) => {
   };
 
   try {
-    if (callerRole(req) !== "authenticated") {
+    const who = await callerIdentity(req);
+    if (who === "misconfigured") {
+      root.recordError("SUPABASE_URL or SUPABASE_ANON_KEY missing; cannot verify the caller");
+      return done(new Response(JSON.stringify({ error: "Sign in cannot be checked right now. This is a Yaadly problem, not yours." }), { status: 503, headers: { ...cors, "Content-Type": "application/json" } }), 503);
+    }
+    if (!who) {
       root.setAttributes({ "yaadly.auth.outcome": "rejected" });
       return done(new Response(JSON.stringify({ error: "Sign in required." }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } }), 401);
     }
-    if (!(await callerMayUse(req))) {
+    if (!(await callerMayUse(req, who.email))) {
       root.setAttributes({ "yaadly.auth.outcome": "not_permitted" });
       return done(new Response(JSON.stringify({ error: "Complete your client profile and sign the current Client Guidelines to use this." }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } }), 403);
     }
