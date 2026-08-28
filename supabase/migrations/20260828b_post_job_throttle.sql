@@ -37,4 +37,9 @@ create or replace function public.post_job_attempts_sweep()
 returns void language sql security definer set search_path to 'public' as $$
   delete from public.post_job_attempts where created_at < now() - interval '2 hours';
 $$;
-revoke execute on function public.post_job_attempts_sweep() from anon, authenticated;
+-- A fresh function is granted EXECUTE to PUBLIC by default, and revoking from
+-- anon does not touch that grant, because anon inherits PUBLIC. The first
+-- revoke here looked like it worked and did nothing; has_function_privilege
+-- said so. Revoke from PUBLIC, then grant back only to the role that needs it.
+revoke execute on function public.post_job_attempts_sweep() from public, anon, authenticated;
+grant execute on function public.post_job_attempts_sweep() to service_role;
