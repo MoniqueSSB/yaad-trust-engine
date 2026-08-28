@@ -20,6 +20,11 @@
   // to a workers.dev address. This is the thing that lets the desk sit behind
   // an identity check rather than behind a URL nobody has guessed yet.
   "routes": [{ "pattern": "concierge.yaadly.co.uk", "custom_domain": true }],
-  "assets": { "directory": "./public" },
+  "main": "./src/index.ts",
+  // binding, so the Worker can serve the asset and then add headers to it
+  // run_worker_first, because a matching asset is otherwise served straight
+  // from the edge and the Worker never runs, which is why the headers were
+  // missing the first time this was tried.
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   "observability": { "enabled": true }
 }

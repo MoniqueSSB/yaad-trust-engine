@@ -149,6 +149,32 @@ async function readTheJob(text: string, trace: Trace) {
   } catch (_) { return null; }
 }
 
+// ───────────────────────── throttle ─────────────────────────
+//
+// This endpoint calls a model, and the only credential it needs is the
+// publishable key printed in the page source. Without a cap, one loop drains
+// the model balance and fills the jobs table.
+//
+// Two limits, because they stop two different things. PER_CALLER stops one
+// person flooding the table. MODEL_PER_HOUR is a hard ceiling on spend
+// whoever is behind it, and when it trips the draft is still saved: the job
+// is the client's, the model enrichment is a nicety, so the nicety is what
+// gets dropped rather than their work.
+const PER_CALLER_PER_HOUR = 8;
+const MODEL_PER_HOUR = 120;
+
+// A throttle key, not a visitor log. The address is hashed and truncated and
+// never stored, so this cannot be read back as an IP and nothing joins to it.
+async function callerKey(req: Request): Promise<string> {
+  const raw = req.headers.get("cf-connecting-ip")
+           ?? (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim()
+           ?? "";
+  const bytes = new TextEncoder().encode("yaadly-post-job:" + raw);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -178,6 +204,24 @@ Deno.serve(async (req: Request) => {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // Counted before anything is written or sent to a model.
+    const key = await callerKey(req);
+    const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+
+    const { count: mine } = await admin.from("post_job_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("caller_key", key).gt("created_at", hourAgo);
+    if ((mine ?? 0) >= PER_CALLER_PER_HOUR) {
+      root.setAttributes({ "yaadly.post.throttled": "caller" });
+      return json({ error: "That is a lot of job requests in one hour. Give it a little while, or message us on WhatsApp and we will finish it with you." }, 429);
+    }
+
+    const { count: modelCalls } = await admin.from("post_job_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("used_model", true).gt("created_at", hourAgo);
+    const modelBudgetLeft = (modelCalls ?? 0) < MODEL_PER_HOUR;
+    root.setAttributes({ "yaadly.post.model_budget_left": modelBudgetLeft });
 
     const parish = s(b.parish);
     const addr = s(b.addr);
@@ -211,7 +255,17 @@ Deno.serve(async (req: Request) => {
       // The agent reads it before it becomes a row. Anything it returns is a
       // suggestion the client can still overwrite on the next screen; nothing
       // it says about money is used, because it is not asked about money.
-      const read = await readTheJob(desc, trace);
+      const read = modelBudgetLeft ? await readTheJob(desc, trace) : null;
+      // Recorded whether or not the model ran, so the per-caller count covers
+      // every request and the global count only covers the ones that cost.
+      await admin.from("post_job_attempts").insert({ caller_key: key, used_model: !!read });
+      // try/catch, not .catch(): the query builder is thenable but does not
+      // implement .catch, so calling it throws TypeError rather than swallowing
+      // anything. Housekeeping must never be able to fail a real request.
+      if (Math.random() < 0.02) {
+        try { await admin.rpc("post_job_attempts_sweep"); } catch (_) { /* housekeeping only */ }
+      }
+      if (!modelBudgetLeft) root.setAttributes({ "yaadly.post.model_skipped": "hourly cap" });
       if (read) {
         root.setAttributes({ "yaadly.agent.read": true, "yaadly.agent.trade": String(read.trade ?? "") });
         if (!row.trade && s(read.trade)) { row.trade = s(read.trade); row.trade_source = "model"; }  // jobs_trade_source_chk: wizard | model | regex | admin
