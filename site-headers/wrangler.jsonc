@@ -1,0 +1,29 @@
+{
+  // Security headers for yaadly.co.uk.
+  //
+  // The site itself stays on GitHub Pages, served from docs/ on main. This
+  // Worker sits in FRONT of it on a route, adds the headers, and passes the
+  // response through untouched otherwise.
+  //
+  // A route, deliberately, and not a custom domain. A custom domain would
+  // rewrite the DNS record for the apex and take GitHub Pages out of the
+  // path, which means:
+  //   - the site would stop deploying when you merge to main, and start
+  //     needing a wrangler deploy instead
+  //   - rolling back would mean recreating DNS at 2am
+  // A route changes no DNS at all. Cloudflare already proxies this hostname,
+  // so the Worker simply runs on the way past. To undo the whole thing:
+  //
+  //     npx wrangler delete yaadly-site-headers
+  //
+  // and traffic goes straight to Pages again, exactly as before.
+  "name": "yaadly-site-headers",
+  "compatibility_date": "2026-08-01",
+  "main": "./src/index.ts",
+  "routes": [
+    { "pattern": "yaadly.co.uk/*",     "zone_name": "yaadly.co.uk" },
+    { "pattern": "www.yaadly.co.uk/*", "zone_name": "yaadly.co.uk" }
+  ],
+  "workers_dev": false,
+  "observability": { "enabled": true }
+}
