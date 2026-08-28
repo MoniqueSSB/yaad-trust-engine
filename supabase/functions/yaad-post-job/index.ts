@@ -259,7 +259,12 @@ Deno.serve(async (req: Request) => {
       // Recorded whether or not the model ran, so the per-caller count covers
       // every request and the global count only covers the ones that cost.
       await admin.from("post_job_attempts").insert({ caller_key: key, used_model: !!read });
-      if (Math.random() < 0.02) await admin.rpc("post_job_attempts_sweep").catch(() => {});
+      // try/catch, not .catch(): the query builder is thenable but does not
+      // implement .catch, so calling it throws TypeError rather than swallowing
+      // anything. Housekeeping must never be able to fail a real request.
+      if (Math.random() < 0.02) {
+        try { await admin.rpc("post_job_attempts_sweep"); } catch (_) { /* housekeeping only */ }
+      }
       if (!modelBudgetLeft) root.setAttributes({ "yaadly.post.model_skipped": "hourly cap" });
       if (read) {
         root.setAttributes({ "yaadly.agent.read": true, "yaadly.agent.trade": String(read.trade ?? "") });
