@@ -357,6 +357,72 @@ html.jsrv .rv{opacity:0;transform:translateY(24px)}
 .gl.lg{width:30px;height:30px;stroke-width:1.5}
 
 /* the trust engine */
+/* the money walk, on the payments pane */
+.mw{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 18px;margin-top:22px}
+.mw-ctl{display:flex;flex-wrap:wrap;gap:16px 26px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.mw-grp{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.mw-lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-right:2px}
+.mw-b{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:var(--r-pill);border:1px solid var(--line);background:var(--bg);color:var(--mute);cursor:pointer;transition:.15s}
+.mw-b:hover{border-color:var(--softline);color:var(--ink)}
+.mw-b.on{background:var(--soft);border-color:var(--softline);color:var(--tealb)}
+.mw.service .mw-market{display:none}
+.mw-svc{display:none}
+.mw.service .mw-svc{display:flex}
+.mw-stage{display:grid;grid-template-columns:1fr 132px 1fr;gap:14px;align-items:center;margin-top:20px}
+.mw-box{border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center;background:var(--bg)}
+.mw-box .who{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+.mw-box .amt{font-family:var(--disp);font-size:26px;line-height:1}
+.mw-box .st2{font-size:11.5px;color:var(--mute);margin-top:7px;min-height:16px}
+.mw-mid{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--mango)}
+.mw-mid .lockw{width:44px;height:44px;border-radius:13px;border:1px solid rgba(255,176,32,.45);background:rgba(255,176,32,.08);display:grid;place-items:center;transition:.4s}
+.mw-mid small{font-family:var(--mono);font-size:9px;letter-spacing:.11em;text-transform:uppercase}
+.mw-mid .amt2{font-family:var(--disp);font-size:19px;line-height:1;color:var(--mango)}
+.mw.open .mw-mid{color:var(--tealb)}
+.mw.open .mw-mid .lockw{border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.1)}
+.mw.open .mw-mid .amt2{color:var(--tealb)}
+.mw.open #mw-a3{color:var(--tealb)}
+.mw.warn .mw-mid .lockw{border-color:rgba(255,107,74,.6);background:rgba(255,107,74,.1)}
+.mw.warn .mw-mid,.mw.warn .mw-mid .amt2{color:#FF6B4A}
+.mw.service .mw-mid{opacity:.3}
+.mw.nohold .mw-mid{color:var(--dim)}
+.mw.nohold .mw-mid .lockw{border-color:var(--line);background:var(--bg)}
+.mw.nohold .mw-mid .amt2{color:var(--dim)}
+.mw.nohold .mw-mid small{color:var(--dim)}
+/* the payment link a client actually receives, shown at the step that issues it */
+.mw-pay{border:1px solid var(--softline);background:var(--soft);border-radius:14px;padding:15px 16px;margin-top:18px}
+.mw-pay-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:11px}
+.mw-pay-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--tealb);border:1px solid rgba(45,212,191,.35);border-radius:100px;padding:3px 9px}
+.mw-pay-stage{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);margin-left:auto}
+.mw-pay-for{font-size:13px;color:var(--mute);line-height:1.55}
+.mw-pay-amt{font-family:var(--disp);font-size:30px;line-height:1;margin:9px 0 13px;color:var(--ink)}
+.mw-pay-url{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:11px;word-break:break-all}
+.mw-pay-note{font-size:12px;color:var(--dim);margin-top:7px;line-height:1.55}
+.mw-pay-note b{color:var(--mute)}
+.mw-pay.none{border-color:var(--line);background:var(--bg)}
+.mw-pay.none .mw-pay-tag{color:var(--mango);border-color:rgba(255,176,32,.4)}
+.mw-pay.none .mw-pay-body{font-size:13px;color:var(--mute);line-height:1.6}
+.mw-note{border-radius:14px;padding:14px 16px;margin-top:14px;border:1px solid var(--line);background:var(--bg)}
+.mw-note h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;margin:0 0 8px;color:var(--mango)}
+.mw-note p{font-size:13px;line-height:1.65;color:var(--mute);margin:0}
+.mw-note b{color:var(--ink)}
+.mw-note.risk{border-color:rgba(255,107,74,.35);background:rgba(255,107,74,.06)}
+.mw-note.risk h5{color:#FF6B4A}
+.mw-note.ok{border-color:var(--softline);background:var(--soft)}
+.mw-note.ok h5{color:var(--tealb)}
+.mw-act{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.mw-ev{margin-top:18px}
+.mw.service .mw-ev{display:none}
+.mw-cap{display:flex;align-items:flex-start;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--softline);font-size:13.5px;color:var(--mute);line-height:1.6;min-height:44px}
+.mw-cap b{color:var(--ink)}
+.mw-dot{width:7px;height:7px;border-radius:50%;background:var(--mango);flex:0 0 auto;margin-top:7px}
+.mw.open .mw-dot{background:var(--tealb)}
+.mw.warn .mw-dot{background:#FF6B4A}
+.mw-where{margin-top:10px;font-size:12.5px;color:var(--dim);line-height:1.6}
+.mw-where b{color:var(--mute)}
+.mw-nav{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.mw-nav .btn:disabled{opacity:.35;cursor:not-allowed;filter:none}
+.mw-count{margin-left:auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim)}
+@media(max-width:640px){ .mw-stage{grid-template-columns:1fr;gap:10px} .mw-mid{flex-direction:row;gap:12px;justify-content:center} .mw-nav .btn{width:auto;flex:1} .mw-count{margin-left:0;width:100%} }
 .engine{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px 18px;margin-top:20px;overflow:hidden}
 .eng-stage{display:grid;grid-template-columns:1fr 118px 1fr;gap:14px;align-items:center}
 @media(max-width:720px){.eng-stage{grid-template-columns:1fr;gap:12px}}
@@ -960,6 +1026,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Marketplace</a>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
+    <button class="vbtn" data-v="payments" onclick="go('payments')">Payments</button>
     <!-- One portal, not two. It shows "As the client" and "As the worker" off
          the signed-in email, so two tabs pointing at the same URL was telling
          people there were two places to go when there is one. -->
@@ -1055,12 +1122,12 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <div class="isteps">
     <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg><b>01</b></div><h4>Tell us what needs doing</h4><p>Form, WhatsApp, voice note, Patois. No app.</p><span class="tag">🤖 AI reads it</span></div>
     <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><b>02</b></div><h4>An itemised quote</h4><p>Labour split from materials, checked before it reaches you.</p><span class="tag">🤖 AI drafts · 🧍 we confirm</span></div>
-    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3.2"/><path d="M5 7v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V7"/><path d="M5 12v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-5"/></svg><b>03</b></div><h4>Money held, not sent</h4><p>Agreed in writing before a tool is lifted.</p><span class="tag">🧍 you confirm</span></div>
+    <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><ellipse cx="12" cy="7" rx="7" ry="3.2"/><path d="M5 7v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2V7"/><path d="M5 12v5c0 1.8 3.1 3.2 7 3.2s7-1.4 7-3.2v-5"/></svg><b>03</b></div><h4>Money held, not sent</h4><p>Agreed in writing before a tool is lifted. <b>From launch</b>, once holding is approved.</p><span class="tag">🧍 you confirm</span></div>
     <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><b>04</b></div><h4>Every stage documented</h4><p>Before, after, video. Timestamped and geotagged.</p><span class="tag">🤖 AI checks · 🧍 we confirm</span></div>
     <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><b>05</b></div><h4>You approve, from anywhere</h4><p>Or walk the site on video first and raise it live.</p><span class="tag">🧍 you decide</span></div>
     <div class="ist"><div class="ih"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><b>06</b></div><h4>Worker paid in 3 days</h4><p>And the job builds a record a bank can finally see.</p><span class="tag">🧍 released on your say so</span></div>
   </div>
-  <div class="rule" style="margin-top:16px"><span>💷</span><div><b>On payments today:</b> online payment holding opens shortly. Until then the quote and payment terms are agreed with you directly, in writing, before work starts. Same rule either way: nothing is charged without you.</div></div>
+  <div class="rule" style="margin-top:16px"><span>💷</span><div><b>On payments today:</b> <b>Yaadly holds none of your money.</b> You pay your tradesperson directly, stage by stage, against an agreement you both sign first, and we invoice our own fee separately after the work. Payment holding is pending legal sign off and government approval. Same rule either way: nothing is charged without you. <a onclick="go('payments')" style="color:var(--tealb);cursor:pointer;font-weight:600">The full payment journey</a></div></div>
 </div>
 
 <!-- ════════ 2 · START WHERE YOU ALREADY ARE ════════ -->
@@ -1121,6 +1188,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <p class="kick m">What you're paying for</p>
   <h2 class="hx">Money moves <span class="g1">when the proof lands.</span></h2>
   <p class="lead">Not when they ask. Not when you hope. Watch it.</p>
+  <div class="rule" style="margin-top:16px;border-color:var(--softline);background:var(--soft)"><span>🔜</span><div><b>This is what the platform becomes, not what it does today.</b> Holding payments is pending legal sign off and government approval. Right now you pay your tradesperson directly, in stages, against an agreement you both sign, and <b>Yaadly holds none of your money.</b> The vetting, the evidence and the dispute review are live now. <a onclick="go('payments')" style="color:var(--tealb);cursor:pointer;font-weight:600">See exactly how a job is paid today</a></div></div>
 
   <div class="engine" id="engine">
     <div class="eng-stage">
@@ -1158,7 +1226,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <p class="kick m" style="margin-bottom:8px">For tradespeople</p>
       <div class="iline"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span><b>Paid in 3 working days</b> once the client approves</span></div>
       <div class="iline"><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span><b>Free to join.</b> Never charged to quote, ever</span></div>
-      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>The money is real</b> and confirmed before you start</span></div>
+      <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7.5 3v6c0 4.6-3.2 7.9-7.5 9.3C7.7 19.9 4.5 16.6 4.5 12V6L12 3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></svg><span><b>Stage one is paid before you start</b>, so you never buy materials yourself</span></div>
       <div class="iline"><svg class="gl" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8 3 14h6L6 8ZM18 8l-3 6h6l-3-6Z"/></svg><span><b>Walk away</b> from a mis-described site, no penalty</span></div>
     </div>
   </div>
@@ -1517,7 +1585,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div class="sec">
       <p class="kick m">Run by me</p>
       <h3 class="hx">Available now</h3>
-      <p class="lead" style="margin-top:10px">Fixed fee, paid up front, no percentage. <b>Reach out and we talk first</b>, a free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote before anything starts. <b>Every line shows the full price and the founding price</b>, because under the DMCCA 2024 a discount off a price nobody can actually buy is a misleading action, and because your own pricing rule says publish the real number first.</p>
+      <p class="lead" style="margin-top:10px">Fixed fee, no percentage, and <b>the bigger pieces are paid in stages rather than all up front</b>, see Paying for it below. <b>Reach out and we talk first</b>, a free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote before anything starts. <b>Every line shows the full price and the founding price</b>, because under the DMCCA 2024 a discount off a price nobody can actually buy is a misleading action, and because your own pricing rule says publish the real number first.</p>
       <div class="grid g2c" style="margin-top:22px" id="svcremote"></div>
     </div>
 
@@ -1527,6 +1595,60 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <p class="lead" style="margin-top:10px">Built to the shape the UK market already uses, because that is the market your clients benchmark against. <b>A checker records what is there. A trained inspector tells you what it means.</b> That is the Level 1 to Level 2 line and it is where the price steps. Three families, whole-property reports, in-job sign-offs, and recurring care, each anchored to a published UK price. The table is below.</p>
       <div class="grid g2c" style="margin-top:22px" id="svcground"></div>
       <div id="mkttable"></div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">Paying for it</p>
+      <h3 class="hx">You do not have to pay it all at once</h3>
+      <p class="lead" style="margin-top:10px">The rest of this market asks for the whole fee before anything exists. A surveyor is paid in full before they attend, every time. <b>We do it differently on the bigger pieces, on purpose</b>, because telling you not to hand money to strangers far away and then doing exactly that would be a poor look.</p>
+
+      <div class="grid g4c" style="margin-top:22px">
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">Under £200</p>
+          <h4 style="font-size:17px;margin-bottom:10px">Paid in full</h4>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Visual Check</span><span class="r">£95</span>
+            <span class="mut">Deposit Protection Check</span><span class="r">£149</span>
+          </div>
+          <p class="tiny" style="margin-top:12px">72 hour turnaround. Splitting a fee this size costs us both more in admin than it saves you.</p>
+        </div>
+        <div class="card" style="border-color:var(--softline);background:var(--soft)">
+          <p class="kick" style="margin-bottom:10px">£200 and over, one off</p>
+          <h4 style="font-size:17px;margin-bottom:10px">50% deposit, 50% on delivery</h4>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Deposit, books the slot</span><span class="r">50%</span>
+            <span class="mut">Balance, on delivery</span><span class="r">50%</span>
+            <div class="hr"></div>
+            <span class="tot">Condition Report, £245</span><span class="r tot" style="color:var(--tealb)">£122.50 &times; 2</span>
+          </div>
+          <p class="tiny" style="margin-top:12px">The deposit books the visit. The balance is invoiced when the report is written and settled before it is released.</p>
+        </div>
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">Retainers</p>
+          <h4 style="font-size:17px;margin-bottom:10px">Monthly, in advance</h4>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">First month</span><span class="r">on signing</span>
+            <span class="mut">Then</span><span class="r">monthly</span>
+            <span class="mut">Notice to stop</span><span class="r">30 days</span>
+          </div>
+          <p class="tiny" style="margin-top:12px">No deposit, no lock in. Visits already made are not clawed back and months not yet run are not charged.</p>
+        </div>
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">Full Project Management</p>
+          <h4 style="font-size:17px;margin-bottom:10px">Stages, never up front</h4>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Up front</span><span class="r">nothing</span>
+            <span class="mut">Then</span><span class="r">per stage</span>
+            <span class="mut">Tied to</span><span class="r">the build programme</span>
+          </div>
+          <p class="tiny" style="margin-top:12px">Invoiced against agreed stages as the build reaches them, so the fee moves at the speed your project does.</p>
+        </div>
+      </div>
+
+      <div class="rule" style="margin-top:20px"><span>🧾</span><div><b>Every stage is a numbered invoice</b>, itemised, with the full price and the founding price both shown. <b>Your first engagement is payable before delivery</b>, whichever service it is. After one job together, 14 day terms are yours on request. We say that plainly rather than deciding it case by case.</div></div>
+      <div class="rule" style="margin-top:10px"><span>↩️</span><div><b>If you stop it part way.</b> A deposit covers the work already done at the point you say stop, and anything not yet done is refunded. On a report that means refundable right up until it is issued, because the report is the thing you were buying.</div></div>
+      <div class="rule" style="margin-top:10px"><span>🗓️</span><div><b>If you cancel a booked visit.</b> More than 48 hours, nothing to pay and one free rebook. Inside 48 hours, 50%. Inside 24 hours, or nobody can let us in on the day, the full fee. <b>That charge pays the person who travelled, first.</b> They held the day, and that is not their cost to carry.</div></div>
+      <div class="rule" style="margin-top:10px"><span>⏱️</span><div><b>Anything outside the agreed scope</b> is £95 an hour, minimum one hour. We will never bill you for it as a surprise: we tell you it is out of scope, estimate the hours, and do nothing until you say yes in writing.</div></div>
     </div>
 
     <div class="sec">
@@ -1607,6 +1729,424 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     </div>
   </div>
 </section>
+
+<!-- ════════ PANE · THE PAYMENT JOURNEY ════════ -->
+<section class="pane" id="pane-payments">
+<div class="wrap">
+    <p class="kick">The payment journey</p>
+    <h2 class="hx">Where your money goes,<br><span class="g2">every step of it.</span></h2>
+    <p class="lead">Most people building back home have no idea where their money sits between sending it and the work being done. That gap is where it goes missing. So here is the whole route, written down before you part with anything.</p>
+
+    <!-- The one claim on this page. Everything else describes a mechanism. -->
+    <div class="rule" style="margin-top:24px;border-color:var(--softline);background:var(--soft)">
+      <span>💷</span>
+      <div>
+        <b>Yaadly does not hold your money. Not at any point, and not today.</b> You pay your tradesperson directly, stage by stage, against an agreement you both sign before a tool is lifted. Nothing passes through us, so we cannot hold your money, release it, or hand it back.
+        <br><br>
+        <b>What we do instead.</b> Vet the tradesperson before they reach you. Write the agreement. Hold the evidence to our standard, before, during and after, timestamped. Run a free dispute review by a person. Give you somebody to call who answers. <b>We invoice our own fee, and only our own fee, after the work is done.</b>
+        <br><br>
+        <b>Held payments are coming, not here.</b> The part where you pay Yaadly, the money waits, and it is released only when you approve the evidence, is on hold pending legal sign off and government approval. When it lands we will say so on this page. Until then, if anyone sends you a Yaadly payment link for a tradesperson's labour or materials, <b>it did not come from us.</b>
+      </div>
+    </div>
+    <div class="sec">
+      <p class="kick m">Try it yourself</p>
+      <h3 class="hx">Follow the money</h3>
+      <p class="lead" style="margin-top:10px">You are the client. Press the buttons and watch where your money actually sits at each point. <b>It never sits with Yaadly.</b> You pay your tradesperson directly, stage by stage, against an agreement you both signed. <b>Nothing here is a mock up of a future product</b>, it is the rule a job runs on today.</p>
+
+      <div class="mw" id="mw">
+        <div class="mw-ctl">
+          <div class="mw-grp"><span class="mw-lab">Journey</span>
+            <button class="mw-b on" data-k="journey" data-v="today">A marketplace job</button>
+            <button class="mw-b" data-k="journey" data-v="service">A Yaadly service</button>
+          </div>
+          <div class="mw-grp mw-market"><span class="mw-lab">You pay from</span>
+            <button class="mw-b on" data-k="pay" data-v="abroad">Abroad</button>
+            <button class="mw-b" data-k="pay" data-v="local">In Jamaica</button>
+          </div>
+          <div class="mw-grp mw-svc"><span class="mw-lab">Service</span>
+            <button class="mw-b on" data-k="svc" data-v="small">Deposit Check, £149</button>
+            <button class="mw-b" data-k="svc" data-v="staged">Condition Report, £245</button>
+          </div>
+          <div class="mw-grp mw-market"><span class="mw-lab">Worker collects by</span>
+            <button class="mw-b on" data-k="collect" data-v="bank">Bank</button>
+            <button class="mw-b" data-k="collect" data-v="lynk">Lynk wallet</button>
+            <button class="mw-b" data-k="collect" data-v="cash">Cash</button>
+          </div>
+        </div>
+
+        <div class="mw-stage">
+          <div class="mw-box"><div class="who">You have paid</div><div class="amt" id="mw-a1">£0</div><div class="st2" id="mw-s1">Nothing has left you</div></div>
+          <div class="mw-mid">
+            <div class="lockw" id="mw-lock"><span class="lockem">🔒</span></div>
+            <small id="mw-lab">Held</small>
+            <div class="amt2" id="mw-held">£0</div>
+          </div>
+          <div class="mw-box"><div class="who" id="mw-w3">The worker has</div><div class="amt" id="mw-a3">£0</div><div class="st2" id="mw-s3">Not yet hired</div></div>
+        </div>
+
+        <div class="eng-ev mw-ev" id="mw-ev">
+          <i><svg class="gl" viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Arrival</span></i>
+          <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>Before</span></i>
+          <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span>Receipt</span></i>
+          <i><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>After</span></i>
+          <i><svg class="gl" viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5 21 7v10l-6-3.5v-3Z"/></svg><span>Walk-round</span></i>
+          <i><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></i>
+        </div>
+
+        <div class="mw-cap"><span class="mw-dot" id="mw-dot"></span><span id="mw-cap"></span></div>
+        <div class="mw-where"><b>Where the money physically is:</b> <span id="mw-where"></span></div>
+
+        <div id="mw-note"></div>
+        <div id="mw-pay"></div>
+        <div class="mw-act" id="mw-act"></div>
+
+        <div class="mw-nav">
+          <button class="btn o sm" id="mw-back">Back a step</button>
+          <button class="btn o sm" id="mw-reset">Start again</button>
+          <span class="mw-count" id="mw-count"></span>
+        </div>
+      </div>
+
+      <p class="tiny" style="margin-top:12px">Paying from abroad, the worker's Jamaican dollar figure is fixed before the job starts, so a rate moving mid job cannot cut their pay. Paying from Jamaica, there is no conversion at any point.</p>
+    </div>
+
+<script>
+(function(){
+  var mw = document.getElementById('mw'); if(!mw) return;
+  var S = { journey:'today', pay:'abroad', collect:'bank', outcome:'approve', svc:'small' };
+  var i = 0;
+
+  // A job over £500, so retention is visible. Labour, materials and the fee are
+  // separate on purpose: the fee is 15% of LABOUR only and materials are never
+  // fee'd on either side.
+  // Nothing passes through Yaadly, so there is no worker fee to deduct here and
+  // no retention for Yaadly to hold. The client holds the retention under the
+  // agreement, the way an employer does in ordinary construction.
+  var MONEY = {
+    abroad: { c:'£',  labour:600,    mats:250,   fee:90,     total:940,
+              s1:250,    s2:240,    s3:330,    ret:30,    wtotal:850 },
+    local:  { c:'J$', labour:120000, mats:50000, fee:18000,  total:188000,
+              s1:50000,  s2:48000,  s3:66000,  ret:6000,  wtotal:170000 }
+  };
+
+  var COLLECT = {
+    bank: 'a Jamaican bank account, by direct deposit',
+    lynk: 'their Lynk mobile wallet, no bank account needed',
+    cash: 'a cash counter, collected in person with Jamaican ID'
+  };
+  var f = function(m,n){
+    var v = Number(n);
+    return m.c + (v % 1 === 0 ? v.toLocaleString('en-GB')
+                              : v.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}));
+  };
+  var go = function(n, set){ if(set) S.outcome = set; i = n; render(); };
+
+  // A marketplace job as it actually runs. Yaadly holds nothing at any point.
+  // The client pays the worker directly, in stages, against the signed
+  // agreement. Yaadly vets, records the evidence, writes the agreement and
+  // invoices its own fee afterwards.
+  function todaySteps(){
+    var m = MONEY[S.pay], col = COLLECT[S.collect];
+    var RISK = 'Materials are recorded <b>last thing every day he attends, and again first thing next morning</b>, in the place you approved. '
+      + 'Those two timestamps decide who carries a loss. <b>Gone during the working day, while they are in his hands: his loss.</b> '
+      + '<b>Gone overnight, from the place you approved, with the evening record showing them stored correctly: your loss</b>, because they were locked on your property with him not there. '
+      + '<b>No evening record, no transfer</b>, and it stays his: the record is the thing that moves it. His tools are always his own risk, day or night. '
+      + 'If he was paid for materials and cannot produce them, or the loss looks deliberate, a person reviews it, and only a human finding of malice goes on his record.';
+
+    return [
+      { t:'A leaking roof in Portland',
+        cap:'You are in London. Your aunt says water is running down the bedroom wall. Nobody you know is free to go and look.',
+        where:'In your account. You have not spoken to anybody yet.',
+        you:0, held:null, wk:0, ev:0, s1:'Nothing has left you', s3:'Not yet hired', lock:0,
+        act:[{l:'Post the job, free', go:1}] },
+
+      { t:'Delroy quotes it, split three ways',
+        cap:'Labour '+f(m,m.labour)+'. Materials '+f(m,m.mats)+', at cost. Yaadly\'s fee '+f(m,m.fee)+', which is 15% of the labour and <b>nothing at all on the materials</b>, invoiced to you separately after the work. Your total is <b>'+f(m,m.total)+'</b>.',
+        where:'Still in your account. A quote is not a charge.',
+        you:0, held:null, wk:0, ev:0, s1:'Quote seen, nothing charged', s3:'Waiting on you', lock:0,
+        note:{ k:'ok', t:'The stage schedule you are about to sign',
+               b:'<b>Stage 1, materials, '+f(m,m.s1)+'</b>, on the receipt and a video of them stored. <b>Stage 2, midpoint, '+f(m,m.s2)+'</b>, when a named milestone is photographed. <b>Stage 3, completion, '+f(m,m.s3)+'</b>, when you approve the evidence pack, with <b>'+f(m,m.ret)+' held back and paid on day 28</b>. Every stage is a photograph you can check, and nothing is due before its stage arrives. The retention and its release date are on the agreement from the start, so it is never a deduction he finds out about at the end. <b>On the 25% rule:</b> consumer guidance says never pay a deposit above 25%, or only enough to cover materials. Stage 1 here is '+f(m,m.s1)+' on a '+f(m,m.total)+' job, which is over a quarter, and it is <b>allowed because every penny of it is materials at cost</b>. It is a pass-through, not a deposit, and no fee is charged on it. <b>Nothing else is taken before work starts.</b>' },
+        act:[{l:'Sign the agreement', go:2}] },
+
+      { t:'You sign, and it says who pays whom',
+        cap:'Scope, price, the stages, the evidence standard, where materials are stored and <b>who pays whom</b>. Signed by you and by Delroy. <b>Yaadly is named in it as the party checking the work, never as the party holding the money.</b>',
+        where:'Still in your account.',
+        you:0, held:null, wk:0, ev:0, s1:'Agreement signed', s3:'Agreement signed', lock:0,
+        note:{ k:'risk', t:'Yaadly holds none of this money. None of it, at any point',
+               b:'<b>You pay Delroy directly, every stage.</b> Nothing passes through Yaadly, so Yaadly cannot hold your money, cannot release it, and cannot hand it back. There is no Yaadly checkout on any of these stages. <b>If anyone sends you a Yaadly payment link for a tradesperson\'s labour or materials, it did not come from us.</b> What Yaadly does is vet Delroy, write this agreement, hold the evidence to its standard, run a free dispute review, and give you a person to call. Yaadly invoices its own fee, and only its own fee, after the work is done.' },
+        act:[{l:'Nominate where materials go', go:3}] },
+
+      { t:'Where do the materials go',
+        cap:'<b>You nominate and approve where on the property the materials are stored overnight.</b> A lockable room, the garage, a container. <b>You approving it is what makes an overnight loss yours rather than his guess</b>, so it is your call. If there is nowhere securable, say so now: Delroy buys in smaller drops and clears surplus nightly, and that is priced in rather than discovered after a theft.',
+        where:'Still in your account.',
+        you:0, held:null, wk:0, ev:0, s1:'Storage approved', s3:'Told where to put them', lock:0,
+        act:[{l:'Approve the back garage', go:4}] },
+
+      { t:'Stage 1. You pay Delroy the materials, direct',
+        cap:'<b>'+f(m,m.s1)+' straight to Delroy</b>, into '+col+', so he never buys materials out of his own pocket. Not the whole '+f(m,m.total)+', just this stage. He files the receipt, photographs and <b>a video of them in the garage you approved</b>, then records them night and morning from here on.',
+        where:'With Delroy. It never passed through Yaadly.',
+        you:m.s1, held:null, wk:m.s1, ev:2, s1:'Stage 1 paid direct', s3:'Materials, at cost', lock:0,
+        note:{ k:'risk', t:'Who carries a loss, and when', b:RISK },
+        act:[{l:'Send Delroy in', go:5}] },
+
+      { t:'Stage 2. The midpoint, photographed and paid',
+        cap:'Old roof stripped, deck exposed, membrane down. <b>A named milestone you can look at</b>, not "50% complete" and not "after two weeks". Every trade has its own real ones: strip out, first fix, plaster, second fix, snagging. You pay him '+f(m,m.s2)+' direct once it is filed and checked. The materials keep being recorded night and morning throughout.',
+        where:'With Delroy.',
+        you:m.s1+m.s2, held:null, wk:m.s1+m.s2, ev:4, s1:'Stages 1 and 2 paid', s3:'Materials and midpoint', lock:0,
+        act:[{l:'He finishes the job', go:6}] },
+
+      { t:'Your call, and nobody else can make it',
+        cap:'The evidence pack closes and nothing can be added after. Look at it from wherever you are. <b>Here is the honest limit: Yaadly cannot hold his money back for you, because Yaadly never had it.</b> What you have is the full evidence pack, a person to call, and a free dispute review by a human.',
+        where:'With you, until you pay stage 3.',
+        you:m.s1+m.s2, held:null, wk:m.s1+m.s2, ev:6, s1:'Stages 1 and 2 paid', s3:'Waiting on stage 3', lock:0,
+        act:[{l:'Approve and pay stage 3', go:7, set:'approve'},{l:'Something is wrong, dispute it', go:7, set:'dispute', warn:1}] }
+    ].concat(S.outcome==='approve' ? [
+      { t:'Stage 3, less the retention you hold',
+        cap:'You pay him '+f(m,m.s3)+' direct. <b>'+f(m,m.ret)+', the 5% retention, you keep until day 28</b>, exactly as written in the agreement you both signed at step 3.',
+        where:'With Delroy, except the retention, which is still with you.',
+        you:m.s1+m.s2+m.s3, held:null, wk:m.s1+m.s2+m.s3, ev:6, s1:'Retention still with you', s3:'Paid, less retention', lock:0,
+        note:{ k:'ok', t:'What the 28 days is for, and who holds it',
+               b:'<b>You hold the retention, not Yaadly</b>, the same way an employer does on any ordinary building contract. The point is not that '+f(m,m.ret)+' pays for a repair, it does not. The point is that <b>a worker with something still outstanding has a reason to answer the phone in week three</b> and come back and put it right himself. Every fault he fixes is a claim on Yaadly\'s guarantee that never happens, which is what keeps that guarantee funded for everybody else. Cut from 10% to 5% on 28 August 2026, because 10% held for a month is real money to a worker paid week to week, and 5% is still enough to be felt. Jobs of £500 or under carry none. Founding Pros carry none ever.' },
+        act:[{l:'Day 28', go:8}] },
+      { t:'Day 28, and Yaadly invoices its fee',
+        cap:'You release the '+f(m,m.ret)+' retention to Delroy as the four week warranty closes. <b>Yaadly invoices '+f(m,m.fee)+', its own fee and nothing else</b>, on 14 day terms. Delroy\'s labour and materials were never on a Yaadly invoice and never will be.',
+        where:'Settled. Delroy '+f(m,m.wtotal)+', Yaadly '+f(m,m.fee)+', and nothing sat in the middle at any point.',
+        you:m.total, held:null, wk:m.wtotal, ev:6, s1:'Paid in full', s3:'Paid in full, record built', lock:0,
+        pay:{ stage:'Yaadly fee, once, at the end', what:'Invoice INV-1043 against job YH-4821. Guarantee and Support fee only.',
+              amt:f(m,m.fee), cta:'Pay this invoice', url:'pay.yaadly.co.uk/i/INV-1043 &middot; unique to your invoice',
+              issued:'<b>after the work, never before it</b>. The only Yaadly payment link on this whole job.' },
+        act:[{l:'Run it again', go:0, ghost:1}] }
+    ] : [
+      { t:'You hold stage 3 and raise it',
+        cap:'<b>You have not paid stage 3, so it is still yours.</b> That is your leverage in this period, not Yaadly holding anything. Raise it and a person reads it, never a machine, and the review is free.',
+        where:'Stage 3 is still in your account. Stages 1 and 2 were earned and proven.',
+        you:m.s1+m.s2, held:null, wk:m.s1+m.s2, ev:6, s1:'Stage 3 unpaid', s3:'Stages 1 and 2 only', lock:0, warn:1,
+        act:[{l:'A person reviews it', go:8}] },
+      { t:'Resolved on the evidence, by a human',
+        cap:'What the photographs actually show decides it. Put right, part paid, or not paid, and a re-inspection is paid for by whoever was at fault. <b>Yaadly cannot move money it never had</b>, so what it does is read the evidence, write the finding, and stand behind it.',
+        where:'Whatever the finding says. You were never asked to chase it yourself.',
+        you:m.s1+m.s2, held:null, wk:m.s1+m.s2, ev:6, s1:'Resolved', s3:'Per the outcome', lock:0,
+        note:{ k:'risk', t:'When a finding sticks to a worker',
+               b:'If Delroy was paid for materials and cannot produce them, or the loss looks deliberate, <b>a person reviews it and decides.</b> Only where a human confirms it was malicious does it go on his record. <b>A dispute on its own never does</b>, because a client raising one in bad faith must not be able to damage a worker at will. Yaadly cannot hold his money in this period. <b>It decides who is offered the next job</b>, which for a worker building a book of work is the stronger lever of the two.' },
+        act:[{l:'Run it again', go:0, ghost:1}] }
+    ]);
+  }
+
+  function serviceSteps(){
+    var staged = S.svc === 'staged';
+    var name   = staged ? 'Condition Report' : 'Deposit Protection Check';
+    var full   = staged ? 245 : 149;
+    var dep    = staged ? 122.50 : full;
+    var gbp    = function(n){ return '£' + n.toFixed(2).replace(/\.00$/, ''); };
+    return [
+      { t:'You have a contractor and a bad feeling',
+        cap:'He has quoted, he wants 60% up front, and you are 4,000 miles away with no way to tell whether that is normal or a warning.',
+        where:'In your account. Nothing asked for yet.',
+        you:0, held:null, wk:0, ev:0, s1:'Nothing has left you', s3:'Nothing owed', lock:0,
+        act:[{l:'Book the free call', go:1}] },
+      { t:'Twenty minutes, free',
+        cap:'By the end of it you will know whether you actually need me. <b>If you do not, I will say so</b>, and it has cost you nothing.',
+        where:'In your account.',
+        you:0, held:null, wk:0, ev:0, s1:'Nothing has left you', s3:'Nothing owed', lock:0,
+        act:[{l:'Get the quote', go:2}] },
+      { t:'A firm price, in writing',
+        cap:'A '+name+' is <b>'+gbp(full)+'</b> at the founding rate. Fixed fee, not a percentage, and not an estimate that moves later. '
+            +(staged ? 'It is over £200, so it <b>splits into two stages</b>: '+gbp(dep)+' deposit now, '+gbp(full-dep)+' when the report is written. You never pay ahead for work that has not started.'
+                     : 'It is under £200, so it is <b>one payment</b>. Splitting a fee this size costs more in admin than it saves you.'),
+        where:'In your account.',
+        you:0, held:null, wk:0, ev:0, s1:'Quote seen', s3:'Nothing owed', lock:0,
+        pay:{ stage: staged ? 'Stage 1 of 2, deposit' : 'Stage 1 of 1',
+              what: name + (staged ? ', 50% deposit. Books the visit and starts the work.' : ', in full. 72 hour turnaround.'),
+              amt: gbp(dep), url:'pay.yaadly.co.uk/s/DPC-2207 &middot; your real link is unique to your booking',
+              issued:'<b>with your written quote, at step 2</b>, before anything starts. Emailed to you, and payable by card or by bank transfer against the invoice on 14 day terms.' },
+        act:[{l:'Pay ' + gbp(dep), go:3}] },
+      { t:'Paid, and nothing is held',
+        cap:'Card payment link, or bank transfer against an invoice on 14 day terms, and on the larger pieces a deposit now with the balance on delivery. <b>There is no holding on this journey</b>, because there is no worker and nobody to release it to. This is an ordinary professional fee, like paying a surveyor.',
+        where:'With Yaadly, as fee income.',
+        you:dep, held:null, wk:0, ev:0, s1:'Paid ' + gbp(dep), s3:'Work begins', lock:0,
+        act:[{l:'Open my portal', go:4}] },
+      { t:'The portal opens immediately',
+        cap:'A link and an access code the moment payment clears. The same portal a marketplace client gets. You can see the clock and what stage I am at, rather than waiting on an email.',
+        where:'With Yaadly.',
+        you:dep, held:null, wk:0, ev:0, s1:'Paid ' + gbp(dep), s3:'In progress', lock:0,
+        act:[{l:'Read the report, 72 hours', go:5}] },
+      { t:'His quote, checked against real numbers',
+        cap:'Contractor and quote against real Jamaican material costs and day rates. Payment structure, deposit exposure, scope, red flags, and a written go or no go. <b>A deposit only ever covers work already done</b>, and a report is refundable right up until it is issued, because the report is the thing you were buying.',
+        where:'With Yaadly. Earned.',
+        you:full, held:null, wk:0, ev:0, s1:'Paid ' + gbp(full), s3:'Delivered', lock:0,
+        pay: staged ? { stage:'Stage 2 of 2, balance', what:name+', balance on delivery. The report is released to you once this clears.',
+                        amt: gbp(full-dep), cta:'Pay the balance', url:'pay.yaadly.co.uk/s/DPC-2207-2 &middot; second link, same booking',
+                        issued:'<b>when the report is written, at step 5</b>, and not a day earlier. You have already seen the work exists before you are asked for the rest.' } : null,
+        act:[{l:'Run it again', go:0, ghost:1}] }
+    ];
+  }
+
+  function steps(){
+    return S.journey==='service' ? serviceSteps() : todaySteps();
+  }
+
+  function render(){
+    // Only the service journey is priced in pounds regardless. Both marketplace
+    // journeys, held and interim, follow the pay-from toggle.
+    var st = steps(), e = st[i], m = S.journey==='service' ? {c:'£'} : MONEY[S.pay];
+    mw.classList.toggle('service', S.journey==='service');
+    mw.classList.toggle('today', S.journey==='today');
+    mw.classList.toggle('open', !e.lock);
+    mw.classList.add('nohold');
+    mw.classList.toggle('warn', !!e.warn);
+    var fx = document.getElementById('mw-fx');
+    if(fx) fx.style.display = S.journey==='service' ? 'none' : '';
+
+    document.getElementById('mw-a1').textContent = S.journey==='service' ? ('£'+Number(e.you).toFixed(2).replace(/\.00$/,'')) : f(m, e.you);
+    document.getElementById('mw-s1').textContent = e.s1;
+    document.getElementById('mw-a3').textContent = S.journey==='service' ? ('£'+Number(e.you).toFixed(2).replace(/\.00$/,'')) : f(m, e.wk);
+    document.getElementById('mw-s3').textContent = e.s3;
+    document.getElementById('mw-w3').textContent = S.journey==='service' ? 'Yaadly has' : 'The worker has';
+    // Yaadly holds nothing on any journey, so the middle of this diagram stays
+    // empty from the first click to the last. That is the point of it.
+    document.getElementById('mw-held').textContent = f(m, 0);
+    document.getElementById('mw-lab').textContent = 'Yaadly holds';
+    document.getElementById('mw-lock').innerHTML = '<span class="lockem">🚫</span>';
+    document.getElementById('mw-cap').innerHTML = '<b>'+e.t+'.</b> '+e.cap;
+    document.getElementById('mw-where').textContent = e.where;
+    document.getElementById('mw-count').textContent = 'Step '+(i+1)+' of '+st.length;
+    document.getElementById('mw-back').disabled = i===0;
+
+    document.querySelectorAll('#mw-ev i').forEach(function(n,k){ n.classList.toggle('on', k < (e.ev||0)); });
+
+    var note = document.getElementById('mw-note'); note.innerHTML='';
+    if(e.note){
+      note.innerHTML = '<div class="mw-note '+(e.note.k||'')+'"><h5>'+e.note.t+'</h5><p>'+e.note.b+'</p></div>';
+    }
+
+    // The payment link is the thing a client actually receives, so the demo has
+    // to show it at the step that issues it rather than imply it with a button.
+    var pay = document.getElementById('mw-pay'); pay.innerHTML='';
+    if(e.pay){
+      var P = e.pay;
+      if(P.none){
+        pay.innerHTML = '<div class="mw-pay none">'
+          + '<div class="mw-pay-hd"><span class="mw-pay-tag">No payment link</span>'
+          + '<span class="mw-pay-stage">' + P.stage + '</span></div>'
+          + '<div class="mw-pay-body">' + P.why + '</div></div>';
+      } else {
+        pay.innerHTML = '<div class="mw-pay">'
+          + '<div class="mw-pay-hd"><span class="mw-pay-tag">Payment link</span>'
+          + '<span class="mw-pay-stage">' + P.stage + '</span></div>'
+          + '<div class="mw-pay-for">' + P.what + '</div>'
+          + '<div class="mw-pay-amt">' + P.amt + '</div>'
+          + '<button class="btn sm" id="mw-paybtn">' + (P.cta || 'Pay securely') + '</button>'
+          + '<div class="mw-pay-url">' + P.url + '</div>'
+          + '<div class="mw-pay-note"><b>Issued:</b> ' + P.issued + '</div></div>';
+      }
+    }
+
+    var act = document.getElementById('mw-act'); act.innerHTML='';
+    (e.act||[]).forEach(function(a){
+      var b=document.createElement('button');
+      // .ghost is not a class this stylesheet defines. The outline variant is
+      // .o and the destructive one is .warn.
+      b.className = 'btn sm' + (a.warn?' warn':(a.ghost?' o':''));
+      b.textContent = a.l;
+      b.onclick = function(){ go(a.go, a.set); };
+      act.appendChild(b);
+    });
+
+    var pb = document.getElementById('mw-paybtn');
+    if(pb && (e.act||[]).length) pb.onclick = function(){ go(e.act[0].go, e.act[0].set); };
+  }
+
+  mw.querySelectorAll('.mw-b').forEach(function(b){
+    b.onclick=function(){
+      S[b.dataset.k]=b.dataset.v;
+      mw.querySelectorAll('.mw-b[data-k="'+b.dataset.k+'"]').forEach(function(o){o.classList.toggle('on', o===b)});
+      // Changing the journey restarts it. Landing mid way through a journey you
+      // have not watched is not a demo, it is a puzzle.
+      if(b.dataset.k==='journey'){ i=0; S.outcome='approve'; }
+      if(i >= steps().length) i = steps().length-1;
+      render();
+    };
+  });
+  document.getElementById('mw-back').onclick=function(){ if(i>0){i--;render()} };
+  document.getElementById('mw-reset').onclick=function(){ i=0; S.outcome='approve'; render() };
+  render();
+})();
+</script>
+    <div class="sec">
+      <p class="kick m">The rule above every stage</p>
+      <h3 class="hx">Never more than a quarter, before anything exists</h3>
+      <p class="lead" style="margin-top:10px">Consumer guidance in the UK is consistent and we follow it: <b>never a deposit above 25%</b>, ideally nothing up front, or only enough to cover materials. Stage payments tied to milestones you can see, not to dates. <b>Never the final instalment until you have inspected the work.</b></p>
+      <div class="rule" style="margin-top:18px"><span>📐</span><div><b>Materials at cost are the one exemption</b>, and it is the guidance's own. Materials are a pass-through, not a deposit, and no fee is ever charged on them. So on a small job the materials stage can be more than a quarter of the total, and that is allowed. We say so on your quote rather than leaving you to count it.</div></div>
+      <div class="rule" style="margin-top:10px"><span>🧱</span><div><b>If there is nothing to buy, we do not take a deposit.</b> A one or two day job with no materials is paid in full on completion, nothing up front at all. That is what the trade does when it is done honestly, and asking for money on a one day job is a warning sign, not a standard.</div></div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">The ladder</p>
+      <h3 class="hx">Four shapes, by the size of the job</h3>
+      <div class="grid g2c" style="margin-top:22px">
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">Small, one to two days, nothing to buy</p>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Up front</span><span class="r" style="color:var(--tealb)">Nothing</span>
+            <span class="mut">On completion</span><span class="r">100%</span>
+            <span class="mut">Retention</span><span class="r">None</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">Up to £500, materials heavy</p>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Materials, on receipt and site photo</span><span class="r">at cost</span>
+            <span class="mut">Labour, on your approval</span><span class="r">100%</span>
+            <span class="mut">Retention</span><span class="r">None</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">£500 to £2,000</p>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Materials, on receipt</span><span class="r">at cost</span>
+            <span class="mut">Midpoint, milestone signed off</span><span class="r">40% of labour</span>
+            <span class="mut">Completion, you approve</span><span class="r">60% of labour</span>
+            <span class="mut">Retention, day 28</span><span class="r">5% of labour</span>
+          </div>
+        </div>
+        <div class="card">
+          <p class="kick" style="margin-bottom:10px">£2,000 and up</p>
+          <div class="feebox" style="font-size:13.5px">
+            <span class="mut">Sub-milestones, each capped at</span><span class="r">£500 to £1,000</span>
+            <span class="mut">Materials, per milestone</span><span class="r">at cost</span>
+            <span class="mut">Inspection before each release</span><span class="r">required</span>
+            <span class="mut">Retention, day 28</span><span class="r">5% of labour</span>
+          </div>
+          <p class="tiny" style="margin-top:12px">The cap is the real protection. No single unproven stage ever carries much more than £1,000 of your money.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">Naming a stage</p>
+      <h3 class="hx">If you cannot photograph it, it is not a stage</h3>
+      <p class="lead" style="margin-top:10px">"50% complete" and "after two weeks" are not triggers, they are guesses. Every trade has real ones: <b>strip out, first fix, plaster, second fix, snagging</b>. On a roof it is materials delivered, old roof stripped and deck exposed, membrane down, zinc fixed and flashing sealed, site cleared and filmed. Written in the trade's own words, agreed before the job, one photograph each.</p>
+    </div>
+
+    <div class="sec">
+      <p class="kick m">Materials</p>
+      <h3 class="hx">Who carries a loss, and when</h3>
+      <p class="lead" style="margin-top:10px">Your tradesperson buys the materials and you pay for them first, so he is never funding your job out of his own pocket. <b>You nominate and approve where they are stored overnight</b>, and nothing is released until you have.</p>
+      <div class="rule" style="margin-top:18px"><span>🌗</span><div><b>Recorded last thing every day he attends, and again first thing next morning.</b> Those two timestamps decide who carries a loss. <b>Gone during the working day, while they are in his hands: his loss. Gone overnight, from the place you approved, with the evening record showing them stored correctly: yours</b>, because they were locked on your property with him not there.</div></div>
+      <div class="rule" style="margin-top:10px"><span>📵</span><div><b>No evening record, no transfer.</b> The risk stays with him. The record is the thing that moves it. His tools are always his own risk, day or night, and never yours.</div></div>
+      <div class="rule" style="margin-top:10px"><span>🛡️</span><div><b>Check your insurance covers materials on site.</b> Cover on an unoccupied property is usually the most restricted there is. Yaadly does not insure materials.</div></div>
+    </div>
+
+    <div class="sec">
+      <div class="rule"><span>⚖️</span><div><b>Yaadly Ltd</b>, registered in England and Wales, company number <b>17358077</b>. We know the edge of our scope: boundaries go to a land surveyor, structures to a PERB engineer, title to an attorney. In writing, never guessed.</div></div>
+      <div class="ctarow" style="margin-top:20px">
+        <button class="btn sm" onclick="postJob()">Post a job, free</button>
+        <button class="btn o sm" onclick="go('services')">See the full fee page</button>
+      </div>
+    </div>
+</div>
+</section>
+
 <!-- ═══════════════ CLIENT PORTAL ═══════════════ -->
 <!-- ═══════════════ ADMIN DESK ═══════════════ -->
 <footer><div class="wrap"><div class="fgrid">
@@ -1946,13 +2486,13 @@ function marketTable(){
   ["Where do you operate?", "Yaadly is built for property work across <b>Jamaica</b>. We are <b>launching in Kingston and Portmore first</b>, with professional oversight on every job. Starting deep in one area is deliberate: it is how we keep every job verified rather than spreading thin. <b>More parishes open as we grow.</b> Elsewhere in Jamaica today? Message us anyway: professional services travel further than repairs, and you will be first to know when we reach your parish."],
   ["How does the money side work?", "<b>Your payment is held and released only when you approve the evidence.</b> The worker sees the money is real before starting, you see timestamped proof before anything is released. Nothing moves without your say so. Yaadly's own fee is separate from the worker's price, itemised on your quote, and explained in full below. Online holding opens shortly; until then the terms are agreed with you directly in writing before work starts."],
   ["What does it cost?", "<b>Professional services are priced on the page.</b> Every one shows the full price and the founding rate side by side, because a discount off a price nobody can actually buy is a misleading action under the Digital Markets, Competition and Consumers Act 2024. Deposit Protection Check from <b>&pound;149</b>, Visual Check from <b>&pound;95</b> a visit, Condition Report from <b>&pound;245</b>, Technical Sign-off from <b>&pound;245</b>, Oversight Retainer from <b>&pound;495</b> a month, Full Project Management 12 to 15% of build cost. Founding rates are limited to the first five clients per service. <a onclick=\"go('services')\" style=\"color:var(--tealb);cursor:pointer\">See the full list and what each one is priced against &rarr;</a><br><br><b>Property work through the marketplace</b> gets a written quote from the worker, benchmarked against real material costs and real day rates, confirmed <b>before any money moves</b>. No surprises after the fact, and no \"farrin price\": a client overseas pays what a client in Jamaica pays."],
-  ["What does Yaadly charge? Show me the breakdown.", "Yaadly is not free to run and you should see the cost before you commit, not after. On a marketplace job there are two fees, and both are charged <b>on labour only, never on materials</b>.<br><br><b>You pay a Guarantee &amp; Support fee of 15%</b> on top of the worker's labour price. That is what pays for vetting the worker, holding your money, checking the evidence, running a dispute if you raise one, and a person to call.<br><br><b>The worker pays 12%</b> of their labour price, so they keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave a worker, and they are never charged to join, never charged to quote, and never charged for a lead they did not win.<br><br><b>A &pound;300 labour job, in full:</b><div class=\"ex\"><div><span>Worker's labour price</span><span>&pound;300</span></div><div><span>Your Guarantee &amp; Support fee, 15%</span><span>&pound;45</span></div><div class=\"t\"><span>You pay</span><span>&pound;345</span></div><div><span>Worker's fee, 12%</span><span>&pound;36</span></div><div class=\"t\"><span>Worker receives</span><span>&pound;264</span></div></div><br>The rest, plainly. If we advance cash for materials there is a disclosed 5% admin charge. On very small jobs a minimum Guarantee &amp; Support fee applies, J$3,500 to J$4,500 depending on the trade, so on a small job the fee works out as a higher percentage. If you pay from abroad, the exchange rate we use carries a margin of about 2%. Paying from Jamaica in J$ skips that entirely. Inspections, Property Care visits and project management are priced separately and always shown before you book. Every fee that applies to your job is on your quote, itemised, before you agree to anything."],
+  ["What does Yaadly charge? Show me the breakdown.", "Yaadly is not free to run and you should see the cost before you commit, not after. On a marketplace job there are two fees, and both are charged <b>on labour only, never on materials</b>.<br><br><b>You pay a Guarantee &amp; Support fee of 15%</b> on top of the worker's labour price. That is what pays for vetting the worker, holding your money, checking the evidence, running a dispute if you raise one, and a person to call.<br><br><b>The worker pays 12%</b> of their labour price, so they keep 88%. <b>That rate is published but not currently charged</b>, because payments go directly from you to your tradesperson and nothing passes through Yaadly to deduct it from. It starts the day Yaadly holds payments, and workers are told before it does. That is more than TaskRabbit, Fiverr or Airtasker leave a worker, and they are never charged to join, never charged to quote, and never charged for a lead they did not win.<br><br><b>A &pound;300 labour job, in full:</b><div class=\"ex\"><div><span>Worker's labour price</span><span>&pound;300</span></div><div><span>Your Guarantee &amp; Support fee, 15%</span><span>&pound;45</span></div><div class=\"t\"><span>You pay</span><span>&pound;345</span></div><div><span>Worker's fee, 12%</span><span>&pound;36</span></div><div class=\"t\"><span>Worker receives</span><span>&pound;264</span></div></div><br>The rest, plainly. If we advance cash for materials there is a disclosed 5% admin charge. On very small jobs a minimum Guarantee &amp; Support fee applies, J$3,500 to J$4,500 depending on the trade, so on a small job the fee works out as a higher percentage. If you pay from abroad, the exchange rate we use carries a margin of about 2%. Paying from Jamaica in J$ skips that entirely. Inspections, Property Care visits and project management are priced separately and always shown before you book. Every fee that applies to your job is on your quote, itemised, before you agree to anything."],
   ["What do I actually get at the end of a job?", "A <b>signed Completion Report</b>, as a PDF that is yours to keep: the job summary, before and after photographs side by side, the verification record, the worker's own confirmation that what is written is what was done, and your approval with the payment record on the final page. It is drafted automatically from the evidence (the worker files one evidence package and writes no paperwork), confirmed by them, reviewed by a person, then delivered to you. Forward it to family, keep it with the house papers, show it to the next contractor."],
   ["Can I see the site live before I approve?", "Yes. At sign-off you can approve from the evidence package, or book a <b>live video walkthrough</b>: the worker walks the whole site with you on WhatsApp video, Google Meet or Zoom, whichever suits you. You raise anything you see on the spot, the notes are recorded, <b>you confirm them in your portal</b>, and both land on your Completion Report. On builds and larger works we also require a continuous <b>site overview video</b> as part of the evidence itself."],
   ["What if I am not happy with the work?", "Raise it before you approve. Disputes are reviewed by a person, not an algorithm. The worker gets a fair chance to make it right, and your money stays held until it is resolved."],
   ["Do I need to be in Jamaica?", "No. Most of our clients are overseas: London, New York, Toronto, anywhere. You review evidence and approve from your phone. That is the whole point."],
   ["How are workers vetted? Who is coming to my property?", "Nobody attends your property unverified. Before a first job, every worker shows <b>government photo ID</b> on a video call with us, proof of address dated within three months, and their TRN. They also give a <b>live photo taken in the moment</b> and a <b>short video turning their face slowly left, then right</b>. An upload proves somebody has a document. A live turn proves the person holding it is them, now.<br><br>A <b>police record check from the Jamaica Constabulary Force</b> is <b>mandatory</b> on any job over <b>&pound;500</b>, on any work inside an occupied home, and any time the worker holds keys or attends an empty property. Below &pound;500 with the owner present it is optional, and you can still require it at no cost to you. That line is drawn at &pound;500 because that is roughly where a job stops being a call-out and starts being someone's savings.<br><br>On top of that: references called rather than emailed, past work reviewed, and a trial job with <b>an independent reviewer on site at Yaadly's cost</b> before they are trusted with yours. Certified trades have their certification checked with the body that issued it. You are told who is coming, and you see their record before they arrive."],
-  ["I am a tradesperson. What does it cost to join, and how do I get paid?", "Joining is free, quoting is free, and you are never charged for a lead, win or lose. <b>The one charge is 12% of your labour price on a completed job</b>, taken when you are paid, so you keep 88%. That is more than TaskRabbit, Fiverr or Airtasker leave you, and your materials are never touched. Remote digital work carries 10% instead. The client pays their own separate fee on top of your price, so their total is higher than your quote, but not a cent of your 88% goes anywhere else. The client's money is confirmed before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own."],
+  ["I am a tradesperson. What does it cost to join, and how do I get paid?", "Joining is free, quoting is free, and you are never charged for a lead, win or lose. <b>The one charge is 12% of your labour price on a completed job</b>, taken when you are paid, so you keep 88%. <b>Right now it is not charged at all</b>, because the client pays you directly and nothing comes through us to take it from, so today you keep 100%. It begins the day Yaadly holds payments, and you will be told before that happens, not after. That is more than TaskRabbit, Fiverr or Airtasker leave you, and your materials are never touched. Remote digital work carries 10% instead. The client pays their own separate fee on top of your price, so their total is higher than your quote, but not a cent of your 88% goes anywhere else. The client's money is confirmed before you start, so you know it is real. Once your evidence is in and the client approves, you are paid <b>within 3 working days</b> by bank transfer, Lynk wallet or remittance pick up, whichever you chose. You can see what you are owed and what has been paid in your portal, and every completed job builds a record you own."],
   ["What kinds of work do you handle?", "Repairs and maintenance through to renovations: painting, plumbing, roofing, tiling, masonry, electrical and more. Plus professional services: deposit protection checks, project setup, oversight, contractor sourcing, full project management and property care visits."]
  ];
  var box=document.getElementById('faq'); if(!box) return;
