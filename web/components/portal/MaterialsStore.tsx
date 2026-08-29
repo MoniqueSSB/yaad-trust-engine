@@ -53,6 +53,9 @@ export function MaterialsStore({
 
   return (
     <section
+      /* The go-live checklist links here by name, so the id is load-bearing
+         rather than decoration. */
+      id="materials"
       className={
         "mt-6 rounded-2xl border p-5 " +
         (named ? "border-line bg-panel" : "border-coral/40 bg-coral/[.06]")
