@@ -78,26 +78,34 @@ export default async function ClientPortal() {
       )}
 
       {/*
-        The first screen after signing in, and the right place to say the one
-        thing standing between every one of these jobs and a tradesperson.
+        The first screen after signing in, and the right place to name what is
+        standing between these jobs and a tradesperson.
 
-        Each of them carries the badge "Waiting on your portal setup", which
-        names a state and leaves the reader to work out the action. There is
-        only one action, it clears all of them at once, and nothing said so.
+        This deliberately does NOT promise that signing clears them all. It
+        used to, and that was wrong: 20260828e also requires a nominated
+        materials store per job, and client_go_live() skips the jobs that
+        lack one rather than failing for the rest. A client who signed on
+        that promise would watch nothing happen. The per-job checklist in the
+        job room is the honest version, so this points at it instead of
+        guessing on its behalf.
       */}
       {waitingOnSetup > 0 && (
         <div className="mt-6 rounded-2xl border border-mango/30 bg-mango/10 p-5">
           <h2 className="font-display text-[18px] uppercase leading-none">
             {waitingOnSetup === 1
-              ? "One job is waiting on you"
-              : `${waitingOnSetup} jobs are waiting on you`}
+              ? "One job is not on the marketplace yet"
+              : `${waitingOnSetup} jobs are not on the marketplace yet`}
           </h2>
           <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
-            Sign the Client Guidelines and{" "}
-            {waitingOnSetup === 1 ? "it goes" : "they all go"} live together.
-            They set out what Yaadly does, what it charges, and what happens if
-            the work is wrong. Nothing reaches a tradesperson until you have
-            agreed to them, which is the point of them.
+            No tradesperson can see{" "}
+            {waitingOnSetup === 1 ? "it" : "them"} until a short list is done:
+            a confirmed email, a signed set of Client Guidelines, and, on each
+            job, where materials are to be kept on the property.
+          </p>
+          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
+            Signing is once, for all of them. The materials question is per
+            job, because the answer is about that property. Open a job below
+            and it shows you exactly what it is still waiting on.
           </p>
           <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
             Nothing is charged, and you are not committing to any quote.

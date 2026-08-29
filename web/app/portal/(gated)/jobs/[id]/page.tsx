@@ -13,7 +13,10 @@ import { DisputePanel } from "@/components/portal/DisputePanel";
 import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { FeeBreakdown } from "@/components/portal/FeeBreakdown";
 import { PortalCard } from "@/components/portal/PortalCard";
+import { JobBrief } from "@/components/portal/JobBrief";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
+import { GoLive, type Gate } from "@/components/portal/GoLive";
+import legal from "@/lib/legal-copy.json";
 import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 
@@ -93,7 +96,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by",
     )
     .eq("id", id)
     .maybeSingle();
@@ -143,6 +146,20 @@ export default async function JobRoom({
     .ilike("author_email", email)
     .maybeSingle();
 
+  /* The signature that opens the board, at the exact version in force. A
+     signature on an older version is not a signature for this purpose:
+     client_go_live() compares doc_version to current_doc_version() with =,
+     so "signed, but 1.2" and "never signed" are the same answer to Postgres
+     and must be the same answer here. */
+  const { data: cgSig } = await supabase
+    .from("doc_signatures")
+    .select("id")
+    .eq("doc_type", "client_guidelines")
+    .eq("doc_version", legal.CG_VERSION)
+    .ilike("signer_email", email)
+    .limit(1)
+    .maybeSingle();
+
   const ev = (evidence ?? []) as Evidence[];
   const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
@@ -183,6 +200,54 @@ export default async function JobRoom({
   const takeHome = labour == null ? null : Math.round(labour * 0.88) + (won?.materials_jmd ?? 0);
 
   const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
+
+  /* THE GO LIVE GATES.
+     Read off the triggers, in the order Postgres applies them, so the list a
+     client works through is the list the database is actually holding them
+     on. Each line here has a migration behind it; none of it is a house
+     style rule that could be relaxed in this file. */
+  const emailConfirmed = !!user.email_confirmed_at;
+  const signed = !!cgSig;
+  const storeNamed =
+    !!job.materials_store_type &&
+    (job.materials_store_type === "none_available" ||
+      (job.materials_store ?? "").trim() !== "");
+  /* open_jobs is open = true AND no worker AND stage 0. Past that point the
+     job is not "not live", it has moved on, and the checklist retires. */
+  const onBoard =
+    job.open === true && !job.worker_email && (job.stage ?? 0) === 0;
+  const movedOn = !!job.worker_email || (job.stage ?? 0) > 0 || job.status === "complete";
+
+  const gates: Gate[] = [
+    {
+      title: "Confirm your email address",
+      why: "Open the link Yaadly emailed you when you signed up. A job can be posted in anybody's name; a confirmed mailbox is what proves this one is yours.",
+      done: emailConfirmed,
+    },
+    {
+      title: `Sign the Client Guidelines, version ${legal.CG_VERSION}`,
+      why: "What Yaadly does, what it charges, and what happens if the work is wrong. Nothing reaches a tradesperson until you have agreed to them.",
+      done: signed,
+      href: "/portal/guidelines",
+      cta: "Read and sign",
+    },
+    {
+      title: "Say where materials are kept",
+      why: "A worker cannot price this honestly without it. With nowhere securable he buys in drops and drives the surplus off site each night, and those trips belong in his quote.",
+      done: storeNamed,
+      href: jobBase + "#materials",
+      cta: "Answer it",
+    },
+  ];
+
+  /* The board carries the trade filter so the job is not one card in a list
+     of everything, and the anchor puts it under the reader's eye rather than
+     somewhere on the page. */
+  const marketplaceHref =
+    "/jobs?" +
+    (job.trade ? "trade=" + encodeURIComponent(job.trade) + "&" : "") +
+    "q=" + encodeURIComponent(job.id) +
+    "#" + encodeURIComponent(job.id);
   const approvedPack = pk.find((x) => x.status === "approved") ?? pk[0];
   const docs: Doc[] = [
     {
@@ -289,42 +354,27 @@ export default async function JobRoom({
 
       {/*
         "Waiting on your portal setup" names a state and leaves the reader to
-        guess the action. The state is real: enforce_signed_before_open needs a
-        signed set of current Client Guidelines AND a client_profiles row
-        before a job can go out to workers, and until both exist the job sits
-        here and nobody sees it.
+        guess the action, so the actions go here, in the order the database
+        applies them.
 
-        But there is exactly one thing to do about it, and the client had no
-        way to know that from the badge. Signing does both halves: the
-        signature is recorded and client_go_live() writes the profile and opens
-        every job that was waiting only on this. So say it, and link to it.
+        This replaces a banner that said signing the Client Guidelines was
+        "the whole list". It is not, and saying so was the specific way this
+        breaks: 20260828e made a nominated materials store a condition of
+        reaching the board, and client_go_live() SKIPS any job without one
+        rather than failing the statement for the client's other jobs. A
+        client who believed that banner would sign, watch nothing happen, and
+        have nothing left to try.
 
-        Workers see the same badge on their own jobs and can do nothing about
-        it, so this is for the client only.
+        Workers see the same stuck job and can clear none of it, so the
+        checklist is the client's alone.
       */}
-      {role === "client" && job.status === "awaiting_client_setup" && (
-        <div className="mt-5 rounded-2xl border border-mango/30 bg-mango/10 p-5">
-          <h2 className="font-display text-[17px] uppercase leading-none">
-            One thing left before this job goes anywhere
-          </h2>
-          <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
-            Sign the Client Guidelines. That is the whole list. They set out
-            what Yaadly does, what it charges, and what happens if the work is
-            wrong, and nothing reaches a tradesperson until you have agreed to
-            them.
-          </p>
-          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
-            Signing opens this job and any other job of yours that is waiting
-            on the same thing. Nothing is charged, and you are not committing
-            to any quote.
-          </p>
-          <Link
-            href="/portal/guidelines"
-            className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
-          >
-            Read and sign the Client Guidelines
-          </Link>
-        </div>
+      {role === "client" && !movedOn && (
+        <GoLive
+          jobId={job.id}
+          gates={gates}
+          live={onBoard}
+          marketplaceHref={marketplaceHref}
+        />
       )}
 
       <StageRail
@@ -368,14 +418,11 @@ export default async function JobRoom({
       />
 
       {job.descr && (
-        <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
-          <h2 className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-            The job, as agreed
-          </h2>
-          <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-mute">
-            {job.descr}
-          </p>
-        </div>
+        <JobBrief
+          descr={job.descr}
+          trade={job.trade}
+          parish={job.parish}
+        />
       )}
 
       <section className="mt-8">

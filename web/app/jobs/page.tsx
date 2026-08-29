@@ -165,7 +165,7 @@ export default async function Board({
                   STORE_LABEL[j.materials_store_type ?? ""]].filter(Boolean) as string[];
                 const open = q === j.id;
                 return (
-                  <div key={j.id} className={"rounded-2xl border bg-panel p-5 " + (fresh ? "border-mango/50 bg-mango/[.045]" : "border-line")}>
+                  <div key={j.id} id={j.id} className={"scroll-mt-6 rounded-2xl border bg-panel p-5 " + (fresh ? "border-mango/50 bg-mango/[.045]" : "border-line")}>
                     <div className="flex flex-wrap items-start gap-3">
                       <h2 className="min-w-[220px] flex-1 text-[16.5px] font-bold leading-snug">{j.title ?? "Job"}</h2>
                       <span className="flex flex-wrap gap-2">
