@@ -34,8 +34,12 @@ export default async function Guidelines({
     .in("doc_type", ["client_guidelines", "worker_guidelines"]);
 
   const docs = [
-    { key: "client_guidelines", label: "Client Guidelines", version: legal.CG_VERSION, sections: legal.client_guidelines as Sec[] },
-    { key: "worker_guidelines", label: "Worker Guidelines", version: legal.WG_VERSION, sections: legal.worker_guidelines as Sec[] },
+    // version is the bare number and nothing else. It is what goes into
+    // doc_signatures and what current_doc_version() compares against, so a
+    // date living inside it would be a date the go-live gate had to match.
+    // The date is carried separately and is display only.
+    { key: "client_guidelines", label: "Client Guidelines", version: legal.CG_VERSION, date: legal.CG_DATE, sections: legal.client_guidelines as Sec[] },
+    { key: "worker_guidelines", label: "Worker Guidelines", version: legal.WG_VERSION, date: legal.WG_DATE, sections: legal.worker_guidelines as Sec[] },
   ];
 
   return (
@@ -58,7 +62,7 @@ export default async function Guidelines({
           <section key={d.key} className="mt-5 rounded-2xl border border-line bg-panel p-5">
             <div className="flex flex-wrap items-center gap-3">
               <b className="text-[15.5px]">{d.label}</b>
-              <span className="text-[12px] text-dim">Version {d.version}</span>
+              <span className="text-[12px] text-dim">Version {d.version} · {d.date}</span>
               {sig ? (
                 <span className="ml-auto rounded-full border border-softline bg-soft px-3 py-1 text-[11px] font-bold text-tealb">
                   ✓ Signed {String(sig.signed_at).slice(0, 10)}
@@ -92,7 +96,7 @@ export default async function Guidelines({
                       className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal" />
                   </label>
                   <button className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-[#04211D]">
-                    Sign {d.label} {d.version.split(" ")[0]}
+                    Sign {d.label} v{d.version}
                   </button>
                   <p className="w-full text-[11.5px] leading-relaxed text-dim">
                     Written to doc_signatures with a timestamp, the exact

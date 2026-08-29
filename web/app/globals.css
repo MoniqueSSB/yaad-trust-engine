@@ -138,3 +138,21 @@ body {
    would satisfy it, because a checklist you cannot act on is decoration. */
 .vitem{width:100%;text-align:left;background:none;cursor:pointer;transition:.13s}
 .vitem:hover b{color:var(--tealb)}
+
+/* ── The signed documents ────────────────────────────────────────────────
+   The guidelines are stored as HTML fragments and rendered into .doc-body.
+   Tailwind's preflight strips list markers and heading weights, so until
+   this existed the terms people sign rendered as one unbroken run of text
+   with the callouts and the amendment notes indistinguishable from the
+   clauses around them. A document nobody can read is not a document
+   anybody agreed to, so it gets the small amount of CSS it needs. */
+.doc-body ul{list-style:disc;padding-left:20px;margin:6px 0 10px}
+.doc-body li{margin-bottom:7px}
+.doc-body p{margin:0 0 9px}
+.doc-body b{color:var(--ink)}
+.doc-body h4{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--tealb);margin:14px 0 7px}
+.doc-body .callout{border:1px solid var(--softline);background:var(--soft);border-radius:11px;padding:12px 13px;margin:10px 0}
+.doc-body .callout.warn{border-color:rgba(255,176,32,.34);background:rgba(255,176,32,.07)}
+/* An amendment note is the history of the clause above it, not a clause.
+   It reads as a margin note because that is what it is. */
+.doc-body .amend{border-left:2px solid var(--line2);padding-left:11px;margin:10px 0 0;font-size:12px;color:var(--dim)}

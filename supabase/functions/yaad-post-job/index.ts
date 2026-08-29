@@ -62,8 +62,24 @@ function buildDescr(b: Record<string, unknown>) {
   ].filter(Boolean).join("\n");
 }
 
+/** The client's answer to where materials are kept, mapped to the three codes
+ *  jobs_materials_store_type_chk permits.
+ *
+ *  Mapped HERE rather than posted as a code from the page, so a stale cached
+ *  copy of yaadly.co.uk cannot write a value the database has never heard of.
+ *  Anything unrecognised becomes null, and null is refused by the materials
+ *  gate rather than quietly passing as an answer. Fail closed: an unanswered
+ *  question about who carries a stolen load is the one thing that must not
+ *  slip through as a blank. */
+const STORE_TYPE: Record<string, string> = {
+  "a lockable room, store or container on site": "lockable",
+  "indoors, inside the house": "indoors",
+  "nowhere securable, buy in drops": "none_available",
+};
+
 /** Columns the job card maps onto one-for-one. */
 function cardCols(b: Record<string, unknown>) {
+  const storeType = STORE_TYPE[s(b.materialsStore).toLowerCase()] ?? null;
   return {
     trade: s(b.workType) || null,
     trade_source: s(b.workType) ? "wizard" : null,
@@ -71,6 +87,12 @@ function cardCols(b: Record<string, unknown>) {
     size_band: s(b.sizeBand) || null,
     access_type: s(b.accessType) || null,
     materials_by: s(b.materialsBy) || null,
+    // Free text, and it names where the valuable things are kept on a property
+    // that is often empty. open_jobs publishes the type and withholds this.
+    materials_store: storeType === "none_available"
+      ? null
+      : (s(b.materialsStoreWhere).slice(0, 160) || null),
+    materials_store_type: storeType,
     urgency: s(b.urgency) || null,
     budget_band: s(b.budgetBand) || null,   // never published, see open_jobs
   };
@@ -311,7 +333,7 @@ Deno.serve(async (req: Request) => {
     const password = String(b.password ?? "");
     const sig      = s(b.signature);
     const consent  = s(b.consentText);
-    const version  = s(b.guidelinesVersion) || "1.0";
+    let version   = s(b.guidelinesVersion);
 
     if (!jobId) return json({ error: "That draft could not be found. Start again and it will save as you go." }, 400);
     if (!name) return json({ error: "Your name is needed." }, 400);
@@ -364,6 +386,30 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Could not attach your signature to an account. Message Yaadly." }, 502);
     }
     const confirmed = Boolean(user.email_confirmed_at ?? (user as { confirmed_at?: string }).confirmed_at);
+
+    // The version the page DISPLAYED is what gets recorded, because a signature
+    // belongs to the words the person actually read. A stale cached page
+    // signing 1.2 records 1.2, and the portal then asks them to re-sign the
+    // current one, which is exactly what versioned signatures are for.
+    //
+    // The fallback is the one thing that must not be a guess. It used to be the
+    // literal "1.0", which quietly stamped a signature against a version nobody
+    // had seen, and which drifted out of step with app_settings the moment the
+    // wording moved on. Ask the database what is in force instead.
+    //
+    // Resolved here rather than with the other fields above so that a request
+    // missing a name is told about the name, not billed a database round trip
+    // and then told something about guidelines versions.
+    if (!version) {
+      const { data: cur } = await admin.from("app_settings")
+        .select("value").eq("key", "client_guidelines_version").maybeSingle();
+      version = s(cur?.value);
+      root.setAttributes({ "yaadly.guidelines.version_from": "app_settings" });
+    }
+    if (!version) {
+      root.recordError("no guidelines version available to stamp");
+      return json({ error: "Could not confirm which Client Guidelines you signed. Nothing was recorded, and nothing was charged. Message Yaadly." }, 500);
+    }
 
     // The signature. One row per version: signing again for a new version is a
     // new row, never an edit of the old one.

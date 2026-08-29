@@ -502,6 +502,14 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 // heading, the loader, the search box and the empty state are all built from
 // it. Bespoke views (overview, invoices, sketch) opt out with bespoke:true
 // and own their own markup.
+//
+// ACTIONS come in two shapes. The plain one is a column write: set:{...} on
+// the row you opened. The second asks for values first, and exists because
+// some facts cannot be a fixed button: ask:[...] draws a small form in the
+// drawer, and rpc/args send the answers to a Postgres function instead of
+// writing columns directly. Anything with a rule behind it goes through an
+// rpc, so the rule is checked in the database whoever is calling, and this
+// page is only ever the form in front of it.
 
 const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
@@ -614,11 +622,11 @@ const VIEWS = [
 
   { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",
     title:"Jobs", table:"jobs",
-    sub:"Every job and where it has got to, including everything that arrives by WhatsApp, email and the website form. What somebody actually typed is under In their own words, kept exactly as they wrote it. Hover to read the whole thing. A budget band is the client's private figure and is never shown here.",
+    sub:"Every job and where it has got to, including everything that arrives by WhatsApp, email and the website form. What somebody actually typed is under In their own words, kept exactly as they wrote it. Hover to read the whole thing. A budget band is the client's private figure and is never shown here. Materials store is where the client said materials are to be kept: until that is answered the database will not let a materials tranche or materials evidence be recorded at all.",
     // Every column except budget_band, named one by one on purpose. "*" plus a
     // hide list would still fetch the client's private figure into this page
     // and merely decline to draw it. The rule is that it never arrives.
-    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,urgency",
+    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency",
     order:"updated_at", search:["id","title","parish","client_name","client_phone","worker_name","trade","descr"],
     empty:["No jobs yet","A job appears here once somebody writes in by WhatsApp, email or the website form."],
     cols:[
@@ -627,6 +635,7 @@ const VIEWS = [
       {h:"Client", f:r => esc(r.client_name || "none") + sub_(r.client_phone || r.client_email || "no way to reply")},
       {h:"In their own words", f:r => ownWords(r.descr)},
       {h:"Worker", f:r => r.worker_name ? esc(r.worker_name) : mute_("not chosen")},
+      {h:"Materials store", f:r => matStore(r)},
       {h:"Stage", f:r => stageBar(r.stage)},
       {h:"Owed", n:true, f:r => r.owed ? jmd(r.owed) : mute_("none")},
       {h:"State", f:r => tone_(r.status || (r.open ? "open" : "closed"))},
@@ -644,6 +653,30 @@ const VIEWS = [
       { label:"Cancel this job", cls:"d", when:r => r.status !== "cancelled",
         set:{ status:"cancelled", open:false },
         says:r => `Marks ${r.id} cancelled and takes it off the board. The row stays on the record.` },
+      // Where materials are kept is the client's answer, not yours, and it is
+      // what decides who carries the loss if they are stolen. This button is
+      // for writing down what they told you on the phone; if they are in
+      // their portal, let them answer it there themselves. Postgres checks
+      // the rule either way, so a typo here is refused rather than recorded.
+      { label:"Record where materials are kept", cls:"g",
+        rpc:"nominate_materials_store",
+        ask:[
+          { k:"type", label:"What the client said",
+            from:r => r.materials_store_type || "",
+            options:[
+              ["lockable","A lockable room, store or container on site"],
+              ["indoors","Indoors, inside the house"],
+              ["none_available","Nowhere securable, buy in drops"],
+            ] },
+          { k:"where", label:"Which room or store, in their words", type:"text",
+            placeholder:"the back room off the veranda, key with my aunt",
+            from:r => r.materials_store || "",
+            hideWhen:v => v.type === "none_available" },
+        ],
+        args:(r, v) => ({ p_job:r.id, p_type:v.type, p_where:v.where }),
+        says:r => r.materials_store_type
+          ? `Replaces the nomination on ${r.id}. The change is stamped against you and the old one stays in the record. It cannot be removed once a materials tranche or materials evidence exists against it.`
+          : `Records where the client wants materials kept on ${r.id}. Until this is in, no materials tranche and no materials evidence can be recorded against this job. "Nowhere securable" is a real answer: the worker then buys in drops sized to the next stage and takes the surplus away nightly, priced at quote time.` },
     ]},
 
   { k:"evid", g:"Run the day", label:"Evidence", icon:"photo",
@@ -950,6 +983,32 @@ function ownWords(descr){
   const waiting = /Still gathering/i.test(raw);
   return `<span title="${esc(flat)}">${esc(cut)}</span>`
        + (waiting ? sub_("still gathering, the assistant has asked for more") : "");
+}
+
+// Where the client said materials are to be kept, and whether they said at
+// all. This is not decoration: no materials tranche and no materials evidence
+// can be recorded against a job with nothing here, because the database
+// refuses both. A coral chip is therefore a job that cannot pay a worker for
+// his receipt yet, and the fix is a phone call to the client, not a form.
+// "Nowhere securable" is a real answer, and it puts the job on drops sized to
+// the next stage with the surplus removed nightly, priced at quote time.
+const MAT_STORE = {
+  lockable:      ["ok",   "lockable store"],
+  indoors:       ["ok",   "indoors"],
+  none_available:["warn", "nowhere securable"],
+};
+function matStore(r){
+  const m = MAT_STORE[String(r.materials_store_type || "")];
+  if (!m) return chip_("crit", "not nominated") + sub_("no materials release possible");
+  const flat = String(r.materials_store || "").trim().replace(/\s+/g, " ");
+  const cut = flat.length > 44 ? flat.slice(0, 44) + "\u2026" : flat;
+  const who = String(r.materials_store_set_by || "").trim();
+  // Who named the place and when is what a dispute over a stolen load turns
+  // on, so it hangs off the cell rather than living only in the row.
+  const said = [who ? "named by " + who : "", day_(r.materials_store_set_at)].filter(Boolean).join(", ");
+  return chip_(m[0], m[1])
+       + (cut ? `<span class="sub" title="${esc(flat + (said ? " (" + said + ")" : ""))}">${esc(cut)}</span>`
+              : sub_(said || "buys in drops, surplus off site nightly"));
 }
 
 // A stage number rendered as the platform's segmented bar. Teal is done,
@@ -1586,16 +1645,93 @@ function openDetail(k, i){
   });
 }
 
-async function runAction(k, a, row, btn){
+// An asking action draws its form where the confirm dialog would have been.
+// A browser confirm can only ever ask yes or no, and some facts are neither:
+// where the client wants the materials kept is a sentence, and a button
+// cannot hold one.
+function drawAsk(k, a, row, btn){
+  const fields = a.ask.map((f, n) => {
+    const cur = f.from ? f.from(row) : "";
+    const control = f.options
+      ? `<select data-ask="${n}"><option value="">Choose&hellip;</option>`
+        + f.options.map(([val, lab]) =>
+            `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(lab)}</option>`).join("")
+        + `</select>`
+      : `<input data-ask="${n}" maxlength="160" value="${esc(cur)}" placeholder="${esc(f.placeholder || "")}">`;
+    return `<div data-askrow="${n}"><label>${esc(f.label)}</label>${control}</div>`;
+  }).join("");
+
+  $("drwMsg").innerHTML = `<div class="card" style="margin-top:12px">
+      <div class="row" style="margin-bottom:0" id="askRow">${fields}</div>
+      <div class="brow" style="margin-top:12px">
+        <button class="btn" id="askGo">${esc(a.label)}</button>
+        <button class="btn g" id="askNo">Leave it</button>
+      </div>
+      <div id="askMsg"></div>
+    </div>`;
+  btn.disabled = true;
+
+  // A field can be beside the point once another is answered: there is no room
+  // to describe when the answer is that there is no room. Hidden means not
+  // asked and not sent, so the desk cannot record a description of a place the
+  // same form has just said does not exist.
+  const collect = () => {
+    const vals = {};
+    $("askRow").querySelectorAll("[data-ask]").forEach((el) => {
+      const f = a.ask[Number(el.dataset.ask)];
+      const hidden = el.closest("[data-askrow]").classList.contains("hidden");
+      vals[f.k] = hidden ? "" : (el.value || "").trim();
+    });
+    return vals;
+  };
+  const redraw = () => {
+    const vals = collect();
+    a.ask.forEach((f, n) => {
+      if (!f.hideWhen) return;
+      $("askRow").querySelector(`[data-askrow="${n}"]`).classList.toggle("hidden", !!f.hideWhen(vals));
+    });
+  };
+  $("askRow").addEventListener("change", redraw);
+  redraw();
+
+  $("askNo").addEventListener("click", () => { $("drwMsg").innerHTML = ""; btn.disabled = false; });
+  $("askGo").addEventListener("click", async () => {
+    const vals = collect();
+    $("askMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Writing.</div>';
+    const err = await writeAction(k, a, row, vals);
+    if (err) {
+      // As Postgres said it. The function refusing this is the rule working,
+      // and rewording it would hide which rule fired.
+      $("askMsg").innerHTML = `<div class="msg err"><b>The database refused this.</b><br>${esc(err)}</div>`;
+      return;
+    }
+    await loadTableView(k);
+    closeDrawer();
+  });
+}
+
+// The one place a drawer action reaches the database. A plain action writes
+// columns; an rpc action calls a function, which is where anything with a
+// rule behind it belongs, because the rule then holds for the portal and the
+// wizard too and not only for whoever is looking at this page.
+async function writeAction(k, a, row, vals){
   const v = VIEW[k];
+  const { error } = a.rpc
+    ? await sb.rpc(a.rpc, a.args(row, vals))
+    : await sb.from(v.table).update(a.set).eq(pkOf(k), row[pkOf(k)]);
+  return error ? error.message : null;
+}
+
+async function runAction(k, a, row, btn){
+  if (a.ask) return drawAsk(k, a, row, btn);
   if (!confirm((a.says ? a.says(row) + "\n\n" : "") + a.label + "?")) return;
   btn.disabled = true;
   $("drwMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Writing.</div>';
-  const { error } = await sb.from(v.table).update(a.set).eq(pkOf(k), row[pkOf(k)]);
-  if (error) {
+  const err = await writeAction(k, a, row, {});
+  if (err) {
     // Shown as Postgres said it. A trigger refusing this is the trigger doing
     // its job, and rewording it would hide which rule fired.
-    $("drwMsg").innerHTML = `<div class="msg err"><b>The database refused this.</b><br>${esc(error.message)}</div>`;
+    $("drwMsg").innerHTML = `<div class="msg err"><b>The database refused this.</b><br>${esc(err)}</div>`;
     btn.disabled = false;
     return;
   }
