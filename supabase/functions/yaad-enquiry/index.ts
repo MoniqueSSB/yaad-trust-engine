@@ -28,6 +28,14 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // thing that must survive: Monique can always reply by hand from the desk.
 // The receipt is a courtesy, and its outcome is recorded on the row so she can
 // see who has heard from us and who has not.
+//
+// Two things go out, not one. The receipt goes to the person who wrote in, and
+// a copy of what they wrote goes to the desk address in app_settings. The push
+// notification alone was not enough: it is deliberately anonymous, so it says
+// a question arrived and nothing about who asked or what they need, and the
+// enquiry itself then lived only in a table nobody opens at eight in the
+// evening. The site promises an answer within 24 hours. A promise that depends
+// on somebody remembering to go and look is not a promise.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -184,10 +192,10 @@ Deno.serve(async (req: Request) => {
 
   // ── the receipt ─────────────────────────────────────────────────────────
   let emailed = false;
+  const when = new Date().toUTCString();
   if (willEmail && !RESEND_KEY) {
     root.recordError("RESEND_API_KEY is not set on this project, enquiry receipt not sent");
   } else if (willEmail) {
-    const when = new Date().toUTCString();
     const text =
 `Thank you, ${name}. Your message reached Yaadly.
 
@@ -274,19 +282,104 @@ with this address. If that was not you, ignore it. Nothing else happens.`;
       if (Math.random() < 0.05) {
         try { await admin.rpc("enquiry_attempts_sweep"); } catch (_) { /* housekeeping only */ }
       }
-      // The site promises a reply within 24 hours, so something has to say an
-      // enquiry landed. No name, no address, no number leaves for the relay:
-      // only the topic, which is a menu choice, and whether they can be
-      // emailed back.
-      const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
-      if (!st?.value) return;
-      await fetch(`https://ntfy.sh/${st.value}`, {
-        method: "POST",
-        headers: { Title: "New Yaadly enquiry", Priority: "default", Tags: "envelope" },
-        body: `${topic || "A question"}. ${email ? "Receipt sent, reply by email." : "No email given, reply on WhatsApp."} Promised within 24 hours.`,
-        signal: AbortSignal.timeout(4000),
-      });
-    } catch (_) { /* never let telemetry or notification break an enquiry */ }
+    } catch (_) { /* a missed counter must never break an enquiry */ }
+
+    // Read once, use twice. The push and the desk copy are independent of each
+    // other on purpose: before this, the push was fetched first and returned
+    // early when no topic was configured, which would have taken the email
+    // with it.
+    let cfg: Record<string, string> = {};
+    try {
+      const { data: rows } = await admin.from("app_settings")
+        .select("key,value").in("key", ["ntfy_topic", "admin_email"]);
+      // Some values in this table were written as JSON and carry their quotes
+      // (desk_url is one). Strip a single surrounding pair rather than trust
+      // every writer to have been consistent.
+      cfg = Object.fromEntries((rows ?? []).map((r) =>
+        [r.key, String(r.value ?? "").trim().replace(/^"(.*)"$/, "$1")]));
+    } catch (_) { /* both notifications degrade to nothing, the row still stands */ }
+
+    // The push: a nudge on a phone, not the enquiry. No name, no address, no
+    // number leaves for the relay: only the topic, which is a menu choice, and
+    // whether they can be emailed back.
+    if (cfg.ntfy_topic) {
+      try {
+        await fetch(`https://ntfy.sh/${cfg.ntfy_topic}`, {
+          method: "POST",
+          headers: { Title: "New Yaadly enquiry", Priority: "default", Tags: "envelope" },
+          body: `${topic || "A question"}. ${email ? "Receipt sent, reply by email." : "No email given, reply on WhatsApp."} Promised within 24 hours.`,
+          signal: AbortSignal.timeout(4000),
+        });
+      } catch (_) { /* a nudge that did not arrive is not worth a failed request */ }
+    }
+
+    // The desk copy: everything, to the address she actually reads. Unlike the
+    // job summaries out of yaad-inbound, this one does carry Reply-To, because
+    // an enquiry has no thread in the desk to be pulled out of. The receipt
+    // told the person "just reply to this email", so replying is the channel,
+    // and hitting reply here has to land on them rather than on the relay.
+    if (cfg.admin_email && RESEND_KEY) {
+      const heard = !email
+        ? "No email address given, so they have heard nothing. Reply on WhatsApp."
+        : emailed
+        ? "A receipt has gone to them, so they know it arrived."
+        : "The receipt did not send. As far as they know, nothing arrived.";
+
+      const text =
+`${name} sent an enquiry through yaadly.co.uk.
+
+Reach them: ${contact}
+About: ${topic || "not said"}
+Sent: ${when}
+
+${message}
+
+--
+${heard}
+Answer within 24 hours, that is what the page promises.`;
+
+      const html =
+`<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
+<p style="margin:0 0 14px"><b>${esc(name)}</b> sent an enquiry through yaadly.co.uk.</p>
+<table style="border-collapse:collapse;font-size:14px;margin-bottom:16px">
+<tr><td style="padding:4px 14px 4px 0;color:#67807a;white-space:nowrap">Reach them</td><td style="padding:4px 0">${esc(contact)}</td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#67807a;white-space:nowrap">About</td><td style="padding:4px 0">${esc(topic || "not said")}</td></tr>
+<tr><td style="padding:4px 14px 4px 0;color:#67807a;white-space:nowrap">Sent</td><td style="padding:4px 0">${esc(when)}</td></tr>
+</table>
+<div style="margin:0 0 18px;padding:14px 16px;border-radius:12px;background:#f2f7f5;border:1px solid #dbe7e3;white-space:pre-wrap">${esc(message)}</div>
+<p style="margin:0;font-size:12.5px;color:#67807a">${esc(heard)}<br>Answer within 24 hours, that is what the page promises.</p>
+</div>`;
+
+      try {
+        const r = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: `Yaadly <${FROM_EMAIL}>`,
+            to: [cfg.admin_email],
+            // Only when they gave an address. Reply-To pointing at a phone
+            // number is a bounce waiting to happen.
+            ...(email ? { reply_to: email } : {}),
+            subject: `New enquiry from ${name}, ${topic || "no topic given"}`,
+            text,
+            html,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        // console, not the trace. Everything in here runs after the response
+        // has gone and the trace has already been flushed, so a span recorded
+        // now is a span nobody ever sees. Worth saying loudly somewhere: if
+        // these stop arriving, the 24 hour promise is being missed and nothing
+        // else in the system says so.
+        if (!r.ok) console.error("enquiry desk copy", r.status, (await r.text()).slice(0, 200));
+      } catch (e) {
+        console.error("enquiry desk copy failed:", String(e).slice(0, 200));
+      }
+    } else if (!cfg.admin_email) {
+      console.error("app_settings.admin_email is not set, enquiry desk copy not sent");
+    } else {
+      console.error("RESEND_API_KEY is not set, enquiry desk copy not sent");
+    }
   })();
   const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
   if (rt?.waitUntil) rt.waitUntil(after);
