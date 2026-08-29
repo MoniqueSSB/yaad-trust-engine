@@ -379,13 +379,22 @@ Deno.serve(async (req: Request) => {
     // Find the user so the signature can be attributed. doc_signatures.signer_user
     // is NOT NULL by design: a signature that is not tied to an account is not a
     // signature, it is a checkbox.
-    const { data: list } = await admin.auth.admin.listUsers();
-    const user = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
-    if (!user) {
-      root.recordError("user not found after create");
+    //
+    // Asked of Postgres by email, not read off a page of accounts.
+    // listUsers() hands back the first fifty and no warning that there are
+    // more, so the moment Yaadly passes fifty auth users a client whose row
+    // sits on page two stops being found. Everything about that request is
+    // correct, and it fails anyway: no signature, no open job, and an error
+    // message that tells them to message us rather than saying what happened.
+    // The count only ever goes up, so this had one direction to fail in.
+    const { data: found, error: lookupErr } = await admin
+      .rpc("auth_user_by_email", { p_email: email })
+      .maybeSingle<{ user_id: string; confirmed_at: string | null }>();
+    if (lookupErr || !found) {
+      root.recordError(lookupErr ? `user lookup: ${lookupErr.message}` : "user not found after create");
       return json({ error: "Could not attach your signature to an account. Message Yaadly." }, 502);
     }
-    const confirmed = Boolean(user.email_confirmed_at ?? (user as { confirmed_at?: string }).confirmed_at);
+    const confirmed = Boolean(found.confirmed_at);
 
     // The version the page DISPLAYED is what gets recorded, because a signature
     // belongs to the words the person actually read. A stale cached page
@@ -414,7 +423,7 @@ Deno.serve(async (req: Request) => {
     // The signature. One row per version: signing again for a new version is a
     // new row, never an edit of the old one.
     const { error: sigErr } = await admin.from("doc_signatures").insert({
-      signer_user: user.id,
+      signer_user: found.user_id,
       signer_email: email,
       signer_name: sig,
       doc_type: "client_guidelines",
