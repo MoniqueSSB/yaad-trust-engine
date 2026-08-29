@@ -20,7 +20,17 @@ import { useSearchParams } from "next/navigation";
  *
  * Public sign-up is switched off in Auth on purpose. The job code is the only
  * door, it is checked server side by yaad-portal-signup with rate limiting on
- * verify_portal_code, and nothing here can talk its way past that.
+ * pend_portal_code, and nothing here can talk its way past that.
+ *
+ * The email typed here is not checked against the job, it is attached to it.
+ * A job that arrived on WhatsApp has a phone number and no email, so there was
+ * nothing to check against and the door never opened for anyone who came that
+ * way.
+ *
+ * The attaching happens when the confirmation link is clicked, not when this
+ * form is submitted. Somebody typing their own address wrong on a phone is the
+ * likeliest thing that goes wrong here, and this way it costs them a retry
+ * rather than their job.
  */
 
 const SIGNUP = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/yaad-portal-signup`;

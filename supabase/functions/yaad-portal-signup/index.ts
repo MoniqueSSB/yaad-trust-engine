@@ -13,20 +13,43 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // The only way to make the claim true is to close public sign-up in Auth and
 // create accounts here, behind the check. That is what this does.
 //
-//   client -> must present the portal code for a job or service that carries
-//             their email. verify_portal_code() also rate limits: five wrong
-//             answers for one email inside fifteen minutes and it stops
-//             answering.
+//   client -> must present the portal code for their job or service.
+//             pend_portal_code() decides. If the row already carries an
+//             email, that email has to match, exactly as before. If it does
+//             not carry one yet, the code is good enough on its own: that is
+//             the normal case, because WhatsApp intake has a phone number and
+//             never an email, and those jobs were impossible to claim at all
+//             until 20260829b. It rate limits on both the email and the code:
+//             five wrong answers against either inside fifteen minutes and it
+//             stops answering.
 //   worker -> must already have an active worker profile, which only exists
-//             once Monique has vetted them. No vetting, no account. That is
-//             the same rule the site already promises clients.
+//             once Monique has vetted them. No vetting, no account.
 //
+// Nothing here attaches an email to a job. Signing up records a PENDING claim
+// and the confirmation link is what binds it, because clicking that link is
+// the only thing that proves the address is real and belongs to the person
+// typing it. A client who mistypes their own address loses nothing: no link
+// arrives, no claim is consumed, they try again. See 20260829c.
+//
+// The confirmation email goes out through Resend, not through GoTrue's own
+// sender. Supabase's built-in SMTP is rate limited to a handful of messages an
+// hour and is documented as being for testing, which is not a thing to find
+// out during a launch. Resend is already the sending path for worker match
+// alerts and desk summaries on this project, from a domain with live DKIM and
+// SPF. generateLink() gives us the same link GoTrue would have posted; we just
+// carry it ourselves.
 // This function holds the service role key, so it is deliberately small and
 // does exactly one thing. Nothing here echoes a secret, and it never says
 // whether an email is already registered.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const RESEND_KEY   = Deno.env.get("RESEND_API_KEY") ?? "";
+// in.yaadly.co.uk, not send.yaadly.co.uk. Resend still lists the latter as
+// verified but its DKIM and SPF records are gone from DNS, so mail from it
+// fails authentication and lands in spam. Same reasoning as yaad-inbound.
+const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
+const SIGNIN_URL   = Deno.env.get("YAAD_PORTAL_SIGNIN_URL") ?? "https://app.yaadly.co.uk/portal/sign-in";
 const MIN_PASSWORD = 8;
 
 const CORS = {
@@ -75,14 +98,19 @@ Deno.serve(async (req: Request) => {
     if (role === "client") {
       if (!code) return json({ error: "Your job code is needed. It is on the message Yaadly sent you." }, 400);
 
-      const { data: ok, error } = await admin.rpc("verify_portal_code", { p_email: email, p_code: code });
+      // Records a pending claim on success. Binds nothing: that happens when
+      // the confirmation link is clicked.
+      const { data: ok, error } = await admin.rpc("pend_portal_code", { p_email: email, p_code: code });
       if (error) {
         root.recordError(error.message);
         return json({ error: "Could not check that code. Try again shortly." }, 502);
       }
       if (ok !== true) {
         root.setAttributes({ "yaadly.signup.outcome": "code_rejected" });
-        return json({ error: "That code and email do not match a job we hold. Check both, or message Yaadly." }, 403);
+        // Deliberately one message for every way this fails: wrong code, a
+        // code already claimed by somebody else, or too many tries. Naming
+        // which would tell a guesser which half they got right.
+        return json({ error: "That job code will not open an account. Check it against the message Yaadly sent you. If you have been here before, sign in instead, or message Yaadly." }, 403);
       }
     } else {
       const { data: profile, error } = await admin
@@ -101,16 +129,24 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ---- create the account ---------------------------------------------
-    // Created UNCONFIRMED on purpose. The portal code proves which job they
-    // are attached to; it does not prove they can read that mailbox. A real
-    // confirmation email does, and it is also the thing people expect to see.
-    const { error: createErr } = await admin.auth.admin.createUser({
-      email, password, email_confirm: false,
+    // ---- create the account, and take the link ---------------------------
+    // Created UNCONFIRMED on purpose, and this is now load-bearing rather than
+    // good manners: the confirmation click is what binds the job to them.
+    //
+    // generateLink() makes the user and hands back the very link GoTrue would
+    // have emailed, without emailing it. We carry it ourselves so it goes out
+    // over Resend rather than Supabase's testing-grade built-in SMTP.
+    const { data: link, error: createErr } = await admin.auth.admin.generateLink({
+      type: "signup",
+      email,
+      password,
+      options: { redirectTo: SIGNIN_URL },
     });
 
-    if (createErr) {
-      const msg = String(createErr.message || "");
+    const confirmUrl = link?.properties?.action_link ?? "";
+
+    if (createErr || !confirmUrl) {
+      const msg = String(createErr?.message || "no action link returned");
       root.setAttributes({ "yaadly.signup.outcome": "create_failed" });
       if (/already|registered|exists/i.test(msg)) {
         // Deliberately not confirmed as "this email exists": say the same
@@ -122,19 +158,60 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- send the confirmation email ------------------------------------
-    // The account exists but cannot sign in until this link is clicked.
-    const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    // The account exists but cannot sign in until this link is clicked, and
+    // the job stays unattached to anyone until it is.
+    const esc = (t: string) => t.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c] as string));
+    const href = esc(confirmUrl);
+
+    const text =
+`Confirm your email to open your Yaadly portal.
+
+${confirmUrl}
+
+That link does two things: it proves this address is yours, and it attaches
+your job to it. Until you click it, nothing on your job moves and nobody is
+charged anything.
+
+If you did not ask for a Yaadly portal, ignore this. Nothing happens.`;
+
+    const html =
+`<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
+<p style="margin:0 0 18px">Confirm your email and your portal is open.</p>
+<p style="margin:0 0 22px"><a href="${href}" style="background:#14b8a6;color:#04211d;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:100px;display:inline-block">Confirm my email</a></p>
+<p style="margin:0 0 18px">That link does two things: it proves this address is yours, and it attaches your job to it. Until you click it, nothing on your job moves and nobody is charged anything.</p>
+<p style="margin:0 0 18px;font-size:13px;color:#67807a">If the button does not work, paste this into your browser:<br><span style="word-break:break-all">${href}</span></p>
+<p style="margin:0;font-size:12.5px;color:#67807a">If you did not ask for a Yaadly portal, ignore this. Nothing happens.</p>
+</div>`;
+
     let emailed = false;
-    try {
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
-        body: JSON.stringify({ type: "signup", email }),
+    if (!RESEND_KEY) {
+      root.recordError("RESEND_API_KEY is not set on this project, confirmation email not sent");
+    } else {
+      await trace.span("resend.send confirmation", SpanKind.CLIENT, {
+        "server.address": "api.resend.com",
+        "messaging.system": "resend",
+        "messaging.operation.name": "send",
+      }, async (sp) => {
+        try {
+          const r = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: `Yaadly <${FROM_EMAIL}>`,
+              to: [email],
+              subject: "Confirm your email to open your Yaadly portal",
+              text,
+              html,
+            }),
+            signal: AbortSignal.timeout(15000),
+          });
+          sp.setAttributes({ "http.response.status_code": r.status });
+          emailed = r.ok;
+          if (!r.ok) sp.recordError(`resend send ${r.status}: ${(await r.text()).slice(0, 160)}`);
+        } catch (e) {
+          sp.recordError(String(e).slice(0, 200));
+        }
       });
-      emailed = r.ok;
-      if (!r.ok) root.recordError(`confirmation email not sent: ${r.status} ${(await r.text()).slice(0, 200)}`);
-    } catch (e) {
-      root.recordError(`confirmation email threw: ${String(e).slice(0, 200)}`);
     }
 
     root.setAttributes({ "yaadly.signup.confirmation_emailed": emailed });
@@ -148,7 +225,7 @@ Deno.serve(async (req: Request) => {
     }
 
     root.setAttributes({ "yaadly.signup.outcome": "created" });
-    return json({ ok: true, emailed: true, message: `Check ${email} for a confirmation link, then sign in.` });
+    return json({ ok: true, emailed: true, message: `Check ${email} for a confirmation link. Clicking it opens your portal and attaches your job.` });
   } catch (e) {
     root.recordError(e);
     return json({ error: "Something went wrong. Try again, or message Yaadly." }, 500);

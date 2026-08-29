@@ -21,6 +21,21 @@ export default async function PortalDoor() {
   if (!user) redirect("/portal/sign-in");
 
   const supabase = await createClient();
+
+  // The safety net under the confirmation trigger.
+  //
+  // A job that arrived on WhatsApp carries no email, so it is attached to a
+  // client the moment they click their confirmation link, by a trigger on
+  // auth.users. That trigger swallows its own errors on purpose: failing to
+  // attach a job is bad, but failing to let somebody confirm their email at
+  // all would be worse. Silent and sole would mean a client confirms, signs
+  // in, and finds an empty portal with nothing to tell anyone.
+  //
+  // So we ask again here, on the way in. It binds nothing this user did not
+  // already pend under their own confirmed address, and it is a no-op for
+  // everybody who has nothing waiting, which is almost every load.
+  await supabase.rpc("bind_my_portal_claims");
+
   const { data } = await supabase
     .from("jobs")
     .select("id,client_email,worker_email,status")
