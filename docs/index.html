@@ -1020,6 +1020,66 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 #pane-services .reach a.wa:hover{background:rgba(37,211,102,.08)}
 #pane-services .reach .lab{width:100%;font-size:11px;color:var(--dim);margin-bottom:1px}
 
+/* ── services · motion, emoji badges and the step flow (Aug 2026 tighten).
+   The written ladder table came out: every price it carried is already on
+   the card above it, so the table was the same numbers a second time. ── */
+#pane-services .svc,#pane-services .card{transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+#pane-services .svc:hover,#pane-services .card:hover{transform:translateY(-4px);border-color:var(--teal);box-shadow:0 14px 34px rgba(0,0,0,.3)}
+#pane-services .strip b i{font-style:normal;font-size:17px;margin-right:9px;vertical-align:1px}
+#pane-services .emo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:21px;line-height:1;background:var(--soft);border:1px solid var(--softline);margin-bottom:12px}
+#pane-services .emo.big{width:58px;height:58px;font-size:28px;border-radius:18px;margin:0 auto 14px}
+#pane-services .svc h4{display:flex;align-items:center;gap:10px}
+#pane-services .svc h4 .emo{flex:0 0 auto;margin-bottom:0;width:38px;height:38px;font-size:19px;transition:transform .35s ease}
+#pane-services .svc.star h4 .emo{background:rgba(255,176,32,.12);border-color:rgba(255,176,32,.34)}
+#pane-services .svc:hover h4 .emo{animation:svcpop .5s ease}
+@keyframes svcpop{40%{transform:translateY(-5px) rotate(-8deg) scale(1.12)}100%{transform:none}}
+#pane-services .pnow{background:linear-gradient(90deg,#2DD4BF,#7FF0E2 45%,#2DD4BF);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:pshine 7s linear infinite}
+@keyframes pshine{to{background-position:220% 0}}
+#pane-services .pnow s{-webkit-text-fill-color:var(--dim)}
+
+/* the four payment terms, one line each, instead of four paragraphs */
+#pane-services .terms{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+#pane-services .terms>div{display:flex;gap:11px;align-items:flex-start;padding:13px 15px;border-radius:12px;background:var(--soft);border:1px solid var(--softline);transition:var(--tr)}
+#pane-services .terms>div:hover{border-color:var(--teal);transform:translateY(-2px)}
+#pane-services .terms span{font-size:18px;line-height:1.3;flex:0 0 auto}
+#pane-services .terms p{font-size:13.5px;color:#BDE8DE;line-height:1.55;margin:0}
+#pane-services .terms b{color:var(--ink)}
+@media(max-width:640px){#pane-services .terms{grid-template-columns:1fr}}
+
+/* the four-step flow, with the line running through the bubbles */
+#pane-services .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:26px;position:relative}
+#pane-services .flow:before{content:"";position:absolute;left:11%;right:11%;top:29px;height:2px;background:linear-gradient(90deg,var(--teal),var(--mango));opacity:.3}
+#pane-services .fstep{text-align:center;position:relative}
+#pane-services .fstep .bub{width:58px;height:58px;margin:0 auto 14px;border-radius:19px;display:grid;place-items:center;font-size:26px;background:var(--panel);border:1px solid var(--line2);transition:transform .25s ease,border-color .25s ease}
+#pane-services .fstep:hover .bub{transform:translateY(-5px) scale(1.06);border-color:var(--teal)}
+#pane-services .fstep .bub.live{border-color:rgba(45,212,191,.5);animation:bubpulse 2.6s ease-in-out infinite}
+#pane-services .fstep .bub.gold{border-color:rgba(255,176,32,.45);background:rgba(255,176,32,.06)}
+@keyframes bubpulse{0%,100%{box-shadow:0 0 0 0 rgba(45,212,191,.28)}55%{box-shadow:0 0 0 12px rgba(45,212,191,0)}}
+#pane-services .fstep h4{font-size:15px;margin-bottom:7px}
+#pane-services .fstep p{font-size:13px;color:var(--mute);line-height:1.6}
+@media(max-width:860px){#pane-services .flow{grid-template-columns:1fr 1fr}#pane-services .flow:before{display:none}}
+@media(max-width:480px){#pane-services .flow{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){#pane-services .pnow,#pane-services .fstep .bub.live,#pane-services .svc:hover h4 .emo{animation:none}}
+
+/* ── contact · the two direct channels ──
+   The form below them is for somebody who wants a record of what they asked.
+   These two are for somebody who wants a person, which is most people, so
+   they sit above the form rather than under it as a footnote. */
+#pane-site .chan{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0 4px}
+@media(max-width:560px){#pane-site .chan{grid-template-columns:1fr}}
+#pane-site .chan a{display:flex;gap:13px;align-items:flex-start;text-decoration:none;padding:16px;border-radius:var(--r-md);border:1px solid var(--line2);background:var(--bg);transition:var(--tr)}
+#pane-site .chan a:hover{border-color:var(--teal)}
+#pane-site .chan a.wa:hover{border-color:rgba(37,211,102,.55)}
+#pane-site .chan .ico{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--soft);border:1px solid var(--softline)}
+#pane-site .chan .ico svg{width:19px;height:19px;fill:none;stroke:var(--tealb);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#pane-site .chan a.wa .ico{background:rgba(37,211,102,.10);border-color:rgba(37,211,102,.32)}
+#pane-site .chan a.wa .ico svg{stroke:#25D366}
+#pane-site .chan .lab{font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+#pane-site .chan .val{display:block;font-size:15.5px;font-weight:700;color:var(--ink);margin:3px 0 5px;word-break:break-word}
+#pane-site .chan a:hover .val{color:var(--tealb)}
+#pane-site .chan a.wa:hover .val{color:#25D366}
+#pane-site .chan .why{font-size:12.5px;color:var(--mute);line-height:1.5}
+
 </style>
 </head>
 <body>
@@ -1038,6 +1098,9 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <!-- Joining takes government ID, a police check and references, so it lives
          on the app behind auth, never on the marketing site. -->
     <a class="vbtn" href="https://app.yaadly.co.uk/apply">Join as a pro</a>
+    <!-- Not a pane. Contact lives at the bottom of the website, so this is the
+         one nav button that scrolls rather than switches. -->
+    <button class="vbtn" onclick="contactUs()">Contact</button>
   </div>
   <button class="navcta" onclick="postJob()">Post a job</button>
 </div></nav>
@@ -1391,6 +1454,71 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 
 </div>
 
+<!-- ════════ 8 · CONTACT ════════
+     Every other way in was a commitment: post a job builds a job card, book a
+     call puts a slot in a diary, the waiting list says sell to me later, and
+     feedback is anonymous by design so nobody is waiting on an answer.
+     Somebody who only wants to ask a question had to pick one of those and
+     mean something they did not mean. Most of them just left. -->
+<div class="wrap sec" id="contact">
+  <div class="card">
+    <div class="pills"><span class="pill hold">Answered by a person</span><span class="pill n">Within 24 hours</span></div>
+    <h2 class="hx" style="font-size:clamp(24px,3.4vw,34px)">Contact us</h2>
+    <p class="lead" style="margin-top:10px">You do not have to post a job, book a call or join a list to talk to us. Ask the question first. Messages land with Monique and she answers them herself, which is why the reply takes hours rather than seconds.</p>
+
+    <div class="chan">
+      <a class="wa" id="contact-wa" target="_blank" rel="noopener">
+        <span class="ico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></span>
+        <span>
+          <span class="lab">WhatsApp</span>
+          <b class="val" id="contact-wa-num">WhatsApp us</b>
+          <span class="why">Fastest. Text, photos or a voice note. Patois or English, both fine.</span>
+        </span>
+      </a>
+      <a id="contact-mail">
+        <span class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></span>
+        <span>
+          <span class="lab">Email</span>
+          <b class="val" id="contact-mail-addr">Email us</b>
+          <span class="why">Best when you have quotes, drawings or documents to send.</span>
+        </span>
+      </a>
+    </div>
+
+    <p class="kick" style="margin-top:26px;margin-bottom:10px">Or write it here</p>
+    <p class="tiny" style="font-size:13px;color:var(--mute);line-height:1.6;margin-bottom:16px">This goes to the same place, and unlike a chat it cannot be lost with a phone. Say as much or as little as you like.</p>
+
+    <div class="grid g2c">
+      <div class="fgroup"><label class="fl" for="ct-name">Your name</label><input class="f" id="ct-name" autocomplete="name"></div>
+      <div class="fgroup"><label class="fl" for="ct-contact">Email or WhatsApp number</label><input class="f" id="ct-contact" placeholder="+44… or you@email.com"></div>
+    </div>
+
+    <div class="fgroup"><label class="fl" for="ct-topic">What is it about?</label>
+      <select class="f" id="ct-topic">
+        <option>A question before I commit to anything</option>
+        <option>Property in Jamaica that needs work doing</option>
+        <option>I already have a contractor and want somebody watching</option>
+        <option>Property care while the house is empty</option>
+        <option>Something already booked or in progress</option>
+        <option>I am a tradesperson wanting work</option>
+        <option>Press, partnership or investment</option>
+        <option>Something else</option>
+      </select>
+    </div>
+
+    <div class="fgroup" style="margin-bottom:0"><label class="fl" for="ct-msg">Your message</label>
+      <textarea class="f" id="ct-msg" placeholder="Where the property is, what is happening, and what you want to know."></textarea>
+    </div>
+
+    <div class="wnav">
+      <button class="btn" id="ct-send" onclick="sendEnquiry()">Send enquiry</button>
+      <span class="sp">Read by a person, not a queue</span>
+    </div>
+    <p class="note">Nothing here is charged and nothing commits you to anything. What you write is used to answer you and for nothing else.</p>
+    <div id="ct-status"></div>
+  </div>
+</div>
+
 <div style="height:76px"></div>
 
 </section>
@@ -1598,95 +1726,100 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 <!-- ═══════════════ SERVICES PAGE ═══════════════ -->
 <section class="pane" id="pane-services">
 <div class="wrap">
-    <p class="kick">Project management services</p>
+    <p class="kick">🛠️ Project management services</p>
     <h2 class="hx">You don't have to<br><span class="g2">use the marketplace</span></h2>
-    <p class="lead">Building back home and already have your own contractor? These are the services where <b>I project manage your job myself</b>, a BEng-qualified construction project manager, seven years of heat pump, solar and energy projects. Separate from the marketplace. Same evidence standard. <b>Reach out to me</b> and we will work out what you actually need, before you pay for anything.</p>
+    <p class="lead">Got your own contractor? <b>I project manage the job myself.</b> BEng, seven years of UK construction. <b>Free call first</b>, before you pay anything.</p>
 
     <!-- three columns and its breakpoints live in CSS; an inline value here
          would beat every media query and stay three-wide on a phone -->
     <div class="strip">
-      <div><b>72 hrs</b><span>turnaround, every report</span></div>
-      <div><b>Fixed</b><span>price, quoted before I start</span></div>
-      <div><b>Talk first</b><span>free call before you pay anything</span></div>
+      <div><b><i>⏱️</i>72 hrs</b><span>every report, turned around</span></div>
+      <div><b><i>🔒</i>Fixed</b><span>price, quoted before I start</span></div>
+      <div><b><i>💬</i>Free</b><span>20 minute call, no obligation</span></div>
     </div>
 
-    <div class="sec">
-      <p class="kick m">Run by me</p>
+    <div class="sec rv">
+      <p class="kick m">💻 Run by me</p>
       <h3 class="hx">Available now</h3>
-      <p class="lead" style="margin-top:10px">Fixed fee, no percentage, and <b>the bigger pieces are paid in stages rather than all up front</b>, see Paying for it below. <b>Reach out and we talk first</b>, a free 20 minute call, and by the end of it you will know whether you actually need me. If you do not, I will tell you. You get a firm quote before anything starts. <b>Every line shows the full price and the founding price</b>, because under the DMCCA 2024 a discount off a price nobody can actually buy is a misleading action, and because your own pricing rule says publish the real number first.</p>
+      <p class="lead" style="margin-top:10px">Fixed fee, no percentage. Every card shows <b>the full price and the founding price</b>, both real, both buyable.</p>
       <div class="grid g2c" style="margin-top:22px" id="svcremote"></div>
     </div>
 
-    <div class="sec">
-      <p class="kick m">On the ground, someone attends</p>
-      <h3 class="hx">The inspection ladder</h3>
-      <p class="lead" style="margin-top:10px">Built to the shape the UK market already uses, because that is the market your clients benchmark against. <b>A checker records what is there. A trained inspector tells you what it means.</b> That is the Level 1 to Level 2 line and it is where the price steps. Three families, whole-property reports, in-job sign-offs, and recurring care, each anchored to a published UK price. The table is below.</p>
+    <div class="sec rv">
+      <p class="kick m">📍 On the ground</p>
+      <h3 class="hx">Someone attends</h3>
+      <p class="lead" style="margin-top:10px"><b>A checker records what is there. An inspector tells you what it means.</b> That is where the price steps.</p>
       <div class="grid g2c" style="margin-top:22px" id="svcground"></div>
-      <div id="mkttable"></div>
     </div>
 
-    <div class="sec">
-      <p class="kick m">Paying for it</p>
-      <h3 class="hx">You do not have to pay it all at once</h3>
-      <p class="lead" style="margin-top:10px">The rest of this market asks for the whole fee before anything exists. A surveyor is paid in full before they attend, every time. <b>We do it differently on the bigger pieces, on purpose</b>, because telling you not to hand money to strangers far away and then doing exactly that would be a poor look.</p>
+    <div class="sec rv">
+      <p class="kick m">💳 Paying for it</p>
+      <h3 class="hx">Not all at once</h3>
+      <p class="lead" style="margin-top:10px">A surveyor takes the whole fee before they attend. We don't. Telling you not to send money to strangers far away, then doing it, would be a poor look.</p>
 
       <div class="grid g4c" style="margin-top:22px">
         <div class="card">
-          <p class="kick" style="margin-bottom:10px">Under £200</p>
+          <div class="emo">💷</div>
+          <p class="kick" style="margin-bottom:8px">Under £200</p>
           <h4 style="font-size:17px;margin-bottom:10px">Paid in full</h4>
           <div class="feebox" style="font-size:13.5px">
             <span class="mut">Visual Check</span><span class="r">£95</span>
             <span class="mut">Deposit Protection Check</span><span class="r">£149</span>
           </div>
-          <p class="tiny" style="margin-top:12px">72 hour turnaround. Splitting a fee this size costs us both more in admin than it saves you.</p>
+          <p class="tiny" style="margin-top:12px">Splitting a fee this small costs more in admin than it saves.</p>
         </div>
         <div class="card" style="border-color:var(--softline);background:var(--soft)">
-          <p class="kick" style="margin-bottom:10px">£200 and over, one off</p>
-          <h4 style="font-size:17px;margin-bottom:10px">50% deposit, 50% on delivery</h4>
+          <div class="emo">🤝</div>
+          <p class="kick" style="margin-bottom:8px">£200 and over</p>
+          <h4 style="font-size:17px;margin-bottom:10px">Half now, half on delivery</h4>
           <div class="feebox" style="font-size:13.5px">
             <span class="mut">Deposit, books the slot</span><span class="r">50%</span>
             <span class="mut">Balance, on delivery</span><span class="r">50%</span>
             <div class="hr"></div>
             <span class="tot">Condition Report, £245</span><span class="r tot" style="color:var(--tealb)">£122.50 &times; 2</span>
           </div>
-          <p class="tiny" style="margin-top:12px">The deposit books the visit. The balance is invoiced when the report is written and settled before it is released.</p>
+          <p class="tiny" style="margin-top:12px">Balance invoiced when the report is written, settled before release.</p>
         </div>
         <div class="card">
-          <p class="kick" style="margin-bottom:10px">Retainers</p>
+          <div class="emo">🔁</div>
+          <p class="kick" style="margin-bottom:8px">Retainers</p>
           <h4 style="font-size:17px;margin-bottom:10px">Monthly, in advance</h4>
           <div class="feebox" style="font-size:13.5px">
             <span class="mut">First month</span><span class="r">on signing</span>
             <span class="mut">Then</span><span class="r">monthly</span>
             <span class="mut">Notice to stop</span><span class="r">30 days</span>
           </div>
-          <p class="tiny" style="margin-top:12px">No deposit, no lock in. Visits already made are not clawed back and months not yet run are not charged.</p>
+          <p class="tiny" style="margin-top:12px">No lock in. Months not run are never charged.</p>
         </div>
         <div class="card">
-          <p class="kick" style="margin-bottom:10px">Full Project Management</p>
+          <div class="emo">🏗️</div>
+          <p class="kick" style="margin-bottom:8px">Full Project Management</p>
           <h4 style="font-size:17px;margin-bottom:10px">Stages, never up front</h4>
           <div class="feebox" style="font-size:13.5px">
             <span class="mut">Up front</span><span class="r">nothing</span>
             <span class="mut">Then</span><span class="r">per stage</span>
             <span class="mut">Tied to</span><span class="r">the build programme</span>
           </div>
-          <p class="tiny" style="margin-top:12px">Invoiced against agreed stages as the build reaches them, so the fee moves at the speed your project does.</p>
+          
         </div>
       </div>
 
-      <div class="rule" style="margin-top:20px"><span>🧾</span><div><b>Every stage is a numbered invoice</b>, itemised, with the full price and the founding price both shown. <b>Your first engagement is payable before delivery</b>, whichever service it is. After one job together, 14 day terms are yours on request. We say that plainly rather than deciding it case by case.</div></div>
-      <div class="rule" style="margin-top:10px"><span>↩️</span><div><b>If you stop it part way.</b> A deposit covers the work already done at the point you say stop, and anything not yet done is refunded. On a report that means refundable right up until it is issued, because the report is the thing you were buying.</div></div>
-      <div class="rule" style="margin-top:10px"><span>🗓️</span><div><b>If you cancel a booked visit.</b> More than 48 hours, nothing to pay and one free rebook. Inside 48 hours, 50%. Inside 24 hours, or nobody can let us in on the day, the full fee. <b>That charge pays the person who travelled, first.</b> They held the day, and that is not their cost to carry.</div></div>
-      <div class="rule" style="margin-top:10px"><span>⏱️</span><div><b>Anything outside the agreed scope</b> is £95 an hour, minimum one hour. We will never bill you for it as a surprise: we tell you it is out of scope, estimate the hours, and do nothing until you say yes in writing.</div></div>
+      <div class="terms">
+        <div><span>🧾</span><p><b>Numbered invoices</b>, itemised. First job paid before delivery, 14 day terms after.</p></div>
+        <div><span>↩️</span><p><b>Stop part way</b>, pay only for what is done. A report is refundable until it is issued.</p></div>
+        <div><span>🗓️</span><p><b>Cancel a visit</b> over 48 hrs, free rebook. Inside 48, 50%. Inside 24, full fee, which pays whoever travelled.</p></div>
+        <div><span>⏱️</span><p><b>Out of scope</b> is £95 an hour. We estimate it and wait for a yes in writing.</p></div>
+      </div>
     </div>
 
-    <div class="sec">
-      <p class="kick m">Marketplace fees</p>
+    <div class="sec rv">
+      <p class="kick m">🧮 Marketplace fees</p>
       <h3 class="hx">One number, on the page</h3>
-      <p class="lead" style="margin-top:10px">This is separate from the services above. When you hire through the marketplace, the fee is <b>27% blended on labour only, never on materials</b>. Split 15% to the client, 12% to the worker.</p>
+      <p class="lead" style="margin-top:10px">Separate from the services above. The marketplace fee is <b>27% blended, labour only, never materials</b>. 15% client, 12% worker.</p>
 
       <div class="grid g2c" style="margin-top:22px">
         <div class="card">
-          <p class="kick" style="margin-bottom:12px">A £300 labour job, in full</p>
+          <p class="kick" style="margin-bottom:12px">💼 A £300 labour job, in full</p>
           <div class="feebox">
             <span class="mut">Worker's labour price</span><span class="r mut">£300.00</span>
             <span class="mut">Guarantee &amp; Support, 15%</span><span class="r mut">+£45.00</span>
@@ -1696,59 +1829,59 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
             <span class="mut">Worker fee, 12%</span><span class="r mut">−£36.00</span>
             <span class="tot">Worker receives</span><span class="r tot" style="color:var(--tealb)">£264.00</span>
           </div>
-          <p class="tiny" style="margin-top:14px">Every quote on the board shows you the £345, not the £300. The fee is inside the number you see, never added at the end.</p>
+          <p class="tiny" style="margin-top:14px">The board shows the £345, not the £300. The fee is inside the number you see.</p>
         </div>
 
         <div class="card">
-          <p class="kick" style="margin-bottom:12px">Everything else that touches your money</p>
+          <p class="kick" style="margin-bottom:12px">🔍 Everything else that touches your money</p>
           <div class="feebox" style="font-size:13.5px">
             <span class="mut">Materials</span><span class="r">never fee'd</span>
-            <span class="mut">Small-job minimum, by trade risk</span><span class="r">J$3,500 to 4,500</span>
+            <span class="mut">Small-job minimum</span><span class="r">J$3,500 to 4,500</span>
             <span class="mut">Materials cash advance</span><span class="r">5% admin</span>
-            <span class="mut">FX margin, international invoices</span><span class="r">~2%</span>
+            <span class="mut">FX margin, international</span><span class="r">~2%</span>
             <span class="mut">Yaadly Remote, digital work</span><span class="r">10%</span>
             <span class="mut">Paying in Jamaica, in J$</span><span class="r" style="color:var(--tealb)">no FX at all</span>
           </div>
-          <p class="tiny" style="margin-top:14px">On a J$8,000 job the minimum works out nearer 44% than 15%. That is written on the quote before you accept it, not afterwards.</p>
+          <p class="tiny" style="margin-top:14px">On a J$8,000 job the minimum lands nearer 44% than 15%, and it is on the quote before you accept.</p>
         </div>
       </div>
 
       <div class="card soft" style="margin-top:16px">
-        <p style="font-size:14px;color:var(--mute);line-height:1.65"><b style="color:var(--ink)">Why the all-in number matters.</b> Under the Digital Markets, Competition and Consumers Act 2024, a mandatory platform charge has to sit inside the displayed price, not be added at checkout. The CMA fined the AA £4.2m in April 2026 over a <b style="color:var(--ink)">£3</b> booking fee shown separately. Scale is not the trigger; presentation is. Showing one honest total is also the whole point of what Yaadly sells, so the rule and the brand point the same way.</p>
+        <p style="font-size:14px;color:var(--mute);line-height:1.65"><b style="color:var(--ink)">⚖️ Why the all-in number matters.</b> Under the DMCCA 2024 a mandatory platform charge must sit inside the displayed price. The CMA fined the AA £4.2m over a <b style="color:var(--ink)">£3</b> booking fee shown separately. Presentation is the trigger, not scale.</p>
       </div>
     </div>
 
-    <div class="sec">
-      <p class="kick m">Say the quiet part first</p>
+    <div class="sec rv">
+      <p class="kick m">🗣️ Say the quiet part first</p>
       <div class="card">
         <div class="scope">
           <h5>What these services are</h5>
-          <p>A record of physical works and costs, prepared by a construction project manager. What was observed on site on the date and time stated, and how the prices you were quoted compare against material costs, day rates and completed jobs in our database.</p>
+          <p>A record of physical works and costs by a construction project manager: what was observed on site on the date stated, and how your quoted prices compare against real material costs, day rates and completed jobs.</p>
           <h5>What they are not</h5>
-          <p>Yaadly is not a law firm and nobody here is an attorney-at-law. Nothing is legal advice. We do not verify title, tell you whether a title is good, or advise on what an agreement means, that is an attorney's work and you should instruct one.</p>
-          <p>We do not carry out land surveys or confirm boundaries, only a surveyor registered under the Land Surveyors Act may do that. We do not certify structural adequacy, only an engineer registered with the PERB may do that. We do not buy, sell, market or introduce property, and we take no commission on any property transaction.</p>
+          <p>Not a law firm, not legal advice. No title checks and no reading of agreements, that is an attorney's work. No land surveys or boundaries (Land Surveyors Act) and no certifying structural adequacy (PERB). No commission on any property transaction.</p>
           <h5>What we owe you</h5>
-          <p>The service carried out with reasonable care and skill, as section 49 of the Consumer Rights Act 2015 requires. Nothing in our terms limits that duty or your rights under it.</p>
+          <p>Reasonable care and skill, as section 49 of the Consumer Rights Act 2015 requires. Nothing in our terms limits that.</p>
         </div>
       </div>
-      <p class="tiny" style="margin-top:12px">This block appears on the site, in every quote, and bound into the report itself, the deliverable and the terms are one document you can't separate.</p>
+      <p class="tiny" style="margin-top:12px">On the site, in every quote, and inside the report itself.</p>
     </div>
 
-    <div class="sec">
-      <p class="kick m">How a service actually runs</p>
+    <div class="sec rv">
+      <p class="kick m">🧭 How a service actually runs</p>
       <h3 class="hx">You get a portal, same as a job</h3>
-      <p class="lead" style="margin-top:10px">Booking a service is not sending money into a void and waiting for an email. The moment your payment clears you get a portal link and a code, the same portal a marketplace client gets, just a different kind of job inside it. You can see the clock, what stage I am at, and the draft report before anybody else does.</p>
-      <div class="grid g4c" style="margin-top:20px">
-        <div class="card"><p class="kick" style="margin-bottom:6px">On payment</p><h4 style="font-size:15px;margin-bottom:7px">Portal link, instantly</h4><p style="font-size:13px;color:var(--mute);line-height:1.6">Reference, link and access code by email before I have done anything. No password to remember.</p></div>
-        <div class="card"><p class="kick" style="margin-bottom:6px">While it runs</p><h4 style="font-size:15px;margin-bottom:7px">The clock is visible</h4><p style="font-size:13px;color:var(--mute);line-height:1.6">72 hours from your documents landing, not from when you paid. You see the due date without asking me for it.</p></div>
-        <div class="card"><p class="kick" style="margin-bottom:6px">Before it is final</p><h4 style="font-size:15px;margin-bottom:7px">You read the draft first</h4><p style="font-size:13px;color:var(--mute);line-height:1.6">If a fact about your job is wrong, you tell me and I fix it. The verdict is on page one.</p></div>
-        <div class="card" style="border-color:rgba(255,176,32,.35);background:rgba(255,176,32,.045)"><p class="kick m" style="margin-bottom:6px">After</p><h4 style="font-size:15px;margin-bottom:7px">It becomes your scope</h4><p style="font-size:13px;color:var(--mute);line-height:1.6">Post the job on the board with the scope already written, or keep your own contractor and add oversight.</p></div>
+      <p class="lead" style="margin-top:10px">Not money into a void. Payment clears, you get a portal link and a code, the same portal a marketplace client gets.</p>
+      <div class="flow">
+        <div class="fstep"><div class="bub live">💌</div><p class="kick" style="margin-bottom:6px">On payment</p><h4>Portal link, instantly</h4><p>Reference, link and code by email. No password to remember.</p></div>
+        <div class="fstep"><div class="bub">⏳</div><p class="kick" style="margin-bottom:6px">While it runs</p><h4>The clock is visible</h4><p>72 hours from your documents landing, not from when you paid.</p></div>
+        <div class="fstep"><div class="bub">📝</div><p class="kick" style="margin-bottom:6px">Before it is final</p><h4>You read the draft</h4><p>A fact wrong, you tell me, I fix it. Verdict on page one.</p></div>
+        <div class="fstep"><div class="bub gold">🚀</div><p class="kick m" style="margin-bottom:6px">After</p><h4>It becomes your scope</h4><p>Post the job with the scope already written, or add oversight to your own contractor.</p></div>
       </div>
-      <p style="margin-top:18px"><a class="btn ghost sm" href="https://app.yaadly.co.uk/portal">Open your client portal</a></p>
+      <p style="margin-top:22px"><a class="btn ghost sm" href="https://app.yaadly.co.uk/portal">Open your client portal</a></p>
     </div>
 
-    <div class="sec">
+    <div class="sec rv">
       <div class="card soft" style="text-align:center;padding:32px 24px">
+        <div class="emo big">☎️</div>
         <h3 class="hx">Book a free 20 minute call</h3>
         <p class="lead" style="margin:12px auto 6px">By the end of it you'll know whether you actually need me.</p>
         <p style="color:var(--mango);font-weight:700;font-size:15px;margin-bottom:20px">If you don't, I'll tell you.</p>
@@ -2200,6 +2333,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
   <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
   <span>A human confirms every step that moves money or changes a reputation.</span>
+  <a onclick="contactUs()" style="cursor:pointer">Contact us</a>
   <a id="foot-wa">WhatsApp</a>
 </div></div></footer>
 <script>
@@ -2312,80 +2446,71 @@ var svg=function(k){return '<svg class="i" viewBox="0 0 24 24">'+(IC[k]||IC.hand
 
 
 /* ---------- services ----------
-   Ported from preview/index.html #s-services. The data, the card shape and
-   the wording are the preview's; this file does not get to reword them.
+   Card shape ported from preview/index.html #s-services. Three deliberate
+   differences, all asked for:
 
-   Two deliberate differences, both asked for:
+   1. The pricing-review notes (keep / fix / warn) are gone. They were written
+      to Monique during the August review, not to a client, and one of them
+      named a competitor who does a version of the Deposit Check for £10.
 
-   1. SHOW_REVIEW_NOTES. The preview renders three fields written to Monique
-      during the pricing review, not to a client: keep ("Checked, keeping
-      it"), fix ("Corrected. Was £45") and warn ("Your call..."). One of them
-      names a competitor who does a version of the Deposit Check for £10.
-      Useful in a prototype she is reviewing, actively harmful on a page that
-      is trying to sell the thing. Off here. Flip to true to see the preview
-      exactly as it renders.
+   2. The written ladder table is gone too (29 Aug). Every price it listed is
+      already on the card above it, so it was the same numbers a second time
+      and it was the longest block on the page.
 
-   2. Every card gets a reach row: WhatsApp, a call at the right length, and
+   3. Every card gets a reach row: WhatsApp, a call at the right length, and
       an email with the job questions already in the body. The page sells
       judgment and nobody buys judgment from a form.                        */
-const SHOW_REVIEW_NOTES = false;
 const SVC_EMAIL = "monique@yaadly.co.uk";
 
 var SVC_REMOTE=[
- {n:'Deposit Protection Check',d:'Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates, payment structure, deposit exposure, works scope, red flags. Written go or no-go, back in 72 hours.',f:'\u00a3149',fu:'\u00a3249',u:'fixed fee',star:1,note:'Money, works, evidence and process only. No title, no contract interpretation.',src:'Checked against the market 26 Aug, correctly priced',keep:'\u00a3249 sits just under JAMCO\u2019s \u00a3263, the only direct Jamaica-facing competitor selling the same deliverable, and at the bottom of the UK QS early-cost-advice band of \u00a3300 to 1,000. This one was right. Headroom exists to \u00a3299 later; no reason to move it now.',warn:'The framing risk, not the price: <b>MyBuildAlly reviews a UK builder\u2019s quote for \u00a310</b>, automated. A client who has seen that needs to be told in one line why yours is \u00a3249, a person, Jamaican material costs and day rates a UK tool does not hold, a written go or no-go, and PI cover behind the opinion. Say it on the page rather than hoping they work it out.'},
-  {n:'Oversight Retainer',d:'Documented site visits, a monthly cost-and-progress report, a contractor accountability call, and a WhatsApp line to me. <b>Pick your frequency.</b> Your contractor knows somebody is watching, and how often.',
+ {n:'Deposit Protection Check',e:'\ud83d\udee1\ufe0f',
+  d:'Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates. <b>Written go or no-go, 72 hours.</b>',
+  f:'\u00a3149',fu:'\u00a3249',u:'fixed fee',star:1,
+  note:'Money, works, evidence and process only. No title, no contracts.',
+  src:'The only direct competitor sells this at \u00a3263'},
+ {n:'Oversight Retainer',e:'\ud83d\udc41\ufe0f',
+  d:'Documented visits, a monthly cost-and-progress report, an accountability call, a WhatsApp line to me. <b>Pick your frequency.</b>',
   f:'\u00a3595',fu:'\u00a31,095',u:'per month',star:1,
   tiers:[['Fortnightly','2 visits a month','\u00a3495','\u00a3595'],['Weekly','4 visits a month','\u00a3895','\u00a31,095']],
-  src:'One UK monitoring surveyor visit is \u00a3500 to 1,500. This is 2 or 4 visits, a report and a call.',
-  fix:'Was \u00a3350 flat. Two visits at the \u00a3149 ladder rate are \u00a3298, so \u00a3350 charged \u00a352 for the report, the call, the WhatsApp line and carrying the job in my head for a month. Fortnightly at \u00a3595 charges \u00a3297 for the oversight; weekly at \u00a31,095 charges \u00a3499 against \u00a3596 of visits. Proportionate, not an arbitrary jump.',
-  note:'Weekly is for an active build, anything on a programme, or a contractor you are not yet sure about. Fortnightly is the standard watch, enough that nothing goes two weeks unseen. Founder-attended from December.'},
- {n:'Full Project Management',d:'The whole build. Scope and specification, contractor sourcing and vetting, staged payments, programme, site inspections, handover and aftercare. Paid in milestones alongside the build, never up front.',f:'12 to 15%',u:'of build cost',min:'Minimum fee \u00a32,500',dec:'From December 2026',src:'Buildathon Logbook \u00b7 decided 13 Aug',note:'The minimum bites more often than you think. On a \u00a317,000 renovation 12% is \u00a32,040, the client pays \u00a32,500, an effective 14.7%. Say so on the page before they work it out themselves.'}
+  src:'One UK monitoring surveyor visit is \u00a3500 to 1,500',
+  note:'Weekly for an active build, fortnightly is the standard watch.'},
+ {n:'Full Project Management',e:'\ud83c\udfd7\ufe0f',
+  d:'The whole build. Scope, contractor vetting, staged payments, programme, inspections, handover. <b>Paid in milestones, never up front.</b>',
+  f:'12 to 15%',u:'of build cost',min:'Minimum fee \u00a32,500',dec:'From December 2026',
+  note:'On a \u00a317,000 job the minimum makes it 14.7%.'}
 ];
 var SVC_GROUND=[
- {n:'Visual Check',d:'A trained checker attends, photographs the property or the stage against a written checklist, and files a one-page observation note in 72 hours. They record what is there. They do not rate it, advise on it, or certify it.',
-  f:'\u00a395',fu:'\u00a3149',u:'per visit',site:1,src:'Mirrors the UK property inspection report, \u00a380 to 150',
-  note:'Short notice, inside 48 hours: \u00a3185. The UK same-day band is \u00a3130 to 180.',
-  fix:'Absorbs Property Check In, Eyes On It and the visual reviewer. One product, one price.'},
- {n:'Condition Report',d:'The whole property recorded system by system, roof and hurricane fixings, structure, water and tank, electrics and inverter, drainage and septic, termites, security. Every finding rated Severe, Moderate or Low, issue summary on page one.',
-  f:'\u00a3245',fu:'\u00a3325',u:'fixed fee',site:1,src:'Mirrors RICS Level 1 Condition Report, \u00a3300 to 900',
-  note:'Like a Level 1, it tells you what is wrong and how bad, not what to do about it.',
-  fix:'Absorbs Site Verification Visit and Property Condition Report.'},
- {n:'Technical Sign-off',d:'A qualified trade inspector assesses one stage or one works package against the trade standard for that job type, and gives you a pass, a fail, or a written list of what to put right. The first rung that gives an opinion rather than a record.',
-  f:'\u00a3245',fu:'\u00a3300',u:'per sign-off',site:1,star:1,src:'Mirrors a UK structural engineer\u2019s site visit, \u00a3300',
-  note:'Short notice, inside 48 hours: \u00a3395. A technical person attending, priced against a technical person attending.'},
- {n:'Property Care',d:'Recurring visits on a schedule, the same checklist every time, so change is visible visit to visit. An empty or elder-occupied home, checked and documented while you are four thousand miles away.',
+ {n:'Visual Check',e:'\ud83d\udcf8',
+  d:'A trained checker attends, photographs everything against a written checklist, files a one-page note in 72 hours. <b>They record. They do not rate or advise.</b>',
+  f:'\u00a395',fu:'\u00a3149',u:'per visit',site:1,
+  src:'UK property inspection report, \u00a380 to 150',
+  note:'Inside 48 hours: \u00a3185.'},
+ {n:'Condition Report',e:'\ud83c\udfe1',
+  d:'System by system: roof and hurricane fixings, structure, water, electrics, drainage, termites, security. <b>Every finding rated Severe, Moderate or Low.</b>',
+  f:'\u00a3245',fu:'\u00a3325',u:'fixed fee',site:1,
+  src:'RICS Level 1, \u00a3300 to 900',
+  note:'What is wrong and how bad, not what to do about it.'},
+ {n:'Technical Sign-off',e:'\u2705',
+  d:'A qualified trade inspector judges one stage against the standard for that job. <b>Pass, fail, or a written put-right list.</b>',
+  f:'\u00a3245',fu:'\u00a3300',u:'per sign-off',site:1,star:1,
+  src:'UK structural engineer site visit, \u00a3300',
+  note:'Inside 48 hours: \u00a3395.'},
+ {n:'Property Care',e:'\ud83d\udd11',
+  d:'The same checklist every visit, so change is visible. <b>An empty or elder-occupied home, watched from four thousand miles away.</b>',
   f:'\u00a375',fu:'\u00a395',u:'per visit, standard',site:1,
   alt:'Large or rental \u00a3135 \u00b7 villa \u00a3175 \u00b7 setup \u00a395 to 125',
-  src:'Mirrors the UK periodic property inspection, \u00a380 + VAT per visit',
-  fix:'Was \u00a345. A UK periodic inspection is \u00a380 plus VAT for a 20 to 40 minute visit with time-stamped photos and a report, the same product. \u00a345 was half the market rate for identical work.',
-  note:'Local J$ menu unchanged: J$7,500 / 12,000 / 18,000 per visit, no FX. A Jamaican client buying in J$ is a different market with a different cost base.'}
-];
-var LADDER=[
- ['h','A \u00b7 Whole-property reports, one-off','','','','',''],
- ['A1','Visual Check','A trained checker','Records. No rating, no advice.','\u00a395','\u00a3149','UK property inspection report \u00a380 to 150'],
- ['A2','Condition Report','A trained inspector','Severity-rated, system by system. Still no advice.','\u00a3245','\u00a3325','RICS Level 1 \u00a3300 to 900'],
- ['A3','Full Report, with advice','A qualified inspector','Defects, advice, and what to do about them.','\u00a3445','\u00a3595','RICS Level 2 \u00a3400 to 1,000'],
- ['h','B \u00b7 In-job sign-offs, per milestone','','','','',''],
- ['B1','Visual Check','A trained checker','Records the stage. No opinion.','\u00a395','\u00a3149','UK property inspection report \u00a380 to 150'],
- ['B2','<b>Technical Sign-off</b>','A qualified trade inspector','Against the trade standard. Pass, fail, or put-right list.','\u00a3245','\u00a3300','Structural engineer site visit \u00a3300'],
- ['h','Add-on \u00b7 any rung','','','','',''],
- ['+','Live viewing','The inspector, on video','Watch the inspection happen instead of reading it after.',', ','\u00a340',', '],
- ['h','C \u00b7 Recurring, per visit or per month','','','','',''],
- ['C1','Property Care, standard','A trained checker','Same checklist every visit, so change is visible.','\u00a375','\u00a395','UK periodic inspection \u00a380+VAT'],
- ['C2','Property Care, large or rental','A trained checker','Bigger property, longer visit.','\u00a3110','\u00a3135',', '],
- ['C3','Property Care, villa','A trained checker','Grounds, pool, outbuildings.','\u00a3145','\u00a3175',', '],
- ['C4','Oversight Retainer, <b>fortnightly</b>','Monique','2 documented visits a month, report, accountability call.','\u00a3495/mo','\u00a3595/mo','UK monitoring surveyor \u00a3500 to 1,500 <b>per visit</b>'],
- ['C5','Oversight Retainer, <b>weekly</b>','Monique','4 documented visits a month. Same everything, double the frequency.','\u00a3895/mo','\u00a31,095/mo',', ']
+  src:'UK periodic inspection, \u00a380 + VAT per visit',
+  note:'Local J$ menu: 7,500 / 12,000 / 18,000 per visit, no FX.'}
 ];
 function svcCard(v){
  var unit = v.dec
    ? esc(v.u)+', paid in milestones'
    : esc(v.u||'service');
  var price;
- if(v.tiers){ price = '<p class="tiny" style="margin-top:8px">Both rates are founding prices for the first five, dated, and a real discount off a price you can actually buy.</p>'; }
+ if(v.tiers){ price = '<p class="tiny" style="margin-top:8px">Both are founding rates, first five clients.</p>'; }
  else price = '<div class="prices"><span class="pnow">'+v.f+(v.u==='per month'?'<s>/mo</s>':'')+'</span>'+
    '<span class="pfull">'+unit+
-   (v.fu?'<br><b class="pf2">Full price '+v.fu+(v.u==='per month'?' a month':'')+'</b><br><span class="tiny">'+v.f+' is the founding price for the first five. Dated, and a real discount off a price you can actually buy.</span>':'')+
+   (v.fu?'<br><b class="pf2">Full price '+v.fu+(v.u==='per month'?' a month':'')+'</b><br><span class="tiny">Founding rate, first five clients.</span>':'')+
    (v.min?'<br><b class="pf2">'+esc(v.min)+'</b>':'')+
    (v.alt?'<br><b>'+esc(v.alt)+'</b>':'')+
    (v.dec?'<br><b>'+esc(v.dec)+'</b>':'')+
@@ -2397,40 +2522,19 @@ function svcCard(v){
   (v.inside?'<span class="pill n">Inside a job, not sold alone</span>':'')+
   (v.site&&!v.inside?'<span class="pill n">On your site now</span>':'')+
   '<span class="pill n">'+esc(v.u||'service')+'</span></div>'+
-  '<h4>'+esc(v.n)+'</h4><p class="what">'+v.d+'</p>'+
+  '<h4>'+(v.e?'<span class="emo">'+v.e+'</span>':'')+'<span>'+esc(v.n)+'</span></h4><p class="what">'+v.d+'</p>'+
   (v.tiers?'<div class="freqrow">'+v.tiers.map(function(t){
     return '<div class="freq"><b>'+esc(t[0])+'</b><span>'+esc(t[1])+'</span>'+
      '<i>'+t[3]+'</i><em>'+t[2]+' founding</em></div>'}).join('')+'</div>':'')+
   (v.note?'<p class="tiny" style="color:var(--coral)">'+v.note+'</p>':'')+
-  (SHOW_REVIEW_NOTES&&v.keep?'<div class="fixed"><b>Checked, keeping it.</b> '+v.keep+'</div>':'')+(SHOW_REVIEW_NOTES&&v.fix?'<div class="fixed"><b>Corrected.</b> '+v.fix+'</div>':'')+
-  (SHOW_REVIEW_NOTES&&v.warn?'<div class="flag" style="margin-top:0"><b>Your call.</b> '+v.warn+'</div>':'')+
   price+
   (v.src?'<p class="srcline">'+esc(v.src)+'</p>':'')+'</div>';
 }
-function marketTable(){
- return '<div class="pk legal" style="margin-top:14px"><div class="dochd"><div><h3>The ladder, and what it mirrors</h3>'+
- '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Every price in the Mirrors column is a published UK price, researched 26 Aug 2026.</p></div></div>'+
-
- '<div class="pksec" style="margin-top:14px;padding-top:0;border-top:0"><h5>Yaadly\u2019s ladder</h5>'+
- '<div style="overflow-x:auto"><table><thead><tr><th>Rung</th><th>What it is</th><th>Who does it</th><th>Founding</th><th>Full price</th><th>Mirrors</th></tr></thead><tbody>'+
- LADDER.map(function(r){
-  if(r[0]==='h') return '<tr><td colspan="6" style="padding-top:15px;color:var(--mango);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;border-bottom:1px solid var(--line)">'+r[1]+'</td></tr>';
-  return '<tr><td style="font-family:var(--mono);color:var(--tealb)">'+r[0]+'</td>'+
-   '<td><b style="color:var(--ink)">'+r[1]+'</b><br><span style="font-size:11.5px">'+r[3]+'</span></td>'+
-   '<td>'+r[2]+'</td>'+
-   '<td style="color:var(--mango);white-space:nowrap">'+r[4]+'</td>'+
-   '<td style="color:var(--tealb);white-space:nowrap"><b>'+r[5]+'</b></td>'+
-   '<td style="color:var(--dim);font-size:11.5px">'+r[6]+'</td></tr>';
- }).join('')+'</tbody></table></div></div></div>';
-}
-
 (function(){
  var R=document.getElementById('svcremote'), G=document.getElementById('svcground');
  if(!R||!G) return;
  R.innerHTML=SVC_REMOTE.map(svcCard).join('');
  G.innerHTML=SVC_GROUND.map(svcCard).join('');
- var mt=document.getElementById('mkttable');
- if(mt) mt.innerHTML=marketTable();
 
  /* thirty minutes for the things with a shape to talk through */
  var LONG={'Oversight Retainer':1,'Full Project Management':1};
@@ -2575,12 +2679,17 @@ function marketTable(){
   if(h === "market"){ location.replace("https://app.yaadly.co.uk/jobs"); return; }
   if(h === "client" || h === "worker"){ location.replace("https://app.yaadly.co.uk/portal"); return; }
   if(h && document.getElementById("pane-"+h)){ go(h); return; }
+  /* #contact is the one in-page anchor on the site, and it has to survive
+     being pasted into a message or printed on a card. It is not a pane, so
+     the pane lookup above misses it and the scrub below would delete it. */
+  if(h === "contact"){ window.addEventListener("DOMContentLoaded", contactUs); return; }
   /* A hash that names nothing gets scrubbed out of the address bar. #admin
      named the desk until 27 Aug 2026 and names nothing now, but it survived in
      bookmarks and in the URL bar of anybody who tried it, which reads as a live
-     back door on a page that has none. There are no in-page anchors anywhere on
-     this site, so a hash still sitting here is either a dead route or somebody
-     guessing at one. Neither belongs in a link somebody can pass on. */
+     back door on a page that has none. #contact aside, there are no in-page
+     anchors on this site, so a hash still sitting here is either a dead route
+     or somebody guessing at one. Neither belongs in a link somebody can pass
+     on. */
   if(h) history.replaceState(null, "", location.pathname + location.search);
 })();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
@@ -2602,6 +2711,30 @@ function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encode
    is better than confidently opening the wrong person's chat. */
 /* A button that cannot work should say so rather than look pressable. */
 $("foot-wa").href = wa("Hello Yaadly, I have a question about:\n\n");
+
+/* The contact section reads its two channels off CONFIG and SVC_EMAIL rather
+   than repeating them in the markup. A phone number printed in two places is
+   a phone number that will one day be right in one of them. */
+$("contact-wa").href = wa("Hello Yaadly, I have a question about:\n\n");
+$("contact-mail").href = "mailto:" + SVC_EMAIL + "?subject=" + encodeURIComponent("Yaadly enquiry");
+$("contact-mail-addr").textContent = SVC_EMAIL;
+/* Digits only is what wa.me needs and not what anybody reads. Grouped as a UK
+   mobile because that is the shape of the number; a number that stops being
+   that shape falls through and shows unspaced, which is ugly and still correct. */
+$("contact-wa-num").textContent = "+" + CONFIG.whatsapp.replace(/^(\d{2})(\d{4})(\d{6})$/, "$1 $2 $3");
+
+/* Contact is a section at the bottom of the website, not a pane of its own,
+   so the nav button and the footer link have to put the right pane up first
+   and only then scroll. go() jumps to the top, hence the wait. */
+function contactUs(){
+  go("site");
+  closeNav();
+  setTimeout(function(){
+    var el = $("contact");
+    if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+    history.replaceState(null, "", location.pathname + "#contact");
+  }, 40);
+}
 /* What somebody types first decides how many rounds it takes.
    "Hi" is one message and four questions. This is one message and usually
    none, because the three things a worker refuses to quote without, what the
@@ -2645,6 +2778,11 @@ async function filesToPhotos(list){ const out=[]; for(const f of Array.from(list
    well as the signature, and that row is created in the portal once the
    client has confirmed their email. The invariant stays in Postgres. */
 const POST_JOB_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-post-job";
+/* The contact form. It used to insert into the enquiries table directly on the
+   publishable key, which worked and told the person nothing. It posts here now
+   because a receipt has to be sent server-side: the key in this page source
+   cannot send mail, and should never be able to. */
+const ENQUIRY_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-enquiry";
 const WEBSITE_INTAKE_URL = POST_JOB_URL;
 const GOLIVE_URL = POST_JOB_URL;
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
@@ -3378,6 +3516,70 @@ function bookCall(){
   ["bk-name","bk-contact","bk-note"].forEach(i=>$(i).value="");
   document.querySelectorAll(".slots input:checked").forEach(c=>c.checked=false);
 }
+/* Unlike bookCall and joinWaitlistModal, this one waits for the server and
+   says so if the write failed. Those two fire and forget: a console warning
+   nobody sees, and a green tick either way. That is survivable for a waiting
+   list and not survivable here, where somebody has just described a problem
+   and is now waiting on a reply that will never come. If the write fails, the
+   two channels above the form still work, so send them there.
+
+   It posts to yaad-enquiry rather than writing the row itself, because the
+   function also emails a receipt. What the person typed into "email or
+   WhatsApp" decides whether there is anywhere to send one, and the server is
+   the only side that knows whether it actually went, so the wording below
+   follows what it reports back rather than guessing. */
+async function sendEnquiry(){
+  const g = id => ($(id).value||"").trim();
+  const status = $("ct-status"), btn = $("ct-send");
+  const say = (tone, html) => { status.innerHTML = '<div class="rule" style="margin-top:14px'+(tone==="bad"?';background:var(--redsoft);border-color:#542020;color:#F3C9C9':"")+'">'+html+'</div>'; };
+
+  const fallback = ' Send it on <a href="'+$("contact-wa").href+'" target="_blank" rel="noopener" style="color:var(--tealb)">WhatsApp</a> instead, or email <a href="'+$("contact-mail").href+'" style="color:var(--tealb)">'+esc(SVC_EMAIL)+'</a>.';
+
+  const e = { name:g("ct-name"), contact:g("ct-contact"), topic:$("ct-topic").value, message:g("ct-msg") };
+  if(!e.name || !e.contact || !e.message){
+    say("bad", "\u26a0\ufe0f <b>Nearly.</b> We need your name, a way to reach you, and what you want to ask.");
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "Sending\u2026";
+  let j = null;
+  try{
+    const r = await fetch(ENQUIRY_URL, {
+      method: "POST",
+      headers: { "Content-Type":"application/json",
+                 "Authorization":"Bearer " + SUPABASE_PUBLISHABLE_KEY,
+                 "apikey": SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify(e)
+    });
+    j = await r.json().catch(()=>null);
+    if(!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+  }catch(err){
+    btn.disabled = false; btn.textContent = "Send enquiry";
+    console.warn("enquiry:", err && err.message);
+    /* A 429 is the throttle and carries its own wording, which is about them
+       having written a lot, not about us being broken. Anything else is us. */
+    const mine = (j && j.error) ? esc(j.error) : "That did not send. Nothing is lost on your side.";
+    say("bad", "\u26a0\ufe0f <b>" + mine + "</b>" + fallback);
+    return;
+  }
+  btn.disabled = false; btn.textContent = "Send enquiry";
+
+  /* Only claim a receipt was emailed when the server says one went, and say
+     which of the three other things happened when it did not. Telling
+     somebody who typed an address that we only have their phone number is a
+     lie they can see, and it is the exact moment they stop believing the rest
+     of the page. */
+  const RECEIPT = {
+    sent:      ' A confirmation of exactly what you sent is on its way to <b>' + esc((j && j.email) || e.contact) + '</b>, so you have it in writing.',
+    no_email:  " We have your number rather than an email, so the reply comes back the same way you wrote to us.",
+    failed:    " We could not get the confirmation email out to you just now, which is our end and not yours. Your message is here and it will be answered.",
+    throttled: " You have written a few times from that address today, so we have not sent another confirmation. Your message is here all the same."
+  };
+  const receipt = RECEIPT[(j && j.receipt) || (j && j.emailed ? "sent" : "no_email")] || "";
+  say("ok", "\u2705 <b>Got it, "+esc(e.name)+".</b>" + receipt + " Monique reads these herself and comes back within 24 hours, usually sooner. If it is urgent, message the WhatsApp number above and it reaches the same person faster.");
+  ["ct-name","ct-contact","ct-msg"].forEach(i=>$(i).value="");
+}
+
 function joinWaitlistModal(){
   const g = id => ($(id).value||"").trim();
   if(!g("wlm-name") || !g("wlm-contact")){ alert("Name and a way to reach you are needed."); return; }
