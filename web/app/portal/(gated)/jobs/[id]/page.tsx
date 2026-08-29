@@ -14,6 +14,7 @@ import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { FeeBreakdown } from "@/components/portal/FeeBreakdown";
 import { PortalCard } from "@/components/portal/PortalCard";
 import { JobBrief } from "@/components/portal/JobBrief";
+import { jobGates } from "@/lib/portal/gates";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import legal from "@/lib/legal-copy.json";
@@ -218,27 +219,12 @@ export default async function JobRoom({
     job.open === true && !job.worker_email && (job.stage ?? 0) === 0;
   const movedOn = !!job.worker_email || (job.stage ?? 0) > 0 || job.status === "complete";
 
-  const gates: Gate[] = [
-    {
-      title: "Confirm your email address",
-      why: "Open the link Yaadly emailed you when you signed up. A job can be posted in anybody's name; a confirmed mailbox is what proves this one is yours.",
-      done: emailConfirmed,
-    },
-    {
-      title: `Sign the Client Guidelines, version ${legal.CG_VERSION}`,
-      why: "What Yaadly does, what it charges, and what happens if the work is wrong. Nothing reaches a tradesperson until you have agreed to them.",
-      done: signed,
-      href: "/portal/guidelines",
-      cta: "Read and sign",
-    },
-    {
-      title: "Say where materials are kept",
-      why: "A worker cannot price this honestly without it. With nowhere securable he buys in drops and drives the surplus off site each night, and those trips belong in his quote.",
-      done: storeNamed,
-      href: jobBase + "#materials",
-      cta: "Answer it",
-    },
-  ];
+  const gates: Gate[] = jobGates({
+    job,
+    jobBase,
+    emailConfirmed,
+    signed,
+  });
 
   /* The board carries the trade filter so the job is not one card in a list
      of everything, and the anchor puts it under the reader's eye rather than

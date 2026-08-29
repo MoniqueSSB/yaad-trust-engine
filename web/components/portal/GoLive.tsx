@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { goLive } from "@/app/portal/golive-actions";
+import type { Gate } from "@/lib/portal/gates";
+
+// Re-exported so the job room can keep importing the type from here, next to
+// the thing that renders it.
+export type { Gate };
 
 /**
  * What this job still needs before a tradesperson can see it, and the link to
@@ -24,16 +29,6 @@ import { goLive } from "@/app/portal/golive-actions";
  * is stopping them and a way to do it, and four ticks with four links say
  * that where a percentage never could.
  */
-
-export type Gate = {
-  title: string;
-  /** what this gate is for, in the client's terms, not the schema's */
-  why: string;
-  done: boolean;
-  /** where to go and clear it; absent when the gate clears itself */
-  href?: string;
-  cta?: string;
-};
 
 export function GoLive({
   jobId,

@@ -3,6 +3,12 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
+import {
+  jobGates,
+  stillWaiting,
+  CG_VERSION,
+  type GateJob,
+} from "@/lib/portal/gates";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
 export const dynamic = "force-dynamic";
@@ -31,7 +37,7 @@ export default async function ClientPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,client_email,worker_email,updated_at",
+      "id,title,trade,parish,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type",
     )
     .order("updated_at", { ascending: false });
 
@@ -51,9 +57,50 @@ export default async function ClientPortal() {
     price: string | null;
   }[];
 
-  const waitingOnSetup = jobs.filter(
-    (j) => j.status === "awaiting_client_setup",
-  ).length;
+  /* The signature that opens the board, at the exact version in force. A
+     signature on an older version is not a signature for this purpose:
+     client_go_live() compares doc_version with =, so "signed, but 1.2" and
+     "never signed" are the same answer to Postgres and must be the same
+     answer here. Same query as the job room, on purpose. */
+  const { data: cgSig } = await supabase
+    .from("doc_signatures")
+    .select("id")
+    .eq("doc_type", "client_guidelines")
+    .eq("doc_version", CG_VERSION)
+    .ilike("signer_email", email)
+    .limit(1)
+    .maybeSingle();
+
+  const emailConfirmed = !!user.email_confirmed_at;
+  const signed = !!cgSig;
+
+  /* Jobs the checklist still has something to say about: not on the board,
+     and not moved past it. A job with a worker on it is not "not live". */
+  const waiting = (jobs as GateJob[]).filter(stillWaiting);
+
+  const gatesFor = (j: GateJob) =>
+    jobGates({
+      job: j,
+      jobBase: "/portal/jobs/" + encodeURIComponent(j.id),
+      emailConfirmed,
+      signed,
+    });
+
+  /* Account gates are the same answer for every job, so they are counted once
+     and shown once. Reprinting "confirm your email" under each of four jobs
+     would read as four separate problems. */
+  const accountOutstanding = waiting.length
+    ? gatesFor(waiting[0]).filter((g) => g.scope === "account" && !g.done)
+    : [];
+
+  const jobOutstanding = waiting
+    .map((j) => ({
+      job: jobs.find((x) => x.id === j.id)!,
+      gates: gatesFor(j).filter((g) => g.scope === "job" && !g.done),
+    }))
+    .filter((x) => x.gates.length > 0);
+
+  const todo = accountOutstanding.length + jobOutstanding.length;
 
   return (
     <>
@@ -78,45 +125,100 @@ export default async function ClientPortal() {
       )}
 
       {/*
-        The first screen after signing in, and the right place to name what is
-        standing between these jobs and a tradesperson.
+        The list, at the top, on the way in.
 
-        This deliberately does NOT promise that signing clears them all. It
-        used to, and that was wrong: 20260828e also requires a nominated
-        materials store per job, and client_go_live() skips the jobs that
-        lack one rather than failing for the rest. A client who signed on
-        that promise would watch nothing happen. The per-job checklist in the
-        job room is the honest version, so this points at it instead of
-        guessing on its behalf.
+        This used to be prose: it named the three conditions in a sentence and
+        sent the reader into a job to find out which ones applied to them. That
+        is a description of the problem, not the answer to it. Somebody opening
+        the portal is asking one question, "what do I have to do", and they
+        should not have to open anything to get it.
+
+        Every gate is computed by lib/portal/gates.ts, the same module the job
+        room uses, so the two screens cannot disagree about what is left. A
+        checklist that contradicts itself between pages is worse than none: the
+        reader cannot tell which page is lying.
+
+        Account gates once, job gates per job. That distinction is the thing
+        people get wrong, and printing "confirm your email" under each of four
+        jobs would read as four separate problems rather than one.
       */}
-      {waitingOnSetup > 0 && (
-        <div className="mt-6 rounded-2xl border border-mango/30 bg-mango/10 p-5">
+      {todo > 0 && (
+        <section className="mt-6 rounded-2xl border border-mango/30 bg-mango/10 p-5">
           <h2 className="font-display text-[18px] uppercase leading-none">
-            {waitingOnSetup === 1
-              ? "One job is not on the marketplace yet"
-              : `${waitingOnSetup} jobs are not on the marketplace yet`}
+            {waiting.length === 1
+              ? "Your job is not on the marketplace yet"
+              : `${waiting.length} of your jobs are not on the marketplace yet`}
           </h2>
-          <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
+          <p className="mt-3 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
             No tradesperson can see{" "}
-            {waitingOnSetup === 1 ? "it" : "them"} until a short list is done:
-            a confirmed email, a signed set of Client Guidelines, and, on each
-            job, where materials are to be kept on the property.
-          </p>
-          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
-            Signing is once, for all of them. The materials question is per
-            job, because the answer is about that property. Open a job below
-            and it shows you exactly what it is still waiting on.
-          </p>
-          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
+            {waiting.length === 1 ? "it" : "them"} until this list is done.
             Nothing is charged, and you are not committing to any quote.
           </p>
-          <Link
-            href="/portal/guidelines"
-            className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
-          >
-            Read and sign the Client Guidelines
-          </Link>
-        </div>
+
+          <ol className="mt-4 grid gap-2.5">
+            {accountOutstanding.map((g) => (
+              <li
+                key={g.title}
+                className="rounded-xl border border-softline bg-soft px-3.5 py-3"
+              >
+                <b className="text-[13.5px]">{g.title}</b>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
+                  {g.why}
+                </p>
+                {g.href && (
+                  <Link
+                    href={g.href}
+                    className="mt-2.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D] transition hover:brightness-110"
+                  >
+                    {g.cta ?? "Do this"}
+                  </Link>
+                )}
+                {!g.href && (
+                  <p className="mt-2 text-[12px] text-dim">
+                    Nothing to click here. It clears itself once you open the
+                    link in that email.
+                  </p>
+                )}
+              </li>
+            ))}
+
+            {jobOutstanding.map(({ job, gates }) => (
+              <li
+                key={job.id}
+                className="rounded-xl border border-softline bg-soft px-3.5 py-3"
+              >
+                <p className="text-[10.5px] font-bold uppercase tracking-[.18em] text-tealb">
+                  {job.title ?? job.id}
+                </p>
+                {gates.map((g) => (
+                  <div key={g.title} className="mt-1.5">
+                    <b className="text-[13.5px]">{g.title}</b>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
+                      {g.why}
+                    </p>
+                    {g.href && (
+                      <Link
+                        href={g.href}
+                        className="mt-2.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D] transition hover:brightness-110"
+                      >
+                        {g.cta ?? "Do this"}
+                      </Link>
+                    )}
+                  </div>
+                ))}
+              </li>
+            ))}
+          </ol>
+
+          {accountOutstanding.length > 0 && jobOutstanding.length > 0 && (
+            <p className="mt-3.5 text-[12.5px] leading-relaxed text-dim">
+              The first{" "}
+              {accountOutstanding.length === 1 ? "item is" : "items are"} done
+              once and cover every job you have. The rest are per job, because
+              the answer is about that property.
+            </p>
+          )}
+        </section>
       )}
 
       <JobList
