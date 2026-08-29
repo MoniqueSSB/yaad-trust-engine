@@ -571,16 +571,25 @@ Deno.serve(async (req: Request) => {
       // Find the user so the signature can be attributed. doc_signatures.signer_user
       // is NOT NULL by design: a signature that is not tied to an account is not a
       // signature, it is a checkbox.
-      const { data: list } = await admin.auth.admin.listUsers();
-      const found = list?.users?.find((u) => (u.email ?? "").toLowerCase() === email);
-      if (!found) {
-        root.recordError("user not found after create");
+      //
+      // Asked of Postgres by email, not read off a page of accounts.
+      // listUsers() hands back the first fifty and no warning that there are
+      // more, so the moment Yaadly passes fifty auth users a client whose row
+      // sits on page two stops being found. Everything about that request is
+      // correct, and it fails anyway: no signature, no open job, and an error
+      // message that tells them to message us rather than saying what happened.
+      // The count only ever goes up, so this had one direction to fail in.
+      //
+      // The signed-in branch above never had the problem: a verified session
+      // already names the account, so there is nothing to look up.
+      const { data: found, error: lookupErr } = await admin
+        .rpc("auth_user_by_email", { p_email: email })
+        .maybeSingle<{ user_id: string; confirmed_at: string | null }>();
+      if (lookupErr || !found) {
+        root.recordError(lookupErr ? `user lookup: ${lookupErr.message}` : "user not found after create");
         return json({ error: "Could not attach your signature to an account. Message Yaadly." }, 502);
       }
-      user = {
-        id: found.id,
-        confirmed: Boolean(found.email_confirmed_at ?? (found as { confirmed_at?: string }).confirmed_at),
-      };
+      user = { id: found.user_id, confirmed: Boolean(found.confirmed_at) };
     }
     const confirmed = user.confirmed;
 
