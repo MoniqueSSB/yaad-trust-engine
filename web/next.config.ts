@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 
+// Refuses to build without the Supabase environment. Imported for the side
+// effect, deliberately: next.config.ts is loaded by every build path there is,
+// including `opennextjs-cloudflare build` and `deploy`, which is what makes it
+// the one place a missing value cannot slip past. See the file for the outage
+// that caused this.
+import "./scripts/check-env.mjs";
+
 // Security headers for app.yaadly.co.uk.
 //
 // This host carries the client and worker portals: signed-in sessions, job
