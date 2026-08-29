@@ -99,6 +99,7 @@ function cardCols(b: Record<string, unknown>) {
 }
 
 
+
 // ── The intake agent ─────────────────────────────────────────────────────
 //
 // Runs HERE, on the server, not from the browser. The build sheet flags the
@@ -390,6 +391,42 @@ Deno.serve(async (req: Request) => {
     const access = s(b.access);
     const photos: string[] = Array.isArray(b.photos) ? (b.photos as string[]).slice(0, 8) : [];
 
+    // The voice note recorded at step 2. It rides the same JSON the photos
+    // ride and lands in evidence like them, so the person reviewing the job
+    // hears the words exactly as the client said them. The transcript already
+    // went into desc on the client side; what arrives here in voiceNoteText
+    // is kept on the evidence row so the recording and its machine reading
+    // stay together. The prefix check is the whole validation: anything that
+    // is not an audio data URL is not a voice note and is ignored.
+    const voiceNote = typeof b.voiceNote === "string" && b.voiceNote.startsWith("data:audio/")
+      ? b.voiceNote : "";
+    if (voiceNote.length > 8_000_000) return json({ error: "That voice note is too big. Three minutes is the most the form takes." }, 413);
+    const voiceNoteText = s(b.voiceNoteText).slice(0, 4000);
+    if (voiceNote) root.setAttributes({ "yaadly.post.voice_note_chars": voiceNote.length });
+
+    // Files the clip against the job as evidence so the person reviewing it
+    // can listen before it reaches the board. One per job: the wizard saves
+    // the same draft several times on the way through (the assistant button,
+    // every Continue, go live), and three copies of the same clip helps
+    // nobody. The clip is never re-filed and never replaced, because the
+    // recording is the record; changing your mind is what Remove and
+    // re-record are for on the form, before it is sent.
+    const attachVoiceNote = async (jobId: string) => {
+      if (!voiceNote) return;
+      const { data: had } = await admin.from("evidence")
+        .select("id").eq("job_id", jobId).eq("label", "Client voice note").limit(1);
+      if (had?.length) return;
+      const mime = voiceNote.slice(5, voiceNote.indexOf(";"));
+      const { error } = await admin.from("evidence").insert({
+        job_id: jobId, label: "Client voice note", mime,
+        meta: voiceNoteText
+          ? `Recorded in the job wizard. The speech service wrote it out as: ${voiceNoteText}`
+          : "Recorded in the job wizard. The speech service could not write it out, so listen to it.",
+        img: voiceNote, ok: true,
+      });
+      if (error) console.warn("voice note insert:", error.message);
+    };
+
     // ───────────────────────── draft ─────────────────────────
     if (mode === "draft") {
       const existing = s(b.jobId);
@@ -406,6 +443,10 @@ Deno.serve(async (req: Request) => {
         if (cur && !s(cur.client_email)) {
           const { error } = await admin.from("jobs").update(row).eq("id", existing);
           if (error) { root.recordError(error.message); return json({ error: error.message }, 500); }
+          // Recorded after the draft was first written, which is the common
+          // shape: the draft lands on the first Continue, the voice note can
+          // come any time the client is back on step 2.
+          await attachVoiceNote(existing);
           const { data } = await admin.from("jobs").select("portal_code").eq("id", existing).single();
           root.setAttributes({ "yaadly.post.outcome": "draft_updated" });
           return json({ ok: true, jobId: existing, portalCode: data?.portal_code ?? null });
@@ -469,6 +510,7 @@ Deno.serve(async (req: Request) => {
         const { error: evErr } = await admin.from("evidence").insert(rows);
         if (evErr) console.warn("evidence insert:", evErr.message);
       }
+      await attachVoiceNote(jobId);
 
       root.setAttributes({ "yaadly.post.outcome": "draft_created", "yaadly.job.id": jobId });
       // The read goes back to the page as well as into the row. Writing it to
@@ -663,6 +705,7 @@ Deno.serve(async (req: Request) => {
       const { error: evErr } = await admin.from("evidence").insert(rows);
       if (evErr) console.warn("evidence insert:", evErr.message);
     }
+    await attachVoiceNote(jobId);
 
     // Ask the database to open it. It will refuse until the client is cleared,
     // which needs the profile as well as this signature, and the profile only

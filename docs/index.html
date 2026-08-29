@@ -1484,6 +1484,22 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <label class="fl" for="w-desc">Describe the job</label>
       <textarea class="f" id="w-desc" placeholder="e.g. Water leaking from the pipe under the kitchen sink, been going about a week. Cupboard floor is soft now. House is my father's in Barbican, I'm in London."></textarea>
     </div>
+    <!-- Voice. Somebody standing in front of a leaking roof says it in thirty
+         seconds far more accurately than they will ever type it, which is the
+         whole reason the WhatsApp intake takes voice notes. This is the same
+         thing without leaving the form: recorded in the browser, written out
+         by the same speech service the WhatsApp intake uses, and the clip
+         itself attached to the job so a person hears the words as they were
+         said. Pressing record is the consent, the same rule as the assistant
+         button below: leave it alone and nothing is recorded, nothing is sent. -->
+    <div class="manualnote">
+      <b>Rather say it than type it?</b> Press record and talk, Patois or English, up to three minutes. Your recording goes to a speech to text service that writes it into the box above for you to check, and the recording itself stays attached to your job, so a person hears it in your own words even where the machine misheard you. Nothing is recorded until you press the button.
+      <div class="assistrow">
+        <button class="btn ghost" type="button" id="vn-btn">Record it instead</button>
+        <span class="sp" id="vn-hint"></span>
+      </div>
+      <div id="vn-out"></div>
+    </div>
     <div class="manualnote">
       <b>Want the intake assistant to read this?</b> Press the button and it reads what you wrote, fills in what it can work out on the job card below, and tells you the two things a worker will ring up and ask before quoting. It is never asked about money or materials, so it never guesses those. Your words go to an AI model to do it, and a person still reads every job before it reaches the board. Leave the button alone and nothing machine reads what you wrote.
       <div class="assistrow">
@@ -2390,6 +2406,10 @@ const POST_JOB_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad
 const ENQUIRY_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-enquiry";
 const WEBSITE_INTAKE_URL = POST_JOB_URL;
 const GOLIVE_URL = POST_JOB_URL;
+/* Speech to text. The same function the WhatsApp intake already uses, so a
+   voice note recorded here and one sent there land in the same handwriting,
+   with the same Patois instruction and the same provider chain behind it. */
+const TRANSCRIBE_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-transcribe";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 /* ═══════════ POST A JOB · the six-step wizard ═══════════
    specs/POST-A-JOB-FLOW-SPEC.md v1.0.
@@ -2419,6 +2439,8 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  var wzFlex=false;
  var wzMonth=null;         // first of the month on show
  var photos=[];
+ var voiceNote=null;       // data URL of the clip recorded at step 2
+ var voiceNoteText='';     // what the speech service made of it
  var when='Within the next two weeks';
  var draftId=null;         // the job row, written at step 2
  var portalCode=null;
@@ -2743,6 +2765,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    '<div class="rvsplit pub"><p class="h">Public, workers see this</p>'+
      '<p>'+esc((S('#w-desc').value||'').trim())+'</p>'+
      (photos.length?'<p class="tiny" style="margin-top:8px">'+photos.length+' photo'+(photos.length>1?'s':'')+' attached</p>':'')+
+     (voiceNote?'<p class="tiny" style="margin-top:4px">Voice note attached, in your own words</p>':'')+
      '<dl style="margin-top:10px">'+
       '<dt>Job type</dt><dd>'+esc(JC.type.v)+'</dd>'+
       '<dt>How much work</dt><dd>'+esc(JC.size.v)+'</dd>'+
@@ -2879,6 +2902,89 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   drawCard();
  });
 
+ /* ---------- step 2 · voice ----------
+    MediaRecorder, no library. Safari records audio/mp4, everything else
+    audio/webm, and yaad-transcribe takes either. The clip is kept as a data
+    URL so it rides the same JSON the photos already ride, and it is sent to
+    the job whether or not the speech service managed to write it out: the
+    transcript is the convenience, the recording is the record. */
+ var vnRec=null, vnStream=null, vnChunks=[], vnTimer=null, vnT0=0, vnBusy=false;
+ var VN_MAX_S=180;
+ function vnSay(t){ var h=S('#vn-hint'); if(h) h.textContent=t }
+ function vnClock(){
+  var sec=Math.min(VN_MAX_S,Math.round((Date.now()-vnT0)/1000));
+  var b=S('#vn-btn'); if(b) b.textContent='Stop recording · '+Math.floor(sec/60)+':'+('0'+sec%60).slice(-2);
+  if(sec>=VN_MAX_S && vnRec && vnRec.state==='recording') vnRec.stop();
+ }
+ function vnDraw(){
+  var box=S('#vn-out'); if(!box) return;
+  box.innerHTML = voiceNote
+   ? '<div class="card soft" style="margin-top:12px"><p class="kick m" style="margin-bottom:8px">Your voice note, attached to this job</p>'+
+     '<audio controls preload="metadata" src="'+voiceNote+'" style="width:100%"></audio>'+
+     '<div class="assistrow"><button class="btn ghost sm" type="button" id="vn-again">Record again</button>'+
+     '<button class="btn ghost sm" type="button" id="vn-drop">Remove it</button>'+
+     '<span class="sp" id="vn-status"></span></div></div>'
+   : '';
+ }
+ async function vnTranscribe(){
+  var st=S('#vn-status'); if(st) st.textContent='Writing it out…';
+  try{
+   var r=await fetch(TRANSCRIBE_URL,{method:'POST',headers:authHeaders(),
+     body:JSON.stringify({audio:voiceNote,
+       filename:voiceNote.indexOf('audio/mp4')>-1?'note.m4a':'note.webm'})});
+   var j=await r.json();
+   if(!j || !j.ok || !j.text) throw new Error((j&&j.error)||'no text came back');
+   voiceNoteText=j.text;
+   var d=S('#w-desc'), cur=(d.value||'').trim();
+   d.value = cur ? cur+'\n\n'+j.text : j.text;
+   hint2();
+   if(st) st.textContent='Written into the box above. Read it back and fix anything it misheard, your recording stays with the job either way.';
+  }catch(err){
+   /* The clip still goes up with the job, so a failed transcription costs
+      the client nothing but the typing they were trying to avoid. */
+   if(st) st.textContent='Could not write it out this time. The recording still goes with your job and a person will listen to it.';
+  }
+ }
+ S('#vn-btn').addEventListener('click',async function(){
+  var b=this;
+  if(vnRec && vnRec.state==='recording'){ vnRec.stop(); return }
+  /* A second tap while the microphone prompt is still open must not start a
+     second recorder over the first. */
+  if(vnBusy) return;
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)||typeof MediaRecorder==='undefined'){
+   vnSay('Recording is not available in this browser. Type it instead, or send us a voice note on WhatsApp, top of this page.'); return }
+  vnBusy=true;
+  try{ vnStream=await navigator.mediaDevices.getUserMedia({audio:true}) }
+  catch(err){
+   vnBusy=false;
+   vnSay('The microphone was not allowed. Type it instead, or send us a voice note on WhatsApp.'); return }
+  var mime=['audio/mp4','audio/webm;codecs=opus','audio/webm'].filter(function(m){
+    return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m)})[0];
+  vnChunks=[];
+  try{ vnRec = mime ? new MediaRecorder(vnStream,{mimeType:mime,audioBitsPerSecond:48000}) : new MediaRecorder(vnStream) }
+  catch(err){ vnRec = new MediaRecorder(vnStream) }
+  vnRec.ondataavailable=function(e){ if(e.data&&e.data.size) vnChunks.push(e.data) };
+  vnRec.onstop=function(){
+   clearInterval(vnTimer);
+   vnStream.getTracks().forEach(function(t){t.stop()});
+   vnBusy=false;
+   b.textContent='Record it instead';
+   var blob=new Blob(vnChunks,{type:vnRec.mimeType||mime||'audio/webm'});
+   if(blob.size<2000){ vnSay('Nothing was heard. Try again, a little closer to the phone.'); return }
+   var rd=new FileReader();
+   rd.onload=function(){ voiceNote=rd.result; vnSay(''); vnDraw(); vnTranscribe() };
+   rd.readAsDataURL(blob);
+  };
+  vnRec.start();
+  vnT0=Date.now(); vnTimer=setInterval(vnClock,500); vnClock();
+  vnSay('Recording. Say it how you would say it to a neighbour, then press stop.');
+ });
+ root.addEventListener('click',function(e){
+  if(e.target.id==='vn-again'){ voiceNote=null; voiceNoteText=''; vnDraw(); S('#vn-btn').click() }
+  if(e.target.id==='vn-drop'){ voiceNote=null; voiceNoteText=''; vnDraw();
+   vnSay('Removed. Nothing goes with the job unless you record again.') }
+ });
+
  /* ---------- the client who already has an account ----------
     Not a demo toggle, a real session. The token goes up with the job, the
     server asks the auth server who it belongs to, and nothing is created
@@ -2997,7 +3103,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    storey:JC.storey.v, accessType:JC.access.v, materialsBy:JC.mat.v,
    materialsStore:JC.store.v, materialsStoreWhere:JC.storeWhere.v,
    budgetBand:JC.budget.v, stages:jcStages(), evidence:jcEv,
-   photos:photos
+   photos:photos,
+   voiceNote:voiceNote||undefined,
+   voiceNoteText:voiceNoteText||undefined
   };
  }
 
