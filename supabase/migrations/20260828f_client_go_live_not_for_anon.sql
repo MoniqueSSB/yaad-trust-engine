@@ -1,0 +1,24 @@
+-- client_go_live() was reachable at /rest/v1/rpc/client_go_live by anybody
+-- holding the publishable key printed in the page source.
+--
+-- Not exploitable: the first thing the function does is check auth.uid() and
+-- raise 28000 when it is null, so an anonymous call has always bounced. But
+-- this repository's standing rule, written down in 20260828a, is that nothing
+-- anonymous gets near a function that moves work or money, whatever the body
+-- says. Bodies get edited.
+--
+-- Why the existing revoke did not do it, which is the useful part. 20260827i
+-- ended with:
+--
+--   revoke all on function public.client_go_live() from public;
+--   grant execute on function public.client_go_live() to authenticated;
+--
+-- That removes the PUBLIC grant. It does not remove an EXPLICIT anon grant,
+-- and Supabase grants EXECUTE to anon and authenticated on every function
+-- created in an exposed schema. So the ACL kept anon=X throughout and the
+-- revoke looked like it had worked. This is the same trap as 20260828b, the
+-- other way round: there, revoking from anon missed the PUBLIC grant anon
+-- inherits; here, revoking from PUBLIC misses the explicit grant anon holds.
+-- Revoking from one of them is never enough. Name both.
+revoke execute on function public.client_go_live() from public, anon;
+grant  execute on function public.client_go_live() to authenticated;

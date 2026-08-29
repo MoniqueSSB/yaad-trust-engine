@@ -7,6 +7,7 @@ import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
+import { MaterialsStore } from "@/components/portal/MaterialsStore";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
 import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
@@ -92,7 +93,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code",
+      "id,title,trade,parish,stage,status,descr,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by",
     )
     .eq("id", id)
     .maybeSingle();
@@ -314,6 +315,18 @@ export default async function JobRoom({
         />
       )}
 
+      {/* Before the evidence ledger on purpose. Until this is answered no
+          materials money can move and no materials evidence can be filed, so
+          it belongs above the thing it is blocking rather than below it. */}
+      <MaterialsStore
+        jobId={job.id}
+        role={role}
+        storeType={job.materials_store_type ?? null}
+        store={job.materials_store ?? null}
+        setBy={job.materials_store_set_by ?? null}
+        setAt={job.materials_store_set_at ?? null}
+      />
+
       {job.descr && (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
           <h2 className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -413,7 +426,12 @@ export default async function JobRoom({
         })}
 
         {job.status !== "complete" && (
-          <EvidenceUpload jobId={job.id} maxStage={stages.length} />
+          <EvidenceUpload
+            jobId={job.id}
+            maxStage={stages.length}
+            storeType={job.materials_store_type ?? null}
+            store={job.materials_store ?? null}
+          />
         )}
       </section>
 

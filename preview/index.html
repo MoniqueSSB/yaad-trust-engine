@@ -2307,42 +2307,6 @@ var REVIEWERS={
   note:'Short notice, inside 48 hours: <b>\u00a3395</b>. Right for anything structural or electrical, and any stage about to be covered over.'}
 };
 
-var MARKET=[
- ['<b>Basic \u2014 not a surveyor</b>','',''],
- ['UK property inspection report','\u00a380\u2013150','gvec.co.uk, 2026'],
- ['\u2003same-day / emergency','\u00a3130\u2013180','gvec.co.uk, 2026'],
- ['UK periodic property inspection, <b>per visit</b>','\u00a380 + VAT','Leisure Guard, 2026'],
- ['UK snagging survey \u2014 3-bed house','\u00a3449','HomeOwners Alliance, 2026'],
- ['UK snagging <b>re-inspection</b> \u2014 flat','\u00a3290\u2013350','HomeOwners Alliance, 2026'],
- ['<b>Carried out by a trained professional</b>','',''],
- ['<b>RICS Level 1</b> \u2014 Condition Report, no advice','\u00a3300\u2013900','HomeOwners Alliance, 2026'],
- ['<b>RICS Level 2</b> \u2014 HomeBuyer, with repair advice','\u00a3400\u20131,000','HomeOwners Alliance, 2026'],
- ['<b>RICS Level 3</b> \u2014 Building Survey, with repair costs','\u00a3630\u20131,500+','HomeOwners Alliance, 2026'],
- ['Structural engineer \u2014 site visit only','\u00a3300','Checkatrade, 2026'],
- ['Structural engineer \u2014 visit + report','\u00a31,000','Checkatrade, 2026'],
- ['Structural engineer \u2014 hourly','\u00a3100\u2013200','Checkatrade, 2026'],
- ['<b>Ongoing oversight</b>','',''],
- ['UK monitoring surveyor \u2014 <b>per visit</b>','\u00a3500\u20131,500','Construction Capital, 2026'],
- ['\u2003smaller schemes','\u00a3600\u2013800','Construction Capital, 2026'],
- ['UK monitoring \u2014 desk-top review, one-off','\u00a3750\u20132,000','Construction Capital, 2026'],
- ['<b>Advisory \u2014 quote review and project setup</b>','',''],
- ['QS \u2014 early cost advice','\u00a3300\u20131,000','Homebuilding & Renovating, 2026'],
- ['Building surveyor \u2014 specific defect report','\u00a3300\u2013600','Survey Merchant, 2026'],
- ['Average quantity surveying job','\u00a3400','Kingsmead Consultants, 2026'],
- ['Building surveyor \u2014 hourly','\u00a360\u2013150','Survey Merchant, 2026'],
- ['QS \u2014 <b>full cost control and tendering</b>','\u00a32,000\u201310,000+','Homebuilding & Renovating, 2026'],
- ['Project manager \u2014 % of build cost','3\u20137%','Homebuilding & Renovating, 2026'],
- ['Project manager \u2014 typical total','\u00a310,000\u201330,000+','Homebuilding & Renovating, 2026'],
- ['QS \u2014 % of construction value','0.5\u20132%','Designing Buildings, RICS wiki'],
- ['Professional fees, whole self-build','8\u201315% of build','Homebuilding & Renovating, 2026'],
- ['MyBuildAlly \u2014 automated quote comparison','\u00a310','mybuildally.co.uk'],
- ['<b>Diaspora comparables</b>','',''],
- ['JAMCO \u2014 Before You Build Audit <b>(direct competitor)</b>','\u2248\u00a3263','buildingjamaica.ca'],
- ['JAMCO \u2014 Build Smart, setup + oversight','\u2248\u00a32,384','buildingjamaica.ca'],
- ['IndiaForNRI \u2014 property report','\u2248\u00a3186','indiafornri.com'],
- ['NaijaSight \u2014 monitoring, per visit','\u2248\u00a374','naijasight.com'],
- ['SimpleXD \u2014 virtual inspection','\u2248\u00a327','simplexd.co']
-];
 
 var LADDER=[
  ['h','A \u00b7 Whole-property reports \u2014 one-off','','','','',''],
@@ -2363,9 +2327,9 @@ var LADDER=[
 ];
 function marketTable(){
  return '<div class="pk legal" style="margin-top:14px"><div class="dochd"><div><h3>The ladder, and what it mirrors</h3>'+
- '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Researched 26 Aug 2026 \u2014 every figure is a published price from a live market.</p></div></div>'+
+ '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Every price in the Mirrors column is a published UK price, researched 26 Aug 2026.</p></div></div>'+
 
- '<div class="pksec" style="margin-top:14px;padding-top:0;border-top:0"><h5><span class="dnum">1</span>Yaadly\u2019s ladder</h5>'+
+ '<div class="pksec" style="margin-top:14px;padding-top:0;border-top:0"><h5>Yaadly\u2019s ladder</h5>'+
  '<div style="overflow-x:auto"><table><thead><tr><th>Rung</th><th>What it is</th><th>Who does it</th><th>Founding</th><th>Full price</th><th>Mirrors</th></tr></thead><tbody>'+
  LADDER.map(function(r){
   if(r[0]==='h') return '<tr><td colspan="6" style="padding-top:15px;color:var(--mango);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;border-bottom:1px solid var(--line)">'+r[1]+'</td></tr>';
@@ -2375,18 +2339,7 @@ function marketTable(){
    '<td style="color:var(--mango);white-space:nowrap">'+r[4]+'</td>'+
    '<td style="color:var(--tealb);white-space:nowrap"><b>'+r[5]+'</b></td>'+
    '<td style="color:var(--dim);font-size:11.5px">'+r[6]+'</td></tr>';
- }).join('')+'</tbody></table></div></div>'+
-
- '<div class="pksec"><h5><span class="dnum">2</span>The UK market it is built on</h5>'+
- '<div style="overflow-x:auto"><table><thead><tr><th>Comparable</th><th>Price</th><th>Source</th></tr></thead><tbody>'+
- MARKET.map(function(r){
-  if(!r[1]) return '<tr><td colspan="3" style="padding-top:14px;color:var(--mango);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;border-bottom:1px solid var(--line)">'+r[0].replace(/<\/?b>/g,'')+'</td></tr>';
-  return '<tr><td>'+r[0]+'</td><td style="color:var(--tealb);white-space:nowrap"><b>'+r[1]+'</b></td><td style="color:var(--dim)">'+esc(r[2])+'</td></tr>';
- }).join('')+'</tbody></table></div></div>'+
-
- '<div class="callout"><b>The one distinction the UK market is built on, and we copy it exactly.</b> A <b>Level 1</b> tells you what is wrong and how bad. A <b>Level 2</b> tells you what to do about it. That is the line between a record and an opinion, and it is why Level 2 costs more. Our rungs 1 and 2 record. Rungs 3 and 4 advise. We say which one you are buying, on the page, before you buy it.</div>'+
- '<div class="callout warn"><b>Where we deliberately sit low.</b> Every rung is priced at or below the bottom of its UK band, because the scope is narrower \u2014 one property or one works package, not a whole pre-purchase survey. That is a defensible discount. \u00a340\u201360 for a site attendance was not: it sat below a US insurance 4-point check.</div>'+
- '<div class="callout"><b>Why not the Nigerian price level.</b> NaijaSight at \u00a374 and SimpleXD at \u00a327 are priced against a Nigerian cost base with local staff. Yaadly Ltd is a UK company carrying UK professional indemnity cover with territorial reach into Jamaica and jurisdiction including the USA and Canada \u2014 the expensive end of that market. Their prices are right for their cost base. They are not right for ours.</div></div>';
+ }).join('')+'</tbody></table></div></div></div>';
 }
 function reviewPicker(){
  var R=REVIEWERS[revPick];

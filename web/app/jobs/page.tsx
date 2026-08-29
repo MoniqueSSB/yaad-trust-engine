@@ -21,6 +21,20 @@ type OpenJob = {
   client_signed: boolean | null; client_jobs_completed: number | null;
   job_type: string | null; size_band: string | null;
   access_type: string | null; materials_by: string | null; urgency: string | null;
+  materials_store_type: string | null;
+};
+
+/** What the client answered when asked where materials are to be kept on the
+ *  property. The board carries the answer but never the client's description
+ *  of the place, which open_jobs withholds for the same reason it withholds
+ *  the address: it says where the valuable things are on a house that is
+ *  often empty. A worker needs the answer to quote, because "nowhere
+ *  securable" means buying in drops sized to the next stage and taking the
+ *  surplus away each night, and those trips are priced in the quote. */
+const STORE_LABEL: Record<string, string> = {
+  lockable: "Lockable store on site",
+  indoors: "Materials kept indoors",
+  none_available: "No secure store, buy in drops",
 };
 type Photo = { job_id: string; caption: string; img: string | null; position: number };
 type Worker = { name: string | null; trade: string | null; parish: string | null; lane: string | null; jobs_completed: number | null; slug: string | null };
@@ -147,7 +161,8 @@ export default async function Board({
                 const expanded = pics === j.id;
                 const showPh = expanded ? ph : ph.slice(0, 3);
                 const fresh = !!j.updated_at && newest - new Date(j.updated_at).getTime() < 1000 * 60 * 60 * 6;
-                const sp = [j.job_type, j.size_band, j.access_type, j.materials_by].filter(Boolean) as string[];
+                const sp = [j.job_type, j.size_band, j.access_type, j.materials_by,
+                  STORE_LABEL[j.materials_store_type ?? ""]].filter(Boolean) as string[];
                 const open = q === j.id;
                 return (
                   <div key={j.id} className={"rounded-2xl border bg-panel p-5 " + (fresh ? "border-mango/50 bg-mango/[.045]" : "border-line")}>

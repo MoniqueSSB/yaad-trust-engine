@@ -1521,7 +1521,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div class="card" id="w-review"></div>
 
     <div class="card" id="gblock" style="margin-top:14px;background:var(--soft);border-color:var(--softline)">
-      <p class="kick" style="margin-bottom:9px">Client Guidelines <span id="gver">v1.0</span>, required to go live</p>
+      <p class="kick" style="margin-bottom:9px">Client Guidelines <span id="gver">v1.3</span>, required to go live</p>
       <div class="gscroll">
         <h6>1. What Yaadly does</h6>Yaadly holds your payment for each agreed stage and releases it only when you have seen the evidence and signed it off. Yaadly is not the tradesperson and does not price the work.
         <h6>2. What you agree to</h6>Describe the job honestly, give safe and timely access to the property, and respond to evidence within five working days. Silence past five days counts as approval.
@@ -1529,7 +1529,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
         <h6>4. Your details</h6>Your address and phone number stay off the public board. They are shared with one worker only when you choose to share them.
         <h6>5. Disputes</h6>Where evidence does not match what was agreed in writing, the stage is not released and the job goes to review. Decisions are made on the written scope and the evidence, nothing else.
       </div>
-      <label class="tick" for="gtick"><input type="checkbox" id="gtick"><span>I have read and agree to the Client Guidelines <span class="gverx">v1.0</span>, and I understand my job is not visible to any worker until I confirm this.</span></label>
+      <label class="tick" for="gtick"><input type="checkbox" id="gtick"><span>I have read and agree to the Client Guidelines <span class="gverx">v1.3</span>, and I understand my job is not visible to any worker until I confirm this.</span></label>
       <div class="fgroup" style="margin-top:13px;margin-bottom:0"><label class="fl" for="w-sig">Type your full name to sign</label><input class="f" id="w-sig" placeholder="Your full name">
         <p class="tiny" style="margin-top:7px">Written to <span class="mono" style="font-size:12px">doc_signatures</span> with a timestamp and the exact consent text. No edit, no delete.</p></div>
     </div>
@@ -2343,42 +2343,6 @@ var LADDER=[
  ['C4','Oversight Retainer, <b>fortnightly</b>','Monique','2 documented visits a month, report, accountability call.','\u00a3495/mo','\u00a3595/mo','UK monitoring surveyor \u00a3500 to 1,500 <b>per visit</b>'],
  ['C5','Oversight Retainer, <b>weekly</b>','Monique','4 documented visits a month. Same everything, double the frequency.','\u00a3895/mo','\u00a31,095/mo',', ']
 ];
-var MARKET=[
- ['<b>Basic, not a surveyor</b>','',''],
- ['UK property inspection report','\u00a380 to 150','gvec.co.uk, 2026'],
- ['\u2003same-day / emergency','\u00a3130 to 180','gvec.co.uk, 2026'],
- ['UK periodic property inspection, <b>per visit</b>','\u00a380 + VAT','Leisure Guard, 2026'],
- ['UK snagging survey, 3-bed house','\u00a3449','HomeOwners Alliance, 2026'],
- ['UK snagging <b>re-inspection</b>, flat','\u00a3290 to 350','HomeOwners Alliance, 2026'],
- ['<b>Carried out by a trained professional</b>','',''],
- ['<b>RICS Level 1</b>, Condition Report, no advice','\u00a3300 to 900','HomeOwners Alliance, 2026'],
- ['<b>RICS Level 2</b>, HomeBuyer, with repair advice','\u00a3400 to 1,000','HomeOwners Alliance, 2026'],
- ['<b>RICS Level 3</b>, Building Survey, with repair costs','\u00a3630 to 1,500+','HomeOwners Alliance, 2026'],
- ['Structural engineer, site visit only','\u00a3300','Checkatrade, 2026'],
- ['Structural engineer, visit + report','\u00a31,000','Checkatrade, 2026'],
- ['Structural engineer, hourly','\u00a3100 to 200','Checkatrade, 2026'],
- ['<b>Ongoing oversight</b>','',''],
- ['UK monitoring surveyor, <b>per visit</b>','\u00a3500 to 1,500','Construction Capital, 2026'],
- ['\u2003smaller schemes','\u00a3600 to 800','Construction Capital, 2026'],
- ['UK monitoring, desk-top review, one-off','\u00a3750 to 2,000','Construction Capital, 2026'],
- ['<b>Advisory, quote review and project setup</b>','',''],
- ['QS, early cost advice','\u00a3300 to 1,000','Homebuilding & Renovating, 2026'],
- ['Building surveyor, specific defect report','\u00a3300 to 600','Survey Merchant, 2026'],
- ['Average quantity surveying job','\u00a3400','Kingsmead Consultants, 2026'],
- ['Building surveyor, hourly','\u00a360 to 150','Survey Merchant, 2026'],
- ['QS, <b>full cost control and tendering</b>','\u00a32,000 to 10,000+','Homebuilding & Renovating, 2026'],
- ['Project manager, % of build cost','3 to 7%','Homebuilding & Renovating, 2026'],
- ['Project manager, typical total','\u00a310,000 to 30,000+','Homebuilding & Renovating, 2026'],
- ['QS, % of construction value','0.5 to 2%','Designing Buildings, RICS wiki'],
- ['Professional fees, whole self-build','8 to 15% of build','Homebuilding & Renovating, 2026'],
- ['MyBuildAlly, automated quote comparison','\u00a310','mybuildally.co.uk'],
- ['<b>Diaspora comparables</b>','',''],
- ['JAMCO, Before You Build Audit <b>(direct competitor)</b>','\u2248\u00a3263','buildingjamaica.ca'],
- ['JAMCO, Build Smart, setup + oversight','\u2248\u00a32,384','buildingjamaica.ca'],
- ['IndiaForNRI, property report','\u2248\u00a3186','indiafornri.com'],
- ['NaijaSight, monitoring, per visit','\u2248\u00a374','naijasight.com'],
- ['SimpleXD, virtual inspection','\u2248\u00a327','simplexd.co']
-];
 function svcCard(v){
  var unit = v.dec
    ? esc(v.u)+', paid in milestones'
@@ -2411,9 +2375,9 @@ function svcCard(v){
 }
 function marketTable(){
  return '<div class="pk legal" style="margin-top:14px"><div class="dochd"><div><h3>The ladder, and what it mirrors</h3>'+
- '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Researched 26 Aug 2026, every figure is a published price from a live market.</p></div></div>'+
+ '<p class="tiny">Built to the UK structure: a basic visual check by a trained checker, then real inspections by qualified people. Every price in the Mirrors column is a published UK price, researched 26 Aug 2026.</p></div></div>'+
 
- '<div class="pksec" style="margin-top:14px;padding-top:0;border-top:0"><h5><span class="dnum">1</span>Yaadly\u2019s ladder</h5>'+
+ '<div class="pksec" style="margin-top:14px;padding-top:0;border-top:0"><h5>Yaadly\u2019s ladder</h5>'+
  '<div style="overflow-x:auto"><table><thead><tr><th>Rung</th><th>What it is</th><th>Who does it</th><th>Founding</th><th>Full price</th><th>Mirrors</th></tr></thead><tbody>'+
  LADDER.map(function(r){
   if(r[0]==='h') return '<tr><td colspan="6" style="padding-top:15px;color:var(--mango);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;border-bottom:1px solid var(--line)">'+r[1]+'</td></tr>';
@@ -2423,18 +2387,7 @@ function marketTable(){
    '<td style="color:var(--mango);white-space:nowrap">'+r[4]+'</td>'+
    '<td style="color:var(--tealb);white-space:nowrap"><b>'+r[5]+'</b></td>'+
    '<td style="color:var(--dim);font-size:11.5px">'+r[6]+'</td></tr>';
- }).join('')+'</tbody></table></div></div>'+
-
- '<div class="pksec"><h5><span class="dnum">2</span>The UK market it is built on</h5>'+
- '<div style="overflow-x:auto"><table><thead><tr><th>Comparable</th><th>Price</th><th>Source</th></tr></thead><tbody>'+
- MARKET.map(function(r){
-  if(!r[1]) return '<tr><td colspan="3" style="padding-top:14px;color:var(--mango);font-family:var(--mono);font-size:10px;letter-spacing:.11em;text-transform:uppercase;border-bottom:1px solid var(--line)">'+r[0].replace(/<\/?b>/g,'')+'</td></tr>';
-  return '<tr><td>'+r[0]+'</td><td style="color:var(--tealb);white-space:nowrap"><b>'+r[1]+'</b></td><td style="color:var(--dim)">'+esc(r[2])+'</td></tr>';
- }).join('')+'</tbody></table></div></div>'+
-
- '<div class="callout"><b>The one distinction the UK market is built on, and we copy it exactly.</b> A <b>Level 1</b> tells you what is wrong and how bad. A <b>Level 2</b> tells you what to do about it. That is the line between a record and an opinion, and it is why Level 2 costs more. Our rungs 1 and 2 record. Rungs 3 and 4 advise. We say which one you are buying, on the page, before you buy it.</div>'+
- '<div class="callout warn"><b>Where we deliberately sit low.</b> Every rung is priced at or below the bottom of its UK band, because the scope is narrower, one property or one works package, not a whole pre-purchase survey. That is a defensible discount. \u00a340 to 60 for a site attendance was not: it sat below a US insurance 4-point check.</div>'+
- '<div class="callout"><b>Why not the Nigerian price level.</b> NaijaSight at \u00a374 and SimpleXD at \u00a327 are priced against a Nigerian cost base with local staff. Yaadly Ltd is a UK company carrying UK professional indemnity cover with territorial reach into Jamaica and jurisdiction including the USA and Canada, the expensive end of that market. Their prices are right for their cost base. They are not right for ours.</div></div>';
+ }).join('')+'</tbody></table></div></div></div>';
 }
 
 (function(){
@@ -2690,7 +2643,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  var S=function(s){return root.querySelector(s)};
 
  /* ---------- the job card ----------
-    Eleven fields, five sections, keyed Trade|Type off the taxonomy so a
+    Thirteen fields, five sections, keyed Trade|Type off the taxonomy so a
     duplicate type name under two trades never collides. In guest mode
     nothing is inferred, so every field starts coral except the trade the
     visitor picked themselves. */
@@ -2699,6 +2652,13 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  var JC_URG=['Emergency, within 48 hours','Within two weeks','Within a month','Flexible, planning ahead'];
  var JC_ACCESS=['I am on site myself','Family member on site','Neighbour holds a key','Tenant is in the property','Caretaker or gardener','Property is empty, key with an agent'];
  var JC_MAT=['Worker supplies and invoices with receipts','I supply the materials','Split, agree item by item','Not sure, worker to advise'];
+ /* Materials custody, founder decision 28 Aug 2026. You name the place, the
+    worker films the materials in it, and from that moment they are yours and
+    at your risk. So the question has to be asked here, of you, before any
+    materials money moves. The database refuses a materials release on a job
+    with no answer on it, so this is not a nicety on a form. */
+ var JC_STORE=['A lockable room, store or container on site','Indoors, inside the house','Nowhere securable, buy in drops'];
+ var JC_STORE_NONE='Nowhere securable, buy in drops';
  var JC_BUDGET=['Under J$25,000','J$25,000 to J$60,000','J$60,000 to J$150,000','J$150,000 to J$400,000','Over J$400,000','I would rather the worker tell me'];
  var JC_PARISH=['Kingston','St Andrew','St Catherine','Clarendon','Manchester','St Elizabeth','Westmoreland','Hanover','St James','Trelawny','St Ann','St Mary','Portland','St Thomas'];
  var JC_GENERIC_SIZE=['Small, half a day','Medium, one to two days','Large, three days or more','Not sure, worker to assess'];
@@ -2706,6 +2666,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  var JC={ trade:{v:'',src:'empty'}, type:{v:'',src:'empty'}, prop:{v:'',src:'empty'},
           parish:{v:'',src:'empty'}, size:{v:'',src:'empty'}, storey:{v:'',src:'empty'},
           urg:{v:'',src:'empty'}, access:{v:'',src:'empty'}, mat:{v:'',src:'empty'},
+          store:{v:'',src:'empty'}, storeWhere:{v:'',src:'empty'},
           budget:{v:'',src:'empty'} };
  var jcEv=[];
 
@@ -2717,11 +2678,24 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  function sizeOpts(){ return (window.JC_SIZE&&JC_SIZE[ck()])||JC_GENERIC_SIZE }
  function evOpts(){ return (window.JC_EV&&(JC_EV[ck()]||JC_EV['default']))||[] }
  function jcStages(){ return (window.JC_STAGES&&JC_STAGES[ck()])||2 }
- function jcGaps(){ var n=0; for(var k in JC){ if(!JC[k].v) n++ } return n }
+ /* storeWhere is the only field that can be legitimately blank: there is
+    nothing to describe when the answer is that there is nowhere securable. */
+ function jcGaps(){ var n=0; for(var k in JC){
+   if(k==='storeWhere' && JC.store.v===JC_STORE_NONE) continue;
+   if(!JC[k].v) n++ } return n }
 
  function srcTag(k){
   var m={ok:['ok','From your message'],guess:['guess','Best guess, check it'],empty:['empty','You need to pick']};
   return '<span class="src '+m[k][0]+'">'+m[k][1]+'</span>';
+ }
+ /* A free text field on the card. The nominated store is the client's own
+    words for a place on their own property, and no picker describes a
+    Jamaican yard. Redraw happens on change, which fires on blur, so typing
+    never loses focus. */
+ function jcTxt(id,f,lab,ph){
+  var cls='jsel'+(f.v?'':' empty');
+  return '<div class="jfield"><label>'+lab+srcTag(f.v?f.src:'empty')+'</label>'+
+         '<input class="'+cls+'" data-jc="'+id+'" maxlength="160" value="'+esc(f.v)+'" placeholder="'+esc(ph)+'"></div>';
  }
  function jcSel(id,opts,f,lab){
   var cls='jsel'+(f.src==='guess'?' guess':f.v?'':' empty');
@@ -2750,6 +2724,14 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    '<div class="jcsec"><p class="jclab">Money and materials</p><div class="jfrow">'+
      jcSel('mat',JC_MAT,JC.mat,'Who supplies materials')+
      jcSel('budget',JC_BUDGET,JC.budget,'Your budget band')+'</div>'+
+    '<div class="jfrow" style="margin-top:12px">'+
+     jcSel('store',JC_STORE,JC.store,'Where materials are kept on site')+
+     (JC.store.v && JC.store.v!==JC_STORE_NONE
+       ? jcTxt('storeWhere',JC.storeWhere,'Which room or store, in your words','e.g. the back room off the veranda, key with my aunt')
+       : '')+'</div>'+
+    '<div class="flag" style="margin-top:12px">'+(JC.store.v===JC_STORE_NONE
+      ? '<b>Nowhere securable is a real answer.</b> The worker then buys in drops sized to the next stage and takes the surplus away each night. That costs him trips, so it is priced into his quote up front rather than argued about after a theft.'
+      : '<b>You name the place, and that is what moves the risk.</b> The worker buys the materials, sends the receipt, and photographs and films them in the place you name here. From the moment that evidence is filed the materials are yours and at your risk. Nothing is released for materials until you have named somewhere, and if he stores them elsewhere or leaves them plainly insecure the risk stays with him. His tools are his own risk either way. Check that your property insurance covers materials on site, because cover on an empty house often does not.')+'</div>'+
     '<div class="flag" style="margin-top:12px"><b>This one is yours alone.</b> Your budget band is <b>never</b> shown to a worker, on the board or in a quote. It exists so we can tell you early if what you want and what you have are not the same thing. Workers quote on the scope, blind, because a band a worker can see is a band a worker quotes to, and Yaadly does not price work.</div></div>'+
    '<div class="jcsec"><p class="jclab">Evidence required · '+st+' stage'+(st>1?'s':'')+'</p>'+
     '<p class="tiny" style="margin-bottom:9px">Set from the job type. Tap to add or drop an item, this is what the worker must upload before any money moves.</p>'+
@@ -2765,10 +2747,22 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
     count and the evidence checklist. Keyed Trade|Type, never Type alone. */
  root.addEventListener('change',function(e){
   var sel=e.target.closest('[data-jc]'); if(!sel) return;
-  var k=sel.dataset.jc; JC[k].v=sel.value; JC[k].src=sel.value?'ok':'empty';
+  var k=sel.dataset.jc; JC[k].v=(sel.value||'').trim(); JC[k].src=JC[k].v?'ok':'empty';
   if(k==='trade'){ JC.type.v=''; JC.size.v=''; jcEv=[]; chosen=sel.value; paintTrades() }
   if(k==='type'){ JC.size.v=''; jcEv=evOpts().slice(0,6) }
+  /* Nowhere securable means there is no place to describe. Anything typed
+     before that answer would sit on the job contradicting it. */
+  if(k==='store' && JC.store.v===JC_STORE_NONE){ JC.storeWhere.v=''; JC.storeWhere.src='empty' }
   drawCard();
+ });
+ /* Typed characters update the card's state but do NOT redraw it, because a
+    redraw mid-word takes the cursor with it. hint2 is called instead, so
+    Continue unlocks on the last character rather than on blur; the badge
+    inside the card catches up on the change event. */
+ root.addEventListener('input',function(e){
+  var el=e.target.closest('input[data-jc]'); if(!el) return;
+  var k=el.dataset.jc; JC[k].v=(el.value||'').trim(); JC[k].src=JC[k].v?'ok':'empty';
+  hint2();
  });
  root.addEventListener('click',function(e){
   var b=e.target.closest('[data-ev]'); if(!b) return;
@@ -2994,6 +2988,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    startDate: wzFlex ? 'Flexible' : (wzSel?niceDate(wzSel):''),
    jobType:JC.type.v, propertyType:JC.prop.v, sizeBand:JC.size.v,
    storey:JC.storey.v, accessType:JC.access.v, materialsBy:JC.mat.v,
+   materialsStore:JC.store.v, materialsStoreWhere:JC.storeWhere.v,
    budgetBand:JC.budget.v, stages:jcStages(), evidence:jcEv,
    photos:photos
   };
