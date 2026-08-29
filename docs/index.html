@@ -651,7 +651,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
    One animated moment on the page (the trust engine). Nothing else moves. */
 
 /* ── rhythm ── */
-#pane-site .sec,#pane-services .sec{margin-top:64px}
+#pane-site .sec,#pane-services .sec,#pane-payments .sec{margin-top:64px}
 #pane-site .sec:first-child{margin-top:0}
 
 /* ── type ── */
@@ -661,7 +661,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 #pane-site h2.hx .g2,#pane-services h2.hx .g2{background:linear-gradient(90deg,#FFB020,#FF6B4A);-webkit-background-clip:text;background-clip:text;color:transparent}
 #pane-site .lead,#pane-services .lead{color:var(--mute);font-size:16.5px;max-width:62ch;margin-top:14px}
 #pane-site .lead b,#pane-services .lead b{color:var(--ink);font-weight:700}
-#pane-site .tiny,#pane-services .tiny{font-size:var(--t-tiny);color:var(--mute);line-height:1.55}
+#pane-site .tiny,#pane-services .tiny,#pane-payments .tiny{font-size:var(--t-tiny);color:var(--mute);line-height:1.55}
 #pane-site .mono,#pane-services .mono{font-family:var(--mono)}
 
 /* ── pills. The global .pill is the admin desk's, so this one is scoped. ── */
@@ -687,17 +687,17 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 @media(max-width:420px){#pane-site .strip,#pane-services .strip{grid-template-columns:1fr}}
 
 /* ── grid utilities ── */
-#pane-site .grid,#pane-services .grid{display:grid;gap:14px}
-#pane-site .g2c,#pane-services .g2c{grid-template-columns:repeat(2,1fr)}
-#pane-site .g3c,#pane-services .g3c{grid-template-columns:repeat(3,1fr)}
-#pane-site .g4c,#pane-services .g4c{grid-template-columns:repeat(4,1fr)}
-@media(max-width:860px){#pane-site .g3c,#pane-site .g4c,#pane-services .g4c{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){#pane-site .g2c,#pane-site .g3c,#pane-services .g2c,#pane-services .g3c{grid-template-columns:1fr}#pane-site .g4c,#pane-services .g4c{grid-template-columns:repeat(2,1fr)}}
+#pane-site .grid,#pane-services .grid,#pane-payments .grid{display:grid;gap:14px}
+#pane-site .g2c,#pane-services .g2c,#pane-payments .g2c{grid-template-columns:repeat(2,1fr)}
+#pane-site .g3c,#pane-services .g3c,#pane-payments .g3c{grid-template-columns:repeat(3,1fr)}
+#pane-site .g4c,#pane-services .g4c,#pane-payments .g4c{grid-template-columns:repeat(4,1fr)}
+@media(max-width:860px){#pane-site .g3c,#pane-site .g4c,#pane-services .g4c,#pane-payments .g4c{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){#pane-site .g2c,#pane-site .g3c,#pane-services .g2c,#pane-services .g3c,#pane-payments .g2c{grid-template-columns:1fr}#pane-site .g4c,#pane-services .g4c,#pane-payments .g4c{grid-template-columns:repeat(2,1fr)}}
 
 /* ── ghost button, to sit beside the gradient primary ── */
 #pane-site .btn.ghost,#pane-services .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
 #pane-site .btn.ghost:hover,#pane-services .btn.ghost:hover{border-color:var(--teal);color:var(--tealb);filter:none}
-#pane-site .ctarow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
+#pane-site .ctarow,#pane-payments .ctarow{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
 
 /* ── the gate card in the WhatsApp lane. Mango, because it is the point
       where the decision passes to you. ── */
@@ -780,7 +780,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 #pane-site .formcard{box-shadow:none;border:1px solid rgba(0,0,0,.10)}
 
 /* ── cards on this page carry the 14px corner, like everything else ── */
-#pane-site .card,#pane-services .card{border-radius:var(--r)}
+#pane-site .card,#pane-services .card,#pane-payments .card{border-radius:var(--r)}
 
 
 /* ═══════════ POST A JOB · the six-step wizard ═══════════
@@ -981,11 +981,11 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 #pane-services .scopedoc .sd-h{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 #pane-services .flag{background:rgba(255,107,74,.07);border:1px solid rgba(255,107,74,.28);border-radius:11px;padding:12px 14px;font-size:12.5px;color:var(--mute);line-height:1.55;margin-top:12px}
 #pane-services .flag b{color:var(--coral)}
-#pane-services .feebox{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:14px;font-variant-numeric:tabular-nums}
-#pane-services .feebox .r{text-align:right}
-#pane-services .feebox .hr{grid-column:1/-1;height:1px;background:var(--line);margin:4px 0}
-#pane-services .feebox .tot{font-weight:700;color:var(--ink)}
-#pane-services .feebox .mut{color:var(--mute)}
+#pane-services .feebox,#pane-payments .feebox{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:14px;font-variant-numeric:tabular-nums}
+#pane-services .feebox .r,#pane-payments .feebox .r{text-align:right}
+#pane-services .feebox .hr,#pane-payments .feebox .hr{grid-column:1/-1;height:1px;background:var(--line);margin:4px 0}
+#pane-services .feebox .tot,#pane-payments .feebox .tot{font-weight:700;color:var(--ink)}
+#pane-services .feebox .mut,#pane-payments .feebox .mut{color:var(--mute)}
 #pane-services .svc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:19px;display:flex;flex-direction:column;gap:11px}
 #pane-services .svc.star{border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.045)}
 #pane-services .svc h4{font-size:16.5px;line-height:1.25}
@@ -1756,21 +1756,21 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <div class="mw" id="mw">
         <div class="mw-ctl">
           <div class="mw-grp"><span class="mw-lab">Journey</span>
-            <button class="mw-b on" data-k="journey" data-v="today">A marketplace job</button>
-            <button class="mw-b" data-k="journey" data-v="service">A Yaadly service</button>
+            <button class="mw-b on" data-k="journey" data-v="today" aria-pressed="true">A marketplace job</button>
+            <button class="mw-b" data-k="journey" data-v="service" aria-pressed="false">A Yaadly service</button>
           </div>
           <div class="mw-grp mw-market"><span class="mw-lab">You pay from</span>
-            <button class="mw-b on" data-k="pay" data-v="abroad">Abroad</button>
-            <button class="mw-b" data-k="pay" data-v="local">In Jamaica</button>
+            <button class="mw-b on" data-k="pay" data-v="abroad" aria-pressed="true">Abroad</button>
+            <button class="mw-b" data-k="pay" data-v="local" aria-pressed="false">In Jamaica</button>
           </div>
           <div class="mw-grp mw-svc"><span class="mw-lab">Service</span>
-            <button class="mw-b on" data-k="svc" data-v="small">Deposit Check, £149</button>
-            <button class="mw-b" data-k="svc" data-v="staged">Condition Report, £245</button>
+            <button class="mw-b on" data-k="svc" data-v="small" aria-pressed="true">Deposit Check, £149</button>
+            <button class="mw-b" data-k="svc" data-v="staged" aria-pressed="false">Condition Report, £245</button>
           </div>
           <div class="mw-grp mw-market"><span class="mw-lab">Worker collects by</span>
-            <button class="mw-b on" data-k="collect" data-v="bank">Bank</button>
-            <button class="mw-b" data-k="collect" data-v="lynk">Lynk wallet</button>
-            <button class="mw-b" data-k="collect" data-v="cash">Cash</button>
+            <button class="mw-b on" data-k="collect" data-v="bank" aria-pressed="true">Bank</button>
+            <button class="mw-b" data-k="collect" data-v="lynk" aria-pressed="false">Lynk wallet</button>
+            <button class="mw-b" data-k="collect" data-v="cash" aria-pressed="false">Cash</button>
           </div>
         </div>
 
@@ -1793,17 +1793,17 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
           <i><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></i>
         </div>
 
-        <div class="mw-cap"><span class="mw-dot" id="mw-dot"></span><span id="mw-cap"></span></div>
+        <div class="mw-cap" role="status" aria-live="polite"><span class="mw-dot" id="mw-dot"></span><span id="mw-cap"></span></div>
         <div class="mw-where"><b>Where the money physically is:</b> <span id="mw-where"></span></div>
 
-        <div id="mw-note"></div>
+        <div id="mw-note" role="status" aria-live="polite"></div>
         <div id="mw-pay"></div>
         <div class="mw-act" id="mw-act"></div>
 
         <div class="mw-nav">
           <button class="btn o sm" id="mw-back">Back a step</button>
           <button class="btn o sm" id="mw-reset">Start again</button>
-          <span class="mw-count" id="mw-count"></span>
+          <span class="mw-count" id="mw-count" role="status" aria-live="polite"></span>
         </div>
       </div>
 
@@ -2053,13 +2053,25 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     });
 
     var pb = document.getElementById('mw-paybtn');
-    if(pb && (e.act||[]).length) pb.onclick = function(){ go(e.act[0].go, e.act[0].set); };
+    // Bind the card's button to the step's PAY action, not simply to the first
+    // one. On the closing step the first action is "Run it again", so pressing
+    // "Pay this invoice" restarted the whole demo.
+    if(pb){
+      var payAct = (e.act||[]).filter(function(a){ return !a.ghost && !a.warn; })[0];
+      if(payAct){ pb.onclick = function(){ go(payAct.go, payAct.set); }; }
+      else { pb.disabled = true; }
+    }
   }
 
   mw.querySelectorAll('.mw-b').forEach(function(b){
     b.onclick=function(){
       S[b.dataset.k]=b.dataset.v;
-      mw.querySelectorAll('.mw-b[data-k="'+b.dataset.k+'"]').forEach(function(o){o.classList.toggle('on', o===b)});
+      mw.querySelectorAll('.mw-b[data-k="'+b.dataset.k+'"]').forEach(function(o){
+        o.classList.toggle('on', o===b);
+        // Selection was teal text and nothing else. One of many, so a person
+        // who cannot see the colour had no way to tell which was active.
+        o.setAttribute('aria-pressed', o===b ? 'true' : 'false');
+      });
       // Changing the journey restarts it. Landing mid way through a journey you
       // have not watched is not a demo, it is a puzzle.
       if(b.dataset.k==='journey'){ i=0; S.outcome='approve'; }
@@ -2106,7 +2118,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
             <span class="mut">Materials, on receipt</span><span class="r">at cost</span>
             <span class="mut">Midpoint, milestone signed off</span><span class="r">40% of labour</span>
             <span class="mut">Completion, you approve</span><span class="r">60% of labour</span>
-            <span class="mut">Retention, day 28</span><span class="r">5% of labour</span>
+            <div class="hr"></div>
+            <span class="mut">of which held to day 28</span><span class="r">5% of labour</span>
           </div>
         </div>
         <div class="card">
