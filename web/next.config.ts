@@ -28,7 +28,27 @@ const securityHeaders = [
   // Job ids and portal codes can appear in a path. Do not leak them to
   // whatever a client clicks through to next.
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // camera=(self), and the reason is the whole of step 3 of the join flow.
+  //
+  // This read camera=() until the live capture shipped. An empty allowlist is
+  // not "ask the user", it is "deny, to everyone, including this site". So
+  // /apply would have called getUserMedia, been refused by the platform before
+  // any permission prompt could appear, and fallen back to a file upload for
+  // every applicant on every device. The page would have gone on saying it
+  // opens the camera while never once opening one, which is precisely the
+  // fault the live capture was built to remove.
+  //
+  // (self) is not a grant. It says the platform will stop blocking our own
+  // origin from asking; the browser still prompts, and the applicant can still
+  // refuse, and LiveCapture says the word upload on the row when they do.
+  //
+  // microphone stays fully denied: the face turn is captured with audio:false
+  // and nothing on this host has any business with a microphone. geolocation
+  // likewise. Worth tightening camera to /apply alone later, but a per-path
+  // Permissions-Policy needs two non-overlapping header rules, and a browser
+  // seeing two of this header takes the more restrictive one, so a mistake
+  // there kills the feature silently. Not worth it untested.
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
 ];
 
 const nextConfig: NextConfig = {

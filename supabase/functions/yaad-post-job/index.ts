@@ -116,27 +116,95 @@ function cardCols(b: Record<string, unknown>) {
 const MINIMAX_API = "https://api.minimax.io/v1/chat/completions";
 const AGENT_MODEL = "MiniMax-M2.7";
 
-const AGENT_PROMPT = `You read a property job described in plain words, often
-in Jamaican Patois, and return JSON only. Never invent facts. Never state a
-price, a budget or a cost. If something is not in the text, use "".
+// The 18 trades are the routing key: workers subscribe by trade and the board
+// filters on it, so this list is not free text and never has been.
+const TRADES = [
+  "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
+  "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
+  "Landscaping", "General Handyman", "Solar Install", "Water Tank & Pump",
+  "Locks & Security Doors", "Windows & Glazing", "Carpentry & Joinery",
+  "Drainage & Septic", "Fencing", "CCTV & Alarms",
+];
+
+// Every other list the model may answer from is sent up by the page, because
+// the taxonomy lives in one place (data/job-taxonomy.js) and a second copy
+// here would drift the first time a job type is added. Size bands and job
+// types are keyed Trade|Type, so only the browser knows which ones apply.
+//
+// They are still treated as text from a stranger: capped in count and length,
+// newlines stripped so nothing can be smuggled in as an instruction, and every
+// answer checked back against the list it came from before it reaches the card
+// or the row. The worst a caller can do is widen the options on their own job.
+type Lists = Record<string, string[]>;
+
+const LIST_KEYS = [
+  "job_type", "property_type", "parish", "size_band", "storey", "access_type", "urgency",
+] as const;
+
+function cleanLists(raw: unknown): Lists {
+  const out: Lists = {};
+  const src = (raw ?? {}) as Record<string, unknown>;
+  for (const k of LIST_KEYS) {
+    const v = Array.isArray(src[k]) ? (src[k] as unknown[]) : [];
+    const list = v.slice(0, 40)
+      .map((x) => s(x).replace(/[\r\n]+/g, " ").slice(0, 80))
+      .filter(Boolean);
+    if (list.length) out[k] = list;
+  }
+  return out;
+}
+
+/** An answer counts only if it is one of the options we offered, matched
+ *  case-insensitively and handed back in the list's own spelling. Anything
+ *  else is dropped rather than corrected: a blank the client fills herself is
+ *  worth more than a value nothing downstream recognises. */
+function fromList(value: unknown, list: string[] | undefined): string {
+  const v = s(value);
+  if (!v || !list?.length) return "";
+  return list.find((o) => o.toLowerCase() === v.toLowerCase()) ?? "";
+}
+
+function agentPrompt(lists: Lists): string {
+  const pick = (key: string, label: string) =>
+    lists[key]?.length
+      ? `${label}: copy one value EXACTLY from this list, or "" if the text does not say. ${lists[key].join(" | ")}`
+      : `${label}: always "".`;
+  return `You read a property job described in plain words, often in Jamaican
+Patois, and return JSON only. Never invent facts. Never state a price, a budget
+or a cost. If something is not in the text, use "".
 
 Return exactly:
-{"title":"", "scope":"", "trade":"", "job_type":"", "urgency":"",
+{"title":"", "scope":"", "trade":"", "job_type":"", "property_type":"",
+ "parish":"", "size_band":"", "storey":"", "access_type":"", "urgency":"",
  "access_note":"", "questions":["",""]}
 
 title: six words maximum, what the job is.
-scope: the same facts rewritten so a tradesperson can quote from them. Keep
-  the client's meaning. Do not add work nobody asked for.
-trade: one of Plumbing, Roofing, Electrical, Tiling, Masonry & Concrete,
-  Painting & Decorating, Grille & Gate Welding, Air Conditioning, Landscaping,
-  General Handyman, Solar Install, Water Tank & Pump, Locks & Security Doors,
-  Windows & Glazing, Carpentry & Joinery, Drainage & Septic, Fencing,
-  CCTV & Alarms. Empty if genuinely unclear.
-urgency: Emergency, within 48 hours | Within two weeks | Within a month |
-  Flexible, planning ahead. Empty if not stated.
-questions: the two things a worker would ring up and ask before quoting.`;
+scope: the same facts rewritten so a tradesperson can quote from them. Keep the
+  client's meaning. Do not add work nobody asked for.
+trade: copy one value EXACTLY from this list, or "" if genuinely unclear.
+  ${TRADES.join(" | ")}
+${pick("job_type", "job_type")}
+${pick("property_type", "property_type")}
+${pick("parish", "parish")}
+${pick("size_band", "size_band")}
+${pick("storey", "storey")}
+${pick("access_type", "access_type")}
+${pick("urgency", "urgency")}
+access_note: anything said about getting in or who is on the ground.
+questions: the two things a worker would ring up and ask before quoting.
 
-async function readTheJob(text: string, trace: Trace) {
+You are never asked who pays for materials, where materials are kept, or what
+the budget is. Those are the client's to state and a guess there would be
+Yaadly pricing the work, which Yaadly does not do. Leave them out entirely.`;
+}
+
+type Read = {
+  title: string; scope: string; access_note: string; trade: string;
+  job_type: string; property_type: string; parish: string; size_band: string;
+  storey: string; access_type: string; urgency: string; questions: string[];
+};
+
+async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Read | null> {
   const key = Deno.env.get("MINIMAX_API_KEY");
   if (!key || text.length < 12) return null;
   try {
@@ -152,7 +220,7 @@ async function readTheJob(text: string, trace: Trace) {
         body: JSON.stringify({
           model: AGENT_MODEL, temperature: 0.2, max_tokens: 900,
           messages: [
-            { role: "system", content: AGENT_PROMPT },
+            { role: "system", content: agentPrompt(lists) },
             { role: "user", content: text.slice(0, 6000) },
           ],
         }),
@@ -166,7 +234,24 @@ async function readTheJob(text: string, trace: Trace) {
       const content = j?.choices?.[0]?.message?.content ?? "";
       const m = String(content).match(/\{[\s\S]*\}/);
       if (!m) return null;
-      try { return JSON.parse(m[0]); } catch (_) { return null; }
+      let out: any;
+      try { out = JSON.parse(m[0]); } catch (_) { return null; }
+      return {
+        title: s(out.title).slice(0, 120),
+        scope: s(out.scope).slice(0, 2000),
+        access_note: s(out.access_note).slice(0, 300),
+        trade: fromList(out.trade, TRADES),
+        job_type: fromList(out.job_type, lists.job_type),
+        property_type: fromList(out.property_type, lists.property_type),
+        parish: fromList(out.parish, lists.parish),
+        size_band: fromList(out.size_band, lists.size_band),
+        storey: fromList(out.storey, lists.storey),
+        access_type: fromList(out.access_type, lists.access_type),
+        urgency: fromList(out.urgency, lists.urgency),
+        questions: Array.isArray(out.questions)
+          ? out.questions.map((q: unknown) => s(q).slice(0, 240)).filter(Boolean).slice(0, 3)
+          : [],
+      };
     });
   } catch (_) { return null; }
 }
@@ -197,6 +282,59 @@ async function callerKey(req: Request): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// ── who is posting ───────────────────────────────────────────────────────
+//
+// An email address is a claim. These two turn it into proof.
+//
+// signedInUser reads a real session token off the request. The page sends the
+// publishable key in that header when nobody is signed in, so anything that is
+// not a three-part JWT is not a session and is not asked about.
+// The auth server is asked, rather than the token being decoded and believed.
+// A signature and an account are downstream of the answer, so "who is this"
+// has to come from something that checks, not from base64 the caller wrote.
+async function signedInUser(req: Request) {
+  const tok = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!tok || !tok.startsWith("ey") || tok.split(".").length !== 3) return null;
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  if (!anon) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: anon, Authorization: `Bearer ${tok}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    const email = s(u?.email).toLowerCase();
+    if (!u?.id || !email) return null;
+    return {
+      id: String(u.id),
+      email,
+      confirmed: Boolean(u.email_confirmed_at ?? u.confirmed_at),
+    };
+  } catch (_) { return null; }
+}
+
+// verifyPassword is for the client who is not signed in but whose email is
+// already known here. An account that has never confirmed its email cannot
+// sign in at all, and the token endpoint says so specifically, so that answer
+// counts as the password being right. It is the only thing being asked.
+async function verifyPassword(email: string, password: string): Promise<"ok" | "unconfirmed" | "wrong"> {
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  if (!anon || !password) return "wrong";
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anon },
+      body: JSON.stringify({ email, password }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) return "ok";
+    const j = await r.json().catch(() => ({}));
+    const said = `${j?.error_code ?? ""} ${j?.error ?? ""} ${j?.msg ?? ""} ${j?.error_description ?? ""}`;
+    return /not.?confirmed/i.test(said) ? "unconfirmed" : "wrong";
+  } catch (_) { return "wrong"; }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -219,7 +357,9 @@ Deno.serve(async (req: Request) => {
     const b = await req.json().catch(() => ({})) as Record<string, unknown>;
     const mode = s(b.mode) === "golive" ? "golive" : "draft";
     const desc = s(b.desc);
-    root.setAttributes({ "yaadly.post.mode": mode, "yaadly.job.trade": s(b.workType) });
+    // Explicit. Anything other than a literal true is a no, including absent.
+    const assist = b.assist === true;
+    root.setAttributes({ "yaadly.post.mode": mode, "yaadly.job.trade": s(b.workType), "yaadly.agent.asked": assist });
 
     if (!desc) return json({ error: "A description of the job is needed." }, 400);
 
@@ -274,10 +414,16 @@ Deno.serve(async (req: Request) => {
 
       const jobId = `JOB-WEB-${Date.now()}`;
 
-      // The agent reads it before it becomes a row. Anything it returns is a
-      // suggestion the client can still overwrite on the next screen; nothing
-      // it says about money is used, because it is not asked about money.
-      const read = modelBudgetLeft ? await readTheJob(desc, trace) : null;
+      // The agent reads it before it becomes a row, and ONLY when the client
+      // pressed the button that asks it to. It used to run on every draft,
+      // which meant a model read the words of somebody who had been told on
+      // that very screen that no assistant was involved. The button is the
+      // consent, so the flag is what fires the model.
+      //
+      // Anything it returns is a suggestion the client can still overwrite on
+      // the next screen; nothing it says about money is used, because it is
+      // not asked about money.
+      const read = (assist && modelBudgetLeft) ? await readTheJob(desc, cleanLists(b.options), trace) : null;
       // Recorded whether or not the model ran, so the per-caller count covers
       // every request and the global count only covers the ones that cost.
       await admin.from("post_job_attempts").insert({ caller_key: key, used_model: !!read });
@@ -291,8 +437,11 @@ Deno.serve(async (req: Request) => {
       if (read) {
         root.setAttributes({ "yaadly.agent.read": true, "yaadly.agent.trade": String(read.trade ?? "") });
         if (!row.trade && s(read.trade)) { row.trade = s(read.trade); row.trade_source = "model"; }  // jobs_trade_source_chk: wizard | model | regex | admin
-        if (!row.job_type && s(read.job_type)) row.job_type = s(read.job_type);
-        if (!row.urgency && s(read.urgency)) row.urgency = s(read.urgency);
+        if (!row.job_type && read.job_type) row.job_type = read.job_type;
+        if (!row.urgency && read.urgency) row.urgency = read.urgency;
+        if (!row.size_band && read.size_band) row.size_band = read.size_band;
+        if (!row.access_type && read.access_type) row.access_type = read.access_type;
+        if (!row.parish && read.parish) row.parish = read.parish;
         if (s(read.title)) row.title = s(read.title);
         const qs = Array.isArray(read.questions) ? read.questions.filter(Boolean).map(s) : [];
         if (s(read.scope) || qs.length) {
@@ -322,7 +471,10 @@ Deno.serve(async (req: Request) => {
       }
 
       root.setAttributes({ "yaadly.post.outcome": "draft_created", "yaadly.job.id": jobId });
-      return json({ ok: true, jobId, portalCode: data?.portal_code ?? null });
+      // The read goes back to the page as well as into the row. Writing it to
+      // the row alone was the old shape, and it meant the client filled twelve
+      // fields by hand and the agent's answers were thrown away behind her.
+      return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, read });
     }
 
     // ───────────────────────── go live ─────────────────────────
@@ -335,12 +487,20 @@ Deno.serve(async (req: Request) => {
     const consent  = s(b.consentText);
     let version   = s(b.guidelinesVersion);
 
+    // A session for THIS email, or nothing. Someone signed in as one person
+    // cannot post as another: the token has to match the email on the form.
+    const session = await signedInUser(req);
+    const signedIn = !!session && session.email === email;
+    root.setAttributes({ "yaadly.post.signed_in": signedIn });
+
     if (!jobId) return json({ error: "That draft could not be found. Start again and it will save as you go." }, 400);
     if (!name) return json({ error: "Your name is needed." }, 400);
     if (!email || !email.includes("@")) return json({ error: "A valid email is needed." }, 400);
     if (!phone) return json({ error: "A phone or WhatsApp number is needed." }, 400);
-    if (password.length < MIN_PASSWORD) return json({ error: `Password needs to be at least ${MIN_PASSWORD} characters.` }, 400);
-    if (sig.length < 3) return json({ error: "Type your full name to sign." }, 400);
+    if (!signedIn && password.length < MIN_PASSWORD) return json({ error: `Password needs to be at least ${MIN_PASSWORD} characters.` }, 400);
+    // The signature is checked further down, once we know whether this person
+    // has already signed the version in force. Somebody who signed it last
+    // month is not asked to sign it again.
 
     // The draft must exist and must not already belong to somebody else.
     const { data: job, error: jobErr } = await admin.from("jobs")
@@ -352,49 +512,86 @@ Deno.serve(async (req: Request) => {
       return json({ error: "That job already belongs to another account." }, 403);
     }
 
-    // The account. Created unconfirmed on purpose: the confirmation link is
-    // what proves the mailbox is theirs, and that is what later lets the job
-    // open. An email we have already seen is not an error here, they may be
-    // posting a second job before confirming the first.
-    let emailed = false;
-    const { error: createErr } = await admin.auth.admin.createUser({ email, password, email_confirm: false });
-    const alreadyExisted = createErr && /already|registered|exists/i.test(String(createErr.message || ""));
-    if (createErr && !alreadyExisted) {
-      root.recordError(String(createErr.message));
-      return json({ error: "Could not create the account. Try again, or message Yaadly." }, 502);
-    }
-    if (!alreadyExisted) {
-      try {
-        const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-        const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
-          body: JSON.stringify({ type: "signup", email }),
-        });
-        emailed = r.ok;
-        if (!r.ok) root.recordError(`confirmation email not sent: ${r.status}`);
-      } catch (e) { root.recordError(`confirmation email threw: ${String(e).slice(0, 200)}`); }
-    }
-
-    // Find the user so the signature can be attributed. doc_signatures.signer_user
-    // is NOT NULL by design: a signature that is not tied to an account is not a
-    // signature, it is a checkbox.
+    // The account. Three cases, and they are not the same trust level.
     //
-    // Asked of Postgres by email, not read off a page of accounts.
-    // listUsers() hands back the first fifty and no warning that there are
-    // more, so the moment Yaadly passes fifty auth users a client whose row
-    // sits on page two stops being found. Everything about that request is
-    // correct, and it fails anyway: no signature, no open job, and an error
-    // message that tells them to message us rather than saying what happened.
-    // The count only ever goes up, so this had one direction to fail in.
-    const { data: found, error: lookupErr } = await admin
-      .rpc("auth_user_by_email", { p_email: email })
-      .maybeSingle<{ user_id: string; confirmed_at: string | null }>();
-    if (lookupErr || !found) {
-      root.recordError(lookupErr ? `user lookup: ${lookupErr.message}` : "user not found after create");
-      return json({ error: "Could not attach your signature to an account. Message Yaadly." }, 502);
+    //   signed in       the browser sent a session token for this email.
+    //                   Nothing is created, no password is asked for, and a
+    //                   signature they already gave still counts.
+    //
+    //   new email       created unconfirmed on purpose: the confirmation link
+    //                   is what proves the mailbox is theirs, and that is what
+    //                   later lets the job open.
+    //
+    //   known email,    the password is checked BEFORE anything is written.
+    //   not signed in   This used to be waved through. createUser failed with
+    //                   "already registered", the code carried on, and a
+    //                   signature in somebody else's name went onto their
+    //                   account with their job attached. Any eight characters
+    //                   did it. An account that has never confirmed its email
+    //                   cannot sign in yet, so "email not confirmed" from the
+    //                   token endpoint counts as the password being right.
+    let emailed = false;
+    let user: { id: string; confirmed: boolean };
+
+    if (signedIn && session) {
+      user = { id: session.id, confirmed: session.confirmed };
+      root.setAttributes({ "yaadly.post.account": "session" });
+    } else {
+      const { error: createErr } = await admin.auth.admin.createUser({ email, password, email_confirm: false });
+      const alreadyExisted = !!createErr && /already|registered|exists/i.test(String(createErr.message || ""));
+      if (createErr && !alreadyExisted) {
+        root.recordError(String(createErr.message));
+        return json({ error: "Could not create the account. Try again, or message Yaadly." }, 502);
+      }
+
+      if (alreadyExisted) {
+        const proof = await verifyPassword(email, password);
+        if (proof === "wrong") {
+          root.setAttributes({ "yaadly.post.outcome": "existing_account_not_proven" });
+          return json({
+            error: "That email already has a Yaadly account. Sign in with it and this job attaches to it, or use a different email.",
+            accountExists: true,
+          }, 403);
+        }
+        root.setAttributes({ "yaadly.post.account": "existing_password_checked" });
+      } else {
+        root.setAttributes({ "yaadly.post.account": "created" });
+        try {
+          const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+          const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
+            body: JSON.stringify({ type: "signup", email }),
+          });
+          emailed = r.ok;
+          if (!r.ok) root.recordError(`confirmation email not sent: ${r.status}`);
+        } catch (e) { root.recordError(`confirmation email threw: ${String(e).slice(0, 200)}`); }
+      }
+
+      // Find the user so the signature can be attributed. doc_signatures.signer_user
+      // is NOT NULL by design: a signature that is not tied to an account is not a
+      // signature, it is a checkbox.
+      //
+      // Asked of Postgres by email, not read off a page of accounts.
+      // listUsers() hands back the first fifty and no warning that there are
+      // more, so the moment Yaadly passes fifty auth users a client whose row
+      // sits on page two stops being found. Everything about that request is
+      // correct, and it fails anyway: no signature, no open job, and an error
+      // message that tells them to message us rather than saying what happened.
+      // The count only ever goes up, so this had one direction to fail in.
+      //
+      // The signed-in branch above never had the problem: a verified session
+      // already names the account, so there is nothing to look up.
+      const { data: found, error: lookupErr } = await admin
+        .rpc("auth_user_by_email", { p_email: email })
+        .maybeSingle<{ user_id: string; confirmed_at: string | null }>();
+      if (lookupErr || !found) {
+        root.recordError(lookupErr ? `user lookup: ${lookupErr.message}` : "user not found after create");
+        return json({ error: "Could not attach your signature to an account. Message Yaadly." }, 502);
+      }
+      user = { id: found.user_id, confirmed: Boolean(found.confirmed_at) };
     }
-    const confirmed = Boolean(found.confirmed_at);
+    const confirmed = user.confirmed;
 
     // The version the page DISPLAYED is what gets recorded, because a signature
     // belongs to the words the person actually read. A stale cached page
@@ -422,15 +619,32 @@ Deno.serve(async (req: Request) => {
 
     // The signature. One row per version: signing again for a new version is a
     // new row, never an edit of the old one.
-    const { error: sigErr } = await admin.from("doc_signatures").insert({
-      signer_user: found.user_id,
-      signer_email: email,
-      signer_name: sig,
-      doc_type: "client_guidelines",
-      doc_version: version,
-      consent_text: consent || `Client Guidelines v${version} accepted through the job wizard.`,
-    });
-    if (sigErr) { root.recordError(sigErr.message); return json({ error: "Could not record the signature. Nothing was charged, message Yaadly." }, 500); }
+    //
+    // A returning client who has already signed the version in force is not
+    // asked to sign it again. That is the whole point of versioning them: the
+    // question is "have these words been agreed", not "has a box been ticked
+    // today". A version bump brings the box back for everybody.
+    const { data: prior } = await admin.from("doc_signatures")
+      .select("id")
+      .eq("signer_user", user.id)
+      .eq("doc_type", "client_guidelines")
+      .eq("doc_version", version)
+      .limit(1);
+    const alreadySigned = !!prior?.length;
+    root.setAttributes({ "yaadly.guidelines.already_signed": alreadySigned });
+
+    if (!alreadySigned) {
+      if (sig.length < 3) return json({ error: "Type your full name to sign." }, 400);
+      const { error: sigErr } = await admin.from("doc_signatures").insert({
+        signer_user: user.id,
+        signer_email: email,
+        signer_name: sig,
+        doc_type: "client_guidelines",
+        doc_version: version,
+        consent_text: consent || `Client Guidelines v${version} accepted through the job wizard.`,
+      });
+      if (sigErr) { root.recordError(sigErr.message); return json({ error: "Could not record the signature. Nothing was charged, message Yaadly." }, 500); }
+    }
 
     // Attach the client and their final answers to the draft.
     const { error: updErr } = await admin.from("jobs").update({
@@ -478,7 +692,7 @@ Deno.serve(async (req: Request) => {
     if (rt?.waitUntil) rt.waitUntil(notify);
 
     root.setAttributes({ "yaadly.post.outcome": open ? "live" : "signed_awaiting_confirmation", "yaadly.job.id": jobId });
-    return json({ ok: true, jobId, open, emailed, guidelinesVersion: `v${version}` });
+    return json({ ok: true, jobId, open, emailed, alreadySigned, signedIn, guidelinesVersion: `v${version}` });
 
   } catch (e) {
     root.recordError(e);

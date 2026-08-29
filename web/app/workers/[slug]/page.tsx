@@ -37,7 +37,7 @@ export default async function WorkerProfile({
 
   const [{ data: score }, { data: checks }, { data: port }, { data: revs }] =
     await Promise.all([
-      supabase.from("worker_scores").select("score,reviews").eq("subject_email", wp.worker_email).maybeSingle(),
+      supabase.from("worker_scores").select("score,reviews").eq("subject_slug", slug).maybeSingle(),
       supabase.from("worker_checks").select("label,passed,note,position").eq("worker_email", wp.worker_email).order("position"),
       supabase.from("portfolio").select("title,month,stages,evidence_items").eq("worker_email", wp.worker_email).order("position"),
       supabase.from("published_reviews").select("id,stars,criteria,body,reply,created_at,author_first_name").eq("subject_slug", slug).eq("direction", "client_of_worker").order("created_at", { ascending: false }),
