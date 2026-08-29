@@ -123,6 +123,7 @@ commit;
 -- TEARDOWN. Removes the rig and nothing else.
 -- ============================================================================
 -- begin;
+-- delete from public.intake_threads  where job_id = 'JOB-TEST-0001';
 -- delete from public.job_quotes      where job_id = 'JOB-TEST-0001';
 -- delete from public.evidence        where job_id = 'JOB-TEST-0001';
 -- delete from public.messages        where job_id = 'JOB-TEST-0001';
