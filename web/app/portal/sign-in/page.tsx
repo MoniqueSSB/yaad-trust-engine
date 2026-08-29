@@ -58,6 +58,16 @@ export default function SignIn() {
           window.history.replaceState(null, "", window.location.pathname);
         }
 
+        // A recovery link also arrives as a valid session, so without this it
+        // would be treated as an ordinary arrival and the person would be sent
+        // into the portal, sailing straight past the password box they came
+        // here to use. They land here only when the reset mail falls back to
+        // Site URL, but that is exactly when they most need it to work.
+        if (frag.get("type") === "recovery") {
+          router.replace("/portal/reset");
+          return;
+        }
+
         const { data } = await supabase.auth.getSession();
         if (data.session) {
           router.replace("/portal");
@@ -163,6 +173,12 @@ export default function SignIn() {
           {busy ? "Signing in..." : "Sign in"}
         </button>
       </form>
+
+      <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
+        <Link href="/portal/forgot" className="text-tealb underline">
+          Forgotten your password?
+        </Link>
+      </p>
 
       <p className="mt-5 text-[12.5px] leading-relaxed text-dim">
         No account yet? Your job code comes to you on WhatsApp or by email, and
