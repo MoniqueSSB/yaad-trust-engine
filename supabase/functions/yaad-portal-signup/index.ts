@@ -13,20 +13,48 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // The only way to make the claim true is to close public sign-up in Auth and
 // create accounts here, behind the check. That is what this does.
 //
-//   client -> must present the portal code for a job or service that carries
-//             their email. verify_portal_code() also rate limits: five wrong
-//             answers for one email inside fifteen minutes and it stops
-//             answering.
+//   client -> must present the portal code for their job or service.
+//             pend_portal_code() decides. If the row already carries an
+//             email, that email has to match, exactly as before. If it does
+//             not carry one yet, the code is good enough on its own: that is
+//             the normal case, because WhatsApp intake has a phone number and
+//             never an email, and those jobs were impossible to claim at all
+//             until 20260829b. It rate limits on both the email and the code:
+//             five wrong answers against either inside fifteen minutes and it
+//             stops answering.
 //   worker -> must already have an active worker profile, which only exists
-//             once Monique has vetted them. No vetting, no account. That is
-//             the same rule the site already promises clients.
+//             once Monique has vetted them. No vetting, no account.
 //
+// Nothing here attaches an email to a job. Signing up records a PENDING claim
+// and the confirmation link is what binds it, because clicking that link is
+// the only thing that proves the address is real and belongs to the person
+// typing it. A client who mistypes their own address loses nothing: no link
+// arrives, no claim is consumed, they try again. See 20260829c.
+//
+// The confirmation email is GoTrue's own, sent over this project's custom
+// SMTP, which is already Resend.
+//
+// It briefly was not. A version of this file created the account with
+// generateLink({type:"signup"}) so the link could be carried out over the
+// Resend HTTP API under our own copy. That broke every new signup: this
+// project has disable_signup turned on, admin.createUser() is an admin call
+// and steps around that, and generate_link for a signup is not, so GoTrue
+// answered "signups not allowed" and the account was never created. The
+// justification was wrong as well as the code: custom SMTP was already
+// configured, so nothing was going through Supabase's testing sender.
+// If the copy is ever worth customising again, do it in the GoTrue email
+// template, not by moving account creation.
 // This function holds the service role key, so it is deliberately small and
 // does exactly one thing. Nothing here echoes a secret, and it never says
 // whether an email is already registered.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+// Where the confirmation link lands. Without this GoTrue falls back to the
+// project's Site URL, which is the site root: a marketing page that does not
+// look at the fragment, so a client who had just confirmed was left standing
+// on the front page with their session in the address bar and no way in.
+const SIGNIN_URL   = Deno.env.get("YAAD_PORTAL_SIGNIN_URL") ?? "https://app.yaadly.co.uk/portal/sign-in";
 const MIN_PASSWORD = 8;
 
 const CORS = {
@@ -75,14 +103,19 @@ Deno.serve(async (req: Request) => {
     if (role === "client") {
       if (!code) return json({ error: "Your job code is needed. It is on the message Yaadly sent you." }, 400);
 
-      const { data: ok, error } = await admin.rpc("verify_portal_code", { p_email: email, p_code: code });
+      // Records a pending claim on success. Binds nothing: that happens when
+      // the confirmation link is clicked.
+      const { data: ok, error } = await admin.rpc("pend_portal_code", { p_email: email, p_code: code });
       if (error) {
         root.recordError(error.message);
         return json({ error: "Could not check that code. Try again shortly." }, 502);
       }
       if (ok !== true) {
         root.setAttributes({ "yaadly.signup.outcome": "code_rejected" });
-        return json({ error: "That code and email do not match a job we hold. Check both, or message Yaadly." }, 403);
+        // Deliberately one message for every way this fails: wrong code, a
+        // code already claimed by somebody else, or too many tries. Naming
+        // which would tell a guesser which half they got right.
+        return json({ error: "That job code will not open an account. Check it against the message Yaadly sent you. If you have been here before, sign in instead, or message Yaadly." }, 403);
       }
     } else {
       const { data: profile, error } = await admin
@@ -102,9 +135,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---- create the account ---------------------------------------------
-    // Created UNCONFIRMED on purpose. The portal code proves which job they
-    // are attached to; it does not prove they can read that mailbox. A real
-    // confirmation email does, and it is also the thing people expect to see.
+    // Created UNCONFIRMED on purpose, and that is now load-bearing rather than
+    // good manners: the confirmation click is what binds the job to them.
+    //
+    // admin.createUser() and not generate_link, because this project has
+    // disable_signup on. An admin create steps around that by design; a
+    // generated signup link does not.
     const { error: createErr } = await admin.auth.admin.createUser({
       email, password, email_confirm: false,
     });
@@ -113,20 +149,25 @@ Deno.serve(async (req: Request) => {
       const msg = String(createErr.message || "");
       root.setAttributes({ "yaadly.signup.outcome": "create_failed" });
       if (/already|registered|exists/i.test(msg)) {
-        // Deliberately not confirmed as "this email exists": say the same
-        // thing either way and point them at sign-in.
-        return json({ error: "Could not create that account. If you already have one, sign in above instead." }, 409);
+        // They have an account. The claim they just pended is still standing,
+        // so the page signs them in with what they typed and claims the code
+        // against that session. Worth being explicit that this is a real
+        // route and not a dead end: a returning client with a second job is
+        // the normal case, not an edge case.
+        return json({ error: "You already have a Yaadly account. Signing you in instead.", existing: true }, 409);
       }
       root.recordError(msg);
       return json({ error: "Could not create the account. Try again, or message Yaadly." }, 502);
     }
 
     // ---- send the confirmation email ------------------------------------
-    // The account exists but cannot sign in until this link is clicked.
+    // GoTrue's own confirmation mail, over this project's custom SMTP, which
+    // is Resend. The account exists but cannot sign in until this is clicked,
+    // and the job stays unattached to anybody until it is.
     const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     let emailed = false;
     try {
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(SIGNIN_URL)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
         body: JSON.stringify({ type: "signup", email }),
@@ -148,7 +189,7 @@ Deno.serve(async (req: Request) => {
     }
 
     root.setAttributes({ "yaadly.signup.outcome": "created" });
-    return json({ ok: true, emailed: true, message: `Check ${email} for a confirmation link, then sign in.` });
+    return json({ ok: true, emailed: true, message: `Check ${email} for a confirmation link. Clicking it opens your portal and attaches your job.` });
   } catch (e) {
     root.recordError(e);
     return json({ error: "Something went wrong. Try again, or message Yaadly." }, 500);

@@ -753,7 +753,7 @@ Deno.serve(async (req: Request) => {
       `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}${turns > 1 ? `, over ${turns} messages` : ""}.`,
       enough ? "" : "[Still gathering. The assistant has asked for what is missing and this stays a draft until it comes back.]",
       lostMedia ? `[${lostMedia} attachment${lostMedia > 1 ? "s" : ""} came through but could not be stored. Ask them to send again.]` : "",
-      (s(card?.client_email) || msg.channel === "email") ? "" : "[No email yet. Reply on the same channel to get one, so they can see this in the client portal.]",
+      (s(card?.client_email) || msg.channel === "email") ? "" : "[No email yet, and none needed from us. The job code is theirs to claim, and the email they sign up with is the one that gets attached to this job.]",
     ].filter(Boolean).join("\n");
 
     const row = {

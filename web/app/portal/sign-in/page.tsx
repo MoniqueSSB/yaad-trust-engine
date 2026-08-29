@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +16,61 @@ export default function SignIn() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [arriving, setArriving] = useState(true);
+
+  // Arriving from a confirmation link.
+  //
+  // GoTrue returns that session in the URL FRAGMENT, and a fragment is never
+  // sent to the server, so no amount of server-side gating can see it. It has
+  // to be picked up here, in the browser, or the client stands on a page
+  // holding a valid session it cannot use. That is exactly what happened: the
+  // link landed on the site root with the tokens in the address bar and
+  // nothing listening for them.
+  //
+  // Reading the fragment explicitly rather than relying on the client library
+  // to detect it, because this is the one step of the whole journey where
+  // silence looks identical to success.
+  useEffect(() => {
+    const supabase = createClient();
+    (async () => {
+      try {
+        const raw = window.location.hash.replace(/^#/, "");
+        const frag = new URLSearchParams(raw);
+
+        // An expired or already-used link comes back here too, and saying so
+        // is kinder than a sign in form that looks like it forgot them.
+        const problem = frag.get("error_description") ?? frag.get("error");
+        if (problem) {
+          window.history.replaceState(null, "", window.location.pathname);
+          setError(
+            "That confirmation link has expired or has already been used. Sign in below, or ask Yaadly for a new one.",
+          );
+          setArriving(false);
+          return;
+        }
+
+        const access_token = frag.get("access_token");
+        const refresh_token = frag.get("refresh_token");
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+          // Do not leave a live session sitting in the address bar, where it
+          // gets copied into a message or a bug report.
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          router.replace("/portal");
+          router.refresh();
+          return;
+        }
+      } catch (_) {
+        // Fall through to the form. A broken hand-off should still leave
+        // somebody able to sign in the ordinary way.
+      }
+      setArriving(false);
+    })();
+  }, [router]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,6 +93,22 @@ export default function SignIn() {
 
     router.replace("/portal");
     router.refresh();
+  }
+
+  // Somebody who has just confirmed is already signed in and about to be sent
+  // on. Showing them a sign in form for the half second in between reads as
+  // "it did not work" and is how people end up typing their password again.
+  if (arriving) {
+    return (
+      <div className="mx-auto max-w-[420px]">
+        <h1 className="font-display text-[32px] uppercase leading-none">
+          Your portal
+        </h1>
+        <p className="mt-3 text-[14px] leading-relaxed text-mute">
+          One moment, opening your portal.
+        </p>
+      </div>
+    );
   }
 
   return (

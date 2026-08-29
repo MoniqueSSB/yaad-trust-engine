@@ -21,11 +21,18 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //
 // Portal access: creating a job here does NOT hand the client an open portal
 // account. The jobs.portal_code column is generated automatically by the
-// database the moment this insert lands, and that code, together with the
-// client's email, is required by verify_portal_code() before the client
-// portal will let anyone sign up. A WhatsApp message that never turns into
-// a real job never gets a code, so it can never be used to self-serve an
-// account, matching how the admin desk works.
+// database the moment this insert lands, and that code is required by
+// claim_portal_code() before the client portal will let anyone sign up. A
+// WhatsApp message that never turns into a real job never gets a code, so it
+// can never be used to self-serve an account, matching how the admin desk
+// works.
+//
+// The email on the job is left empty here, on purpose and unavoidably:
+// WhatsApp gives us a phone number, and clients do not type their email into
+// a chat message. Claiming the code is what attaches an email to the job, so
+// there is nothing to chase on this side. Note that the check used to demand
+// a matching email as well, which meant every job created here was born
+// unclaimable. See 20260829b_whatsapp_jobs_could_never_be_claimed.sql.
 //
 // Tracing: every stage of the pipeline below (signature check, model call,
 // database insert, outbound reply) is a child span of the request span, so a
@@ -33,7 +40,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 
 const MODEL = "MiniMax-M2.7";
 const MINIMAX_API = "https://api.minimax.io/v1/chat/completions";
-const CLIENT_PORTAL_URL = "https://yaadly.co.uk/#client";
+const JOIN_URL = "https://app.yaadly.co.uk/portal/join";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 
 const INTAKE_PROMPT = `You are the Intake Agent for Yaadly, a trust-first property works service in Jamaica (Kingston metro first: Kingston and Portmore). You read a raw WhatsApp message about a property job (English or Jamaican Patois) and produce a structured job card.
@@ -235,7 +242,7 @@ Deno.serve(async (req: Request) => {
 
     const jobId = `JOB-WA-${Date.now()}`;
     const title = card?.title || (contactName ? `WhatsApp job from ${contactName}` : "WhatsApp job, needs review");
-    const noEmailNote = card?.client_email ? "" : "\n\n[NO EMAIL, client came in via WhatsApp. Reply on WhatsApp to get their email so they can see this in the client portal.]";
+    const noEmailNote = card?.client_email ? "" : "\n\n[NO EMAIL YET, client came in via WhatsApp. Nothing to chase: the job code below is theirs to claim, and the email they sign up with is the one that gets attached to this job.]";
     const descr = [card?.scope || text, card?.urgency ? `Urgency: ${card.urgency}` : "", card?.preferred_date ? `Wanted by: ${card.preferred_date}` : "", card?.trade ? `Trade: ${card.trade}` : "", `Raw message: ${text}`,
       spoken ? "Source: voice note, transcribed automatically. The wording is the client's own." : ""].filter(Boolean).join("\n") + noEmailNote;
 
@@ -266,9 +273,14 @@ Deno.serve(async (req: Request) => {
 
     let replyResult = null;
     if (fromWaId) {
-      const replyBody = card?.client_email
-        ? `Thanks, Yaadly got your message. Track this job at ${CLIENT_PORTAL_URL}. First time there? Sign up with ${card.client_email} and job code ${portalCode || "(ask us if it is missing)"}. A project manager will follow up shortly.`
-        : `Thanks, Yaadly got your message. Reply with your email so you can track this job at ${CLIENT_PORTAL_URL} (your job code to sign up is ${portalCode || "on its way"}). A project manager will follow up shortly either way.`;
+      // One link, and it carries the code. Asking someone to copy six
+      // characters between two apps on a phone is a step people drop out on,
+      // and asking them to reply with an email first was a step that did not
+      // need to exist: claiming the code is what attaches their email.
+      const link = `${JOIN_URL}?job=${encodeURIComponent(jobId)}${portalCode ? `&code=${encodeURIComponent(portalCode)}` : ""}`;
+      const replyBody = portalCode
+        ? `Thanks, Yaadly got your message. Last step, and it is short: ${link} That sets up your portal, where you sign the agreement and see every quote. Your job code is ${portalCode} if you are asked for it. A project manager will follow up shortly.`
+        : `Thanks, Yaadly got your message. A project manager will follow up shortly with the link to set up your portal.`;
       replyResult = await maybeSendReply(fromWaId, replyBody, trace);
     }
 
