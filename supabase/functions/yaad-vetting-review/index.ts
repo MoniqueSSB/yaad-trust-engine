@@ -12,6 +12,9 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // unfinished. A person approves on the desk, having read this. The row it
 // writes is a record of what the machine said, not a verdict it reached.
 //
+// It also does not run at all unless the applicant said it could. See the
+// consent gate inside review().
+//
 // ── Why it reads one document at a time ──
 //
 // The obvious build is one call with every document attached, asking the model
@@ -40,11 +43,9 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // tries to run it in the background so the read is already there. That attempt
 // is best effort and known to be: see the dispatch at the bottom.
 //
-// PRIVACY. This sends identity documents to NVIDIA's hosted model. The join
-// page tells applicants their documents are readable only by Yaadly admins,
-// which stops being true the moment this runs. That is a decision for the
-// privacy wording, not something this function can fix, but it is written here
-// so nobody discovers it by accident.
+// PRIVACY. This sends identity documents to NVIDIA's hosted model, which is
+// exactly why step 3 now asks permission and why the gate below is not
+// optional.
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -83,7 +84,7 @@ const DOC_LABEL: Record<string, string> = {
 
 const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address", "police_check"];
 
-/* ── pass 1: read one document ─────────────────────────────────────────── */
+/* ── pass 1: read one document ── */
 
 const READ_PROMPT = `You are reading ONE document uploaded by a tradesperson applying to join Yaadly, a property works service in Jamaica. You report only what is visible on this page. You are not deciding anything about the application.
 
@@ -99,7 +100,7 @@ Rules:
 - Do not comment on the person's appearance, race, age or gender.
 - Output ONLY the JSON object.`;
 
-/* ── pass 2: do these two faces match ──────────────────────────────────── */
+/* ── pass 2: do these two faces match ── */
 
 const FACE_PROMPT = `You are shown two images from one person's application to join Yaadly: first their government photo ID, second a live photo they took in the moment. Say whether they appear to be the same person.
 
@@ -113,7 +114,7 @@ Rules:
 - You are producing a flag for a human, not an identification. Say so in the note if you are anything short of confident.
 - Output ONLY the JSON object.`;
 
-/* ── pass 3: put it together ───────────────────────────────────────────── */
+/* ── pass 3: put it together ── */
 
 const SYNTH_PROMPT = `You are the Vetting Reviewer for Yaadly, a trust-first property works service in Jamaica. You are given what an applicant typed, what a vision model read off each of their documents separately, a face comparison, and date arithmetic that has already been calculated for you. You produce the note a human reviewer reads before opening the file.
 
@@ -158,7 +159,7 @@ function b64(buf: ArrayBuffer): string {
   return btoa(out);
 }
 
-/* ── dates are arithmetic, so code does them ───────────────────────────────
+/* ── dates are arithmetic, so code does them ──
    The model was asked to judge whether a proof of address was inside its three
    month window. Shown a bill dated 03 January and told today was 27 August, it
    answered that the bill was within the last three months. It was seven months
@@ -166,7 +167,7 @@ function b64(buf: ArrayBuffer): string {
    That is not a prompt that needs tightening. Language models are bad at date
    arithmetic and no amount of "do the arithmetic properly" fixes it. So the
    model is asked only to READ the dates off the page, which it does well, and
-   the arithmetic happens here where it is deterministic and checkable. */
+   the arithmetic happens here where it is deterministic and testable. */
 
 const DAY = 86400000;
 const ADDRESS_MAX_DAYS = 92;    // "within three months", generously
@@ -378,7 +379,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
 
   if (!NVIDIA_API_KEY) return { body: { error: "NVIDIA_API_KEY is not set on this function." }, status: 500 };
 
-  /* ── fetch the files ──────────────────────────────────────────────────
+  /* ── fetch the files ──
      Inlined as base64 rather than handed over as signed URLs: a signed URL
      given to a third party is a passport sitting on a fetchable address for as
      long as that URL lives. */
@@ -417,7 +418,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     });
   }
 
-  /* ── pass 1: read each document on its own, in parallel ─────────────── */
+  /* ── pass 1: read each document on its own, in parallel ── */
 
   const extracted = await Promise.all(loaded.map(async (f) => {
     const out = await ask(trace, `read:${f.doc}`, READ_PROMPT, [
@@ -440,7 +441,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     }, 502);
   }
 
-  /* ── pass 2: face match, only if both photos are here ───────────────── */
+  /* ── pass 2: face match, only if both photos are here ── */
 
   const idImg = loaded.find((f) => f.doc === "photo_id");
   const selfie = loaded.find((f) => f.doc === "selfie_with_id");
@@ -470,7 +471,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     };
   }
 
-  /* ── pass 3: synthesis, text only ───────────────────────────────────── */
+  /* ── pass 3: synthesis, text only ── */
 
   const missing = CORE_DOCS.filter((t) => !docs.some((d) => d.doc_type === t)).map((t) => DOC_LABEL[t]);
 
@@ -559,22 +560,20 @@ Deno.serve(async (req: Request) => {
 
     // ── who waits, and who does not ──
     //
-    // Called by the desk, this answers with the finished review, because a
-    // person is sitting there watching and wants the answer.
+    // The desk passes wait:true and gets the finished review, because a person
+    // is sitting there watching. That path is the reliable one: a real client
+    // on a real connection, nothing depending on background execution.
     //
-    // Called by yaad-vetting-upload on submit, it answers immediately and does
-    // the work afterwards. That is not politeness, it is the only thing that
-    // works. The first build held the caller's connection open for the whole
-    // review; the caller's isolate was torn down at eighteen seconds, that
-    // killed the connection, and the connection dying killed the review. It
-    // booted, ran for seventy seconds, wrote nothing and logged nothing.
-    // Answering first lets the caller finish cleanly and leaves this run
-    // depending on nobody.
+    // A submit takes this branch and tries to get the review done in advance,
+    // so it is already waiting when the desk opens the application. Best
+    // effort, and known to be: the isolate is reclaimed around the minute mark
+    // and a three-pass review sometimes needs longer. When it does not finish,
+    // the desk runs it on open instead.
     if (who === "internal" && body.wait !== true) {
       // A thrown error here used to vanish: the catch swallowed it, no row was
-      // written, and the desk saw the same empty box it sees when nothing has
-      // run. Silence and "the machine found nothing" must never look alike, so
-      // a failure writes itself down.
+      // written, and the desk saw the same empty box it shows when nothing has
+      // run at all. Silence and "the machine found nothing" must never look
+      // alike, so a failure writes itself down.
       const work = (async () => {
         try {
           await review(trace, root, appId);
@@ -599,9 +598,9 @@ Deno.serve(async (req: Request) => {
       }
 
       // No waitUntil in this runtime. Awaiting would hold the response open for
-      // the whole review and the isolate gets killed around the minute mark, so
-      // do not pretend: say the automatic run is unavailable and let the desk,
-      // which has a real person waiting on a real connection, do it properly.
+      // the whole review and the isolate is killed around the minute mark, so
+      // do not pretend: say the automatic run is unavailable and leave it to
+      // the desk, which has a person waiting on a connection that stays open.
       root.setAttributes({ "yaadly.vetting.review": "no_background" });
       return json({ ok: false, status: "not_started", reason: "This runtime has no background execution. The desk runs the review when the application is opened." }, 202);
     }

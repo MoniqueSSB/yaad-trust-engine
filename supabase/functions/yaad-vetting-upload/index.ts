@@ -321,7 +321,7 @@ Deno.serve(async (req: Request) => {
         if (rt?.waitUntil) rt.waitUntil(review);
       } catch (_) { /* never let the reviewer break an application */ }
 
-      root.setAttributes({ "yaadly.vetting.outcome": "submitted" });
+      root.setAttributes({ "yaadly.vetting.outcome": "submitted", "yaadly.vetting.ai_consent": aiConsent });
       return json({ ok: true });
     }
 
