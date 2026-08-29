@@ -839,6 +839,10 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       honest description of what actually happens on a first job. ── */
 .manualnote{background:var(--soft);border:1px solid var(--softline);border-radius:12px;padding:14px 16px;margin-top:14px;font-size:13.5px;color:var(--mute);line-height:1.6}
 .manualnote b{color:var(--ink)}
+.assistrow{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:13px}
+.qask{margin:8px 0 0;padding-left:19px}
+.qask li{font-size:13.5px;color:var(--ink);line-height:1.6;margin-bottom:6px}
+.qask li::marker{color:var(--mango)}
 
 /* ── step 1 · trade picker ── */
 .wtrades{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
@@ -1418,7 +1422,14 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       <label class="fl" for="w-desc">Describe the job</label>
       <textarea class="f" id="w-desc" placeholder="e.g. Water leaking from the pipe under the kitchen sink, been going about a week. Cupboard floor is soft now. House is my father's in Barbican, I'm in London."></textarea>
     </div>
-    <div class="manualnote"><b>No assistant on this one.</b> Write it however you'd say it out loud, a person reads every job before it reaches the board. Once you've signed the Client Guidelines and have a profile, the intake assistant tidies your wording and asks the questions workers always come back with.</div>
+    <div class="manualnote">
+      <b>Want the intake assistant to read this?</b> Press the button and it reads what you wrote, fills in what it can work out on the job card below, and tells you the two things a worker will ring up and ask before quoting. It is never asked about money or materials, so it never guesses those. Your words go to an AI model to do it, and a person still reads every job before it reaches the board. Leave the button alone and nothing machine reads what you wrote.
+      <div class="assistrow">
+        <button class="btn ghost" type="button" id="w-assist">Read it back and fill what you can</button>
+        <span class="sp" id="w-assist-hint">Write the job first, then this wakes up</span>
+      </div>
+    </div>
+    <div id="w-agent-out"></div>
 
     <div class="card soft" style="margin-top:16px">
       <p class="kick m" style="margin-bottom:6px">Then the same job card everybody gets</p>
@@ -1494,17 +1505,32 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 
   <!-- 5 ───────────────────────────────────────────── -->
   <div class="wstep" data-step="5">
-    <h2 class="wq">Create your account</h2>
-    <p class="wsub">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
+    <h2 class="wq" id="w5h">Create your account</h2>
+    <p class="wsub" id="w5sub">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
+
+    <div class="card soft" id="w-si-box" style="margin-bottom:18px">
+      <p class="kick" style="margin-top:0;margin-bottom:6px">Posted with us before?</p>
+      <p class="tiny" style="margin-bottom:0">Sign in and this job attaches to the account you already have. No second account, no second password, and if you have already signed the Client Guidelines you are not asked to sign them again.</p>
+      <div class="grid g2c" style="margin-top:13px">
+        <div class="fgroup" style="margin-bottom:0"><label class="fl" for="w-si-email">Email</label><input class="f" id="w-si-email" type="email" autocomplete="email"></div>
+        <div class="fgroup" style="margin-bottom:0"><label class="fl" for="w-si-pw">Password</label><input class="f" id="w-si-pw" type="password" autocomplete="current-password"></div>
+      </div>
+      <div class="assistrow">
+        <button class="btn ghost" type="button" id="w-si-go">Sign in</button>
+        <span class="sp" id="w-si-hint"></span>
+      </div>
+    </div>
+    <div class="fixed" id="w-si-on" style="display:none;margin-bottom:18px"></div>
+
     <div class="grid g2c">
       <div class="fgroup"><label class="fl" for="w-name">Your name</label><input class="f" id="w-name"></div>
       <div class="fgroup"><label class="fl" for="w-email">Email</label><input class="f" id="w-email" type="email"></div>
     </div>
     <div class="fgroup"><label class="fl" for="w-phone">Phone or WhatsApp</label><input class="f" id="w-phone" placeholder="+44… or 876…">
       <p class="tiny" style="margin-top:7px">Hidden from workers until you start a chat with one. You control when it's shared.</p></div>
-    <div class="fgroup"><label class="fl" for="w-pw">Choose a password</label><input class="f" id="w-pw" type="password" autocomplete="new-password">
+    <div class="fgroup" id="w-pw-wrap"><label class="fl" for="w-pw">Choose a password</label><input class="f" id="w-pw" type="password" autocomplete="new-password">
       <p class="tiny" style="margin-top:7px">At least 8 characters. This is what gets you into your client portal.</p></div>
-    <div class="card soft">
+    <div class="card soft" id="w-onescreen">
       <p style="font-size:13.5px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">One screen left.</b> Your job stays a draft until you confirm the Client Guidelines next. That is what puts it in the marketplace, nothing reaches a worker before it.</p>
     </div>
     <div class="wnav">
@@ -1519,6 +1545,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <h2 class="wq">Confirm and go live</h2>
     <p class="wsub">This is what workers will see. The private bits stay private. Confirm the Client Guidelines and your job enters the marketplace.</p>
     <div class="card" id="w-review"></div>
+
+    <div class="fixed" id="gdone" style="display:none;margin-top:14px"></div>
 
     <div class="card" id="gblock" style="margin-top:14px;background:var(--soft);border-color:var(--softline)">
       <p class="kick" style="margin-bottom:9px">Client Guidelines <span id="gver">v1.3</span>, required to go live</p>
@@ -2651,6 +2679,12 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  var when='Within the next two weeks';
  var draftId=null;         // the job row, written at step 2
  var portalCode=null;
+ /* Who is filling this in. Not a toggle: it is a real session, or it is not.
+    A member skips account creation and, if their signature is on the version
+    in force, skips signing it again. */
+ var member=null;          // {email, token, name, phone} once signed in
+ var signedGuidelines=false;
+ var assistRan=false;
 
  var RAIL=['Trade','Details','Photos','Where & when','Create account','Guidelines & go live'];
  var S=function(s){return root.querySelector(s)};
@@ -2710,12 +2744,25 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   return '<div class="jfield"><label>'+lab+srcTag(f.v?f.src:'empty')+'</label>'+
          '<input class="'+cls+'" data-jc="'+id+'" maxlength="160" value="'+esc(f.v)+'" placeholder="'+esc(ph)+'"></div>';
  }
- function jcSel(id,opts,f,lab){
+ /* Every list ends in "Other". A list of eighteen trades and ninety-seven job
+    types still will not describe somebody's yard, and a form that makes a
+    person pick the nearest wrong answer collects a wrong answer.
+    Two lists have no Other, on purpose:
+      trade      the routing key. Workers subscribe by trade and the board
+                 filters on it, so a typed one reaches nobody.
+      materials  the three answers are exhaustive, and the database refuses a
+        store    materials release on any value it does not recognise. */
+ var JC_OTHER='Other, let me type it';
+ function jcSel(id,opts,f,lab,noOther){
+  var other=f.other===true;
   var cls='jsel'+(f.src==='guess'?' guess':f.v?'':' empty');
   var o='<option value="">Choose…</option>'+opts.map(function(x){
-    return '<option'+(x===f.v?' selected':'')+'>'+esc(x)+'</option>'}).join('');
+    return '<option'+(!other&&x===f.v?' selected':'')+'>'+esc(x)+'</option>'}).join('');
+  if(!noOther) o+='<option value="__other"'+(other?' selected':'')+'>'+JC_OTHER+'</option>';
   return '<div class="jfield"><label>'+lab+srcTag(f.v?f.src:'empty')+'</label>'+
-         '<select class="'+cls+'" data-jc="'+id+'">'+o+'</select></div>';
+         '<select class="'+cls+'" data-jc="'+id+'">'+o+'</select>'+
+         (other?'<input class="'+cls+'" data-jco="'+id+'" style="margin-top:8px" maxlength="120" value="'+esc(f.v)+'" placeholder="In your own words">':'')+
+         '</div>';
  }
  function drawCard(){
   var gaps=jcGaps(), st=jcStages(), box=S('#wizcard'); if(!box) return;
@@ -2727,7 +2774,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
          :'<span style="color:var(--tealb)">All fields confirmed</span>')+
    '</div>'+
    '<div class="jcsec"><p class="jclab">What and where</p><div class="jfrow">'+
-     jcSel('trade',(window.JC_TRADES||[]),JC.trade,'Trade')+jcSel('type',typeOpts(),JC.type,'Job type')+'</div>'+
+     jcSel('trade',(window.JC_TRADES||[]),JC.trade,'Trade',true)+jcSel('type',typeOpts(),JC.type,'Job type')+'</div>'+
     '<div class="jfrow" style="margin-top:12px">'+
      jcSel('prop',JC_PROP,JC.prop,'Property type')+jcSel('parish',JC_PARISH,JC.parish,'Parish')+'</div></div>'+
    '<div class="jcsec"><p class="jclab">Scale</p><div class="jfrow">'+
@@ -2738,7 +2785,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
      jcSel('mat',JC_MAT,JC.mat,'Who supplies materials')+
      jcSel('budget',JC_BUDGET,JC.budget,'Your budget band')+'</div>'+
     '<div class="jfrow" style="margin-top:12px">'+
-     jcSel('store',JC_STORE,JC.store,'Where materials are kept on site')+
+     jcSel('store',JC_STORE,JC.store,'Where materials are kept on site',true)+
      (JC.store.v && JC.store.v!==JC_STORE_NONE
        ? jcTxt('storeWhere',JC.storeWhere,'Which room or store, in your words','e.g. the back room off the veranda, key with my aunt')
        : '')+'</div>'+
@@ -2760,9 +2807,19 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
     count and the evidence checklist. Keyed Trade|Type, never Type alone. */
  root.addEventListener('change',function(e){
   var sel=e.target.closest('[data-jc]'); if(!sel) return;
-  var k=sel.dataset.jc; JC[k].v=(sel.value||'').trim(); JC[k].src=JC[k].v?'ok':'empty';
-  if(k==='trade'){ JC.type.v=''; JC.size.v=''; jcEv=[]; chosen=sel.value; paintTrades() }
-  if(k==='type'){ JC.size.v=''; jcEv=evOpts().slice(0,6) }
+  var k=sel.dataset.jc;
+  /* Picking Other empties the field on purpose. It stays coral until they
+     have actually typed something, because "Other" on its own is not an
+     answer to anything. */
+  if(sel.value==='__other'){
+   JC[k].other=true; JC[k].v=''; JC[k].src='empty';
+   drawCard();
+   var box=S('[data-jco="'+k+'"]'); if(box) box.focus();
+   return;
+  }
+  JC[k].other=false; JC[k].v=(sel.value||'').trim(); JC[k].src=JC[k].v?'ok':'empty';
+  if(k==='trade'){ JC.type.v=''; JC.type.other=false; JC.size.v=''; JC.size.other=false; jcEv=[]; chosen=sel.value; paintTrades() }
+  if(k==='type'){ JC.size.v=''; JC.size.other=false; jcEv=evOpts().slice(0,6) }
   /* Nowhere securable means there is no place to describe. Anything typed
      before that answer would sit on the job contradicting it. */
   if(k==='store' && JC.store.v===JC_STORE_NONE){ JC.storeWhere.v=''; JC.storeWhere.src='empty' }
@@ -2773,8 +2830,16 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
     Continue unlocks on the last character rather than on blur; the badge
     inside the card catches up on the change event. */
  root.addEventListener('input',function(e){
-  var el=e.target.closest('input[data-jc]'); if(!el) return;
-  var k=el.dataset.jc; JC[k].v=(el.value||'').trim(); JC[k].src=JC[k].v?'ok':'empty';
+  var el=e.target.closest('input[data-jc],input[data-jco]'); if(!el) return;
+  var k=el.dataset.jc||el.dataset.jco;
+  JC[k].v=(el.value||'').trim(); JC[k].src=JC[k].v?'ok':'empty';
+  /* The badge on this one field is patched in place instead. A full redraw
+     would take the cursor with it, and a coral "you need to pick" sitting
+     over a box somebody has already typed into is just wrong. */
+  var f=el.closest('.jfield'), tag=f&&f.querySelector('.src');
+  if(tag){ tag.className='src '+JC[k].src;
+           tag.textContent = JC[k].v ? 'From your message' : 'You need to pick' }
+  el.classList.toggle('empty', !JC[k].v);
   hint2();
  });
  root.addEventListener('click',function(e){
@@ -2800,7 +2865,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   var b=e.target.closest('[data-trade]'); if(!b) return;
   chosen=b.dataset.trade;
   JC.trade.v=chosen; JC.trade.src='ok';
-  JC.type.v=''; JC.size.v=''; jcEv=[];
+  JC.type.v=''; JC.type.other=false; JC.size.v=''; JC.size.other=false; jcEv=[];
   paintTrades(); drawCard();
  });
 
@@ -2829,10 +2894,14 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  function hint2(){
   var h=S('#h2h'), n2=S('#n2'); if(!h||!n2) return;
   var d=(S('#w-desc').value||'').trim(), gaps=jcGaps();
+  var guesses=0; for(var k in JC){ if(JC[k].v && JC[k].src==='guess') guesses++ }
   var bad = !d ? 'Describe the job to continue'
           : gaps ? gaps+' job card field'+(gaps>1?'s':'')+' still to pick'
           : '';
-  n2.disabled=!!bad; h.textContent=bad||'';
+  n2.disabled=!!bad;
+  /* A best guess does not block. It is filled, it is badged mango, and the
+     person who has to live with it is the one being asked to look. */
+  h.textContent = bad || (guesses ? guesses+' best guess'+(guesses>1?'es':'')+' to check before you continue' : '');
  }
  function hint4(){
   var h=S('#h4'), n4=S('#n4'); if(!h||!n4) return;
@@ -2847,7 +2916,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   var bad = !g('#w-name') ? 'Your name is needed'
           : !g('#w-email') || g('#w-email').indexOf('@')<0 ? 'A valid email is needed'
           : !g('#w-phone') ? 'A phone or WhatsApp number is needed'
-          : g('#w-pw').length<8 ? 'Password needs at least 8 characters'
+          : (!member && g('#w-pw').length<8) ? 'Password needs at least 8 characters'
           : '';
   n5.disabled=!!bad; h.textContent=bad||'';
  }
@@ -2949,12 +3018,178 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  function gateCheck(){
   var t=S('#gtick'), s=S('#w-sig'), b=S('#n6'), h=S('#n6hint');
   if(!t||!s||!b) return;
+  var gb=S('#gblock'), gd=S('#gdone');
+  /* Signed the version in force already? Then there is nothing to sign. The
+     question versioned signatures answer is "have these words been agreed",
+     not "has a box been ticked today". A version bump brings the box back
+     for everybody, including this person. */
+  if(member && signedGuidelines){
+   if(gb) gb.style.display='none';
+   if(gd){ gd.style.display='';
+     gd.innerHTML='<b>Guidelines already on file.</b> You signed the version in force, so you are not asked to sign it again. If the wording ever changes, the box comes back for everybody.' }
+   b.disabled=false;
+   h.textContent='Guidelines already on file, no re-signing';
+   h.style.color='var(--tealb)';
+   return;
+  }
+  if(gb) gb.style.display='';
+  if(gd) gd.style.display='none';
   var ok = t.checked && (s.value||'').trim().length>2;
   b.disabled=!ok;
   h.textContent = ok ? 'Signature captured, this is what makes it live' : 'Tick the box and sign to continue';
   h.style.color = ok ? 'var(--tealb)' : '';
  }
  root.addEventListener('change',function(e){ if(e.target.id==='gtick') gateCheck() });
+
+ /* ---------- the intake assistant ----------
+    It runs on the server, inside the draft write, and only when this button
+    is pressed. Two reasons it is not automatic. A model reading the words of
+    somebody who was told on this very screen that nothing reads them is not
+    a feature, it is a lie in the copy. And an AI endpoint fired for anyone
+    with no account and nothing at stake is a bill waiting to happen.
+
+    It fills blanks and never argues: anything already answered is left
+    alone, and money and materials are not in the map at all, because the
+    assistant is never asked about those. Yaadly does not price work. */
+ var lastRead=null;
+ var READ_MAP={ job_type:'type', property_type:'prop', parish:'parish',
+                size_band:'size', storey:'storey', access_type:'access', urgency:'urg' };
+ /* Size bands are keyed Trade|Type, and the type is exactly what the
+    assistant is being asked to work out, so there is no single right list to
+    offer it yet. It gets every band used anywhere in this trade, and the
+    answer is checked afterwards against the bands that belong to the job
+    type it settled on. Guess the type right and the band survives. Guess it
+    wrong and the band is dropped, which is the correct outcome. */
+ function sizeUnion(){
+  var t=JC.trade.v, m=window.JC_SIZE||{}, out=[];
+  for(var k in m){ if(k.indexOf(t+'|')===0) m[k].forEach(function(x){ if(out.indexOf(x)<0) out.push(x) }) }
+  return out.length?out:JC_GENERIC_SIZE;
+ }
+ function optionLists(){
+  return { job_type:typeOpts(), property_type:JC_PROP, parish:JC_PARISH,
+           size_band:sizeUnion(), storey:JC_STOREY, access_type:JC_ACCESS, urgency:JC_URG };
+ }
+ function optsFor(k){
+  return k==='type'?typeOpts() : k==='prop'?JC_PROP : k==='parish'?JC_PARISH
+       : k==='size'?sizeOpts() : k==='storey'?JC_STOREY : k==='access'?JC_ACCESS
+       : k==='urg'?JC_URG : [];
+ }
+ /* Order matters, and size band is last on purpose. Its list is keyed
+    Trade|Type, so until the job type is in, the only list that exists is the
+    generic one, and that is what the assistant was offered. Once the type
+    lands the real bands take over and the generic answer may not be among
+    them. So every value is checked against the list that applies AFTER the
+    fields it depends on are set, and anything that no longer fits is
+    dropped rather than badged. A field left coral is a field the client
+    picks. A field badged mango and showing "Choose…" is just a lie. */
+ function applyRead(r){
+  var order=['job_type','property_type','parish','storey','access_type','urgency','size_band'];
+  var filled=0, typeWasBlank=!JC.type.v;
+  order.forEach(function(rk){
+   var k=READ_MAP[rk], f=JC[k], v=((r[rk]||'')+'').trim();
+   if(!v || f.v || f.other) return;
+   if(optsFor(k).indexOf(v)<0) return;
+   f.v=v; f.src='guess'; filled++;
+  });
+  /* Same cascade a person picking the job type by hand would set off: the
+     stage count and the evidence checklist come from the type. */
+  if(typeWasBlank && JC.type.v && !jcEv.length) jcEv=evOpts().slice(0,6);
+  return filled;
+ }
+ function drawAgent(r,filled){
+  var box=S('#w-agent-out'); if(!box) return;
+  var qs=(r.questions||[]).filter(Boolean).slice(0,3);
+  box.innerHTML='<div class="card soft" style="margin-top:14px">'+
+   '<p class="kick" style="margin-top:0;margin-bottom:8px">What the assistant made of it</p>'+
+   (r.scope?'<p style="font-size:14px;line-height:1.65">'+esc(r.scope)+'</p>'+
+     '<div class="assistrow"><button class="btn ghost sm" type="button" id="w-usescope">Use this wording instead of mine</button>'+
+     '<span class="sp">Your own words stay on the job either way</span></div>':'')+
+   (qs.length?'<p class="kick" style="margin-bottom:2px">'+(qs.length>1?'What a worker will ask':'What a worker will ask')+'</p>'+
+     '<ul class="qask">'+qs.map(function(q){return '<li>'+esc(q)+'</li>'}).join('')+'</ul>'+
+     '<p class="tiny" style="margin-top:8px">Answer these in your description now and you get a price back first time, instead of a phone call first.</p>':'')+
+   '<div class="'+(filled?'fixed':'flag')+'" style="margin-top:13px">'+(filled
+     ? '<b>'+filled+' field'+(filled>1?'s':'')+' filled in below, every one marked as a best guess.</b> Look at each one and change anything that is wrong. Nothing about money or materials was touched.'
+     : '<b>Nothing new to fill in.</b> Either you had answered it already, or your description does not say. The card below is still yours to finish.')+'</div>'+
+   '</div>';
+ }
+ root.addEventListener('click',function(e){
+  if(e.target.id!=='w-usescope' || !lastRead || !lastRead.scope) return;
+  S('#w-desc').value=lastRead.scope;
+  e.target.textContent='Wording swapped';
+  e.target.disabled=true;
+  hint2();
+ });
+ S('#w-assist').addEventListener('click',async function(){
+  var hint=S('#w-assist-hint'), d=(S('#w-desc').value||'').trim();
+  if(d.length<25){ hint.textContent='Write a line or two first, then this can read it'; return }
+  this.disabled=true; hint.textContent='Reading what you wrote…';
+  var j=await saveDraft(true);
+  this.disabled=false;
+  if(!j || !j.read){
+   hint.textContent='The assistant could not be reached. Fill the card yourself, nothing is lost and your job is saved.';
+   return;
+  }
+  assistRan=true; lastRead=j.read;
+  var filled=applyRead(j.read);
+  hint.textContent='Read. Check anything badged as a best guess.';
+  drawAgent(j.read,filled);
+  drawCard();
+ });
+
+ /* ---------- the client who already has an account ----------
+    Not a demo toggle, a real session. The token goes up with the job, the
+    server asks the auth server who it belongs to, and nothing is created
+    twice. Before this existed, an email that already had an account was
+    waved through on any eight characters, and the signature landed on that
+    person's account. */
+ var SB = (typeof sb!=='undefined') ? sb : null;
+ async function applyMember(){
+  if(!member) return;
+  S('#w-si-box').style.display='none';
+  var on=S('#w-si-on'); on.style.display='';
+  on.innerHTML='<b>Signed in as '+esc(member.email)+'.</b> This job attaches to that account. No second account is made, and nothing you have filled in so far is lost.';
+  S('#w5h').textContent='Confirm your details';
+  S('#w5sub').textContent='Pulled from the account you just signed into. Change anything that is out of date for this job.';
+  var em=S('#w-email'); em.value=member.email; em.readOnly=true;
+  if(member.name && !(S('#w-name').value||'').trim()) S('#w-name').value=member.name;
+  if(member.phone && !(S('#w-phone').value||'').trim()) S('#w-phone').value=member.phone;
+  var pw=S('#w-pw-wrap'); if(pw) pw.style.display='none';
+  /* may_use_agents is the database's own answer to "profile, and signed the
+     version in force". Asking it here means the page cannot drift from the
+     rule the server enforces on the way in. If it cannot be asked, the
+     signature box stays: the safe answer to "have they signed" is no. */
+  signedGuidelines=false;
+  if(SB){
+   try{ var q=await SB.rpc('may_use_agents',{p_email:member.email});
+        signedGuidelines = !!(q && q.data===true) }
+   catch(err){ signedGuidelines=false }
+  }
+  var os=S('#w-onescreen'); if(os) os.style.display = signedGuidelines ? 'none' : '';
+  hint5(); gateCheck();
+ }
+ S('#w-si-go').addEventListener('click',async function(){
+  var hint=S('#w-si-hint');
+  var em=(S('#w-si-email').value||'').trim().toLowerCase(), pw=S('#w-si-pw').value||'';
+  if(!em || em.indexOf('@')<0){ hint.textContent='Your email is needed'; return }
+  if(!pw){ hint.textContent='Your password is needed'; return }
+  if(!SB){ hint.textContent='Sign in is not available on this page right now. Create the account below and message us, we will join them up.'; return }
+  this.disabled=true; hint.textContent='Signing you in…';
+  try{
+   var r=await SB.auth.signInWithPassword({email:em,password:pw});
+   if(r.error) throw new Error(r.error.message||'not right');
+   var u=r.data.user, sess=r.data.session, meta=(u&&u.user_metadata)||{};
+   member={ email:((u&&u.email)||em).toLowerCase(), token:sess.access_token,
+            name:(meta.full_name||meta.name||''), phone:(meta.phone||'') };
+   hint.textContent='';
+   await applyMember();
+  }catch(err){
+   var m=String(err&&err.message||'');
+   hint.textContent = /confirm/i.test(m)
+     ? 'That account has not confirmed its email yet. Click the link we sent you, then sign in here.'
+     : 'That email and password did not match. Try again, or create an account below.';
+  }
+  this.disabled=false;
+ });
 
  /* ---------- continues ---------- */
  S('#n1').addEventListener('click',function(){ if(chosen) setStep(2) });
@@ -2975,22 +3210,38 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
     Somebody who closes the tab at step 4 comes back to a saved job, not an
     empty form. open:false, so sync_job_status parks it at
     awaiting_client_setup until the signature exists. */
- async function saveDraft(){
+ /* The session token when there is one, the publishable key when there is
+    not. apikey stays the publishable key either way: it names the project,
+    it does not say who anybody is. */
+ function authHeaders(){
+  return {'Content-Type':'application/json',
+          'Authorization':'Bearer '+((member&&member.token)||SUPABASE_PUBLISHABLE_KEY),
+          'apikey':SUPABASE_PUBLISHABLE_KEY};
+ }
+ async function saveDraft(assist){
   try{
    var r=await fetch(WEBSITE_INTAKE_URL,{method:'POST',
-     headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'apikey':SUPABASE_PUBLISHABLE_KEY},
-     body:JSON.stringify(payload('draft'))});
+     headers:authHeaders(),
+     body:JSON.stringify(payload('draft',assist))});
    var j=await r.json();
    if(j&&j.jobId){ draftId=j.jobId; portalCode=j.portalCode||null;
      try{ localStorage.setItem('yaadly-draft',JSON.stringify({id:draftId,code:portalCode})) }catch(e){}
-     return true }
+     return j }
   }catch(e){ console.warn('draft save:',e) }
-  return false;
+  return null;
  }
- function payload(mode){
+ function payload(mode,assist){
   var g=function(i){var el=S(i);return el?(el.value||'').trim():''};
   return {
    mode:mode, jobId:draftId,
+   /* Only ever true when the button was pressed. The server fires the model
+      on this flag and on nothing else. */
+   assist: assist===true,
+   /* The taxonomy lives in one file, data/job-taxonomy.js, so the lists the
+      assistant may answer from are sent from here rather than kept as a
+      second copy on the server that drifts the first time a job type is
+      added. The server checks every answer back against them. */
+   options: (mode==='draft' && assist===true) ? optionLists() : undefined,
    name:g('#w-name')||'Draft, name to follow',
    phone:g('#w-phone')||'not given yet',
    email:g('#w-email')||'',
@@ -3013,14 +3264,30 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   b.disabled=true; S('#n6hint').textContent='Creating your account and recording the signature…';
   var body=payload('golive');
   body.signature=(S('#w-sig').value||'').trim();
-  body.password=S('#w-pw').value||'';
+  /* A signed-in client has already proved who they are with the token in
+     the header. Asking them to type a password into a job form as well is
+     how you teach people to type passwords into job forms. */
+  if(!member) body.password=S('#w-pw').value||'';
   body.guidelinesVersion=(S('#gver')?S('#gver').textContent:'v1.0').replace(/^v/,'');
   body.consentText='I have read and agree to the Client Guidelines '+(S('#gver')?S('#gver').textContent:'v1.0')+', and I understand my job is not visible to any worker until I confirm this.';
   try{
    var r=await fetch(GOLIVE_URL,{method:'POST',
-     headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'apikey':SUPABASE_PUBLISHABLE_KEY},
+     headers:authHeaders(),
      body:JSON.stringify(body)});
    var j=await r.json();
+   /* The one error worth handling rather than reporting: that email already
+      has an account and nobody has proved it is theirs. Send them back a
+      screen with the sign-in already filled in, rather than telling them to
+      go and find it. */
+   if(r.status===403 && j && j.accountExists){
+    b.disabled=false; S('#n6hint').textContent='';
+    setStep(5);
+    S('#w-si-email').value=(S('#w-email').value||'').trim();
+    S('#w-si-hint').textContent='This email already has a Yaadly account. Sign in and your job attaches to it.';
+    S('#w-si-pw').focus();
+    st.innerHTML='';
+    return;
+   }
    if(!r.ok||j.error) throw new Error(j.error||('HTTP '+r.status));
    draftId=j.jobId||draftId;
    done(j);
@@ -3039,11 +3306,11 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   var live=!!j.open;
   S('#d-pills').innerHTML=
    '<span class="pill">'+esc(draftId||'Job saved')+(live?' live in the marketplace':' saved')+'</span>'+
-   '<span class="pill m">Guidelines '+esc(j.guidelinesVersion||'v1.0')+' signed</span>'+
+   '<span class="pill m">Guidelines '+esc(j.guidelinesVersion||'v1.0')+(j.alreadySigned?' already on file':' signed')+'</span>'+
    '<span class="pill n">'+esc(JC.trade.v)+' · '+esc(S('#w-parish').value||JC.parish.v)+'</span>';
   S('#d-head').textContent='Hello '+((S('#w-name').value||'').trim().split(' ')[0]||'there')+', '+(live?'your job is live.':'your job is signed and saved.');
   S('#d-lead').innerHTML = live
-   ? 'Your signature on the Client Guidelines is what took it out of draft. Your <b>'+esc(JC.trade.v)+'</b> job is now in the marketplace and we will help you find available workers near <b>'+esc(S('#w-parish').value||JC.parish.v)+'</b>.'
+   ? (j.alreadySigned?'Your signature on the Client Guidelines was already on file, so it went straight out of draft.':'Your signature on the Client Guidelines is what took it out of draft.')+' Your <b>'+esc(JC.trade.v)+'</b> job is now in the marketplace and we will help you find available workers near <b>'+esc(S('#w-parish').value||JC.parish.v)+'</b>.'
    : 'Your signature is recorded. One thing left: <b>confirm your email</b>. We sent a link to <b>'+esc(S('#w-email').value)+'</b>, and clicking it is what opens your job to workers. That step exists so nobody can post a job in your name.';
   var steps = live ? [
    ['We sent your job to relevant workers near '+(S('#w-parish').value||JC.parish.v),'Vetted workers in your trade and area were alerted just now. Your address and phone number were not included.'],
@@ -3075,7 +3342,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   go('post');
   if(trade && (window.JC_TRADES||[]).indexOf(trade)>-1){
    chosen=trade; JC.trade.v=trade; JC.trade.src='ok';
-   JC.type.v=''; JC.size.v=''; jcEv=[];
+   JC.type.v=''; JC.type.other=false; JC.size.v=''; JC.size.other=false; jcEv=[];
    paintTrades(); drawCard(); setStep(2);
   } else { paintTrades(); drawCard(); setStep(1) }
  };
