@@ -7,6 +7,9 @@ out/
 # ...but schema and tests are source code and belong in the repo.
 !supabase/migrations/*.sql
 !supabase/tests/*.sql
+# Seed rigs are tooling, not data. They carry no credentials: the one
+# password they need is passed in at run time, because this repo is public.
+!supabase/seeds/*.sql
 *.sql.gz
 *.dump
 backups/
