@@ -19,7 +19,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //             not carry one yet, the code is good enough on its own: that is
 //             the normal case, because WhatsApp intake has a phone number and
 //             never an email, and those jobs were impossible to claim at all
-//             until 20260829b. It rate limits on both the email and the code:
+//             until 20260829f. It rate limits on both the email and the code:
 //             five wrong answers against either inside fifteen minutes and it
 //             stops answering.
 //   worker -> must already have an active worker profile, which only exists
@@ -29,7 +29,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // and the confirmation link is what binds it, because clicking that link is
 // the only thing that proves the address is real and belongs to the person
 // typing it. A client who mistypes their own address loses nothing: no link
-// arrives, no claim is consumed, they try again. See 20260829c.
+// arrives, no claim is consumed, they try again. See 20260829g.
 //
 // The confirmation email is GoTrue's own, sent over this project's custom
 // SMTP, which is already Resend.

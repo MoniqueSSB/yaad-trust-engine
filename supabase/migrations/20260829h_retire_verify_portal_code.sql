@@ -1,8 +1,8 @@
 -- verify_portal_code() is dead. Retire it.
 --
 -- It was the original gate: does a row exist carrying BOTH this code and this
--- email. 20260829b established why that could never be satisfied by a job that
--- arrived on WhatsApp, and 20260829c replaced the whole idea with pend then
+-- email. 20260829f established why that could never be satisfied by a job that
+-- arrived on WhatsApp, and 20260829g replaced the whole idea with pend then
 -- bind on confirmation. Nothing has called this since.
 --
 -- It is read only and was locked to the service role, so leaving it would not
