@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import legal from "@/lib/legal-copy.json";
@@ -12,6 +11,20 @@ export const dynamic = "force-dynamic";
  * canonical reference. A signature row records the exact version and the
  * exact consent sentence; changing the wording means a new version and a
  * re-sign, never a moved signature.
+ *
+ * READING IS PUBLIC. SIGNING IS NOT.
+ *
+ * This page used to redirect a signed-out visitor to sign-in before a word
+ * of it rendered. The join flow links here from step 7, under the words "Read
+ * the Worker Guidelines", and an applicant has no account by definition: they
+ * are applying for one. So the link opened a login wall, and the very next
+ * control on the join page asked them to tick that they had read the thing
+ * they had just been refused. Asking somebody to agree to words they cannot
+ * open is not a signature, it is a formality.
+ *
+ * So the text is served to everybody. The signature is not: signGuidelines()
+ * calls requireUser() itself, and always did, so the gate never depended on
+ * this redirect. Removing it takes away a wall, not a check.
  */
 
 type Sec = { n: number; title: string; html: string };
@@ -22,16 +35,18 @@ export default async function Guidelines({
   searchParams: Promise<{ read?: string }>;
 }) {
   const user = await getUser();
-  if (!user) redirect("/portal/sign-in");
   const { read } = await searchParams;
-  const supabase = await createClient();
-  const email = (user.email ?? "").toLowerCase();
+  const email = (user?.email ?? "").toLowerCase();
 
-  const { data: sigs } = await supabase
-    .from("doc_signatures")
-    .select("doc_type,doc_version,signed_at")
-    .ilike("signer_email", email)
-    .in("doc_type", ["client_guidelines", "worker_guidelines"]);
+  // Only a signed-in visitor has signatures to look up, and only a signed-in
+  // visitor has a session to look them up with. A reader gets the text.
+  const sigs = user
+    ? (await (await createClient())
+        .from("doc_signatures")
+        .select("doc_type,doc_version,signed_at")
+        .ilike("signer_email", email)
+        .in("doc_type", ["client_guidelines", "worker_guidelines"])).data
+    : null;
 
   const docs = [
     // version is the bare number and nothing else. It is what goes into
@@ -52,6 +67,15 @@ export default async function Guidelines({
         asked to re-sign the new version; a signature is never moved onto
         words you did not read.
       </p>
+      {!user && (
+        <p className="mt-3 max-w-[62ch] rounded-xl border border-softline bg-soft px-4 py-3 text-[13px] leading-relaxed text-mute">
+          <b className="text-ink">Read as much of this as you like without an
+          account.</b>{" "}
+          Signing needs one, because a signature has to belong to somebody. If
+          you are applying as a tradesperson you sign on the join form itself
+          and do not need to sign here.
+        </p>
+      )}
 
       {docs.map((d) => {
         const sig = (sigs ?? []).find(
@@ -69,7 +93,7 @@ export default async function Guidelines({
                 </span>
               ) : (
                 <a href={`/portal/guidelines?read=${d.key}`} className="ml-auto rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
-                  Read and sign
+                  {user ? "Read and sign" : "Read it"}
                 </a>
               )}
             </div>
@@ -86,6 +110,7 @@ export default async function Guidelines({
                     </div>
                   ))}
                 </div>
+                {user ? (
                 <form action={signGuidelines} className="mt-4 flex flex-wrap items-end gap-3">
                   <input type="hidden" name="docType" value={d.key} />
                   <label className="min-w-[240px] flex-1">
@@ -104,6 +129,18 @@ export default async function Guidelines({
                     delete.
                   </p>
                 </form>
+                ) : (
+                  <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
+                    You have read the current version, {d.version}. Signing it
+                    needs an account, so that the signature belongs to a
+                    person.{" "}
+                    <a href="/portal/sign-in" className="font-bold text-tealb underline underline-offset-4">
+                      Sign in to sign it
+                    </a>
+                    , or, if you are applying as a tradesperson, sign it on the
+                    join form and skip this page.
+                  </p>
+                )}
               </>
             )}
           </section>
