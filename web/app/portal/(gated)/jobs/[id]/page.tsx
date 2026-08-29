@@ -14,6 +14,7 @@ import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { FeeBreakdown } from "@/components/portal/FeeBreakdown";
 import { PortalCard } from "@/components/portal/PortalCard";
 import { JobBrief } from "@/components/portal/JobBrief";
+import { IntakeThread } from "@/components/portal/IntakeThread";
 import { jobGates } from "@/lib/portal/gates";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
@@ -112,7 +113,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -134,6 +135,11 @@ export default async function JobRoom({
       supabase.from("scope_agreements").select("side,email").eq("job_id", id),
       supabase.from("messages").select("id,sender_email,body,created_at").eq("job_id", id).order("created_at").limit(200),
       supabase.from("disputes").select("id,state,body,reply,kinds").eq("job_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      /* The conversation this job came out of. Row level security returns
+         nothing here unless the signed-in address is this job's client
+         (20260829q), so a worker's copy of this query is empty and the
+         component below never has worker-side data to mishandle. */
+      supabase.from("intake_threads").select("transcript,channel,turns").eq("job_id", id).maybeSingle(),
     ]);
 
   const current = jobStage(job.status);
@@ -526,6 +532,13 @@ export default async function JobRoom({
           parish={job.parish}
         />
       )}
+
+      <IntakeThread
+        transcript={intakeRow?.transcript ?? null}
+        channel={intakeRow?.channel ?? null}
+        turns={intakeRow?.turns ?? null}
+        role={role === "worker" ? "worker" : "client"}
+      />
 
       {chooseOpen && (
         <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
