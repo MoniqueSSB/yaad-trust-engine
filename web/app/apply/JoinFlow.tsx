@@ -31,6 +31,18 @@ import { createClient } from "@/lib/supabase/client";
  * The application id and upload token are kept in localStorage. A tradesperson
  * filling this in on a phone, on Jamaican mobile data, will lose the tab. They
  * should not lose the passport they already sent.
+ *
+ * Step 3's two identity rows are NOT file inputs. They open the camera on this
+ * page, because the step claims a live photo and a live turn and a file input
+ * cannot deliver either on a desktop browser. See LiveCapture at the bottom of
+ * this file, including what it does not prove.
+ *
+ * THE STANDING RULE FOR THIS FILE. Nothing here may describe a check the code
+ * does not perform. Two labels broke it and both were found by the founder
+ * rather than by us: a button reading "Record" that opened a folder, and a
+ * vetting-record row reading "Documents machine-read" that ticked because the
+ * application had been sent, not because anything had been read. A page whose
+ * entire subject is evidence cannot afford a single ornamental claim.
  */
 
 const FN = "yaad-vetting-upload";
@@ -69,9 +81,9 @@ const STEPS: Step[] = [
     p: "A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.",
     note: "We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it." },
   { n: "3 · Identity", body: "id",
-    h: "A live photo and a live video, not an upload",
-    p: "Government photo ID, a <b>live photo</b> taken in the moment, and a <b>short video where you turn your face slowly left to right</b>. The turn is the check, a photograph of a photograph cannot do it. Then your TRN and proof of address dated within three months.",
-    note: "An upload proves somebody has a document. A live turn proves the person holding it is you, now." },
+    h: "A live photo and a live video, taken on this page",
+    p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
+    note: "A file proves somebody holds a document. A turn taken in front of us proves somebody was sitting there when it was sent. If your browser will not hand over a camera we say so on the row, take an upload instead, and a person checks that one by hand." },
   { n: "4 · Police check", body: "police",
     h: "JCF record check, required over £500",
     p: "A current police record check from the Jamaica Constabulary Force. <b>Mandatory</b> for any job over £500, any work inside an occupied home, and any time you hold keys or attend an empty property. Get it once and it covers every job you take.",
@@ -82,8 +94,8 @@ const STEPS: Step[] = [
     note: "This rule exists because a name on a form is not a referee. Somebody who was never asked cannot vouch for you, and putting them down is a mark against the application, not a neutral." },
   { n: "6 · Documents checked", body: "agent",
     h: "A machine reads the file before a person does",
-    p: "Every document you upload is read for the things a person skims past: does the name match, is the date inside the window, is the certificate number real. Then a person makes the decision. <b>The machine never decides, it only flags.</b>",
-    note: "The decision is always a person's. What the check buys you is speed, not a shortcut." },
+    p: "Every document that arrives as a picture is read for the things a person skims past: does the name match, is the date inside the window, is the certificate number real. A PDF, a Word CV and the face video are not read by it, they go straight to a person. Then a person decides on all of it. <b>The machine never decides, it only flags.</b>",
+    note: "It runs after you send, not while you sit here, and the decision is always a person's. What the check buys you is speed, not a shortcut." },
   { n: "7 · Sign", body: "sign",
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
@@ -110,7 +122,10 @@ const CHECKS: Check[] = [
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
   { k: "police", b: "JCF police record check", s: "Required over £500 and for any occupied home", req: true },
   { k: "refs",   b: "3 references, confirmed and called", s: "Each one told in advance that we would call", req: true },
-  { k: "agent",  b: "Documents machine-read",  s: "Name, dates and certificate numbers checked" },
+  // This row's wording is replaced at render time by agentRow(); see there for
+  // why it must never say a read has happened. What is here is the state before
+  // the applicant has chosen either way.
+  { k: "agent",  b: "Machine read, your choice", s: "Runs after you send. It flags, it never decides" },
   { k: "sign",   b: "Worker Guidelines signed", s: "The current version, once" },
   { k: "trial",  b: "Trial job reviewed",      s: "Independent reviewer on site, at our cost" },
   { k: "live",   b: "Profile published",       s: "You are on the board" },
@@ -380,6 +395,21 @@ export function JoinFlow() {
   const has = (t: DocType) => docs[t]?.state === "done";
   const refsDone = refs.every((r) => r.name.trim() && r.phone.trim() && r.told);
 
+  /* The machine read is the one row the browser cannot observe. It runs on the
+     server after submit, it can fail, and when it fails the desk is told and
+     the applicant is not. So this row is never allowed to claim the read
+     happened. It reports the only two things this page actually knows: which
+     way they answered, and whether the file has left. */
+  const agentRow = (): { b: string; s: string } => {
+    if (aiConsent === "declined")
+      return { b: "Machine read declined", s: "Only a person at the desk opens your documents" };
+    if (aiConsent === "granted" && sentRef)
+      return { b: "Sent for machine reading", s: "It runs on your file now. The desk reads what it finds" };
+    if (aiConsent === "granted")
+      return { b: "Machine read agreed", s: "It runs after you send. It flags, it never decides" };
+    return { b: "Machine read, your choice", s: "Runs after you send. It flags, it never decides" };
+  };
+
   const done: Record<string, boolean> = {
     form: step1Ready,
     port: has("cv") || has("portfolio") || has("certificate") || links.length > 0,
@@ -388,10 +418,12 @@ export function JoinFlow() {
     id3: has("proof_of_address"),
     police: has("police_check"),
     refs: refsDone,
-    // Declining the machine read is a complete answer to this row, not a gap
-    // in it. Leaving it on "Waiting" forever would read as an outstanding task
-    // and quietly punish the choice.
-    agent: Boolean(sentRef) || aiConsent === "declined",
+    // What is ticked here is the CHOICE, which this page can see, never the
+    // read, which it cannot. Declining is a complete answer, not a gap: leaving
+    // it on "Waiting" forever would read as an outstanding task and quietly
+    // punish the choice. Agreeing is also complete, because everything asked of
+    // the applicant on this row is then done.
+    agent: aiConsent === "granted" || aiConsent === "declined",
     sign: signed && signedName.trim().length > 1,
     trial: false,
     live: false,
@@ -625,11 +657,9 @@ export function JoinFlow() {
               <div className="grid gap-3">
                 <Upload label="Government photo ID" hint="Passport, driver's licence or national ID"
                   accept={PAPERS} doc="photo_id" docs={docs} onFile={upload} />
-                <Upload label="A live photo" hint="Taken in the moment, not from your camera roll"
-                  accept={IMAGES} capture="user" cta="Take photo"
+                <LiveCapture kind="photo" label="A live photo, with your ID beside your face"
                   doc="selfie_with_id" docs={docs} onFile={upload} />
-                <Upload label="A short video, face left to right" hint="The turn is the check. Ten seconds is plenty"
-                  accept={VIDEOS} capture="user" cta="Record"
+                <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
                   doc="face_video" docs={docs} onFile={upload} />
                 <Upload label="Your TRN" hint="Matched to the name on the ID"
                   accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
@@ -943,6 +973,7 @@ export function JoinFlow() {
           {CHECKS.map((c) => {
             const ok = done[c.k];
             const now = !ok && ROW_STEP[c.k] === step;
+            const copy = c.k === "agent" ? agentRow() : { b: c.b, s: c.s };
             return (
               <button className="vitem" key={c.k} onClick={() => setStep(ROW_STEP[c.k] ?? 0)}>
                 <span className={"vdot" + (ok ? " done" : now ? " now" : "")}>
@@ -950,10 +981,10 @@ export function JoinFlow() {
                 </span>
                 <div className="flex-1 text-left">
                   <b>
-                    {c.b}{" "}
+                    {copy.b}{" "}
                     {c.req && <span className="src req">Required</span>}
                   </b>
-                  <span>{c.s}</span>
+                  <span>{copy.s}</span>
                 </div>
                 <span className="st">{ok ? "Done" : now ? "Now" : "Waiting"}</span>
               </button>
@@ -966,12 +997,331 @@ export function JoinFlow() {
 }
 
 /**
+ * A photo or a video taken here, on this page, through the camera.
+ *
+ * WHY THIS EXISTS AT ALL.
+ *
+ * Step 3 said "a live photo and a live video, not an upload" over two file
+ * inputs carrying `capture="user"`. That attribute is a hint, nothing more.
+ * An iPhone honours it and opens the camera. Every desktop browser ignores it
+ * completely and opens the file picker, so the button that read "Record"
+ * opened a folder, and the hint that read "taken in the moment, not from your
+ * camera roll" took you directly to the camera roll. The strongest promise on
+ * the page was the one nothing enforced.
+ *
+ * It also mattered more than the wording. The turn is what separates this
+ * application from a form: an uploaded file proves somebody holds a document,
+ * a turn recorded in front of us proves somebody was sitting there. Rewording
+ * the step would have been honest and would have thrown that away.
+ *
+ * So the camera is opened directly, with getUserMedia and MediaRecorder, and
+ * there is no file input on these two rows at all while it works. Not being
+ * able to reach the camera roll is the feature.
+ *
+ * WHAT THIS DOES NOT PROVE, so that nobody writes copy claiming it does.
+ *
+ * A browser camera is not proof of life. Virtual camera software can feed a
+ * recording into getUserMedia and this code cannot tell. What it does buy is
+ * real and worth having: the picture was made on this page during this
+ * application rather than found somewhere, and a still photograph of a
+ * photograph cannot perform a turn on demand. That is the ceiling. Anything
+ * stronger is a liveness vendor, and until one is bought the wording on the
+ * step must stay inside this paragraph.
+ *
+ * WHEN THE CAMERA IS REFUSED.
+ *
+ * Permission denied, no camera, an old browser, another app holding the
+ * device. It falls back to an upload, and the moment it does the row says so
+ * in those words. A silent fallback would rebuild the exact lie this replaces:
+ * a control that says live and behaves like a folder.
+ */
+
+/* mp4 first, because Safari records mp4 and plays webm badly. The bare type is
+   what gets sent: the recorder hands back "video/webm;codecs=vp8" and the
+   bucket's allow-list is an exact match on "video/webm". */
+const VIDEO_TRY = ["video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+const EXT_OF: Record<string, string> = { "video/mp4": "mp4", "video/webm": "webm" };
+const bare = (m: string) => m.split(";")[0].trim().toLowerCase();
+
+function pickVideoType(): string {
+  if (typeof MediaRecorder === "undefined") return "";
+  for (const t of VIDEO_TRY) if (MediaRecorder.isTypeSupported(t)) return t;
+  return "";
+}
+
+/** Say which thing went wrong, in the words of the thing that went wrong. */
+function camReason(e: unknown): string {
+  const n = (e as { name?: string })?.name ?? "";
+  if (n === "NotAllowedError" || n === "PermissionDeniedError")
+    return "The camera was blocked, either by you or by a browser setting.";
+  if (n === "NotFoundError" || n === "DevicesNotFoundError")
+    return "This device has no camera the browser can see.";
+  if (n === "NotReadableError" || n === "TrackStartError")
+    return "Another app is already holding the camera.";
+  if (n === "SecurityError")
+    return "The browser will only open a camera on a secure connection.";
+  if (n === "OverconstrainedError")
+    return "The camera on this device would not run at the size asked for.";
+  return "The browser would not open the camera.";
+}
+
+const stamp = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+
+type CamPhase = "idle" | "opening" | "live" | "counting" | "blocked";
+
+function LiveCapture({
+  kind, label, doc, docs, onFile, seconds = 10,
+}: {
+  kind: "photo" | "video";
+  label: string;
+  doc: DocType;
+  docs: Record<string, DocState>;
+  onFile: (d: DocType, f: File) => void;
+  seconds?: number;
+}) {
+  const [phase, setPhase] = useState<CamPhase>("idle");
+  const [why, setWhy] = useState("");
+  const [left, setLeft] = useState(seconds);
+
+  const videoEl = useRef<HTMLVideoElement | null>(null);
+  const stream = useRef<MediaStream | null>(null);
+  const rec = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const tick = useRef<number | null>(null);
+  const cutoff = useRef<number | null>(null);
+
+  /* Stopping the camera's tracks also stops the recorder, so onstop fires
+     whether the recording was finished or abandoned. Without this flag,
+     "Close the camera" halfway through a turn, or walking off the step, would
+     quietly upload the half of it that had been captured. Abandoning something
+     must throw it away. */
+  const abandoned = useRef(false);
+
+  const st = docs[doc]?.state ?? "idle";
+  const cur = docs[doc];
+
+  /** Let go of the camera. The light staying on after a capture is the fastest
+   *  way to lose somebody's trust on a page that just asked for their passport. */
+  const release = useCallback(() => {
+    if (tick.current !== null) { clearInterval(tick.current); tick.current = null; }
+    if (cutoff.current !== null) { clearTimeout(cutoff.current); cutoff.current = null; }
+    stream.current?.getTracks().forEach((t) => t.stop());
+    stream.current = null;
+    if (videoEl.current) videoEl.current.srcObject = null;
+  }, []);
+
+  /** Give up on whatever is running and keep none of it. */
+  const abandon = useCallback(() => {
+    abandoned.current = true;
+    const r = rec.current;
+    if (r && r.state !== "inactive") r.stop();
+    release();
+  }, [release]);
+
+  // Leaving step 3, or the tab, hands the camera back and keeps nothing.
+  useEffect(() => abandon, [abandon]);
+
+  // The <video> does not exist until the phase says it does, so the stream is
+  // attached after the render that creates it, not when it arrives.
+  useEffect(() => {
+    const v = videoEl.current;
+    if (v && stream.current && v.srcObject !== stream.current) {
+      v.srcObject = stream.current;
+      v.play().catch(() => { /* autoplay refusals are survivable, the frame is there */ });
+    }
+  }, [phase]);
+
+  async function openCamera() {
+    setWhy("");
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setPhase("blocked");
+      setWhy("This browser will not give a web page a camera at all.");
+      return;
+    }
+    if (kind === "video" && !pickVideoType()) {
+      setPhase("blocked");
+      setWhy("This browser can show a camera but cannot record from one.");
+      return;
+    }
+    setPhase("opening");
+    try {
+      stream.current = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      setPhase("live");
+    } catch (e) {
+      release();
+      setPhase("blocked");
+      setWhy(camReason(e));
+    }
+  }
+
+  function snap() {
+    const v = videoEl.current;
+    if (!v) return;
+    const w = v.videoWidth || 1280;
+    const h = v.videoHeight || 720;
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    if (!ctx) { setPhase("blocked"); setWhy("The browser would not draw the frame."); return; }
+    ctx.drawImage(v, 0, 0, w, h);
+    c.toBlob((b) => {
+      if (!b) { setPhase("blocked"); setWhy("The browser would not turn the frame into a file."); return; }
+      release();
+      setPhase("idle");
+      onFile(doc, new File([b], `live-photo-${stamp()}.jpg`, { type: "image/jpeg" }));
+    }, "image/jpeg", 0.9);
+  }
+
+  function endRecording() {
+    if (tick.current !== null) { clearInterval(tick.current); tick.current = null; }
+    if (cutoff.current !== null) { clearTimeout(cutoff.current); cutoff.current = null; }
+    const r = rec.current;
+    if (r && r.state !== "inactive") r.stop();
+  }
+
+  function startRecording() {
+    const s = stream.current;
+    if (!s) return;
+    const want = pickVideoType();
+    let r: MediaRecorder;
+    try {
+      r = new MediaRecorder(s, want ? { mimeType: want } : undefined);
+    } catch {
+      release(); setPhase("blocked");
+      setWhy("The browser refused to start a recording from its own camera.");
+      return;
+    }
+    chunks.current = [];
+    abandoned.current = false;
+    r.ondataavailable = (e) => { if (e.data && e.data.size) chunks.current.push(e.data); };
+    r.onstop = () => {
+      if (abandoned.current) { chunks.current = []; release(); return; }
+      const type = bare(r.mimeType || want || "video/webm");
+      const blob = new Blob(chunks.current, { type });
+      release();
+      if (!blob.size) {
+        setPhase("blocked");
+        setWhy("The recording came back with nothing in it.");
+        return;
+      }
+      setPhase("idle");
+      onFile(doc, new File([blob], `face-turn-${stamp()}.${EXT_OF[type] ?? "webm"}`, { type }));
+    };
+    rec.current = r;
+    r.start();
+    setLeft(seconds);
+    setPhase("counting");
+    tick.current = window.setInterval(() => setLeft((n) => Math.max(0, n - 1)), 1000);
+    cutoff.current = window.setTimeout(endRecording, seconds * 1000);
+  }
+
+  /* ── the camera is not available: say the word upload, on the row ───── */
+
+  if (phase === "blocked") {
+    return (
+      <div className="grid gap-2">
+        <Upload
+          label={label}
+          hint={kind === "photo"
+            ? "Choose a recent photo of your face. A person checks this one."
+            : "Choose a video of your face turning left to right. A person watches this one."}
+          accept={kind === "photo" ? IMAGES : VIDEOS}
+          capture="user"
+          cta="Choose file"
+          doc={doc} docs={docs} onFile={onFile}
+        />
+        <p className="rounded-xl border border-softline bg-soft px-4 py-2.5 text-[12px] leading-relaxed text-mute">
+          <b className="text-ink">This row is an upload, not a live capture.</b>{" "}
+          {why} We are not going to put the word live on a button that opens a
+          folder, so it says what it does. A person at the desk checks this one
+          by hand instead, which is slower and no worse.{" "}
+          <button type="button" onClick={() => { setPhase("idle"); setWhy(""); }}
+            className="font-bold text-tealb underline underline-offset-4">
+            Try the camera again
+          </button>
+        </p>
+      </div>
+    );
+  }
+
+  /* ── the camera is open ────────────────────────────────────────────── */
+
+  if (phase === "live" || phase === "counting") {
+    return (
+      <div className="grid gap-2 rounded-xl border border-teal/40 bg-bg p-3">
+        <div className="flex items-center gap-2">
+          <b className="flex-1 text-[13.5px]">{label}</b>
+          <span className="text-[11.5px] font-bold text-tealb">
+            {phase === "counting" ? `Recording · ${left}s left` : "Camera open"}
+          </span>
+        </div>
+        {/* Not mirrored on purpose. A mirrored preview shows a held-up ID
+            backwards, and what you see here is exactly the frame that is sent. */}
+        <video ref={videoEl} muted playsInline autoPlay
+          className="w-full rounded-lg bg-black"
+          style={{ maxHeight: 300, objectFit: "cover" }} />
+        <p className="text-[12px] leading-relaxed text-dim">
+          {kind === "photo"
+            ? "Hold your ID beside your face, both in frame and readable. What you see is exactly what is sent."
+            : `Look straight in, then turn your face slowly left, then right. It stops itself after ${seconds} seconds.`}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {kind === "photo" ? (
+            <button type="button" className="upbtn" onClick={snap}>Take the photo</button>
+          ) : phase === "counting" ? (
+            <button type="button" className="upbtn" onClick={endRecording}>Stop and use it</button>
+          ) : (
+            <button type="button" className="upbtn" onClick={startRecording}>Start recording</button>
+          )}
+          <button type="button" className="upbtn"
+            onClick={() => { abandon(); setPhase("idle"); }}>
+            {phase === "counting" ? "Cancel and throw it away" : "Close the camera"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── nothing open yet, or a capture already taken ──────────────────── */
+
+  return (
+    <div className={"upl" + (st === "done" ? " done" : st === "error" ? " bad" : "")}>
+      <div className="uplb">
+        <b>{st === "done" ? `✓ ${label}` : label}</b>
+        <span>
+          {st === "busy" ? "Sending…"
+            : st === "done" ? `${cur?.file} · ${kb(cur?.bytes)} · stored`
+            : st === "error" ? cur?.error
+            : kind === "photo"
+              ? "Taken on this page through your camera, not chosen from your files"
+              : `Taken on this page. ${seconds} seconds, turning your face left then right`}
+        </span>
+      </div>
+      <button type="button" className="upbtn" disabled={st === "busy" || phase === "opening"}
+        onClick={openCamera}>
+        {st === "busy" ? "Sending…"
+          : phase === "opening" ? "Opening…"
+          : st === "done" ? "Take it again"
+          : kind === "photo" ? "Open the camera" : "Open the camera"}
+      </button>
+    </div>
+  );
+}
+
+/**
  * One document row.
  *
  * A label wrapping a hidden file input, so the whole pill is a real click
- * target on a phone and the browser's own picker does the work. `capture`
- * is what makes an iPhone open the camera instead of the photo library,
- * which is the entire point of the live photo and the face turn.
+ * target on a phone and the browser's own picker does the work.
+ *
+ * `capture` is only a hint. iOS and most Android browsers honour it and open
+ * the camera; every desktop browser ignores it and opens the file picker. So
+ * it is used here for convenience and NEVER as the basis for a claim. Anything
+ * that has to be taken live goes through LiveCapture above, which opens the
+ * camera itself and admits it when it cannot.
  */
 function Upload({
   label, hint, accept, doc, docs, onFile, capture, cta = "Choose file",
