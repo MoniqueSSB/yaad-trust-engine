@@ -184,10 +184,10 @@ function JoinForm() {
         className={field}
       />
 
-      <label className={label}>Choose a password</label>
+      <label className={label}>Password</label>
       <input
         type="password"
-        autoComplete="new-password"
+        autoComplete="current-password"
         required
         minLength={8}
         value={password}
@@ -195,7 +195,9 @@ function JoinForm() {
         className={field}
       />
       <p className="-mt-2 mb-4 text-[12px] text-dim">
-        At least 8 characters. This is what gets you back into your portal.
+        At least 8 characters. This is what gets you back into your portal. If
+        you already have a Yaadly account, put that password in and we will
+        sign you in and add this job to it.
       </p>
 
       <label className={label}>Job code</label>
