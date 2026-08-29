@@ -85,36 +85,51 @@ for (const { name, valid, looksLike } of REQUIRED) {
   }
 }
 
-if (problems.length === 0) {
-  process.exit(0);
+// PASSING MUST BE SILENT, AND MUST RETURN.
+//
+// This said `process.exit(0)` here, and that one line stopped the app being
+// buildable at all. next.config.ts imports this file for its side effect, so
+// it runs INSIDE the Next process, not beside it. A correct environment
+// therefore killed Next the instant it loaded its own config: the banner
+// printed, the config was read, the process exited zero, and nothing was
+// built. `next build` wrote no output and reported success. `next dev` said
+// "Ready" and died. Every wrapper above it, npm, opennextjs-cloudflare, CI,
+// saw exit code zero and called it a pass.
+//
+// The guard was exactly inverted in effect. A misconfigured machine carried on
+// building, which is the thing this file exists to stop, and a correctly
+// configured one could not build at all.
+//
+// So: a pass does nothing and lets the import finish. Only a failure exits,
+// which is the only case that ever wanted to.
+if (problems.length > 0) {
+  const isProductionBuild = process.env.NODE_ENV === "production";
+  const heading = isProductionBuild
+    ? "BUILD STOPPED. The Supabase environment is not set."
+    : "WARNING. The Supabase environment is not set.";
+
+  const message = [
+    "",
+    "  " + heading,
+    "",
+    ...problems.map((p) => "    - " + p),
+    "",
+    "  These are inlined at BUILD time, so a build without them produces an app",
+    "  that deploys successfully and then returns 500 on every page that talks to",
+    "  Supabase. That has happened in production before.",
+    "",
+    "  Most likely cause: you are building from a git worktree or a fresh clone.",
+    "  web/.env.local is gitignored, so it does not come with the checkout.",
+    "",
+    "  Fix: copy web/.env.local from the main checkout, or create it from",
+    "  web/.env.example with the real publishable key.",
+    "",
+  ].join("\n");
+
+  if (isProductionBuild) {
+    console.error(message);
+    process.exit(1);
+  }
+
+  console.warn(message);
 }
-
-const isProductionBuild = process.env.NODE_ENV === "production";
-const heading = isProductionBuild
-  ? "BUILD STOPPED. The Supabase environment is not set."
-  : "WARNING. The Supabase environment is not set.";
-
-const message = [
-  "",
-  "  " + heading,
-  "",
-  ...problems.map((p) => "    - " + p),
-  "",
-  "  These are inlined at BUILD time, so a build without them produces an app",
-  "  that deploys successfully and then returns 500 on every page that talks to",
-  "  Supabase. That has happened in production before.",
-  "",
-  "  Most likely cause: you are building from a git worktree or a fresh clone.",
-  "  web/.env.local is gitignored, so it does not come with the checkout.",
-  "",
-  "  Fix: copy web/.env.local from the main checkout, or create it from",
-  "  web/.env.example with the real publishable key.",
-  "",
-].join("\n");
-
-if (isProductionBuild) {
-  console.error(message);
-  process.exit(1);
-}
-
-console.warn(message);
