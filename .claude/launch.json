@@ -27,10 +27,12 @@
     },
     {
       "name": "app",
-      "runtimeExecutable": "sh",
+      "runtimeExecutable": "npm",
       "runtimeArgs": [
-        "-c",
-        "cd web && exec ./node_modules/.bin/next dev --webpack --port 3000"
+        "--prefix",
+        "web",
+        "run",
+        "dev"
       ],
       "port": 3000
     }
