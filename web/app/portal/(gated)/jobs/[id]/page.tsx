@@ -16,6 +16,8 @@ import { PortalCard } from "@/components/portal/PortalCard";
 import { JobBrief } from "@/components/portal/JobBrief";
 import { jobGates } from "@/lib/portal/gates";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
+import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
+import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import legal from "@/lib/legal-copy.json";
 import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
@@ -85,13 +87,13 @@ export default async function JobRoom({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ s?: string; cal?: string; d?: string }>;
+  searchParams: Promise<{ s?: string; cal?: string; d?: string; tab?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
-  const { s: sParam, cal, d } = await searchParams;
+  const { s: sParam, cal, d, tab: tabParam } = await searchParams;
   const supabase = await createClient();
 
   const { data: job } = await supabase
@@ -209,10 +211,6 @@ export default async function JobRoom({
      style rule that could be relaxed in this file. */
   const emailConfirmed = !!user.email_confirmed_at;
   const signed = !!cgSig;
-  const storeNamed =
-    !!job.materials_store_type &&
-    (job.materials_store_type === "none_available" ||
-      (job.materials_store ?? "").trim() !== "");
   /* open_jobs is open = true AND no worker AND stage 0. Past that point the
      job is not "not live", it has moved on, and the checklist retires. */
   const onBoard =
@@ -235,18 +233,31 @@ export default async function JobRoom({
     "q=" + encodeURIComponent(job.id) +
     "#" + encodeURIComponent(job.id);
   const approvedPack = pk.find((x) => x.status === "approved") ?? pk[0];
+  /* Every document the job will ever have, each carrying the state it is
+     actually in. "Not completed" is a fact about a document that is going to
+     exist; a blank row is not, and the client had been reading blank rows as
+     breakage. */
   const docs: Doc[] = [
     {
       icon: "\u2713",
       title: "Client Guidelines",
-      note: "Signed, immutable",
+      note: signed
+        ? "Signed, immutable, version " + legal.CG_VERSION
+        : "Sign these and the job can go to workers",
+      state: signed ? "ready" : "not_completed",
+      href: "/portal/guidelines",
     },
     {
       icon: "\ud83d\udcc4",
-      title: approvedPack ? "Kickoff Pack" : "Kickoff Pack",
+      title: "Kickoff Pack",
       note: approvedPack
         ? "Scope, milestones and the evidence checklist"
         : "Written once a worker is chosen and the scope is agreed",
+      state: approvedPack
+        ? approvedPack.status === "approved"
+          ? "ready"
+          : "in_progress"
+        : "not_completed",
       href: approvedPack ? jobBase + "/pack" : undefined,
     },
     {
@@ -256,6 +267,7 @@ export default async function JobRoom({
         job.status === "complete"
           ? "Before and after, the evidence record and your approval"
           : "Written when the job closes",
+      state: job.status === "complete" ? "ready" : "not_completed",
       href: job.status === "complete" ? jobBase + "/completion" : undefined,
     },
   ];
@@ -296,6 +308,21 @@ export default async function JobRoom({
       note: job.status === "complete" ? "Closed and paid" : "",
     },
   ];
+
+  /* The tab is a search param, so every pane is a real address that survives
+     a reload and can be pasted into a message. Anything unrecognised falls
+     back to the job itself rather than an empty screen. */
+  const tab: TabKey = (TABS.find((t) => t.key === tabParam)?.key ?? "job");
+
+  /* Counts sit on the tabs so a client can see there is something to look at
+     without opening each one. Zero is never shown: a badge reading 0 is worse
+     than no badge, because it draws the eye to nothing. */
+  const docsReady = docs.filter((x) => x.state === "ready").length + pk.length;
+  const tabCounts = { evidence: ev.length, documents: docsReady };
+
+  /* jobs.status = 'evidence' is the moment the money is waiting on a human
+     rather than on the work. The ledger leads with it. */
+  const awaitingApproval = job.status === "evidence";
 
   return (
     <>
@@ -380,8 +407,55 @@ export default async function JobRoom({
         workerName={won?.worker_name ?? job.worker_name}
       />
 
+      <TabBar base={jobBase} active={tab} counts={tabCounts} />
+
+      {tab === "documents" && (
+        <>
       <DocStrip docs={docs} />
 
+      {pk.length > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Documents
+          </h2>
+          <ul className="grid gap-3">
+            {pk.map((p) => (
+              <li key={p.id}>
+              <Link
+                href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
+              >
+                <b className="text-[14px]">
+                  Kickoff Pack{p.rev != null ? ` · rev ${p.rev}` : ""}
+                </b>
+                <span className="text-[12.5px] text-dim">
+                  {p.project_title}
+                </span>
+                <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
+                  {p.status}
+                </span>
+              </Link>
+              </li>
+            ))}
+            {job.status === "complete" && (
+              <li>
+                <Link href={"/portal/jobs/" + encodeURIComponent(job.id) + "/completion"}
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal">
+                  <b className="text-[14px]">Completion Report</b>
+                  <span className="text-[12.5px] text-dim">Yours to keep, with the evidence index and fingerprints</span>
+                </Link>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
+
+        </>
+      )}
+
+
+      {tab === "info" && (
+        <>
       {role === "client" && (
         <PortalCard
           reference={job.id}
@@ -391,6 +465,48 @@ export default async function JobRoom({
         />
       )}
 
+          <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+            <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+              This job
+            </h2>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-[13px]">
+              <dt className="text-mute">Reference</dt>
+              <dd className="text-right font-mono text-tealb">{job.id}</dd>
+              {job.trade && (
+                <>
+                  <dt className="text-mute">Trade</dt>
+                  <dd className="text-right">{job.trade}</dd>
+                </>
+              )}
+              {job.parish && (
+                <>
+                  <dt className="text-mute">Parish</dt>
+                  <dd className="text-right">{job.parish}</dd>
+                </>
+              )}
+              <dt className="text-mute">You are the</dt>
+              <dd className="text-right">
+                {role === "client" ? "client" : "tradesperson"}
+              </dd>
+              <dt className="text-mute">On the marketplace</dt>
+              <dd className="text-right">
+                {onBoard ? (
+                  <Link href={marketplaceHref} className="text-tealb underline-offset-2 hover:underline">
+                    Live, see it &rarr;
+                  </Link>
+                ) : movedOn ? (
+                  <span className="text-dim">No, the job has moved on</span>
+                ) : (
+                  <span className="text-dim">Not yet</span>
+                )}
+              </dd>
+            </dl>
+          </section>
+        </>
+      )}
+
+      {tab === "job" && (
+        <>
       {/* Before the evidence ledger on purpose. Until this is answered no
           materials money can move and no materials evidence can be filed, so
           it belongs above the thing it is blocking rather than below it. */}
@@ -410,103 +526,6 @@ export default async function JobRoom({
           parish={job.parish}
         />
       )}
-
-      <section className="mt-8">
-        <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-          Evidence ledger · {ev.length} item{ev.length === 1 ? "" : "s"}
-        </h2>
-        <p className="mb-4 max-w-[62ch] text-[13px] leading-relaxed text-mute">
-          Each stage has its own checklist, its own proof and its own release.
-          Money moves once per stage, never as one lump at the end.
-        </p>
-
-        {stages.map((stageNo) => {
-          const items = ev.filter((e) => (e.stage ?? 1) === stageNo);
-          const state = stageNo < (job.stage ?? 0) ? "done" : stageNo === (job.stage ?? 0) || (job.stage ?? 0) === 0 ? "now" : "todo";
-          return (
-            <div
-              key={stageNo}
-              className={
-                "mb-3 rounded-2xl border p-4 " +
-                (state === "done"
-                  ? "border-softline bg-soft"
-                  : state === "now"
-                    ? "border-mango/40 bg-mango/5"
-                    : "border-line bg-panel opacity-70")
-              }
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <b className="text-[14px]">Stage {stageNo}</b>
-                <span
-                  className={
-                    "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide " +
-                    (state === "done"
-                      ? "bg-tealb/15 text-tealb"
-                      : state === "now"
-                        ? "bg-mango/15 text-mango"
-                        : "bg-panel2 text-dim")
-                  }
-                >
-                  {state === "done" ? "Signed off · released" : state === "now" ? "In progress" : "Not started"}
-                </span>
-                <span className="ml-auto text-[11.5px] text-dim">
-                  {items.length} item{items.length === 1 ? "" : "s"} filed
-                </span>
-              </div>
-
-              {items.length === 0 ? (
-                <p className="mt-2.5 text-[12.5px] text-dim">
-                  Nothing filed against this stage yet.
-                </p>
-              ) : (
-                <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {items.map((e) => (
-                    <li key={e.id} className="overflow-hidden rounded-xl border border-line bg-panel">
-                      {e.img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={e.img} alt={e.label ?? "Evidence photo"} className="h-36 w-full object-cover" />
-                      ) : (
-                        <div className="grid h-16 w-full place-items-center bg-panel2 text-[11.5px] text-dim">
-                          Filed without an image
-                        </div>
-                      )}
-                      <div className="p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <b className="text-[13px] leading-snug">{e.label ?? "Evidence"}</b>
-                          {e.ok != null && (
-                            <span className={"rounded-full px-2 py-0.5 text-[9.5px] font-bold " + (e.ok ? "bg-tealb/15 text-tealb" : "bg-mango/15 text-mango")}>
-                              {e.ok ? "Checked" : "Awaiting check"}
-                            </span>
-                          )}
-                        </div>
-                        {e.created_at && (
-                          <p className="mt-0.5 text-[11px] text-dim">
-                            {new Date(e.created_at).toISOString().slice(0, 16).replace("T", " ")}
-                          </p>
-                        )}
-                        {e.sha256 && (
-                          <p className="mt-1.5 break-all font-mono text-[9px] leading-relaxed text-dim">
-                            sha256 · {e.sha256}
-                          </p>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          );
-        })}
-
-        {job.status !== "complete" && (
-          <EvidenceUpload
-            jobId={job.id}
-            maxStage={stages.length}
-            storeType={job.materials_store_type ?? null}
-            store={job.materials_store ?? null}
-          />
-        )}
-      </section>
 
       {chooseOpen && (
         <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
@@ -611,49 +630,35 @@ export default async function JobRoom({
         </p>
       )}
 
-      {pk.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-            Documents
-          </h2>
-          <ul className="grid gap-3">
-            {pk.map((p) => (
-              <li key={p.id}>
-              <Link
-                href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
-                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
-              >
-                <b className="text-[14px]">
-                  Kickoff Pack{p.rev != null ? ` · rev ${p.rev}` : ""}
-                </b>
-                <span className="text-[12.5px] text-dim">
-                  {p.project_title}
-                </span>
-                <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
-                  {p.status}
-                </span>
-              </Link>
-              </li>
-            ))}
-            {job.status === "complete" && (
-              <li>
-                <Link href={"/portal/jobs/" + encodeURIComponent(job.id) + "/completion"}
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal">
-                  <b className="text-[14px]">Completion Report</b>
-                  <span className="text-[12.5px] text-dim">Yours to keep, with the evidence index and fingerprints</span>
-                </Link>
-              </li>
-            )}
-          </ul>
-        </section>
-      )}
-
       {job.worker_email && (
         <>
           <ChatThread jobId={job.id} messages={chat} self={role === "client" ? "the client" : "the worker"} />
           <DisputePanel jobId={job.id} role={role} dispute={dispute} workerName={job.worker_name ?? "the worker"} />
         </>
       )}
+        </>
+      )}
+
+      {tab === "evidence" && (
+        <>
+          <EvidenceLedger
+            items={ev}
+            stageCount={stageCount}
+            currentStage={job.stage ?? 0}
+            role={role === "worker" ? "worker" : "client"}
+            awaitingApproval={awaitingApproval}
+          />
+      {job.status !== "complete" && (
+        <EvidenceUpload
+          jobId={job.id}
+          maxStage={stages.length}
+          storeType={job.materials_store_type ?? null}
+          store={job.materials_store ?? null}
+        />
+      )}
+        </>
+      )}
+
     </>
   );
 }
