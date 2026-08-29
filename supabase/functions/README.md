@@ -12,13 +12,19 @@ that actually serves real users. That is why these files are here.
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
 | `yaad-whatsapp-webhook` | false | Meta Cloud API inbound webhook: verify → extract → create job → reply |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |
+| `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
 | `yaad-sketch` | true | Site Sketch Pack: video stills → rooms, condition schedule, schematic, admin session only |
 
-`verify_jwt` matters. The two public endpoints must stay `false` — Meta and an
-anonymous website visitor have no Supabase session — and they carry their own
-authentication instead (HMAC signature verification, and field validation plus
-a service-role write). Do not "fix" these to `true`.
+`verify_jwt` matters. The three public endpoints must stay `false`, because
+Meta and an anonymous website visitor have no Supabase session, and they carry
+their own authentication instead (HMAC signature verification, and field
+validation plus a service-role write and a throttle). Do not "fix" these to
+`true`.
+
+`yaad-enquiry` sends mail to an address the caller types in, so its throttle is
+load-bearing rather than housekeeping: without the per-recipient cap it is an
+open relay pointed at whoever somebody names.
 
 ## Tracing
 
