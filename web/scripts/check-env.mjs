@@ -16,6 +16,44 @@
 // A missing value must therefore be an error on the machine doing the deploy,
 // not a 500 for a client in Kingston twenty minutes later.
 
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Load the .env files ourselves.
+//
+// Next.js loads these; plain `node` does not. Without this the guard fires on
+// a machine that IS correctly configured, which would block every legitimate
+// deploy and is a worse failure than the one it exists to prevent. Found
+// exactly that way: the first version passed only because the test injected
+// the variables by hand.
+//
+// Same precedence Next uses: a real environment variable always wins, then
+// .env.local, then .env.production, then .env.
+const here = dirname(fileURLToPath(import.meta.url));
+const webRoot = join(here, "..");
+
+for (const file of [".env.local", ".env.production", ".env"]) {
+  const path = join(webRoot, file);
+  if (!existsSync(path)) continue;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq < 1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    // Already set, by a real environment variable or by an earlier file in the
+    // precedence order. Do not overwrite it.
+    if (process.env[key] !== undefined) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
 const REQUIRED = [
   {
     name: "NEXT_PUBLIC_SUPABASE_URL",
