@@ -32,7 +32,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // a chat message. Claiming the code is what attaches an email to the job, so
 // there is nothing to chase on this side. Note that the check used to demand
 // a matching email as well, which meant every job created here was born
-// unclaimable. See 20260829b_whatsapp_jobs_could_never_be_claimed.sql.
+// unclaimable. See 20260829f_whatsapp_jobs_could_never_be_claimed.sql.
 //
 // Tracing: every stage of the pipeline below (signature check, model call,
 // database insert, outbound reply) is a child span of the request span, so a

@@ -1,6 +1,6 @@
 -- A client who already has an account could not claim a job code at all.
 --
--- 20260829c moved binding onto the confirmation click, which is right for
+-- 20260829g moved binding onto the confirmation click, which is right for
 -- somebody signing up for the first time. It quietly assumed every claim comes
 -- with a signup. It does not. The founder hit this within the hour: an account
 -- from 12 August, already confirmed, a new WhatsApp job to claim, and no route

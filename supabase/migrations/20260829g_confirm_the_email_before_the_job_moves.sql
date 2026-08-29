@@ -1,6 +1,6 @@
 -- Prove the mailbox before the job moves.
 --
--- 20260829b fixed the blocker: a WhatsApp job carries no email, so the code
+-- 20260829f fixed the blocker: a WhatsApp job carries no email, so the code
 -- alone had to be enough to claim it, and the email typed at signup got bound
 -- to the job there and then. That unblocked real clients, and it left one
 -- thing I flagged and Monique pushed back on, correctly.
@@ -65,7 +65,7 @@ begin
     return false;
   end if;
 
-  -- Both sides, for the reason given in 20260829b: counting failures per
+  -- Both sides, for the reason given in 20260829f: counting failures per
   -- email alone lets an attacker rotate the email and guess one code freely.
   select count(*) into v_fail_email
   from public.portal_code_attempts
