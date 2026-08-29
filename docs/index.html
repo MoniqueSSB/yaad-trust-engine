@@ -2546,7 +2546,14 @@ function marketTable(){
   const h = (location.hash||"").replace("#","");
   if(h === "market"){ location.replace("https://app.yaadly.co.uk/jobs"); return; }
   if(h === "client" || h === "worker"){ location.replace("https://app.yaadly.co.uk/portal"); return; }
-  if(h && document.getElementById("pane-"+h)) go(h);
+  if(h && document.getElementById("pane-"+h)){ go(h); return; }
+  /* A hash that names nothing gets scrubbed out of the address bar. #admin
+     named the desk until 27 Aug 2026 and names nothing now, but it survived in
+     bookmarks and in the URL bar of anybody who tried it, which reads as a live
+     back door on a page that has none. There are no in-page anchors anywhere on
+     this site, so a hash still sitting here is either a dead route or somebody
+     guessing at one. Neither belongs in a link somebody can pass on. */
+  if(h) history.replaceState(null, "", location.pathname + location.search);
 })();
 function wa(text){ return "https://wa.me/" + CONFIG.whatsapp + "?text=" + encodeURIComponent(text); }
 
