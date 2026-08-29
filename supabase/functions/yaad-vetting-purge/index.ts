@@ -18,7 +18,9 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // gone is treated as done rather than as an error.
 //
 // Meant to be called on a schedule. Admin-gated so it cannot be triggered by
-// anyone who finds the URL.
+// anyone who finds the URL. The schedule is a pg_cron job in this project's
+// own database, calling out through pg_net; see the secret check below for why
+// it presents a hash rather than an environment variable.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
