@@ -50,6 +50,11 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+// Where the confirmation link lands. Without this GoTrue falls back to the
+// project's Site URL, which is the site root: a marketing page that does not
+// look at the fragment, so a client who had just confirmed was left standing
+// on the front page with their session in the address bar and no way in.
+const SIGNIN_URL   = Deno.env.get("YAAD_PORTAL_SIGNIN_URL") ?? "https://app.yaadly.co.uk/portal/sign-in";
 const MIN_PASSWORD = 8;
 
 const CORS = {
@@ -162,7 +167,7 @@ Deno.serve(async (req: Request) => {
     const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     let emailed = false;
     try {
-      const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(SIGNIN_URL)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
         body: JSON.stringify({ type: "signup", email }),
