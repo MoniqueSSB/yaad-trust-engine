@@ -287,6 +287,46 @@ export default async function JobRoom({
         </span>
       </div>
 
+      {/*
+        "Waiting on your portal setup" names a state and leaves the reader to
+        guess the action. The state is real: enforce_signed_before_open needs a
+        signed set of current Client Guidelines AND a client_profiles row
+        before a job can go out to workers, and until both exist the job sits
+        here and nobody sees it.
+
+        But there is exactly one thing to do about it, and the client had no
+        way to know that from the badge. Signing does both halves: the
+        signature is recorded and client_go_live() writes the profile and opens
+        every job that was waiting only on this. So say it, and link to it.
+
+        Workers see the same badge on their own jobs and can do nothing about
+        it, so this is for the client only.
+      */}
+      {role === "client" && job.status === "awaiting_client_setup" && (
+        <div className="mt-5 rounded-2xl border border-mango/30 bg-mango/10 p-5">
+          <h2 className="font-display text-[17px] uppercase leading-none">
+            One thing left before this job goes anywhere
+          </h2>
+          <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
+            Sign the Client Guidelines. That is the whole list. They set out
+            what Yaadly does, what it charges, and what happens if the work is
+            wrong, and nothing reaches a tradesperson until you have agreed to
+            them.
+          </p>
+          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
+            Signing opens this job and any other job of yours that is waiting
+            on the same thing. Nothing is charged, and you are not committing
+            to any quote.
+          </p>
+          <Link
+            href="/portal/guidelines"
+            className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+          >
+            Read and sign the Client Guidelines
+          </Link>
+        </div>
+      )}
+
       <StageRail
         stages={STAGES}
         current={current}

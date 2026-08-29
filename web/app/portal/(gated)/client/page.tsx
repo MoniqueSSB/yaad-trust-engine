@@ -51,6 +51,10 @@ export default async function ClientPortal() {
     price: string | null;
   }[];
 
+  const waitingOnSetup = jobs.filter(
+    (j) => j.status === "awaiting_client_setup",
+  ).length;
+
   return (
     <>
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -71,6 +75,40 @@ export default async function ClientPortal() {
         >
           Could not load your jobs: {error.message}
         </p>
+      )}
+
+      {/*
+        The first screen after signing in, and the right place to say the one
+        thing standing between every one of these jobs and a tradesperson.
+
+        Each of them carries the badge "Waiting on your portal setup", which
+        names a state and leaves the reader to work out the action. There is
+        only one action, it clears all of them at once, and nothing said so.
+      */}
+      {waitingOnSetup > 0 && (
+        <div className="mt-6 rounded-2xl border border-mango/30 bg-mango/10 p-5">
+          <h2 className="font-display text-[18px] uppercase leading-none">
+            {waitingOnSetup === 1
+              ? "One job is waiting on you"
+              : `${waitingOnSetup} jobs are waiting on you`}
+          </h2>
+          <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
+            Sign the Client Guidelines and{" "}
+            {waitingOnSetup === 1 ? "it goes" : "they all go"} live together.
+            They set out what Yaadly does, what it charges, and what happens if
+            the work is wrong. Nothing reaches a tradesperson until you have
+            agreed to them, which is the point of them.
+          </p>
+          <p className="mt-2.5 text-[13.5px] leading-relaxed text-mute">
+            Nothing is charged, and you are not committing to any quote.
+          </p>
+          <Link
+            href="/portal/guidelines"
+            className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+          >
+            Read and sign the Client Guidelines
+          </Link>
+        </div>
       )}
 
       <JobList
