@@ -552,6 +552,13 @@ const TONE = {
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok",
   // calls / waitlist
   requested:"warn", booked:"ok", held:"warn",
+  // enquiries. "replied" and not "answered": disputes already own answered,
+  // where it means the worker has responded and you still have to decide. A
+  // replied enquiry is finished, so it has to be able to go teal.
+  replied:"ok",
+  // the automatic receipt. no_email is not a failure and must not go red: it
+  // is the honest state for somebody who left a WhatsApp number instead.
+  sent:"ok", no_email:"mute", throttled:"warn",
   // disputes
   raised:"crit", answered:"warn", resolved:"ok",
 };
@@ -590,6 +597,7 @@ const ICON = {
   phone:'<path d="M5 3h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 12l5 2v4a2 2 0 0 1-2.2 2A17 17 0 0 1 3 5.2 2 2 0 0 1 5 3z"/>',
   list:'<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
   chat:'<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>',
   tools:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.4"/>',
 };
 
@@ -894,6 +902,26 @@ const VIEWS = [
       {h:"Asked", f:r => mute_(ago_(r.created_at))},
     ]},
 
+  { k:"enq", g:"Inbox", label:"Enquiries", icon:"mail",
+    title:"Enquiries", table:"enquiries",
+    sub:"Somebody asked a question without booking anything. The contact form at the bottom of the website writes here. WhatsApp arrives under Conversations instead, and email only ever reaches your inbox. Every row is a person waiting on a reply, so this queue is read before the waiting list, not after it. Heard from us says whether the automatic receipt reached them: a red one means they have written to you and had nothing back at all, not even the robot, so answer that one first. Hover a message to read the whole thing.",
+    select:"*",
+    order:"created_at", search:["name","contact","topic","message"],
+    empty:["No enquiries","The contact form at the bottom of the website writes here."],
+    cols:[
+      {h:"Who", f:r => esc(r.name || "no name") + sub_(r.contact || "")},
+      {h:"About", f:r => esc(r.topic || "not said")},
+      {h:"What they said", f:r => said_(r.message)},
+      {h:"Heard from us", f:r => receipt_(r.receipt)},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Asked", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Mark replied", cls:"g", when:r => r.status !== "replied",
+        set:{ status:"replied" },
+        says:() => "Says you have come back to them. It stops counting against you on the Overview. It does not send anything: replying happens on WhatsApp or by email, the same as it always did." },
+    ]},
+
   { k:"waitlist", g:"Inbox", label:"Waiting list", icon:"list",
     title:"Waiting list", table:"waitlist",
     sub:"People who asked to be told when Yaadly opens where they are. This is the list you write to first, and the only list you have.",
@@ -961,6 +989,31 @@ function transcript_(t){
   flat = flat.replace(/\s+/g, " ").trim();
   if (!flat) return mute_("nothing recorded");
   const cut = flat.length > 130 ? flat.slice(0, 130) + "\u2026" : flat;
+  return `<span title="${esc(flat)}">${esc(cut)}</span>`;
+}
+
+// Did the automatic receipt reach them, and if not, why not.
+//
+// This column exists because "sent" and "failed" look identical from the desk
+// otherwise, and they are not the same job: one person has written proof we
+// have their message, the other has heard nothing at all and does not know it.
+// The second is the one to answer first.
+function receipt_(v){
+  const k = String(v || "").toLowerCase();
+  if (k === "sent")      return chip_("ok", "emailed");
+  if (k === "no_email")  return chip_("mute", "no email") + sub_("they left a number, reply on WhatsApp");
+  if (k === "failed")    return chip_("crit", "not sent") + sub_("they have heard nothing, answer this one first");
+  if (k === "throttled") return chip_("warn", "held back") + sub_("rate limit, no receipt went");
+  return mute_("before receipts");
+}
+
+// A free-typed message, cut to fit a table row with the whole thing in the
+// tooltip. Same shape as transcript_ and ownWords: never truncate silently
+// where the cut half might be the half that mattered.
+function said_(msg){
+  const flat = String(msg || "").replace(/\s+/g, " ").trim();
+  if (!flat) return mute_("nothing written");
+  const cut = flat.length > 120 ? flat.slice(0, 120) + "\u2026" : flat;
   return `<span title="${esc(flat)}">${esc(cut)}</span>`;
 }
 
@@ -1953,7 +2006,8 @@ async function loadOverview(){
   renderCal();
 
   const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
-         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned] = await Promise.all([
+         invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
+         enqNew] = await Promise.all([
     countOf("intakes",     q => q.in("status", ["new","triaged"])),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
     countOf("evidence",    q => q.eq("ok", false)),
@@ -1969,6 +2023,7 @@ async function loadOverview(){
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.is("client_user", null)),
+    countOf("enquiries",   q => q.neq("status", "replied")),
   ]);
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
@@ -1980,6 +2035,7 @@ async function loadOverview(){
     tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting"),
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked"),
+    tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to"),
     tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
     tile("", "Jobs on the board", String(jobsOpen), "Open to workers"),
     tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every job has a client"),
@@ -1992,6 +2048,8 @@ async function loadOverview(){
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
+  if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
+    "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
   if (intakeNew) needs.push(alertRow("warn","?", intakeNew + (intakeNew === 1 ? " intake is untriaged" : " intakes are untriaged"),
     "Somebody asked for help and nobody has read it yet. That is the clock people judge you on.", "Open intake", "intake"));
   if (appsWaiting) needs.push(alertRow("warn","?", appsWaiting + (appsWaiting === 1 ? " application is part way through vetting" : " applications are part way through vetting"),
