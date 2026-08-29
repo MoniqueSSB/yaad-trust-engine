@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * Where a WhatsApp conversation turns into a live job.
@@ -42,6 +43,7 @@ const label =
   "mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim";
 
 function JoinForm() {
+  const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,6 +89,43 @@ function JoinForm() {
         }),
       });
       const res = await r.json().catch(() => ({}));
+
+      // They already have an account. That is the normal shape of a second
+      // job, not an error, and it used to dead-end here: signup refused, and
+      // nothing else was listening, so a returning client could not claim a
+      // code at all.
+      //
+      // They have already typed the two things a sign in needs. Use them, then
+      // claim the code against that session. Being signed in on a confirmed
+      // account proves the mailbox at least as well as a link in an old email,
+      // which is the only thing the confirmation step was ever proving.
+      if (r.status === 409 && res.existing) {
+        const supabase = createClient();
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (signInErr) {
+          throw new Error(
+            "You already have a Yaadly account with that email, and that password did not match it. Sign in with the right one, or reset it.",
+          );
+        }
+        const { data: claimed } = await supabase.rpc("claim_code_as_me", {
+          p_code: code.trim(),
+        });
+        setPassword("");
+        if (claimed === true) {
+          router.replace("/portal");
+          router.refresh();
+          return;
+        }
+        // Signed in, but the code would not attach. Say so rather than
+        // dropping them into a portal that does not have their job in it.
+        throw new Error(
+          "You are signed in, but that job code would not attach to your account. Check it against the message Yaadly sent you, or message Yaadly.",
+        );
+      }
+
       if (!r.ok || res.error) throw new Error(res.error || "That did not work.");
 
       // The account is created unconfirmed, deliberately. Possession of an

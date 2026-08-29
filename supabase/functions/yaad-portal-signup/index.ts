@@ -31,25 +31,25 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // typing it. A client who mistypes their own address loses nothing: no link
 // arrives, no claim is consumed, they try again. See 20260829c.
 //
-// The confirmation email goes out through Resend, not through GoTrue's own
-// sender. Supabase's built-in SMTP is rate limited to a handful of messages an
-// hour and is documented as being for testing, which is not a thing to find
-// out during a launch. Resend is already the sending path for worker match
-// alerts and desk summaries on this project, from a domain with live DKIM and
-// SPF. generateLink() gives us the same link GoTrue would have posted; we just
-// carry it ourselves.
+// The confirmation email is GoTrue's own, sent over this project's custom
+// SMTP, which is already Resend.
+//
+// It briefly was not. A version of this file created the account with
+// generateLink({type:"signup"}) so the link could be carried out over the
+// Resend HTTP API under our own copy. That broke every new signup: this
+// project has disable_signup turned on, admin.createUser() is an admin call
+// and steps around that, and generate_link for a signup is not, so GoTrue
+// answered "signups not allowed" and the account was never created. The
+// justification was wrong as well as the code: custom SMTP was already
+// configured, so nothing was going through Supabase's testing sender.
+// If the copy is ever worth customising again, do it in the GoTrue email
+// template, not by moving account creation.
 // This function holds the service role key, so it is deliberately small and
 // does exactly one thing. Nothing here echoes a secret, and it never says
 // whether an email is already registered.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const RESEND_KEY   = Deno.env.get("RESEND_API_KEY") ?? "";
-// in.yaadly.co.uk, not send.yaadly.co.uk. Resend still lists the latter as
-// verified but its DKIM and SPF records are gone from DNS, so mail from it
-// fails authentication and lands in spam. Same reasoning as yaad-inbound.
-const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
-const SIGNIN_URL   = Deno.env.get("YAAD_PORTAL_SIGNIN_URL") ?? "https://app.yaadly.co.uk/portal/sign-in";
 const MIN_PASSWORD = 8;
 
 const CORS = {
@@ -129,89 +129,48 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // ---- create the account, and take the link ---------------------------
-    // Created UNCONFIRMED on purpose, and this is now load-bearing rather than
+    // ---- create the account ---------------------------------------------
+    // Created UNCONFIRMED on purpose, and that is now load-bearing rather than
     // good manners: the confirmation click is what binds the job to them.
     //
-    // generateLink() makes the user and hands back the very link GoTrue would
-    // have emailed, without emailing it. We carry it ourselves so it goes out
-    // over Resend rather than Supabase's testing-grade built-in SMTP.
-    const { data: link, error: createErr } = await admin.auth.admin.generateLink({
-      type: "signup",
-      email,
-      password,
-      options: { redirectTo: SIGNIN_URL },
+    // admin.createUser() and not generate_link, because this project has
+    // disable_signup on. An admin create steps around that by design; a
+    // generated signup link does not.
+    const { error: createErr } = await admin.auth.admin.createUser({
+      email, password, email_confirm: false,
     });
 
-    const confirmUrl = link?.properties?.action_link ?? "";
-
-    if (createErr || !confirmUrl) {
-      const msg = String(createErr?.message || "no action link returned");
+    if (createErr) {
+      const msg = String(createErr.message || "");
       root.setAttributes({ "yaadly.signup.outcome": "create_failed" });
       if (/already|registered|exists/i.test(msg)) {
-        // Deliberately not confirmed as "this email exists": say the same
-        // thing either way and point them at sign-in.
-        return json({ error: "Could not create that account. If you already have one, sign in above instead." }, 409);
+        // They have an account. The claim they just pended is still standing,
+        // so the page signs them in with what they typed and claims the code
+        // against that session. Worth being explicit that this is a real
+        // route and not a dead end: a returning client with a second job is
+        // the normal case, not an edge case.
+        return json({ error: "You already have a Yaadly account. Signing you in instead.", existing: true }, 409);
       }
       root.recordError(msg);
       return json({ error: "Could not create the account. Try again, or message Yaadly." }, 502);
     }
 
     // ---- send the confirmation email ------------------------------------
-    // The account exists but cannot sign in until this link is clicked, and
-    // the job stays unattached to anyone until it is.
-    const esc = (t: string) => t.replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c] as string));
-    const href = esc(confirmUrl);
-
-    const text =
-`Confirm your email to open your Yaadly portal.
-
-${confirmUrl}
-
-That link does two things: it proves this address is yours, and it attaches
-your job to it. Until you click it, nothing on your job moves and nobody is
-charged anything.
-
-If you did not ask for a Yaadly portal, ignore this. Nothing happens.`;
-
-    const html =
-`<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
-<p style="margin:0 0 18px">Confirm your email and your portal is open.</p>
-<p style="margin:0 0 22px"><a href="${href}" style="background:#14b8a6;color:#04211d;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:100px;display:inline-block">Confirm my email</a></p>
-<p style="margin:0 0 18px">That link does two things: it proves this address is yours, and it attaches your job to it. Until you click it, nothing on your job moves and nobody is charged anything.</p>
-<p style="margin:0 0 18px;font-size:13px;color:#67807a">If the button does not work, paste this into your browser:<br><span style="word-break:break-all">${href}</span></p>
-<p style="margin:0;font-size:12.5px;color:#67807a">If you did not ask for a Yaadly portal, ignore this. Nothing happens.</p>
-</div>`;
-
+    // GoTrue's own confirmation mail, over this project's custom SMTP, which
+    // is Resend. The account exists but cannot sign in until this is clicked,
+    // and the job stays unattached to anybody until it is.
+    const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     let emailed = false;
-    if (!RESEND_KEY) {
-      root.recordError("RESEND_API_KEY is not set on this project, confirmation email not sent");
-    } else {
-      await trace.span("resend.send confirmation", SpanKind.CLIENT, {
-        "server.address": "api.resend.com",
-        "messaging.system": "resend",
-        "messaging.operation.name": "send",
-      }, async (sp) => {
-        try {
-          const r = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: `Yaadly <${FROM_EMAIL}>`,
-              to: [email],
-              subject: "Confirm your email to open your Yaadly portal",
-              text,
-              html,
-            }),
-            signal: AbortSignal.timeout(15000),
-          });
-          sp.setAttributes({ "http.response.status_code": r.status });
-          emailed = r.ok;
-          if (!r.ok) sp.recordError(`resend send ${r.status}: ${(await r.text()).slice(0, 160)}`);
-        } catch (e) {
-          sp.recordError(String(e).slice(0, 200));
-        }
+    try {
+      const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
+        body: JSON.stringify({ type: "signup", email }),
       });
+      emailed = r.ok;
+      if (!r.ok) root.recordError(`confirmation email not sent: ${r.status} ${(await r.text()).slice(0, 200)}`);
+    } catch (e) {
+      root.recordError(`confirmation email threw: ${String(e).slice(0, 200)}`);
     }
 
     root.setAttributes({ "yaadly.signup.confirmation_emailed": emailed });
