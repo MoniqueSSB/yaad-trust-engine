@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 
 // Yaadly WhatsApp inbound webhook.
 // Meta calls this directly (Cloud API), no BSP in the middle.
@@ -64,8 +65,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // database insert, outbound reply) is a child span of the request span, so a
 // single inbound WhatsApp message can be read end to end as one trace.
 
-const MODEL = "MiniMax-M2.7";
-const MINIMAX_API = "https://api.minimax.io/v1/chat/completions";
+// Model and endpoint come from _shared/textmodel.ts. See that file for why.
 const JOIN_URL = "https://app.yaadly.co.uk/portal/join";
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "GET, POST, OPTIONS" };
 
@@ -87,22 +87,20 @@ async function verifySignature(req: Request, rawBody: string): Promise<{ ok: boo
 }
 
 async function structureJob(text: string, trace: Trace): Promise<any> {
-  const key = Deno.env.get("MINIMAX_API_KEY");
-  if (!key) return null;
-  return await trace.span(`chat ${MODEL}`, SpanKind.CLIENT, {
-    "gen_ai.system": "minimax",
+  const prov = pickTextProvider();
+  if (!prov) return null;
+  return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+    ...providerAttrs(prov),
     "gen_ai.operation.name": "chat",
-    "gen_ai.request.model": MODEL,
     "gen_ai.request.temperature": 0.2,
-    "server.address": "api.minimax.io",
     "yaadly.agent.name": "intake",
     "yaadly.input.chars": String(text || "").length,
   }, async (s) => {
-    const r = await fetch(MINIMAX_API, {
+    const r = await fetch(prov.api, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
       body: JSON.stringify({
-        model: MODEL,
+        model: prov.model,
         messages: [
           { role: "system", content: INTAKE_PROMPT },
           { role: "user", content: String(text || "").slice(0, 6000) }
@@ -118,7 +116,7 @@ async function structureJob(text: string, trace: Trace): Promise<any> {
       "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
       "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
     });
-    if (!r.ok) s.recordError(`minimax http ${r.status}`);
+    if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
     const out = j?.choices?.[0]?.message?.content ?? "";
     try {
       const match = out.match(/\{[\s\S]*\}/);

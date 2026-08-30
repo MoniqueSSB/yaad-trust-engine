@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -251,23 +252,22 @@ async function keepMedia(
 
 /** The intake agent, same prompt discipline as the job wizard: never money. */
 async function readTheJob(text: string, trace: Trace) {
-  const key = Deno.env.get("MINIMAX_API_KEY");
+  const prov = pickTextProvider();
   // No length gate. "Hi" is the most common first message a real person sends
   // and it is exactly the one that needs a human sounding answer, not a
   // fallback string. Skipping the model on short messages is how an intake
   // ends up feeling like an answerphone.
-  if (!key || !text.trim()) return null;
+  if (!prov || !text.trim()) return null;
   try {
-    return await trace.span("chat MiniMax-M2.7", SpanKind.CLIENT, {
-      "gen_ai.system": "minimax",
+    return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": "MiniMax-M2.7",
     }, async (sp) => {
-      const r = await fetch("https://api.minimax.io/v1/chat/completions", {
+      const r = await fetch(prov.api, {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "MiniMax-M2.7", temperature: 0.3, max_tokens: 1100,
+          model: prov.model, temperature: 0.3, max_tokens: 1100,
           messages: [
             { role: "system", content:
 `You are reading a WhatsApp conversation with somebody who needs property work
@@ -368,7 +368,7 @@ guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
       });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { sp.recordError(`minimax ${r.status}`); return null; }
+      if (!r.ok) { sp.recordError(`${prov.name} ${r.status}`); return null; }
       let j: Record<string, unknown> = {};
       try { j = JSON.parse(raw); } catch (_) { return null; }
       const content = String((j as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "");

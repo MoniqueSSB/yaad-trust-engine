@@ -105,3 +105,37 @@ export YAAD_MODEL="..."
 ```
 
 Unset `YAAD_API_KEY` to fall back to mock mode. See [`DECISIONS.md`](DECISIONS.md) on why the provider is a configuration value and why the current one has to change before real data flows.
+
+This is the Python engine only. The live Edge Functions are step 9.
+
+---
+
+## 9. Completing the move to the EU text model
+
+The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. As shipped it prefers Mistral in the EU and falls back to MiniMax in China while no Mistral key is set. **Until you do the following, the move is not done.**
+
+**Step one, set the secret.** One command, and every function picks it up on its next invocation. No redeploy needed, because it is read at call time.
+
+```bash
+supabase secrets set MISTRAL_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
+```
+
+**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose.
+
+The function logs also carry a warning line beginning `textmodel: falling back to MiniMax` every time the legacy path runs. If that line stops appearing, the switch is complete.
+
+**Step three, remove the fallback.** Once step two is confirmed, delete the MiniMax branch in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in place indefinitely means one missing secret silently sends client data to China again.
+
+**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. Model names move. Confirm the current one on Mistral's model page and set it without touching code:
+
+```bash
+supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzilydlwf
+```
+
+**To point at something else entirely**, no code change: set `TEXT_MODEL_KEY`, `TEXT_MODEL_API`, `TEXT_MODEL_NAME` and `TEXT_MODEL_REGION`. Those take priority over everything. A new hard-coded provider in that file is a new country receiving personal data, so it is a founder decision and a line in the data inventory before it is a code change.
+
+**Deploying the eight**, from disk only, never by pasting file contents:
+
+```bash
+for f in yaad-agent yaad-completion yaad-inbound yaad-invoice yaad-kickoff yaad-post-job yaad-sketch yaad-whatsapp-webhook; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+```

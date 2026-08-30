@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 
 // The six-step "Post a job" wizard on yaadly.co.uk posts here twice.
 //
@@ -114,8 +115,7 @@ function cardCols(b: Record<string, unknown>) {
 //
 // If it fails, the draft still saves. A job with an untidied description is
 // worth far more than no job.
-const MINIMAX_API = "https://api.minimax.io/v1/chat/completions";
-const AGENT_MODEL = "MiniMax-M2.7";
+// Model and endpoint come from _shared/textmodel.ts. See that file for why.
 
 // The 18 trades are the routing key: workers subscribe by trade and the board
 // filters on it, so this list is not free text and never has been.
@@ -206,20 +206,18 @@ type Read = {
 };
 
 async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Read | null> {
-  const key = Deno.env.get("MINIMAX_API_KEY");
-  if (!key || text.length < 12) return null;
+  const prov = pickTextProvider();
+  if (!prov || text.length < 12) return null;
   try {
-    return await trace.span(`chat ${AGENT_MODEL}`, SpanKind.CLIENT, {
-      "gen_ai.system": "minimax",
+    return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": AGENT_MODEL,
-      "server.address": "api.minimax.io",
     }, async (sp) => {
-      const r = await fetch(MINIMAX_API, {
+      const r = await fetch(prov.api, {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: AGENT_MODEL, temperature: 0.2, max_tokens: 900,
+          model: prov.model, temperature: 0.2, max_tokens: 900,
           messages: [
             { role: "system", content: agentPrompt(lists) },
             { role: "user", content: text.slice(0, 6000) },
@@ -229,7 +227,7 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
       });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { sp.recordError(`minimax http ${r.status}`); return null; }
+      if (!r.ok) { sp.recordError(`${prov.name} http ${r.status}`); return null; }
       let j: any = {};
       try { j = JSON.parse(raw); } catch (_) { return null; }
       const content = j?.choices?.[0]?.message?.content ?? "";

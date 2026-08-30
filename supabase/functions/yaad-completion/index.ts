@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 
 // Completion Report narrative agent.
 //
@@ -15,11 +16,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // never mention money in any form - the payment record on the report is
 // rendered from the job data directly, not written by a model.
 
-function pickProvider(): { name: string; api: string; key: string; model: string } | null {
-  const mk = Deno.env.get("MINIMAX_API_KEY");
-  if (mk) return { name: "minimax", api: "https://api.minimax.io/v1/chat/completions", key: mk, model: "MiniMax-M2.7" };
-  return null;
-}
+// Provider lives in _shared/textmodel.ts. See that file for why.
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -115,8 +112,8 @@ Deno.serve(async (req: Request) => {
     const job = (body && typeof body.job === "object" && body.job) ? body.job : null;
     if (!job || !String(job.desc || "").trim()) return json({ error: "The job needs a scope description before a narrative can be drafted." }, 400);
 
-    const prov = pickProvider();
-    if (!prov) { console.error("completion: no model API key"); return json({ error: "MINIMAX_API_KEY is not set." }, 500); }
+    const prov = pickTextProvider();
+    if (!prov) { console.error("completion: no model API key"); return json({ error: NO_PROVIDER_MESSAGE }, 500); }
 
     // Only facts, no client contact details, no money fields.
     const ev = Array.isArray(job.evidence) ? job.evidence.slice(0, 40) : [];
@@ -138,9 +135,8 @@ Deno.serve(async (req: Request) => {
 
     let finishReason = "";
     const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
-      "gen_ai.system": prov.name, "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": prov.model, "gen_ai.request.temperature": 0.3,
-      "server.address": new URL(prov.api).hostname, "yaadly.agent.name": "completion",
+      ...providerAttrs(prov), "gen_ai.operation.name": "chat",
+      "gen_ai.request.temperature": 0.3, "yaadly.agent.name": "completion",
     }, async (s) => {
       const r = await fetch(prov.api, {
         method: "POST",
@@ -153,7 +149,7 @@ Deno.serve(async (req: Request) => {
       const j = await r.json();
       s.setAttributes({ "http.response.status_code": r.status,
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens, "gen_ai.usage.output_tokens": j?.usage?.completion_tokens });
-      if (!r.ok) { console.error("completion: model http", r.status, JSON.stringify(j).slice(0, 300)); s.recordError(`minimax http ${r.status}`); throw new Error(`Model call failed (${r.status})`); }
+      if (!r.ok) { console.error("completion: model http", r.status, JSON.stringify(j).slice(0, 300)); s.recordError(`${prov.name} http ${r.status}`); throw new Error(`Model call failed (${r.status})`); }
       finishReason = j?.choices?.[0]?.finish_reason ?? "";
       return j?.choices?.[0]?.message?.content ?? "";
     });

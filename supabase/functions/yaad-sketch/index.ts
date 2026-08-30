@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 
 // yaad-sketch
 //
@@ -40,8 +41,8 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // yaad-vision, so setting it fixes both at once.
 const VISION_MODEL = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-90b-vision-instruct";
 const VISION_API = "https://integrate.api.nvidia.com/v1/chat/completions";
-const TEXT_MODEL = "MiniMax-M2.7";
-const TEXT_API = "https://api.minimax.io/v1/chat/completions";
+// The text model and its endpoint come from _shared/textmodel.ts. The vision
+// model above is a different job and stays where it is.
 
 const FRAME_PROMPT = `You are looking at stills taken from a walkthrough video of a property in Jamaica, in the order they were filmed. You are recording what is visibly there, for a project manager who will read it later. You are not a surveyor, an engineer or a valuer.
 
@@ -447,23 +448,21 @@ Deno.serve(async (req) => {
 
     // ----------------------------------------------------------- assemble
     if (action === "assemble") {
-      const key = Deno.env.get("MINIMAX_API_KEY");
-      if (!key) return fail("MINIMAX_API_KEY is not set on this project.", 500);
+      const prov = pickTextProvider();
+      if (!prov) return fail(NO_PROVIDER_MESSAGE, 500);
       const described: any[] = Array.isArray(body.frames) ? body.frames : [];
       if (!described.length) return fail("Nothing to assemble: describe the frames first.", 400);
 
-      const raw = await trace.span(`chat ${TEXT_MODEL}`, SpanKind.CLIENT, {
-        "gen_ai.system": "minimax",
+      const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+        ...providerAttrs(prov),
         "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": TEXT_MODEL,
         "gen_ai.request.temperature": 0.1,
-        "server.address": "api.minimax.io",
       }, async (s) => {
-        const r = await fetch(TEXT_API, {
+        const r = await fetch(prov.api, {
           method: "POST",
-          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: TEXT_MODEL, temperature: 0.1,
+            model: prov.model, temperature: 0.1,
             messages: [
               { role: "system", content: ASSEMBLE_PROMPT },
               { role: "user", content: JSON.stringify({ property: String(body.property_label || ""), frames: described }).slice(0, 24000) },
@@ -482,7 +481,7 @@ Deno.serve(async (req) => {
           "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
           "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
         });
-        if (!r.ok) s.recordError(`minimax http ${r.status}: ${rawText.slice(0, 200)}`);
+        if (!r.ok) s.recordError(`${prov.name} http ${r.status}: ${rawText.slice(0, 200)}`);
         return { ok: r.ok, status: r.status, body: rawText, content: j?.choices?.[0]?.message?.content ?? "" };
       });
 
@@ -557,8 +556,8 @@ Deno.serve(async (req) => {
           rooms,
           frames: described.map((f: any) => ({ n: f.n, caption: f.visible, room: f.room, source: "video" })),
           sketch_svg: svg,
-          model: `${VISION_MODEL} + ${TEXT_MODEL}`,
-          model_note: `Frames described by ${VISION_MODEL}, assembled by ${TEXT_MODEL}. Sketch geometry generated in code, not by a model. ${hits.length} measurement phrase(s) scrubbed. Not checked by a human yet.`,
+          model: `${VISION_MODEL} + ${prov.model}`,
+          model_note: `Frames described by ${VISION_MODEL}, assembled by ${prov.model}. Sketch geometry generated in code, not by a model. ${hits.length} measurement phrase(s) scrubbed. Not checked by a human yet.`,
         }),
       });
       if (!ins.ok) return fail(`could not store the pack: ${await ins.text()}`, 502);
