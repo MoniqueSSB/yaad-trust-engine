@@ -1150,7 +1150,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
       <span class="modenote" id="modenote">No account yet. Everything is typed by hand, no agents run until the Client Guidelines are signed.</span>
     </div>
     <div class="prog" id="prog"></div>
-    <div class="proglab"><span id="plab">Step 1 of 6, Trade</span><b id="pfree">Free to post</b></div>
+    <div class="proglab"><span id="plab">Step 1 of 5, Trade</span><b id="pfree">Free to post</b></div>
 
     <div class="wizwrap">
       <div>
@@ -1181,6 +1181,22 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
             <p class="tiny" style="margin-bottom:2px">Pick from the lists rather than typing. It takes under a minute, and it is the reason every job on the board can be filtered, matched and quoted without a phone call first. Anything the assistant worked out from your description is already filled in.</p>
           </div>
           <div id="wizcard" style="margin-top:12px"></div>
+          <!-- Photos, folded in from what was a step of their own, matching
+               docs/index.html and POST-A-JOB-FLOW-SPEC v1.1. Optional. -->
+          <div class="fgroup" style="margin-top:16px">
+            <label class="fl">Add photos or a short video, optional</label>
+            <p class="tiny" style="margin-bottom:8px">Jobs with pictures get roughly three times the responses, and far fewer "I'd have to come see it first" replies. You can also add them later from your portal.</p>
+            <button class="drop" id="drop" style="width:100%">
+              <div style="font-size:26px;line-height:1">＋</div>
+              <div style="font-weight:700;margin-top:6px">Add photos or video</div>
+              <div class="tiny" style="margin-top:4px">Or tap to load the sample set for this demo</div>
+            </button>
+            <div class="thumbs" id="thumbs" style="display:none">
+              <i>pipe-1.jpg</i><i>cupboard.jpg</i><i>floor.jpg</i><i>clip.mp4</i>
+            </div>
+            <div class="manualnote" id="manualph"><b>Photos go up as they are.</b> Nothing reads them yet. From your second job on, the photo check tells you what a worker can and can't see before you post, and it checks the worker's evidence at every stage after that.</div>
+            <div id="agentph"></div>
+          </div>
           <div class="wnav">
             <button class="btn ghost" data-back>Back</button>
             <button class="btn" id="n2">Continue</button>
@@ -1189,27 +1205,6 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 
         <!-- 3 -->
         <div class="wstep" data-step="3">
-          <h2 class="wq">Add photos or a short video</h2>
-          <p class="wsub">Jobs with pictures get roughly three times the responses, and far fewer "I'd have to come see it first" replies.</p>
-          <button class="drop" id="drop" style="width:100%">
-            <div style="font-size:26px;line-height:1">＋</div>
-            <div style="font-weight:700;margin-top:6px">Add photos or video</div>
-            <div class="tiny" style="margin-top:4px">Or tap to load the sample set for this demo</div>
-          </button>
-          <div class="thumbs" id="thumbs" style="display:none">
-            <i>pipe-1.jpg</i><i>cupboard.jpg</i><i>floor.jpg</i><i>clip.mp4</i>
-          </div>
-          <div class="manualnote" id="manual3"><b>Photos go up as they are.</b> Nothing reads them yet. From your second job on, the photo check tells you what a worker can and can't see before you post, and it checks the worker's evidence at every stage after that.</div>
-          <div id="agent3"></div>
-          <div class="wnav">
-            <button class="btn ghost" data-back>Back</button>
-            <button class="btn" id="n3">Continue</button>
-            <span class="sp">You can skip this and add them later</span>
-          </div>
-        </div>
-
-        <!-- 4 -->
-        <div class="wstep" data-step="4">
           <h2 class="wq">Where and when</h2>
           <p class="wsub">The full address is never shown on the public board. Workers only see the area until you choose one of them.</p>
           <div class="grid g2c">
@@ -1231,14 +1226,14 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
           <div class="wzdate" id="wzdate"></div>
           <div class="wnav">
             <button class="btn ghost" data-back>Back</button>
-            <button class="btn" id="n4">Continue</button>
+            <button class="btn" id="n3">Continue</button>
           </div>
         </div>
 
-        <!-- 5 -->
-        <div class="wstep" data-step="5">
-          <h2 class="wq" id="w5h">Create your account</h2>
-          <p class="wsub" id="w5s">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
+        <!-- 4 -->
+        <div class="wstep" data-step="4">
+          <h2 class="wq" id="w4h">Create your account</h2>
+          <p class="wsub" id="w4s">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
           <div class="grid g2c">
             <div class="fgroup"><label class="fl" for="nm">Your name</label><input class="f" id="nm" value="Monique Sewell-Bennett"></div>
             <div class="fgroup"><label class="fl" for="em">Email</label><input class="f" id="em" value="monique@example.com"></div>
@@ -1247,46 +1242,50 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
             <p class="tiny" style="margin-top:7px">Hidden from workers until you start a chat with one. You control when it's shared.</p></div>
           <div class="fgroup" id="pwwrap"><label class="fl" for="pw">Choose a password</label><input class="f" id="pw" type="password" value="hunter2demo">
             <p class="tiny" style="margin-top:7px">Or skip it, we can send a one-tap link to your email instead.</p></div>
-          <div class="card soft" style="margin-top:6px" id="w5note">
+          <div class="card soft" style="margin-top:6px" id="w4note">
             <p style="font-size:13.5px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">One screen left.</b> Your job stays a draft until you confirm the Client Guidelines next. That is what puts it in the marketplace, nothing reaches a worker before it.</p>
           </div>
           <div class="wnav">
             <button class="btn ghost" data-back>Back</button>
-            <button class="btn" id="n5">Continue</button>
+            <button class="btn" id="n4">Continue</button>
           </div>
         </div>
 
-        <!-- 6 -->
-        <div class="wstep" data-step="6">
+        <!-- 5 -->
+        <div class="wstep" data-step="5">
           <h2 class="wq">Confirm and go live</h2>
           <p class="wsub">This is what workers will see. The private bits stay private. Confirm the Client Guidelines and your job enters the marketplace.</p>
           <div class="card" id="review"></div>
           <div id="agent6"></div>
 
+          <!-- Condensation of web/lib/legal-copy.json → client_guidelines,
+               same rule as docs/index.html: the version shown here must equal
+               CG_VERSION there, and the words must not contradict it. -->
           <div class="card" id="gblock" style="margin-top:14px;background:var(--soft);border-color:var(--softline)">
-            <p class="kick" style="margin-bottom:9px">Client Guidelines v1.0, required to go live</p>
+            <p class="kick" style="margin-bottom:9px">Client Guidelines v1.3, required to go live</p>
             <div class="gscroll">
-              <h6>1. What Yaadly does</h6>Yaadly holds your payment for each agreed stage and releases it only when you have seen the evidence and signed it off. Yaadly is not the tradesperson and does not price the work.
-              <h6>2. What you agree to</h6>Describe the job honestly, give safe and timely access to the property, and respond to evidence within five working days. Silence past five days counts as approval.
-              <h6>3. Off-platform payment</h6>Paying a worker directly ends the protection on that stage. We cannot hold or recover money that never reached us.
-              <h6>4. Your details</h6>Your address and phone number stay off the public board. They are shared with one worker only when you choose to share them.
-              <h6>5. Disputes</h6>Where evidence does not match what was agreed in writing, the stage is not released and the job goes to review. Decisions are made on the written scope and the evidence, nothing else.
+              <h6>1. What being a Yaadly client means</h6>Yaadly gets property work done on evidence: verified workers, documented stages, and money that moves only when you approve what you can see. Yaadly is not the tradesperson, does not price the work, and every protection you enjoy has a named counterpart the worker enjoys.
+              <h6>2. Describing your job honestly</h6>Describe the site and the work as they really are, and keep the access you promised. Workers can walk away from a mis-described site without penalty, so an honest pitch protects your own timeline.
+              <h6>3. How money moves today</h6>While Yaadly is not holding money, paying your tradesperson directly through the route agreed on your job is how a job runs, and it is not going behind our backs. What it does mean is plain: Yaadly is holding nothing on your job, so Yaadly can withhold nothing, release nothing and return nothing. The Guarantee &amp; Support fee is 15% of the worker's labour price, itemised before you agree to anything, never charged on materials.
+              <h6>4. All work through Yaadly</h6>Workers quote their own price. Do not beat them down or take a worker from this platform into a side deal: that removes the protection for both of you, and repeat side-dealing ends the account. Never withhold approval to renegotiate a price already agreed.
+              <h6>5. Evidence, approval and disputes</h6>Review evidence when it lands, within 3 days where you can, because a worker who has proven a stage is waiting on your word to be paid. Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free, reviewed by a person, and nothing moves while one is open.
+              <p style="margin-top:10px;margin-bottom:0">This is the deal in brief. The full wording of the same version is in your client portal from your first sign-in, and if it ever changes you will be asked to sign the new version before anything else moves.</p>
             </div>
-            <label class="tick" for="gtick"><input type="checkbox" id="gtick"><span>I have read and agree to the Client Guidelines v1.0, and I understand my job is not visible to any worker until I confirm this.</span></label>
+            <label class="tick" for="gtick"><input type="checkbox" id="gtick"><span>I have read and agree to the Client Guidelines v1.3, and I understand my job is not visible to any worker until I confirm this.</span></label>
             <div class="fgroup" style="margin-top:13px;margin-bottom:0"><label class="fl" for="sig">Type your full name to sign</label><input class="f" id="sig" placeholder="Your full name">
               <p class="tiny" style="margin-top:7px">Written to <span style="font-family:var(--mono);font-size:12px">doc_signatures</span> with a timestamp and the exact consent text. No edit, no delete.</p></div>
           </div>
 
           <div class="signedstrip" id="mblock" style="display:none">
             <span class="tickmark">✓</span>
-            <div><b style="font-size:14px">Client Guidelines v1.0 signed, 12 Aug 2026</b>
+            <div><b style="font-size:14px">Client Guidelines v1.3 signed, 12 Aug 2026</b>
             <p class="tiny" style="margin-top:3px">Already on file in <span style="font-family:var(--mono);font-size:11.5px">doc_signatures</span>. You sign once, not once per job. If the guidelines are ever revised you'll be asked to re-sign the new version before your next job goes live.</p></div>
           </div>
 
           <div class="wnav">
             <button class="btn ghost" data-back>Back</button>
-            <button class="btn" id="n6" disabled>Confirm &amp; go live</button>
-            <span class="sp" id="n6hint">Tick the box and sign to continue</span>
+            <button class="btn" id="n5" disabled>Confirm &amp; go live</button>
+            <span class="sp" id="n5hint">Tick the box and sign to continue</span>
           </div>
         </div>
       </div>
@@ -1352,7 +1351,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 
 <section class="screen" id="s-done">
   <div class="wrap">
-    <div class="pills" style="margin-bottom:14px"><span class="pill">JB-4471 live in the marketplace</span><span class="pill m">Guidelines v1.0 signed</span><span class="pill n">Plumbing · Kingston 8, Barbican</span></div>
+    <div class="pills" style="margin-bottom:14px"><span class="pill">JB-4471 live in the marketplace</span><span class="pill m">Guidelines v1.3 signed</span><span class="pill n">Plumbing · Kingston 8, Barbican</span></div>
     <h2 class="hx">Hello Monique,<br>your job is live.</h2>
     <p class="lead">Your signature on the Client Guidelines is what took it out of draft. Your <b>Plumbing</b> job is now in the marketplace and we'll help you find available workers near <b>Barbican, Kingston 8</b>.</p>
 
@@ -1596,8 +1595,8 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
       <p class="kick m">The mirror rule</p>
       <h3 class="hx">Both sides sign, or nothing moves</h3>
       <div class="grid g2c" style="margin-top:18px">
-        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Client</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.65">Signs Client Guidelines v1.0 → the job appears here. No signature, the job stays a draft nobody can see, and no agent runs on it.</p></div>
-        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Worker</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.65">Vetted, profile published, signs Worker Guidelines v1.0 → can quote. The <span class="mono">job_quotes</span> INSERT policy checks all three and refuses otherwise.</p></div>
+        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Client</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.65">Signs Client Guidelines v1.3 → the job appears here. No signature, the job stays a draft nobody can see, and no agent runs on it.</p></div>
+        <div class="card"><h4 style="font-size:15px;margin-bottom:8px">Worker</h4><p style="font-size:13.5px;color:var(--mute);line-height:1.65">Vetted, profile published, signs Worker Guidelines v1.3 → can quote. The <span class="mono">job_quotes</span> INSERT policy checks all three and refuses otherwise.</p></div>
       </div>
     </div>
   </div>
@@ -1637,7 +1636,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
           <h2 class="hx" style="font-size:30px">Delroy Campbell</h2>
           <p class="muted" style="font-size:14px;margin-top:4px">Plumbing &amp; water systems · Kingston 8, 6, 10 · Trading 9 years</p>
           <div class="pills" style="margin-top:12px">
-            <span class="pill">ID + TRN verified</span><span class="pill">References checked</span><span class="pill">Walkthrough call done</span><span class="pill m">Guidelines signed v1.0</span>
+            <span class="pill">ID + TRN verified</span><span class="pill">References checked</span><span class="pill">Walkthrough call done</span><span class="pill m">Guidelines signed v1.3</span>
           </div>
         </div>
         <div style="text-align:right">
@@ -1757,7 +1756,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
             <h2 class="hx" style="font-size:30px">Monique S.</h2>
             <p class="muted" style="font-size:14px;margin-top:4px">Barbican, Kingston 8 · posting from London · client since Apr 2026</p>
             <div class="pills" style="margin-top:12px">
-              <span class="pill">Email verified</span><span class="pill">Guidelines v1.0 signed</span><span class="pill m">3 jobs completed</span><span class="pill n">0 stages disputed</span>
+              <span class="pill">Email verified</span><span class="pill">Guidelines v1.3 signed</span><span class="pill m">3 jobs completed</span><span class="pill n">0 stages disputed</span>
             </div>
           </div>
           <div style="text-align:right">
@@ -1885,20 +1884,20 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
       <p class="kick m">The gate, decided</p>
       <div class="card">
         <h3 class="hx" style="font-size:22px">Build free, sign to go live</h3>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Decided 25 Aug: anyone can build a job with no account. It saves as a draft. To put it in the marketplace you sign up <em>and</em> confirm the Client Guidelines, no signature, no listing. This is what <code style="font-family:var(--mono);font-size:12px">trg_enforce_signed_before_open</code> already enforces, so the database side is done. What changes is where the person meets it: at the end of a wizard they have already invested six screens in, instead of on a cold form.</p>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">Decided 25 Aug: anyone can build a job with no account. It saves as a draft. To put it in the marketplace you sign up <em>and</em> confirm the Client Guidelines, no signature, no listing. This is what <code style="font-family:var(--mono);font-size:12px">trg_enforce_signed_before_open</code> already enforces, so the database side is done. What changes is where the person meets it: at the end of a wizard they have already invested five screens in, instead of on a cold form.</p>
         <div class="tw">
           <table>
             <thead><tr><th>Point in the flow</th><th>What the person does</th><th>Job state</th><th>Enforced by</th></tr></thead>
             <tbody>
-              <tr><td>Steps 1 to 4</td><td>Nothing. No account, no email, no reading.</td><td><span class="st b">Nothing saved yet</span></td><td>,</td></tr>
-              <tr><td>End of step 5</td><td>Creates an account: name, email, password or one-tap link.</td><td><span class="st b">Draft</span> <code>open = false</code></td><td>Auth + <code>yaad-website-intake</code></td></tr>
-              <tr><td>Step 6</td><td>Reads and confirms Client Guidelines v1.0, types their name to sign.</td><td><span class="st a">Live</span> <code>open = true</code></td><td><code>doc_signatures</code> row → <code>trg_enforce_signed_before_open</code></td></tr>
+              <tr><td>Steps 1 to 3</td><td>Nothing. No account, no email, no reading.</td><td><span class="st b">Nothing saved yet</span></td><td>,</td></tr>
+              <tr><td>End of step 4</td><td>Creates an account: name, email, password or one-tap link.</td><td><span class="st b">Draft</span> <code>open = false</code></td><td>Auth + <code>yaad-website-intake</code></td></tr>
+              <tr><td>Step 5</td><td>Reads and confirms Client Guidelines v1.3, types their name to sign.</td><td><span class="st a">Live</span> <code>open = true</code></td><td><code>doc_signatures</code> row → <code>trg_enforce_signed_before_open</code></td></tr>
               <tr><td>Picks a worker</td><td>Agrees stages in writing, funds stage one.</td><td><span class="st c">Confirmed</span></td><td><code>yaad-kickoff</code></td></tr>
             </tbody>
           </table>
         </div>
-        <p style="margin-top:14px;color:var(--mute);font-size:14.5px;line-height:1.7">The draft row is the part worth building properly. If someone bails at step 5 you still have their job, their trade, their parish and their tidied description, that is a recoverable lead and an email you can send. MyBuilder loses those people entirely. Keep a <code style="font-family:var(--mono);font-size:12px">jobs.status</code> of <span style="font-family:var(--mono);font-size:12px">draft</span> and a resume link, and the friction you just added starts paying you back.</p>
-        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">One thing to watch: signature at go-live means every listing on your board comes from someone who has read the rules, which is exactly the standard you want to hold workers to. Measure the drop-off between step 5 and step 6. If more than a third of drafts never go live, the guidelines are too long, not the gate wrong.</p>
+        <p style="margin-top:14px;color:var(--mute);font-size:14.5px;line-height:1.7">The draft row is the part worth building properly. If someone bails at step 4 you still have their job, their trade, their parish and their tidied description, that is a recoverable lead and an email you can send. MyBuilder loses those people entirely. Keep a <code style="font-family:var(--mono);font-size:12px">jobs.status</code> of <span style="font-family:var(--mono);font-size:12px">draft</span> and a resume link, and the friction you just added starts paying you back.</p>
+        <p style="margin-top:12px;color:var(--mute);font-size:14.5px;line-height:1.7">One thing to watch: signature at go-live means every listing on your board comes from someone who has read the rules, which is exactly the standard you want to hold workers to. Measure the drop-off between step 4 and step 5. If more than a third of drafts never go live, the guidelines are too long, not the gate wrong.</p>
       </div>
     </div>
 
@@ -3190,7 +3189,7 @@ function openQuote(id){
  if(pan.classList.contains('open')){pan.classList.remove('open');pan.innerHTML='';return}
  A('.qpanel').forEach(function(p){p.classList.remove('open');p.innerHTML=''});
  if(vmode!=='worker'){
-  pan.innerHTML='<div class="locknote"><span>🔒</span><div><b>Quoting is for vetted workers.</b><br>The <span class="mono">job_quotes</span> insert policy needs three things true at once: a published worker profile, a signed Worker Guidelines v1.0, and a job that is genuinely open. Browsing stays free for everyone.<br><br><span style="color:var(--tealb)">Flip the toggle above to see the worker view.</span></div></div>';
+  pan.innerHTML='<div class="locknote"><span>🔒</span><div><b>Quoting is for vetted workers.</b><br>The <span class="mono">job_quotes</span> insert policy needs three things true at once: a published worker profile, a signed Worker Guidelines v1.3, and a job that is genuinely open. Browsing stays free for everyone.<br><br><span style="color:var(--tealb)">Flip the toggle above to see the worker view.</span></div></div>';
  } else {
   pan.innerHTML='<p class="kick" style="margin-bottom:9px">Your quote · '+esc(j.id)+'</p>'+
    '<div class="grid g2c"><div class="fgroup" style="margin-bottom:0"><label class="fl" for="amt-'+id+'">Your labour price (J$)</label>'+
@@ -4355,9 +4354,9 @@ document.addEventListener('click',function(e){
 /* ---------- agent rail ---------- */
 var AGENTS=[
  {s:2,f:'yaad-agent',d:'Step 2, turns your own words into a brief a worker can quote from, and asks the two things you left out.',t:'exists v12',lock:1},
- {s:3,f:'yaad-vision',d:'Step 3, reads your photos and says what it can actually see, and what it cannot.',t:'exists v5',lock:1},
- {s:5,f:'yaad-website-intake',d:'Step 5, saves the job as a draft the moment you have an account. Runs for everyone, no signature needed.',t:'live v4 · public'},
- {s:6,f:'doc_signatures',d:'Step 6, your signature lands here. This row is the switch: it opens the job, and it is what every agent below checks before it will run.',t:'table · the gate'},
+ {s:2.5,f:'yaad-vision',d:'Step 2, reads your photos and says what it can actually see, and what it cannot.',t:'exists v5',lock:1},
+ {s:4,f:'yaad-website-intake',d:'Step 4, saves the job as a draft the moment you have an account. Runs for everyone, no signature needed.',t:'live v4 · public'},
+ {s:5,f:'doc_signatures',d:'Step 5, your signature lands here. This row is the switch: it opens the job, and it is what every agent below checks before it will run.',t:'table · the gate'},
  {s:7,f:'yaad-match',d:'On go-live, finds vetted workers by trade and parish and alerts them.',t:'to build',lock:1},
  {s:8,f:'yaad-kickoff',d:'On confirm, Kickoff Pack, payment stages, worker QA sheet.',t:'exists v13',lock:1},
  {s:9,f:'yaad-vision',d:'Every stage after, checks the worker\'s evidence against the scope you agreed before you are asked to sign it off.',t:'exists v5',lock:1},
@@ -4472,7 +4471,7 @@ document.addEventListener('click',function(e){
    vmode=vm.dataset.vmode;
    A('[data-vmode]').forEach(function(b){b.classList.toggle('on',b.dataset.vmode===vmode)});
    S('#vnote').textContent = vmode==='worker'
-     ? 'Vetted, profile published, Worker Guidelines v1.0 signed, you can quote any open job and ask questions on it.'
+     ? 'Vetted, profile published, Worker Guidelines v1.3 signed, you can quote any open job and ask questions on it.'
      : 'Anyone can browse. Quoting needs a published profile and a signed Worker Guidelines, the same rule clients meet.';
    drawJobs(); return;
  }
@@ -4568,50 +4567,50 @@ function applyMode(m){
   : 'Plain words are fine. Write it how you\'d say it, then let the intake assistant tidy it up and flag what a worker would need to ask.';
  S('#tidywrap').style.display=g?'none':'block';
  S('#manual2').style.display=g?'block':'none';
- S('#manual3').style.display=g?'block':'none';
- if(g){S('#agent2').innerHTML='';S('#agent3').innerHTML='';tidied=false}
- S('#w5h').textContent=g?'Create your account':'Confirm your details';
- S('#w5s').textContent=g
+ S('#manualph').style.display=g?'block':'none';
+ if(g){S('#agent2').innerHTML='';S('#agentph').innerHTML='';tidied=false}
+ S('#w4h').textContent=g?'Create your account':'Confirm your details';
+ S('#w4s').textContent=g
   ? 'Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.'
   : 'Pulled from your profile. Change anything that is out of date for this job.';
  S('#pwwrap').style.display=g?'block':'none';
- S('#w5note').style.display=g?'block':'none';
+ S('#w4note').style.display=g?'block':'none';
  S('#gblock').style.display=g?'block':'none';
  S('#mblock').style.display=g?'none':'block';
  gateCheck();
  drawRail(step);
- if(step===6)drawReview();
+ if(step===5)drawReview();
 }
 function setStep(n){
  step=n;
  A('.wstep').forEach(function(s){s.classList.toggle('show',+s.dataset.step===n)});
- var p=''; for(var i=1;i<=6;i++){p+='<i class="'+(i<n?'done':(i===n?'now':''))+'"></i>'}
+ var p=''; for(var i=1;i<=5;i++){p+='<i class="'+(i<n?'done':(i===n?'now':''))+'"></i>'}
  S('#prog').innerHTML=p;
- var labs=['Trade','Details','Photos','Where & when','Create account','Guidelines & go live'];
- S('#plab').textContent='Step '+n+' of 6, '+labs[n-1];
- S('#pfree').innerHTML=n<5?'Free to build':'<span class="draftpill">Draft JB-4471 saved · not live yet</span>';
+ var labs=['Trade','Details & photos','Where & when','Create account','Guidelines & go live'];
+ S('#plab').textContent='Step '+n+' of 5, '+labs[n-1];
+ S('#pfree').innerHTML=n<4?'Free to build':'<span class="draftpill">Draft JB-4471 saved · not live yet</span>';
  drawRail(n);
- if(n===6)drawReview();
+ if(n===5)drawReview();
  window.scrollTo({top:0,behavior:'smooth'});
 }
 A('[data-back]').forEach(function(b){b.addEventListener('click',function(){setStep(step-1)})});
-['n1','n2','n3','n4','n5'].forEach(function(id,i){var b=S('#'+id);if(b)b.addEventListener('click',function(){setStep(i+2)})});
+['n1','n2','n3','n4'].forEach(function(id,i){var b=S('#'+id);if(b)b.addEventListener('click',function(){setStep(i+2)})});
 function gateCheck(){
  if(mode==='member'){
-  S('#n6').disabled=false;
-  S('#n6hint').textContent='Guidelines already on file, no re-signing';
-  S('#n6hint').style.color='var(--tealb)';
+  S('#n5').disabled=false;
+  S('#n5hint').textContent='Guidelines already on file, no re-signing';
+  S('#n5hint').style.color='var(--tealb)';
   return true;
  }
  var ok=S('#gtick').checked && S('#sig').value.trim().length>2;
- S('#n6').disabled=!ok;
- S('#n6hint').textContent=ok?'Signature captured, this is what makes it live':'Tick the box and sign to continue';
- S('#n6hint').style.color=ok?'var(--tealb)':'';
+ S('#n5').disabled=!ok;
+ S('#n5hint').textContent=ok?'Signature captured, this is what makes it live':'Tick the box and sign to continue';
+ S('#n5hint').style.color=ok?'var(--tealb)':'';
  return ok;
 }
 S('#gtick').addEventListener('change',gateCheck);
 S('#sig').addEventListener('input',gateCheck);
-S('#n6').addEventListener('click',function(){if(!gateCheck())return;drawRail(7);go('done')});
+S('#n5').addEventListener('click',function(){if(!gateCheck())return;drawRail(7);go('done')});
 
 /* step 2 agent */
 S('#tidy').addEventListener('click',function(){
@@ -4627,12 +4626,12 @@ S('#tidy').addEventListener('click',function(){
  },1100);
 });
 
-/* step 3 agent */
+/* photos agent, step 2 */
 S('#drop').addEventListener('click',function(){
  S('#thumbs').style.display='grid';
  seen=true;
- if(mode==='guest'){S('#agent3').innerHTML='';return}
- var box=S('#agent3');
+ if(mode==='guest'){S('#agentph').innerHTML='';return}
+ var box=S('#agentph');
  box.innerHTML='<div class="aout"><div class="ah"><span class="spin"></span>yaad-vision · looking at 4 files</div></div>';
  setTimeout(function(){
   seen=true;

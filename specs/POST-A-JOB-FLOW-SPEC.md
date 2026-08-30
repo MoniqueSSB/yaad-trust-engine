@@ -2,8 +2,14 @@
 
 **For:** Claude Code, building into `docs/index.html`
 **Reference implementation:** `preview/index.html`, screens `#s-post` and `#s-done`
-**Version:** 1.0 · 26 August 2026
+**Version:** 1.1 · 30 August 2026 (v1.0 · 26 August 2026)
 **Companions:** `specs/MARKETPLACE-BUILD-SPEC.md` (where the job lands) · `specs/PORTALS-BUILD-SPEC.md` (what happens next)
+
+> **v1.1, 30 August 2026 — five steps, not six.** Photos stopped being a screen of their own and
+> now sit inside step 2, after the job card, marked optional. A screen of its own made an optional
+> thirty seconds read as a stage of the work. Everything after it renumbers down by one:
+> Where and when is step 3, Create account is step 4, Guidelines and go live is step 5. Nothing
+> else about any step changed. Step numbers in this spec have been updated to match.
 
 ---
 
@@ -12,7 +18,7 @@
 > **Anyone can build a job with no account. It saves as a draft. To go live in the marketplace they
 > must sign up AND confirm the Client Guidelines. No signature, no listing.**
 
-Everything below is that sentence turned into six screens. If a decision is ever unclear, this rule
+Everything below is that sentence turned into five screens. If a decision is ever unclear, this rule
 settles it.
 
 A second rule sits alongside it:
@@ -21,7 +27,7 @@ A second rule sits alongside it:
 > The first job is a fully manual intake.**
 
 That is what the `guest` / `member` toggle in §1 is for. It is not a demo gimmick — it is two
-genuinely different experiences of the same six steps.
+genuinely different experiences of the same five steps.
 
 ---
 
@@ -51,8 +57,8 @@ Continue, and advances — a visitor who came in via "Roofing" should not be ask
 │                              file ]                       │
 │  <mode note — changes with the toggle>                    │
 ├──────────────────────────────────────────────────────────┤
-│  ①──②──③──④──⑤──⑥                                        │  #rail
-│  Trade Details Photos Where&when Account Guidelines      │
+│  ①──②──③──④──⑤                                           │  #rail
+│  Trade Details&photos Where&when Account Guidelines      │
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
 │              < the active .wstep >                       │
@@ -62,17 +68,17 @@ Continue, and advances — a visitor who came in via "Roofing" should not be ask
 ```
 
 `setStep(n)` shows one `.wstep`, updates `#rail`, scrolls to top. Rail labels:
-**Trade · Details · Photos · Where & when · Create account · Guidelines & go live**.
+**Trade · Details & photos · Where & when · Create account · Guidelines & go live**.
 
 ### The mode toggle — `applyMode(m)`
 
 | | `guest` | `member` |
 |---|---|---|
 | Note | "No account yet. Everything is typed by hand — **no agent runs until the Client Guidelines are signed and a profile exists.**" | "Guidelines signed, profile live. Agents run inside the wizard and stay on the job through evidence and sign-off." |
-| Step 2 | Manual note shown, `Tidy this up for me` hidden | Assistant button shown |
-| Step 3 | Manual note shown, no photo read | `yaad-vision` reads the photos |
-| Step 5 | "Create your account", password field shown | "Confirm your details", pulled from profile |
-| Step 6 | Tick + signature required | "Guidelines already on file — no re-signing" |
+| Step 2 · description | Manual note shown, `Tidy this up for me` hidden | Assistant button shown |
+| Step 2 · photos | Manual note shown, no photo read | `yaad-vision` reads the photos |
+| Step 4 | "Create your account", password field shown | "Confirm your details", pulled from profile |
+| Step 5 | Tick + signature required | "Guidelines already on file — no re-signing" |
 
 **In production `mode` is not a toggle — it is auth state plus a `doc_signatures` lookup.** Keep the
 toggle in the demo build so the two paths stay testable, but drive it from the session in production.
@@ -147,9 +153,9 @@ Keyed **`Trade|Type`**, never `Type` alone.
 
 ---
 
-## 5 · Step 3 — Photos
+## 5 · Step 2, continued — Photos (optional, after the job card)
 
-> **Add photos or a short video**
+> **Add photos or a short video, optional**
 > Jobs with pictures get roughly three times the responses — and far fewer "I'd have to come see it
 > first" replies.
 
@@ -165,12 +171,12 @@ check tells you what a worker can and can't see before they quote."*
 
 Again the second list carries the value. It gets a better job posted, not a cleverer description.
 
-`Continue` is enabled with or without photos. **Skippable** — the sub-line says
-*"You can skip this and add them later."*
+Step 2's `Continue` is enabled with or without photos — the sub-line says
+*"You can also add them later from your portal."*
 
 ---
 
-## 6 · Step 4 — Where and when
+## 6 · Step 3 — Where and when
 
 > **Where and when**
 > The full address is never shown on the public board. Workers only see the area until you choose
@@ -204,11 +210,11 @@ Or, on a day nobody has open:
 Plus a **"No fixed date — I am flexible"** chip: *"You will get more replies this way, and usually
 better prices — a worker can slot it into a gap."*
 
-Past dates disabled. Month nav both directions. The chosen date carries to step 6 as a mango pill.
+Past dates disabled. Month nav both directions. The chosen date carries to step 5 as a mango pill.
 
 ---
 
-## 7 · Step 5 — Create your account
+## 7 · Step 4 — Create your account
 
 > *Guest:* **Create your account** — "Your job is already saved as a draft. This is the account it
 > belongs to — and it is what lets workers reply to you."
@@ -232,7 +238,7 @@ screen renders, not after. Someone who abandons here has a saved draft to come b
 
 ---
 
-## 8 · Step 6 — Confirm and go live
+## 8 · Step 5 — Confirm and go live
 
 > **Confirm and go live**
 > This is what workers will see. The private bits stay private. Confirm the Client Guidelines and
@@ -289,10 +295,10 @@ JB-4471 live in the marketplace · Guidelines v1.1 signed · Plumbing · Kingsto
 2. **We email and WhatsApp you when a worker expresses interest** — usually within a few hours in
    Kingston. You'll see their Yaad Score, jobs completed and evidence from past work before you reply
 3. **Start a chat to share contact details** — you control when
-4. **Choose your worker, agree the stages, fund stage one**
+4. **Choose your worker and agree the stages**
 5. **Evidence, sign-off, review**
 
-### Where your money sits
+### How the money works
 
 Nothing has been charged. Say it plainly.
 
@@ -329,7 +335,7 @@ let wzFlex  = false;
 ```
 
 Draft persistence: **write the draft row at step 2**, update on every Continue. Someone who closes
-the tab at step 4 comes back to a saved job, not an empty form.
+the tab at step 3 comes back to a saved job, not an empty form.
 
 ---
 
@@ -338,11 +344,10 @@ the tab at step 4 comes back to a saved job, not an empty form.
 | Step | Blocks Continue |
 |---|---|
 | 1 | No trade selected |
-| 2 | Empty description · any coral (blank) field on the job card |
-| 3 | Nothing — skippable |
-| 4 | No parish · no access contact |
-| 5 | No name · no email · no phone · no password *(guest)* |
-| 6 | Tick **and** signature *(guest)* |
+| 2 | Empty description · any coral (blank) field on the job card — photos never block |
+| 3 | No parish · no access contact |
+| 4 | No name · no email · no phone · no password *(guest)* |
+| 5 | Tick **and** signature *(guest)* |
 
 Never a silent no-op. A disabled Continue always has a hint under it saying what is missing.
 
@@ -354,9 +359,9 @@ Never a silent no-op. A disabled Continue always has a hint under it saying what
 |---|---|---|
 | Step 2 description | Types it themselves | Assistant tidies + asks the two questions |
 | Step 2 job card | Fills every field | Pre-filled, badged by confidence |
-| Step 3 photos | Uploaded, unread | `yaad-vision` says what is and is not visible |
-| Step 5 | Creates the account | Confirms details from profile |
-| Step 6 | Tick + sign | Already on file |
+| Step 2 photos | Uploaded, unread | `yaad-vision` says what is and is not visible |
+| Step 4 | Creates the account | Confirms details from profile |
+| Step 5 | Tick + sign | Already on file |
 | After | Agents switch on | Already running |
 
 **The guest path must be genuinely usable, not a degraded funnel.** It is somebody's first
@@ -368,14 +373,14 @@ impression, they are often in a panic, and it is the path that earns the signatu
 
 - [ ] All six entry points land on `#s-post`; a trade card pre-selects and advances to step 2
 - [ ] Step 1 Continue disabled until a trade is picked
-- [ ] Guest mode: no agent button on step 2, no vision output on step 3, manual notes visible
+- [ ] Guest mode: no agent button on step 2, no vision output on step 2's photos, manual notes visible
 - [ ] Member mode: assistant returns a tidied brief **and** two worker questions
 - [ ] Job card cascades — trade changes types; type changes size bands, stage count, evidence list
 - [ ] Money and materials fields are coral until picked
-- [ ] Step 3 is skippable
-- [ ] Calendar: past dates disabled, teal days match worker availability, month nav works, chosen date appears as a mango pill on step 6
+- [ ] Photos never block step 2's Continue
+- [ ] Calendar: past dates disabled, teal days match worker availability, month nav works, chosen date appears as a mango pill on step 5
 - [ ] Draft row exists after step 2; closing and returning restores it
-- [ ] Step 6 guest: Continue disabled with only the tick, only the signature, or neither. Enabled with both
+- [ ] Step 5 guest: Continue disabled with only the tick, only the signature, or neither. Enabled with both
 - [ ] Signature writes `doc_signatures` against the **current** guidelines version
 - [ ] A job with no signature does **not** appear on the board
 - [ ] Done screen shows the agents block only after signature
@@ -387,7 +392,7 @@ impression, they are often in a panic, and it is the path that earns the signatu
 
 - Do not let a job reach the board without a current-version signature.
 - Do not run any agent in guest mode.
-- Do not make step 3 mandatory.
+- Do not make photos mandatory.
 - Do not show the street address or phone on the board, ever.
 - Do not disable a Continue without a hint saying what is missing.
 - Do not create the draft only at the end — write it at step 2.
