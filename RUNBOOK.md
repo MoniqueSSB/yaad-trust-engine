@@ -221,3 +221,20 @@ update public.worker_profiles
 **A published profile still cannot be sent a job until the Worker Guidelines are signed.** `yaad_match` requires a signature on the current version and skips anybody without one, so publishing and being matchable are two separate gates on purpose. If a worker is live and getting no jobs, check the signature first.
 
 **Suspending somebody** is `vetting_state = 'suspended'` plus `active = false`. Keep the row. Deleting it loses the record of why.
+
+
+---
+
+## A client says they never heard about their quote
+
+The quote is saved either way: `yaad-quote-landed` is called after the insert and a failure there never loses it. The function reports what it managed, so ask it rather than guess.
+
+**Look at the trace.** `yaadly.notify.outcome` reads `told` when at least one channel worked and `nobody_told` when neither did. `yaadly.notify.emailed` and `yaadly.notify.whatsapp` say which.
+
+**The three ordinary reasons, in the order they actually happen.**
+
+1. **The job has no email and no phone.** A job posted with only one channel has only that one to send on, and a WhatsApp intake job often has a number and no address. Nothing to fix in code: put the missing one on the job.
+2. **`WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` are not set.** They are not set today, so every WhatsApp send reports exactly that and no client on a phone-only job is told anything. This is the single biggest hole in the notification path and it is a credentials job, not a code one.
+3. **`RESEND_API_KEY` missing or the send returned non-2xx.** `emailReason` carries the status.
+
+**Until the WhatsApp credentials are set**, a phone-only client is told nothing automatically. The quotes page is honest when empty and the link keeps working, so the fallback is a person messaging them. Worth doing deliberately rather than discovering later that somebody waited a week on a price that was sitting there.

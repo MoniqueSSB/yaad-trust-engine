@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -47,21 +47,21 @@ function JoinForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
+  // The link sent on WhatsApp carries both, so the only thing left to type is
+  // an email and a password. Somebody on a phone, in another country, having
+  // already explained the whole job once, should not be copying an eight
+  // character code across from another app.
+  //
+  // Read straight into the initial state rather than written in after mount.
+  // An effect whose only job is to setState runs a second render for no
+  // reason, and for one beat the field is empty on a page whose whole point
+  // is that it arrives filled in.
+  const [code, setCode] = useState(() => (params.get("code") ?? "").toUpperCase());
+  const [job] = useState(() => params.get("job") ?? "");
   const [pendingQuote, setPendingQuote] = useState(false);
-  const [job, setJob] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-
-  // The link sent on WhatsApp carries both, so the only thing left to type is
-  // an email and a password. Somebody on a phone, in another country, having
-  // already explained the whole job once, should not be copying a six
-  // character code across from another app.
-  useEffect(() => {
-    setCode((params.get("code") ?? "").toUpperCase());
-    setJob(params.get("job") ?? "");
-  }, [params]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
