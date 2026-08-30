@@ -1014,9 +1014,103 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 #pane-site .chan a.wa:hover .val{color:#25D366}
 #pane-site .chan .why{font-size:12.5px;color:var(--mute);line-height:1.5}
 
+/* ══════════ THE FORK · three lanes, above the fold ══════════
+   Reuses the pane-site tokens rather than introducing a second card style.
+   Lane three carries the mango accent the site already uses to mean "this is
+   the one that costs, and the one where a human decides", which is exactly
+   what it means here too. */
+#pane-landing .fork{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:26px}
+@media(max-width:900px){#pane-landing .fork{grid-template-columns:1fr}}
+#pane-landing .fk{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;transition:var(--tr)}
+#pane-landing .fk:hover{border-color:var(--line2)}
+#pane-landing .fk .kick{margin-top:0;margin-bottom:9px}
+#pane-landing .fk h3{font-size:18px;line-height:1.28;margin:0 0 9px;color:var(--ink);font-weight:700}
+#pane-landing .fk .fkd{font-size:13.5px;color:var(--mute);line-height:1.6;margin:0}
+#pane-landing .fk .fkm{font-size:12px;color:var(--dim);line-height:1.5;margin:11px 0 0;padding-top:11px;border-top:1px solid var(--line)}
+#pane-landing .fk .fkgo{margin-top:auto;padding-top:15px;display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+#pane-landing .fk .fkgo .btn{width:100%;justify-content:center}
+/* .btn.ghost is scoped per pane further up, so the gate needs its own or the
+   base gradient wins and lane three's mango label lands on an orange fill. */
+#pane-landing .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+#pane-landing .btn.ghost:hover{border-color:var(--teal);color:var(--tealb);filter:none}
+#pane-landing .fk .fks{font-size:11.5px;font-weight:700;color:var(--dim);letter-spacing:.02em}
+#pane-landing .fk .fks.live{color:var(--tealb)}
+#pane-landing .fk .fks.soon{color:var(--mango)}
+/* Lane three is the one being built, so it is the one that reads loudest.
+   Border and wash only. It does not get a bigger button or a badge, because a
+   front page that shouts at a firm is the front page a firm distrusts. */
+#pane-landing .fk.hi{border-color:rgba(255,176,32,.38);background:rgba(255,176,32,.05)}
+#pane-landing .fk.hi:hover{border-color:rgba(255,176,32,.6)}
+#pane-landing .fk.hi .btn.ghost{border-color:rgba(255,176,32,.45);color:var(--mango)}
+#pane-landing .fk.hi .btn.ghost:hover{border-color:var(--mango);color:var(--mango)}
+
+/* ══════════ PANE · YAADLY FOR BUSINESS ══════════
+   The shared layout rules are scoped by pane id, so the new pane is aliased in
+   here in one block rather than appended to a dozen selector lists further up.
+   Additive by design: nothing above this line changes, so a mistake here can
+   only affect #pane-partners. */
+#pane-partners .sec{margin-top:64px}
+#pane-partners .kick{margin-top:0}
+#pane-partners .hx{font-family:var(--disp);font-weight:400;text-transform:uppercase;line-height:.95;letter-spacing:.005em;text-wrap:balance;margin:0}
+#pane-partners h2.hx{font-size:clamp(28px,4.2vw,50px)}
+#pane-partners h2.hx .g2,#pane-partners h3.hx .g2{background:linear-gradient(90deg,#FFB020,#FF6B4A);-webkit-background-clip:text;background-clip:text;color:transparent}
+#pane-partners .lead{color:var(--mute);font-size:16.5px;max-width:62ch;margin-top:14px}
+#pane-partners .lead b{color:var(--ink);font-weight:700}
+#pane-partners .tiny{font-size:var(--t-tiny);color:var(--mute);line-height:1.55}
+#pane-partners .note{font-size:12px;color:var(--dim);margin-top:12px}
+#pane-partners .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+#pane-partners .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);color:var(--tealb);white-space:normal}
+#pane-partners .pill.m{background:rgba(255,176,32,.11);border-color:rgba(255,176,32,.32);color:var(--mango)}
+#pane-partners .pill.n{background:var(--panel2);border-color:var(--line);color:var(--mute)}
+#pane-partners .strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:22px}
+#pane-partners .strip>div{background:var(--panel);padding:15px 16px}
+#pane-partners .strip b{display:block;font-family:var(--disp);font-size:23px;color:var(--tealb);line-height:1.1;font-weight:400}
+#pane-partners .strip span{font-size:12.5px;color:var(--mute);line-height:1.5}
+@media(max-width:760px){#pane-partners .strip{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:420px){#pane-partners .strip{grid-template-columns:1fr}}
+#pane-partners .grid{display:grid;gap:14px}
+#pane-partners .g2c{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){#pane-partners .g2c{grid-template-columns:1fr}}
+#pane-partners .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-top:14px}
+#pane-partners .card.b2b{margin-top:0;display:flex;flex-direction:column}
+#pane-partners .card h4{font-size:16.5px;line-height:1.3;margin:0 0 9px;color:var(--ink)}
+#pane-partners .card p{font-size:13.5px;color:var(--mute);line-height:1.6;margin:0}
+#pane-partners .card p+p{margin-top:11px}
+#pane-partners .card .tiny{margin-top:auto;padding-top:11px;color:var(--dim)}
+#pane-partners .btn.ghost{background:transparent;border:1px solid var(--line2);color:var(--ink)}
+#pane-partners .btn.ghost:hover{border-color:var(--teal);color:var(--tealb);filter:none}
+/* ══════════ THE GATE ══════════
+   body.gate is on from first paint and comes off the moment go() moves to any
+   other pane, so the nav never flashes in before it is hidden. */
+/* The hamburger goes too. On a phone it was still there, opening a menu
+   that body.gate had already hidden, so it was a control that did nothing. */
+body.gate nav.top .views,body.gate nav.top .navcta,body.gate .nav-toggle,body.gate footer{display:none}
+body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
+#pane-landing{padding:0}
+#pane-landing .gate{min-height:calc(100dvh - 58px);display:flex;flex-direction:column;justify-content:center;padding:24px var(--gutter) 40px}
+#pane-landing .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+#pane-landing .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);color:var(--tealb)}
+#pane-landing .pill.n{background:var(--panel2);border-color:var(--line);color:var(--mute)}
+#pane-landing h1.hx{font-family:var(--disp);font-weight:400;text-transform:uppercase;line-height:.96;font-size:clamp(40px,7vw,78px);margin:0}
+#pane-landing h1.hx .g2{background:linear-gradient(90deg,#FFB020,#FF6B4A);-webkit-background-clip:text;background-clip:text;color:transparent}
+#pane-landing .lead{color:var(--mute);font-size:16.5px;max-width:60ch;margin-top:14px}
+#pane-landing .gatefoot{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-top:26px;padding-top:18px;border-top:1px solid var(--line)}
+#pane-landing .gatefoot a{font-size:13.5px;color:var(--tealb);cursor:pointer;font-weight:600}
+#pane-landing .gatefoot a:hover{text-decoration:underline}
+#pane-landing .gatefoot span{font-size:12px;color:var(--dim)}
+/* Under about 900px the cards stack, and a stacked gate is taller than the
+   screen. Centring it then leaves dead space above the fold, so it stops
+   trying to be one screen and simply starts at the top. */
+@media(max-width:900px){#pane-landing .gate{min-height:0;display:block;padding-top:20px}}
+/* Step two of the marketplace lane, under the hero search card. Ghost rather
+   than gradient: posting a job is still the primary action here, browsing the
+   board is the alternative for somebody not ready to describe a job yet. */
+#pane-site .heroalt{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-top:15px}
+#pane-site .heroalt span{font-size:13px;color:var(--dim);line-height:1.5}
+@media(max-width:640px){#pane-site .heroalt{gap:9px}}
 </style>
 </head>
-<body>
+<body class="gate">
 <nav class="top"><div class="nav-in">
   <div class="brand" onclick="go('site')"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></div>
   <button class="nav-toggle" id="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="views" onclick="toggleNav()"><span></span><span></span><span></span></button>
@@ -1024,6 +1118,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <button class="vbtn on" data-v="site" onclick="go('site')">Website</button>
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Marketplace</a>
     <button class="vbtn" data-v="services" onclick="go('services')">Services</button>
+    <button class="vbtn" data-v="partners" onclick="go('partners')">For business</button>
     <button class="vbtn" data-v="payments" onclick="go('payments')">Payments</button>
     <!-- One portal, not two. It shows "As the client" and "As the worker" off
          the signed-in email, so two tabs pointing at the same URL was telling
@@ -1059,8 +1154,67 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     <div id="wlm-status"></div>
   </div>
 </div>
+<!-- ═══════════════ LANDING · the gate ═══════════════
+     The front door, and the only pane that shows with no hash in the address
+     bar. Everything else on this site now sits behind a choice.
+
+     Yaadly is three businesses sharing one company. Run together on one page
+     they fight: the marketplace has not opened, the services are what is
+     actually earning, and a company arriving to check whether the founder is
+     credible had to scroll past a leaking-pipe search box to find out. So the
+     choice happens first, on a page with nothing else on it.
+
+     The nav and the footer are hidden here (see body.gate in the stylesheet).
+     A gate offering nine other links is not a gate. The one escape hatch is
+     the quiet link under the cards, for somebody who does not want to be
+     sorted and just wants the site. ═══════════════ -->
+<section class="pane show" id="pane-landing">
+<div class="wrap gate">
+  <div class="pills">
+    <span class="pill">Yaadly Ltd · UK 17358077</span>
+    <span class="pill n">Jamaica · Kingston &amp; Portmore first</span>
+  </div>
+  <h1 class="hx">Three <span class="g2">ways in.</span></h1>
+  <p class="lead">Yaadly gets property work done in Jamaica and proves it was done. Pick whichever sounds like you. Nothing is locked, and you can move between them at any point.</p>
+
+  <div class="fork">
+    <div class="fk">
+      <p class="kick">01 · Marketplace</p>
+      <h3>I need work done on my property</h3>
+      <p class="fkd">Post the job free. We match a vetted tradesperson, put the scope in writing, and the work is proven with timestamped evidence before anybody is paid.</p>
+      <p class="fkm">For homeowners and families with a house back home</p>
+      <!-- The website first, the board second. This lane pointed straight at
+           app.yaadly.co.uk/jobs for one draft, which dropped a cold visitor
+           onto a list of other people's jobs before anything had told them
+           what Yaadly is or why the money is held. The website carries that
+           explanation, and the board is one visible step on from it. -->
+      <div class="fkgo"><button class="btn ghost sm" onclick="go('site')">Enter the marketplace</button><span class="fks soon">Opening in Kingston &amp; Portmore</span></div>
+    </div>
+    <div class="fk">
+      <p class="kick">02 · Managed services</p>
+      <h3>I have a contractor, or nobody watching</h3>
+      <p class="fkd">Deposit checks, condition reports, technical sign-off, monthly oversight. Run by me, and every price on the page is published rather than quoted in a DM.</p>
+      <p class="fkm">For owners who do not want a marketplace at all</p>
+      <div class="fkgo"><button class="btn ghost sm" onclick="go('services')">See the services</button><span class="fks live">Available today, from £95</span></div>
+    </div>
+    <div class="fk hi">
+      <p class="kick m">03 · Yaadly for business</p>
+      <h3>I am a company, not a household</h3>
+      <p class="fkd">Agents, developers, insurers and partner firms who answer for Jamaican property they cannot stand in front of. Qualified, UK registered, independent of every contractor on the job.</p>
+      <p class="fkm">For companies, not households</p>
+      <div class="fkgo"><button class="btn ghost sm" onclick="go('partners')">Yaadly for business</button><span class="fks">Start with a consultation</span></div>
+    </div>
+  </div>
+
+  <div class="gatefoot">
+    <a onclick="go('site')">Or go straight to the full site</a>
+    <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
+  </div>
+</div>
+</section>
+
 <!-- ═══════════════ WEBSITE ═══════════════ -->
-<section class="pane show" id="pane-site">
+<section class="pane" id="pane-site">
 
 <!-- ════════ 0 · HERO ════════ -->
 <div class="sect first"><div class="wrap">
@@ -1104,6 +1258,15 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
       </div>
     </div>
     <p class="hnote">Free, and nothing is charged here. What you type carries straight down into the form below, so you never fill the same thing twice. Prefer to talk? <a id="site-start">Start on WhatsApp instead</a>.</p>
+  </div>
+
+  <!-- Step two of the marketplace lane. The gate sends somebody here to find
+       out what this is; this is where they go on to the board itself. Without
+       it the lane ends on a homepage and the visitor has to go hunting in the
+       nav for the thing they already said they wanted. -->
+  <div class="heroalt">
+    <a class="btn ghost sm" href="https://app.yaadly.co.uk/jobs">Browse the marketplace</a>
+    <span>Open jobs across Jamaica, and the vetted workers who do them.</span>
   </div>
 
   <div class="strip">
@@ -1258,29 +1421,23 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   <p style="margin-top:16px"><a class="btn ghost sm" id="ask-start">Ask a question</a></p>
 </div>
 
-<!-- ════════ 6 · THREE WAYS IN ════════ -->
+<!-- ════════ 6 · STILL DECIDING ════════
+     This was "Three ways in", three route cards two thirds of the way down
+     the page. The fork at the top does that job now, and two different
+     three-way splits on one page is one too many: the visitor has already
+     chosen a lane by the time they reach here, and being re-offered the menu
+     reads as the page having lost track of them.
+
+     What is left is the thing the fork cannot do, which is catch somebody who
+     did not recognise themselves in any of the three. id="book" stays exactly
+     where it was, because the availability chip in the hero scrolls to it and
+     the booking box below is keyed to it. ════════ -->
 <div class="wrap sec">
-  <p class="kick m">Three ways in</p>
-  <h2 class="hx">Whichever you need</h2>
-  <div class="grid g3c" style="margin-top:20px">
-    <div class="route">
-      <p class="kick" style="margin-bottom:6px">Marketplace</p>
-      <h4>Post a job, pick a vetted worker</h4>
-      <p>Free to build. Money held until the work is proven.</p>
-      <p class="go"><button class="btn ghost sm" onclick="postJob()">Post a job</button></p>
-    </div>
-    <div class="route mine">
-      <p class="kick m" style="margin-bottom:6px">Or have me run it</p>
-      <h4>I project manage it myself</h4>
-      <p>Already have a contractor? Checks, visits, setup packs, monthly oversight. Prices are published, and we talk it through before you commit to anything.</p>
-      <p class="go"><button class="btn ghost sm" onclick="go('services')">See the services</button></p>
-    </div>
-    <div class="route">
-      <p class="kick" style="margin-bottom:6px">Not sure yet</p>
-      <h4>Book a free call first</h4>
-      <p>15 or 30 minutes, no obligation. By the end you will know whether you need me. <a onclick="openWlModal()" style="color:var(--tealb);cursor:pointer">Or join the waiting list</a>.</p>
-      <p class="go" id="book"><a class="btn ghost sm" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Pick a time</a></p>
-    </div>
+  <div class="card route mine" style="margin-top:0">
+    <p class="kick m" style="margin-bottom:6px">None of those quite fit?</p>
+    <h4 style="font-size:19px;margin-bottom:8px">Book a free call and we will work out which lane you are in</h4>
+    <p>15 or 30 minutes, no obligation, no fee. Bring the property and whatever is worrying you about it. By the end you will know whether you need me at all, and if you do not, I will tell you that too. <a onclick="openWlModal()" style="color:var(--tealb);cursor:pointer">Or join the waiting list</a>.</p>
+    <p class="go" id="book"><a class="btn ghost sm" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Pick a time</a></p>
   </div>
 
   <a onclick="toggleBox('book-more', this)" data-open-label="Hide ▲" data-closed-label="Cannot use the calendar? Tell us your availability and we will suggest a time ▾" style="display:inline-block;margin-top:16px;font-size:13.5px;color:var(--tealb);cursor:pointer">Cannot use the calendar? Tell us your availability and we will suggest a time ▾</a>
@@ -1853,6 +2010,76 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
   </div>
 </section>
 
+<!-- ═══════════════ YAADLY FOR BUSINESS ═══════════════
+     Lane three, and deliberately the shortest pane on the site. It is a front
+     sheet, not a product page: it says who I am, that I am vetted, what I can
+     take on for a company, and how to start a conversation. Nothing more.
+
+     It was drafted longer, with engagement stages and indicative fee bands,
+     and that was wrong twice over. A company does not buy oversight off a web
+     page, and quoting bands for work no B2B client has yet bought would be
+     claiming a track record December has not produced. The consultation is
+     the product here. Everything else is agreed on the call.
+
+     It lives at #partners rather than inside the website pane, so it can be
+     sent to a firm as its own link and can lift out to a subdomain later
+     without breaking anything anybody has saved. ═══════════════ -->
+<section class="pane" id="pane-partners">
+<div class="wrap">
+  <div class="pills">
+    <span class="pill m">Yaadly for business</span>
+    <span class="pill n">Yaadly Ltd · UK 17358077</span>
+  </div>
+  <h2 class="hx">Working with<br><span class="g2">your company.</span></h2>
+  <p class="lead">Most of this site is written for a family with a house back home. This page is not. If your business carries property in Jamaica, or clients who do, you need somebody qualified on the ground who is independent of every contractor on the job. <b>That is what I do.</b> Start with a consultation and we will work out whether there is anything here for you.</p>
+
+  <!-- The vetting, stated plainly. This is the whole reason the page exists,
+       so it goes above everything else on it. -->
+  <div class="strip">
+    <div><b>BEng</b><span>Aerospace Engineering</span></div>
+    <div><b>7+ years</b><span>UK construction and IoT project management</span></div>
+    <div><b>UK registered</b><span>Yaadly Ltd, England &amp; Wales, company 17358077</span></div>
+    <div><b>Independent</b><span>I never price, supply or manage the trade I assess</span></div>
+  </div>
+
+  <div class="sec">
+    <p class="kick m">Who I work with</p>
+    <h3 class="hx" style="font-size:clamp(24px,3.4vw,34px)">Four kinds of company</h3>
+    <div class="grid g2c" style="margin-top:22px">
+      <div class="card b2b">
+        <h4>🔑 Agents, managers and letting operators</h4>
+        <p>You hold keys, or a client's confidence, for property four thousand miles from your desk. I attend, document to a standing checklist, and send you a report you can forward without editing.</p>
+      </div>
+      <div class="card b2b">
+        <h4>🏗️ Developers and multi-unit owners</h4>
+        <p>Staged inspections against the programme, contractor oversight, and a progress report specific enough to hold a builder to.</p>
+      </div>
+      <div class="card b2b">
+        <h4>🏛️ Insurers, lenders and diaspora schemes</h4>
+        <p>Condition and completion evidence to one standard, timestamped and geotagged, built to be audited rather than admired.</p>
+      </div>
+      <div class="card b2b">
+        <h4>🤝 White label and partner work</h4>
+        <p>You keep the client and the relationship. I supply the eyes, the checklist and the report, under your name or mine.</p>
+      </div>
+    </div>
+    <p class="tiny" style="margin-top:16px">Not on this list and think it still fits? Say so on the call. It is a thirty minute conversation, not a qualifying test.</p>
+  </div>
+
+  <div class="sec">
+    <div class="card" style="text-align:center;padding:34px 20px">
+      <div class="pills" style="justify-content:center"><span class="pill m">No fee, no obligation</span></div>
+      <h3 class="hx" style="font-size:clamp(24px,3.6vw,36px);margin-top:6px">Bring me one real property</h3>
+      <p class="lead" style="margin:12px auto 6px;max-width:52ch">Thirty minutes on the hardest one you have. By the end you will know whether I am any use to your business.</p>
+      <p style="color:var(--mango);font-weight:700;font-size:15px;margin-bottom:20px">If I am not, I will say so on the call.</p>
+      <a class="btn" href="https://cal.com/yaadly" target="_blank" rel="noopener">Book a consultation</a>
+      <p class="note">Or write to <a id="partners-mail" style="color:var(--tealb)">me directly</a>. Enquiries from companies are answered within one working day.</p>
+      <p class="note" style="margin-top:14px">Two things worth saying before you call. <b>Yaadly holds none of your money</b>, you pay your contractor directly and my fee is invoiced separately. And I do not do valuation, title or legal opinion: I record condition and I assess workmanship. Anything beyond that needs a surveyor or an attorney, and I will tell you which.</p>
+    </div>
+  </div>
+</div>
+</section>
+
 <!-- ════════ PANE · THE PAYMENT JOURNEY ════════ -->
 <section class="pane" id="pane-payments">
 <div class="wrap">
@@ -2025,12 +2252,17 @@ function go(v){
   // #admin used to name one. It does not any more, and an old bookmark or a
   // link somebody saved should land somewhere, not break the page on the way.
   const pane = $("pane-" + v);
-  if (!pane) { v = "site"; }
+  if (!pane) { v = "landing"; }
   document.querySelectorAll(".pane").forEach(p=>p.classList.remove("show"));
   $("pane-"+v).classList.add("show");
   document.querySelectorAll(".vbtn").forEach(b=>b.classList.toggle("on", b.dataset.v===v));
   window.scrollTo({top:0});
-  history.replaceState(null, "", v==="site" ? location.pathname : "#"+v);
+  /* The gate is the bare URL. Every other pane names itself in the hash so
+     it can be sent to somebody directly, which is the whole point of
+     #partners existing as a pane rather than a section. */
+  history.replaceState(null, "", v==="landing" ? location.pathname : "#"+v);
+  /* A gate with a nav bar offering nine other destinations is not a gate. */
+  document.body.classList.toggle("gate", v==="landing");
   closeNav();
 }
 function toggleBox(id, btn){
@@ -2351,6 +2583,10 @@ $("foot-wa").href = wa("Hello Yaadly, I have a question about:\n\n");
 $("contact-wa").href = wa("Hello Yaadly, I have a question about:\n\n");
 $("contact-mail").href = "mailto:" + SVC_EMAIL + "?subject=" + encodeURIComponent("Yaadly enquiry");
 $("contact-mail-addr").textContent = SVC_EMAIL;
+/* Lane three writes to the same inbox, with a subject that says which lane
+   it came from, because a portfolio enquiry and a leaking pipe should not
+   land looking identical. */
+$("partners-mail").href = "mailto:" + SVC_EMAIL + "?subject=" + encodeURIComponent("Yaadly for business: enquiry");
 /* Digits only is what wa.me needs and not what anybody reads. Grouped as a UK
    mobile because that is the shape of the number; a number that stops being
    that shape falls through and shows unspaced, which is ugly and still correct. */
@@ -3357,7 +3593,12 @@ function closeWlModal(){
       /* The wizard is the conversion now. If somebody is anywhere inside it,
          the modal waits: interrupting a six-step form is how you lose a job. */
       const p = document.getElementById("pane-post");
-      return !!(p && p.classList.contains("show"));
+      if (p && p.classList.contains("show")) return true;
+      /* And the gate is three buttons and nothing else. Exit intent there is
+         somebody who has not been told what this is yet, so a waiting-list
+         pop-up is the wrong first thing they see. */
+      const g = document.getElementById("pane-landing");
+      return !!(g && g.classList.contains("show"));
     }catch(e){ return false; }
   }
   function showModal(force){
