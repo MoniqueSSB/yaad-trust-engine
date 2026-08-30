@@ -63,11 +63,6 @@ body {
 }
 
 /* ── Join as a pro, ported from the preview's #s-join ─────────────────── */
-.jrail{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 4px}
-.jrail button{font-size:11.5px;padding:7px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--dim);font-family:var(--mono);letter-spacing:.03em;transition:.13s;cursor:pointer}
-.jrail button:hover{border-color:var(--teal)}
-.jrail button.on{border-color:var(--teal);background:var(--soft);color:var(--tealb)}
-.jrail button.done{color:var(--mute);border-color:var(--softline)}
 .jlane{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start;margin-top:16px}
 @media(max-width:940px){.jlane{grid-template-columns:1fr}}
 .jhead{margin-top:18px}

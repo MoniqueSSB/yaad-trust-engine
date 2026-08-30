@@ -106,43 +106,62 @@ const PARISHES = [
   "St Ann", "St Mary", "Portland", "St Thomas",
 ];
 
-type Step = { n: string; h: string; p: string; body: BodyKind; note: string };
+type Phase = 1 | 2 | 3;
+type Step = { n: string; h: string; p: string; body: BodyKind; note: string; phase: Phase };
+
+/* The three phases, founder's own design (30 Aug 2026). The order matters
+   more than the labels: Phase 1 is the whole first sitting and it is short
+   on purpose, so the desk sees a live applicant while they are still warm.
+   Phase 2 is what a person asks for after saying yes. Phase 3 is a state
+   the account is in, not a form anybody fills in.
+
+   The step rail that used to sit above this was removed on the founder's
+   instruction: a list of nine things still to do is a reason to close the
+   tab, and it was the first thing anybody saw. */
+const PHASES: Record<Phase, { name: string; sub: string }> = {
+  1: { name: "Phase 1 · Your profile",
+       sub: "About two minutes. This is the whole first sitting, and it goes to a person as soon as you send it." },
+  2: { name: "Phase 2 · Trust and verification",
+       sub: "After a person has said yes. We chase these on WhatsApp, so you do not have to sit here for them." },
+  3: { name: "Phase 3 · On the board",
+       sub: "What your account can and cannot do once it is live." },
+};
 type BodyKind = "form" | "port" | "id" | "police" | "refs" | "agent" | "sign" | "trial" | "live";
 
 const STEPS: Step[] = [
-  { n: "1 · Apply", body: "form",
+{ phase: 1, n: "1 · Apply", body: "form",
     h: "Your trades, and every parish you cover",
     p: "Take as many trades as you actually do, and name one yourself if it is not on our list. Pick every parish you will travel to, a job in a parish you have not ticked never reaches you.",
     note: "Your trades and job types come from the same list a client picks from. That is the only reason a client's roofing job and your roofing profile can find each other at all." },
-  { n: "2 · Your work", body: "port",
+{ phase: 1, n: "2 · Your work", body: "port",
     h: "Show us the work, however you have it",
     p: "A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.",
     note: "We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it." },
-  { n: "3 · Identity", body: "id",
+{ phase: 2, n: "3 · Identity", body: "id",
     h: "A live photo and a live video, taken on this page",
     p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
     note: "A file proves somebody holds a document. A turn taken in front of us proves somebody was sitting there when it was sent. If your browser will not hand over a camera we say so on the row, take an upload instead, and a person checks that one by hand." },
-  { n: "4 · Police check", body: "police",
-    h: "JCF record check, required over £500",
-    p: "A current police record check from the Jamaica Constabulary Force. <b>Mandatory</b> for any job over £500, any work inside an occupied home, and any time you hold keys or attend an empty property. Get it once and it covers every job you take.",
-    note: "Without it your profile still publishes, but you are locked out of every job over £500 and every occupied-home job. That is most of the money on the board." },
-  { n: "5 · References", body: "refs",
+{ phase: 2, n: "5 · References", body: "refs",
     h: "Three people who know we are calling",
     p: "Past clients, or trades you have worked alongside. We phone them, an emailed reference is a form somebody filled in. <b>You must confirm each one has been told we will call.</b> If we ring and they have no idea who we are, that is not a reference, and it does not count.",
     note: "This rule exists because a name on a form is not a referee. Somebody who was never asked cannot vouch for you, and putting them down is a mark against the application, not a neutral." },
-  { n: "6 · Documents checked", body: "agent",
+{ phase: 2, n: "6 · Documents checked", body: "agent",
     h: "A machine reads the file before a person does",
     p: "Every document that arrives as a picture is read for the things a person skims past: does the name match, is the date inside the window, is the certificate number real. A PDF, a Word CV and the face video are not read by it, they go straight to a person. Then a person decides on all of it. <b>The machine never decides, it only flags.</b>",
     note: "It runs after you send, not while you sit here, and the decision is always a person's. What the check buys you is speed, not a shortcut." },
-  { n: "7 · Sign", body: "sign",
+{ phase: 3, n: "4 · Police check", body: "police",
+    h: "JCF record check, required over £500",
+    p: "A current police record check from the Jamaica Constabulary Force. <b>Mandatory</b> for any job over £500, any work inside an occupied home, and any time you hold keys or attend an empty property. Get it once and it covers every job you take.",
+    note: "Without it your profile still publishes, but you are locked out of every job over £500 and every occupied-home job. That is most of the money on the board." },
+{ phase: 3, n: "7 · Sign", body: "sign",
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
     note: "Written with a timestamp and the exact consent sentence. No edit, no delete." },
-  { n: "8 · Trial job", body: "trial",
+{ phase: 3, n: "8 · Trial job", body: "trial",
     h: "One job with an independent reviewer, at our cost",
     p: "Your first job carries an independent reviewer on site, paid for by Yaadly, not by you and not by the client. They record what they see against the same evidence standard you will be held to afterwards.",
     note: "It is the only way to know the standard holds on a real site rather than in an application form." },
-  { n: "9 · Send it", body: "live",
+{ phase: 3, n: "9 · Send it", body: "live",
     h: "Send it, and the desk picks it up",
     p: "Nothing you have filled in has reached a person yet. Sending it hands the whole file to the Yaadly desk in one piece: your trades, your parishes, every document, your three referees and your signature.",
     note: "Free to join, free to quote, win or lose. The one charge is 12% of your labour price on a completed job." },
@@ -714,18 +733,6 @@ export function JoinFlow() {
         them.
       </p>
 
-      <div className="jrail">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.n}
-            onClick={() => setStep(i)}
-            className={i === step ? "on" : i < step ? "done" : ""}
-          >
-            {s.n}
-          </button>
-        ))}
-      </div>
-
       {claim && (
         <p className="mt-2 text-[12px] text-dim">
           Saved as <span className="font-mono text-mute">{claim.reference}</span>.
@@ -736,7 +743,14 @@ export function JoinFlow() {
       <div className="jlane">
         <div>
           <div className="jhead">
-            <span className="jbadge">Step {step + 1} of {STEPS.length}</span>
+            {/* The phase, not a running count. "Step 4 of 9" tells somebody
+                on a phone how much is left and nothing about why, and the
+                founder's design groups this work into three sittings rather
+                than one long climb. */}
+            <span className="jbadge">{PHASES[d.phase].name}</span>
+            <p className="mt-2 max-w-[58ch] text-[12.5px] leading-relaxed text-dim">
+              {PHASES[d.phase].sub}
+            </p>
             <h2 className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none">
               {shown.h}
             </h2>
