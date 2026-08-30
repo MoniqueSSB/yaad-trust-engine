@@ -177,7 +177,7 @@ const LATER_STEPS: Step[] = [
     h: "One job with an independent reviewer, at our cost",
     p: "Your first job carries an independent reviewer on site, paid for by Yaadly, not by you and not by the client. They record what they see against the same evidence standard you will be held to afterwards.",
     note: "It is the only way to know the standard holds on a real site rather than in an application form." },
-{ phase: 2, n: "Save it", body: "live",
+{ phase: 3, n: "Save it", body: "live",
     h: "Save what you have added",
     p: "Your application is already with the desk. This adds what you have just done to it: your ID check, your referees and your signature.",
     note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
@@ -1144,8 +1144,7 @@ export function JoinFlow() {
                         <b className="text-ink">You hear back within 48 hours.</b>{" "}
                         The ID check and your referees come after that, and we
                         chase them on WhatsApp so you do not have to sit here for
-                        them. <b className="text-ink">Your profile does not go
-                        public until those are done.</b>
+                        them.
                       </p>
                     </div>
                   </>
