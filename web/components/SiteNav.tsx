@@ -80,11 +80,13 @@ export function SiteNav({
             </button>
           </form>
         ) : (
-          /* #post, not #startform: the single intake form was replaced by the
-             six-step wizard, which lives in its own pane and is reached by
-             that hash. The old anchor pointed at markup that no longer exists. */
+          /* The app, not the marketing site. The funnel that used to live at
+             yaadly.co.uk/#post was deleted when docs/ became short marketing,
+             and for a while this button sent people to a hash that redirected
+             to the board: a list of other people's jobs, with no way to post
+             one. The job is created here now, and only here. */
           <a
-            href={`${SITE}/#post`}
+            href="/jobs/new"
             className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
           >
             Post a job

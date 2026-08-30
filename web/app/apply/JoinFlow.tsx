@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { TRADES, PARISHES } from "@/lib/taxonomy";
 
 /**
  * Join as a pro.
@@ -97,19 +98,7 @@ const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT
 // what is done under v2. Bumping anyway, because the sentence changed and a
 // consent is tied to its sentence.
 
-const TRADES = [
-  "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
-  "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
-  "Landscaping", "General Handyman", "Solar Install", "Water Tank & Pump",
-  "Locks & Security Doors", "Windows & Glazing", "Carpentry & Joinery",
-  "Drainage & Septic", "Fencing", "CCTV & Alarms",
-];
-
-const PARISHES = [
-  "Kingston", "St Andrew", "St Catherine", "Clarendon", "Manchester",
-  "St Elizabeth", "Westmoreland", "Hanover", "St James", "Trelawny",
-  "St Ann", "St Mary", "Portland", "St Thomas",
-];
+/* TRADES and PARISHES are shared with the client funnel. See web/lib/taxonomy.ts. */
 
 type Phase = 1 | 2 | 3;
 type Step = { n: string; h: string; p: string; body: BodyKind; note: string; phase: Phase };

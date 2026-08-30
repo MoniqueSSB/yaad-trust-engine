@@ -89,3 +89,19 @@ Not a technical decision, recorded here because it constrains the technical ones
 ## 2026-08-26 · DNS on Cloudflare, app and site on separate hostnames
 
 The `yaadly.co.uk` zone went active on Cloudflare on 26 August 2026. The marketing site serves from GitHub Pages at the apex, and the Next.js app deploys as a Cloudflare Worker at `app.yaadly.co.uk` via OpenNext. Two hostnames, two deployment paths, one of which has no build step. When the operations console arrives it gets its own hostname for the same reason plus one more: a separate hostname is what allows Cloudflare Zero Trust to sit in front of it, and the console holds ID documents and payment controls. That subdomain must be proxied, orange cloud rather than grey. A DNS-only record routes traffic straight past Cloudflare and Zero Trust does nothing at all, which is the most common way people believe they are protected and are not.
+
+## The client funnel lives in the app, and takes no account (Stage 2, 30 Aug 2026)
+
+Stage 1 deleted the post-a-job funnel from `docs/index.html` so the marketing site could be short. The plan said to leave the old path working until the app funnel existed. It did not: the app's `/jobs` is a BOARD, a list of other people's jobs, and nothing in `web/` ever created one. So for a window there was no way to post a job anywhere, and the app's own "Post a job" button pointed at `yaadly.co.uk/#post`, which redirected to the board. A client went in a circle.
+
+`web/app/jobs/new` is the funnel, and it is now the only place a job is created.
+
+**No account, and no password on the page.** Founder decision, 30 August: no account to get quotes, an account once a job is booked. The account is worth something at booking, where it approves evidence, holds the invoice and carries the property record between jobs. In front of a quote it is a toll gate on the way in.
+
+**Two backends, both already hardened, neither changed.** The work goes to `yaad-post-job` in draft mode, which writes a job at `stage 0, open false` and deliberately stores no personal data. The contact details go to `yaad-enquiry`, which has the per-recipient throttle, the receipt tracking and an honest answer for somebody who gave a phone number rather than an email. The enquiry carries the job reference so the desk reads them as one thing. No new table.
+
+**Three behaviours carried over on purpose**, because a rewrite is the easiest place to lose them: the job saves as a draft before a single personal detail is asked; the contact field still says "Hidden from workers until you start a chat with one. You control when it's shared."; and the reply promise is one working day.
+
+**The end state names what happens next.** "Your job is saved" tells somebody who has just described water running down their mother's bedroom wall nothing at all. It now says a person reads it within one working day, then an itemised quote with labour split from materials, then a written scope, then evidence at every stage with nobody paid for a stage until it is approved, and that no account is needed until they book.
+
+`TRADES` and `PARISHES` moved to `web/lib/taxonomy.ts`. They were declared inside `JoinFlow.tsx` and the funnel needs the same two lists. Two copies drift, and the day they drift a client posts a job in a trade no worker profile can carry.
