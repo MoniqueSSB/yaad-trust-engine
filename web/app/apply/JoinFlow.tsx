@@ -780,7 +780,9 @@ export function JoinFlow() {
                 <div className="fgroup">
                   <label className="fl">
                     Your trades, tick every one you take{" "}
-                    <span className="src ok">{trades.length} selected</span>
+                    <span className={"src " + (trades.length > 0 ? "ok" : "req")}>
+                      {trades.length > 0 ? `${trades.length} selected` : "Required, pick at least one"}
+                    </span>
                   </label>
                   <div className="chips">
                     {TRADES.map((t) => (
@@ -790,7 +792,7 @@ export function JoinFlow() {
                       </button>
                     ))}
                   </div>
-                  <input className="jf mt-2.5" placeholder="Not on the list? Type what you do"
+                  <input className="jf mt-2.5" placeholder="Not on the list? Type what you do (optional)"
                     value={tradeOther} onChange={(e) => setTradeOther(e.target.value)} />
                   <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                     We would rather know what you actually do than squeeze you into
@@ -801,7 +803,9 @@ export function JoinFlow() {
                 <div className="fgroup">
                   <label className="fl">
                     Parishes you will travel to{" "}
-                    <span className="src ok">{parishes.length} selected</span>
+                    <span className={"src " + (parishes.length > 0 ? "ok" : "req")}>
+                      {parishes.length > 0 ? `${parishes.length} selected` : "Required, pick at least one"}
+                    </span>
                   </label>
                   <div className="chips">
                     {PARISHES.map((p) => (
@@ -820,18 +824,20 @@ export function JoinFlow() {
                 <div className="fgroup">
                   <label className="fl">
                     How we reach you{" "}
-                    <span className={"src " + (name.trim().length > 1 && (hasPhone || hasEmail) ? "ok" : "")}>
-                      Your name, and one way to reach you
+                    <span className={"src " + (name.trim().length > 1 && (hasPhone || hasEmail) ? "ok" : "req")}>
+                      {name.trim().length > 1 && (hasPhone || hasEmail)
+                        ? "Done"
+                        : "Required, your name and one way to reach you"}
                     </span>
                   </label>
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <input className="jf" placeholder="Your full name" autoComplete="name"
+                    <input className="jf" placeholder="Your full name (required)" autoComplete="name"
                       value={name} onChange={(e) => setName(e.target.value)} />
                     <input className="jf" placeholder="Years at the trade (optional)" inputMode="numeric"
                       value={years} onChange={(e) => setYears(e.target.value)} />
-                    <input className="jf" placeholder="Phone number" inputMode="tel" autoComplete="tel"
+                    <input className="jf" placeholder="Phone number (or give an email)" inputMode="tel" autoComplete="tel"
                       value={phone} onChange={(e) => setPhone(e.target.value)} />
-                    <input className="jf" placeholder="Email address" inputMode="email" autoComplete="email"
+                    <input className="jf" placeholder="Email address (or give a phone)" inputMode="email" autoComplete="email"
                       value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                   <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
@@ -846,6 +852,20 @@ export function JoinFlow() {
 
             {d.body === "port" && (
               <div className="grid gap-3">
+                {/* Nothing here blocks the Continue button, and saying so is
+                    better than letting somebody sit on a phone hunting for a
+                    certificate before they are allowed to move. It genuinely
+                    helps them, which is a reason to ask, not a reason to gate. */}
+                <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed">
+                  <b className="text-ink">All of this is optional</b>{" "}
+                  <span className="src ok">Nothing here is required</span>
+                  <p className="mt-2 text-mute">
+                    You can send your application without any of it. Showing one
+                    piece of work is the single fastest way to be taken
+                    seriously, so it is worth a minute if you have a photo on
+                    your phone, and you can add the rest later.
+                  </p>
+                </div>
                 <Upload label="A CV or a written history" hint="PDF, Word, or a photo of it"
                   accept={CVFILE} doc="cv" docs={docs} onFile={upload} />
                 <Upload label="A portfolio, or photos of finished jobs" hint="One file, or a PDF of several"
@@ -1098,11 +1118,30 @@ export function JoinFlow() {
 
           <p className="mt-3 text-[12.5px] leading-relaxed text-dim">{shown.note}</p>
 
-          {d.body === "form" && !step1Ready && (
-            <p className="mt-2 text-[12.5px] text-dim">
-              To carry on: pick at least one trade and one parish, and give us
-              your name and one way to reach you.
-            </p>
+          {/* Said once, plainly, and always on screen rather than only when
+              something is missing. Somebody filling a form on a phone should
+              never have to guess which of these is going to stop them. */}
+          {d.body === "form" && (
+            <div className="mt-4 rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed">
+              <b className="text-ink">What is needed to carry on</b>
+              <ul className="mt-2 grid gap-1.5">
+                {[
+                  ["At least one trade", trades.length > 0],
+                  ["At least one parish", parishes.length > 0],
+                  ["Your name", name.trim().length > 1],
+                  ["A phone number or an email address, either one", hasPhone || hasEmail],
+                ].map(([label, ok]) => (
+                  <li key={String(label)} className="flex items-start gap-2">
+                    <span className={ok ? "text-tealb" : "text-dim"}>{ok ? "✓" : "•"}</span>
+                    <span className={ok ? "text-mute" : "text-ink"}>{label}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2.5 text-dim">
+                Everything else on this page is optional, including years at the
+                trade and anything you upload. You can add it later.
+              </p>
+            </div>
           )}
 
           <div className="mt-5 flex flex-wrap items-center gap-2.5">
