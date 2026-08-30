@@ -53,12 +53,18 @@ import { createClient } from "@/lib/supabase/client";
  * confirmed against Persona's API. The browser's claim of "complete" is never
  * what ticks the row: the server's answer is.
  *
- * LiveCapture and the ID upload rows are not deleted. They are the fallback,
+ * Step 3 is ENTIRELY Persona's when it runs (founder decision, 30 Aug 2026):
+ * the steps inside that window are the steps configured on the Persona
+ * template, and this page adds no document rows of its own next to it. So
+ * what step 3 asks for is edited in the Persona dashboard, not here.
+ *
+ * LiveCapture and the upload rows are not deleted. They are the fallback,
  * for three real cases: Persona env vars unset (safe to deploy before the
  * account is wired), Persona's script refusing to load on a thin connection,
- * and Persona erroring mid-flow. The fallback says it is the fallback, on the
- * row, in words. TRN and proof of address stay as uploads either way, because
- * Persona checks identity, not Jamaican tax numbers or utility bills.
+ * and Persona erroring mid-flow. The fallback says it is the fallback, on
+ * the row, in words, and it asks for the full document set (ID, live photo,
+ * face turn, TRN, proof of address) because in that case nobody else is
+ * collecting them.
  */
 
 const FN = "yaad-vetting-upload";
@@ -448,7 +454,12 @@ export function JoinFlow() {
       const { Client } = await import("persona");
       const client = new Client({
         templateId: PERSONA_TEMPLATE_ID,
-        environmentId: PERSONA_ENVIRONMENT_ID,
+        // Persona's dashboard shows environments by name, not id, so the env
+        // var accepts either: a real "env_..." id, or the words "sandbox" /
+        // "production", which ride the client's environment option instead.
+        ...(PERSONA_ENVIRONMENT_ID.startsWith("env_")
+          ? { environmentId: PERSONA_ENVIRONMENT_ID }
+          : { environment: PERSONA_ENVIRONMENT_ID as "sandbox" | "production" }),
         // The application id rides along as Persona's reference-id, and the
         // server refuses to record any inquiry whose reference does not match
         // the application claiming it. That is what stops a passing inquiry
@@ -579,9 +590,9 @@ export function JoinFlow() {
   const shown = d.body === "id" && personaActive
     ? {
         ...d,
-        h: "Your ID and a live selfie, checked by Persona",
-        p: "Your government photo ID and a selfie, in a <b>secure window run by Persona</b>, the identity verification service. Your ID goes to Persona, not into our document store. Then your TRN and proof of address dated within three months, which come to us as before.",
-        note: "Persona checks the document and the selfie and tells our server what it found. A person at Yaadly still decides your application. If the check will not run on your connection, the page takes an in-page capture instead and says so on the row.",
+        h: "Your identity, checked by Persona",
+        p: "One check, in a <b>secure window run by Persona</b>, the identity verification service. It walks you through its own steps: your government photo ID, then a selfie taken in front of the camera where you turn your head. Everything you hand over in that window goes to Persona, not into our document store.",
+        note: "Persona tells our server what it found, and a person at Yaadly still decides your application. If the check will not run on your connection, the page takes uploads and an in-page capture instead and says so on the row.",
       }
     : d;
 
@@ -870,25 +881,32 @@ export function JoinFlow() {
                       doc="selfie_with_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
                       doc="face_video" docs={docs} onFile={upload} />
+                    <Upload label="Your TRN" hint="Matched to the name on the ID"
+                      accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
+                    <Upload label="Proof of address" hint="Dated within the last three months"
+                      accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
                   </>
                 )}
-                <Upload label="Your TRN" hint="Matched to the name on the ID"
-                  accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
-                <Upload label="Proof of address" hint="Dated within the last three months"
-                  accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
 
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
-                  <b className="text-ink">Where these files go.</b>{" "}
-                  {personaActive && (
-                    <>Your ID and selfie are held by Persona under Yaadly&rsquo;s
-                    account there, and what our own records keep is the result of
-                    the check, not the images.{" "}</>
+                  {personaActive ? (
+                    <>
+                      <b className="text-ink">Where your ID goes.</b> Everything
+                      inside the Persona window is held by Persona under
+                      Yaadly&rsquo;s account there. What our own records keep is
+                      the result of the check, not the images. Files you upload on
+                      the other steps go into a private store no browser can
+                      reach, and are destroyed ninety days after you send them.
+                    </>
+                  ) : (
+                    <>
+                      <b className="text-ink">Where these files go.</b> They upload
+                      straight into a private store that no browser can reach. They
+                      are destroyed ninety days after you send them, whatever we
+                      decide, and what we keep forever is the decision, not your
+                      passport.
+                    </>
                   )}
-                  {personaActive ? "Everything you upload on this page goes" : "They upload"}{" "}
-                  straight into a private store that no browser can reach.{" "}
-                  {personaActive ? "Uploaded files are" : "They are"} destroyed
-                  ninety days after you send them, whatever we decide, and what we
-                  keep forever is the decision, not your passport.
                 </div>
 
                 <div className="fgroup" style={{ marginBottom: 0 }}>
@@ -1188,7 +1206,13 @@ export function JoinFlow() {
           <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
             Your vetting record
           </p>
-          {CHECKS.map((c) => {
+          {/* TRN and proof of address are not asked for when Persona runs the
+              identity step (founder decision, 30 Aug 2026): step 3 is the
+              Persona template's steps and nothing else. The rows disappear
+              rather than sit at "Waiting" forever for documents no screen
+              collects. They return whenever the fallback capture is active,
+              because there the page is the one collecting. */}
+          {CHECKS.filter((c) => !(personaActive && (c.k === "id2" || c.k === "id3"))).map((c) => {
             const ok = done[c.k];
             const now = !ok && ROW_STEP[c.k] === step;
             const copy = c.k === "agent" ? agentRow() : c.k === "id" ? idRow() : { b: c.b, s: c.s };

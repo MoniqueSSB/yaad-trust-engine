@@ -520,6 +520,9 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
       : s(app.persona_inquiry_id)
       ? `A Persona identity check was started but has not passed: Persona has it as "${s(app.persona_status) || "unknown"}". Treat the ID as unverified until the desk resolves it.`
       : "",
+    idByPersona
+      ? "When Persona runs the identity step the web flow does not ask for a TRN or proof of address at all (founder decision, 30 Aug 2026). If they are absent, that is the flow's doing, not the applicant withholding them: name it as something the desk may still want to collect, never as a mark against the applicant."
+      : "",
     skipped.length
       ? `Files nobody machine read: ${skipped.map((x) => `${DOC_LABEL[x.doc] ?? x.doc} (${x.why})`).join("; ")}`
       : "",
