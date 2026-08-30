@@ -10,7 +10,7 @@ that actually serves real users. That is why these files are here.
 |---|---|---|
 | `yaad-agent` | true | Intake and Reporting agents (MiniMax-M2.7), admin session only |
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
-| `yaad-whatsapp-webhook` | false | Meta Cloud API inbound webhook: verify → extract → create job → reply |
+| `yaad-whatsapp-webhook` | false | Meta Cloud API inbound webhook: verify → guided intake (one question at a time, state in `wa_intake_sessions`), answer a follow-up from the record, or escalate it to Monique → reply |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |
 | `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
@@ -46,6 +46,36 @@ POST /yaad-whatsapp-webhook          (SERVER)
 ├── db.insert jobs                    (CLIENT)    db.*, portal code issued?
 └── whatsapp.send_reply               (CLIENT)    delivery status
 ```
+
+When the model classifies the message as a follow-up rather than a new job,
+`db.insert jobs` is replaced by `db.lookup client history` (jobs, enquiries
+and call requests matched by phone number) and `db.insert enquiries` (the
+desk row). On the escalated path the email to the desk and the ntfy push run
+after the response, so their failures land on the console, not the trace.
+
+A new job runs as a guided intake instead of a single-shot card: the agent
+asks Monique's seven questions one at a time, holding the answers between
+messages in `wa_intake_sessions` (deleted when the job is created). Whatever
+the opening message already answered is prefilled and not asked again, and
+the job is only inserted once the set is complete.
+
+The last question asks for an email, and the answer is the one thing the
+intake can refuse: anything that is neither an address nor a refusal is asked
+again rather than saved. The address is never written to `jobs.client_email`,
+because that column is the binding and a mailbox nobody has proved must not
+bind a job. It only receives the portal link, and clicking that link is what
+binds, as everywhere else.
+
+Every inbound message id is recorded in `wa_inbound_seen` before any state
+changes and before the transcription and model calls. Meta retries a delivery
+that does not get a prompt 2xx, and without the ledger the retry was read as
+the client's next answer: a question skipped, or a second job for one client.
+A repeat now returns 200 having touched nothing.
+
+The root span's `yaadly.webhook.outcome` says which path ran: `duplicate`,
+`intake_started`, `intake_answer`, `intake_photo`, `intake_retry`,
+`intake_email_retry`, `intake_cancelled`, `job_created`, `job_insert_failed`,
+`follow_up_answered`, or `follow_up_escalated`.
 
 ### Turning it on
 

@@ -1670,6 +1670,18 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
     </div>
   </div>
 
+  <!-- fast lane ─── sits below whichever step is showing, but only steps
+       1 to 4: by step 5 the form is nearly done and sending somebody to
+       WhatsApp would cost them work, not save it. Hidden by setStep. -->
+  <div class="card soft" id="w-walane" style="margin-top:26px">
+    <p class="kick m" style="margin-bottom:6px">💬 Want to do this faster?</p>
+    <p style="font-size:14px;color:var(--mute);line-height:1.65;margin:0 0 13px">Message us on WhatsApp and an AI agent picks up straight away. It asks the same questions as this form, one at a time, answers yours as you go, and builds the job card for you from plain words or a voice note. All you finish off here is your account. Same rules either way: a person reads every job, and nothing reaches a worker until you sign.</p>
+    <div class="assistrow" style="margin-top:0">
+      <a class="btn sm" id="w-walink" target="_blank" rel="noopener">Start on WhatsApp</a>
+      <span class="tiny">Anything you typed above comes with you</span>
+    </div>
+  </div>
+
 </div></section>
 
 <!-- ═══════════════ MARKETPLACE (public) ═══════════════ -->
@@ -2386,6 +2398,15 @@ const JOB_TEMPLATE = [
 ].join("\n");
 $("site-start").href = wa(JOB_TEMPLATE);
 $("ask-start").href = wa("Hello Yaadly, I have a question I would like a tradesperson to answer:\n\n");
+/* The wizard's fast lane opens with a short hello, not JOB_TEMPLATE: the
+   WhatsApp agent asks its questions one at a time, so handing it the whole
+   template defeats the point. Whatever is already in the description box
+   rides along, and the agent prefills from it rather than asking again. */
+$("w-walink").href = wa("Hello Yaadly, I would like to post a job.");
+$("w-walink").addEventListener("click", function(){
+  const d = ($("w-desc").value || "").trim();
+  this.href = wa("Hello Yaadly, I would like to post a job." + (d ? "\n\n" + d : ""));
+});
 function startJob(){ window.open($("site-start").href, "_blank", "noopener"); }
 /* photo handling: shrink to max 1280px JPEG so they fit browser storage */
 function shrink(file){ return new Promise(res=>{ const r=new FileReader(); r.onload=()=>{ const im=new Image(); im.onload=()=>{ const M=1280, sc=Math.min(1, M/Math.max(im.width,im.height)); const c=document.createElement("canvas"); c.width=Math.round(im.width*sc); c.height=Math.round(im.height*sc); c.getContext("2d").drawImage(im,0,0,c.width,c.height); res(c.toDataURL("image/jpeg",.72)); }; im.src=r.result; }; r.readAsDataURL(file); }); }
@@ -2647,6 +2668,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   step=n;
   root.querySelectorAll('.wstep').forEach(function(el){
     el.classList.toggle('show', Number(el.dataset.step)===n) });
+  var fast=S('#w-walane'); if(fast) fast.style.display = n<5 ? '' : 'none';
   paintProg();
   if(n===6) drawReview();
   window.scrollTo({top:0});
