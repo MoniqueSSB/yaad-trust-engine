@@ -113,27 +113,24 @@ function JoinForm() {
       const supabase = createClient();
       const token = otp.replace(/\D/g, "");
 
-      /* Three types tried, and this is a version difference rather than a
-         guess. generateLink({type:"magiclink"}) files its one time token in
-         GoTrue's recovery_token slot, read from auth.one_time_tokens on this
-         project, and which verifyOtp type matches that slot has moved between
-         GoTrue releases. GoTrue returns the SAME "Token has expired or is
-         invalid" for every type when the token does not match, checked
-         against all four, so the right one cannot be discovered from an error
-         and has to be tried.
+      /* type "email", and this is settled rather than assumed. The founder
+         signed in through this page on 30 Aug 2026 and the auth log records
+         a single POST /verify returning 200, login_method "otp", provider
+         "email". One call, first type, no retry.
 
-         "email" is the documented type for a magic link OTP, "magiclink" is
-         its older name, and "recovery" matches the column the token actually
-         sits in. Each is a legitimate type and the extra calls only happen on
-         failure. Telling somebody their correct code is wrong is the worst
-         failure this page has, and it would look exactly like a wrong code. */
-      let otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "email" })).error;
-      if (otpErr) {
-        otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "magiclink" })).error;
-      }
-      if (otpErr) {
-        otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "recovery" })).error;
-      }
+         Worth writing down because the storage says otherwise and would send
+         the next person down the wrong path: generateLink files the token in
+         GoTrue's recovery_token slot and logs the event as
+         "user_recovery_requested". It verifies as "email" all the same. And
+         GoTrue returns the identical "Token has expired or is invalid" for
+         every type when the token does not match, checked against all four,
+         so a wrong type is indistinguishable from a wrong code and this
+         cannot be rediscovered by probing. */
+      const { error: otpErr } = await supabase.auth.verifyOtp({
+        email: sentTo,
+        token,
+        type: "email",
+      });
       if (otpErr) {
         throw new Error(
           "That code did not match, or it has expired. Ask for a new one and try again.",

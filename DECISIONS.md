@@ -119,3 +119,18 @@ The decision was "no account to get quotes, an account once a job is booked." Ha
 **Found while testing:** `revoke all ... from public` did not take execute away from `anon`, because `anon` is a role with its own grant rather than a member of PUBLIC for this purpose. `accept_quote_as_me` was therefore callable by anonymous visitors. The body already refused them, having no email in the JWT, so nothing could be booked, but a booking function anonymous callers may call is one bug away from one they may use. `anon` is now revoked by name.
 
 **Not built:** nothing tells the client a quote has landed. The page is honest when empty and the link keeps working, but the client has to come back and look. Notifying them is its own piece of work and needs the WhatsApp credentials that are still unset.
+
+
+## Clients sign in with a code, not a password (31 Aug 2026)
+
+The audience is diaspora clients, often older, often on a phone in another country, who have already explained the whole job once. "Choose a password, at least 8 characters" is where those people stop, and it bought nothing: the job code was always the real gate and a password was a second secret to lose on top of it.
+
+`yaad-portal-code` issues a six digit code and delivers it by email through Resend, and by WhatsApp or SMS through Twilio when the job carries a number. It uses `generateLink`, which returns both a link and a six digit `email_otp` for the same token, and takes the digits. That was chosen over Supabase's own magic-link mail for three reasons: a link opened in a different browser than the one it started in is the classic way magic links strand somebody, digits travel over WhatsApp as easily as email, and GoTrue's templates stay untouched.
+
+The function issues and delivers and nothing else. It never sees the code come back and never mints a session; verification happens in the browser against Supabase directly, so the code goes to the mailbox or the phone and nowhere else, which is the only reason holding it proves anything.
+
+**The gate is unchanged.** A new client still presents a job code and `pend_portal_code` still rules on it, rate limited on both the email and the code. A returning client is never asked for one, because locking somebody out of their own history over a code from months ago is the wrong trade. `email_has_account` decides which case it is, and it is granted to nobody: callable only with the service role, because "is this person a Yaadly client" is the question an account enumeration attack asks.
+
+**`verifyOtp` takes type `"email"`, and this is measured rather than assumed.** The founder signed in through the page on 30 August and the auth log shows a single `POST /verify` returning 200 with `login_method: "otp"`, `provider: "email"`. Write that down, because the storage says otherwise: `generateLink` files the token in GoTrue's `recovery_token` slot and logs the event as `user_recovery_requested`. It still verifies as `email`. It also cannot be rediscovered by probing, since GoTrue returns the identical "Token has expired or is invalid" for all four types when the token does not match, so a wrong type looks exactly like a wrong code.
+
+Existing accounts keep their passwords. Nothing was removed from them; they simply have a way in that needs nothing remembered.
