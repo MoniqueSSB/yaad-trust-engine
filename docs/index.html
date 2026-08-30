@@ -1102,6 +1102,12 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
    screen. Centring it then leaves dead space above the fold, so it stops
    trying to be one screen and simply starts at the top. */
 @media(max-width:900px){#pane-landing .gate{min-height:0;display:block;padding-top:20px}}
+/* Step two of the marketplace lane, under the hero search card. Ghost rather
+   than gradient: posting a job is still the primary action here, browsing the
+   board is the alternative for somebody not ready to describe a job yet. */
+#pane-site .heroalt{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-top:15px}
+#pane-site .heroalt span{font-size:13px;color:var(--dim);line-height:1.5}
+@media(max-width:640px){#pane-site .heroalt{gap:9px}}
 </style>
 </head>
 <body class="gate">
@@ -1175,13 +1181,14 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
     <div class="fk">
       <p class="kick">01 · Marketplace</p>
       <h3>I need work done on my property</h3>
-      <p class="fkd">Open jobs across Jamaica and the vetted workers who do them. Post yours free, and the work is proven with timestamped evidence before anybody is paid.</p>
+      <p class="fkd">Post the job free. We match a vetted tradesperson, put the scope in writing, and the work is proven with timestamped evidence before anybody is paid.</p>
       <p class="fkm">For homeowners and families with a house back home</p>
-      <!-- Straight to the board on the app, the same destination the nav has
-           always called Marketplace. It went to the website pane for one
-           draft, which meant the lane called Marketplace delivered a homepage
-           and made the visitor find it a second time. -->
-      <div class="fkgo"><a class="btn ghost sm" href="https://app.yaadly.co.uk/jobs">Enter the marketplace</a><span class="fks soon">Opening in Kingston &amp; Portmore</span></div>
+      <!-- The website first, the board second. This lane pointed straight at
+           app.yaadly.co.uk/jobs for one draft, which dropped a cold visitor
+           onto a list of other people's jobs before anything had told them
+           what Yaadly is or why the money is held. The website carries that
+           explanation, and the board is one visible step on from it. -->
+      <div class="fkgo"><button class="btn ghost sm" onclick="go('site')">Enter the marketplace</button><span class="fks soon">Opening in Kingston &amp; Portmore</span></div>
     </div>
     <div class="fk">
       <p class="kick">02 · Managed services</p>
@@ -1251,6 +1258,15 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
       </div>
     </div>
     <p class="hnote">Free, and nothing is charged here. What you type carries straight down into the form below, so you never fill the same thing twice. Prefer to talk? <a id="site-start">Start on WhatsApp instead</a>.</p>
+  </div>
+
+  <!-- Step two of the marketplace lane. The gate sends somebody here to find
+       out what this is; this is where they go on to the board itself. Without
+       it the lane ends on a homepage and the visitor has to go hunting in the
+       nav for the thing they already said they wanted. -->
+  <div class="heroalt">
+    <a class="btn ghost sm" href="https://app.yaadly.co.uk/jobs">Browse the marketplace</a>
+    <span>Open jobs across Jamaica, and the vetted workers who do them.</span>
   </div>
 
   <div class="strip">
