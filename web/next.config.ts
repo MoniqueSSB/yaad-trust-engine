@@ -48,7 +48,15 @@ const securityHeaders = [
   // Permissions-Policy needs two non-overlapping header rules, and a browser
   // seeing two of this header takes the more restrictive one, so a mistake
   // there kills the feature silently. Not worth it untested.
-  { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+  //
+  // "https://inquiry.withpersona.com" is in the camera allowlist because the
+  // Persona ID check on /apply runs in an iframe from that origin, and a
+  // cross-origin iframe needs BOTH its allow attribute (Persona's client sets
+  // that) AND this header to name it. With (self) alone the platform refuses
+  // Persona's camera request before any prompt can appear, the flow errors,
+  // and every applicant silently lands on the fallback capture: the same
+  // shape of failure the camera=() outage had, one origin further down.
+  { key: "Permissions-Policy", value: 'camera=(self "https://inquiry.withpersona.com"), microphone=(), geolocation=()' },
 ];
 
 const nextConfig: NextConfig = {
