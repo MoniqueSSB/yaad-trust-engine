@@ -105,3 +105,17 @@ Stage 1 deleted the post-a-job funnel from `docs/index.html` so the marketing si
 **The end state names what happens next.** "Your job is saved" tells somebody who has just described water running down their mother's bedroom wall nothing at all. It now says a person reads it within one working day, then an itemised quote with labour split from materials, then a written scope, then evidence at every stage with nobody paid for a stage until it is approved, and that no account is needed until they book.
 
 `TRADES` and `PARISHES` moved to `web/lib/taxonomy.ts`. They were declared inside `JoinFlow.tsx` and the funnel needs the same two lists. Two copies drift, and the day they drift a client posts a job in a trade no worker profile can carry.
+
+## Quotes without an account, and the booking that needs one (Stage 2.2, 31 Aug 2026)
+
+The decision was "no account to get quotes, an account once a job is booked." Half of it was not true: `job_quotes` was only ever rendered inside the portal, which is behind auth, so a client had to make an account before seeing a single price.
+
+**Looking is open, choosing is not.** `quotes_for_code` and `job_for_code` are security-definer functions taking the job id and its `portal_code`, which is the bearer token the WhatsApp link and the portal claim already ride on. They return what a client needs in order to choose and nothing else: no client contact details, no address. `/jobs/[id]/quotes?code=` renders them for an anonymous visitor, labour split from materials, materials marked at cost.
+
+**Accepting is the booking, and the booking is where the account appears.** `accept_quote_as_me` is authenticated only and refuses any caller who is not that job's `client_email`. So holding the link is enough to look at prices and never enough to book one. Pressing Book with no account routes to `/portal/join` carrying the job, the code and the chosen quote; the account is made there and the quote is accepted on the way back.
+
+**A job that already has a worker is not re-bookable through it.** Changing a worker mid-job is a desk decision with a conversation behind it, not a button.
+
+**Found while testing:** `revoke all ... from public` did not take execute away from `anon`, because `anon` is a role with its own grant rather than a member of PUBLIC for this purpose. `accept_quote_as_me` was therefore callable by anonymous visitors. The body already refused them, having no email in the JWT, so nothing could be booked, but a booking function anonymous callers may call is one bug away from one they may use. `anon` is now revoked by name.
+
+**Not built:** nothing tells the client a quote has landed. The page is honest when empty and the link keeps working, but the client has to come back and look. Notifying them is its own piece of work and needs the WhatsApp credentials that are still unset.

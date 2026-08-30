@@ -48,6 +48,7 @@ function JoinForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [pendingQuote, setPendingQuote] = useState(false);
   const [job, setJob] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,6 +116,23 @@ function JoinForm() {
         });
         setPassword("");
         if (claimed === true) {
+          /* Arriving here from a quote means the account WAS the booking
+             step. Finish what they pressed rather than landing them in a
+             portal and making them find the quote again. accept_quote_as_me
+             is still the thing that decides, and it still refuses anybody
+             who is not this job's client, so this is a convenience and not a
+             second door. */
+          const quote = params.get("quote");
+          if (quote) {
+            const { error: acceptErr } = await supabase.rpc("accept_quote_as_me", { p_quote: quote });
+            if (acceptErr) {
+              throw new Error(
+                "Your account is ready and you are signed in, but the booking did not go through: " +
+                  acceptErr.message +
+                  " Open your quotes again and press book.",
+              );
+            }
+          }
           router.replace("/portal");
           router.refresh();
           return;
@@ -136,6 +154,10 @@ function JoinForm() {
         res.message ||
           `Check ${email.trim()} for a confirmation link, then sign in.`,
       );
+      /* If they came from a quote, the booking has NOT happened: the account
+         exists but is unconfirmed, so there is no session to accept with. Say
+         so plainly rather than letting them believe the worker is booked. */
+      setPendingQuote(Boolean(params.get("quote")));
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work.");
     } finally {
@@ -150,6 +172,14 @@ function JoinForm() {
           One more step
         </h2>
         <p className="mt-3 text-[14px] leading-relaxed text-mute">{done}</p>
+        {pendingQuote && (
+          <div className="mt-3 rounded-xl border border-mango/40 bg-mango/5 px-4 py-3 text-[13.5px] leading-relaxed text-mute">
+            <b className="text-ink">Your worker is not booked yet.</b> The
+            account has to be confirmed before it can book anything, so
+            confirm the email, sign in, and press book on your quote again.
+            Nobody has been chosen and nothing has been charged.
+          </div>
+        )}
         <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
           The Client Guidelines are waiting inside. Signing them is what opens
           your job to vetted workers, and nothing reaches anyone before that.
