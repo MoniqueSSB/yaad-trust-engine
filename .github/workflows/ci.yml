@@ -108,6 +108,14 @@ jobs:
           done
           exit $fail
 
+      # The banned-language screen exists twice, once in Python for the engine
+      # and once in Deno for the live functions, because they are two runtimes
+      # and the rule has to hold in both. Two copies of a rule drift, so both
+      # suites assert the same five phrases. If somebody loosens one pattern,
+      # one of these two jobs goes red.
+      - name: Run the Deno guardrail tests
+        run: deno test --allow-read supabase/functions/_shared/
+
       # The provider decision lives in _shared/textmodel.ts and nowhere else.
       # A hard-coded model endpoint in a function is how the estate ended up on
       # eight copies of the same China URL, and how it would quietly drift back.

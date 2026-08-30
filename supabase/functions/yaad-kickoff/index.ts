@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, type TextProvider, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 // Project Kickoff Pack agent.
 //
@@ -332,6 +333,10 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     // prose (it did, once). Flag them; the desk shows the samples.
     const cjkHits = blob.match(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]+/g) ?? [];
 
+    // Banned language, same list as the Python engine. Flags rather than
+    // blocks: nothing here is client-facing until a named human marks it so.
+    const bannedHits = guardrails.scan(blob);
+
     const up = await draftsWrite("PATCH", `?id=eq.${draftId}`, {
       status: "ready",
       docs,
@@ -341,6 +346,11 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
         samples: priceHits.slice(0, 5),
         foreign_text_detected: cjkHits.length > 0,
         foreign_samples: cjkHits.slice(0, 5),
+        banned_language_detected: bannedHits.length > 0,
+        banned_samples: [...new Set(bannedHits.map((f) => f.term))].slice(0, 5),
+        banned_note: bannedHits.length
+          ? "The draft uses language Yaadly never uses: " + [...new Set(bannedHits.map((f) => f.guidance))].join(" ") + " Fix it before issuing."
+          : "No banned language found in the draft.",
         note: priced
           ? "The draft contains something that reads like a price. Yaadly does not price work. Remove it before issuing."
           : "No price-like figures found in the draft.",

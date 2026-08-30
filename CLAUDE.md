@@ -26,6 +26,8 @@ Monique is a project manager with seven years in UK construction and IoT, a BEng
 
 Enforced in [`yaad/guardrails.py`](yaad/guardrails.py) and proved by the tests in [`tests/test_engine.py`](tests/test_engine.py). This rule is the product. Everything else in the repo is packaging around it.
 
+**It holds in two runtimes, and both are load bearing.** The Python engine screens its output through `guardrails.py`. The live Edge Functions screen through [`supabase/functions/_shared/guardrails.ts`](supabase/functions/_shared/guardrails.ts), which is a direct port of the same banned-terms list. The Deno copy exists because for a while the rule was true of the engine and not of the thing actually talking to clients, which is worse than no rule because it reads as covered. Change a pattern in one, change it in the other, in the same commit. Both suites assert the same five phrases so the drift shows up red.
+
 ---
 
 ## 3. The refusal clause
@@ -159,6 +161,7 @@ The Technical Notes describe three repositories. Today there is one, and the spl
 |---|---|---|
 | `yaad/` | The Python engine. Four agents, guardrails, benchmarks. No user interface, no database, no auth. Job Card in, structured result out. | Local and CI today |
 | `tests/` | The guardrail and engine tests. The asset. | CI, every push |
+| `supabase/functions/_shared/` | Modules shared by the Edge Functions: the tracer, the model provider, the banned-language screen, and the Deno guardrail tests. Copied into each function by `sync-shared.sh` because Supabase deploys self-contained bundles, and CI fails if a copy drifts. | CI and Supabase |
 | `run_demo.py` | Runs three scenarios on a laptop with no setup and no API key. Keep it working. A demo that needs no infrastructure is a better sales tool than a deployed system nobody can poke at. | Local |
 | `web/` | Next.js on Cloudflare Workers via OpenNext. The client and worker portals. | `app.yaadly.co.uk` |
 | `supabase/functions/` | Deno Edge Functions. Intake, WhatsApp webhook, vetting, invoicing, completion. The live server-side work. | Supabase |

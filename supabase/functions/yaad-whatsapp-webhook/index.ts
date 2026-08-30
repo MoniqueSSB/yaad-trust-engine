@@ -688,9 +688,10 @@ async function finalizeWorkerApplication(
   }
 
   // The profile, created here for the same reason the web flow creates one:
-  // Phase 1 is complete, so it exists and it is live, in probation. A worker
-  // who joined in the chat gets exactly what a worker who joined on the site
-  // gets. No email is written, because this lane never asks for one.
+  // Phase 1 is complete, so the row exists. Hidden until the Phase 2 checks
+  // clear, exactly as the web flow does it. A worker who joined in the chat
+  // gets what a worker who joined on the site gets, no more and no less.
+  // No email is written, because this lane never asks for one.
   try {
     const slugBase = name.toLowerCase().normalize("NFKD")
       .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "pro";
@@ -703,7 +704,7 @@ async function finalizeWorkerApplication(
       areas: String(answers.parishes || "").slice(0, 400) || null,
       years: (() => { const n = parseInt(String(answers.years ?? "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : null; })(),
       slug: `${slugBase}-${String(data.id).slice(0, 6)}`,
-      active: true,
+      active: false,
       vetting_state: "probation",
       updated_at: new Date().toISOString(),
     }, { onConflict: "application_id" });

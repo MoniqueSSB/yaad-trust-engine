@@ -66,3 +66,39 @@ Deno.test("a clean message reports blocked 0 and no terms", () => {
   assertEquals(attrs["yaadly.guardrail.blocked"], 0);
   assertEquals(attrs["yaadly.guardrail.terms"], "");
 });
+
+/* ── the gate is wired, and stays wired ──────────────────────────────────────
+   The unit tests above prove the screen works. They prove nothing about it
+   being switched on, and CLAUDE.md exists because the realistic failure here
+   is not a broken regex, it is somebody removing the call in good faith while
+   making the reply path tidier or faster.
+
+   yaad-inbound composes a reply with a model and sends it to a real person.
+   twiml() is the single place that happens. This asserts the screen is still
+   in it. If this test goes red, the change is wrong, not the test. */
+
+const inboundSource = await Deno.readTextFile(
+  new URL("../yaad-inbound/index.ts", import.meta.url),
+);
+
+Deno.test("yaad-inbound still imports the screen", () => {
+  assert(
+    inboundSource.includes('from "./guardrails.ts"'),
+    "yaad-inbound no longer imports the banned-language screen",
+  );
+});
+
+Deno.test("yaad-inbound still screens inside the one path to a client", () => {
+  const start = inboundSource.indexOf("const twiml = ");
+  assert(start > 0, "twiml() is gone or renamed. Whatever replaced it must screen.");
+  const body = inboundSource.slice(start, start + 2000);
+  assert(body.includes("guardrails.scan("), "twiml() no longer screens the reply");
+  assert(body.includes("SAFE_FALLBACK"), "twiml() no longer substitutes a safe reply on a hit");
+});
+
+Deno.test("the draft producers still flag banned language", () => {
+  for (const fn of ["yaad-completion", "yaad-kickoff"]) {
+    const src = Deno.readTextFileSync(new URL(`../${fn}/index.ts`, import.meta.url));
+    assert(src.includes("guardrails.scan("), `${fn} no longer screens its draft`);
+  }
+});

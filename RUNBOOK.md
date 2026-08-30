@@ -139,3 +139,54 @@ supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzily
 ```bash
 for f in yaad-agent yaad-completion yaad-inbound yaad-invoice yaad-kickoff yaad-post-job yaad-sketch yaad-whatsapp-webhook; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
 ```
+
+---
+
+## 10. A client got a holding reply instead of an answer
+
+The banned-language screen fired. `yaad-inbound` composed a reply, the screen found language Yaadly never uses, and the reply was not sent. The client received the short holding message from `SAFE_FALLBACK` saying a person will come back to them, and a phone notification went out titled **Reply held back**.
+
+**That client is now waiting on you.** The machine deliberately did not answer them.
+
+1. Open the `yaad-inbound` function logs in the Supabase dashboard and find the line beginning `guardrail: outbound reply blocked`. It carries the terms that matched and the first 500 characters of the draft.
+2. Reply to the client yourself.
+3. Then look at why. A single hit is usually the model reaching for "escrow" to explain how payment works, which is exactly the thing this catches. If it repeats, the system prompt in `yaad-inbound` needs a line telling it the right phrase, not a looser screen.
+
+**Never widen the screen to stop the alert.** The alert is the product working. The banned list is a port of `yaad/guardrails.py` and the two move together, with tests on both sides asserting the same phrases.
+
+The span attributes `yaadly.guardrail.blocked` and `yaadly.guardrail.terms` carry the same information in telemetry, with the guidance strings rather than anything the client or the model wrote.
+
+---
+
+## Publishing a worker profile
+
+**The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.
+
+**Publishing is a human act and there is no automatic promotion.** Flipping a profile live is the moment Yaadly vouches for somebody in public, which is a consequential step, so a named person takes it. Do not add a trigger that does this on a Persona pass. If a future console does it, it does it behind a button somebody presses.
+
+**Before publishing, check all four.** The point of the hidden state is that these have actually happened, not that a form was filled in.
+
+1. Persona says the identity check passed. `applications.persona_status` reads `approved` or `completed`, and it was confirmed by our server rather than claimed by a browser.
+2. The three referees were **telephoned**, not emailed, and each had been told in advance the call was coming.
+3. The Worker Guidelines are signed on the current version.
+4. Anything the trade needs: a JCF police check for work over £500, inside an occupied home, or where keys are held, and certification confirmed with the body that issued it.
+
+**To publish**, in the Supabase SQL editor, one worker at a time. Never a bulk update:
+
+```sql
+update public.worker_profiles
+   set vetting_state = 'verified', active = true, updated_at = now()
+ where application_id = 'THE-APPLICATION-UUID';
+```
+
+**To take one back down**, same shape:
+
+```sql
+update public.worker_profiles
+   set active = false, updated_at = now()
+ where application_id = 'THE-APPLICATION-UUID';
+```
+
+**A published profile still cannot be sent a job until the Worker Guidelines are signed.** `yaad_match` requires a signature on the current version and skips anybody without one, so publishing and being matchable are two separate gates on purpose. If a worker is live and getting no jobs, check the signature first.
+
+**Suspending somebody** is `vetting_state = 'suspended'` plus `active = false`. Keep the row. Deleting it loses the record of why.

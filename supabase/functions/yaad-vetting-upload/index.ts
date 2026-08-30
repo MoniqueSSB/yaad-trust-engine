@@ -357,14 +357,16 @@ Deno.serve(async (req: Request) => {
 
       // ── the public profile, created here and not after vetting ────────────
       //
-      // Founder decision, 30 Aug 2026: the profile is created and goes live
-      // once Phase 1 information is in. It is created in 'probation', which is
-      // the honest state on the day it is made.
+      // Founder decision, 30 Aug 2026, revised the same day: the row is
+      // created when Phase 1 lands, and it is created HIDDEN. active=false
+      // until the Phase 2 checks clear, so the profile exists from the first
+      // sitting and nothing unvetted is ever publicly listed.
       //
-      // Listed is not bookable, and that distinction is what keeps the promise
-      // on the public site true. yaad_match refuses any worker without a
-      // signature on the current Worker Guidelines, which is Phase 3, so a
-      // probation profile can be looked at and cannot be sent to a job.
+      // Publishing is a human act, deliberately. Flipping a profile live is
+      // the moment Yaadly vouches for somebody in public, and the governing
+      // rule is that a named human confirms every consequential step. There
+      // is no automatic promotion here and there should not be one. See
+      // RUNBOOK.md for the step the desk runs.
       //
       // Keyed on application_id, so a second submit updates the profile rather
       // than making a rival one. The email is written only when there is one:
@@ -394,7 +396,7 @@ Deno.serve(async (req: Request) => {
             areas: String(appRow.parishes ?? "").slice(0, 400) || null,
             years: Number.isFinite(yearsInt) ? yearsInt : null,
             slug,
-            active: true,
+            active: false,
             vetting_state: "probation",
             updated_at: new Date().toISOString(),
           }, { onConflict: "application_id" });

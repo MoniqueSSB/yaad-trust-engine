@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 // Completion Report narrative agent.
 //
@@ -167,7 +168,17 @@ Deno.serve(async (req: Request) => {
       ...(blob.match(/(?:J?\$|£|€|USD|JMD|GBP)\s?[\d,]+(?:\.\d+)?/gi) ?? []),
       ...(blob.match(/\b(?:paid|payment of|cost|price|charge)\b[^"]{0,40}\d/gi) ?? []),
     ];
-    root.setAttributes({ "yaadly.completion.outcome": "drafted", "yaadly.completion.money_guardrail_hits": moneyHits.length });
+    // Banned language, the same list the Python engine screens against. This
+    // one FLAGS rather than blocks, unlike the live reply path in yaad-inbound,
+    // because a person reads this narrative before the report is ever issued.
+    // The human gate is already here; what was missing was telling them.
+    const bannedHits = guardrails.scan(blob);
+
+    root.setAttributes({
+      "yaadly.completion.outcome": "drafted",
+      "yaadly.completion.money_guardrail_hits": moneyHits.length,
+      ...guardrails.screenAttrs(bannedHits),
+    });
 
     return json({
       ok: true, narrative: docs, model: prov.model,
@@ -175,6 +186,11 @@ Deno.serve(async (req: Request) => {
         money_language_detected: moneyHits.length > 0,
         samples: moneyHits.slice(0, 5),
         note: moneyHits.length ? "The narrative mentions money. It must not - remove it before the report is issued." : "No money language found in the narrative.",
+        banned_language_detected: bannedHits.length > 0,
+        banned_samples: [...new Set(bannedHits.map((f) => f.term))].slice(0, 5),
+        banned_note: bannedHits.length
+          ? "The narrative uses language Yaadly never uses: " + [...new Set(bannedHits.map((f) => f.guidance))].join(" ") + " Fix it before the report is issued."
+          : "No banned language found in the narrative.",
       },
       reminder: "A draft. Read it against the evidence before the report is issued.",
     });
