@@ -1646,6 +1646,13 @@ function fieldValue(val){
   if (typeof val === "boolean") return `<span class="dv">${val ? "yes" : "no"}</span>`;
   if (typeof val === "object") return `<span class="dv mono">${esc(JSON.stringify(val, null, 2))}</span>`;
   const t = String(val);
+  // A data URL is a file, not free text. Play the voice note, show the
+  // photograph, never pour a megabyte of base64 into the drawer. The client
+  // voice note from the job wizard is the reason this exists: listening to it
+  // here is how "read by a person" stays true when the person said it rather
+  // than typed it.
+  if (/^data:audio\//.test(t)) return `<span class="dv"><audio controls preload="metadata" src="${esc(t)}" style="width:100%"></audio></span>`;
+  if (/^data:image\//.test(t)) return `<span class="dv"><img src="${esc(t)}" alt="" style="max-width:100%;border-radius:10px"></span>`;
   if (/^\d{4}-\d{2}-\d{2}T/.test(t)) return `<span class="dv">${esc(t.replace("T"," ").slice(0,19))}<span class="sub">${esc(ago_(t))} ago</span></span>`;
   return `<span class="dv">${esc(t)}</span>`;
 }

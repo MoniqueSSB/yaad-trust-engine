@@ -147,7 +147,19 @@ export function EvidenceLedger({
                         key={e.id}
                         className="overflow-hidden rounded-xl border border-line bg-panel"
                       >
-                        {e.img ? (
+                        {e.img && e.img.startsWith("data:audio/") ? (
+                          /* A voice note, not a photograph: the client's own
+                             words from the job wizard, played rather than
+                             shown. */
+                          <div className="grid h-36 w-full place-items-center bg-panel2 px-3">
+                            <audio
+                              controls
+                              preload="metadata"
+                              src={e.img}
+                              className="w-full"
+                            />
+                          </div>
+                        ) : e.img ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={e.img}
