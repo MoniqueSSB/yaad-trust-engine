@@ -32,6 +32,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...but the template is not a configuration, it is documentation, and it has
+# to survive a fresh clone. check-env.mjs tells you to build .env.local "from
+# web/.env.example", which was impossible: the blanket rule above ignored the
+# example too, so the one file that explains the setup never shipped with the
+# checkout that needed it. Matches the root .gitignore, which negates it.
+!.env.example
 
 # vercel
 .vercel
