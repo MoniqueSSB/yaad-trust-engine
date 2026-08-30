@@ -53,18 +53,21 @@ import { createClient } from "@/lib/supabase/client";
  * confirmed against Persona's API. The browser's claim of "complete" is never
  * what ticks the row: the server's answer is.
  *
- * Step 3 is ENTIRELY Persona's when it runs (founder decision, 30 Aug 2026):
- * the steps inside that window are the steps configured on the Persona
- * template, and this page adds no document rows of its own next to it. So
- * what step 3 asks for is edited in the Persona dashboard, not here.
+ * WHAT PERSONA OWNS, AND WHAT STAYS OURS (founder decision, 30 Aug 2026,
+ * closing the point the ledger had marked OPEN). Persona owns the IDENTITY
+ * check: the government ID and the live selfie, exactly the steps on the
+ * Persona template. The TRN and proof of address stay as upload rows on this
+ * page either way, because the template does not collect them, and a
+ * requirement nobody collects is a hole in the vetting record dressed as a
+ * step. They go to our own bucket, which already carries the purge clock and
+ * the machine-read pipeline built for them.
  *
- * LiveCapture and the upload rows are not deleted. They are the fallback,
+ * LiveCapture and the ID upload rows are not deleted. They are the fallback,
  * for three real cases: Persona env vars unset (safe to deploy before the
  * account is wired), Persona's script refusing to load on a thin connection,
  * and Persona erroring mid-flow. The fallback says it is the fallback, on
- * the row, in words, and it asks for the full document set (ID, live photo,
- * face turn, TRN, proof of address) because in that case nobody else is
- * collecting them.
+ * the row, in words, and it adds the ID, live photo and face turn because in
+ * that case nobody else is checking identity.
  */
 
 const FN = "yaad-vetting-upload";
@@ -591,7 +594,7 @@ export function JoinFlow() {
     ? {
         ...d,
         h: "Your identity, checked by Persona",
-        p: "One check, in a <b>secure window run by Persona</b>, the identity verification service. It walks you through its own steps: your government photo ID, then a selfie taken in front of the camera where you turn your head. Everything you hand over in that window goes to Persona, not into our document store.",
+        p: "Your identity, in a <b>secure window run by Persona</b>, the identity verification service. It walks you through its own steps: your government photo ID, then a selfie taken in front of the camera where you turn your head. Everything you hand over in that window goes to Persona, not into our document store. Then your TRN and proof of address dated within three months, which come to us as before.",
         note: "Persona tells our server what it found, and a person at Yaadly still decides your application. If the check will not run on your connection, the page takes uploads and an in-page capture instead and says so on the row.",
       }
     : d;
@@ -881,12 +884,16 @@ export function JoinFlow() {
                       doc="selfie_with_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
                       doc="face_video" docs={docs} onFile={upload} />
-                    <Upload label="Your TRN" hint="Matched to the name on the ID"
-                      accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
-                    <Upload label="Proof of address" hint="Dated within the last three months"
-                      accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
                   </>
                 )}
+
+                {/* Ours on both paths (founder decision, 30 Aug 2026). The
+                    Persona template checks identity and collects nothing else,
+                    so these two rows must exist here or nobody asks at all. */}
+                <Upload label="Your TRN" hint="Matched to the name on the ID"
+                  accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
+                <Upload label="Proof of address" hint="Dated within the last three months"
+                  accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
 
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
                   {personaActive ? (
@@ -894,9 +901,10 @@ export function JoinFlow() {
                       <b className="text-ink">Where your ID goes.</b> Everything
                       inside the Persona window is held by Persona under
                       Yaadly&rsquo;s account there. What our own records keep is
-                      the result of the check, not the images. Files you upload on
-                      the other steps go into a private store no browser can
-                      reach, and are destroyed ninety days after you send them.
+                      the result of the check, not the images. Files you upload
+                      on this page go into a private store no browser can reach,
+                      and are destroyed ninety days after you send them, whatever
+                      we decide.
                     </>
                   ) : (
                     <>
@@ -1206,13 +1214,7 @@ export function JoinFlow() {
           <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
             Your vetting record
           </p>
-          {/* TRN and proof of address are not asked for when Persona runs the
-              identity step (founder decision, 30 Aug 2026): step 3 is the
-              Persona template's steps and nothing else. The rows disappear
-              rather than sit at "Waiting" forever for documents no screen
-              collects. They return whenever the fallback capture is active,
-              because there the page is the one collecting. */}
-          {CHECKS.filter((c) => !(personaActive && (c.k === "id2" || c.k === "id3"))).map((c) => {
+          {CHECKS.map((c) => {
             const ok = done[c.k];
             const now = !ok && ROW_STEP[c.k] === step;
             const copy = c.k === "agent" ? agentRow() : c.k === "id" ? idRow() : { b: c.b, s: c.s };
