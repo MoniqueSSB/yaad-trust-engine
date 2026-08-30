@@ -113,18 +113,26 @@ function JoinForm() {
       const supabase = createClient();
       const token = otp.replace(/\D/g, "");
 
-      /* Two types tried, and this is a version difference rather than a
+      /* Three types tried, and this is a version difference rather than a
          guess. generateLink({type:"magiclink"}) files its one time token in
-         GoTrue's recovery_token slot, confirmed by reading
-         auth.one_time_tokens on this project, and which verifyOtp type
-         matches that has moved between GoTrue releases. "email" is the
-         documented one for a magic link OTP and is tried first; "magiclink"
-         is the older name for the same thing. A wrong TYPE and a wrong CODE
-         are indistinguishable to the caller otherwise, and telling somebody
-         their correct code is wrong is the worst failure this page has. */
+         GoTrue's recovery_token slot, read from auth.one_time_tokens on this
+         project, and which verifyOtp type matches that slot has moved between
+         GoTrue releases. GoTrue returns the SAME "Token has expired or is
+         invalid" for every type when the token does not match, checked
+         against all four, so the right one cannot be discovered from an error
+         and has to be tried.
+
+         "email" is the documented type for a magic link OTP, "magiclink" is
+         its older name, and "recovery" matches the column the token actually
+         sits in. Each is a legitimate type and the extra calls only happen on
+         failure. Telling somebody their correct code is wrong is the worst
+         failure this page has, and it would look exactly like a wrong code. */
       let otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "email" })).error;
       if (otpErr) {
         otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "magiclink" })).error;
+      }
+      if (otpErr) {
+        otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "recovery" })).error;
       }
       if (otpErr) {
         throw new Error(
