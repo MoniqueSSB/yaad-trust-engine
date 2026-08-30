@@ -24,9 +24,9 @@ import { createClient } from "@/lib/supabase/client";
  *   submit   at the end, which flips the application to `received` and pings
  *            the desk.
  *
- * The vetting record on the right used to tick as you clicked through, which
- * meant it was measuring reading, not doing. It now ticks off what has actually
- * been uploaded, typed and confirmed, so it disagrees with you when you skip.
+ * There is no vetting record beside the form any more (founder instruction,
+ * 30 Aug 2026). What it needed is still tracked, and what is still missing is
+ * said once on the send screen rather than counted at you throughout.
  *
  * The application id and upload token are kept in localStorage. A tradesperson
  * filling this in on a phone, on Jamaican mobile data, will lose the tab. They
@@ -167,35 +167,29 @@ const STEPS: Step[] = [
     note: "Free to join, free to quote, win or lose. The one charge is 12% of your labour price on a completed job." },
 ];
 
-/* ── the vetting record ───────────────────────────────────────────────────
-   Each row states what it needs. The row ticks when that thing is true, not
-   when the step it lives under has been scrolled past. */
+/* ── what the desk still needs ────────────────────────────────────────────
+   This was the vetting record, a ticking checklist beside the form. It was
+   removed on the founder's instruction: a running tally of what you have not
+   done yet is a discouraging thing to sit next to while you are doing it.
+
+   The list itself stays, because the rows marked req still drive the honest
+   "still outstanding" line on the send screen. It is now stated once, at the
+   end, instead of watched throughout. Each entry ticks when the thing is
+   actually true, never when a step has merely been scrolled past. */
 type Check = { k: string; b: string; s: string; req?: boolean };
 const CHECKS: Check[] = [
   { k: "form",   b: "Trades and parishes set", s: "From the same list clients pick from" },
   { k: "port",   b: "CV, portfolio or links",  s: "Any one of them is enough to start" },
-  // This row's wording is replaced at render time by idRow(): what it claims
-  // depends on whether Persona is running the check or the in-page capture is,
-  // and on what the server has actually confirmed. This is the fallback text.
   { k: "id",     b: "Government photo ID",     s: "Live photo and a left-to-right video turn" },
   { k: "id2",    b: "TRN verified",            s: "Matched to the name on the ID" },
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
   { k: "police", b: "JCF police record check", s: "Required over £500 and for any occupied home", req: true },
   { k: "refs",   b: "3 references, confirmed and called", s: "Each one told in advance that we would call", req: true },
-  // This row's wording is replaced at render time by agentRow(); see there for
-  // why it must never say a read has happened. What is here is the state before
-  // the applicant has chosen either way.
   { k: "agent",  b: "Machine read, your choice", s: "Runs after you send. It flags, it never decides" },
   { k: "sign",   b: "Worker Guidelines signed", s: "The current version, once" },
   { k: "trial",  b: "Trial job reviewed",      s: "Independent reviewer on site, at our cost" },
   { k: "live",   b: "Profile published",       s: "You are on the board" },
 ];
-
-/** Which step to jump to when a checklist row is clicked. */
-const ROW_STEP: Record<string, number> = {
-  form: 0, port: 1, id: 2, id2: 2, id3: 2, police: 3, refs: 4, agent: 5,
-  sign: 6, trial: 7, live: 8,
-};
 
 /* ── documents ─────────────────────────────────────────────────────────── */
 
@@ -580,35 +574,6 @@ export function JoinFlow() {
   const has = (t: DocType) => docs[t]?.state === "done";
   const refsDone = refs.every((r) => r.name.trim() && r.phone.trim() && r.told);
 
-  /* The machine read is the one row the browser cannot observe. It runs on the
-     server after submit, it can fail, and when it fails the desk is told and
-     the applicant is not. So this row is never allowed to claim the read
-     happened. It reports the only two things this page actually knows: which
-     way they answered, and whether the file has left. */
-  const agentRow = (): { b: string; s: string } => {
-    if (aiConsent === "declined")
-      return { b: "Machine read declined", s: "Only a person at the desk opens your documents" };
-    if (aiConsent === "granted" && sentRef)
-      return { b: "Sent for machine reading", s: "It runs on your file now. The desk reads what it finds" };
-    if (aiConsent === "granted")
-      return { b: "Machine read agreed", s: "It runs after you send. It flags, it never decides" };
-    return { b: "Machine read, your choice", s: "Runs after you send. It flags, it never decides" };
-  };
-
-  /* The ID row's wording follows which check is actually running, and what the
-     server has actually said about it. "Verified" appears only when the server
-     asked Persona and Persona said the flow passed; a recorded check that
-     Persona has as anything else shows Persona's own word for it. */
-  const idRow = (): { b: string; s: string } => {
-    if (!personaActive)
-      return { b: "Government photo ID", s: "Live photo and a left-to-right video turn" };
-    if (persona.state === "done" && persona.verified)
-      return { b: "ID verified by Persona", s: "Government ID and live selfie, confirmed by our server" };
-    if (persona.state === "done")
-      return { b: "ID check recorded", s: `Persona has it as "${persona.status || "unchecked"}". A person at the desk resolves it` };
-    return { b: "ID check with Persona", s: "Government ID and a live selfie, in a secure Persona window" };
-  };
-
   const done: Record<string, boolean> = {
     form: step1Ready,
     port: has("cv") || has("portfolio") || has("certificate") || links.length > 0,
@@ -622,11 +587,11 @@ export function JoinFlow() {
     id3: has("proof_of_address"),
     police: has("police_check"),
     refs: refsDone,
-    // What is ticked here is the CHOICE, which this page can see, never the
-    // read, which it cannot. Declining is a complete answer, not a gap: leaving
-    // it on "Waiting" forever would read as an outstanding task and quietly
-    // punish the choice. Agreeing is also complete, because everything asked of
-    // the applicant on this row is then done.
+    // What is recorded here is the CHOICE, which this page can see, never the
+    // read, which it cannot: the read runs on the server after submit and can
+    // fail. Declining is a complete answer, not a gap, so it must never count
+    // as outstanding and quietly punish the choice. Agreeing is complete too,
+    // because everything asked of the applicant on this row is then done.
     agent: aiConsent === "granted" || aiConsent === "declined",
     sign: signed && signedName.trim().length > 1,
     trial: false,
@@ -1268,37 +1233,6 @@ export function JoinFlow() {
           )}
         </div>
 
-        <div className="vrec">
-          <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
-            Your vetting record
-          </p>
-          {/* TRN and proof of address are not asked for when Persona runs the
-              identity step (founder decision, 30 Aug 2026): step 3 is the
-              Persona template's steps and nothing else. The rows disappear
-              rather than sit at "Waiting" forever for documents no screen
-              collects. They return whenever the fallback capture is active,
-              because there the page is the one collecting. */}
-          {CHECKS.filter((c) => !(personaActive && (c.k === "id2" || c.k === "id3"))).map((c) => {
-            const ok = done[c.k];
-            const now = !ok && ROW_STEP[c.k] === step;
-            const copy = c.k === "agent" ? agentRow() : c.k === "id" ? idRow() : { b: c.b, s: c.s };
-            return (
-              <button className="vitem" key={c.k} onClick={() => setStep(ROW_STEP[c.k] ?? 0)}>
-                <span className={"vdot" + (ok ? " done" : now ? " now" : "")}>
-                  {ok ? "✓" : now ? "•" : ""}
-                </span>
-                <div className="flex-1 text-left">
-                  <b>
-                    {copy.b}{" "}
-                    {c.req && <span className="src req">Required</span>}
-                  </b>
-                  <span>{copy.s}</span>
-                </div>
-                <span className="st">{ok ? "Done" : now ? "Now" : "Waiting"}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </>
   );

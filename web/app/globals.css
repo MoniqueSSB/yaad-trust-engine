@@ -63,8 +63,8 @@ body {
 }
 
 /* ── Join as a pro, ported from the preview's #s-join ─────────────────── */
-.jlane{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start;margin-top:16px}
-@media(max-width:940px){.jlane{grid-template-columns:1fr}}
+/* One column since the vetting record beside it was removed. */
+.jlane{margin-top:16px}
 .jhead{margin-top:18px}
 .jbadge{display:inline-flex;font-size:11px;padding:4px 10px;border-radius:100px;background:var(--panel2);border:1px solid var(--line);color:var(--mute);margin-bottom:10px}
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
@@ -82,15 +82,6 @@ body {
 .fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .jf{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:11px 12px;color:var(--ink);font:inherit;font-size:14px}
 .jf:focus{outline:none;border-color:var(--teal)}
-.vrec{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;position:sticky;top:74px}
-.vitem{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
-.vrec .vitem:first-of-type{border-top:0}
-.vdot{width:22px;height:22px;border-radius:50%;border:1px solid var(--line2);flex:0 0 auto;display:grid;place-items:center;font-size:10px;color:var(--dim);margin-top:1px}
-.vdot.now{border-color:var(--mango);color:var(--mango);background:rgba(255,176,32,.1)}
-.vdot.done{border-color:var(--teal);color:var(--tealb);background:rgba(20,184,166,.12)}
-.vitem b{display:block;font-size:13.5px;line-height:1.3}
-.vitem span{display:block;font-size:12px;color:var(--dim);line-height:1.5;margin-top:2px}
-.vitem .st{margin-left:auto;font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
 .pcrule{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:14px}
 @media(max-width:760px){.pcrule{grid-template-columns:1fr}}
 .pcbox{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel)}
@@ -131,8 +122,6 @@ body {
 
 /* The vetting record rows are buttons now: each one jumps to the step that
    would satisfy it, because a checklist you cannot act on is decoration. */
-.vitem{width:100%;text-align:left;background:none;cursor:pointer;transition:.13s}
-.vitem:hover b{color:var(--tealb)}
 
 /* ── The signed documents ────────────────────────────────────────────────
    The guidelines are stored as HTML fragments and rendered into .doc-body.
