@@ -17,6 +17,11 @@ backups/
 *.env
 !.env.example
 
+# HubSpot CLI writes a live personal access key into this file. This repo is
+# public, so it must never be tracked.
+hubspot.config.yml
+hubspot.config.yaml
+
 # macOS
 .DS_Store
 .DS_Store?
