@@ -52,7 +52,80 @@ const json = (body: unknown, status = 200) =>
 const money = (n: number | null) =>
   n == null ? "" : "J$" + Number(n).toLocaleString("en-JM");
 
-async function sendWhatsApp(to: string, body: string, trace: Trace) {
+/* Twilio, which this project already uses for inbound WhatsApp and SMS, so
+   the account and its credentials are real and working today. Outbound needs
+   one thing inbound never did: a sender to send FROM. TWILIO_WHATSAPP_FROM
+   for WhatsApp, TWILIO_SMS_FROM for the text fallback, both in Twilio's own
+   format (whatsapp:+1..., +1...).
+
+   THE 24 HOUR RULE, which is WhatsApp's and not Twilio's, so switching
+   provider does not escape it. A business may send free text only within 24
+   hours of the person's last message. Outside that window it must be a
+   template approved in advance. A client who posted their job on WhatsApp
+   this morning and gets a quote this afternoon is inside the window and this
+   works. One who posted last week is not, and the send comes back 63016,
+   which is why that code is named rather than passed through as a number. */
+async function sendTwilio(
+  to: string, body: string, channel: "whatsapp" | "sms", trace: Trace,
+) {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const from = channel === "whatsapp"
+    ? (Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "")
+    : (Deno.env.get("TWILIO_SMS_FROM") ?? "");
+
+  if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
+  if (!from) {
+    return {
+      sent: false,
+      reason: channel === "whatsapp"
+        ? "TWILIO_WHATSAPP_FROM not set, so there is no sender to send from"
+        : "TWILIO_SMS_FROM not set, so there is no sender to send from",
+    };
+  }
+
+  const digits = to.replace(/\D/g, "");
+  if (digits.length < 7) return { sent: false, reason: "the client's number is not usable" };
+  const e164 = "+" + digits;
+  const dest = channel === "whatsapp" ? `whatsapp:${e164}` : e164;
+
+  return await trace.span(`twilio.send.${channel}`, SpanKind.CLIENT, {
+    "server.address": "api.twilio.com",
+    "messaging.system": "twilio",
+  }, async (s) => {
+    try {
+      const form = new URLSearchParams({ To: dest, From: from, Body: body });
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: {
+          Authorization: "Basic " + btoa(`${sid}:${tok}`),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: form,
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      if (r.ok) return { sent: true, status: r.status, via: `twilio ${channel}` };
+
+      const detail = await r.json().catch(() => null) as { code?: number; message?: string } | null;
+      const code = detail?.code;
+      // Named, because "63016" in a log tells the desk nothing and this one
+      // is the difference between a broken integration and WhatsApp policy.
+      const reason = code === 63016
+        ? "outside WhatsApp's 24 hour window, so this needed an approved template rather than free text"
+        : code === 21211
+        ? "Twilio rejected the client's number as invalid"
+        : `twilio ${r.status}${code ? ` (${code})` : ""}: ${(detail?.message ?? "").slice(0, 140)}`;
+      s.recordError(reason);
+      return { sent: false, status: r.status, code, reason };
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return { sent: false, reason: String(e).slice(0, 160) };
+    }
+  });
+}
+
+async function sendMetaWhatsApp(to: string, body: string, trace: Trace) {
   const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
   const phoneId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
   if (!token || !phoneId) {
@@ -179,10 +252,29 @@ Deno.serve(async (req) => {
       emailReason = "RESEND_API_KEY not set";
     }
 
+    /* The phone, tried in the order most likely to reach a Jamaican client.
+       Twilio WhatsApp first, because WhatsApp is where this audience lives
+       and Twilio is the account this project already runs on. Meta's own API
+       second, for if those credentials ever get set. Plain SMS last, because
+       it costs money and has no 24 hour window, which makes it the thing that
+       still works when WhatsApp will not. */
     const clientPhone = String(job.client_phone ?? "").trim();
-    const wa = clientPhone
-      ? await sendWhatsApp(clientPhone, line, trace)
-      : { sent: false, reason: "no client phone on the job" };
+    let wa: { sent: boolean; reason?: string; via?: string; status?: number; code?: number } =
+      { sent: false, reason: "no client phone on the job" };
+
+    if (clientPhone) {
+      wa = await sendTwilio(clientPhone, line, "whatsapp", trace);
+      if (!wa.sent) {
+        const meta = await sendMetaWhatsApp(clientPhone, line, trace);
+        if (meta.sent) wa = { ...meta, via: "meta whatsapp" };
+        else {
+          const sms = await sendTwilio(clientPhone, line, "sms", trace);
+          // Report the WhatsApp reason when SMS was never configured either,
+          // because that is the one worth fixing first.
+          wa = sms.sent ? { ...sms, via: "twilio sms" } : wa;
+        }
+      }
+    }
 
     // Said out loud rather than assumed. If neither channel worked the desk
     // needs to know, because the client is sitting waiting on a price nobody
