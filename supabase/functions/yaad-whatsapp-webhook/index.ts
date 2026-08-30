@@ -302,9 +302,14 @@ const personaLink = (appRowId: string): string | null => {
   if (!PERSONA_TEMPLATE_ID || !PERSONA_ENVIRONMENT_ID) return null;
   const q = new URLSearchParams({
     "inquiry-template-id": PERSONA_TEMPLATE_ID,
-    "environment-id": PERSONA_ENVIRONMENT_ID,
     "reference-id": appRowId,
   });
+  // Same two shapes the web flow accepts, for the same reason: Persona's
+  // dashboard shows environments by NAME, and the value configured here is
+  // "production", not an "env_..." id. Sending a name as environment-id
+  // builds a link that opens on nothing.
+  if (PERSONA_ENVIRONMENT_ID.startsWith("env_")) q.set("environment-id", PERSONA_ENVIRONMENT_ID);
+  else q.set("environment", PERSONA_ENVIRONMENT_ID);
   return `https://withpersona.com/verify?${q.toString()}`;
 };
 
