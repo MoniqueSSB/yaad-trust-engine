@@ -20,6 +20,7 @@ import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
+import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
 import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
@@ -101,7 +102,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
     )
     .eq("id", id)
     .maybeSingle();
@@ -114,7 +115,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -141,6 +142,10 @@ export default async function JobRoom({
          (20260829q), so a worker's copy of this query is empty and the
          component below never has worker-side data to mishandle. */
       supabase.from("intake_threads").select("transcript,channel,turns").eq("job_id", id).maybeSingle(),
+      /* The photos the public board shows, from the same table the board
+         reads, so the preview below cannot show a photo the board would
+         not. */
+      supabase.from("job_photos").select("caption,img").eq("job_id", id).order("position"),
     ]);
 
   const current = jobStage(job.status);
@@ -408,6 +413,21 @@ export default async function JobRoom({
           gates={gates}
           live={onBoard}
           marketplaceHref={marketplaceHref}
+        />
+      )}
+
+      {/*
+        Shown only while the job is not yet on the board, which is the one
+        moment the question "what exactly am I publishing?" is live. Once
+        the job IS on the board the GoLive card links to the real thing,
+        and a preview next to the original would just be the original,
+        twice.
+      */}
+      {role === "client" && !movedOn && !onBoard && (
+        <BoardPreview
+          job={job}
+          signed={signed}
+          photos={(boardPhotos ?? []) as { caption: string; img: string | null }[]}
         />
       )}
 
