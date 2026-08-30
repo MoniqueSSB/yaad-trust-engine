@@ -110,9 +110,11 @@ This is the Python engine only. The live Edge Functions are step 9.
 
 ---
 
-## 9. Completing the move to the EU text model
+## 9. Switching the text model to the EU
 
-The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. As shipped it prefers Mistral in the EU and falls back to MiniMax in China while no Mistral key is set. **Until you do the following, the move is not done.**
+The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set.
+
+**MiniMax is the current choice, deliberately.** Founder decision, 30 August 2026: the data flowing through these functions today is synthetic, and a China transfer of invented job cards is not what the DPIA is about. **The trigger for this step is real client and worker data, which arrives with the December pilot.** Do it before then, not after.
 
 **Step one, set the secret.** One command, and every function picks it up on its next invocation. No redeploy needed, because it is read at call time.
 
@@ -120,11 +122,9 @@ The eight live functions that call a text model all read `supabase/functions/_sh
 supabase secrets set MISTRAL_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
 ```
 
-**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose.
+**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose, and it is the same attribute that answers "where is our data going" today.
 
-The function logs also carry a warning line beginning `textmodel: falling back to MiniMax` every time the legacy path runs. If that line stops appearing, the switch is complete.
-
-**Step three, remove the fallback.** Once step two is confirmed, delete the MiniMax branch in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in place indefinitely means one missing secret silently sends client data to China again.
+**Step three, remove the MiniMax branch.** Once step two is confirmed, delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again.
 
 **If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. Model names move. Confirm the current one on Mistral's model page and set it without touching code:
 

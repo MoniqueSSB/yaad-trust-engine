@@ -10,24 +10,32 @@
 // UK adequacy decision, and Jamaica's Data Protection Act 2020 restricts
 // transfers where the destination lacks adequate protection.
 //
-// Founder decision, 30 August 2026: move to an EU endpoint before the pilot
-// carries real data. Mistral, because it is hosted in the EU, it speaks the
-// OpenAI chat completions shape so the eight call sites barely change, and it
-// offers a signed data processing agreement.
+// Founder decision, 30 August 2026, in two parts and both of them deliberate.
 //
-// ── How the move actually happens ──
+// The endpoint to move TO is Mistral: hosted in the EU, speaks the OpenAI chat
+// completions shape so the eight call sites barely change, and offers a signed
+// data processing agreement.
+//
+// WHEN to move is not yet. MiniMax stays for now. The data flowing through
+// these functions today is synthetic and buildathon shaped, and a China
+// transfer of invented job cards is not the risk the DPIA is about. The line
+// is REAL CLIENT AND WORKER DATA, which arrives with the December pilot in
+// Kingston and Portmore.
+//
+// ── How the move happens when it happens ──
 //
 // Set MISTRAL_API_KEY as an Edge Function secret. That is the whole switch.
 // The order below prefers it, so the moment the secret exists every function
-// is on the EU endpoint, and until it exists they keep working on MiniMax
-// rather than falling over.
+// is on the EU endpoint. No deploy, no code change, no eight-file edit. That
+// was the point of moving the decision into this file ahead of the decision
+// itself. RUNBOOK step 9 has the three steps.
 //
-// That fallback is a deliberate, temporary and NOISY one. A quiet fallback to
-// China is exactly how a migration gets declared done and silently is not, so
-// every caller records the provider and its region on the span, and this file
-// logs a warning each time the legacy path is taken. Once MISTRAL_API_KEY is
-// set and RUNBOOK step 9 has confirmed the switch, delete the MiniMax branch.
-// It is four lines and it should not outlive the pilot.
+// The MiniMax branch below is therefore the CURRENT CHOICE, not a failure
+// state, and it does not shout on every call: an alarm somebody has been told
+// to ignore has stopped being an alarm. What it does instead is leave a trace.
+// Every model span carries yaadly.model.region, so "where did this client's
+// message actually go" is answered from telemetry rather than from memory, and
+// the day the answer needs to be "eu" it is checkable in one query.
 //
 // ── Adding a provider ──
 //
@@ -77,14 +85,15 @@ export function pickTextProvider(): TextProvider | null {
     };
   }
 
-  // 3. MiniMax. Legacy, in China, on the way out. Delete once the EU key is
-  //    set and the switch is confirmed.
+  // 3. MiniMax, in China. The current choice while the data is synthetic, by
+  //    founder decision of 30 Aug 2026. Not a fallback and not an error, so it
+  //    does not log. The region rides on every span instead, which is the
+  //    honest signal: silent when nobody is asking, conclusive when they are.
+  //
+  //    This branch comes out when Mistral goes in, before the December pilot
+  //    carries real client and worker data.
   const minimax = Deno.env.get("MINIMAX_API_KEY");
   if (minimax) {
-    console.warn(
-      "textmodel: falling back to MiniMax (China). MISTRAL_API_KEY is not set on this project, "
-        + "so the EU migration is NOT complete. See RUNBOOK step 9.",
-    );
     return {
       name: "minimax",
       api: "https://api.minimax.io/v1/chat/completions",
