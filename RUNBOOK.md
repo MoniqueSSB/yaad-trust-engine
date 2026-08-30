@@ -39,9 +39,27 @@ With no `YAAD_API_KEY` it runs in mock mode: deterministic, rule based, every mo
 
 Deploy from disk only. Never paste file contents into a deploy tool: doing that has silently shipped a different intake flow before.
 
+**Check the auth setting before you deploy, every time.** `--no-verify-jwt` is not a house style, it is a per-function setting, and passing it to a function that should verify tokens turns platform authentication off without any warning and without failing the deploy.
+
 ```bash
-supabase functions deploy yaad-agent --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+supabase functions list --project-ref leffyisvfvjwzilydlwf
 ```
+
+Read `verify_jwt` for the function you are about to deploy, then match it.
+
+**`verify_jwt` is true**, which is most of them, so deploy with no flag:
+
+```bash
+supabase functions deploy yaad-agent --project-ref leffyisvfvjwzilydlwf
+```
+
+**`verify_jwt` is false**, only the endpoints that carry their own authentication (`yaad-inbound`, `yaad-whatsapp-webhook`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`), so deploy with the flag:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+Afterwards, run `supabase functions list` again and confirm `verify_jwt` is what it was. A deploy that quietly flipped it looks exactly like a deploy that worked.
 
 To see what is actually happening, read the function logs in the Supabase dashboard before changing code. Most failures here are a missing environment variable or a 403 from a downstream API, not a logic bug.
 

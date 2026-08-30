@@ -178,7 +178,8 @@ The Technical Notes describe three repositories. Today there is one, and the spl
 ## 12. Standing repository facts
 
 - Supabase is on the **free plan**. Do not raise Pro-only items.
-- **Deploy Edge Functions from disk only**, with the CLI, `--project-ref` and `--no-verify-jwt`. Never paste file contents into a deploy tool. It has silently shipped a different intake flow before.
+- **Deploy Edge Functions from disk only**, with the CLI and `--project-ref`. Never paste file contents into a deploy tool. It has silently shipped a different intake flow before.
+- **`--no-verify-jwt` is per function, never a blanket.** Most functions run with `verify_jwt = true` and the platform checks the token before the code runs. Passing the flag turns that off, silently, and the deploy still succeeds. On 30 August 2026 the blanket form of this rule would have stripped platform auth from `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff`, `yaad-post-job` and `yaad-sketch`. Read the live setting first with `supabase functions list --project-ref <ref>` and preserve what is there. Only the endpoints that carry their own authentication get the flag: today that is `yaad-inbound`, `yaad-whatsapp-webhook`, `yaad-vetting-review`, `yaad-vetting-upload` and `yaad-enquiry`.
 - **Parallel Claude sessions share this working tree.** The branch and the files can change under you mid-task. Check `git status` before assuming your edit is still the newest thing here.
 - Merges to `main` are Monique's click by default. Do them when she says so.
 - Nothing in this repository contains real client, worker, ID or payment data. Keep it that way.
