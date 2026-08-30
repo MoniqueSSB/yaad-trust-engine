@@ -7,6 +7,13 @@ does not, and the difference matters more than the shape.*
 **Legend.** `LIVE` is in the repo and working now. `NEW` does not exist.
 `MOVED` exists somewhere else today and would have to be relocated.
 
+**Status, founder decisions of 30 August 2026.** This tree is the TARGET, not a
+migration to start now. The edge functions **stay on Supabase**; Next.js calls
+them. The Python engine runs as a **Cloudflare Python Worker**, which is what
+`packages/engine-client` calls. Everything below stays where it is until a stage
+needs it, with one exception: **`apps/console` is a new build and is not blocked
+by any of this.**
+
 ---
 
 ## The corrected tree
@@ -71,9 +78,11 @@ the backend**: WhatsApp intake, transcription, vetting, Persona confirmation,
 invoicing, completion reports, matching. Seventy-eight tracked files. Leaving
 them off a tree is how they get quietly rewritten into something worse.
 
-The proposal did show `apps/web/app/api/whatsapp/webhook/`, which reads as a plan
-to move the webhook into Next.js. That is a real decision, not a filing choice,
-and it is question 1 below.
+The proposal did show `apps/web/app/api/whatsapp/webhook/`, which read as a plan
+to move the webhook into Next.js. **Settled 30 Aug 2026: the edge functions stay
+on Supabase and Next.js calls them.** They keep service-role database access,
+Meta signature verification and OpenTelemetry tracing, all of which work today
+and would each have to be re-solved in the Next runtime.
 
 ### 2. Edge functions cannot be grouped into folders
 
@@ -90,7 +99,10 @@ directories stay flat. Anyone tidying them into subfolders takes the backend dow
 `packages/engine-client` was described as "typed caller for the Python Worker",
 which means a Python engine exists somewhere. It does: `yaad/`, with four agents
 (intake, pricing, reporting, verification) plus guardrails and telemetry. It
-needs a location in the tree. Where it *runs* is question 3.
+needs a location in the tree. **Settled 30 Aug 2026: it runs as a Cloudflare
+Python Worker**, called over HTTP through `packages/engine-client`. That keeps
+the agents in Python, where they are written and tested, and keeps the calling
+side typed.
 
 ### 4. The marketing site should stay static
 
@@ -106,7 +118,17 @@ back where we already are.
 
 ---
 
-## What is worth doing first
+## The order of work
+
+**Now:** `apps/console`. It is the only node in this tree that is a missing
+thing rather than a move, and it is not blocked by the rest.
+
+**Later, and only when a stage needs it:** `packages/`, the `engine/` rename,
+and folding `docs/` into `apps/web/public/`. None of it buys anything on its own,
+and doing it early would collide with the site stages still to run and with
+parallel sessions working in this repo.
+
+## Why the console is first
 
 **`apps/console` is the strongest idea in the proposal.** The admin desk was
 removed from `docs/index.html` on 27 August and has had no home since. There is
