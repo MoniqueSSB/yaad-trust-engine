@@ -167,9 +167,22 @@ The span attributes `yaadly.guardrail.blocked` and `yaadly.guardrail.terms` carr
 **Before publishing, check all four.** The point of the hidden state is that these have actually happened, not that a form was filled in.
 
 1. Persona says the identity check passed. `applications.persona_status` reads `approved` or `completed`, and it was confirmed by our server rather than claimed by a browser.
-2. The three referees were **telephoned**, not emailed, and each had been told in advance the call was coming.
-3. The Worker Guidelines are signed on the current version.
-4. Anything the trade needs: a JCF police check for work over £500, inside an occupied home, or where keys are held, and certification confirmed with the body that issued it.
+2. **The TRN is approved.** The applicant types the number in Phase 2 and it arrives as `pending`, never approved: this is the step where a person checks it against the name on the ID. Nine digits. Approve it with:
+
+```sql
+update public.applications
+   set trn_status = 'approved', trn_checked_at = now()
+ where app_id = 'APP-XXXXXX';
+```
+
+   If it does not match the ID, set `'rejected'` instead and ask them again. We hold the number, not a photograph of the card.
+3. The three referees were **telephoned**, not emailed, and each had been told in advance the call was coming.
+4. The Worker Guidelines are signed on the current version.
+5. Anything the trade needs: a JCF police check for work over £500, inside an occupied home, or where keys are held, and certification confirmed with the body that issued it.
+
+**The database refuses a publish that skips these.** `trg_profile_publish_checks` will not let `active` become true without an email address, a Persona pass and an approved TRN, and it says which one is missing. That is the same list as above, enforced rather than remembered. It refuses a bad publish; it never performs one, so publishing stays a human act.
+
+**An email address is required to publish**, even though Phase 1 accepts a phone number instead. The portal account, the Worker Guidelines signature and the job alerts are all keyed on it, so a worker published without one would sit in a dead profile that can never be sent a job. Phase 2 asks for it when Phase 1 did not.
 
 **To publish**, in the Supabase SQL editor, one worker at a time. Never a bulk update:
 

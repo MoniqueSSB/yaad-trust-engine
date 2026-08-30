@@ -273,6 +273,12 @@ export function JoinFlow() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [years, setYears] = useState("");
+  /* Phase 2. The TRN is a nine digit number, and the number is what gets
+     checked: an image of the card is a document to store, redact and destroy
+     for no extra proof. It matters for two reasons that are not identity, it
+     is one of the stronger signs somebody is a contractor rather than an
+     employee, and a subcontractor raises an invoice against it. */
+  const [trn, setTrn] = useState("");
 
   // Step 2
   const [work, setWork] = useState("");
@@ -337,7 +343,8 @@ export function JoinFlow() {
           setTrades(v.form.trades ?? []); setParishes(v.form.parishes ?? []);
           setTradeOther(v.form.tradeOther ?? ""); setName(v.form.name ?? "");
           setPhone(v.form.phone ?? ""); setEmail(v.form.email ?? "");
-          setYears(v.form.years ?? ""); setWork(v.form.work ?? "");
+          setYears(v.form.years ?? "");
+          setTrn(v.form.trn ?? ""); setWork(v.form.work ?? "");
           setLinks(v.form.links ?? []);
         }
       }
@@ -354,11 +361,11 @@ export function JoinFlow() {
         const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
         localStorage.setItem(STORE, JSON.stringify({
           ...cur, ...next,
-          form: { trades, parishes, tradeOther, name, phone, email, years, work, links },
+          form: { trades, parishes, tradeOther, name, phone, email, years, work, links, trn },
         }));
       } catch { /* private browsing, carry on */ }
     },
-    [trades, parishes, tradeOther, name, phone, email, years, work, links],
+    [trades, parishes, tradeOther, name, phone, email, years, work, links, trn],
   );
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
@@ -571,6 +578,7 @@ export function JoinFlow() {
         trade: trades.join(", "), tradeOther: tradeOther.trim(),
         parish: parishes[0] ?? "", parishes: parishes.join(", "),
         years: years.trim(), work: work.trim(), links: links.join("\n"),
+        trn: trn.replace(/\D/g, ""),
         ref1: refLine(refs[0]), ref2: refLine(refs[1]), ref3: refLine(refs[2]),
         refsTold: refs.every((r) => r.told),
         policeStatus: policeStatus || "not_yet",
@@ -986,6 +994,54 @@ export function JoinFlow() {
                     <Upload label="Proof of address" hint="Dated within the last three months"
                       accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
                   </>
+                )}
+
+                {/* The TRN, asked for in Phase 2 rather than Phase 1, because
+                    it belongs with verification and not with a two minute
+                    profile. Persona took over step 3 on 30 Aug and the TRN row
+                    went with it, so nothing was collecting one at all.
+
+                    The number, not a photograph of the card: the number is
+                    what gets checked, and an image is another document to
+                    store, redact and destroy for no extra proof. */}
+                <div className="rounded-xl border border-line bg-bg px-4 py-3">
+                  <label className="fl" htmlFor="trn">
+                    Your TRN{" "}
+                    <span className={"src " + (trn.replace(/\D/g, "").length === 9 ? "ok" : "")}>
+                      {trn.replace(/\D/g, "").length === 9 ? "Nine digits" : "Nine digits, from your TRN card"}
+                    </span>
+                  </label>
+                  <input id="trn" className="jf" inputMode="numeric" placeholder="123456789"
+                    value={trn} onChange={(e) => setTrn(e.target.value)} />
+                  <p className="mt-2 text-[12px] leading-relaxed text-dim">
+                    A person at the desk checks it against the name on your ID.
+                    We hold the number, not a picture of the card. It is how you
+                    are paid as your own business rather than as somebody&rsquo;s
+                    staff, and it is what your invoices are raised against.
+                  </p>
+                </div>
+
+                {/* Phase 1 takes a phone number OR an email. Everything after
+                    this point is keyed on an email: the portal account, the
+                    Worker Guidelines signature, and the job alerts themselves.
+                    So it is asked for here, once, with the reason attached,
+                    rather than a worker being published into a dead profile
+                    that can never be sent a job. */}
+                {!email.trim() && (
+                  <div className="rounded-xl border border-mango/40 bg-mango/5 px-4 py-3">
+                    <label className="fl" htmlFor="lateEmail">
+                      An email address <span className="src req">Needed to get work</span>
+                    </label>
+                    <input id="lateEmail" className="jf" inputMode="email" autoComplete="email"
+                      placeholder="you@email.com" value={email}
+                      onChange={(e) => setEmail(e.target.value)} />
+                    <p className="mt-2 text-[12px] leading-relaxed text-dim">
+                      You joined with a phone number, which was enough to apply.
+                      Jobs are sent by email, and your account and the Worker
+                      Guidelines are tied to one, so we cannot put you on the
+                      board without it.
+                    </p>
+                  </div>
                 )}
 
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">

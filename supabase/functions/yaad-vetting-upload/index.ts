@@ -338,6 +338,12 @@ Deno.serve(async (req: Request) => {
         trade:    s(b.trade)  || undefined,
         trade_other: s(b.tradeOther).slice(0, 120) || undefined,
         years:    s(b.years)  || undefined,
+        // Digits only, and stored as the number rather than a picture of the
+        // card. Arriving here sets it PENDING, never approved: this function
+        // records what the applicant typed, and a person at the desk checks it
+        // against the name on the ID before it counts for anything.
+        trn:        s(b.trn).replace(/\D/g, "").slice(0, 20) || undefined,
+        trn_status: s(b.trn).replace(/\D/g, "") ? "pending" : undefined,
         work:     s(b.work).slice(0, 2000) || undefined,
         links:    s(b.links).slice(0, 1000) || undefined,
         ref1:     s(b.ref1)   || undefined,
