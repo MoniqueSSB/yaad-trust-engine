@@ -84,6 +84,15 @@ const DOC_LABEL: Record<string, string> = {
 
 const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address", "police_check"];
 
+// When Persona has confirmed the government ID and selfie, those two are not
+// missing, they are somewhere better: checked by a vendor with real document
+// authenticity and liveness detection, which this pipeline has never claimed
+// for itself. "completed" is a finished flow awaiting a decision, "approved"
+// is Persona's template deciding. Both mean the images exist and were checked;
+// the desk still decides the application.
+const personaPassed = (status: unknown) =>
+  s(status) === "completed" || s(status) === "approved";
+
 /* ── pass 1: read one document ── */
 
 const READ_PROMPT = `You are reading ONE document uploaded by a tradesperson applying to join Yaadly, a property works service in Jamaica. You report only what is visible on this page. You are not deciding anything about the application.
@@ -334,7 +343,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
 
   const { data: app, error: appErr } = await admin
     .from("applications")
-    .select("id, app_id, name, trade, trade_other, parish, parishes, years, police_status, signed_name, ai_review_consent")
+    .select("id, app_id, name, trade, trade_other, parish, parishes, years, police_status, signed_name, ai_review_consent, persona_inquiry_id, persona_status")
     .eq("id", appId).maybeSingle();
   if (appErr || !app) return { body: { error: "No such application." }, status: 404 };
 
@@ -369,10 +378,21 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
   // an empty hand and letting it fill the silence.
   if (!docs || !docs.length) {
     root.setAttributes({ "yaadly.vetting.review": "no_documents" });
+    const idDone = personaPassed(app.persona_status);
     return save({
-      summary: "No documents were uploaded with this application, so there was nothing to read.",
-      checks: [{ name: "Documents", verdict: "unclear", note: "The application arrived with no files attached at all." }],
-      questions: ["Ask them to send a photo ID, a proof of address and their TRN before this goes any further."],
+      summary: idDone
+        ? "No documents were uploaded here, so there was nothing for the model to read. The identity check itself is done: Persona confirmed the government ID and selfie. What is still owed is the TRN, the proof of address and the police check."
+        : "No documents were uploaded with this application, so there was nothing to read.",
+      checks: [
+        ...(idDone
+          ? [{ name: "Identity, checked by Persona", verdict: "pass",
+               note: `Government ID and live selfie confirmed by Persona, status "${s(app.persona_status)}", inquiry ${s(app.persona_inquiry_id)}. The images live with Persona, not on this file.` }]
+          : []),
+        { name: "Documents", verdict: "unclear", note: "The application arrived with no files attached at all." },
+      ],
+      questions: [idDone
+        ? "Ask them to send their TRN and a proof of address before this goes any further."
+        : "Ask them to send a photo ID, a proof of address and their TRN before this goes any further."],
       extracted: [], docs_read: [], docs_skipped: [], flag_count: 0,
     });
   }
@@ -448,7 +468,15 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
   let face: Record<string, unknown>;
 
   if (!idImg || !selfie) {
-    face = {
+    // Persona having done the face match is not a gap, it is the check having
+    // happened somewhere stronger. Saying "nothing to compare" there would
+    // read as a hole in the file when the file has no hole.
+    face = personaPassed(app.persona_status)
+      ? {
+          same_person: "checked_by_persona", confidence: "high",
+          note: `The ID and selfie went through Persona (status "${s(app.persona_status)}"), which did its own document and liveness checks, so there was nothing here for this model to compare and no need for it to.`,
+        }
+      : {
       same_person: "cannot_tell", confidence: "low",
       note: !idImg && !selfie
         ? "Neither the photo ID nor the live photo was readable, so there was nothing to compare."
@@ -473,7 +501,11 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
 
   /* ── pass 3: synthesis, text only ── */
 
-  const missing = CORE_DOCS.filter((t) => !docs.some((d) => d.doc_type === t)).map((t) => DOC_LABEL[t]);
+  const idByPersona = personaPassed(app.persona_status);
+  const core = idByPersona
+    ? CORE_DOCS.filter((t) => t !== "photo_id" && t !== "selfie_with_id")
+    : CORE_DOCS;
+  const missing = core.filter((t) => !docs.some((d) => d.doc_type === t)).map((t) => DOC_LABEL[t]);
 
   const typed = [
     `Today's date: ${new Date().toISOString().slice(0, 10)}`,
@@ -483,6 +515,14 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     `Years at the trade: ${s(app.years) || "not given"}`,
     s(app.signed_name) ? `Name typed as a signature on the Worker Guidelines: ${s(app.signed_name)}` : "",
     app.police_status === "not_yet" ? "They stated they do not have a police record check yet." : "",
+    idByPersona
+      ? `Identity: the government ID and live selfie were checked by Persona, status "${s(app.persona_status)}". No ID images are on this file and their absence is not a gap. Do not ask for them.`
+      : s(app.persona_inquiry_id)
+      ? `A Persona identity check was started but has not passed: Persona has it as "${s(app.persona_status) || "unknown"}". Treat the ID as unverified until the desk resolves it.`
+      : "",
+    idByPersona
+      ? "When Persona runs the identity step the web flow does not ask for a TRN or proof of address at all (founder decision, 30 Aug 2026). If they are absent, that is the flow's doing, not the applicant withholding them: name it as something the desk may still want to collect, never as a mark against the applicant."
+      : "",
     skipped.length
       ? `Files nobody machine read: ${skipped.map((x) => `${DOC_LABEL[x.doc] ?? x.doc} (${x.why})`).join("; ")}`
       : "",

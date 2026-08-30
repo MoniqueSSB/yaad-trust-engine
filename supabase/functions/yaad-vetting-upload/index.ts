@@ -25,6 +25,11 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // (application_id, upload_token) is the credential. The token is minted by
 // the database, returned once to the browser that created the application,
 // and never rendered anywhere else.
+//
+// {action:"persona"} is the odd one out: no file moves through us at all.
+// The ID and selfie go to Persona inside their own flow, the browser reports
+// the inquiry id, and this function asks Persona's API whether that inquiry
+// is real, belongs to this application, and passed. See the action itself.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -153,6 +158,81 @@ Deno.serve(async (req: Request) => {
       return json({ error: "This upload link is not valid." }, 403);
     }
     root.setAttributes({ "yaadly.vetting.doc_type": docType });
+
+    // ── persona: record the ID check, confirmed with Persona, not the browser ──
+    //
+    // The browser reports an inquiry id when the Persona flow completes. That
+    // report is worth nothing on its own: a browser that can call this
+    // function can type any string it likes. So the server asks Persona's API
+    // whether the inquiry is real, whether it belongs to THIS application
+    // (reference-id was set to the application id when the flow opened), and
+    // what its status actually is. What gets stored is Persona's answer.
+    //
+    // If PERSONA_API_KEY is not set the inquiry id is still recorded, with
+    // status "unchecked", and the response says verified:false, so the page
+    // cannot show a tick the server never earned. The desk looks it up by
+    // hand in the Persona dashboard in that case.
+    if (action === "persona") {
+      const inquiryId = s(b.inquiryId);
+      if (!/^inq_[A-Za-z0-9]{6,64}$/.test(inquiryId)) {
+        return json({ error: "That does not look like a Persona inquiry." }, 400);
+      }
+
+      const personaKey = Deno.env.get("PERSONA_API_KEY") ?? "";
+      let status = "unchecked";
+      let verified = false;
+
+      if (personaKey) {
+        let r: Response;
+        try {
+          r = await fetch(`https://api.withpersona.com/api/v1/inquiries/${inquiryId}`, {
+            headers: {
+              Authorization: `Bearer ${personaKey}`,
+              "Persona-Version": "2023-01-05",
+            },
+            signal: AbortSignal.timeout(15000),
+          });
+        } catch {
+          root.setAttributes({ "yaadly.vetting.outcome": "persona_unreachable" });
+          return json({ error: "Persona could not be reached to confirm the check. Nothing was recorded. Try again." }, 502);
+        }
+        if (r.status === 404) {
+          root.setAttributes({ "yaadly.vetting.outcome": "persona_no_such_inquiry" });
+          return json({ error: "Persona has no record of that check." }, 403);
+        }
+        if (!r.ok) {
+          root.recordError(`persona http ${r.status}`);
+          return json({ error: "Persona would not confirm the check. Nothing was recorded. Try again." }, 502);
+        }
+        const j = await r.json().catch(() => null) as
+          { data?: { attributes?: Record<string, unknown> } } | null;
+        const attrs = j?.data?.attributes ?? {};
+        const ref = s(attrs["reference-id"]);
+        // An inquiry opened for a different application must not land on this
+        // one. An empty reference is also a refusal: every inquiry this page
+        // opens carries one, so a bare inquiry was not opened by this page.
+        if (ref !== appId) {
+          root.setAttributes({ "yaadly.vetting.outcome": "persona_wrong_application" });
+          return json({ error: "That check belongs to a different application." }, 403);
+        }
+        status = s(attrs.status) || "unknown";
+        // "completed" is a finished flow awaiting a decision; "approved" is the
+        // template's own decision. Either way the applicant has done their
+        // part. Everything else (pending, needs_review, declined, expired) is
+        // stored as-is and shown as-is: the page never rounds it up to a pass.
+        verified = status === "completed" || status === "approved";
+      }
+
+      const { error: upErr } = await admin.from("applications").update({
+        persona_inquiry_id: inquiryId,
+        persona_status: status,
+        persona_checked_at: new Date().toISOString(),
+      }).eq("id", appId);
+      if (upErr) { root.recordError(upErr.message); return json({ error: "Could not record the check." }, 500); }
+
+      root.setAttributes({ "yaadly.vetting.outcome": "persona_recorded", "yaadly.vetting.persona_status": status });
+      return json({ ok: true, status, verified });
+    }
 
     // ── start: the server picks the path and mints a one-path URL ──
     if (action === "start") {

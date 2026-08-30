@@ -43,11 +43,41 @@ import { createClient } from "@/lib/supabase/client";
  * vetting-record row reading "Documents machine-read" that ticked because the
  * application had been sent, not because anything had been read. A page whose
  * entire subject is evidence cannot afford a single ornamental claim.
+ *
+ * THE ID CHECK IS PERSONA'S NOW (30 Aug 2026, founder decision). LiveCapture
+ * below was honest about its ceiling from the day it shipped: a browser
+ * camera is not proof of life, and anything stronger is a liveness vendor.
+ * Persona is that vendor. When it is configured, step 3 opens Persona's flow
+ * for the government ID and selfie, the images go to Persona rather than into
+ * our bucket, and what we store is the inquiry id and the status OUR SERVER
+ * confirmed against Persona's API. The browser's claim of "complete" is never
+ * what ticks the row: the server's answer is.
+ *
+ * Step 3 is ENTIRELY Persona's when it runs (founder decision, 30 Aug 2026):
+ * the steps inside that window are the steps configured on the Persona
+ * template, and this page adds no document rows of its own next to it. So
+ * what step 3 asks for is edited in the Persona dashboard, not here.
+ *
+ * LiveCapture and the upload rows are not deleted. They are the fallback,
+ * for three real cases: Persona env vars unset (safe to deploy before the
+ * account is wired), Persona's script refusing to load on a thin connection,
+ * and Persona erroring mid-flow. The fallback says it is the fallback, on
+ * the row, in words, and it asks for the full document set (ID, live photo,
+ * face turn, TRN, proof of address) because in that case nobody else is
+ * collecting them.
  */
 
 const FN = "yaad-vetting-upload";
 const STORE = "yaadly.application.v1";
 const GUIDELINES_VERSION = "v1";
+
+// Persona, the identity vendor. Both values are public by design (they name a
+// template and an environment, they authorise nothing) and both are inlined at
+// build time. Unset means the legacy in-page capture runs instead, so this is
+// safe to deploy before the Persona account is wired up.
+const PERSONA_TEMPLATE_ID = process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID ?? "";
+const PERSONA_ENVIRONMENT_ID = process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID ?? "";
+const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT_ID.length > 0;
 
 // Bump this whenever the wording of the AI review choice changes. A consent is
 // only worth anything tied to the sentence that earned it, and an old consent
@@ -117,6 +147,9 @@ type Check = { k: string; b: string; s: string; req?: boolean };
 const CHECKS: Check[] = [
   { k: "form",   b: "Trades and parishes set", s: "From the same list clients pick from" },
   { k: "port",   b: "CV, portfolio or links",  s: "Any one of them is enough to start" },
+  // This row's wording is replaced at render time by idRow(): what it claims
+  // depends on whether Persona is running the check or the in-page capture is,
+  // and on what the server has actually confirmed. This is the fallback text.
   { k: "id",     b: "Government photo ID",     s: "Live photo and a left-to-right video turn" },
   { k: "id2",    b: "TRN verified",            s: "Matched to the name on the ID" },
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
@@ -216,6 +249,16 @@ export function JoinFlow() {
   // be casual about it with.
   const [aiConsent, setAiConsent] = useState<"" | "granted" | "declined">("");
 
+  // The Persona ID check. "done" means OUR SERVER recorded the inquiry, and
+  // `verified` is the server's word after asking Persona's API, never the
+  // browser's. `fallback` is the reason the in-page capture is running
+  // instead, and empty means it is not.
+  const [persona, setPersona] = useState<{
+    state: "idle" | "opening" | "open" | "saving" | "done" | "error";
+    inquiryId?: string; status?: string; verified?: boolean; error?: string;
+  }>({ state: "idle" });
+  const [personaFallback, setPersonaFallback] = useState("");
+
   // Step 4
   const [policeStatus, setPoliceStatus] = useState("");
 
@@ -250,6 +293,10 @@ export function JoinFlow() {
         claimRef.current = v.claim;
         setClaim(v.claim);
         setDocs(v.docs ?? {});
+        // Only a recorded check is worth restoring. A modal that was open when
+        // the tab died was nothing yet, and restoring "error" would show a
+        // stale complaint about a connection that may be fine now.
+        if (v.persona?.state === "done" && v.persona?.inquiryId) setPersona(v.persona);
         if (v.form) {
           setTrades(v.form.trades ?? []); setParishes(v.form.parishes ?? []);
           setTradeOther(v.form.tradeOther ?? ""); setName(v.form.name ?? "");
@@ -263,7 +310,11 @@ export function JoinFlow() {
   }, []);
 
   const remember = useCallback(
-    (next: Partial<{ claim: Claim; docs: Record<string, DocState> }>) => {
+    (next: Partial<{
+      claim: Claim;
+      docs: Record<string, DocState>;
+      persona: { state: "done"; inquiryId: string; status?: string; verified?: boolean };
+    }>) => {
       try {
         const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
         localStorage.setItem(STORE, JSON.stringify({
@@ -353,6 +404,87 @@ export function JoinFlow() {
     }
   }
 
+  /* ── the Persona ID check ──────────────────────────────────────────── */
+
+  // Configured, and not fallen back. The fallback is one-way for the life of
+  // the page: a vendor that failed once on this connection does not get to
+  // flap between "checked by Persona" and "upload a file" while somebody is
+  // half way through.
+  const personaActive = PERSONA_CONFIGURED && !personaFallback;
+
+  async function recordPersona(inquiryId: string, flowStatus: string) {
+    setPersona({ state: "saving", inquiryId, status: flowStatus });
+    try {
+      const c = await ensureApplication();
+      const d = await call({
+        action: "persona",
+        applicationId: c.applicationId, uploadToken: c.uploadToken,
+        inquiryId,
+      });
+      // The row shows the SERVER's answer. The flow's own "complete" is what
+      // the browser said, and the browser is not the one we believe.
+      const next = {
+        state: "done" as const, inquiryId,
+        status: String(d.status ?? flowStatus),
+        verified: d.verified === true,
+      };
+      setPersona(next);
+      remember({ persona: next });
+    } catch (e) {
+      setPersona({
+        state: "error", inquiryId, status: flowStatus,
+        error: e instanceof Error
+          ? e.message
+          : "The check finished but did not record. Nothing is lost. Record it again.",
+      });
+    }
+  }
+
+  async function startPersona() {
+    setError("");
+    setPersona({ state: "opening" });
+    let c: Claim;
+    try { c = await ensureApplication(); }
+    catch (e) {
+      setPersona({ state: "idle" });
+      setError(e instanceof Error ? e.message : "Could not start your application.");
+      return;
+    }
+    try {
+      const { Client } = await import("persona");
+      const client = new Client({
+        templateId: PERSONA_TEMPLATE_ID,
+        // Persona's dashboard shows environments by name, not id, so the env
+        // var accepts either: a real "env_..." id, or the words "sandbox" /
+        // "production", which ride the client's environment option instead.
+        ...(PERSONA_ENVIRONMENT_ID.startsWith("env_")
+          ? { environmentId: PERSONA_ENVIRONMENT_ID }
+          : { environment: PERSONA_ENVIRONMENT_ID as "sandbox" | "production" }),
+        // The application id rides along as Persona's reference-id, and the
+        // server refuses to record any inquiry whose reference does not match
+        // the application claiming it. That is what stops a passing inquiry
+        // being pasted onto somebody else's application.
+        referenceId: c.applicationId,
+        onReady: () => {
+          setPersona((p) => (p.state === "opening" ? { state: "open" } : p));
+          client.open();
+        },
+        onComplete: ({ inquiryId, status }) => { void recordPersona(inquiryId, status); },
+        onCancel: () => setPersona((p) => (p.state === "done" ? p : { state: "idle" })),
+        onError: (err) => {
+          // Persona refusing to run is the moment the fallback earns its keep.
+          // The row says why, in the vendor's own words, and the in-page
+          // capture takes over for the rest of this visit.
+          setPersonaFallback(`Persona could not run here${err?.code ? ` (${err.code})` : ""}.`);
+          setPersona({ state: "idle" });
+        },
+      });
+    } catch {
+      setPersonaFallback("The Persona check would not load on this connection.");
+      setPersona({ state: "idle" });
+    }
+  }
+
   /* ── send ──────────────────────────────────────────────────────────── */
 
   const refLine = (r: { name: string; phone: string }) =>
@@ -410,10 +542,29 @@ export function JoinFlow() {
     return { b: "Machine read, your choice", s: "Runs after you send. It flags, it never decides" };
   };
 
+  /* The ID row's wording follows which check is actually running, and what the
+     server has actually said about it. "Verified" appears only when the server
+     asked Persona and Persona said the flow passed; a recorded check that
+     Persona has as anything else shows Persona's own word for it. */
+  const idRow = (): { b: string; s: string } => {
+    if (!personaActive)
+      return { b: "Government photo ID", s: "Live photo and a left-to-right video turn" };
+    if (persona.state === "done" && persona.verified)
+      return { b: "ID verified by Persona", s: "Government ID and live selfie, confirmed by our server" };
+    if (persona.state === "done")
+      return { b: "ID check recorded", s: `Persona has it as "${persona.status || "unchecked"}". A person at the desk resolves it` };
+    return { b: "ID check with Persona", s: "Government ID and a live selfie, in a secure Persona window" };
+  };
+
   const done: Record<string, boolean> = {
     form: step1Ready,
     port: has("cv") || has("portfolio") || has("certificate") || links.length > 0,
-    id: has("photo_id") && has("selfie_with_id") && has("face_video"),
+    // Through Persona, the applicant's part is done when the server has the
+    // inquiry recorded. Whether it PASSED is printed on the row rather than
+    // hidden in the tick, and the desk decides the application either way.
+    id: personaActive
+      ? persona.state === "done"
+      : has("photo_id") && has("selfie_with_id") && has("face_video"),
     id2: has("trn"),
     id3: has("proof_of_address"),
     police: has("police_check"),
@@ -431,6 +582,19 @@ export function JoinFlow() {
 
   const outstanding = CHECKS.filter((c) => c.req && !done[c.k]).map((c) => c.b);
   const d = STEPS[step];
+
+  /* Step 3's heading is chosen at render time because the check it describes
+     is chosen at render time. The static STEPS copy describes the in-page
+     capture; when Persona is the path, saying "taken on this page" would be
+     describing a check that is not running. */
+  const shown = d.body === "id" && personaActive
+    ? {
+        ...d,
+        h: "Your identity, checked by Persona",
+        p: "One check, in a <b>secure window run by Persona</b>, the identity verification service. It walks you through its own steps: your government photo ID, then a selfie taken in front of the camera where you turn your head. Everything you hand over in that window goes to Persona, not into our document store.",
+        note: "Persona tells our server what it found, and a person at Yaadly still decides your application. If the check will not run on your connection, the page takes uploads and an in-page capture instead and says so on the row.",
+      }
+    : d;
 
   /* ── the sent screen ───────────────────────────────────────────────── */
 
@@ -477,9 +641,18 @@ export function JoinFlow() {
           </p>
         </div>
         <p className="mt-4 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
-          Your identity documents sit in a private store no browser can reach,
-          and they are destroyed ninety days after you sent them, whatever we
-          decide. What survives is the decision, not your passport.
+          {persona.state === "done" ? (
+            <>Your ID and selfie are held by Persona, the identity service that
+            ran your check, under Yaadly&rsquo;s account there. Every document
+            you uploaded here sits in a private store no browser can reach, and
+            is destroyed ninety days after you sent it, whatever we decide.
+            What survives is the decision, not your passport.</>
+          ) : (
+            <>Your identity documents sit in a private store no browser can
+            reach, and they are destroyed ninety days after you sent them,
+            whatever we decide. What survives is the decision, not your
+            passport.</>
+          )}
         </p>
       </>
     );
@@ -529,11 +702,11 @@ export function JoinFlow() {
           <div className="jhead">
             <span className="jbadge">Step {step + 1} of {STEPS.length}</span>
             <h2 className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none">
-              {d.h}
+              {shown.h}
             </h2>
             <p
               className="mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-mute"
-              dangerouslySetInnerHTML={{ __html: d.p }}
+              dangerouslySetInnerHTML={{ __html: shown.p }}
             />
           </div>
 
@@ -655,22 +828,85 @@ export function JoinFlow() {
 
             {d.body === "id" && (
               <div className="grid gap-3">
-                <Upload label="Government photo ID" hint="Passport, driver's licence or national ID"
-                  accept={PAPERS} doc="photo_id" docs={docs} onFile={upload} />
-                <LiveCapture kind="photo" label="A live photo, with your ID beside your face"
-                  doc="selfie_with_id" docs={docs} onFile={upload} />
-                <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
-                  doc="face_video" docs={docs} onFile={upload} />
-                <Upload label="Your TRN" hint="Matched to the name on the ID"
-                  accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
-                <Upload label="Proof of address" hint="Dated within the last three months"
-                  accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
+                {personaActive ? (
+                  <div className={"upl" + (persona.state === "done" ? " done" : persona.state === "error" ? " bad" : "")}>
+                    <div className="uplb">
+                      <b>
+                        {persona.state === "done"
+                          ? `✓ ${persona.verified ? "ID verified by Persona" : "ID check recorded"}`
+                          : "Government ID and a live selfie, with Persona"}
+                      </b>
+                      <span>
+                        {persona.state === "opening" ? "Opening the Persona window…"
+                          : persona.state === "open" ? "The Persona window is open. Finish the check there."
+                          : persona.state === "saving" ? "Recording the check with our server…"
+                          : persona.state === "done"
+                            ? (persona.verified
+                                ? "Our server confirmed it with Persona. Your ID stays with Persona, not in our files."
+                                : `Persona has it as "${persona.status || "unchecked"}". A person at the desk resolves it.`)
+                          : persona.state === "error" ? persona.error
+                          : "Opens a secure window run by Persona, the identity service. Your ID and selfie go to Persona, not into our files."}
+                      </span>
+                    </div>
+                    {persona.state === "error" && persona.inquiryId ? (
+                      // The check itself finished; only OUR record of it failed.
+                      // Re-recording asks the server again. It does not make
+                      // anybody hold their passport up twice.
+                      <button type="button" className="upbtn"
+                        onClick={() => { const { inquiryId, status } = persona; void recordPersona(inquiryId!, status ?? ""); }}>
+                        Record it again
+                      </button>
+                    ) : (
+                      <button type="button" className="upbtn"
+                        disabled={persona.state === "opening" || persona.state === "open" || persona.state === "saving"}
+                        onClick={() => void startPersona()}>
+                        {persona.state === "done" ? "Run it again"
+                          : persona.state === "idle" ? "Start the ID check"
+                          : "Opening…"}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {personaFallback && (
+                      <p className="rounded-xl border border-softline bg-soft px-4 py-2.5 text-[12px] leading-relaxed text-mute">
+                        <b className="text-ink">The Persona check is not running on this visit.</b>{" "}
+                        {personaFallback} The in-page capture below stands in, and a
+                        person at the desk checks it by hand.
+                      </p>
+                    )}
+                    <Upload label="Government photo ID" hint="Passport, driver's licence or national ID"
+                      accept={PAPERS} doc="photo_id" docs={docs} onFile={upload} />
+                    <LiveCapture kind="photo" label="A live photo, with your ID beside your face"
+                      doc="selfie_with_id" docs={docs} onFile={upload} />
+                    <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
+                      doc="face_video" docs={docs} onFile={upload} />
+                    <Upload label="Your TRN" hint="Matched to the name on the ID"
+                      accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
+                    <Upload label="Proof of address" hint="Dated within the last three months"
+                      accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
+                  </>
+                )}
 
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
-                  <b className="text-ink">Where these files go.</b> They upload
-                  straight into a private store that no browser can reach. They are
-                  destroyed ninety days after you send them, whatever we decide, and
-                  what we keep forever is the decision, not your passport.
+                  {personaActive ? (
+                    <>
+                      <b className="text-ink">Where your ID goes.</b> Everything
+                      inside the Persona window is held by Persona under
+                      Yaadly&rsquo;s account there. What our own records keep is
+                      the result of the check, not the images. Files you upload on
+                      the other steps go into a private store no browser can
+                      reach, and are destroyed ninety days after you send them.
+                    </>
+                  ) : (
+                    <>
+                      <b className="text-ink">Where these files go.</b> They upload
+                      straight into a private store that no browser can reach. They
+                      are destroyed ninety days after you send them, whatever we
+                      decide, and what we keep forever is the decision, not your
+                      passport.
+                    </>
+                  )}
                 </div>
 
                 <div className="fgroup" style={{ marginBottom: 0 }}>
@@ -926,7 +1162,7 @@ export function JoinFlow() {
             )}
           </div>
 
-          <p className="mt-3 text-[12.5px] leading-relaxed text-dim">{d.note}</p>
+          <p className="mt-3 text-[12.5px] leading-relaxed text-dim">{shown.note}</p>
 
           {step === 0 && !step1Ready && (
             <p className="mt-2 text-[12.5px] text-dim">
@@ -970,10 +1206,16 @@ export function JoinFlow() {
           <p className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
             Your vetting record
           </p>
-          {CHECKS.map((c) => {
+          {/* TRN and proof of address are not asked for when Persona runs the
+              identity step (founder decision, 30 Aug 2026): step 3 is the
+              Persona template's steps and nothing else. The rows disappear
+              rather than sit at "Waiting" forever for documents no screen
+              collects. They return whenever the fallback capture is active,
+              because there the page is the one collecting. */}
+          {CHECKS.filter((c) => !(personaActive && (c.k === "id2" || c.k === "id3"))).map((c) => {
             const ok = done[c.k];
             const now = !ok && ROW_STEP[c.k] === step;
-            const copy = c.k === "agent" ? agentRow() : { b: c.b, s: c.s };
+            const copy = c.k === "agent" ? agentRow() : c.k === "id" ? idRow() : { b: c.b, s: c.s };
             return (
               <button className="vitem" key={c.k} onClick={() => setStep(ROW_STEP[c.k] ?? 0)}>
                 <span className={"vdot" + (ok ? " done" : now ? " now" : "")}>

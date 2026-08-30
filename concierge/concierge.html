@@ -740,6 +740,17 @@ const VIEWS = [
       {h:"Applicant", f:r => esc(r.name || "no name") + sub_(r.email || r.phone || "")},
       {h:"Trade & area", f:r => esc(r.trade || "not said") + sub_(r.parish || "")},
       {h:"Years", n:true, f:r => r.years ? esc(r.years) : mute_("none")},
+      // Persona's word, exactly as the server recorded it after asking
+      // Persona's API. "unchecked" means the edge function had no PERSONA_API_KEY
+      // to confirm with: look the inquiry up in the Persona dashboard by hand.
+      {h:"ID check", f:r => {
+        if (r.persona_status) {
+          const ok = ["approved","completed"].includes(String(r.persona_status));
+          return chip_(ok ? "ok" : "warn", "Persona: " + r.persona_status);
+        }
+        const hasId = (VDOC[r.id] || []).some(x => x.doc_type === "photo_id");
+        return hasId ? chip_("mute", "uploaded, check by hand") : chip_("warn", "nothing yet");
+      }},
       {h:"Police check", f:r => r.police_status ? tone_(r.police_status) : chip_("warn","not started")},
       {h:"Signed", f:r => r.signed_at ? chip_("ok", day_(r.signed_at)) : chip_("warn","not signed")},
       {h:"State", f:r => tone_(r.status)},
@@ -1367,6 +1378,7 @@ function panelApps(rows){
   return `<div class="card">
       <div class="chd"><h3>${esc(a.name || a.app_id || "Application")}</h3>`
     + (v ? `<span class="chip ${flags ? "warn" : "ok"} dot">${flags} flag${flags === 1 ? "" : "s"}</span>` : `<span class="chip mute dot">not reviewed</span>`)
+    + (a.persona_status ? `<span class="chip ${["approved","completed"].includes(String(a.persona_status)) ? "ok" : "warn"} dot">ID by Persona: ${esc(a.persona_status)}</span>` : "")
     + `<span class="sp">${esc(a.trade || "trade not said")} &middot; ${esc(a.parish || "parish not said")} &middot; applied ${esc(ago_(a.created_at))} ago</span></div>`
     + body
     + `<p class="conseq"><b>The agent flags, a person decides.</b> ${v ? esc(v.model || "The model") + " read " + docs.length + " document" + (docs.length === 1 ? "" : "s") + " and raised " + flags + "." : "Nothing has read these documents."} It never approves anybody. Open the row below to record Pass, Gap or Block, and each one says what it does before it does it.</p>`

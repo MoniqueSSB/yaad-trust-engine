@@ -70,6 +70,28 @@ const REQUIRED = [
 
 const problems = [];
 
+// The Persona environment. Sandbox simulates every verification and offers a
+// "Pass verifications" toggle, which is exactly right for testing and exactly
+// wrong for a real applicant: a production build pointing at sandbox would
+// hand out ID "passes" nobody earned, on a product whose whole promise is the
+// check. So a production build refuses sandbox unless told, in writing, that
+// it is deliberate: PERSONA_ALLOW_SANDBOX=1.
+{
+  const env = (process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID ?? "").trim().toLowerCase();
+  if (
+    process.env.NODE_ENV === "production" &&
+    env === "sandbox" &&
+    process.env.PERSONA_ALLOW_SANDBOX !== "1"
+  ) {
+    problems.push(
+      "NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID is \"sandbox\" in a production build. " +
+      "Sandbox simulates every ID check, so real applicants would get passes nobody earned. " +
+      "Set it to \"production\" (with a production-published template), comment both Persona " +
+      "values out, or set PERSONA_ALLOW_SANDBOX=1 if a sandbox deploy is deliberate.",
+    );
+  }
+}
+
 for (const { name, valid, looksLike } of REQUIRED) {
   const raw = process.env[name];
   const v = typeof raw === "string" ? raw.trim() : "";
@@ -105,8 +127,8 @@ for (const { name, valid, looksLike } of REQUIRED) {
 if (problems.length > 0) {
   const isProductionBuild = process.env.NODE_ENV === "production";
   const heading = isProductionBuild
-    ? "BUILD STOPPED. The Supabase environment is not set."
-    : "WARNING. The Supabase environment is not set.";
+    ? "BUILD STOPPED. The environment is not right."
+    : "WARNING. The environment is not right.";
 
   const message = [
     "",
