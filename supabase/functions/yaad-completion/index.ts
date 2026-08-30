@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 // Completion Report narrative agent.
 //
@@ -15,11 +17,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // never mention money in any form - the payment record on the report is
 // rendered from the job data directly, not written by a model.
 
-function pickProvider(): { name: string; api: string; key: string; model: string } | null {
-  const mk = Deno.env.get("MINIMAX_API_KEY");
-  if (mk) return { name: "minimax", api: "https://api.minimax.io/v1/chat/completions", key: mk, model: "MiniMax-M2.7" };
-  return null;
-}
+// Provider lives in _shared/textmodel.ts. See that file for why.
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -115,8 +113,8 @@ Deno.serve(async (req: Request) => {
     const job = (body && typeof body.job === "object" && body.job) ? body.job : null;
     if (!job || !String(job.desc || "").trim()) return json({ error: "The job needs a scope description before a narrative can be drafted." }, 400);
 
-    const prov = pickProvider();
-    if (!prov) { console.error("completion: no model API key"); return json({ error: "MINIMAX_API_KEY is not set." }, 500); }
+    const prov = pickTextProvider();
+    if (!prov) { console.error("completion: no model API key"); return json({ error: NO_PROVIDER_MESSAGE }, 500); }
 
     // Only facts, no client contact details, no money fields.
     const ev = Array.isArray(job.evidence) ? job.evidence.slice(0, 40) : [];
@@ -138,9 +136,8 @@ Deno.serve(async (req: Request) => {
 
     let finishReason = "";
     const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
-      "gen_ai.system": prov.name, "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": prov.model, "gen_ai.request.temperature": 0.3,
-      "server.address": new URL(prov.api).hostname, "yaadly.agent.name": "completion",
+      ...providerAttrs(prov), "gen_ai.operation.name": "chat",
+      "gen_ai.request.temperature": 0.3, "yaadly.agent.name": "completion",
     }, async (s) => {
       const r = await fetch(prov.api, {
         method: "POST",
@@ -153,7 +150,7 @@ Deno.serve(async (req: Request) => {
       const j = await r.json();
       s.setAttributes({ "http.response.status_code": r.status,
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens, "gen_ai.usage.output_tokens": j?.usage?.completion_tokens });
-      if (!r.ok) { console.error("completion: model http", r.status, JSON.stringify(j).slice(0, 300)); s.recordError(`minimax http ${r.status}`); throw new Error(`Model call failed (${r.status})`); }
+      if (!r.ok) { console.error("completion: model http", r.status, JSON.stringify(j).slice(0, 300)); s.recordError(`${prov.name} http ${r.status}`); throw new Error(`Model call failed (${r.status})`); }
       finishReason = j?.choices?.[0]?.finish_reason ?? "";
       return j?.choices?.[0]?.message?.content ?? "";
     });
@@ -171,7 +168,17 @@ Deno.serve(async (req: Request) => {
       ...(blob.match(/(?:J?\$|£|€|USD|JMD|GBP)\s?[\d,]+(?:\.\d+)?/gi) ?? []),
       ...(blob.match(/\b(?:paid|payment of|cost|price|charge)\b[^"]{0,40}\d/gi) ?? []),
     ];
-    root.setAttributes({ "yaadly.completion.outcome": "drafted", "yaadly.completion.money_guardrail_hits": moneyHits.length });
+    // Banned language, the same list the Python engine screens against. This
+    // one FLAGS rather than blocks, unlike the live reply path in yaad-inbound,
+    // because a person reads this narrative before the report is ever issued.
+    // The human gate is already here; what was missing was telling them.
+    const bannedHits = guardrails.scan(blob);
+
+    root.setAttributes({
+      "yaadly.completion.outcome": "drafted",
+      "yaadly.completion.money_guardrail_hits": moneyHits.length,
+      ...guardrails.screenAttrs(bannedHits),
+    });
 
     return json({
       ok: true, narrative: docs, model: prov.model,
@@ -179,6 +186,11 @@ Deno.serve(async (req: Request) => {
         money_language_detected: moneyHits.length > 0,
         samples: moneyHits.slice(0, 5),
         note: moneyHits.length ? "The narrative mentions money. It must not - remove it before the report is issued." : "No money language found in the narrative.",
+        banned_language_detected: bannedHits.length > 0,
+        banned_samples: [...new Set(bannedHits.map((f) => f.term))].slice(0, 5),
+        banned_note: bannedHits.length
+          ? "The narrative uses language Yaadly never uses: " + [...new Set(bannedHits.map((f) => f.guidance))].join(" ") + " Fix it before the report is issued."
+          : "No banned language found in the narrative.",
       },
       reminder: "A draft. Read it against the evidence before the report is issued.",
     });

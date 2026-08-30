@@ -15,6 +15,24 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // It also does not run at all unless the applicant said it could. See the
 // consent gate inside review().
 //
+// ── What it will and will not send ──
+//
+// It does NOT send identity documents. The government photo ID, the live
+// selfie and the face-turn video never leave storage, whatever the applicant
+// consented to. See IDENTITY_DOCS below.
+//
+// That is a founder decision of 30 Aug 2026 and the reasoning is worth keeping
+// because it is not squeamishness. Persona already does the identity step, with
+// real document-authenticity and liveness checks that this pipeline has never
+// claimed for itself. Sending the same passport to a second vendor added a
+// transfer of the most sensitive thing on the file to a US hosted model without
+// adding a check anybody relies on. The consent gate made that lawful to ask
+// for. It did not make it worth asking for.
+//
+// What it still reads is the paperwork around the person: police record,
+// proof of address, TRN, certificates, CV, portfolio. That is where the machine
+// read genuinely saves the desk time, and none of it is an identity document.
+//
 // ── Why it reads one document at a time ──
 //
 // The obvious build is one call with every document attached, asking the model
@@ -23,15 +41,17 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // exactly one image per request.
 //
 // Rather than pin the whole feature to whichever model happens to allow five,
-// it runs in three passes:
+// it runs in two passes:
 //
 //   1. read      one call per document, in parallel. What does this page say.
-//   2. face      one call with the ID and the live photo together, IF the
-//                model will take two images. If it will not, face match comes
-//                back "cannot tell" naming the cause, which is the honest
-//                answer and tells whoever reads it what to change.
-//   3. synthesis one text-only call over everything pass 1 read, plus what the
+//   2. synthesis one text-only call over everything pass 1 read, plus what the
 //                applicant typed.
+//
+// There used to be a face-match pass between them, comparing the ID against
+// the live selfie. It is gone with the identity documents it needed. Where
+// Persona has passed, that check has happened somewhere stronger. Where Persona
+// has not, NOTHING has compared those two faces and the desk is told so in as
+// many words rather than left to notice the absence.
 //
 // Reading a document on its own is also simply more accurate than asking one
 // prompt to juggle five, and pass 1's raw readings are stored, so when the
@@ -43,9 +63,8 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // tries to run it in the background so the read is already there. That attempt
 // is best effort and known to be: see the dispatch at the bottom.
 //
-// PRIVACY. This sends identity documents to NVIDIA's hosted model, which is
-// exactly why step 3 now asks permission and why the gate below is not
-// optional.
+// PRIVACY. What is left still goes to NVIDIA's hosted model, which is why step
+// 3 asks permission and why the gate below is not optional.
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -84,6 +103,18 @@ const DOC_LABEL: Record<string, string> = {
 
 const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address", "police_check"];
 
+// Identity documents. These never reach a model, consent or no consent.
+//
+// The consent gate above decides whether the machine reads this application at
+// all. This decides what it is allowed to read when the answer is yes, and it
+// is not a preference the desk can turn off: there is no flag, no override and
+// no query parameter. Persona holds the identity check. A second copy of a
+// passport sitting in a US model vendor's request logs buys nothing.
+//
+// Adding a doc_type here is safe. Removing one is a data protection decision
+// and belongs to the founder, not to whoever is editing this file.
+const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video"];
+
 // When Persona has confirmed the government ID and selfie, those two are not
 // missing, they are somewhere better: checked by a vendor with real document
 // authenticity and liveness detection, which this pipeline has never claimed
@@ -109,29 +140,24 @@ Rules:
 - Do not comment on the person's appearance, race, age or gender.
 - Output ONLY the JSON object.`;
 
-/* ── pass 2: do these two faces match ── */
+/* ── there was a face-match prompt here ──
+   It compared the government photo ID against the live selfie. Removed on
+   30 Aug 2026 along with the identity documents it needed. Persona does that
+   check properly, and where Persona has not passed the review now says in
+   plain words that nobody has compared them, which is a better outcome than a
+   model guessing at two faces. Do not put it back. */
 
-const FACE_PROMPT = `You are shown two images from one person's application to join Yaadly: first their government photo ID, second a live photo they took in the moment. Say whether they appear to be the same person.
+/* ── pass 2: put it together ── */
 
-Return STRICT JSON only, no markdown fences, exactly this shape:
-{"same_person":"likely|unlikely|cannot_tell","confidence":"high|medium|low","note":"one or two sentences on what you based that on and what limited you"}
+const SYNTH_PROMPT = `You are the Vetting Reviewer for Yaadly, a trust-first property works service in Jamaica. You are given what an applicant typed, what a vision model read off each of their documents separately, a statement of where the identity check stands, and date arithmetic that has already been calculated for you. You produce the note a human reviewer reads before opening the file.
 
-Rules:
-- "cannot_tell" is the right answer whenever lighting, image quality, angle, or the age of the ID photo stop you being sure. Prefer it to guessing.
-- A person can age, change weight, grow or shave a beard, and change their hair. None of those on their own make it a different person.
-- Never comment on race or ethnicity. Never describe the person beyond what the comparison needs.
-- You are producing a flag for a human, not an identification. Say so in the note if you are anything short of confident.
-- Output ONLY the JSON object.`;
-
-/* ── pass 3: put it together ── */
-
-const SYNTH_PROMPT = `You are the Vetting Reviewer for Yaadly, a trust-first property works service in Jamaica. You are given what an applicant typed, what a vision model read off each of their documents separately, a face comparison, and date arithmetic that has already been calculated for you. You produce the note a human reviewer reads before opening the file.
+No model has seen this person's identity documents. The government photo ID, the live selfie and the face video are never sent to a model. You have not seen a face and you must not write as though you had.
 
 You never decide. You do not approve, decline, or recommend approving or declining. You produce flags and questions for a person to act on.
 
 Cover these, but only where there is something to say:
 - Name match. Is the name the same across every document, and does it match what the applicant typed? A middle name on one document and not another is worth a note, not a flag. A different surname with no explanation is a flag.
-- Face match. Report what the comparison said, including its confidence.
+- Identity. Repeat where the identity check stands, in the reviewer's own interest. If it says nobody has checked it, that is a flag and it is the most urgent one on the file. If Persona passed it, say so and move on: it is not a gap.
 - Document is what it claims. Any document where matches_label is "no" or "unsure" is a flag, and the most serious one.
 - Legibility. Anything that came back partly readable or unreadable needs re-sending, and that is a question for the applicant, not a flag against them.
 - Signs of alteration. Report concerns raised on any document.
@@ -405,9 +431,21 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
      long as that URL lives. */
   const skipped: { doc: string; why: string }[] = [];
   const loaded: { doc: string; label: string; dataUrl: string }[] = [];
+  let withheldCount = 0;
 
   for (const d of docs) {
     const doc = s(d.doc_type);
+    // Checked before the mime test and before the download, so an identity
+    // document is never fetched out of the bucket on this path at all.
+    //
+    // It goes on the skipped list rather than vanishing, because the desk has
+    // to know the file is there and unread. A document that disappears from
+    // the review reads as a document that does not exist.
+    if (IDENTITY_DOCS.includes(doc)) {
+      withheldCount++;
+      skipped.push({ doc, why: "An identity document. These are never sent to a model. Open it yourself." });
+      continue;
+    }
     if (!READABLE.includes(s(d.mime))) {
       skipped.push({ doc, why: `${s(d.mime) || "unknown type"}, which a vision model cannot read. Open it yourself.` });
       continue;
@@ -428,12 +466,29 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
   root.setAttributes({
     "yaadly.vetting.docs_read": loaded.length,
     "yaadly.vetting.docs_skipped": skipped.length,
+    // Counted separately so it is provable after the fact that identity
+    // documents were withheld rather than merely absent. A DPIA is easier to
+    // answer with a number than with a promise.
+    "yaadly.vetting.identity_docs_withheld": withheldCount,
   });
 
   if (!loaded.length) {
+    // Two different empty hands, and they mean opposite things. An application
+    // holding nothing but a passport and a selfie is not a badly filed one:
+    // it is the common case now that identity documents are withheld by
+    // policy, and saying "every file is a PDF" there would be a lie the desk
+    // could act on.
+    const onlyIdentity = withheldCount > 0 && withheldCount === skipped.length;
     return save({
-      summary: "Nothing on this application could be machine read. Every file is a PDF, a document or a video, so all of it needs your eyes.",
-      checks: [{ name: "Documents", verdict: "unclear", note: "No readable image was attached. " + skipped.map((x) => `${DOC_LABEL[x.doc] ?? x.doc}: ${x.why}`).join(" ") }],
+      summary: onlyIdentity
+        ? "Everything on this application is an identity document, and those are never sent to a model. Nothing was read, and nothing was meant to be. Open the file yourself."
+        : "Nothing on this application could be machine read. Every file is a PDF, a document or a video, so all of it needs your eyes.",
+      checks: [{
+        name: "Documents",
+        verdict: "unclear",
+        note: (onlyIdentity ? "Nothing here was for a model to read. " : "No readable image was attached. ")
+          + skipped.map((x) => `${DOC_LABEL[x.doc] ?? x.doc}: ${x.why}`).join(" "),
+      }],
       questions: [], extracted: [], docs_read: [], docs_skipped: skipped, flag_count: 0,
     });
   }
@@ -461,45 +516,30 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     }, 502);
   }
 
-  /* ── pass 2: face match, only if both photos are here ── */
+  /* ── identity: stated, never modelled ──
+     No call. Nothing here reaches NVIDIA. This block exists to say plainly
+     where the identity check happened, because the one thing worse than not
+     running a check is running nothing and leaving a silence that reads like a
+     pass. */
 
-  const idImg = loaded.find((f) => f.doc === "photo_id");
-  const selfie = loaded.find((f) => f.doc === "selfie_with_id");
-  let face: Record<string, unknown>;
+  const idUploadedHere = docs.some((d) => IDENTITY_DOCS.includes(s(d.doc_type)));
 
-  if (!idImg || !selfie) {
-    // Persona having done the face match is not a gap, it is the check having
-    // happened somewhere stronger. Saying "nothing to compare" there would
-    // read as a hole in the file when the file has no hole.
-    face = personaPassed(app.persona_status)
-      ? {
-          same_person: "checked_by_persona", confidence: "high",
-          note: `The ID and selfie went through Persona (status "${s(app.persona_status)}"), which did its own document and liveness checks, so there was nothing here for this model to compare and no need for it to.`,
-        }
-      : {
-      same_person: "cannot_tell", confidence: "low",
-      note: !idImg && !selfie
-        ? "Neither the photo ID nor the live photo was readable, so there was nothing to compare."
-        : !idImg
-        ? "No readable photo ID, so there was nothing to compare the live photo against."
-        : "No live photo was readable, so there was nothing to compare the ID against.",
-    };
-  } else {
-    const out = await ask(trace, "face", FACE_PROMPT, [
-      { type: "text", text: "First image: the government photo ID. Second image: the live photo. Are they the same person?" },
-      { type: "image_url", image_url: { url: idImg.dataUrl } },
-      { type: "image_url", image_url: { url: selfie.dataUrl } },
-    ], 400);
-    face = out.ok ? out.value : {
-      same_person: "cannot_tell", confidence: "low",
-      // The usual cause is a model that takes one image per request. Naming it
-      // beats a bare failure: it tells whoever reads this what to change rather
-      // than only that something broke.
-      note: `The face comparison did not run, so nobody has checked the ID photo against the live photo. Compare them yourself. Cause: ${s(out.error).slice(0, 160)}`,
-    };
-  }
+  const identity: Record<string, unknown> = personaPassed(app.persona_status)
+    ? {
+        checked_by: "persona",
+        note: `The government ID and live selfie went through Persona (status "${s(app.persona_status)}"), which does its own document authenticity and liveness checks. No identity image was read here and none needed to be.`,
+      }
+    : idUploadedHere
+    ? {
+        checked_by: "nobody_yet",
+        note: "An identity document was uploaded but Persona has not passed, and identity documents are never sent to a model. So NOBODY has compared the ID against the live photo. Open them and compare them yourself before this application moves.",
+      }
+    : {
+        checked_by: "nobody_yet",
+        note: "Persona has not passed and no identity document was uploaded here either. There is nothing on this file establishing who this person is.",
+      };
 
-  /* ── pass 3: synthesis, text only ── */
+  /* ── pass 2: synthesis, text only ── */
 
   const idByPersona = personaPassed(app.persona_status);
   const core = idByPersona
@@ -536,7 +576,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     type: "text",
     text: `WHAT THE APPLICANT TYPED\n${typed}\n\n`
       + `WHAT WAS READ OFF EACH DOCUMENT\n${JSON.stringify(extracted, null, 1)}\n\n`
-      + `FACE COMPARISON\n${JSON.stringify(face)}\n\n`
+      + `IDENTITY, ESTABLISHED FACTS, NOT A MODEL OUTPUT\n${JSON.stringify(identity)}\n\n`
       + `DATE ARITHMETIC, ALREADY DONE FOR YOU\nThese were calculated, not judged. Treat them as settled and never contradict them. They are added to the checks after you answer, so do not repeat them as checks of your own; use them for the summary and the questions.\n${JSON.stringify(computed, null, 1)}\n\n`
       + `Now produce the reviewer's note.`,
   }], 1000);

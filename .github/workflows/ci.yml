@@ -69,36 +69,67 @@ jobs:
             echo "::endgroup::"
           done
 
-      # The shared tracer is copied into each function directory because Supabase
+      # Shared modules are copied into each function directory because Supabase
       # deploys self-contained bundles. If a copy drifts from _shared, the thing
       # you tested is not the thing you deployed.
       #
-      # The check keys off whether a function actually imports the tracer, not
-      # whether a file happens to be sitting there. The old version compared
-      # every yaad-* directory against _shared, so yaad-match, which has no otel
-      # import and correctly carries no copy, failed every run from the day it
-      # was added. Keying off the import also catches the opposite mistake: a
-      # stale otel.ts left behind in a function that no longer imports it.
-      - name: Check the shared tracer copies are in sync
+      # The check keys off whether a function actually imports the file, not
+      # whether one happens to be sitting there. An early version compared every
+      # yaad-* directory against _shared, so yaad-match, which has no otel import
+      # and correctly carries no copy, failed every run from the day it was
+      # added. Keying off the import also catches the opposite mistake: a stale
+      # copy left behind in a function that no longer imports it.
+      #
+      # Loops over every file in _shared rather than naming otel.ts, so adding a
+      # shared module does not mean remembering to extend this job. textmodel.ts
+      # was the second one and it decides which country the text model calls go
+      # to, which is not a thing to leave unenforced.
+      - name: Check the shared module copies are in sync
         run: |
           set -e
           fail=0
-          for d in supabase/functions/yaad-*; do
-            [ -f "$d/index.ts" ] || continue
-            if grep -q 'from "./otel.ts"' "$d/index.ts"; then
-              if [ ! -f "$d/otel.ts" ]; then
-                echo "::error file=$d/index.ts::imports ./otel.ts but no copy is present. Run supabase/functions/sync-shared.sh"
-                fail=1
-              elif ! cmp -s supabase/functions/_shared/otel.ts "$d/otel.ts"; then
-                echo "::error file=$d/otel.ts::otel.ts has drifted from _shared/otel.ts. Run supabase/functions/sync-shared.sh"
+          for shared in supabase/functions/_shared/*.ts; do
+            name=$(basename "$shared")
+            for d in supabase/functions/yaad-*; do
+              [ -f "$d/index.ts" ] || continue
+              if grep -q "from \"./$name\"" "$d/index.ts"; then
+                if [ ! -f "$d/$name" ]; then
+                  echo "::error file=$d/index.ts::imports ./$name but no copy is present. Run supabase/functions/sync-shared.sh"
+                  fail=1
+                elif ! cmp -s "$shared" "$d/$name"; then
+                  echo "::error file=$d/$name::$name has drifted from _shared/$name. Run supabase/functions/sync-shared.sh"
+                  fail=1
+                fi
+              elif [ -f "$d/$name" ]; then
+                echo "::error file=$d/$name::$name is here but nothing imports it. Delete it, or import it."
                 fail=1
               fi
-            elif [ -f "$d/otel.ts" ]; then
-              echo "::error file=$d/otel.ts::otel.ts is here but nothing imports it. Delete it, or import it."
-              fail=1
-            fi
+            done
           done
           exit $fail
+
+      # The banned-language screen exists twice, once in Python for the engine
+      # and once in Deno for the live functions, because they are two runtimes
+      # and the rule has to hold in both. Two copies of a rule drift, so both
+      # suites assert the same five phrases. If somebody loosens one pattern,
+      # one of these two jobs goes red.
+      - name: Run the Deno guardrail tests
+        run: deno test --allow-read supabase/functions/_shared/
+
+      # The provider decision lives in _shared/textmodel.ts and nowhere else.
+      # A hard-coded model endpoint in a function is how the estate ended up on
+      # eight copies of the same China URL, and how it would quietly drift back.
+      - name: No function hard-codes a model endpoint
+        run: |
+          set -e
+          hits=$(grep -rnE 'https://(api\.minimax\.io|api\.mistral\.ai)' \
+            supabase/functions/yaad-*/index.ts || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::A text model endpoint is hard-coded in a function. Use pickTextProvider() from _shared/textmodel.ts."
+            exit 1
+          fi
+          echo "No hard-coded text model endpoints."
 
   web:
     name: Web app (typecheck and tests)

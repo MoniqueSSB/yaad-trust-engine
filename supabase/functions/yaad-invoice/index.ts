@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 
 // yaad-invoice
 //
@@ -16,8 +17,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // The function never sends an invoice and never marks one paid. Both of those
 // are human moves, and the second is refused by the database itself.
 
-const MODEL = "MiniMax-M2.7";
-const API = "https://api.minimax.io/v1/chat/completions";
+// Model and endpoint come from _shared/textmodel.ts. See that file for why.
 
 const SYSTEM = `You are the Invoicing Agent for Yaadly Ltd, a UK company providing construction project management and oversight for property work in Jamaica. You read a short instruction from the founder and turn it into the lines of a draft invoice.
 
@@ -285,10 +285,10 @@ Deno.serve(async (req) => {
     const text = String(body.text || "").slice(0, 4000);
     if (!text.trim()) return fail("Tell me what to bill for.", 400);
 
-    const key = Deno.env.get("MINIMAX_API_KEY");
-    if (!key) {
-      root.recordError("MINIMAX_API_KEY secret is not set");
-      return fail("MINIMAX_API_KEY secret is not set in Edge Function secrets", 500);
+    const prov = pickTextProvider();
+    if (!prov) {
+      root.recordError("no text model is configured");
+      return fail(NO_PROVIDER_MESSAGE, 500);
     }
 
     // The model sees names and ids. It does NOT see prices, because it has no
@@ -297,18 +297,16 @@ Deno.serve(async (req) => {
       .map((c) => `${c.id} = ${c.name} (per ${c.unit_label}${c.recurring ? ", recurring monthly" : ""}). ${c.blurb}`)
       .join("\n");
 
-    const raw = await trace.span(`chat ${MODEL}`, SpanKind.CLIENT, {
-      "gen_ai.system": "minimax",
+    const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": MODEL,
       "gen_ai.request.temperature": 0,
-      "server.address": "api.minimax.io",
     }, async (s) => {
-      const r = await fetch(API, {
+      const r = await fetch(prov.api, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
         body: JSON.stringify({
-          model: MODEL,
+          model: prov.model,
           temperature: 0,
           messages: [
             { role: "system", content: `${SYSTEM}\n\nCATALOGUE (the only permitted catalogue_id values, plus "UNKNOWN"):\n${catalogueForPrompt}` },
@@ -324,7 +322,7 @@ Deno.serve(async (req) => {
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`minimax http ${r.status}`);
+      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
       return j?.choices?.[0]?.message?.content ?? "";
     });
 
@@ -390,7 +388,7 @@ Deno.serve(async (req) => {
         drafted_by: "ai",
         period_label: String(parsed.period_label ?? "").slice(0, 80),
         covering_note: String(parsed.covering_note ?? "").slice(0, 1200),
-        model_note: `${MODEL}, temperature 0. Lines proposed by the agent, prices taken from service_catalogue. Not checked by a human yet.`,
+        model_note: `${prov.model}, temperature 0. Lines proposed by the agent, prices taken from service_catalogue. Not checked by a human yet.`,
       }),
     });
     if (!insRes.ok) return fail(`could not create the draft: ${await insRes.text()}`, 502);

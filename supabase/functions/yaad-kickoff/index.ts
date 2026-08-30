@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs, type TextProvider, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 // Project Kickoff Pack agent.
 //
@@ -66,25 +68,24 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // MiniMax") - the mere presence of an NVIDIA key must never hijack the
 // draft (v5 did exactly that and a test failed on an NVIDIA 503).
 // NVIDIA runs only when explicitly chosen: set the secret PROVIDER=nvidia.
-function pickProvider(override?: string): { name: string; api: string; key: string; model: string } | null {
+function pickProvider(override?: string): TextProvider | null {
   if (override) {
     const ork = Deno.env.get("OPENROUTER_API_KEY");
     if (!ork) return null;
-    return { name: "openrouter", api: "https://openrouter.ai/api/v1/chat/completions", key: ork, model: override };
+    return { name: "openrouter", api: "https://openrouter.ai/api/v1/chat/completions", key: ork, model: override, region: "unstated" };
   }
   const want = (Deno.env.get("PROVIDER") || "").toLowerCase();
   const nk = Deno.env.get("NVIDIA_API_KEY");
-  const mk = Deno.env.get("MINIMAX_API_KEY");
-  if (want === "nvidia" && nk) return {
-    name: "nvidia",
-    api: "https://integrate.api.nvidia.com/v1/chat/completions",
-    key: nk,
-    model: Deno.env.get("NVIDIA_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b",
-  };
-  if (mk) return { name: "minimax", api: "https://api.minimax.io/v1/chat/completions", key: mk, model: "MiniMax-M2.7" };
-  if (nk) return { name: "nvidia", api: "https://integrate.api.nvidia.com/v1/chat/completions", key: nk,
-    model: Deno.env.get("NVIDIA_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b" };
-  return null;
+  const nvidia = (): TextProvider | null => nk
+    ? { name: "nvidia", api: "https://integrate.api.nvidia.com/v1/chat/completions", key: nk,
+        model: Deno.env.get("NVIDIA_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b", region: "us" }
+    : null;
+
+  if (want === "nvidia") { const n = nvidia(); if (n) return n; }
+
+  // The ordinary path. Shared with the other seven functions so the EU move
+  // is one secret, not eight edits.
+  return pickTextProvider() ?? nvidia();
 }
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -241,18 +242,16 @@ const PARTS: { name: string; keys: string[]; maxTokens: number }[] = [
 const ALL_KEYS = PARTS.flatMap((p) => p.keys);
 
 async function draftPart(
-  prov: { name: string; api: string; key: string; model: string },
+  prov: TextProvider,
   userPrompt: string,
   part: { name: string; keys: string[]; maxTokens: number },
   trace: Trace,
 ): Promise<Record<string, unknown>> {
   let finishReason = "";
   const raw = await trace.span(`chat ${prov.model} part ${part.name}`, SpanKind.CLIENT, {
-    "gen_ai.system": prov.name,
+    ...providerAttrs(prov),
     "gen_ai.operation.name": "chat",
-    "gen_ai.request.model": prov.model,
     "gen_ai.request.temperature": 0.3,
-    "server.address": new URL(prov.api).hostname,
     "yaadly.agent.name": "kickoff",
     "yaadly.kickoff.part": part.name,
   }, async (s) => {
@@ -314,7 +313,7 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     const prov = pickProvider(overrideModel);
     if (!prov) { await fail(overrideModel
       ? "A model override needs the OPENROUTER_API_KEY secret, which is not set."
-      : "No model API key is set on this function. Add MINIMAX_API_KEY in Supabase secrets."); return; }
+      : NO_PROVIDER_MESSAGE); return; }
 
     const userPrompt = intakeToPrompt(intake);
     const partDocs = await Promise.all(PARTS.map((p) => draftPart(prov, userPrompt, p, trace)));
@@ -334,6 +333,10 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     // prose (it did, once). Flag them; the desk shows the samples.
     const cjkHits = blob.match(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]+/g) ?? [];
 
+    // Banned language, same list as the Python engine. Flags rather than
+    // blocks: nothing here is client-facing until a named human marks it so.
+    const bannedHits = guardrails.scan(blob);
+
     const up = await draftsWrite("PATCH", `?id=eq.${draftId}`, {
       status: "ready",
       docs,
@@ -343,6 +346,11 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
         samples: priceHits.slice(0, 5),
         foreign_text_detected: cjkHits.length > 0,
         foreign_samples: cjkHits.slice(0, 5),
+        banned_language_detected: bannedHits.length > 0,
+        banned_samples: [...new Set(bannedHits.map((f) => f.term))].slice(0, 5),
+        banned_note: bannedHits.length
+          ? "The draft uses language Yaadly never uses: " + [...new Set(bannedHits.map((f) => f.guidance))].join(" ") + " Fix it before issuing."
+          : "No banned language found in the draft.",
         note: priced
           ? "The draft contains something that reads like a price. Yaadly does not price work. Remove it before issuing."
           : "No price-like figures found in the draft.",

@@ -338,6 +338,12 @@ Deno.serve(async (req: Request) => {
         trade:    s(b.trade)  || undefined,
         trade_other: s(b.tradeOther).slice(0, 120) || undefined,
         years:    s(b.years)  || undefined,
+        // Digits only, and stored as the number rather than a picture of the
+        // card. Arriving here sets it PENDING, never approved: this function
+        // records what the applicant typed, and a person at the desk checks it
+        // against the name on the ID before it counts for anything.
+        trn:        s(b.trn).replace(/\D/g, "").slice(0, 20) || undefined,
+        trn_status: s(b.trn).replace(/\D/g, "") ? "pending" : undefined,
         work:     s(b.work).slice(0, 2000) || undefined,
         links:    s(b.links).slice(0, 1000) || undefined,
         ref1:     s(b.ref1)   || undefined,
@@ -354,6 +360,60 @@ Deno.serve(async (req: Request) => {
         submitted_at:   new Date().toISOString(),
       }).eq("id", appId);
       if (error) { root.recordError(error.message); return json({ error: error.message }, 500); }
+
+      // ── the public profile, created here and not after vetting ────────────
+      //
+      // Founder decision, 30 Aug 2026, revised the same day: the row is
+      // created when Phase 1 lands, and it is created HIDDEN. active=false
+      // until the Phase 2 checks clear, so the profile exists from the first
+      // sitting and nothing unvetted is ever publicly listed.
+      //
+      // Publishing is a human act, deliberately. Flipping a profile live is
+      // the moment Yaadly vouches for somebody in public, and the governing
+      // rule is that a named human confirms every consequential step. There
+      // is no automatic promotion here and there should not be one. See
+      // RUNBOOK.md for the step the desk runs.
+      //
+      // Keyed on application_id, so a second submit updates the profile rather
+      // than making a rival one. The email is written only when there is one:
+      // Phase 1 takes a phone number OR an email, and a made up address in
+      // this column would eventually be mailed.
+      try {
+        const { data: appRow } = await admin.from("applications")
+          .select("name, trade, parish, parishes, years, email")
+          .eq("id", appId).single();
+
+        if (appRow?.name) {
+          const slugBase = String(appRow.name).toLowerCase()
+            .normalize("NFKD").replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "").slice(0, 40) || "pro";
+          // The application id tail keeps two Delroy Campbells apart without
+          // a lookup, and the slug is stable for the life of the application.
+          const slug = `${slugBase}-${String(appId).slice(0, 6)}`;
+          const yearsInt = parseInt(String(appRow.years ?? "").replace(/\D/g, ""), 10);
+          const email = String(appRow.email ?? "").trim().toLowerCase();
+
+          const { error: profErr } = await admin.from("worker_profiles").upsert({
+            application_id: appId,
+            worker_email: email || null,
+            name: String(appRow.name).slice(0, 120),
+            trade: String(appRow.trade ?? "").split(",")[0].trim() || null,
+            parish: String(appRow.parish ?? "").split(",")[0].trim() || null,
+            areas: String(appRow.parishes ?? "").slice(0, 400) || null,
+            years: Number.isFinite(yearsInt) ? yearsInt : null,
+            slug,
+            active: false,
+            vetting_state: "probation",
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "application_id" });
+          if (profErr) root.recordError(`profile: ${profErr.message}`);
+          else root.setAttributes({ "yaadly.profile.created": true, "yaadly.profile.slug": slug });
+        }
+      } catch (e) {
+        // A profile that failed to write must never lose the application. The
+        // desk can create it by hand, and the applicant is already recorded.
+        root.recordError(`profile: ${String(e).slice(0, 200)}`);
+      }
 
       // Tell Monique. No contact details leave for the relay.
       try {

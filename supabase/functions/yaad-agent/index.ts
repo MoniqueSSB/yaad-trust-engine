@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 
-const MODEL = "MiniMax-M2.7";
-const API = "https://api.minimax.io/v1/chat/completions";
+// Model and endpoint come from _shared/textmodel.ts. See that file for why.
 
 const PROMPTS: Record<string, string> = {
   intake: `You are the Intake Agent for Yaadly, a trust-first property works service in Jamaica (Kingston metro first: Kingston and Portmore). You read a raw message about a property job (English or Jamaican Patois, may be a client WhatsApp message, a voice note transcript, or the founder's rough notes) and produce a structured job card.
@@ -119,29 +119,27 @@ Deno.serve(async (req) => {
     }
     root.setAttributes({ "yaadly.agent.mode": resolvedMode, "yaadly.input.chars": String(text || "").length });
 
-    const key = Deno.env.get("MINIMAX_API_KEY");
-    if (!key) {
-      root.setAttributes({ "yaadly.config.missing": "MINIMAX_API_KEY" });
-      root.recordError("MINIMAX_API_KEY secret is not set");
-      return done(new Response(JSON.stringify({ error: "MINIMAX_API_KEY secret is not set in Edge Function secrets" }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } }), 500);
+    const prov = pickTextProvider();
+    if (!prov) {
+      root.setAttributes({ "yaadly.config.missing": "MISTRAL_API_KEY" });
+      root.recordError("no text model is configured");
+      return done(new Response(JSON.stringify({ error: NO_PROVIDER_MESSAGE }), { status: 500, headers: { ...cors, "Content-Type": "application/json" } }), 500);
     }
     const sys = (resolvedMode === "classify" || resolvedMode === "intake")
       ? PROMPTS[resolvedMode] + `\n\nTRADES (the only permitted values): ${tradeList}`
       : PROMPTS[resolvedMode];
 
     // GenAI semantic conventions, so this span is recognised as a model call.
-    const out = await trace.span(`chat ${MODEL}`, SpanKind.CLIENT, {
-      "gen_ai.system": "minimax",
+    const out = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": MODEL,
       "gen_ai.request.temperature": resolvedMode === "classify" ? 0 : 0.2,
-      "server.address": "api.minimax.io",
     }, async (s) => {
-      const r = await fetch(API, {
+      const r = await fetch(prov.api, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
         body: JSON.stringify({
-          model: MODEL,
+          model: prov.model,
           messages: [
             { role: "system", content: sys },
             { role: "user", content: String(text || "").slice(0, 6000) }
@@ -157,7 +155,7 @@ Deno.serve(async (req) => {
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`minimax http ${r.status}`);
+      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
       return j?.choices?.[0]?.message?.content ?? JSON.stringify(j);
     });
 

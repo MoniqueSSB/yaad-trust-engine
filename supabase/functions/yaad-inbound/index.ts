@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -251,23 +253,22 @@ async function keepMedia(
 
 /** The intake agent, same prompt discipline as the job wizard: never money. */
 async function readTheJob(text: string, trace: Trace) {
-  const key = Deno.env.get("MINIMAX_API_KEY");
+  const prov = pickTextProvider();
   // No length gate. "Hi" is the most common first message a real person sends
   // and it is exactly the one that needs a human sounding answer, not a
   // fallback string. Skipping the model on short messages is how an intake
   // ends up feeling like an answerphone.
-  if (!key || !text.trim()) return null;
+  if (!prov || !text.trim()) return null;
   try {
-    return await trace.span("chat MiniMax-M2.7", SpanKind.CLIENT, {
-      "gen_ai.system": "minimax",
+    return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": "MiniMax-M2.7",
     }, async (sp) => {
-      const r = await fetch("https://api.minimax.io/v1/chat/completions", {
+      const r = await fetch(prov.api, {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "MiniMax-M2.7", temperature: 0.3, max_tokens: 1100,
+          model: prov.model, temperature: 0.3, max_tokens: 1100,
           messages: [
             { role: "system", content:
 `You are reading a WhatsApp conversation with somebody who needs property work
@@ -368,7 +369,7 @@ guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
       });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { sp.recordError(`minimax ${r.status}`); return null; }
+      if (!r.ok) { sp.recordError(`${prov.name} ${r.status}`); return null; }
       let j: Record<string, unknown> = {};
       try { j = JSON.parse(raw); } catch (_) { return null; }
       const content = String((j as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "");
@@ -614,6 +615,34 @@ ${desk ? `<p style="margin:0 0 18px"><a href="${desk}" style="background:#14b8a6
   }
 }
 
+/** Tell the desk a reply was held back, without repeating what it said.
+ *
+ *  ntfy.sh is a public service, so this carries the guidance strings, which
+ *  are a fixed closed set, and nothing the client or the model wrote. Same
+ *  rule the other functions already follow for their notifications. The draft
+ *  itself is in the function log. */
+async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace) {
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: st } = await supabase.from("app_settings")
+      .select("value").eq("key", "ntfy_topic").maybeSingle();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: "Reply held back", Priority: "high", Tags: "warning" },
+      body: "A WhatsApp reply failed the language screen and was not sent. The client got a "
+        + "holding message and is waiting on a person. Reason: "
+        + [...new Set(findings.map((f) => f.guidance))].join(" ")
+        + " The draft is in the yaad-inbound function log.",
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (e) {
+    // A failed notification must never become a failed reply. The block itself
+    // already happened and is already in the log and on the span.
+    trace.startSpan("guardrail alert failed").recordError(String(e).slice(0, 200)).end();
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -629,9 +658,36 @@ Deno.serve(async (req: Request) => {
   // Twilio reads the response body as TwiML. Hand it JSON and it logs an
   // error on every single message, and the sender gets nothing back, which
   // from their side is indistinguishable from the message vanishing.
-  const twiml = (reply: string) => {
-    const safe = reply.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
-    root.setAttributes({ "http.response.status_code": 200 });
+  //
+  // This is also the ONE place anything in this function reaches a client, so
+  // it is where the banned-language screen goes. Every reply passes through
+  // here, the model-written ones and the fixed strings alike. Screening the
+  // fixed ones costs nothing and means a careless edit to one of them cannot
+  // walk past the rule either.
+  const twiml = async (reply: string) => {
+    const findings = guardrails.scan(reply);
+    let body = reply;
+
+    if (findings.length) {
+      // The model wrote something the company has a standing rule never to
+      // say. It does not go out. The client gets a plain holding reply and a
+      // person picks it up, which is the governing rule working rather than
+      // failing: AI drafts, a human takes it from here.
+      body = guardrails.SAFE_FALLBACK;
+
+      // The draft goes to the function log, which is private to this project.
+      // Not to telemetry and not to ntfy: it is model prose about somebody's
+      // property and may carry their name.
+      console.error(
+        "guardrail: outbound reply blocked. Terms: "
+          + [...new Set(findings.map((f) => f.term))].join(", ")
+          + ". Draft was: " + reply.slice(0, 500),
+      );
+      await alertDeskBlocked(findings, trace);
+    }
+
+    root.setAttributes({ "http.response.status_code": 200, ...guardrails.screenAttrs(findings) });
+    const safe = body.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
     root.end(); trace.flush();
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${safe}</Message></Response>`,

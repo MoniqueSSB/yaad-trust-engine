@@ -29,23 +29,34 @@ export default async function WorkerProfile({
 
   const { data: wp } = await supabase
     .from("worker_profiles")
-    .select("worker_email,name,trade,parish,lane,jobs_completed,about,years,areas,slug")
+    .select("worker_email,name,trade,parish,lane,jobs_completed,about,years,areas,slug,vetting_state")
     .eq("slug", slug)
     .eq("active", true)
     .maybeSingle();
   if (!wp) notFound();
 
+  /* worker_email is nullable since 30 Aug 2026: a profile is created at the
+     end of Phase 1, and Phase 1 takes a phone number OR an email. The tables
+     that hang off a profile are still keyed on the email, so for a phone only
+     worker there is nothing to look up and the queries are skipped rather
+     than sent with a null and answered with somebody else's rows. */
+  const wEmail = wp.worker_email ?? "";
+
   const [{ data: score }, { data: checks }, { data: port }, { data: revs }] =
     await Promise.all([
       supabase.from("worker_scores").select("score,reviews").eq("subject_slug", slug).maybeSingle(),
-      supabase.from("worker_checks").select("label,passed,note,position").eq("worker_email", wp.worker_email).order("position"),
-      supabase.from("portfolio").select("title,month,stages,evidence_items").eq("worker_email", wp.worker_email).order("position"),
+      wEmail
+        ? supabase.from("worker_checks").select("label,passed,note,position").eq("worker_email", wEmail).order("position")
+        : Promise.resolve({ data: [] as { label: string; passed: boolean; note: string | null; position: number }[] }),
+      wEmail
+        ? supabase.from("portfolio").select("title,month,stages,evidence_items").eq("worker_email", wEmail).order("position")
+        : Promise.resolve({ data: [] as { title: string; month: string; stages: unknown; evidence_items: unknown }[] }),
       supabase.from("published_reviews").select("id,stars,criteria,body,reply,created_at,author_first_name").eq("subject_slug", slug).eq("direction", "client_of_worker").order("created_at", { ascending: false }),
     ]);
 
   const reviews = (revs ?? []) as Review[];
   const hasPolice = (checks ?? []).some((c) => c.passed && /police/i.test(c.label));
-  const isSelf = user?.email?.toLowerCase() === wp.worker_email.toLowerCase();
+  const isSelf = Boolean(wEmail) && user?.email?.toLowerCase() === wEmail.toLowerCase();
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-10">
@@ -71,8 +82,20 @@ export default async function WorkerProfile({
             </>
           ) : (
             <>
-              <span className="rounded-full border border-softline bg-soft px-3 py-1.5 text-[11.5px] font-bold text-tealb">Building a record</span>
-              <p className="mt-1.5 text-[11.5px] text-dim">The Yaad Score starts at the first signed-off job</p>
+              {/* A profile exists from Phase 1, before any of the checks are
+                  done, so the state has to be on the page. Saying "Building a
+                  record" over an unvetted profile would read as new rather
+                  than unchecked, and those are not the same thing. */}
+              {wp.vetting_state === "probation" ? (
+                <span className="rounded-full border border-mango/40 bg-mango/10 px-3 py-1.5 text-[11.5px] font-bold text-mango">Vetting in progress</span>
+              ) : (
+                <span className="rounded-full border border-softline bg-soft px-3 py-1.5 text-[11.5px] font-bold text-tealb">Building a record</span>
+              )}
+              <p className="mt-1.5 text-[11.5px] text-dim">
+                {wp.vetting_state === "probation"
+                  ? "Cannot be sent to a job until the checks are done"
+                  : "The Yaad Score starts at the first signed-off job"}
+              </p>
             </>
           )}
         </span>

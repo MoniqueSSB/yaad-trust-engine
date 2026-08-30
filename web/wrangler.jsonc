@@ -13,7 +13,25 @@
   },
   // The portal's real address. The yaadly.co.uk zone went active on
   // Cloudflare on 26 Aug 2026, so this deploys live.
-  "routes": [{ "pattern": "app.yaadly.co.uk", "custom_domain": true }]
+  "routes": [{ "pattern": "app.yaadly.co.uk", "custom_domain": true }],
+
+  // The portal answers on app.yaadly.co.uk and nowhere else.
+  //
+  // Both of these default to true, which is the problem. A Worker with a
+  // custom domain is ALSO served on yaadly-app.<account>.workers.dev, and
+  // every uploaded version gets its own preview URL as well. Those hostnames
+  // run the same code against the same Supabase project, and nobody watches
+  // them.
+  //
+  // Today that means the portal has two addresses instead of one. It gets
+  // worse the moment the operations console ships: Cloudflare Access is
+  // attached to a hostname, so a workers.dev URL walks straight past it. That
+  // is the most common way people believe they are protected and are not.
+  //
+  // Turn these off here rather than in the dashboard, so the setting survives
+  // the next deploy and is visible to whoever reads this file.
+  "workers_dev": false,
+  "preview_urls": false
   // Public env vars are set at build time from .env.local / .env.production.
   // Anything genuinely secret goes in `wrangler secret put NAME`, never here:
   // this file is committed to a public repository.
