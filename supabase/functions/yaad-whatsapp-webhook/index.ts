@@ -71,8 +71,8 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers
 
 const INTAKE_PROMPT = `You are the Intake Agent for Yaadly, a trust-first property works service in Jamaica (Kingston metro first: Kingston and Portmore). You read a raw WhatsApp message (English or Jamaican Patois) and produce a structured card.
 Return STRICT JSON only, no markdown fences, exactly this shape:
-{"intent":"new_job or follow_up","title":"short job title naming the issue","client_name":"client's name if stated","client_email":"email address if stated, otherwise empty string","trade":"main trade needed","parish":"place if stated","urgency":"their words for timing","preferred_date":"any specific date or time they want the work done, as stated","scope":"clear plain-English scope of works, 2-4 sentences","questions":["up to 3 questions Yaadly should ask before quoting"]}
-Intent: set follow_up when the message is mainly chasing something already sent in: asking what is happening with their job, quote, call request or enquiry, whether it was received, when they will hear back, or why nobody has replied. Set new_job when the message describes property work to be done, even if it also asks for an update on that same new request. When unsure use new_job.
+{"intent":"new_job or follow_up or worker_signup","title":"short job title naming the issue","client_name":"client's name if stated","client_email":"email address if stated, otherwise empty string","trade":"main trade needed","parish":"place if stated","urgency":"their words for timing","preferred_date":"any specific date or time they want the work done, as stated","scope":"clear plain-English scope of works, 2-4 sentences","questions":["up to 3 questions Yaadly should ask before quoting"]}
+Intent: set worker_signup when the sender is a TRADESPERSON offering their own labour: saying what trade they work, asking to join, register or apply, or looking for work. A person asking FOR a tradesperson is never worker_signup, they are new_job. Set follow_up when the message is mainly chasing something already sent in: asking what is happening with their job, quote, call request or enquiry, whether it was received, when they will hear back, or why nobody has replied. Set new_job when the message describes property work to be done, even if it also asks for an update on that same new request. When unsure use new_job.
 Rules: never invent facts, if a field is not in the message use empty string. Do not estimate any price. Keep the client's meaning, not their exact slang. Never use dash characters in any field, use a comma or colon instead.`;
 
 async function verifySignature(req: Request, rawBody: string): Promise<{ ok: boolean; checked: boolean }> {
@@ -218,6 +218,95 @@ const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@.]+\.[^\s@]{2,}$/.test(v.tr
 const saidNoEmail = (v: string) =>
   /^(no|none|nope|skip|no email|not now|no thanks|rather not|don'?t have one|do not have one)\b/i.test(v.trim());
 const INTAKE_INTRO = "Happy to help. I will ask a few short questions, one at a time, so nothing gets missed. Photos help a lot, send them straight into this chat whenever you like.";
+
+// ── the worker lane ──────────────────────────────────────────────────────
+// A tradesperson who messages this number is signing up, not booking work,
+// and until now the only way in was app.yaadly.co.uk/apply. Most of the
+// supply side is on a phone, on WhatsApp, and a form on a website is a
+// worse door than the chat they are already in.
+//
+// This is Phase 1 of the founder's three-phase design, the profile hook,
+// and nothing more: enough to put a live applicant in front of the desk
+// while they are still warm. Everything heavier (the intro video, the
+// testimonials, the police check) belongs to Phase 2, after a human has
+// said yes.
+//
+// Five questions, and deliberately not seven. No email: the WhatsApp
+// number the message arrived on is already the best contact there is,
+// same reasoning as the client intake not asking for a phone number.
+const WORKER_STEPS = ["name", "trade", "parishes", "years", "proof"] as const;
+type WorkerStep = typeof WORKER_STEPS[number];
+const WORKER_QUESTIONS: Record<WorkerStep, string> = {
+  name: "Good to hear from you. First, what is your name?",
+  trade: "What trade do you work? For example plumbing, roofing, electrical, mason work. If you do more than one, list them.",
+  parishes: "Which parishes can you work in? Kingston and St Andrew, St Catherine including Portmore, or wherever you travel to.",
+  years: "How long have you been doing this work?",
+  proof: "Last one, and it is the one that matters most: send a photo of a job you have finished. A picture straight from your phone is perfect. A link to your Facebook or Instagram works too, or say none for now and Yaadly will ask later.",
+};
+const WORKER_INTRO = "Happy to take your details. Free to join, free to quote, and you are never charged for a lead. I will ask five short questions, one at a time.";
+
+// The payoff, said at the end rather than the start, because it means more
+// once they have put the work in. Wage language is deliberately absent:
+// the price is agreed per job, it is not a cut of anybody's wage.
+const WORKER_PAYOFF =
+  "Free to join and free to quote, win or lose. Your price is agreed with you per job, in writing, before you start, and your materials are paid at cost on top of it. Once the client approves the evidence you are paid within 3 working days.";
+
+// The keyword door. The classifier below names this intent too, but a
+// tradesperson must be able to sign up when the model is down, so the
+// obvious openers are matched here without it. Kept tight on purpose:
+// "mi need a plumber" is a client and must never land in this lane, so a
+// first person claim is required, never a bare trade word.
+const TRADE_WORDS =
+  "plumber|plumbing|mason|masonry|electrician|electrical|roofer|roofing|carpenter|carpentry|painter|painting|tiler|tiling|welder|welding|handyman|technician|contractor|builder|labourer|laborer|tradesman|tradesperson";
+const looksLikeWorkerSignup = (t: string) => {
+  const s = t.trim();
+  if (s.length > 400) return false;
+  // Asking FOR a trade is a client, whatever else the message says. This runs
+  // first and refuses outright, because "I am looking for a roofer to fix the
+  // back room" contains a first person trade claim and is not one.
+  if (new RegExp(`\\b(looking for|need|want|send|get|find|hire|book)\\s+(a|an|any|some)\\s+(${TRADE_WORDS})\\b`, "i").test(s)) return false;
+  // "I am a plumber", "mi a plumber", "me a roofer and mi want work"
+  if (new RegExp(`\\b(i am|i'?m|mi a|me a|im)\\b[^.!?]{0,30}\\b(${TRADE_WORDS})\\b`, "i").test(s)) return true;
+  // "I want to join", "how do I sign up as a worker", "register as a pro"
+  if (/\b(join|sign ?up|register|apply)\b[^.!?]{0,40}\b(work|worker|pro|tradesman|tradesperson|team|yaadly)\b/i.test(s)) return true;
+  // "looking for work as a tiler" has no first person pronoun in it at all.
+  if (/\blooking for work\b/i.test(s)) return true;
+  if (/\b(i|mi|me)\b[^.!?]{0,20}\b(want|need|looking for)\b[^.!?]{0,20}\bwork\b/i.test(s)) return true;
+  if (/\bwant (to )?(join|work with|work for)\b/i.test(s)) return true;
+  return false;
+};
+
+const workerNextStep = (answers: Record<string, string>): WorkerStep | null =>
+  (WORKER_STEPS.find((k) => !String(answers?.[k] ?? "").trim()) as WorkerStep | undefined) ?? null;
+
+// The lane a session is running. Stored inside the answers jsonb rather
+// than as a column, so this needed no migration and an old session with
+// no marker still reads as what it was, a client.
+const laneOf = (session: any): "client" | "worker" =>
+  String(session?.answers?._lane ?? "") === "worker" ? "worker" : "client";
+
+// The applicant said they have nothing to show yet. Accepted, because
+// Phase 1 is a hook and not a gate: the desk can ask again, and a worker
+// turned away at question five never comes back.
+const saidNoProof = (v: string) =>
+  /^(no|none|nope|skip|not now|no photo|none for now|later|nothing|i don'?t have|mi nuh have)\b/i.test(v.trim());
+
+// Persona's hosted flow. The embedded SDK on /apply cannot run in a chat,
+// but the same template opens as a link, and reference-id carries the
+// application id exactly as the web flow sets it. That matters: the server
+// confirms every inquiry against that id before recording it, so a link
+// forwarded to somebody else lands on nothing.
+const PERSONA_TEMPLATE_ID = Deno.env.get("PERSONA_TEMPLATE_ID") ?? "";
+const PERSONA_ENVIRONMENT_ID = Deno.env.get("PERSONA_ENVIRONMENT_ID") ?? "";
+const personaLink = (appRowId: string): string | null => {
+  if (!PERSONA_TEMPLATE_ID || !PERSONA_ENVIRONMENT_ID) return null;
+  const q = new URLSearchParams({
+    "inquiry-template-id": PERSONA_TEMPLATE_ID,
+    "environment-id": PERSONA_ENVIRONMENT_ID,
+    "reference-id": appRowId,
+  });
+  return `https://withpersona.com/verify?${q.toString()}`;
+};
 
 // A session older than this is abandoned, not resumed: whatever the person
 // says two days later, it is not the answer to "who can let a worker in".
@@ -495,6 +584,122 @@ ${portalCode ? `<p style="margin:0 0 14px;font-size:13px;color:#67807a">Your job
 // seven questions must never be told to come back later. The session row is
 // deleted only after the job insert succeeds; if the insert fails, the
 // answers survive and the client's next message triggers another attempt.
+// Ask Persona what happened to the check we sent, matched on the reference
+// id we set when the link was built. Nothing the applicant says is trusted:
+// "done" is a prompt to go and look, never evidence in itself. Same rule the
+// web flow follows in yaad-vetting-upload, for the same reason.
+async function reconcilePersona(
+  supabase: any, appRowId: string, trace: Trace,
+): Promise<{ status: string; verified: boolean; checked: boolean }> {
+  const key = Deno.env.get("PERSONA_API_KEY") ?? "";
+  if (!key) return { status: "unchecked", verified: false, checked: false };
+  return await trace.span("persona.reconcile", SpanKind.CLIENT, {
+    "yaadly.persona.reference_id": appRowId,
+  }, async (s) => {
+    let r: Response;
+    try {
+      r = await fetch(
+        `https://api.withpersona.com/api/v1/inquiries?filter%5Breference-id%5D=${encodeURIComponent(appRowId)}`,
+        { headers: { Authorization: `Bearer ${key}`, "Persona-Version": "2023-01-05" }, signal: AbortSignal.timeout(15000) },
+      );
+    } catch {
+      s.setAttributes({ "yaadly.persona.outcome": "unreachable" });
+      return { status: "unchecked", verified: false, checked: false };
+    }
+    if (!r.ok) {
+      s.recordError(`persona http ${r.status}`);
+      return { status: "unchecked", verified: false, checked: false };
+    }
+    const j = await r.json().catch(() => null) as { data?: Array<{ id?: string; attributes?: Record<string, unknown> }> } | null;
+    const rows = j?.data ?? [];
+    if (!rows.length) {
+      s.setAttributes({ "yaadly.persona.outcome": "not_started" });
+      return { status: "not_started", verified: false, checked: true };
+    }
+    // Most recent wins: an applicant who restarted the flow has more than one.
+    const best = rows.find((x) => {
+      const st = String(x.attributes?.status ?? "");
+      return st === "approved" || st === "completed";
+    }) ?? rows[rows.length - 1];
+    const status = String(best.attributes?.status ?? "unknown");
+    const verified = status === "completed" || status === "approved";
+    await supabase.from("applications").update({
+      persona_inquiry_id: String(best.id ?? ""),
+      persona_status: status,
+      persona_checked_at: new Date().toISOString(),
+    }).eq("id", appRowId);
+    s.setAttributes({ "yaadly.persona.status": status, "yaadly.persona.verified": verified });
+    return { status, verified, checked: true };
+  });
+}
+
+// Phase 1 lands here: an application row the desk can see, and the ID check
+// sent straight back into the chat. Both halves matter. A profile with no
+// verification started is a lead; a verification with no profile is nothing.
+async function finalizeWorkerApplication(
+  supabase: any, waId: string, contactName: string,
+  answers: Record<string, string>, photoCount: number, trace: Trace,
+) {
+  const name = String(answers.name || contactName || "").slice(0, 120);
+  const trade = String(answers.trade || "").slice(0, 200);
+  const proof = String(answers.proof || "").trim();
+  const gaveProof = proof && !saidNoProof(proof);
+
+  const work = [
+    gaveProof ? `Work proof given over WhatsApp: ${proof}` : "No work proof given yet, the applicant said they would send it later.",
+    photoCount ? `${photoCount} photo${photoCount === 1 ? "" : "s"} sent into the WhatsApp chat, review them there.` : "",
+    `Applied over WhatsApp from ${waId}.`,
+    "[Phase 1 profile hook, collected in chat. The intro video, testimonials and police check are Phase 2, after a human says yes.]",
+  ].filter(Boolean).join("\n").slice(0, 2000);
+
+  const { data, error } = await trace.span("db.insert applications", SpanKind.CLIENT, {
+    "db.system.name": "postgresql",
+    "db.operation.name": "INSERT",
+    "db.collection.name": "applications",
+    "yaadly.application.source": "whatsapp",
+  }, async (s) => {
+    const r = await supabase.from("applications").insert({
+      app_id: "APP-" + crypto.randomUUID().slice(0, 6).toUpperCase(),
+      name,
+      trade,
+      parish: String(answers.parishes || "").split(",")[0].trim().slice(0, 120),
+      parishes: String(answers.parishes || "").slice(0, 400),
+      phone: waId.slice(0, 40),
+      email: "",
+      years: String(answers.years || "").slice(0, 60),
+      work,
+      // "received" and not "started": unlike the web flow, which opens a row
+      // the moment somebody starts typing, nothing is written here until all
+      // five answers are in. What the desk sees is a finished Phase 1.
+      status: "received",
+      submitted_at: new Date().toISOString(),
+    }).select("id, app_id").single();
+    if (r.error) s.recordError(r.error.message);
+    return { data: r.data, error: r.error };
+  });
+
+  if (error || !data) {
+    const replyResult = await maybeSendReply(waId,
+      "Thank you, that is everything. Saving it hit a snag on our side just now, and nothing you sent is lost. Monique will pick it up and come back to you here.", trace);
+    return { applicationId: null, reference: null, insertError: error?.message ?? "no row", replyResult };
+  }
+
+  await supabase.from("wa_intake_sessions").delete().eq("wa_id", waId);
+
+  const firstName = name.trim().split(/\s+/)[0] || "";
+  const link = personaLink(String(data.id));
+  const head = firstName ? `Thank you, ${firstName}.` : "Thank you.";
+  const idBit = link
+    ? `\n\nOne more thing and you are done. Yaadly checks who everybody is before they set foot on a client's property, and this is that check: ${link}\n\nIt takes about two minutes on your phone. Your voter ID, driver's licence or passport, and a photo of your face. Do it whenever suits you, then send me a message here and I will confirm it came through.`
+    : `\n\nMonique will come back to you here with the ID check, which is the last step before you can quote.`;
+
+  const replyBody =
+    `${head} Your application is in, reference ${data.app_id}, and a person reads it rather than a queue.\n\n${WORKER_PAYOFF}${idBit}`;
+
+  const replyResult = await maybeSendReply(waId, replyBody, trace);
+  return { applicationId: String(data.id), reference: String(data.app_id), insertError: null, replyResult };
+}
+
 async function finalizeIntake(
   supabase: any, waId: string, contactName: string,
   answers: Record<string, string>, photoCount: number, trace: Trace,
@@ -712,6 +917,35 @@ Deno.serve(async (req: Request) => {
     // treated fresh.
     if (session && Date.now() - new Date(session.updated_at).getTime() > SESSION_STALE_MS) {
       const a: Record<string, string> = session.answers ?? {};
+      // A worker who went quiet part way is salvaged the same way a client
+      // is, into a row the desk can chase, provided they got as far as
+      // naming a trade. A name on its own is not an application.
+      if (laneOf(session) === "worker") {
+        if (String(a.trade ?? "").trim()) {
+          await supabase.from("applications").insert({
+            app_id: "APP-" + crypto.randomUUID().slice(0, 6).toUpperCase(),
+            name: String(a.name ?? contactName ?? "").slice(0, 120),
+            trade: String(a.trade).slice(0, 200),
+            parish: String(a.parishes ?? "").split(",")[0].trim().slice(0, 120),
+            parishes: String(a.parishes ?? "").slice(0, 400),
+            phone: fromWaId.slice(0, 40),
+            email: "",
+            years: String(a.years ?? "").slice(0, 60),
+            work: [
+              a.proof ? `Work proof: ${a.proof}` : "",
+              session.photo_count ? `${session.photo_count} photo(s) sent in the WhatsApp chat, review them there.` : "",
+              "[Applied over WhatsApp and stopped partway. These are the answers gathered before it went quiet. No ID check was sent.]",
+            ].filter(Boolean).join("\n").slice(0, 2000),
+            status: "started",
+          });
+        }
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", fromWaId);
+        root.setAttributes({ "yaadly.worker_signup.abandoned": true });
+        session = null;
+      }
+    }
+    if (session && Date.now() - new Date(session.updated_at).getTime() > SESSION_STALE_MS) {
+      const a: Record<string, string> = session.answers ?? {};
       if (String(a.what ?? "").trim()) {
         await supabase.from("jobs").insert({
           id: `JOB-WA-${Date.now()}`,
@@ -738,6 +972,60 @@ Deno.serve(async (req: Request) => {
       await supabase.from("wa_intake_sessions").delete().eq("wa_id", fromWaId);
       root.setAttributes({ "yaadly.intake.abandoned": true });
       session = null;
+    }
+
+    // ── a worker part way through signing up ────────────────────────────────
+    if (session && fromWaId && laneOf(session) === "worker") {
+      const answers: Record<string, string> = { ...(session.answers ?? {}) };
+      let photoCount: number = session.photo_count ?? 0;
+      const pending = workerNextStep(answers);
+
+      if (wantsOut(text)) {
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", fromWaId);
+        const replyResult = await maybeSendReply(fromWaId,
+          "No problem, I have closed this off and nothing is saved. Whenever you want to pick it up, message here and we start again.", trace);
+        return jsonReply({ intent: "worker_signup", cancelled: true, replyResult }, "worker_cancelled");
+      }
+
+      // A photo IS the answer to the last question, and often arrives before
+      // it is asked. Bank it either way rather than making them type
+      // something to go with it.
+      if (isMedia) {
+        photoCount += 1;
+        if (pending === "proof") answers.proof = `Photo sent in the WhatsApp chat (${photoCount} so far).`;
+        await supabase.from("wa_intake_sessions")
+          .update({ answers, photo_count: photoCount, updated_at: new Date().toISOString() })
+          .eq("wa_id", fromWaId);
+        const after = workerNextStep(answers);
+        if (!after) {
+          const fin = await finalizeWorkerApplication(supabase, fromWaId, contactName, answers, photoCount, trace);
+          return jsonReply({ intent: "worker_signup", ...fin }, fin.insertError ? "worker_insert_failed" : "worker_application_created");
+        }
+        const replyResult = await maybeSendReply(fromWaId, `Got the photo, thank you. ${WORKER_QUESTIONS[after]}`, trace);
+        return jsonReply({ intent: "worker_signup", step: after, photoCount, replyResult }, "worker_photo");
+      }
+
+      if (isPlaceholder(text)) {
+        const body = pending
+          ? `Sorry, I could not catch that. Type it as a message please, or try the voice note again. ${WORKER_QUESTIONS[pending]}`
+          : "Sorry, I could not catch that. Type it as a message please.";
+        const replyResult = await maybeSendReply(fromWaId, body, trace);
+        return jsonReply({ intent: "worker_signup", step: pending, replyResult }, "worker_retry");
+      }
+
+      if (pending) answers[pending] = text.slice(0, pending === "proof" ? 1000 : 300);
+
+      await supabase.from("wa_intake_sessions")
+        .update({ answers, updated_at: new Date().toISOString() })
+        .eq("wa_id", fromWaId);
+
+      const remaining = workerNextStep(answers);
+      if (remaining) {
+        const replyResult = await maybeSendReply(fromWaId, `Got it. ${WORKER_QUESTIONS[remaining]}`, trace);
+        return jsonReply({ intent: "worker_signup", step: remaining, replyResult }, "worker_answer");
+      }
+      const fin = await finalizeWorkerApplication(supabase, fromWaId, contactName, answers, photoCount, trace);
+      return jsonReply({ intent: "worker_signup", ...fin }, fin.insertError ? "worker_insert_failed" : "worker_application_created");
     }
 
     if (session && fromWaId) {
@@ -866,6 +1154,61 @@ Deno.serve(async (req: Request) => {
         signatureVerified: sig.checked,
         replyResult,
       }), { status: 200, headers: { ...CORS, "Content-Type": "application/json" } }), 200);
+    }
+
+    // ── a tradesperson signing up, or coming back from the ID check ─────────
+    // Placed after follow_up and before the job intake, because a worker
+    // message must never become a job card: a job card with a plumber's own
+    // details in it is worse than no row at all.
+    // The keyword door only opens where the model did not produce real work to
+    // do. "I am a plumber and I need someone to fix my roof" is a CLIENT, and
+    // the phrase that starts it would otherwise route them into the wrong
+    // lane. A described job always wins over a first person trade claim.
+    const workerByWords = !isMedia && !card?.scope && looksLikeWorkerSignup(text);
+    if (fromWaId && (card?.intent === "worker_signup" || workerByWords)) {
+      // Already applied from this number? Then this is them coming back, and
+      // the useful thing to do is go and ask Persona what happened rather
+      // than start a second application.
+      const { data: prior } = await supabase.from("applications")
+        .select("id, app_id, name, persona_status")
+        .eq("phone", fromWaId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const existing = prior?.[0] ?? null;
+
+      if (existing) {
+        const pv = await reconcilePersona(supabase, String(existing.id), trace);
+        const link = personaLink(String(existing.id));
+        let body: string;
+        if (pv.verified) {
+          body = `You are already on file, reference ${existing.app_id}, and your ID check came back clear. Nothing else is needed from you right now. Monique reviews every application herself and will come back to you here.`;
+        } else if (pv.status === "not_started" && link) {
+          body = `You are already on file, reference ${existing.app_id}. The ID check is the one thing still outstanding: ${link}\n\nAbout two minutes on your phone, then message me here and I will confirm it came through.`;
+        } else if (pv.checked) {
+          body = `You are already on file, reference ${existing.app_id}. Your ID check is showing as "${pv.status}" at the moment, so it is with Persona rather than with you. Monique will come back to you here.`;
+        } else {
+          body = `You are already on file, reference ${existing.app_id}. Monique reviews every application herself and will come back to you here.`;
+        }
+        const replyResult = await maybeSendReply(fromWaId, body, trace);
+        return jsonReply({ intent: "worker_signup", existing: existing.app_id, persona: pv, replyResult }, "worker_returning");
+      }
+
+      const answers: Record<string, string> = { _lane: "worker" };
+      // Bank what the opener already gave. The name is only taken from the
+      // model, never from the WhatsApp profile: a profile name is whatever
+      // somebody typed into their phone once, and this one goes on a vetting
+      // record.
+      if (card?.client_name) answers.name = String(card.client_name).slice(0, 200);
+      if (card?.trade) answers.trade = String(card.trade).slice(0, 200);
+      const first = workerNextStep(answers) as WorkerStep;
+      await supabase.from("wa_intake_sessions").upsert({
+        wa_id: fromWaId,
+        answers,
+        photo_count: isMedia ? 1 : 0,
+        updated_at: new Date().toISOString(),
+      });
+      const replyResult = await maybeSendReply(fromWaId, `${WORKER_INTRO} ${WORKER_QUESTIONS[first]}`, trace);
+      return jsonReply({ intent: "worker_signup", step: first, prefilled: Object.keys(answers).filter((k) => k !== "_lane"), replyResult }, "worker_started");
     }
 
     // ── a new job starts the guided intake, one question at a time ──────────
