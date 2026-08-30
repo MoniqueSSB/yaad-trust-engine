@@ -100,6 +100,50 @@ jobs:
           done
           exit $fail
 
+  web:
+    name: Web app (typecheck and tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 on purpose. tests/ import the app's real .ts files and rely on
+      # Node stripping the types itself, which older Node cannot do. Drop this
+      # below 22.18 and every test fails to parse rather than fails to pass.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `npm run lint` is deliberately NOT run here yet. It currently reports a
+      # pre-existing error in app/portal/join/page.tsx (react-hooks
+      # set-state-in-effect) that predates this job. Adding lint today would
+      # mean either a permanently red build, or quietly changing portal
+      # behaviour to make an unrelated job go green. Fix that error, then add
+      # `npm run lint` here in the same commit.
+
+      # The tests that matter here are the negative ones: an unsigned, forged or
+      # replayed request to /api/hubspot/stage must write NOTHING. That endpoint
+      # is what stands between a forged webhook and a deal marked as funded, so
+      # these run on every push rather than by hand. No network and no
+      # credentials: HubSpot is stubbed.
+      - name: Run the web tests
+        run: npm test
+
+      # `next build` is deliberately not run here. check-env.mjs stops a
+      # production build without the Supabase values, which are secrets this
+      # workflow has no reason to hold. Typecheck and lint already catch the
+      # class of breakage a build would.
+
   secrets:
     name: No secrets committed
     runs-on: ubuntu-latest
