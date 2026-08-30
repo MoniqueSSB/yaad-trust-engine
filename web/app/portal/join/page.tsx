@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/client";
  * the job never reaches a worker, however good the description was.
  *
  * Public sign-up is switched off in Auth on purpose. The job code is the only
- * door, it is checked server side by yaad-portal-signup with rate limiting on
+ * door, it is checked server side by yaad-portal-code with rate limiting on
  * pend_portal_code, and nothing here can talk its way past that.
  *
  * The email typed here is not checked against the job, it is attached to it.
@@ -28,13 +28,21 @@ import { createClient } from "@/lib/supabase/client";
  * nothing to check against and the door never opened for anyone who came that
  * way.
  *
- * The attaching happens when the confirmation link is clicked, not when this
- * form is submitted. Somebody typing their own address wrong on a phone is the
- * likeliest thing that goes wrong here, and this way it costs them a retry
- * rather than their job.
+ * NO PASSWORD, anywhere in here (31 Aug 2026). This audience is diaspora
+ * clients, often older, often on a phone in another country, who have already
+ * explained the whole job once. "Choose a password, at least 8 characters" is
+ * where those people stop, and it bought nothing: the job code was always the
+ * real gate and a password was a second secret to lose on top of it.
+ *
+ * A six digit code goes to the mailbox, and to WhatsApp when we have a number
+ * for them. Typing it back proves the mailbox exactly as the old confirmation
+ * link did, and it does it without stranding somebody who opens the link in a
+ * different browser than the one they started in, which is the classic way
+ * magic links fail. It also costs them a retry rather than their job when
+ * they mistype their own address, which is the likeliest thing to go wrong.
  */
 
-const SIGNUP = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/yaad-portal-signup`;
+const CODE_FN = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/yaad-portal-code`;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 const field =
@@ -45,119 +53,48 @@ const label =
 function JoinForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+
   // The link sent on WhatsApp carries both, so the only thing left to type is
-  // an email and a password. Somebody on a phone, in another country, having
-  // already explained the whole job once, should not be copying an eight
-  // character code across from another app.
-  //
-  // Read straight into the initial state rather than written in after mount.
-  // An effect whose only job is to setState runs a second render for no
-  // reason, and for one beat the field is empty on a page whose whole point
-  // is that it arrives filled in.
+  // an email. Read straight into the initial state rather than written in
+  // after mount: an effect whose only job is to setState costs a second
+  // render and leaves the field empty for one beat on a page whose whole
+  // point is that it arrives filled in.
   const [code, setCode] = useState(() => (params.get("code") ?? "").toUpperCase());
   const [job] = useState(() => params.get("job") ?? "");
-  const [pendingQuote, setPendingQuote] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [stage, setStage] = useState<"ask" | "enter">("ask");
+  const [sentTo, setSentTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
+  /* Step one. Ask for a code. No password is chosen here and none is asked
+     for anywhere: the job code was always the real gate, and a password is a
+     second secret to lose on top of it. */
+  async function askForCode(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
-
-    if (password.length < 8) {
-      setError("Your password needs to be at least 8 characters.");
-      setBusy(false);
-      return;
-    }
-
     try {
-      const r = await fetch(SIGNUP, {
+      const r = await fetch(CODE_FN, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: KEY,
-          Authorization: `Bearer ${KEY}`,
-        },
-        body: JSON.stringify({
-          email: email.trim(),
-          password,
-          code: code.trim(),
-          role: "client",
-        }),
+        headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${KEY}` },
+        body: JSON.stringify({ email: email.trim(), code: code.trim(), role: "client" }),
       });
       const res = await r.json().catch(() => ({}));
-
-      // They already have an account. That is the normal shape of a second
-      // job, not an error, and it used to dead-end here: signup refused, and
-      // nothing else was listening, so a returning client could not claim a
-      // code at all.
-      //
-      // They have already typed the two things a sign in needs. Use them, then
-      // claim the code against that session. Being signed in on a confirmed
-      // account proves the mailbox at least as well as a link in an old email,
-      // which is the only thing the confirmation step was ever proving.
-      if (r.status === 409 && res.existing) {
-        const supabase = createClient();
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInErr) {
-          throw new Error(
-            "You already have a Yaadly account with that email, and that password did not match it. Sign in with the right one, or reset it.",
-          );
-        }
-        const { data: claimed } = await supabase.rpc("claim_code_as_me", {
-          p_code: code.trim(),
-        });
-        setPassword("");
-        if (claimed === true) {
-          /* Arriving here from a quote means the account WAS the booking
-             step. Finish what they pressed rather than landing them in a
-             portal and making them find the quote again. accept_quote_as_me
-             is still the thing that decides, and it still refuses anybody
-             who is not this job's client, so this is a convenience and not a
-             second door. */
-          const quote = params.get("quote");
-          if (quote) {
-            const { error: acceptErr } = await supabase.rpc("accept_quote_as_me", { p_quote: quote });
-            if (acceptErr) {
-              throw new Error(
-                "Your account is ready and you are signed in, but the booking did not go through: " +
-                  acceptErr.message +
-                  " Open your quotes again and press book.",
-              );
-            }
-          }
-          router.replace("/portal");
-          router.refresh();
-          return;
-        }
-        // Signed in, but the code would not attach. Say so rather than
-        // dropping them into a portal that does not have their job in it.
-        throw new Error(
-          "You are signed in, but that job code would not attach to your account. Check it against the message Yaadly sent you, or message Yaadly.",
-        );
-      }
-
       if (!r.ok || res.error) throw new Error(res.error || "That did not work.");
 
-      // The account is created unconfirmed, deliberately. Possession of an
-      // email address is not proof you can read that mailbox, and until they
-      // click the link nothing about this job goes anywhere.
-      setPassword("");
-      setDone(
-        res.message ||
-          `Check ${email.trim()} for a confirmation link, then sign in.`,
-      );
-      /* If they came from a quote, the booking has NOT happened: the account
-         exists but is unconfirmed, so there is no session to accept with. Say
-         so plainly rather than letting them believe the worker is booked. */
-      setPendingQuote(Boolean(params.get("quote")));
+      // Never claim a code was sent when nothing went anywhere. Somebody
+      // staring at an empty inbox because we said "check your email" is the
+      // worst version of this page.
+      if (!res.delivered) {
+        throw new Error(
+          "Your account is ready but the code would not send, which is our end and not yours. Message Yaadly and we will get you in.",
+        );
+      }
+      setSentTo(email.trim());
+      setStage("enter");
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work.");
     } finally {
@@ -165,37 +102,114 @@ function JoinForm() {
     }
   }
 
-  if (done) {
+  /* Step two. The six digits. Verifying happens against Supabase directly,
+     so the code never comes back through our own server: it went to their
+     mailbox or their phone, and only they can have it. */
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const token = otp.replace(/\D/g, "");
+
+      /* Two types tried, and this is a version difference rather than a
+         guess. generateLink({type:"magiclink"}) files its one time token in
+         GoTrue's recovery_token slot, confirmed by reading
+         auth.one_time_tokens on this project, and which verifyOtp type
+         matches that has moved between GoTrue releases. "email" is the
+         documented one for a magic link OTP and is tried first; "magiclink"
+         is the older name for the same thing. A wrong TYPE and a wrong CODE
+         are indistinguishable to the caller otherwise, and telling somebody
+         their correct code is wrong is the worst failure this page has. */
+      let otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "email" })).error;
+      if (otpErr) {
+        otpErr = (await supabase.auth.verifyOtp({ email: sentTo, token, type: "magiclink" })).error;
+      }
+      if (otpErr) {
+        throw new Error(
+          "That code did not match, or it has expired. Ask for a new one and try again.",
+        );
+      }
+
+      // Signed in and confirmed in one step. Now bind the job.
+      const { data: claimed } = await supabase.rpc("claim_code_as_me", { p_code: code.trim() });
+      if (claimed !== true) {
+        throw new Error(
+          "You are signed in, but that job code would not attach to your account. Check it against the message Yaadly sent you, or message Yaadly.",
+        );
+      }
+
+      /* Arriving here from a quote means the account WAS the booking step.
+         Finish what they pressed rather than landing them in a portal and
+         making them find the quote again. accept_quote_as_me still decides,
+         and it still refuses anybody who is not this job's client. */
+      const quote = params.get("quote");
+      if (quote) {
+        const { error: acceptErr } = await supabase.rpc("accept_quote_as_me", { p_quote: quote });
+        if (acceptErr) {
+          throw new Error(
+            "Your account is ready and you are signed in, but the booking did not go through: " +
+              acceptErr.message +
+              " Open your quotes again and press book.",
+          );
+        }
+      }
+
+      router.replace("/portal");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That did not work.");
+      setBusy(false);
+    }
+  }
+
+  if (stage === "enter") {
     return (
-      <div className="rounded-2xl border border-line bg-panel p-6">
-        <h2 className="font-display text-[22px] uppercase leading-none">
-          One more step
-        </h2>
-        <p className="mt-3 text-[14px] leading-relaxed text-mute">{done}</p>
-        {pendingQuote && (
-          <div className="mt-3 rounded-xl border border-mango/40 bg-mango/5 px-4 py-3 text-[13.5px] leading-relaxed text-mute">
-            <b className="text-ink">Your worker is not booked yet.</b> The
-            account has to be confirmed before it can book anything, so
-            confirm the email, sign in, and press book on your quote again.
-            Nobody has been chosen and nothing has been charged.
-          </div>
-        )}
-        <p className="mt-3 text-[13.5px] leading-relaxed text-mute">
-          The Client Guidelines are waiting inside. Signing them is what opens
-          your job to vetted workers, and nothing reaches anyone before that.
+      <form onSubmit={verify}>
+        <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+          We sent a six digit code to <b className="text-ink">{sentTo}</b>, and
+          to your WhatsApp number if we have one. It lasts about an hour.
         </p>
-        <Link
-          href="/portal/sign-in"
-          className="mt-5 inline-flex rounded-full border border-line2 px-4 py-2 text-[12.5px] font-bold transition hover:border-teal hover:text-tealb"
+
+        <label className={label}>The six digit code</label>
+        <input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          required
+          value={otp}
+          onChange={(e) => setOtp(e.target.value)}
+          placeholder="123456"
+          className={`${field} font-mono text-[20px] tracking-[6px]`}
+        />
+
+        {error && (
+          <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
         >
-          Go to sign in
-        </Link>
-      </div>
+          {busy ? "Checking..." : "Open my portal"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setStage("ask"); setOtp(""); setError(null); }}
+          className="mt-3 w-full text-[12.5px] text-dim underline"
+        >
+          Send it again, or use a different address
+        </button>
+      </form>
     );
   }
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={askForCode}>
       {job && (
         <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
           Finishing <b className="font-mono text-tealb">{job}</b>, the job you
@@ -213,21 +227,10 @@ function JoinForm() {
         onChange={(e) => setEmail(e.target.value)}
         className={field}
       />
-
-      <label className={label}>Password</label>
-      <input
-        type="password"
-        autoComplete="current-password"
-        required
-        minLength={8}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        className={field}
-      />
       <p className="-mt-2 mb-4 text-[12px] text-dim">
-        At least 8 characters. This is what gets you back into your portal. If
-        you already have a Yaadly account, put that password in and we will
-        sign you in and add this job to it.
+        <b className="text-mute">No password to choose and none to remember.</b>{" "}
+        We send you a six digit code instead, here and on WhatsApp if we have
+        your number.
       </p>
 
       <label className={label}>Job code</label>
@@ -240,10 +243,7 @@ function JoinForm() {
       />
 
       {error && (
-        <p
-          role="alert"
-          className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute"
-        >
+        <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute">
           {error}
         </p>
       )}
@@ -253,7 +253,7 @@ function JoinForm() {
         disabled={busy}
         className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
       >
-        {busy ? "Checking your code..." : "Create my portal"}
+        {busy ? "Sending your code..." : "Send me a sign in code"}
       </button>
     </form>
   );
