@@ -52,6 +52,20 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Evidence photographs arrive through a Server Action, and Next caps a
+  // Server Action body at 1MB by default. A photograph off any phone made in
+  // the last decade is 2 to 5MB, so every real evidence upload was refused by
+  // the platform BEFORE the route's own size check could run, and the worker
+  // was told "The database refused this upload." The database never saw it.
+  //
+  // This is the ceiling for the whole multipart body, so it sits above the
+  // per-image limit in app/portal/evidence-actions.ts rather than matching it.
+  // The two are meant to be read together: this one stops the request, that
+  // one explains itself to the person holding the phone. The headroom is
+  // affordable because the bytes go to the evidence bucket, not into a row.
+  experimental: {
+    serverActions: { bodySizeLimit: "25mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

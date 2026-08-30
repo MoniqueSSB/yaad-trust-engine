@@ -41,6 +41,7 @@ type Evidence = {
   label: string | null;
   meta: string | null;
   img: string | null;
+  storage_path: string | null;
   ok: boolean | null;
   created_at: string | null;
   uploaded_by: string | null;
@@ -117,7 +118,7 @@ export default async function JobRoom({
     await Promise.all([
       supabase
         .from("evidence")
-        .select("id,label,meta,img,ok,created_at,uploaded_by,sha256,stage")
+        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -170,6 +171,20 @@ export default async function JobRoom({
     .maybeSingle();
 
   const ev = (evidence ?? []) as Evidence[];
+
+  /* Evidence filed since the bucket move lives in private storage, so the page
+     mints a short-lived signed URL per object as it renders. Nothing in that
+     bucket is public and no URL here outlives the page it was drawn on. Rows
+     filed before the move still carry their base64 data URL in img and are
+     left exactly as they were. */
+  const inBucket = ev.filter((e) => e.storage_path);
+  if (inBucket.length) {
+    const { data: signed } = await supabase.storage
+      .from("evidence")
+      .createSignedUrls(inBucket.map((e) => e.storage_path as string), 300);
+    const byPath = new Map((signed ?? []).map((r) => [r.path, r.signedUrl]));
+    for (const e of inBucket) e.img = byPath.get(e.storage_path) ?? null;
+  }
   const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
