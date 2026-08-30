@@ -366,9 +366,18 @@ export function JoinFlow() {
 
   /* ── the application, opened once ───────────────────────────────────── */
 
+  /* One way to reach somebody is enough to start, and it is their choice
+     which one. Demanding a phone number AND an email address for a first
+     contact is a gate with nothing behind it: a tradesperson who gives a
+     number he answers has told us everything we need to ring him back.
+     Years at the trade is not asked for here either. It is worth knowing and
+     it is not worth losing an applicant over, so it stays on the form and out
+     of the gate. */
+  const hasPhone = phone.trim().length > 5;
+  const hasEmail = /.+@.+\..+/.test(email.trim());
   const step1Ready =
-    name.trim().length > 1 && phone.trim().length > 5 &&
-    /.+@.+\..+/.test(email.trim()) && trades.length > 0 && parishes.length > 0;
+    name.trim().length > 1 && (hasPhone || hasEmail) &&
+    trades.length > 0 && parishes.length > 0;
 
   async function ensureApplication(): Promise<Claim> {
     if (claimRef.current) return claimRef.current;
@@ -642,7 +651,7 @@ export function JoinFlow() {
             Yaadly. Allow <b className="text-ink">within 48 hours</b>.
           </p>
           <p className="mt-3">
-            You will hear back on the phone number and email you gave us. Quote{" "}
+            You will hear back on whichever way you gave us to reach you. Quote{" "}
             <span className="font-mono text-ink">{sentRef}</span> if you contact
             us first.
           </p>
@@ -809,20 +818,27 @@ export function JoinFlow() {
                 </div>
 
                 <div className="fgroup">
-                  <label className="fl">How we reach you</label>
+                  <label className="fl">
+                    How we reach you{" "}
+                    <span className={"src " + (name.trim().length > 1 && (hasPhone || hasEmail) ? "ok" : "")}>
+                      Your name, and one way to reach you
+                    </span>
+                  </label>
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <input className="jf" placeholder="Your full name" autoComplete="name"
                       value={name} onChange={(e) => setName(e.target.value)} />
+                    <input className="jf" placeholder="Years at the trade (optional)" inputMode="numeric"
+                      value={years} onChange={(e) => setYears(e.target.value)} />
                     <input className="jf" placeholder="Phone number" inputMode="tel" autoComplete="tel"
                       value={phone} onChange={(e) => setPhone(e.target.value)} />
                     <input className="jf" placeholder="Email address" inputMode="email" autoComplete="email"
                       value={email} onChange={(e) => setEmail(e.target.value)} />
-                    <input className="jf" placeholder="Years at the trade" inputMode="numeric"
-                      value={years} onChange={(e) => setYears(e.target.value)} />
                   </div>
                   <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-                    The phone number is the one we call about a job. Give us the one
-                    you actually answer.
+                    <b className="text-mute">A phone number or an email address, whichever
+                    you would rather.</b> Both is useful and neither is required twice.
+                    If you give a number, give the one you actually answer, because it
+                    is the one we ring about a job.
                   </p>
                 </div>
               </>
@@ -1084,8 +1100,8 @@ export function JoinFlow() {
 
           {d.body === "form" && !step1Ready && (
             <p className="mt-2 text-[12.5px] text-dim">
-              Fill in your trades, your parishes, your name, phone and email to
-              carry on.
+              To carry on: pick at least one trade and one parish, and give us
+              your name and one way to reach you.
             </p>
           )}
 
