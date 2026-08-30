@@ -154,9 +154,9 @@ const PHASE1_STEPS: Step[] = [
     h: "Show us the work, however you have it",
     p: "A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.",
     note: "We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it." },
-{ phase: 1, n: "Send it", body: "live",
-    h: "Send it, and the desk picks it up",
-    p: "Nothing you have filled in has reached a person yet. Sending it hands your profile to the Yaadly desk: your trades, your parishes, and the work you have shown us. <b>That is all we need to start.</b> The ID check and your referees come after somebody has read this.",
+{ phase: 1, n: "Your profile", body: "live",
+    h: "This is how a client will see you",
+    p: "Check it reads the way you would say it yourself. <b>Nothing here is fixed</b>, you can change any of it later, and the badge and the score fill in as you complete jobs.",
     note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
 ];
 
@@ -1078,17 +1078,84 @@ export function JoinFlow() {
 
             {d.body === "live" && (
               <div className="grid gap-3">
-                <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
-                  <b className="text-ink">Who reads this next.</b>
-                  <p className="mt-2">
-                    <b className="text-ink">A person at the Yaadly desk</b> opens
-                    the file and telephones your referees. Nothing about your
-                    documents is sent outside Yaadly.{" "}
-                    <b className="text-ink">You hear back within 48 hours.</b>
-                  </p>
-                </div>
+                {/* The profile preview. This screen used to be a sentence
+                    saying nothing had been sent yet and a button, which gave
+                    somebody nothing to check and no reason to be on it. What
+                    belongs here is the thing they are actually about to hand
+                    over, drawn from the same fields the public profile reads,
+                    so what they see is what a client sees.
 
-                {outstanding.length > 0 && (
+                    It deliberately shows the UNVETTED state, because that is
+                    the true one on the day they send: no score, no verified
+                    badge, "Building a record". A preview that flatters is a
+                    preview that lies, and this page has spent three screens
+                    telling them the check is the point. */}
+                {!sentRef && (
+                  <>
+                    <p className="text-[12.5px] leading-relaxed text-dim">
+                      This is your profile as a client will see it. Nothing here
+                      is fixed, you can change any of it later.
+                    </p>
+
+                    <div className="flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-panel p-5">
+                      <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-[#04211D]">
+                        {(name.trim() || "W").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="min-w-[220px] flex-1">
+                        <h3 className="font-display text-[clamp(20px,3.4vw,28px)] uppercase leading-none">
+                          {name.trim() || "Your name"}
+                        </h3>
+                        <p className="mt-1.5 text-[13.5px] text-mute">
+                          {[
+                            trades.length ? trades.join(", ") : "General trades",
+                            tradeOther.trim(),
+                            parishes.length ? parishes.join(", ") : "",
+                            years.trim() ? `Trading ${years.trim()} years` : "",
+                          ].filter(Boolean).join(" · ")}
+                        </p>
+                      </span>
+                      <span className="text-right">
+                        <span className="rounded-full border border-softline bg-soft px-3 py-1.5 text-[11.5px] font-bold text-tealb">
+                          Building a record
+                        </span>
+                        <p className="mt-1.5 text-[11.5px] text-dim">
+                          The Yaad Score starts at the first signed-off job
+                        </p>
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-line bg-bg px-4 py-3 text-[12.5px] leading-relaxed text-mute">
+                      <b className="text-ink">Work you have shown us:</b>{" "}
+                      {(() => {
+                        const shown = Object.entries(docs)
+                          .filter(([, v]) => v.state === "done")
+                          .map(([k]) => k.replace(/_/g, " "));
+                        const all = [...shown, ...links.map((l) => l.replace(/^https?:\/\//, ""))];
+                        return all.length
+                          ? all.join(", ")
+                          : "nothing yet. You can still send this, and add work later.";
+                      })()}
+                    </div>
+
+                    <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
+                      <b className="text-ink">What happens after you send.</b>
+                      <p className="mt-2">
+                        A person at the Yaadly desk reads it, not a queue.{" "}
+                        <b className="text-ink">You hear back within 48 hours.</b>{" "}
+                        The ID check and your referees come after that, and we
+                        chase them on WhatsApp so you do not have to sit here for
+                        them. <b className="text-ink">Your profile does not go
+                        public until those are done.</b>
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {/* Only in the second sitting. In Phase 1 the referees have not
+                    been asked for yet, so calling them "still outstanding" at
+                    the end of a two minute form is both untrue and the exact
+                    discouragement this flow was shortened to remove. */}
+                {continuing && outstanding.length > 0 && (
                   <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed text-mute">
                     <b className="text-ink">Still outstanding:</b> {outstanding.join(", ")}.
                     You can send it anyway. It will sit at the desk until these land,
@@ -1108,8 +1175,8 @@ export function JoinFlow() {
                 </button>
                 {!step1Ready && (
                   <p className="text-[12.5px] text-dim">
-                    Step 1 is not complete. We need your name, a phone number, an
-                    email, at least one trade and at least one parish.
+                    Not quite ready. We need your name, one way to reach you, at
+                    least one trade and at least one parish.
                   </p>
                 )}
               </div>
