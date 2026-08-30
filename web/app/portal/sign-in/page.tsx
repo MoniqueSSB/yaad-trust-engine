@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const CODE_FN = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/yaad-portal-code`;
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+
 /**
  * Sign in is a Client Component on purpose: the browser client is what holds
  * the session and refreshes the token. See lib/supabase/auth.ts for why this
@@ -13,10 +16,18 @@ import { createClient } from "@/lib/supabase/client";
 export default function SignIn() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [arriving, setArriving] = useState(true);
+
+  /* A six digit code is the only way in, and there is no password anywhere on
+     this page. Accounts opened since 31 Aug never chose one, so a password box
+     was asking those people for something they do not have. The founder
+     confirmed there are no live client accounts holding an old password, so
+     nothing is being taken away from anybody. */
+  const [otp, setOtp] = useState("");
+  const [stage, setStage] = useState<"ask" | "enter">("ask");
+  const [sentTo, setSentTo] = useState("");
 
   // Arriving from a confirmation link.
   //
@@ -58,15 +69,11 @@ export default function SignIn() {
           window.history.replaceState(null, "", window.location.pathname);
         }
 
-        // A recovery link also arrives as a valid session, so without this it
-        // would be treated as an ordinary arrival and the person would be sent
-        // into the portal, sailing straight past the password box they came
-        // here to use. They land here only when the reset mail falls back to
-        // Site URL, but that is exactly when they most need it to work.
-        if (frag.get("type") === "recovery") {
-          router.replace("/portal/reset");
-          return;
-        }
+        // A recovery link used to be sent to /portal/reset so somebody could
+        // choose a new password. There are no passwords now, so that page
+        // could only ask for something nobody needs. The link still carries a
+        // valid session, so the useful thing to do with it is the obvious
+        // one: let them in.
 
         const { data } = await supabase.auth.getSession();
         if (data.session) {
@@ -82,25 +89,54 @@ export default function SignIn() {
     })();
   }, [router]);
 
-  async function submit(e: React.FormEvent) {
+  /* No job code is asked for here. This page is for people who already have
+     an account, and yaad-portal-code only demands a job code when it is
+     opening a NEW one. Asking a returning client for a code they were given
+     months ago would lock them out of their own history. */
+  async function askForCode(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    try {
+      const r = await fetch(CODE_FN, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${KEY}` },
+        body: JSON.stringify({ email: email.trim(), role: "client" }),
+      });
+      const res = await r.json().catch(() => ({}));
+      if (!r.ok || res.error) throw new Error(res.error || "That did not work.");
+      if (!res.delivered) {
+        throw new Error(
+          "The code would not send, which is our end and not yours. Message Yaadly and we will get you in.",
+        );
+      }
+      setSentTo(email.trim());
+      setStage("enter");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That did not work.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
+  async function verifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
+    // type "email", measured on 30 Aug: a single POST /verify returning 200,
+    // login_method "otp". See the note in portal/join for why the storage
+    // slot says recovery and this still does not.
+    const { error: otpErr } = await supabase.auth.verifyOtp({
+      email: sentTo,
+      token: otp.replace(/\D/g, ""),
+      type: "email",
     });
-
-    if (error) {
-      // Deliberately not "no account with that email". That tells a stranger
-      // which addresses are real.
-      setError("That email and password did not match. Try again.");
+    if (otpErr) {
+      setError("That code did not match, or it has expired. Ask for a new one and try again.");
       setBusy(false);
       return;
     }
-
     router.replace("/portal");
     router.refresh();
   }
@@ -131,54 +167,81 @@ export default function SignIn() {
         them. Same sign in whether you are a client or a tradesperson.
       </p>
 
-      <form onSubmit={submit} className="mt-7">
-        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
-          Email
-        </label>
-        <input
-          type="email"
-          autoComplete="username"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal"
-        />
-
-        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
-          Password
-        </label>
-        <input
-          type="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal"
-        />
-
-        {error && (
-          <p
-            role="alert"
-            className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute"
-          >
-            {error}
+      {stage === "enter" ? (
+        <form onSubmit={verifyCode} className="mt-7">
+          <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+            We sent a six digit code to <b className="text-ink">{sentTo}</b>, and
+            to your WhatsApp number if we have one. It lasts about an hour.
           </p>
-        )}
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
-        >
-          {busy ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+            The six digit code
+          </label>
+          <input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            required
+            value={otp}
+            onChange={(e) => setOtp(e.target.value)}
+            placeholder="123456"
+            className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 font-mono text-[20px] tracking-[6px] text-ink outline-none focus:border-teal"
+          />
 
-      <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
-        <Link href="/portal/forgot" className="text-tealb underline">
-          Forgotten your password?
-        </Link>
-      </p>
+          {error && (
+            <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+          >
+            {busy ? "Checking..." : "Open my portal"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setStage("ask"); setOtp(""); setError(null); }}
+            className="mt-3 w-full text-[12.5px] text-dim underline"
+          >
+            Send it again, or use a different address
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={askForCode} className="mt-7">
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+            Email
+          </label>
+          <input
+            type="email"
+            autoComplete="username"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal"
+          />
+          <p className="-mt-2 mb-4 text-[12px] leading-relaxed text-dim">
+            <b className="text-mute">No password.</b> We send a six digit code
+            to your email, and to your WhatsApp number if we have one.
+          </p>
+
+          {error && (
+            <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+          >
+            {busy ? "Sending your code..." : "Send me a sign in code"}
+          </button>
+        </form>
+      )}
 
       <p className="mt-5 text-[12.5px] leading-relaxed text-dim">
         No account yet? Your job code comes to you on WhatsApp or by email, and
