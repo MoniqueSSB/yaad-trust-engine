@@ -44,8 +44,6 @@ export const metadata = {
   description: "Open property jobs across Jamaica and the verified workers who do them. Money held until the work is proven.",
 };
 
-const SITE = "https://yaadly.co.uk";
-
 function ago(iso: string | null): string {
   if (!iso) return "";
   const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -274,11 +272,30 @@ export default async function Board({
           completed job. Tradespeople: apply free, pass verification, sign the
           Worker Guidelines, and every job on this board is yours to quote.
         </p>
+        {/* All three of these used to point at yaadly.co.uk/#worker and
+            /#client. Those panes came off the marketing site on 27 Aug, and
+            its hash router now answers both by replacing the location with
+            app.yaadly.co.uk/portal, which is inside the gated group and so
+            redirects again to sign-in. So every button on a PUBLIC board sent
+            the visitor to a login form: "Read the Client Guidelines" asked
+            them to sign in before reading the thing they were told they could
+            read, and "Join as a worker" sent an applicant, who by definition
+            has no account, to a sign-in wall.
+
+            They point at the real pages instead. Both are on this origin, so
+            they are Links, not cross-site hops through a redirect. The
+            guidelines page reads without an account on purpose (see the note
+            at the top of app/portal/guidelines/page.tsx), and ?read= opens
+            the document text itself rather than the index, so the labels
+            promise what the click delivers. The marketing site keeps its
+            #client and #worker rule: it was put there for old bookmarks
+            already loose in the world, and nothing here was ever what
+            justified it. */}
         <div className="mt-3.5 flex flex-wrap gap-2.5">
           <Link href="/portal/sign-in" className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110">Become a client &rarr;</Link>
-          <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Join as a worker &rarr;</a>
-          <a href={`${SITE}/#client`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Client Guidelines</a>
-          <a href={`${SITE}/#worker`} className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Worker Guidelines</a>
+          <Link href="/apply" className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Join as a worker &rarr;</Link>
+          <Link href="/portal/guidelines?read=client_guidelines" className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Client Guidelines</Link>
+          <Link href="/portal/guidelines?read=worker_guidelines" className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Worker Guidelines</Link>
         </div>
       </div>
     </div>
