@@ -96,7 +96,6 @@ const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT
 // v2 is strictly narrower than v1, so every existing v1 consent still covers
 // what is done under v2. Bumping anyway, because the sentence changed and a
 // consent is tied to its sentence.
-const AI_CONSENT_VERSION = "ai-review-v2";
 
 const TRADES = [
   "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
@@ -132,7 +131,7 @@ const PHASES: Record<Phase, { name: string; sub: string }> = {
   3: { name: "Phase 3 · On the board",
        sub: "What your account can and cannot do once it is live." },
 };
-type BodyKind = "form" | "port" | "id" | "police" | "refs" | "agent" | "sign" | "trial" | "live";
+type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "trial" | "live";
 
 const STEPS: Step[] = [
 { phase: 1, n: "1 · Apply", body: "form",
@@ -151,14 +150,6 @@ const STEPS: Step[] = [
     h: "Three people who know we are calling",
     p: "Past clients, or trades you have worked alongside. We phone them, an emailed reference is a form somebody filled in. <b>You must confirm each one has been told we will call.</b> If we ring and they have no idea who we are, that is not a reference, and it does not count.",
     note: "This rule exists because a name on a form is not a referee. Somebody who was never asked cannot vouch for you, and putting them down is a mark against the application, not a neutral." },
-{ phase: 2, n: "6 · Documents checked", body: "agent",
-    h: "A machine reads the file before a person does",
-    p: "Every document that arrives as a picture is read for the things a person skims past: does the name match, is the date inside the window, is the certificate number real. A PDF, a Word CV and the face video are not read by it, they go straight to a person. Then a person decides on all of it. <b>The machine never decides, it only flags.</b>",
-    note: "It runs after you send, not while you sit here, and the decision is always a person's. What the check buys you is speed, not a shortcut." },
-{ phase: 3, n: "4 · Police check", body: "police",
-    h: "JCF record check, required over £500",
-    p: "A current police record check from the Jamaica Constabulary Force. <b>Mandatory</b> for any job over £500, any work inside an occupied home, and any time you hold keys or attend an empty property. Get it once and it covers every job you take.",
-    note: "Without it your profile still publishes, but you are locked out of every job over £500 and every occupied-home job. That is most of the money on the board." },
 { phase: 3, n: "7 · Sign", body: "sign",
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
@@ -189,9 +180,7 @@ const CHECKS: Check[] = [
   { k: "id",     b: "Government photo ID",     s: "Live photo and a left-to-right video turn" },
   { k: "id2",    b: "TRN verified",            s: "Matched to the name on the ID" },
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
-  { k: "police", b: "JCF police record check", s: "Required over £500 and for any occupied home", req: true },
   { k: "refs",   b: "3 references, confirmed and called", s: "Each one told in advance that we would call", req: true },
-  { k: "agent",  b: "Machine read, your choice", s: "Runs after you send. It flags, it never decides" },
   { k: "sign",   b: "Worker Guidelines signed", s: "The current version, once" },
   { k: "trial",  b: "Trial job reviewed",      s: "Independent reviewer on site, at our cost" },
   { k: "live",   b: "Profile published",       s: "You are on the board" },
@@ -274,7 +263,6 @@ export function JoinFlow() {
   // Step 3. Deliberately starts empty rather than defaulting to "yes": consent
   // that was pre-ticked is not consent, and a passport is not the document to
   // be casual about it with.
-  const [aiConsent, setAiConsent] = useState<"" | "granted" | "declined">("");
 
   // The Persona ID check. "done" means OUR SERVER recorded the inquiry, and
   // `verified` is the server's word after asking Persona's API, never the
@@ -306,7 +294,6 @@ export function JoinFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentRef, setSentRef] = useState("");
-  const [sentConsent, setSentConsent] = useState<"granted" | "declined">("declined");
   const claimRef = useRef<Claim | null>(null);
 
   /* Restore a half-finished application. Losing the tab on mobile data must
@@ -330,7 +317,6 @@ export function JoinFlow() {
           setPhone(v.form.phone ?? ""); setEmail(v.form.email ?? "");
           setYears(v.form.years ?? ""); setWork(v.form.work ?? "");
           setLinks(v.form.links ?? []);
-          setAiConsent(v.form.aiConsent ?? "");
         }
       }
     } catch { /* a corrupt cache is not worth an error screen */ }
@@ -346,11 +332,11 @@ export function JoinFlow() {
         const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
         localStorage.setItem(STORE, JSON.stringify({
           ...cur, ...next,
-          form: { trades, parishes, tradeOther, name, phone, email, years, work, links, aiConsent },
+          form: { trades, parishes, tradeOther, name, phone, email, years, work, links },
         }));
       } catch { /* private browsing, carry on */ }
     },
-    [trades, parishes, tradeOther, name, phone, email, years, work, links, aiConsent],
+    [trades, parishes, tradeOther, name, phone, email, years, work, links],
   );
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
@@ -560,13 +546,10 @@ export function JoinFlow() {
         // Unanswered goes over as "declined". The server treats it that way too,
         // but sending it explicitly means the row records a decision rather than
         // a gap somebody could later read either way.
-        aiReviewConsent: aiConsent || "declined",
-        aiReviewConsentVersion: AI_CONSENT_VERSION,
         signedName: signed ? signedName.trim() : "",
         signedVersion: GUIDELINES_VERSION,
       });
       setSentRef(c.reference);
-      setSentConsent(aiConsent || "declined");
       try { localStorage.removeItem(STORE); } catch { /* fine */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : "That did not send. Try again.");
@@ -591,14 +574,7 @@ export function JoinFlow() {
       : has("photo_id") && has("selfie_with_id") && has("face_video"),
     id2: has("trn"),
     id3: has("proof_of_address"),
-    police: has("police_check"),
     refs: refsDone,
-    // What is recorded here is the CHOICE, which this page can see, never the
-    // read, which it cannot: the read runs on the server after submit and can
-    // fail. Declining is a complete answer, not a gap, so it must never count
-    // as outstanding and quietly punish the choice. Agreeing is complete too,
-    // because everything asked of the applicant on this row is then done.
-    agent: aiConsent === "granted" || aiConsent === "declined",
     sign: signed && signedName.trim().length > 1,
     trial: false,
     live: false,
@@ -635,30 +611,12 @@ export function JoinFlow() {
         </h1>
         <div className="mt-6 max-w-[62ch] rounded-2xl border border-softline bg-soft p-6 text-[14.5px] leading-relaxed text-mute">
           <b className="text-ink">What happens next, in order.</b>
-          {sentConsent === "granted" ? (
-            <p className="mt-3">
-              Your paperwork is read first by software, for the things a person
-              skims past: whether the name matches across every document, whether
-              the dates are current, whether a certificate number is real. That
-              produces flags, never a decision.{" "}
-              <b className="text-ink">Your ID and your selfie are not part of that
-              and were never sent.</b>
-            </p>
-          ) : (
-            <p className="mt-3">
-              <b className="text-ink">You asked that no AI model read your
-              documents, and none will.</b> They go straight to a person, and
-              nothing about them is sent outside Yaadly. Allow{" "}
-              <b className="text-ink">within 48 hours</b>. Somebody reads every
-              page from cold, and it counts against you in no way at all.
-            </p>
-          )}
           <p className="mt-3">
-            {sentConsent === "granted" ? "Then a" : "A"} person at the Yaadly desk
-            opens the file{sentConsent === "granted" ? ", reads those flags," : ""}{" "}
-            and telephones your three referees. That is the part nothing
-            automates, and it is the reason a client believes the badge on your
-            profile.
+            <b className="text-ink">A person at the Yaadly desk reads every page
+            from cold</b>, then telephones your referees. That is the part
+            nothing automates, and it is the reason a client believes the badge
+            on your profile. Nothing about your documents is sent outside
+            Yaadly. Allow <b className="text-ink">within 48 hours</b>.
           </p>
           <p className="mt-3">
             You will hear back on the phone number and email you gave us. Quote{" "}
@@ -973,105 +931,7 @@ export function JoinFlow() {
                   )}
                 </div>
 
-                <div className="fgroup" style={{ marginBottom: 0 }}>
-                  <label className="fl">Who may read them</label>
-                  <p className="mb-2.5 text-[12.5px] leading-relaxed text-mute">
-                    A person at Yaadly reads your documents and decides. Before they
-                    do, we can have software read your paperwork first, to check the
-                    name is the same on every one, that the dates are current, and
-                    that nothing looks altered. It flags things for that person.{" "}
-                    <b className="text-ink">It never decides anything.</b>
-                  </p>
-                  <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
-                    <b className="text-ink">Your ID, your selfie and your face video
-                    are never sent to any AI model, whichever you choose here.</b> Not
-                    once, not ever. Those go to our identity checker and to a person
-                    at Yaadly, and nowhere else.
-                  </p>
-                  <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
-                    This choice is about the rest of the paperwork: your police
-                    record, proof of address, TRN, trade certificates, CV and work
-                    photos. To read those we send them to an AI model run by NVIDIA,
-                    outside Yaadly. Say no and only a person at Yaadly will ever open
-                    them.{" "}
-                    <b className="text-ink">Saying no counts against you in no way at
-                    all.</b> It is slower. That is the whole difference.
-                  </p>
-
-                  <div className="grid gap-2.5">
-                    {([
-                      ["granted", "Software may read the paperwork first, then a person decides",
-                        "Faster. Your police record, proof of address, TRN, certificates and CV go to NVIDIA's model to be read, and are not used to train anything. Your ID and selfie do not."],
-                      ["declined", "A person only. Do not send any of my documents to an AI model",
-                        "Nothing at all is sent outside Yaadly. A person reads every page from cold, and you hear back within 48 hours."],
-                    ] as const).map(([value, title, sub]) => (
-                      <label key={value}
-                        className={"flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition "
-                          + (aiConsent === value ? "border-teal bg-soft" : "border-line bg-bg hover:border-line2")}>
-                        <input type="radio" name="aiconsent" className="mt-0.5 size-4 shrink-0 accent-teal"
-                          checked={aiConsent === value}
-                          onChange={() => setAiConsent(value)} />
-                        <span>
-                          <b className="block text-[13.5px] leading-snug">{title}</b>
-                          <span className="mt-1 block text-[12px] leading-relaxed text-dim">{sub}</span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
-                    Neither is ticked for you. If you send your application without
-                    choosing, we read that as no.
-                  </p>
-                </div>
               </div>
-            )}
-
-            {d.body === "police" && (
-              <>
-                <div className="pcrule">
-                  <div className="pcbox must">
-                    <div className="pch">Over £500</div>
-                    <p><b className="text-ink">Mandatory.</b> Any job above £500 in
-                    value needs a current JCF police record check on file before you
-                    can be matched to it. No exceptions, no client opt-out.</p>
-                  </div>
-                  <div className="pcbox must">
-                    <div className="pch">Inside a home</div>
-                    <p><b className="text-ink">Mandatory.</b> Any work inside an
-                    occupied home, any job where you hold keys, and any attendance at
-                    an empty property, whatever the value.</p>
-                  </div>
-                  <div className="pcbox">
-                    <div className="pch">Under £500</div>
-                    <p>Optional, with the owner present. The client can still ask for
-                    it and we will require it, free to them, and you keep the
-                    certificate for every job after.</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3">
-                  <Upload label="Your JCF police record check" hint="A photo or a scan of the certificate"
-                    accept={PAPERS} doc="police_check" docs={docs} onFile={upload} />
-                  <label className="flex items-start gap-2.5 text-[13px] leading-relaxed text-mute">
-                    <input type="checkbox" className="mt-0.5 size-4 accent-teal"
-                      checked={policeStatus === "not_yet" && !has("police_check")}
-                      disabled={has("police_check")}
-                      onChange={() => setPoliceStatus(policeStatus === "not_yet" ? "" : "not_yet")} />
-                    I do not have one yet. Publish my profile without it and I
-                    understand I cannot be matched to a job over £500 or any job
-                    inside an occupied home until I send it.
-                  </label>
-                </div>
-
-                <div className="mt-4 rounded-xl border border-softline bg-soft px-4 py-3 text-[13px] leading-relaxed text-mute">
-                  <b className="text-ink">Why it is drawn at £500.</b> That is roughly
-                  where a job stops being a call-out and starts being someone&rsquo;s
-                  savings. Above it, a client is trusting you with real money and real
-                  access, so the bar goes up. Get the check once and it covers every
-                  job you take.
-                </div>
-              </>
             )}
 
             {d.body === "refs" && (
@@ -1096,42 +956,6 @@ export function JoinFlow() {
                   We phone every one. If we ring and they have no idea who we are,
                   it does not count.
                 </p>
-              </div>
-            )}
-
-            {d.body === "agent" && (
-              <div className="grid gap-3">
-                {[["Name match", "The name on every document is the same name"],
-                  ["Dates in window", "Proof of address inside three months, police check current"],
-                  ["Certificate numbers", "Checked against the issuing body, not read off the image"]].map(([a, b]) => (
-                  <div key={a} className="rounded-xl border border-line bg-bg px-4 py-3">
-                    <b className="text-[13.5px]">{a}</b>
-                    <span className="mt-1 block text-[12px] text-dim">{b}</span>
-                  </div>
-                ))}
-                <div className="rounded-xl border border-line bg-bg px-4 py-3">
-                  <b className="text-[13.5px]">On your file so far</b>
-                  <span className="mt-1 block text-[12px] text-dim">
-                    {Object.entries(docs).filter(([, v]) => v.state === "done").length === 0
-                      ? "Nothing yet. Go back to steps 2, 3 and 4 and attach what you have."
-                      : Object.entries(docs).filter(([, v]) => v.state === "done")
-                          .map(([k]) => k.replace(/_/g, " ")).join(", ")}
-                  </span>
-                </div>
-                <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
-                  <b className="text-ink">The machine never decides.</b> It flags, and
-                  a person at the Yaadly desk makes the call, then telephones your
-                  referees. What the check buys you is speed, not a shortcut.
-                </div>
-                {aiConsent !== "granted" && (
-                  <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed text-mute">
-                    <b className="text-ink">This step will be skipped for you.</b> On
-                    step 3 you {aiConsent === "declined" ? "asked" : "have not yet agreed"}{" "}
-                    {aiConsent === "declined" ? "that no AI model reads your documents" : "to an AI model reading your documents"},
-                    so a person reads them from cold. You hear back within
-                    48 hours. Nothing else changes.
-                  </div>
-                )}
               </div>
             )}
 
@@ -1178,31 +1002,12 @@ export function JoinFlow() {
               <div className="grid gap-3">
                 <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
                   <b className="text-ink">Who reads this next.</b>
-                  {aiConsent === "granted" ? (
-                    <p className="mt-2">
-                      Software reads your documents first and flags mismatched
-                      names, out of date paperwork and certificate numbers that do
-                      not check out. Then a person at the Yaadly desk opens the
-                      file, reads the flags, and telephones your three referees.
-                      The software never decides. The person always does.
-                    </p>
-                  ) : (
-                    <p className="mt-2">
-                      <b className="text-ink">No AI model will read your
-                      documents.</b> They go straight to a person at the Yaadly
-                      desk, who opens the file and telephones your three referees.
-                      Nothing about them is sent outside Yaadly.{" "}
-                      <b className="text-ink">You hear back within 48 hours.</b> Somebody
-                      is reading every page from cold.
-                      {aiConsent === "" && (
-                        <>
-                          {" "}You did not answer the question on step 3, so we are
-                          reading that as no. Change it there if you meant
-                          otherwise.
-                        </>
-                      )}
-                    </p>
-                  )}
+                  <p className="mt-2">
+                    <b className="text-ink">A person at the Yaadly desk</b> opens
+                    the file and telephones your referees. Nothing about your
+                    documents is sent outside Yaadly.{" "}
+                    <b className="text-ink">You hear back within 48 hours.</b>
+                  </p>
                 </div>
 
                 {outstanding.length > 0 && (
