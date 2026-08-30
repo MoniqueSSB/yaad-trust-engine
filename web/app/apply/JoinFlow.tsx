@@ -1140,11 +1140,14 @@ export function JoinFlow() {
                     <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
                       <b className="text-ink">What happens after you send.</b>
                       <p className="mt-2">
-                        A person at the Yaadly desk reads it, not a queue.{" "}
-                        <b className="text-ink">You hear back within 48 hours.</b>{" "}
-                        The ID check and your referees come after that, and we
-                        chase them on WhatsApp so you do not have to sit here for
-                        them.
+                        <b className="text-ink">Your profile is created and goes
+                        live as soon as you send this.</b> A person at the Yaadly
+                        desk reads it, not a queue, and you hear back within 48
+                        hours. The ID check and your referees come after that,
+                        and we chase them on WhatsApp so you do not have to sit
+                        here for them. Until they are done your profile shows as
+                        vetting in progress, and <b className="text-ink">it
+                        cannot be sent to a job</b>.
                       </p>
                     </div>
                   </>

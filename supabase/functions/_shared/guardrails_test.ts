@@ -1,0 +1,68 @@
+// Deno mirror of the guardrail tests in tests/test_engine.py.
+//
+// The phrases below are the SAME five the Python side asserts, deliberately.
+// Two copies of a rule drift, and a rule that holds in one runtime and not the
+// other is worse than no rule because it reads as covered. If somebody loosens
+// a pattern in one file, one of these two suites goes red.
+//
+// Run: deno test supabase/functions/_shared/guardrails_test.ts
+
+import { assert, assertEquals } from "jsr:@std/assert@1";
+import { isClean, SAFE_FALLBACK, scan, screenAttrs } from "./guardrails.ts";
+
+const BANNED_PHRASES = [
+  "Your money sits in escrow until the job is done.",
+  "We remove all fraud from the process.",
+  "You are 100% protected.",
+  "Every job is fully covered.",
+  "We hold your money safely.",
+];
+
+Deno.test("banned language is caught, same phrases as the Python suite", () => {
+  for (const text of BANNED_PHRASES) {
+    assert(scan(text).length > 0, `guardrail missed: ${text}`);
+    assertEquals(isClean(text), false, `guardrail missed: ${text}`);
+  }
+});
+
+Deno.test("approved language passes", () => {
+  assert(isClean(
+    "Payment is held safely with a licensed payment provider and released to the worker "
+    + "within 24 hours of your approval. Work is protected up to the guarantee limit.",
+  ));
+});
+
+Deno.test("the fallback a blocked client gets is itself clean", () => {
+  // Otherwise a screen failure would send a second thing that fails the screen.
+  assert(isClean(SAFE_FALLBACK));
+});
+
+Deno.test("an ordinary reply is not blocked", () => {
+  assert(isClean(
+    "Thanks, I have that. Which parish is the property in, and is anybody there to let a worker in?",
+  ));
+});
+
+Deno.test("scanning twice returns the same answer", () => {
+  // The patterns are module-level /g regexes. A leftover lastIndex between
+  // calls silently skips the first hit on the second call, which would mean
+  // the screen passing a message it had just blocked.
+  const text = "Your money sits in escrow.";
+  assertEquals(scan(text).length, scan(text).length);
+  assert(scan(text).length > 0);
+  assert(scan(text).length > 0);
+});
+
+Deno.test("telemetry carries the guidance, never the client's words", () => {
+  const attrs = screenAttrs(scan("Your money sits in escrow, and you are 100% protected."));
+  assertEquals(attrs["yaadly.guardrail.blocked"], 1);
+  const terms = String(attrs["yaadly.guardrail.terms"]);
+  assert(terms.includes("escrow"), "expected the escrow guidance");
+  assert(!terms.includes("Your money sits"), "the screened text must not reach telemetry");
+});
+
+Deno.test("a clean message reports blocked 0 and no terms", () => {
+  const attrs = screenAttrs(scan("What needs doing, and which parish is it in?"));
+  assertEquals(attrs["yaadly.guardrail.blocked"], 0);
+  assertEquals(attrs["yaadly.guardrail.terms"], "");
+});

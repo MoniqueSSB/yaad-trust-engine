@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -614,6 +615,34 @@ ${desk ? `<p style="margin:0 0 18px"><a href="${desk}" style="background:#14b8a6
   }
 }
 
+/** Tell the desk a reply was held back, without repeating what it said.
+ *
+ *  ntfy.sh is a public service, so this carries the guidance strings, which
+ *  are a fixed closed set, and nothing the client or the model wrote. Same
+ *  rule the other functions already follow for their notifications. The draft
+ *  itself is in the function log. */
+async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace) {
+  try {
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+    const { data: st } = await supabase.from("app_settings")
+      .select("value").eq("key", "ntfy_topic").maybeSingle();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: "Reply held back", Priority: "high", Tags: "warning" },
+      body: "A WhatsApp reply failed the language screen and was not sent. The client got a "
+        + "holding message and is waiting on a person. Reason: "
+        + [...new Set(findings.map((f) => f.guidance))].join(" ")
+        + " The draft is in the yaad-inbound function log.",
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (e) {
+    // A failed notification must never become a failed reply. The block itself
+    // already happened and is already in the log and on the span.
+    trace.startSpan("guardrail alert failed").recordError(String(e).slice(0, 200)).end();
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -629,9 +658,36 @@ Deno.serve(async (req: Request) => {
   // Twilio reads the response body as TwiML. Hand it JSON and it logs an
   // error on every single message, and the sender gets nothing back, which
   // from their side is indistinguishable from the message vanishing.
-  const twiml = (reply: string) => {
-    const safe = reply.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
-    root.setAttributes({ "http.response.status_code": 200 });
+  //
+  // This is also the ONE place anything in this function reaches a client, so
+  // it is where the banned-language screen goes. Every reply passes through
+  // here, the model-written ones and the fixed strings alike. Screening the
+  // fixed ones costs nothing and means a careless edit to one of them cannot
+  // walk past the rule either.
+  const twiml = async (reply: string) => {
+    const findings = guardrails.scan(reply);
+    let body = reply;
+
+    if (findings.length) {
+      // The model wrote something the company has a standing rule never to
+      // say. It does not go out. The client gets a plain holding reply and a
+      // person picks it up, which is the governing rule working rather than
+      // failing: AI drafts, a human takes it from here.
+      body = guardrails.SAFE_FALLBACK;
+
+      // The draft goes to the function log, which is private to this project.
+      // Not to telemetry and not to ntfy: it is model prose about somebody's
+      // property and may carry their name.
+      console.error(
+        "guardrail: outbound reply blocked. Terms: "
+          + [...new Set(findings.map((f) => f.term))].join(", ")
+          + ". Draft was: " + reply.slice(0, 500),
+      );
+      await alertDeskBlocked(findings, trace);
+    }
+
+    root.setAttributes({ "http.response.status_code": 200, ...guardrails.screenAttrs(findings) });
+    const safe = body.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
     root.end(); trace.flush();
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${safe}</Message></Response>`,

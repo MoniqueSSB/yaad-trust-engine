@@ -687,6 +687,31 @@ async function finalizeWorkerApplication(
     return { applicationId: null, reference: null, insertError: error?.message ?? "no row", replyResult };
   }
 
+  // The profile, created here for the same reason the web flow creates one:
+  // Phase 1 is complete, so it exists and it is live, in probation. A worker
+  // who joined in the chat gets exactly what a worker who joined on the site
+  // gets. No email is written, because this lane never asks for one.
+  try {
+    const slugBase = name.toLowerCase().normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "pro";
+    const { error: profErr } = await supabase.from("worker_profiles").upsert({
+      application_id: data.id,
+      worker_email: null,
+      name,
+      trade: trade.split(",")[0].trim() || null,
+      parish: String(answers.parishes || "").split(",")[0].trim() || null,
+      areas: String(answers.parishes || "").slice(0, 400) || null,
+      years: (() => { const n = parseInt(String(answers.years ?? "").replace(/\D/g, ""), 10); return Number.isFinite(n) ? n : null; })(),
+      slug: `${slugBase}-${String(data.id).slice(0, 6)}`,
+      active: true,
+      vetting_state: "probation",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "application_id" });
+    if (profErr) console.error("worker profile:", profErr.message);
+  } catch (e) {
+    console.error("worker profile:", String(e).slice(0, 200));
+  }
+
   await supabase.from("wa_intake_sessions").delete().eq("wa_id", waId);
 
   const firstName = name.trim().split(/\s+/)[0] || "";
