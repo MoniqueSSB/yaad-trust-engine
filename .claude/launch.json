@@ -26,6 +26,30 @@
       "port": 8932
     },
     {
+      "name": "preview-alt",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8934",
+        "--directory",
+        "preview"
+      ],
+      "port": 8934
+    },
+    {
+      "name": "site-alt",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8933",
+        "--directory",
+        "docs"
+      ],
+      "port": 8933
+    },
+    {
       "name": "app",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

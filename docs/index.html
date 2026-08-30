@@ -717,8 +717,8 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 #pane-site .card,#pane-services .card,#pane-payments .card{border-radius:var(--r)}
 
 
-/* ═══════════ POST A JOB · the six-step wizard ═══════════
-   Built to specs/POST-A-JOB-FLOW-SPEC.md v1.0.
+/* ═══════════ POST A JOB · the five-step wizard ═══════════
+   Built to specs/POST-A-JOB-FLOW-SPEC.md v1.1.
 
    The rule the whole flow exists to enforce:
      anyone can build a job with no account, it saves as a draft, and it
@@ -820,14 +820,14 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 .fixed{background:rgba(45,212,191,.06);border:1px solid rgba(45,212,191,.28);border-radius:11px;padding:12px 14px;font-size:12.5px;color:var(--mute);line-height:1.55}
 .fixed b{color:var(--tealb)}
 
-/* ── step 3 · photos ── */
+/* ── step 2 · photos ── */
 .drop{display:block;width:100%;background:var(--panel);border:1px dashed var(--line2);border-radius:var(--r);padding:30px 20px;text-align:center;color:var(--mute);cursor:pointer;transition:var(--tr);font:inherit;margin-top:20px}
 .drop:hover{border-color:var(--teal);background:var(--panel2)}
 .drop input{display:none}
 #pane-post .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 #pane-post .thumbs img{width:78px;height:78px;object-fit:cover;border-radius:10px;border:1px solid var(--line2)}
 
-/* ── step 4 · when ── */
+/* ── step 3 · when ── */
 .choice{display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer;transition:var(--tr)}
 .choice:hover{border-color:var(--teal)}
 .choice .dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;margin-top:2px;transition:var(--tr)}
@@ -835,7 +835,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 .choice.on .dot{border-color:var(--mango);background:var(--mango);box-shadow:inset 0 0 0 3px var(--panel)}
 .choice .tiny{color:var(--dim)}
 
-/* ── step 4 · the calendar ── */
+/* ── step 3 · the calendar ── */
 .wzdate{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px;margin-top:10px}
 .wzhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
 .wzhead b{font-size:14px}
@@ -855,7 +855,7 @@ html.jsrv .msg,html.jsrv .sysnote{opacity:0;transform:translateY(10px) scale(.97
 .wzflex button.on{border-color:var(--mango);background:rgba(255,176,32,.09);color:var(--mango)}
 @media(max-width:460px){.wzgrid{gap:3px}.wzgrid button{font-size:12px}}
 
-/* ── step 6 · review and the gate ── */
+/* ── step 5 · review and the gate ── */
 .rvsplit{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .rvsplit .h{font-size:10.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;margin-bottom:7px}
 .rvsplit.pub .h{color:var(--tealb)}
@@ -1186,7 +1186,7 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
       <!-- The website first, the board second. This lane pointed straight at
            app.yaadly.co.uk/jobs for one draft, which dropped a cold visitor
            onto a list of other people's jobs before anything had told them
-           what Yaadly is or why the money is held. The website carries that
+           what Yaadly is or how the money works. The website carries that
            explanation, and the board is one visible step on from it. -->
       <div class="fkgo"><button class="btn ghost sm" onclick="go('site')">Enter the marketplace</button><span class="fks soon">Opening in Kingston &amp; Portmore</span></div>
     </div>
@@ -1228,7 +1228,7 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
     <span>Money moves</span>
     <span class="g2">when you see it.</span>
   </h1>
-  <p class="lead">Vetted tradespeople. Money held until you approve the proof. <b>Property work across Jamaica</b>, Kingston and Portmore first.</p>
+  <p class="lead">Vetted tradespeople. Nobody is paid for a stage until you approve the proof. <b>Property work across Jamaica</b>, Kingston and Portmore first.</p>
 
   <div class="avail">
     <span class="av2 link" onclick="document.getElementById('book').scrollIntoView()">✅ Available today: free scoping call, checks and oversight</span>
@@ -1613,13 +1613,15 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
 
 </section>
 <!-- ═══════════════ POST A JOB · the wizard ═══════════════
-     Six steps, guest path. Built to specs/POST-A-JOB-FLOW-SPEC.md v1.0.
+     Five steps, guest path. Built to specs/POST-A-JOB-FLOW-SPEC.md v1.1:
+     photos fold into step 2 (30 Aug 2026), because a screen of their own
+     made an optional thirty seconds read as a stage of the work.
      The job row is written at step 2, so somebody who closes the tab at
-     step 4 has a saved draft to come back to rather than an empty form. -->
+     step 3 has a saved draft to come back to rather than an empty form. -->
 <section class="pane" id="pane-post"><div class="wrap">
 
   <div class="prog" id="prog"></div>
-  <div class="proglab"><span id="plab">Step 1 of 6, Trade</span><b id="pfree">Free to post</b></div>
+  <div class="proglab"><span id="plab">Step 1 of 5, Trade</span><b id="pfree">Free to post</b></div>
 
   <!-- 1 ───────────────────────────────────────────── -->
   <div class="wstep show" data-step="1">
@@ -1671,6 +1673,22 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
     </div>
     <div id="wizcard" style="margin-top:12px"></div>
 
+    <!-- Photos, folded in from what was a step of their own. Optional, and
+         placed after the card so the description is written before anyone
+         reaches for the camera roll. -->
+    <div class="fgroup" style="margin-top:16px">
+      <label class="fl">Add photos or a short video, optional</label>
+      <p class="tiny" style="margin-bottom:8px">Jobs with pictures get roughly three times the responses, and far fewer "I'd have to come see it first" replies. You can also add them later from your portal.</p>
+      <label class="drop" id="w-drop">
+        <div style="font-size:26px;line-height:1">＋</div>
+        <div style="font-weight:700;margin-top:6px">Add photos or video</div>
+        <div class="tiny" style="margin-top:4px">Up to 8. Phone photos are fine, we shrink them automatically.</div>
+        <input type="file" multiple accept="image/*" onchange="wzPhotos(event)">
+      </label>
+      <div class="thumbs" id="w-thumbs"></div>
+      <div class="manualnote"><b>Photos go up as they are.</b> Nothing reads them yet. From your second job on, the photo check tells you what a worker can and can't see before you post, and it checks the worker's evidence at every stage after that.</div>
+    </div>
+
     <div class="wnav">
       <button class="btn ghost" data-back>Back</button>
       <button class="btn" id="n2">Continue</button>
@@ -1680,25 +1698,6 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
 
   <!-- 3 ───────────────────────────────────────────── -->
   <div class="wstep" data-step="3">
-    <h2 class="wq">Add photos or a short video</h2>
-    <p class="wsub">Jobs with pictures get roughly three times the responses, and far fewer "I'd have to come see it first" replies.</p>
-    <label class="drop" id="w-drop">
-      <div style="font-size:26px;line-height:1">＋</div>
-      <div style="font-weight:700;margin-top:6px">Add photos or video</div>
-      <div class="tiny" style="margin-top:4px">Up to 8. Phone photos are fine, we shrink them automatically.</div>
-      <input type="file" multiple accept="image/*" onchange="wzPhotos(event)">
-    </label>
-    <div class="thumbs" id="w-thumbs"></div>
-    <div class="manualnote"><b>Photos go up as they are.</b> Nothing reads them yet. From your second job on, the photo check tells you what a worker can and can't see before you post, and it checks the worker's evidence at every stage after that.</div>
-    <div class="wnav">
-      <button class="btn ghost" data-back>Back</button>
-      <button class="btn" id="n3">Continue</button>
-      <span class="sp">You can skip this and add them later</span>
-    </div>
-  </div>
-
-  <!-- 4 ───────────────────────────────────────────── -->
-  <div class="wstep" data-step="4">
     <h2 class="wq">Where and when</h2>
     <p class="wsub">The full address is never shown on the public board. Workers only see the area until you choose one of them.</p>
     <div class="grid g2c">
@@ -1732,15 +1731,15 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
 
     <div class="wnav">
       <button class="btn ghost" data-back>Back</button>
-      <button class="btn" id="n4">Continue</button>
-      <span class="sp" id="h4"></span>
+      <button class="btn" id="n3">Continue</button>
+      <span class="sp" id="h3"></span>
     </div>
   </div>
 
-  <!-- 5 ───────────────────────────────────────────── -->
-  <div class="wstep" data-step="5">
-    <h2 class="wq" id="w5h">Create your account</h2>
-    <p class="wsub" id="w5sub">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
+  <!-- 4 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="4">
+    <h2 class="wq" id="w4h">Create your account</h2>
+    <p class="wsub" id="w4sub">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
 
     <div class="card soft" id="w-si-box" style="margin-bottom:18px">
       <p class="kick" style="margin-top:0;margin-bottom:6px">Posted with us before?</p>
@@ -1769,27 +1768,36 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
     </div>
     <div class="wnav">
       <button class="btn ghost" data-back>Back</button>
-      <button class="btn" id="n5">Continue</button>
-      <span class="sp" id="h5"></span>
+      <button class="btn" id="n4">Continue</button>
+      <span class="sp" id="h4"></span>
     </div>
   </div>
 
-  <!-- 6 ───────────────────────────────────────────── -->
-  <div class="wstep" data-step="6">
+  <!-- 5 ───────────────────────────────────────────── -->
+  <div class="wstep" data-step="5">
     <h2 class="wq">Confirm and go live</h2>
     <p class="wsub">This is what workers will see. The private bits stay private. Confirm the Client Guidelines and your job enters the marketplace.</p>
     <div class="card" id="w-review"></div>
 
     <div class="fixed" id="gdone" style="display:none;margin-top:14px"></div>
 
+    <!-- This block is a condensation of web/lib/legal-copy.json →
+         client_guidelines, and #gver must equal CG_VERSION in that file.
+         The signature is stamped against the version shown here, so the two
+         must never say different things: if legal-copy.json changes, this
+         block and #gver change in the same commit. The previous text here
+         predated v1.3 and still described Yaadly holding the payment, which
+         is the arrangement the money copy was rewritten to stop describing
+         (PERG 15.5 Q33A), while the tick recorded a v1.3 signature. -->
     <div class="card" id="gblock" style="margin-top:14px;background:var(--soft);border-color:var(--softline)">
       <p class="kick" style="margin-bottom:9px">Client Guidelines <span id="gver">v1.3</span>, required to go live</p>
       <div class="gscroll">
-        <h6>1. What Yaadly does</h6>Yaadly holds your payment for each agreed stage and releases it only when you have seen the evidence and signed it off. Yaadly is not the tradesperson and does not price the work.
-        <h6>2. What you agree to</h6>Describe the job honestly, give safe and timely access to the property, and respond to evidence within five working days. Silence past five days counts as approval.
-        <h6>3. Off-platform payment</h6>Paying a worker directly ends the protection on that stage. We cannot hold or recover money that never reached us.
-        <h6>4. Your details</h6>Your address and phone number stay off the public board. They are shared with one worker only when you choose to share them.
-        <h6>5. Disputes</h6>Where evidence does not match what was agreed in writing, the stage is not released and the job goes to review. Decisions are made on the written scope and the evidence, nothing else.
+        <h6>1. What being a Yaadly client means</h6>Yaadly gets property work done on evidence: verified workers, documented stages, and money that moves only when you approve what you can see. Yaadly is not the tradesperson, does not price the work, and every protection you enjoy has a named counterpart the worker enjoys.
+        <h6>2. Describing your job honestly</h6>Describe the site and the work as they really are, and keep the access you promised. Workers can walk away from a mis-described site without penalty, so an honest pitch protects your own timeline.
+        <h6>3. How money moves today</h6>While Yaadly is not holding money, paying your tradesperson directly through the route agreed on your job is how a job runs, and it is not going behind our backs. What it does mean is plain: Yaadly is holding nothing on your job, so Yaadly can withhold nothing, release nothing and return nothing. The Guarantee &amp; Support fee is 15% of the worker's labour price, itemised before you agree to anything, never charged on materials.
+        <h6>4. All work through Yaadly</h6>Workers quote their own price. Do not beat them down or take a worker from this platform into a side deal: that removes the protection for both of you, and repeat side-dealing ends the account. Never withhold approval to renegotiate a price already agreed.
+        <h6>5. Evidence, approval and disputes</h6>Review evidence when it lands, within 3 days where you can, because a worker who has proven a stage is waiting on your word to be paid. Approve when the evidence shows the agreed work; raise it before you approve when it does not. Disputes are free, reviewed by a person, and nothing moves while one is open.
+        <p style="margin-top:10px;margin-bottom:0">This is the deal in brief. The full wording of the same version is in your client portal from your first sign-in, and if it ever changes you will be asked to sign the new version before anything else moves.</p>
       </div>
       <label class="tick" for="gtick"><input type="checkbox" id="gtick"><span>I have read and agree to the Client Guidelines <span class="gverx">v1.3</span>, and I understand my job is not visible to any worker until I confirm this.</span></label>
       <div class="fgroup" style="margin-top:13px;margin-bottom:0"><label class="fl" for="w-sig">Type your full name to sign</label><input class="f" id="w-sig" placeholder="Your full name">
@@ -1798,14 +1806,14 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
 
     <div class="wnav">
       <button class="btn ghost" data-back>Back</button>
-      <button class="btn" id="n6" disabled>Confirm &amp; go live</button>
-      <span class="sp" id="n6hint">Tick the box and sign to continue</span>
+      <button class="btn" id="n5" disabled>Confirm &amp; go live</button>
+      <span class="sp" id="n5hint">Tick the box and sign to continue</span>
     </div>
     <div id="w-status"></div>
   </div>
 
   <!-- done ───────────────────────────────────────── -->
-  <div class="wstep" data-step="7">
+  <div class="wstep" data-step="6">
     <div class="pills" style="margin-bottom:14px" id="d-pills"></div>
     <h2 class="wq" id="d-head">Your job is saved.</h2>
     <p class="wsub" id="d-lead"></p>
@@ -1827,7 +1835,7 @@ body.gate nav.top{background:transparent;border-bottom:0;backdrop-filter:none}
   </div>
 
   <!-- fast lane ─── sits below whichever step is showing, but only steps
-       1 to 4: by step 5 the form is nearly done and sending somebody to
+       1 to 3: by step 4 the form is nearly done and sending somebody to
        WhatsApp would cost them work, not save it. Hidden by setStep. -->
   <div class="card soft" id="w-walane" style="margin-top:26px">
     <p class="kick m" style="margin-bottom:6px">💬 Want to do this faster?</p>
@@ -2667,10 +2675,11 @@ const GOLIVE_URL = POST_JOB_URL;
    with the same Patois instruction and the same provider chain behind it. */
 const TRANSCRIBE_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-transcribe";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
-/* ═══════════ POST A JOB · the six-step wizard ═══════════
-   specs/POST-A-JOB-FLOW-SPEC.md v1.0.
+/* ═══════════ POST A JOB · the five-step wizard ═══════════
+   specs/POST-A-JOB-FLOW-SPEC.md v1.1. Photos live inside step 2 as an
+   optional add, not on a screen of their own.
 
-   The rule the flow enforces, and the reason it is six screens and not one:
+   The rule the flow enforces, and the reason it is five screens and not one:
      anyone can build a job with no account, it saves as a draft, and it
      reaches the marketplace only once they have an account AND have signed
      the current Client Guidelines.
@@ -2688,7 +2697,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
 (function(){
  var root=document.getElementById('pane-post'); if(!root) return;
 
- var TOTAL=6;
+ var TOTAL=5;
  var step=1;
  var chosen=null;          // trade, picked at step 1
  var wzSel=null;           // exact start date, 'y-m-d'
@@ -2707,7 +2716,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  var signedGuidelines=false;
  var assistRan=false;
 
- var RAIL=['Trade','Details','Photos','Where & when','Create account','Guidelines & go live'];
+ var RAIL=['Trade','Details & photos','Where & when','Create account','Guidelines & go live'];
  var S=function(s){return root.querySelector(s)};
 
  /* ---------- the job card ----------
@@ -2903,9 +2912,9 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   step=n;
   root.querySelectorAll('.wstep').forEach(function(el){
     el.classList.toggle('show', Number(el.dataset.step)===n) });
-  var fast=S('#w-walane'); if(fast) fast.style.display = n<5 ? '' : 'none';
+  var fast=S('#w-walane'); if(fast) fast.style.display = n<4 ? '' : 'none';
   paintProg();
-  if(n===6) drawReview();
+  if(n===5) drawReview();
   window.scrollTo({top:0});
  }
  root.addEventListener('click',function(e){
@@ -2925,39 +2934,39 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
      person who has to live with it is the one being asked to look. */
   h.textContent = bad || (guesses ? guesses+' best guess'+(guesses>1?'es':'')+' to check before you continue' : '');
  }
- function hint4(){
-  var h=S('#h4'), n4=S('#n4'); if(!h||!n4) return;
+ function hint3(){
+  var h=S('#h3'), n3=S('#n3'); if(!h||!n3) return;
   var bad = !S('#w-parish').value ? 'Pick a parish to continue'
           : !(S('#w-access').value||'').trim() ? 'We need who lets the worker in'
           : '';
-  n4.disabled=!!bad; h.textContent=bad||'';
+  n3.disabled=!!bad; h.textContent=bad||'';
  }
- function hint5(){
-  var h=S('#h5'), n5=S('#n5'); if(!h||!n5) return;
+ function hint4(){
+  var h=S('#h4'), n4=S('#n4'); if(!h||!n4) return;
   var g=function(i){return (S(i).value||'').trim()};
   var bad = !g('#w-name') ? 'Your name is needed'
           : !g('#w-email') || g('#w-email').indexOf('@')<0 ? 'A valid email is needed'
           : !g('#w-phone') ? 'A phone or WhatsApp number is needed'
           : (!member && g('#w-pw').length<8) ? 'Password needs at least 8 characters'
           : '';
-  n5.disabled=!!bad; h.textContent=bad||'';
+  n4.disabled=!!bad; h.textContent=bad||'';
  }
  root.addEventListener('input',function(e){
   if(e.target.id==='w-desc') hint2();
-  if(e.target.id==='w-access') hint4();
-  if(['w-name','w-email','w-phone','w-pw'].indexOf(e.target.id)>-1) hint5();
+  if(e.target.id==='w-access') hint3();
+  if(['w-name','w-email','w-phone','w-pw'].indexOf(e.target.id)>-1) hint4();
   if(e.target.id==='w-sig') gateCheck();
  });
- root.addEventListener('change',function(e){ if(e.target.id==='w-parish') hint4() });
+ root.addEventListener('change',function(e){ if(e.target.id==='w-parish') hint3() });
 
- /* ---------- step 4 · when ---------- */
+ /* ---------- step 3 · when ---------- */
  root.addEventListener('click',function(e){
   var b=e.target.closest('[data-when]'); if(!b) return;
   when=b.dataset.when;
   root.querySelectorAll('[data-when]').forEach(function(x){x.classList.toggle('on',x===b)});
  });
 
- /* ---------- step 4 · calendar ----------
+ /* ---------- step 3 · calendar ----------
     Teal days are days a matching worker already has open. It is a signal,
     not a booking: nothing is held until a worker is chosen and both sides
     agree the scope. */
@@ -2999,13 +3008,13 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   if(e.target.id==='wzflexb'){ wzFlex=!wzFlex; if(wzFlex) wzSel=null; drawCal(); return }
  });
 
- /* ---------- step 3 · photos ---------- */
+ /* ---------- step 2 · photos ---------- */
  window.wzPhotos=async function(ev){
   photos=await filesToPhotos(ev.target.files);
   S('#w-thumbs').innerHTML=photos.map(function(p){return '<img src="'+p+'" alt="">'}).join('');
  };
 
- /* ---------- step 6 · review ---------- */
+ /* ---------- step 5 · review ---------- */
  function niceDate(k){
   if(!k) return '';
   var p=k.split('-'); return p[2]+' '+MON[p[1]-1]+' '+p[0];
@@ -3039,7 +3048,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  /* ---------- the gate ----------
     Not a checkbox. The signature is the row that makes the job visible. */
  function gateCheck(){
-  var t=S('#gtick'), s=S('#w-sig'), b=S('#n6'), h=S('#n6hint');
+  var t=S('#gtick'), s=S('#w-sig'), b=S('#n5'), h=S('#n5hint');
   if(!t||!s||!b) return;
   var gb=S('#gblock'), gd=S('#gdone');
   /* Signed the version in force already? Then there is nothing to sign. The
@@ -3254,8 +3263,8 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   S('#w-si-box').style.display='none';
   var on=S('#w-si-on'); on.style.display='';
   on.innerHTML='<b>Signed in as '+esc(member.email)+'.</b> This job attaches to that account. No second account is made, and nothing you have filled in so far is lost.';
-  S('#w5h').textContent='Confirm your details';
-  S('#w5sub').textContent='Pulled from the account you just signed into. Change anything that is out of date for this job.';
+  S('#w4h').textContent='Confirm your details';
+  S('#w4sub').textContent='Pulled from the account you just signed into. Change anything that is out of date for this job.';
   var em=S('#w-email'); em.value=member.email; em.readOnly=true;
   if(member.name && !(S('#w-name').value||'').trim()) S('#w-name').value=member.name;
   if(member.phone && !(S('#w-phone').value||'').trim()) S('#w-phone').value=member.phone;
@@ -3271,7 +3280,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    catch(err){ signedGuidelines=false }
   }
   var os=S('#w-onescreen'); if(os) os.style.display = signedGuidelines ? 'none' : '';
-  hint5(); gateCheck();
+  hint4(); gateCheck();
  }
  S('#w-si-go').addEventListener('click',async function(){
   var hint=S('#w-si-hint');
@@ -3307,13 +3316,12 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   h.textContent = ok ? '' : 'Saved locally, we will retry when you continue';
   drawCard(); setStep(3);
  });
- S('#n3').addEventListener('click',function(){ setStep(4) });
+ S('#n3').addEventListener('click',function(){ if(!this.disabled) setStep(4) });
  S('#n4').addEventListener('click',function(){ if(!this.disabled) setStep(5) });
- S('#n5').addEventListener('click',function(){ if(!this.disabled) setStep(6) });
- S('#n6').addEventListener('click',goLive);
+ S('#n5').addEventListener('click',goLive);
 
  /* ---------- the draft row, written at step 2 ----------
-    Somebody who closes the tab at step 4 comes back to a saved job, not an
+    Somebody who closes the tab at step 3 comes back to a saved job, not an
     empty form. open:false, so sync_job_status parks it at
     awaiting_client_setup until the signature exists. */
  /* The session token when there is one, the publishable key when there is
@@ -3366,10 +3374,10 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
   };
  }
 
- /* ---------- step 6 · sign, then go live ---------- */
+ /* ---------- step 5 · sign, then go live ---------- */
  async function goLive(){
-  var b=S('#n6'), st=S('#w-status');
-  b.disabled=true; S('#n6hint').textContent='Creating your account and recording the signature…';
+  var b=S('#n5'), st=S('#w-status');
+  b.disabled=true; S('#n5hint').textContent='Creating your account and recording the signature…';
   var body=payload('golive');
   body.signature=(S('#w-sig').value||'').trim();
   /* A signed-in client has already proved who they are with the token in
@@ -3388,8 +3396,8 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
       screen with the sign-in already filled in, rather than telling them to
       go and find it. */
    if(r.status===403 && j && j.accountExists){
-    b.disabled=false; S('#n6hint').textContent='';
-    setStep(5);
+    b.disabled=false; S('#n5hint').textContent='';
+    setStep(4);
     S('#w-si-email').value=(S('#w-email').value||'').trim();
     S('#w-si-hint').textContent='This email already has a Yaadly account. Sign in and your job attaches to it.';
     S('#w-si-pw').focus();
@@ -3400,7 +3408,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    draftId=j.jobId||draftId;
    done(j);
   }catch(e){
-   b.disabled=false; S('#n6hint').textContent='';
+   b.disabled=false; S('#n5hint').textContent='';
    st.innerHTML='<div class="flag" style="margin-top:14px"><b>That did not go through.</b> '+esc(e.message)+
      ' Your job is saved as a draft'+(draftId?' ('+esc(draftId)+')':'')+', nothing is lost. Try again, or message us on WhatsApp and we will finish it with you.</div>';
   }
@@ -3424,20 +3432,20 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
    ['We sent your job to relevant workers near '+(S('#w-parish').value||JC.parish.v),'Vetted workers in your trade and area were alerted just now. Your address and phone number were not included.'],
    ['We email and WhatsApp you when a worker expresses interest','Usually within a few hours in Kingston. You will see their Yaad Score, jobs completed and evidence from past work before you reply to anyone.'],
    ['Start a chat to share contact details','Chat on Yaadly, or hand over your number and take it to WhatsApp. Your choice, your timing, nothing is shared until you say so.'],
-   ['Choose your worker, agree the stages, fund stage one','No more paperwork, the guidelines are already signed. You agree the stages in writing, fund stage one, and Yaadly holds it. Nothing releases until photo and video evidence is signed off.'],
+   ['Choose your worker and agree the stages','No more paperwork, the guidelines are already signed. You agree the stages in writing before work starts, and nobody is paid for a stage until photo and video evidence is signed off by you.'],
    ['Evidence, sign-off, review','The worker uploads proof at each stage. You approve or send it back. When it is done you leave a review and their Yaad Score moves.']
   ] : [
    ['Confirm your email','We sent a link to '+(S('#w-email').value)+'. Clicking it proves the mailbox is yours, and that is what lets your job go to workers.'],
    ['Your job is held as a draft until then','It is saved with everything you filled in. No worker can see it, and nothing is charged.'],
    ['We alert matching workers the moment it opens','By trade and parish. Your address and phone number are never included.'],
-   ['Choose your worker, agree the stages, fund stage one','You agree the stages in writing, fund stage one, and Yaadly holds it. Nothing releases until evidence is signed off.'],
+   ['Choose your worker and agree the stages','You agree the stages in writing before work starts, and nobody is paid for a stage until evidence is signed off by you.'],
    ['Evidence, sign-off, review','The worker uploads proof at each stage. You approve or send it back, then leave a review.']
   ];
   S('#d-next').innerHTML=steps.map(function(s){
    return '<div class="nx"><b class="num"></b><div><h4>'+esc(s[0])+'</h4><p>'+esc(s[1])+'</p></div></div>' }).join('');
-  setStep(7);
+  setStep(6);
   root.querySelectorAll('.wstep').forEach(function(el){
-    el.classList.toggle('show', el.dataset.step==='7') });
+    el.classList.toggle('show', el.dataset.step==='6') });
   S('#prog').innerHTML=''; S('#plab').textContent=live?'Live':'Signed, one step left';
   window.scrollTo({top:0});
  }
@@ -3458,7 +3466,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
  /* ---------- boot ---------- */
  function boot(){
   paintTrades(); drawCard(); drawCal(); paintProg();
-  hint2(); hint4(); hint5(); gateCheck();
+  hint2(); hint3(); hint4(); gateCheck();
   var d=S('#w-desc');
   if(d && !d.value){
    /* whatever they typed in the hero search card carries down, so they
@@ -3590,7 +3598,7 @@ function closeWlModal(){
   function formOnScreen(){
     try{
       /* The wizard is the conversion now. If somebody is anywhere inside it,
-         the modal waits: interrupting a six-step form is how you lose a job. */
+         the modal waits: interrupting a five-step form is how you lose a job. */
       const p = document.getElementById("pane-post");
       if (p && p.classList.contains("show")) return true;
       /* And the gate is three buttons and nothing else. Exit intent there is
