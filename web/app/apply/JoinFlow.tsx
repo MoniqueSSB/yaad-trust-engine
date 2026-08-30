@@ -75,6 +75,12 @@ const GUIDELINES_VERSION = "v1";
 // template and an environment, they authorise nothing) and both are inlined at
 // build time. Unset means the legacy in-page capture runs instead, so this is
 // safe to deploy before the Persona account is wired up.
+/* The Yaadly WhatsApp Business sender, and the opener that puts the webhook
+   into its worker lane rather than treating the message as a job. */
+const WA_JOIN =
+  "https://wa.me/447878877567?text=" +
+  encodeURIComponent("Hello Yaadly, I am a tradesperson and I want to join.");
+
 const PERSONA_TEMPLATE_ID = process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID ?? "";
 const PERSONA_ENVIRONMENT_ID = process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID ?? "";
 const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT_ID.length > 0;
@@ -703,6 +709,40 @@ export function JoinFlow() {
           Saved as <span className="font-mono text-mute">{claim.reference}</span>.
           You can close this and come back on the same phone.
         </p>
+      )}
+
+      {/* The WhatsApp door. Most of the supply side is on a phone, on
+          WhatsApp, and a form on a website is a worse door than the chat they
+          are already in. The prefill is not decoration: the webhook classifies
+          the opening message, and this wording is covered by the test that
+          keeps worker sign-ups apart from clients asking FOR a tradesperson.
+
+          The number is deliberately not printed. It is a WhatsApp Business
+          sender, so anybody who reads it as a phone number and rings it
+          reaches nobody. */}
+      {!claim && (
+        <a
+          href={WA_JOIN}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-softline bg-soft p-4 no-underline transition hover:border-teal sm:p-5"
+        >
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[#25D366]">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="#04211D"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z" />
+            </svg>
+          </span>
+          <span className="min-w-[210px] flex-1">
+            <b className="block text-[15.5px] text-ink">Rather do this on WhatsApp?</b>
+            <span className="mt-0.5 block text-[13px] leading-relaxed text-mute">
+              Answer five short questions in the chat, one at a time, and send a
+              photo of a finished job. Patois or English. Your ID check comes
+              back to you on WhatsApp too.
+            </span>
+          </span>
+          <span className="whitespace-nowrap font-bold text-tealb">Open WhatsApp &rarr;</span>
+        </a>
       )}
 
       <div className="jlane">
