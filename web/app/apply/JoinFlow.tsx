@@ -82,7 +82,15 @@ const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT
 // Bump this whenever the wording of the AI review choice changes. A consent is
 // only worth anything tied to the sentence that earned it, and an old consent
 // must not be read as agreement to a newer, broader one.
-const AI_CONSENT_VERSION = "ai-review-v1";
+//
+// v2, 30 Aug 2026. v1 asked permission to send identity documents to NVIDIA's
+// model, and until today that is what happened. It does not any more: the ID,
+// the selfie and the face video are withheld in yaad-vetting-review whatever
+// the applicant chose. The choice now covers the supporting paperwork only.
+// v2 is strictly narrower than v1, so every existing v1 consent still covers
+// what is done under v2. Bumping anyway, because the sentence changed and a
+// consent is tied to its sentence.
+const AI_CONSENT_VERSION = "ai-review-v2";
 
 const TRADES = [
   "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
@@ -639,10 +647,12 @@ export function JoinFlow() {
           <b className="text-ink">What happens next, in order.</b>
           {sentConsent === "granted" ? (
             <p className="mt-3">
-              Your documents are read first by software, for the things a person
+              Your paperwork is read first by software, for the things a person
               skims past: whether the name matches across every document, whether
               the dates are current, whether a certificate number is real. That
-              produces flags, never a decision.
+              produces flags, never a decision.{" "}
+              <b className="text-ink">Your ID and your selfie are not part of that
+              and were never sent.</b>
             </p>
           ) : (
             <p className="mt-3">
@@ -948,26 +958,33 @@ export function JoinFlow() {
                   <label className="fl">Who may read them</label>
                   <p className="mb-2.5 text-[12.5px] leading-relaxed text-mute">
                     A person at Yaadly reads your documents and decides. Before they
-                    do, we can have software read them first, to check the name is
-                    the same on every one, that the dates are current, and that
-                    nothing looks altered. It flags things for that person.{" "}
+                    do, we can have software read your paperwork first, to check the
+                    name is the same on every one, that the dates are current, and
+                    that nothing looks altered. It flags things for that person.{" "}
                     <b className="text-ink">It never decides anything.</b>
                   </p>
                   <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
-                    To do that we send the images to an AI model run by NVIDIA,
-                    outside Yaadly. Plenty of people would rather that did not happen
-                    to a passport, and that is fair. Say no and only a person at
-                    Yaadly will ever open them.{" "}
+                    <b className="text-ink">Your ID, your selfie and your face video
+                    are never sent to any AI model, whichever you choose here.</b> Not
+                    once, not ever. Those go to our identity checker and to a person
+                    at Yaadly, and nowhere else.
+                  </p>
+                  <p className="mb-3 text-[12.5px] leading-relaxed text-mute">
+                    This choice is about the rest of the paperwork: your police
+                    record, proof of address, TRN, trade certificates, CV and work
+                    photos. To read those we send them to an AI model run by NVIDIA,
+                    outside Yaadly. Say no and only a person at Yaadly will ever open
+                    them.{" "}
                     <b className="text-ink">Saying no counts against you in no way at
                     all.</b> It is slower. That is the whole difference.
                   </p>
 
                   <div className="grid gap-2.5">
                     {([
-                      ["granted", "Software may read them first, then a person decides",
-                        "Faster. The images go to NVIDIA's model to be read, and are not used to train anything."],
-                      ["declined", "A person only. Do not send my documents to any AI model",
-                        "Your files are never sent outside Yaadly. A person reads every page from cold, and you hear back within 48 hours."],
+                      ["granted", "Software may read the paperwork first, then a person decides",
+                        "Faster. Your police record, proof of address, TRN, certificates and CV go to NVIDIA's model to be read, and are not used to train anything. Your ID and selfie do not."],
+                      ["declined", "A person only. Do not send any of my documents to an AI model",
+                        "Nothing at all is sent outside Yaadly. A person reads every page from cold, and you hear back within 48 hours."],
                     ] as const).map(([value, title, sub]) => (
                       <label key={value}
                         className={"flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition "
