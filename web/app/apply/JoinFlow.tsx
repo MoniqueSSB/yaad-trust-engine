@@ -133,7 +133,19 @@ const PHASES: Record<Phase, { name: string; sub: string }> = {
 };
 type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "trial" | "live";
 
-const STEPS: Step[] = [
+/* ── the two sittings ──────────────────────────────────────────────────────
+   Phase 1 is the whole first visit and it is three screens: what you do,
+   what you have done, send. That is about two minutes, and it is deliberate.
+   The desk wants a live applicant while they are still warm, and a
+   tradesperson on Jamaican mobile data will not climb nine screens to give
+   somebody their passport before anybody has said they want them.
+
+   Everything that asks for real trust comes AFTER a person has said yes,
+   which is when it is reasonable to ask. It is chased on WhatsApp where
+   possible, and reachable here from the confirmation screen for anybody who
+   would rather do it in a browser. Nothing was deleted, it was moved to the
+   point where it is earned. */
+const PHASE1_STEPS: Step[] = [
 { phase: 1, n: "1 · Apply", body: "form",
     h: "Your trades, and every parish you cover",
     p: "Take as many trades as you actually do, and name one yourself if it is not on our list. Pick every parish you will travel to, a job in a parish you have not ticked never reaches you.",
@@ -142,6 +154,13 @@ const STEPS: Step[] = [
     h: "Show us the work, however you have it",
     p: "A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.",
     note: "We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it." },
+{ phase: 1, n: "Send it", body: "live",
+    h: "Send it, and the desk picks it up",
+    p: "Nothing you have filled in has reached a person yet. Sending it hands your profile to the Yaadly desk: your trades, your parishes, and the work you have shown us. <b>That is all we need to start.</b> The ID check and your referees come after somebody has read this.",
+    note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
+];
+
+const LATER_STEPS: Step[] = [
 { phase: 2, n: "3 · Identity", body: "id",
     h: "A live photo and a live video, taken on this page",
     p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
@@ -158,10 +177,10 @@ const STEPS: Step[] = [
     h: "One job with an independent reviewer, at our cost",
     p: "Your first job carries an independent reviewer on site, paid for by Yaadly, not by you and not by the client. They record what they see against the same evidence standard you will be held to afterwards.",
     note: "It is the only way to know the standard holds on a real site rather than in an application form." },
-{ phase: 3, n: "9 · Send it", body: "live",
-    h: "Send it, and the desk picks it up",
-    p: "Nothing you have filled in has reached a person yet. Sending it hands the whole file to the Yaadly desk in one piece: your trades, your parishes, every document, your three referees and your signature.",
-    note: "Free to join, free to quote, win or lose. The one charge is 12% of your labour price on a completed job." },
+{ phase: 2, n: "Save it", body: "live",
+    h: "Save what you have added",
+    p: "Your application is already with the desk. This adds what you have just done to it: your ID check, your referees and your signature.",
+    note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
 ];
 
 /* ── what the desk still needs ────────────────────────────────────────────
@@ -294,6 +313,9 @@ export function JoinFlow() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sentRef, setSentRef] = useState("");
+  /* Phase 1 is sent and they have chosen to carry straight on into the
+     verification steps rather than wait to be chased. */
+  const [continuing, setContinuing] = useState(false);
   const claimRef = useRef<Claim | null>(null);
 
   /* Restore a half-finished application. Losing the tab on mobile data must
@@ -581,6 +603,7 @@ export function JoinFlow() {
   };
 
   const outstanding = CHECKS.filter((c) => c.req && !done[c.k]).map((c) => c.b);
+  const STEPS = continuing ? LATER_STEPS : PHASE1_STEPS;
   const d = STEPS[step];
 
   /* Step 3's heading is chosen at render time because the check it describes
@@ -598,7 +621,7 @@ export function JoinFlow() {
 
   /* ── the sent screen ───────────────────────────────────────────────── */
 
-  if (sentRef) {
+  if (sentRef && !continuing) {
     return (
       <>
         <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Application sent</p>
@@ -624,6 +647,25 @@ export function JoinFlow() {
             us first.
           </p>
         </div>
+        {/* The way into the second sitting, for anybody who would rather do
+            it now and in a browser than wait to be chased on WhatsApp. It is
+            an offer, not a queue: the application is already in, and nothing
+            here is required to have been done for the desk to read it. */}
+        <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
+          <b className="text-[15px] text-ink">Want to get ahead of it?</b>
+          <p className="mt-2 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
+            Your ID check, your referees and the Worker Guidelines are the next
+            things we ask for, and we normally chase them on WhatsApp once a
+            person has read your application. You can do them now instead. It
+            makes no difference to the decision, only to how fast it lands.
+          </p>
+          <button
+            onClick={() => { setContinuing(true); setStep(0); }}
+            className="mt-4 rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110">
+            Carry on to the ID check
+          </button>
+        </div>
+
         <p className="mt-4 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
           {persona.state === "done" ? (
             <>Your ID and selfie are held by Persona, the identity service that
@@ -1040,7 +1082,7 @@ export function JoinFlow() {
 
           <p className="mt-3 text-[12.5px] leading-relaxed text-dim">{shown.note}</p>
 
-          {step === 0 && !step1Ready && (
+          {d.body === "form" && !step1Ready && (
             <p className="mt-2 text-[12.5px] text-dim">
               Fill in your trades, your parishes, your name, phone and email to
               carry on.
@@ -1054,12 +1096,12 @@ export function JoinFlow() {
                 Back
               </button>
             )}
-            {step < STEPS.length - 1 && (
+            {d.body !== "live" && (
               <button
-                disabled={busy || (step === 0 && !step1Ready)}
+                disabled={busy || (d.body === "form" && !step1Ready)}
                 onClick={async () => {
                   setError("");
-                  if (step === 0) {
+                  if (d.body === "form") {
                     setBusy(true);
                     try { await ensureApplication(); }
                     catch (e) { setError(e instanceof Error ? e.message : "Could not start your application."); setBusy(false); return; }
@@ -1068,12 +1110,12 @@ export function JoinFlow() {
                   setStep(step + 1);
                 }}
                 className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                {busy && step === 0 ? "Starting…" : "Continue"}
+                {busy && d.body === "form" ? "Starting…" : "Continue"}
               </button>
             )}
           </div>
 
-          {error && step !== STEPS.length - 1 && (
+          {error && d.body !== "live" && (
             <p className="mt-3 text-[13px] text-coral">{error}</p>
           )}
         </div>
