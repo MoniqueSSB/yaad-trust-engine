@@ -440,16 +440,42 @@ export function JoinFlow() {
     }
   }
 
+  /* The check rides on the application: the application id is Persona's
+     reference-id, and without one there is nothing to tie the check to. So
+     before step 1 is done the button's job is to take you to step 1, in
+     words, not to fail into a small red line at the bottom of the panel.
+     That exact failure shipped and was found by the founder: "I click on
+     the link in step 3 and it takes me nowhere." */
+  const personaNeedsStep1 = !claim && !step1Ready;
+
   async function startPersona() {
     setError("");
     setPersona({ state: "opening" });
     let c: Claim;
     try { c = await ensureApplication(); }
     catch (e) {
-      setPersona({ state: "idle" });
-      setError(e instanceof Error ? e.message : "Could not start your application.");
+      // On the row, in red, where the person who clicked is looking. The
+      // page-bottom error line is below the fold on a phone.
+      setPersona({
+        state: "error",
+        error: e instanceof Error ? e.message : "Could not start your application.",
+      });
       return;
     }
+    // If Persona has said nothing after twenty seconds, stop waiting and say
+    // so. Without this, a blocked script (an ad blocker is the usual culprit)
+    // leaves the button reading "Opening…" forever, which is indistinguishable
+    // from a button that does nothing.
+    window.setTimeout(() => {
+      setPersona((p) => {
+        if (p.state !== "opening") return p;
+        // A side effect inside an updater is normally wrong; here it is the
+        // only place that knows the state is still "opening", and setting the
+        // same fallback string twice under StrictMode is harmless.
+        setPersonaFallback("Persona did not answer after twenty seconds. An ad blocker or the connection may be stopping it.");
+        return { state: "idle" };
+      });
+    }, 20000);
     try {
       const { Client } = await import("persona");
       const client = new Client({
@@ -845,6 +871,8 @@ export function JoinFlow() {
                                 ? "Our server confirmed it with Persona. Your ID stays with Persona, not in our files."
                                 : `Persona has it as "${persona.status || "unchecked"}". A person at the desk resolves it.`)
                           : persona.state === "error" ? persona.error
+                          : personaNeedsStep1
+                            ? "The check is tied to your application, so step 1 comes first: your name, phone, email, trades and parishes."
                           : "Opens a secure window run by Persona, the identity service. Your ID and selfie go to Persona, not into our files."}
                       </span>
                     </div>
@@ -856,12 +884,19 @@ export function JoinFlow() {
                         onClick={() => { const { inquiryId, status } = persona; void recordPersona(inquiryId!, status ?? ""); }}>
                         Record it again
                       </button>
+                    ) : personaNeedsStep1 && (persona.state === "idle" || persona.state === "error") ? (
+                      // Nothing can start yet, so the button goes to the thing
+                      // that can: it must never fail into silence.
+                      <button type="button" className="upbtn" onClick={() => setStep(0)}>
+                        Finish step 1 first
+                      </button>
                     ) : (
                       <button type="button" className="upbtn"
                         disabled={persona.state === "opening" || persona.state === "open" || persona.state === "saving"}
                         onClick={() => void startPersona()}>
                         {persona.state === "done" ? "Run it again"
                           : persona.state === "idle" ? "Start the ID check"
+                          : persona.state === "error" ? "Try again"
                           : "Opening…"}
                       </button>
                     )}
