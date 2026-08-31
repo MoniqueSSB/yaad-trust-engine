@@ -245,3 +245,20 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:30px 0 44px}
 /* status messages under forms */
 .status-ok,.status-bad{border-radius:12px;border:1px solid var(--line);background:var(--panel);padding:14px 16px;margin-top:14px;font-size:14px}
 .status-bad{background:var(--redsoft);border-color:#542020;color:#F3C9C9}
+
+/* price guide tables */
+.ptable-wrap{overflow-x:auto;margin-top:16px;border:1px solid var(--line);border-radius:var(--r)}
+table.ptable{width:100%;border-collapse:collapse;font-size:14px;min-width:520px}
+table.ptable th,table.ptable td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--line)}
+table.ptable th{background:var(--panel2);color:var(--mute);font:700 11px var(--body);letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+table.ptable td{color:var(--ink)}
+table.ptable td.num{font-family:var(--mono);white-space:nowrap}
+table.ptable tr:last-child td{border-bottom:none}
+table.ptable tbody tr:hover{background:var(--panel2)}
+.conf{display:inline-block;font:700 10px var(--body);letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:100px;white-space:nowrap}
+.conf.high{color:var(--tealb);background:var(--soft);border:1px solid var(--softline)}
+.conf.medium{color:var(--mango);background:#1e1808;border:1px solid #4a3a14}
+.conf.low{color:var(--coral);background:#2a1a14;border:1px solid #4a2a1e}
+.conf.none{color:var(--dim);background:var(--panel2);border:1px solid var(--line2)}
+.gapcard{background:var(--redsoft);border:1px solid #542020;border-radius:var(--r);padding:18px 20px;margin-top:16px}
+.gapcard b{color:#F3C9C9}
