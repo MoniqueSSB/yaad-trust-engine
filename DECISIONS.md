@@ -134,3 +134,15 @@ The function issues and delivers and nothing else. It never sees the code come b
 **`verifyOtp` takes type `"email"`, and this is measured rather than assumed.** The founder signed in through the page on 30 August and the auth log shows a single `POST /verify` returning 200 with `login_method: "otp"`, `provider: "email"`. Write that down, because the storage says otherwise: `generateLink` files the token in GoTrue's `recovery_token` slot and logs the event as `user_recovery_requested`. It still verifies as `email`. It also cannot be rediscovered by probing, since GoTrue returns the identical "Token has expired or is invalid" for all four types when the token does not match, so a wrong type looks exactly like a wrong code.
 
 Existing accounts keep their passwords. Nothing was removed from them; they simply have a way in that needs nothing remembered.
+
+## One door in (Stage 3, 31 Aug 2026)
+
+The plan said to retire `yaad-post-job`. That would have broken the funnel, because `/jobs/new` calls it in draft mode, which is the right thing to call: it is rate limited, it writes `stage 0, open false`, and it deliberately stores no personal data. What actually needed retiring was narrower and more important.
+
+**`yaad-post-job`'s `golive` mode is gone.** It created an account from a password, captured the Client Guidelines signature and opened the job, and it was step 6 of the five-step funnel deleted in Stage 1. Nothing had called it since. Removing it was not tidying: it was a **second account-creation path that took a password**, on a journey that moved to a six digit code with no password anywhere. A dead endpoint that can still mint password accounts is exactly the kind of thing that quietly outlives the decision to stop doing it. `verifyPassword`, `signedInUser` and `MIN_PASSWORD` went with it, forty-seven lines of password handling. It answers 410 and names where each part went.
+
+**`yaad-website-intake` is retired to a 410 stub.** It served the public "Tell us what needs doing" form deleted in Stage 1, took no authentication by design, and created jobs. The only reference left anywhere was one line in `web/README.md`. It is a stub rather than a deletion because an unreferenced public endpoint that writes rows is precisely what survives three refactors unnoticed, and a 410 that says what happened beats a 404 that says nothing. If something out there still calls it, that is now visible rather than silent.
+
+**One stale link found and fixed:** the portal's `ServiceNext` still sent clients to `yaadly.co.uk/#post`, the deleted funnel, and to `#services`, which moved to its own page in Stage 1.
+
+**What can create a job now:** `/jobs/new` through `yaad-post-job` draft mode, plus the WhatsApp webhook and `yaad-inbound` for email and SMS. Those are channels rather than rival funnels: they land in the same tables with the same portal code model, which is what the plan meant by one code path plus WhatsApp intake.

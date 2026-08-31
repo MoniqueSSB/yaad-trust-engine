@@ -65,7 +65,7 @@ this app:**
 
 - Inbound third-party webhooks (`yaad-whatsapp-webhook`). Meta calls that URL
   directly, so it must not change when this app deploys.
-- Public entry points used by the marketing site (`yaad-website-intake`).
+- `yaad-website-intake` was the marketing site's public intake and was retired on 31 Aug 2026. It answers 410. Jobs are created at `/jobs/new`, which posts to `yaad-post-job` in draft mode.
   yaadly.co.uk is hand-written HTML on GitHub Pages and cannot call a Server
   Action.
 - All AI model calls (`yaad-agent`, `yaad-kickoff`, `yaad-vision`,

@@ -37,7 +37,6 @@ import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const MIN_PASSWORD = 8;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -281,58 +280,15 @@ async function callerKey(req: Request): Promise<string> {
     .map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// ── who is posting ───────────────────────────────────────────────────────
-//
-// An email address is a claim. These two turn it into proof.
-//
-// signedInUser reads a real session token off the request. The page sends the
-// publishable key in that header when nobody is signed in, so anything that is
-// not a three-part JWT is not a session and is not asked about.
-// The auth server is asked, rather than the token being decoded and believed.
-// A signature and an account are downstream of the answer, so "who is this"
-// has to come from something that checks, not from base64 the caller wrote.
-async function signedInUser(req: Request) {
-  const tok = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (!tok || !tok.startsWith("ey") || tok.split(".").length !== 3) return null;
-  const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  if (!anon) return null;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: anon, Authorization: `Bearer ${tok}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!r.ok) return null;
-    const u = await r.json();
-    const email = s(u?.email).toLowerCase();
-    if (!u?.id || !email) return null;
-    return {
-      id: String(u.id),
-      email,
-      confirmed: Boolean(u.email_confirmed_at ?? u.confirmed_at),
-    };
-  } catch (_) { return null; }
-}
+/* ── who is posting ───────────────────────────────────────────────────────
+   Nobody, and that is the point.
 
-// verifyPassword is for the client who is not signed in but whose email is
-// already known here. An account that has never confirmed its email cannot
-// sign in at all, and the token endpoint says so specifically, so that answer
-// counts as the password being right. It is the only thing being asked.
-async function verifyPassword(email: string, password: string): Promise<"ok" | "unconfirmed" | "wrong"> {
-  const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  if (!anon || !password) return "wrong";
-  try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: anon },
-      body: JSON.stringify({ email, password }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (r.ok) return "ok";
-    const j = await r.json().catch(() => ({}));
-    const said = `${j?.error_code ?? ""} ${j?.error ?? ""} ${j?.msg ?? ""} ${j?.error_description ?? ""}`;
-    return /not.?confirmed/i.test(said) ? "unconfirmed" : "wrong";
-  } catch (_) { return "wrong"; }
-}
+   signedInUser and verifyPassword lived here and went with the go live
+   branch on 31 Aug 2026. Both existed to decide whether the person finishing
+   a job already had an account and whether their password was right. There
+   are no passwords in the client journey any more, and this function does
+   not need to know who is asking: draft mode is deliberately anonymous and
+   writes no name, email or phone number onto the row at all. */
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -517,223 +473,28 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, read });
     }
 
-    // ───────────────────────── go live ─────────────────────────
-    const jobId    = s(b.jobId);
-    const email    = s(b.email).toLowerCase();
-    const name     = s(b.name);
-    const phone    = s(b.phone);
-    const password = String(b.password ?? "");
-    const sig      = s(b.signature);
-    const consent  = s(b.consentText);
-    let version   = s(b.guidelinesVersion);
-
-    // A session for THIS email, or nothing. Someone signed in as one person
-    // cannot post as another: the token has to match the email on the form.
-    const session = await signedInUser(req);
-    const signedIn = !!session && session.email === email;
-    root.setAttributes({ "yaadly.post.signed_in": signedIn });
-
-    if (!jobId) return json({ error: "That draft could not be found. Start again and it will save as you go." }, 400);
-    if (!name) return json({ error: "Your name is needed." }, 400);
-    if (!email || !email.includes("@")) return json({ error: "A valid email is needed." }, 400);
-    if (!phone) return json({ error: "A phone or WhatsApp number is needed." }, 400);
-    if (!signedIn && password.length < MIN_PASSWORD) return json({ error: `Password needs to be at least ${MIN_PASSWORD} characters.` }, 400);
-    // The signature is checked further down, once we know whether this person
-    // has already signed the version in force. Somebody who signed it last
-    // month is not asked to sign it again.
-
-    // The draft must exist and must not already belong to somebody else.
-    const { data: job, error: jobErr } = await admin.from("jobs")
-      .select("id, client_email").eq("id", jobId).maybeSingle();
-    if (jobErr) { root.recordError(jobErr.message); return json({ error: "Could not read that job." }, 500); }
-    if (!job) return json({ error: "That draft could not be found." }, 404);
-    if (s(job.client_email) && s(job.client_email).toLowerCase() !== email) {
-      root.setAttributes({ "yaadly.post.outcome": "job_claimed_by_other" });
-      return json({ error: "That job already belongs to another account." }, 403);
-    }
-
-    // The account. Three cases, and they are not the same trust level.
-    //
-    //   signed in       the browser sent a session token for this email.
-    //                   Nothing is created, no password is asked for, and a
-    //                   signature they already gave still counts.
-    //
-    //   new email       created unconfirmed on purpose: the confirmation link
-    //                   is what proves the mailbox is theirs, and that is what
-    //                   later lets the job open.
-    //
-    //   known email,    the password is checked BEFORE anything is written.
-    //   not signed in   This used to be waved through. createUser failed with
-    //                   "already registered", the code carried on, and a
-    //                   signature in somebody else's name went onto their
-    //                   account with their job attached. Any eight characters
-    //                   did it. An account that has never confirmed its email
-    //                   cannot sign in yet, so "email not confirmed" from the
-    //                   token endpoint counts as the password being right.
-    let emailed = false;
-    let user: { id: string; confirmed: boolean };
-
-    if (signedIn && session) {
-      user = { id: session.id, confirmed: session.confirmed };
-      root.setAttributes({ "yaadly.post.account": "session" });
-    } else {
-      const { error: createErr } = await admin.auth.admin.createUser({ email, password, email_confirm: false });
-      const alreadyExisted = !!createErr && /already|registered|exists/i.test(String(createErr.message || ""));
-      if (createErr && !alreadyExisted) {
-        root.recordError(String(createErr.message));
-        return json({ error: "Could not create the account. Try again, or message Yaadly." }, 502);
-      }
-
-      if (alreadyExisted) {
-        const proof = await verifyPassword(email, password);
-        if (proof === "wrong") {
-          root.setAttributes({ "yaadly.post.outcome": "existing_account_not_proven" });
-          return json({
-            error: "That email already has a Yaadly account. Sign in with it and this job attaches to it, or use a different email.",
-            accountExists: true,
-          }, 403);
-        }
-        root.setAttributes({ "yaadly.post.account": "existing_password_checked" });
-      } else {
-        root.setAttributes({ "yaadly.post.account": "created" });
-        try {
-          const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-          const r = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", apikey: anon, Authorization: `Bearer ${anon}` },
-            body: JSON.stringify({ type: "signup", email }),
-          });
-          emailed = r.ok;
-          if (!r.ok) root.recordError(`confirmation email not sent: ${r.status}`);
-        } catch (e) { root.recordError(`confirmation email threw: ${String(e).slice(0, 200)}`); }
-      }
-
-      // Find the user so the signature can be attributed. doc_signatures.signer_user
-      // is NOT NULL by design: a signature that is not tied to an account is not a
-      // signature, it is a checkbox.
-      //
-      // Asked of Postgres by email, not read off a page of accounts.
-      // listUsers() hands back the first fifty and no warning that there are
-      // more, so the moment Yaadly passes fifty auth users a client whose row
-      // sits on page two stops being found. Everything about that request is
-      // correct, and it fails anyway: no signature, no open job, and an error
-      // message that tells them to message us rather than saying what happened.
-      // The count only ever goes up, so this had one direction to fail in.
-      //
-      // The signed-in branch above never had the problem: a verified session
-      // already names the account, so there is nothing to look up.
-      const { data: found, error: lookupErr } = await admin
-        .rpc("auth_user_by_email", { p_email: email })
-        .maybeSingle<{ user_id: string; confirmed_at: string | null }>();
-      if (lookupErr || !found) {
-        root.recordError(lookupErr ? `user lookup: ${lookupErr.message}` : "user not found after create");
-        return json({ error: "Could not attach your signature to an account. Message Yaadly." }, 502);
-      }
-      user = { id: found.user_id, confirmed: Boolean(found.confirmed_at) };
-    }
-    const confirmed = user.confirmed;
-
-    // The version the page DISPLAYED is what gets recorded, because a signature
-    // belongs to the words the person actually read. A stale cached page
-    // signing 1.2 records 1.2, and the portal then asks them to re-sign the
-    // current one, which is exactly what versioned signatures are for.
-    //
-    // The fallback is the one thing that must not be a guess. It used to be the
-    // literal "1.0", which quietly stamped a signature against a version nobody
-    // had seen, and which drifted out of step with app_settings the moment the
-    // wording moved on. Ask the database what is in force instead.
-    //
-    // Resolved here rather than with the other fields above so that a request
-    // missing a name is told about the name, not billed a database round trip
-    // and then told something about guidelines versions.
-    if (!version) {
-      const { data: cur } = await admin.from("app_settings")
-        .select("value").eq("key", "client_guidelines_version").maybeSingle();
-      version = s(cur?.value);
-      root.setAttributes({ "yaadly.guidelines.version_from": "app_settings" });
-    }
-    if (!version) {
-      root.recordError("no guidelines version available to stamp");
-      return json({ error: "Could not confirm which Client Guidelines you signed. Nothing was recorded, and nothing was charged. Message Yaadly." }, 500);
-    }
-
-    // The signature. One row per version: signing again for a new version is a
-    // new row, never an edit of the old one.
-    //
-    // A returning client who has already signed the version in force is not
-    // asked to sign it again. That is the whole point of versioning them: the
-    // question is "have these words been agreed", not "has a box been ticked
-    // today". A version bump brings the box back for everybody.
-    const { data: prior } = await admin.from("doc_signatures")
-      .select("id")
-      .eq("signer_user", user.id)
-      .eq("doc_type", "client_guidelines")
-      .eq("doc_version", version)
-      .limit(1);
-    const alreadySigned = !!prior?.length;
-    root.setAttributes({ "yaadly.guidelines.already_signed": alreadySigned });
-
-    if (!alreadySigned) {
-      if (sig.length < 3) return json({ error: "Type your full name to sign." }, 400);
-      const { error: sigErr } = await admin.from("doc_signatures").insert({
-        signer_user: user.id,
-        signer_email: email,
-        signer_name: sig,
-        doc_type: "client_guidelines",
-        doc_version: version,
-        consent_text: consent || `Client Guidelines v${version} accepted through the job wizard.`,
-      });
-      if (sigErr) { root.recordError(sigErr.message); return json({ error: "Could not record the signature. Nothing was charged, message Yaadly." }, 500); }
-    }
-
-    // Attach the client and their final answers to the draft.
-    const { error: updErr } = await admin.from("jobs").update({
-      client_name: name, client_email: email, client_phone: phone,
-      parish, addr, access_contact: access,
-      title: s(b.workType) ? `${s(b.workType)} job for ${name}` : `Job for ${name}`,
-      descr: buildDescr(b), ...cardCols(b),
-    }).eq("id", jobId);
-    if (updErr) { root.recordError(updErr.message); return json({ error: updErr.message }, 500); }
-
-    if (photos.length) {
-      const rows = photos.map((img, i) => ({
-        job_id: jobId, label: `Client photo ${i + 1}`,
-        meta: "From the job wizard", img, ok: true,
-      }));
-      const { error: evErr } = await admin.from("evidence").insert(rows);
-      if (evErr) console.warn("evidence insert:", evErr.message);
-    }
-    await attachVoiceNote(jobId);
-
-    // Ask the database to open it. It will refuse until the client is cleared,
-    // which needs the profile as well as this signature, and the profile only
-    // exists once they have confirmed their email in the portal. A refusal here
-    // is the system working, not an error, so it is reported as "not open yet".
-    let open = false;
-    if (confirmed) {
-      const { error: openErr } = await admin.from("jobs").update({ open: true }).eq("id", jobId);
-      open = !openErr;
-      if (openErr) root.setAttributes({ "yaadly.post.golive_refused": openErr.message.slice(0, 120) });
-    }
-
-    // Tell Monique. Fire and forget, and no contact details leave for the relay.
-    const notify = (async () => {
-      try {
-        const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
-        if (!st?.value) return;
-        await fetch(`https://ntfy.sh/${st.value}`, {
-          method: "POST",
-          headers: { Title: "Job signed on the website", Priority: "high", Tags: "house" },
-          body: `${jobId}: ${s(b.workType) || "job"}, ${parish || "parish not given"}. Guidelines v${version} signed. ${open ? "Live on the board." : "Waiting on email confirmation."}`,
-          signal: AbortSignal.timeout(4000),
-        });
-      } catch (_) { /* never let a notification break a signature */ }
-    })();
-    const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-    if (rt?.waitUntil) rt.waitUntil(notify);
-
-    root.setAttributes({ "yaadly.post.outcome": open ? "live" : "signed_awaiting_confirmation", "yaadly.job.id": jobId });
-    return json({ ok: true, jobId, open, emailed, alreadySigned, signedIn, guidelinesVersion: `v${version}` });
+    /* GO LIVE IS GONE (31 Aug 2026, Stage 3).
+     *
+     * This branch created an account from a password, captured the Client
+     * Guidelines signature and opened the job, and it was step 6 of the
+     * five step funnel that used to live in docs/index.html. That funnel was
+     * deleted in Stage 1 and nothing has called this since.
+     *
+     * Removing it is not tidying. It was a SECOND account creation path, it
+     * took a password, and the whole client journey moved to a six digit
+     * code with no password anywhere. A dead endpoint that can still mint
+     * password accounts is exactly the kind of thing that quietly outlives
+     * the decision to stop doing it.
+     *
+     * What replaced each part: accounts come from yaad-portal-code, the
+     * Guidelines signature is signed in the portal, and a job is opened by
+     * the client_go_live RPC, which enforce_signed_before_open still guards.
+     * Draft mode above is untouched and is what web/app/jobs/new calls.
+     */
+    root.setAttributes({ "yaadly.post.outcome": "golive_retired" });
+    return json({
+      error: "This way of finishing a job has been retired. Your job is saved as a draft. Open your portal to sign the Client Guidelines and put it live.",
+    }, 410);
 
   } catch (e) {
     root.recordError(e);
