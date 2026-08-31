@@ -388,7 +388,20 @@ Deno.serve(async (req: Request) => {
     // this only reads the role it already verified, the same trust the
     // "authenticated" branch below already relied on.
     const caller = callerJwt(req);
-    const isServiceRole = caller.role === "service_role";
+    // Not a JWT role check: this project's service role secret is the
+    // newer opaque sb_secret_... form, not a JWT, so it has no "role"
+    // claim to decode - callerJwt() silently returns role:"" for it, which
+    // the JWT check below would have wrongly treated as "reject". Direct
+    // string comparison against this function's own copy of the secret is
+    // correct either way, legacy JWT or opaque key, and is what actually
+    // ran clean, not the first version.
+    const presentedToken = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    let isServiceRole = false;
+    if (SB_SERVICE && presentedToken.length === SB_SERVICE.length) {
+      let diff = 0;
+      for (let i = 0; i < SB_SERVICE.length; i++) diff |= presentedToken.charCodeAt(i) ^ SB_SERVICE.charCodeAt(i);
+      isServiceRole = diff === 0;
+    }
     if (!isServiceRole) {
       if (caller.role !== "authenticated") {
         root.setAttributes({ "yaadly.auth.outcome": "rejected" });
