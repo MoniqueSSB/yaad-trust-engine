@@ -48,6 +48,40 @@ export async function sendMessage(
   return { hits };
 }
 
+/** A client's comment on one specific photo, not the whole stage. Same
+ *  scrub-before-insert shape as sendMessage(); the RLS policy on
+ *  evidence_comments (20260831z_evidence_comments_per_photo) is what
+ *  actually locks from_role to 'client' and origin to 'portal', and
+ *  refuses anyone whose signed-in email is not this job's own client, so
+ *  a worker calling this by mistake is refused there, not here. stage is
+ *  read off the evidence row itself rather than trusted from the caller,
+ *  since a wrong stage on the written comment would misfile it. */
+export async function commentOnEvidence(
+  jobId: string,
+  evidenceId: string,
+  body: string,
+): Promise<{ hits: string[] }> {
+  await requireUser();
+  const text = body.trim().slice(0, 1000);
+  if (!text) return { hits: [] };
+  const { clean, hits } = scrub(text);
+  const supabase = await createClient();
+  const { data: item } = await supabase
+    .from("evidence")
+    .select("stage")
+    .eq("id", evidenceId)
+    .eq("job_id", jobId)
+    .maybeSingle();
+  if (!item) throw new Error("That photo could not be found on this job.");
+  const { error } = await supabase.from("evidence_comments").insert({
+    job_id: jobId, stage: item.stage ?? 1, from_role: "client", origin: "portal",
+    evidence_id: evidenceId, body: clean,
+  });
+  if (error) throw new Error("refused");
+  revalidatePath("/portal/jobs/" + jobId);
+  return { hits };
+}
+
 export async function raiseDispute(
   jobId: string,
   kinds: string[],

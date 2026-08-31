@@ -6,6 +6,7 @@ import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
 import { matchApprovingJob } from "./approval-match.ts";
+import { pickEvidenceItem } from "./evidence-item-match.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -192,7 +193,12 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string };
+// hasCaption is the record of whether a worker actually said what this is,
+// separate from label itself: label always holds something displayable
+// ("Sent on WhatsApp" when nothing was said), but that fallback text is not
+// context, and the dispatch loop needs to tell the two apart to know
+// whether to ask.
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean };
 
 // Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
 // a straight download rather than a two-step lookup: fetchMedia() above
@@ -209,7 +215,8 @@ async function downloadAndStageEvidence(admin: any, url: string, mime: string, c
   if (error) return null;
 
   const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
-  return { path, mime, bytes: got.bytes.byteLength, sha256, label: (caption || "Sent on WhatsApp").slice(0, 140) };
+  const trimmed = caption.trim();
+  return { path, mime, bytes: got.bytes.byteLength, sha256, label: (trimmed || "Sent on WhatsApp").slice(0, 140), hasCaption: !!trimmed };
 }
 
 async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence): Promise<boolean> {
@@ -259,6 +266,36 @@ async function mintPortalUploadLink(admin: any, email: string, jobId: string): P
     if (error || !data?.properties?.action_link) return null;
     return String(data.properties.action_link);
   } catch (_) { return null; }
+}
+
+// Everything else in this file replies to whoever just messaged, via
+// TwiML. Telling the WORKER about a client's comment is a different
+// person than the one who sent this request, so that mechanism cannot
+// reach them: this is a genuine outbound send, same shape as the ones
+// yaad-notify-client and yaad-job-health already carry their own copy of.
+async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<boolean> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+  const digits = to.replace(/\D/g, "");
+  if (!sid || !tok || !from || digits.length < 7) return false;
+  return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
+    "server.address": "api.twilio.com", "messaging.system": "twilio",
+  }, async (s) => {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body }),
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      return r.ok;
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return false;
+    }
+  });
 }
 
 async function transcribeUrl(url: string, trace: Trace): Promise<string> {
@@ -813,6 +850,27 @@ Deno.serve(async (req: Request) => {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+      const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
+
+      // A worker answering the "send this draft, or write your own"
+      // prompt. "1" means send exactly what was drafted; anything else
+      // typed is read as their own version and that is what goes out
+      // instead. Founder's own requirement, 31 Aug 2026, confirmed to the
+      // worker to decide, not routed through anyone else first.
+      if (reportSession && !msg.media.length && msg.text.trim()) {
+        const a = reportSession.answers as any;
+        const said = msg.text.trim();
+        const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
+        const { error } = await supabase.rpc("relay_confirmed_report", {
+          p_job: a.job_id, p_override_text: overrideText, p_ai_summary: a.ai_summary ?? "",
+        });
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.customised": said !== "1" });
+        if (error) return twiml("That did not go through. Try again, or send it again in a moment.");
+        return twiml(said === "1"
+          ? "Sent to the client as drafted."
+          : "Sent to the client, your own words.");
+      }
 
       // A code prompt, shared by the "one job" and "several jobs" cases:
       // the code is always shown and always the answer asked for, never
@@ -830,6 +888,11 @@ Deno.serve(async (req: Request) => {
         const pending: PendingEvidence[] = answers.pending ?? [];
         const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
         const workerEmail: string = answers.worker_email ?? "";
+        // Set once the job code is confirmed, ahead of asking for context,
+        // so a context reply never has to re-run pickJobChoice against
+        // free text that was never meant to answer that question.
+        const confirmedJob: { id: string; stage: number } | null =
+          answers.confirmed_job ? { id: answers.confirmed_job, stage: answers.confirmed_stage } : null;
         const media = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
 
         if (media.length) {
@@ -838,15 +901,48 @@ Deno.serve(async (req: Request) => {
           await supabase.from("wa_intake_sessions")
             .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
+          const prompt = confirmedJob ? "What do these show?" : codePrompt(choices);
           return twiml(items.length
-            ? `Got that too, ${next.length} so far. ${codePrompt(choices)}`
-            : `That one did not come through. ${codePrompt(choices)}`);
+            ? `Got that too, ${next.length} so far. ${prompt}`
+            : `That one did not come through. ${prompt}`);
+        }
+
+        // The job is already confirmed and this reply is standing in for
+        // context, not a job code: founder's own requirement, 31 Aug 2026,
+        // a worker sending a photo or video with no caption gets asked what
+        // it shows rather than it being filed as "Sent on WhatsApp" and
+        // left for the client to guess at.
+        if (confirmedJob) {
+          const context = msg.text.trim().slice(0, 140);
+          const described = context
+            ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
+            : pending;
+          let filed = 0;
+          for (const item of described) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_after_context" : "context_but_nothing_filed" });
+          if (!filed) return twiml("Confirmed, but nothing saved properly. Try sending the photo again.");
+          let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, stage ${confirmedJob.stage}. Keep them coming.`;
+          const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
+          if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+          return twiml(body);
         }
 
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) {
           return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
         }
+
+        // Only asked once per batch, and only when something still needs
+        // it: an item that already carried a real caption keeps it exactly
+        // as sent, never overwritten by a later answer meant for the others.
+        if (pending.some((p) => !p.hasCaption)) {
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage }, updated_at: new Date().toISOString() })
+            .eq("wa_id", msg.from);
+          return twiml(`Got it, that's for ${pick.id}. What does this show? A line on what was done helps the client understand it faster.`);
+        }
+
         let filed = 0;
         for (const item of pending) if (await finalizeEvidenceItem(supabase, pick.id, pick.stage, workerEmail, item)) filed++;
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
@@ -891,6 +987,106 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // A worker's plain reply, answering a client's comment. The mirror
+      // of the client-comment lane below: exactly one job may be awaiting
+      // this worker's answer for it to be read this way, never guessed
+      // among several. "Awaiting" means the newest comment on that job is
+      // still from the client, nobody has answered it yet.
+      if (!msg.media.length && msg.text.trim()) {
+        const worker = await lookupWorkerByPhone(supabase, msg.from);
+        if (worker) {
+          const activeJobs = await lookupActiveJobsForWorker(supabase, worker.email);
+          const awaitingReply: { id: string; title: string; stage: number }[] = [];
+          for (const j of activeJobs) {
+            const { data: latest } = await supabase.from("evidence_comments")
+              .select("from_role").eq("job_id", j.id)
+              .order("created_at", { ascending: false }).limit(1).maybeSingle();
+            if (latest?.from_role === "client") awaitingReply.push(j);
+          }
+
+          if (awaitingReply.length === 1) {
+            const job = awaitingReply[0];
+            // A code in the worker's reply ("P2 is done now") attributes
+            // the answer to one specific photo rather than the whole
+            // stage, when one is actually named; a plain reply with no
+            // code stays exactly as it was, about the stage, since a
+            // worker answering generally has not necessarily seen the
+            // client's own point about one item.
+            const { data: stageItems } = await supabase.from("evidence")
+              .select("id, item_code").eq("job_id", job.id).eq("stage", job.stage);
+            const namedItem = pickEvidenceItem(msg.text, stageItems ?? []);
+            await supabase.from("evidence_comments").insert({
+              job_id: job.id, stage: job.stage, from_role: "worker", origin: "whatsapp",
+              body: msg.text.trim().slice(0, 1000), evidence_id: namedItem?.id ?? null,
+            });
+            root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "worker" });
+
+            const { data: jobRow } = await supabase.from("jobs")
+              .select("client_phone").eq("id", job.id).maybeSingle();
+            let notified = false;
+            if (jobRow?.client_phone) {
+              notified = await sendWhatsAppTo(
+                String(jobRow.client_phone),
+                `The worker replied on ${job.id} (${job.title}): "${msg.text.trim().slice(0, 300)}"\n\nReply with the code ${job.id} to approve, or say more and we will pass it on.`,
+                trace,
+              );
+            }
+            root.setAttributes({ "yaadly.evidence_comment.client_notified": notified });
+            return twiml(notified
+              ? `Got it, passed on to the client on ${job.id}.`
+              : `Got it, on record against ${job.id}. We could not reach the client directly just now, but it is saved.`);
+          }
+        }
+      }
+
+      // Stage 6: a client booking a worker by replying with the job's own
+      // code, rather than tapping Accept in the portal. Same guard as the
+      // approval block below and the same reason: every plain text message
+      // a client sends passes through here, so only an exact code match is
+      // trusted, never a bare "yes". A job with more than one open price at
+      // once refuses the reply rather than guessing which one was meant.
+      //
+      // This calls choose_worker_via_whatsapp(), not the older
+      // accept_quote_via_whatsapp() the first version of this block called:
+      // that was built on accept_quote_as_me(), a stale duplicate of the
+      // real booking path found only once this was tested live against a
+      // real database. choose_worker() is what the signed-in portal
+      // actually uses, and it will not book a worker until both the client
+      // and the worker have separately agreed the job's scope. The
+      // client's side of that agreement is what this reply IS, per the
+      // founder's own decision, 31 Aug 2026: yaad-notify-client sends the
+      // worker's proposed scope in words before this reply is ever asked
+      // for, so replying with the code is a real yes to a real proposal,
+      // not a rubber stamp. If the worker has not agreed their own side
+      // yet, choose_worker_via_whatsapp() does not fail on that: the
+      // client's own agreement is recorded either way, and it returns a
+      // distinct marker rather than an error so that recording is never
+      // rolled back by a refusal that follows it in the same call. Nothing
+      // then auto-completes the booking the moment the worker's side
+      // lands, on purpose, matching the portal's own agreeScope(), which
+      // does not retry choose_worker() on its own either: whoever tries
+      // second, client or worker, is the one whose action actually books
+      // it.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: openToBook } = await supabase.from("jobs")
+          .select("id, title, stage, client_phone")
+          .eq("status", "quoted")
+          .not("client_phone", "is", null);
+        const bookTail = msg.from.replace(/\D/g, "").slice(-9);
+        const mineToBook = (openToBook ?? []).filter((j: any) =>
+          String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === bookTail);
+
+        const bookTarget = matchApprovingJob(msg.text, mineToBook);
+        if (bookTarget) {
+          const { data: bookResult, error } = await supabase.rpc("choose_worker_via_whatsapp", { p_job: bookTarget.id, p_phone: msg.from });
+          const pending = bookResult === "PENDING_WORKER_SCOPE";
+          root.setAttributes({ "yaadly.whatsapp_quote_accept.job": bookTarget.id, "yaadly.whatsapp_quote_accept.outcome": error ? "refused" : pending ? "pending_worker" : "accepted" });
+          if (error) return twiml(`That did not go through: ${error.message}`);
+          if (pending) return twiml(`Got it, that's on record. ${bookTarget.title} books the moment the worker also confirms the scope, and you'll hear the moment it does.`);
+          return twiml(`Booked. ${bookTarget.title} is on. A message with the price and how payment works is coming through next.`);
+        }
+      }
+
       // Stage 6: a client approving a stage by replying, rather than
       // tapping Approve in the portal. Unlike the worker lanes above, this
       // one is not gated behind an open multi-turn session: every plain
@@ -905,7 +1101,7 @@ Deno.serve(async (req: Request) => {
       // an approval rather than guessed at.
       if (!msg.media.length && msg.text.trim()) {
         const { data: awaiting } = await supabase.from("jobs")
-          .select("id, title, stage, client_phone")
+          .select("id, title, stage, client_phone, worker_email")
           .eq("status", "evidence")
           .not("client_phone", "is", null);
         const tail = msg.from.replace(/\D/g, "").slice(-9);
@@ -918,6 +1114,44 @@ Deno.serve(async (req: Request) => {
           root.setAttributes({ "yaadly.whatsapp_approval.job": target.id, "yaadly.whatsapp_approval.outcome": error ? "refused" : "approved" });
           if (error) return twiml(`That did not go through: ${error.message}`);
           return twiml(`Approved. Stage ${target.stage ?? 1} of ${target.title} is confirmed, and the worker is paid for it. Nothing else to do.`);
+        }
+
+        // Not a code, and exactly one job is waiting on this client's
+        // review: read as a comment on that evidence, not a new job
+        // description. Founder's own requirement, 31 Aug 2026: a client
+        // who is not satisfied should have a way to say so, and it should
+        // reach the worker to answer, not vanish or get misread as
+        // somebody describing a fresh problem.
+        if (mine.length === 1) {
+          const job = mine[0] as { id: string; title: string; stage: number; worker_email: string | null };
+          // Same attribution as the worker's reply above: "P2 has a gap
+          // still" names one photo, a plain complaint stays about the
+          // whole stage, exactly as it always has.
+          const { data: stageItems } = await supabase.from("evidence")
+            .select("id, item_code").eq("job_id", job.id).eq("stage", job.stage);
+          const namedItem = pickEvidenceItem(msg.text, stageItems ?? []);
+          await supabase.from("evidence_comments").insert({
+            job_id: job.id, stage: job.stage, from_role: "client", body: msg.text.trim().slice(0, 1000),
+            evidence_id: namedItem?.id ?? null,
+          });
+          root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "client" });
+
+          let notified = false;
+          if (job.worker_email) {
+            const { data: worker } = await supabase.from("worker_profiles")
+              .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+            if (worker?.phone) {
+              notified = await sendWhatsAppTo(
+                String(worker.phone),
+                `A note from the client on ${job.id} (${job.title}), stage ${job.stage}: "${msg.text.trim().slice(0, 300)}"\n\nReply to this number to answer, and it goes straight back to them.`,
+                trace,
+              );
+            }
+          }
+          root.setAttributes({ "yaadly.evidence_comment.worker_notified": notified });
+          return twiml(notified
+            ? `Got it, passed on to the worker on ${job.id}. They'll get back to you.`
+            : `Got it, on record against ${job.id}. We could not reach the worker directly just now, but it is saved and Yaadly can follow up.`);
         }
       }
     }

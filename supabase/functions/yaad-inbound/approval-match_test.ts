@@ -68,3 +68,13 @@ Deno.test("yaad-inbound imports matchApprovingJob rather than defining its own",
   assert(inboundSource.includes('from "./approval-match.ts"'), "yaad-inbound no longer imports approval-match.ts");
   assert(inboundSource.includes("approve_stage_via_whatsapp"), "yaad-inbound no longer calls approve_stage_via_whatsapp");
 });
+
+Deno.test("yaad-inbound also wires quote acceptance through the same strict match", () => {
+  // Stage 6, continued: booking a worker by WhatsApp reply reuses this same
+  // matcher rather than a looser one of its own, so a bare "yes" can no
+  // more book a worker than it can approve a stage. Calls
+  // choose_worker_via_whatsapp(), the real booking mechanism, not the
+  // stale accept_quote_via_whatsapp() the first version of this wiring
+  // called before that was found to be built on a duplicate, broken path.
+  assert(inboundSource.includes("choose_worker_via_whatsapp"), "yaad-inbound no longer calls choose_worker_via_whatsapp");
+});

@@ -26,27 +26,32 @@
  *
  * CHANNELS: the same order yaad-quote-landed already proved. Twilio
  * WhatsApp, then Meta's API, then Twilio SMS, then Resend email regardless.
- * Six of the seven kinds below have no approved WhatsApp Content Template of
- * their own, so they go over WhatsApp as free text, which works inside the
- * 24 hour window and fails honestly outside it: reusing a template approved
- * for one sentence to send a different sentence is exactly the kind of thing
- * that gets a WhatsApp sender flagged, so free text is the only honest option
- * for those six. quote_arrived is the exception, because it is not a
- * different sentence: it is the same notification yaadly_quote_landed_v2 was
- * approved for, word for word bar one clause (below). It reuses that
- * template (TWILIO_CONTENT_SID_QUOTE) unconditionally whenever the template
- * is configured, the same way the retired yaad-quote-landed did and for the
- * same reason: a template is valid inside the 24 hour window too, so one
- * path that always works beats two that each work half the time. Until
- * Trust Hub KYC clears (RUNBOOK.md), that path is what carries quote_arrived
- * over WhatsApp; the other six still depend on the client's own last message
- * being recent.
+ * None of the kinds below reuses an approved WhatsApp Content Template as
+ * its FIRST attempt, free text only: reusing a template approved for one
+ * sentence to send a different sentence is exactly the kind of thing that
+ * gets a WhatsApp sender flagged, and it would mean sending a fixed
+ * sentence instead of the real one, missing whatever the free text alone
+ * carries. quote_arrived is the one exception, and only as a fallback: if
+ * the free-text send fails specifically for landing outside WhatsApp's 24
+ * hour window, and TWILIO_CONTENT_SID_QUOTE is configured, it retries once
+ * with that approved template (yaadly_quote_landed_v2) rather than
+ * reporting the failure and stopping there. Deliberately not used
+ * unconditionally: quote_arrived's free text carries the worker's own
+ * proposed scope in words (Stage 6, founder's decision 31 Aug 2026, the
+ * client's reply to THIS message is what stands in for the portal's scope
+ * tick), which the template's four fixed variable slots cannot hold. A
+ * message that only sometimes has the scope in it is worse than one that
+ * sometimes arrives a little later; the template exists so a client
+ * outside the 24 hour window still gets something, not so the richer
+ * message gets skipped when it does not need to be.
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { Image } from "jsr:@matmen/imagescript";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -61,7 +66,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed"] as const;
+const KINDS = ["quote_arrived", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -206,11 +211,16 @@ function extractReportingJson(s: string): Record<string, string> | null {
   return null;
 }
 
+type ComposedReport = { message: string; nextStep: string };
+
 // Returns null on anything short of a clean, usable report, so the caller's
-// existing fixed sentence is what actually ships. Never throws.
+// existing fixed sentence is what actually ships. Never throws. nextStep is
+// carried separately from the composed message, not re-parsed out of it
+// later, so the follow-up mechanism (job_followups, below) acts on exactly
+// what the model said rather than a second reading of its own words.
 async function composeEvidenceReport(
   admin: any, jobId: string, jobTitle: string, stage: number, trace: Trace,
-): Promise<string | null> {
+): Promise<ComposedReport | null> {
   try {
     const prov = pickTextProvider();
     if (!prov) return null;
@@ -236,7 +246,7 @@ async function composeEvidenceReport(
           model: prov.model, temperature: 0.3, max_tokens: 600,
           messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(25000),
       });
       const j = await r.json().catch(() => ({}));
       s.setAttributes({ "http.response.status_code": r.status });
@@ -255,7 +265,7 @@ async function composeEvidenceReport(
 
     const message = `${headline}\n\n${plain}\n\nNext: ${next}\nYou need to: ${action}`;
     if (guardrails.scan(message).length > 0) return null;
-    return message;
+    return { message, nextStep: next };
   } catch (_) {
     return null;
   }
@@ -276,27 +286,288 @@ const MAX_PHOTOS_SENT_DIRECTLY = 5;
  *  page relies on for a signed-in client's own session: this is a
  *  server-to-server send, not a page render, and the URL it hands back is
  *  only good for five minutes and only ever reaches Twilio's own fetch. */
-async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<string[]> {
+type EvidencePhoto = { url: string; code: string | null; label: string | null };
+
+async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<EvidencePhoto[]> {
   const { data: items } = await admin.from("evidence")
-    .select("storage_path, mime")
+    .select("storage_path, mime, item_code, label")
     .eq("job_id", jobId).eq("stage", stage)
     .not("storage_path", "is", null)
     .like("mime", "image/%")
     .order("created_at", { ascending: true })
     .limit(MAX_PHOTOS_SENT_DIRECTLY);
-  const paths = (items ?? []).map((e: any) => e.storage_path).filter(Boolean);
-  if (!paths.length) return [];
+  const rows = (items ?? []).filter((e: any) => e.storage_path);
+  if (!rows.length) return [];
 
   return await trace.span("storage.sign_evidence_urls", SpanKind.CLIENT, {}, async (s) => {
     try {
+      const paths = rows.map((e: any) => e.storage_path);
       const { data, error } = await admin.storage.from("evidence").createSignedUrls(paths, 300);
       if (error) { s.recordError(error.message); return []; }
-      return (data ?? []).map((r: any) => r.signedUrl).filter(Boolean) as string[];
+      const byPath = new Map((data ?? []).map((r: any) => [r.path, r.signedUrl]));
+      return rows
+        .map((e: any) => ({ url: byPath.get(e.storage_path), code: e.item_code ?? null, label: e.label ?? null }))
+        .filter((p: EvidencePhoto) => p.url) as EvidencePhoto[];
     } catch (e) {
       s.recordError(String(e).slice(0, 200));
       return [];
     }
   });
+}
+
+// ── the AI overview, ported from yaad-vision ────────────────────────────
+//
+// yaad-vision has existed since 17 Aug and nothing ever called it: it
+// requires a signed-in caller's own JWT (may_use_agents), which a
+// server-to-server notification has no way to present. Rather than loosen
+// a working function's auth model for one new caller, the review itself is
+// ported here, same system prompt, same model, same rule that a finding
+// says only what is visible and never states a structural or safety
+// diagnosis with certainty.
+//
+// Photos only. A video needs frames pulled out of it before any
+// vision-language model can look at it, and nothing in an edge function
+// does that today; asked for, 31 Aug 2026, not yet built, said so rather
+// than silently reviewing nothing and calling it done.
+//
+// Reworded 31 Aug 2026: the original prompt ("reviewer", "hazards",
+// "diagnosis", a preamble about not being a licensed surveyor) reads like
+// exactly the shape of prompt a safety-tuned model is trained to decline,
+// and in practice NVIDIA's model was declining it outright rather than
+// returning findings, confirmed live in function_logs ("I'm not going to
+// engage in this discussion topic"). Nothing about what the feature needs
+// changed: same categories, same JSON shape, same refusal to overstate
+// certainty. What changed is the framing, from "review this for hazards"
+// to "note the visible condition for a job log", which is a description
+// task rather than a judgement one.
+const VISION_SYSTEM_PROMPT = `You write short, factual condition notes for a property maintenance job log in Jamaica, based on photos a tradesperson has taken on site. You describe only what is plainly visible in each image.
+
+Note anything visible in these categories, where present:
+- Water staining or damp marks
+- Cracks in a wall, ceiling or floor
+- Paint that is peeling, bubbling or flaking
+- Sealant or grout that is missing, cracked or worn
+- Mould
+- Rust on metalwork
+- Roofing wear (missing tiles, sagging, rust on zinc)
+- Wiring or fixtures that look damaged or exposed
+- Plumbing marks (leaks, staining under fixtures)
+- Visible sagging, leaning or significant cracking in the structure
+- Work that looks incomplete or does not match the stated scope, if a scope is given
+- Anything else visibly out of place for a completed or in-progress job
+
+You are shown one photo at a time.
+
+Respond with a JSON array ONLY, no other text before or after it, in this exact shape:
+[
+  {
+    "issue": "short label, e.g. Sealant missing on right column",
+    "category": "one of: cosmetic, maintenance, safety, structural, scope_mismatch",
+    "severity": "low, medium, or high",
+    "note": "one plain sentence describing only what is visible",
+    "recommend_professional": true or false
+  }
+]
+
+Rules:
+- If nothing notable is visible, return an empty array: []
+- Describe only what the image shows. Use phrasing like "appears to show" or "worth a closer look in person" rather than stating a firm diagnosis
+- Any note in the "structural" or "safety" category should have "recommend_professional": true
+- Do not add anything you cannot see in the photo
+- If a photo is unclear, too dark, or too zoomed to make out, note that as a low-severity "cosmetic" item rather than guessing
+- Output ONLY the JSON array`;
+
+type VisionFinding = {
+  photo_code?: string; issue?: string; category?: string; severity?: string;
+  note?: string; recommend_professional?: boolean;
+};
+
+// nvidia/nemotron-nano-12b-v2-vl was both declining the request outright
+// ("I'm not going to engage in this discussion topic") and, separately,
+// running past a 20s timeout on ordinary requests, confirmed live 31 Aug
+// 2026. Llama 3.2's vision model is a mainstream instruction-tuned
+// checkpoint with none of a "nano" experimental build's rough edges, and
+// is what most NIM users actually run for photo description tasks. It
+// stopped refusing once switched, but NVIDIA's hosted infrastructure for
+// it is still uneven call to call, confirmed live the same day across
+// three different shapes: a clean 15s response, a request that ran past
+// 35s with nothing back, and a flat "http 500 Internal Server Error" on
+// the very next attempt after that. A timeout and a 5xx are both "NVIDIA's
+// side had a bad moment," worth one retry; a refusal or unparseable body
+// is NVIDIA answering and answering badly, which asking again is unlikely
+// to fix and isn't tried a second time.
+async function attemptVisionReview(
+  model: string, key: string, userContent: Record<string, unknown>[], s: { setAttributes: (a: Record<string, AttrValue>) => unknown },
+): Promise<{ ok: true; findings: VisionFinding[] } | { ok: false; retryable: boolean }> {
+  try {
+    const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model, temperature: 0.2, max_tokens: 1200,
+        messages: [{ role: "system", content: VISION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+      }),
+      signal: AbortSignal.timeout(25000),
+    });
+    s.setAttributes({ "http.response.status_code": r.status });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      console.error(`yaad-vision: nvidia http ${r.status}: ${errText.slice(0, 300)}`);
+      return { ok: false, retryable: r.status >= 500 };
+    }
+    const j = await r.json();
+    const raw = j?.choices?.[0]?.message?.content ?? "[]";
+    const match = String(raw).match(/\[[\s\S]*\]/);
+    if (!match) {
+      // A non-JSON reply is a distinct, reportable outcome, not the same
+      // silent null as "never ran" (no key, no images): it means NVIDIA
+      // answered and the answer was not usable, most likely a refusal.
+      // Told apart in telemetry so a repeat can be seen without reading
+      // function_logs every time, per RUNBOOK.md.
+      console.error(`yaad-vision: no JSON array in model response: ${String(raw).slice(0, 300)}`);
+      return { ok: false, retryable: false };
+    }
+    return { ok: true, findings: JSON.parse(match[0]) };
+  } catch (e) {
+    const isTimeout = e instanceof Error && e.name === "TimeoutError";
+    console.error(`yaad-vision: ${isTimeout ? "timed out" : "threw"}: ${String(e).slice(0, 300)}`);
+    return { ok: false, retryable: isTimeout };
+  }
+}
+
+function findingLabel(f: VisionFinding, images: EvidencePhoto[]): string {
+  const code = f.photo_code?.trim();
+  if (code && images.some((p) => p.code === code)) return code;
+  return "";
+}
+
+// Discovered live, 31 Aug 2026: NVIDIA's hosted meta/llama-3.2-11b-vision-
+// instruct refuses more than one image in a single request outright
+// ("At most 1 image(s) may be provided in one prompt"), an http 400, not a
+// refusal or a timeout. A stage with more than one photo was silently
+// getting no review at all rather than a partial one, since the whole
+// batched call failed before any image was looked at.
+//
+// The fix turns out better than the batched design it replaces: one call
+// per photo, run together rather than one after another so the wall clock
+// stays close to a single photo's own latency, not the sum of five. Which
+// photo a finding is about is no longer something the model has to get
+// right and echo back, it is simply which call produced it, assigned here
+// with certainty rather than parsed from the model's own words.
+//
+// A phone photo is commonly 8-12MB at full resolution, and nothing in this
+// codebase resizes evidence before it is stored, deliberately: the stored
+// copy is the proof, fingerprinted and timestamped exactly as filed, and
+// stays that way. What NVIDIA fetches and decodes today is that same full
+// original, over a shared free-tier inference service, which is a real
+// part of why it times out. This shrinks a THROWAWAY copy for the review
+// call only: nothing here writes to storage, nothing here touches
+// evidence.sha256 or the signed URL the client and worker actually see.
+// Supabase's own image transform could do this on the free tier for
+// nobody, only paid plans, confirmed before reaching for a library instead.
+const MAX_REVIEW_DIMENSION = 1024;
+const REVIEW_JPEG_QUALITY = 70;
+
+async function shrinkForReview(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) { console.error(`yaad-vision: shrink fetch http ${r.status}`); return null; }
+    const original = new Uint8Array(await r.arrayBuffer());
+    const img = await Image.decode(original);
+    if (img.width > MAX_REVIEW_DIMENSION || img.height > MAX_REVIEW_DIMENSION) {
+      if (img.width >= img.height) img.resize(MAX_REVIEW_DIMENSION, Image.RESIZE_AUTO);
+      else img.resize(Image.RESIZE_AUTO, MAX_REVIEW_DIMENSION);
+    }
+    const encoded = await img.encodeJPEG(REVIEW_JPEG_QUALITY);
+    // Silent success and silent fallback look identical from the outside,
+    // the same gap this file already closed once for the review call
+    // itself: a number here proves the resize actually ran rather than
+    // hoping a fast response means it did.
+    console.error(`yaad-vision: shrink ${original.length}b -> ${encoded.length}b (${img.width}x${img.height})`);
+    return `data:image/jpeg;base64,${encodeBase64(encoded)}`;
+  } catch (e) {
+    // A photo NVIDIA cannot be handed at all is worse than a slow one it
+    // is handed at full size: fall back to the original URL rather than
+    // dropping the review entirely over a decode failure on one photo.
+    console.error(`yaad-vision: shrink failed, using original: ${String(e).slice(0, 200)}`);
+    return null;
+  }
+}
+
+async function reviewOnePhoto(
+  model: string, key: string, photo: EvidencePhoto, jobTitle: string, trace: Trace,
+): Promise<VisionFinding[] | null> {
+  return await trace.span(`chat ${model}`, SpanKind.CLIENT, {
+    "gen_ai.system": "nvidia_nim", "gen_ai.operation.name": "chat", "gen_ai.request.model": model,
+    "server.address": "integrate.api.nvidia.com", "yaadly.agent.name": "photo_review",
+    "yaadly.vision.photo_code": photo.code ?? "",
+  }, async (s) => {
+    const shrunk = await shrinkForReview(photo.url);
+    s.setAttributes({ "yaadly.vision.image_shrunk": !!shrunk });
+    const userContent: Record<string, unknown>[] = [
+      { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview this photo and return findings as instructed.` },
+      { type: "image_url", image_url: { url: shrunk ?? photo.url } },
+    ];
+    let result = await attemptVisionReview(model, key, userContent, s);
+    let attempts = 1;
+    if (!result.ok && result.retryable) {
+      result = await attemptVisionReview(model, key, userContent, s);
+      attempts = 2;
+    }
+    s.setAttributes({ "yaadly.vision.attempts": attempts });
+    if (!result.ok) {
+      s.setAttributes({ "yaadly.vision.outcome": result.retryable ? "infra_error" : "unusable_response" });
+      s.recordError(result.retryable ? "infra_error" : "unusable_response");
+      return null;
+    }
+    s.setAttributes({ "yaadly.vision.outcome": "ok", "yaadly.vision.finding_count": result.findings.length });
+    // Assigned from the call that produced it, not from anything the model
+    // said: this call only ever saw one photo, so there is nothing to
+    // attribute wrong.
+    return result.findings.map((f) => ({ ...f, photo_code: photo.code ?? undefined }));
+  });
+}
+
+/** Null only when nothing could be reviewed at all (no key, no images, or
+ *  every photo's call failed): the caller's existing fixed sentence is what
+ *  ships then. A stage where some photos reviewed and others did not still
+ *  returns the findings that did, rather than discarding a partial result
+ *  because one photo out of several had a bad moment. */
+async function reviewEvidencePhotos(images: EvidencePhoto[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
+  const key = Deno.env.get("NVIDIA_API_KEY");
+  if (!key) { console.error("yaad-vision: NVIDIA_API_KEY is not set"); return null; }
+  if (!images.length) { console.error("yaad-vision: no image URLs to review"); return null; }
+  const model = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-11b-vision-instruct";
+
+  const perPhoto = await Promise.all(
+    images.slice(0, 6).map((p) => reviewOnePhoto(model, key, p, jobTitle, trace)),
+  );
+  const reviewed = perPhoto.filter((r): r is VisionFinding[] => r !== null);
+  if (!reviewed.length) return null;
+  return reviewed.flat();
+}
+
+/** One line the client can actually read, not a JSON dump. Null return
+ *  (the model call failed) is handled by the caller, which just leaves the
+ *  AI section out rather than claim a review happened when it did not.
+ *  Prefixes each note with its photo's code, but only when there is more
+ *  than one photo to tell apart: on a single-photo stage, "P1:" in front
+ *  of every sentence is noise nobody needs to disambiguate anything. */
+function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): string {
+  if (!findings.length) return "Nothing of concern visible in what was sent.";
+  const worst = findings.some((f) => f.severity === "high") ? "high"
+    : findings.some((f) => f.severity === "medium") ? "medium" : "low";
+  const escalate = findings.some((f) => f.recommend_professional);
+  const multi = images.length > 1;
+  const items = findings.slice(0, 3).map((f) => {
+    const text = f.note || f.issue;
+    if (!text) return null;
+    const code = multi ? findingLabel(f, images) : "";
+    return code ? `${code}: ${text}` : text;
+  }).filter(Boolean).join(" ");
+  const tail = escalate ? " Worth a professional look in person." : "";
+  const more = findings.length > 3 ? ` (${findings.length - 3} more noted on the job.)` : "";
+  return `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -320,6 +591,7 @@ Deno.serve(async (req: Request) => {
     const secret = String(b.secret ?? "");
     const jobId = String(b.jobId ?? "");
     const kind = String(b.kind ?? "") as Kind;
+    const meta = (b.meta ?? {}) as Record<string, unknown>;
     if (!secret || !jobId || !KINDS.includes(kind)) {
       return json({ error: "secret, jobId and a valid kind are required." }, 400);
     }
@@ -335,12 +607,34 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: job } = await admin.from("jobs")
-      .select("id, title, parish, stage, portal_code, client_email, client_phone")
+      .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
       .eq("id", jobId).maybeSingle();
     if (!job) return json({ error: "No such job." }, 404);
 
     const clientEmail = String(job.client_email ?? "").trim();
     const clientPhone = String(job.client_phone ?? "").trim();
+
+    // Most kinds tell the client. Two do not: evidence_comment, because a
+    // client left it and the worker is who answers; evidence_landed,
+    // because 31 Aug 2026 that stopped meaning "tell the client" and
+    // started meaning "draft it for the worker first." The client only
+    // hears from evidence_report_confirmed now, once the worker has said
+    // yes or written their own version. Everything below still reads
+    // "client" in its own variable names because that is what it is for
+    // every other kind; these two are what the actual send at the bottom
+    // uses.
+    let recipientEmail = clientEmail;
+    let recipientPhone = clientPhone;
+    let workerPhone = "";
+    if ((kind === "evidence_comment" || kind === "evidence_landed") && job.worker_email) {
+      const { data: worker } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+      workerPhone = String(worker?.phone ?? "").trim();
+    }
+    if (kind === "evidence_comment" || kind === "evidence_landed") {
+      recipientEmail = "";
+      recipientPhone = workerPhone;
+    }
 
     // Post-booking every client has an account (Stage 2's own rule), so the
     // link always goes to the portal room rather than the no-account quotes
@@ -354,24 +648,42 @@ Deno.serve(async (req: Request) => {
 
     let subject = "";
     let line = "";
-    let photoUrls: string[] = [];
+    let photoUrls: EvidencePhoto[] = [];
+    let attachPhotos: string[] = [];
     // Only quote_arrived has an approved WhatsApp Content Template
     // (yaadly_quote_landed_v2); see the header comment for why it is the
-    // one kind that may reuse it.
+    // one kind that may reuse it, and only as a fallback for the specific
+    // failure it exists to fix (outside the 24 hour window), never as a
+    // substitute for the richer free-text message when that can still be
+    // delivered: see the send site below.
     let waTemplate: { sid: string; vars: Record<string, string> } | undefined;
 
     if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd")
+        .select("worker_name, labour_jmd, materials_jmd, note")
         .eq("job_id", jobId).eq("status", "submitted")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const total = (q?.labour_jmd ?? 0) + (q?.materials_jmd ?? 0);
       const workerName = q?.worker_name ?? "A tradesperson";
       const priceText = money(total);
       subject = `A price on your job: ${job.title}`;
+      // Stage 6, continued: a client with a phone on file can book straight
+      // from this message rather than needing to open the link at all. The
+      // founder's own decision, 31 Aug 2026: replying with the code is
+      // what stands in for the portal's own scope tick, so what the
+      // worker actually proposed to do has to be in this message in
+      // words, not only the price, before that reply is ever asked for.
+      // The link stays too, both because it is the fallback when more
+      // than one price is open at once, and because it remains the
+      // system of record.
+      const proposal = String(q?.note ?? "").trim();
+      const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
+      const bookHint = clientPhone
+        ? `Reply with the code ${job.id} to confirm that and book ${q?.worker_name ?? "them"}, or `
+        : "";
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
-        `${workerName} quoted ${priceText}, labour and materials itemised separately. ` +
-        `Nothing is booked and nothing is charged until you choose. See it here: ${codeLink}`;
+        `${workerName} quoted ${priceText}, labour and materials itemised separately.${scopeLine} ` +
+        `Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
       const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
       if (contentSid) {
         waTemplate = {
@@ -379,25 +691,109 @@ Deno.serve(async (req: Request) => {
           vars: { "1": String(job.title ?? "your job"), "2": String(workerName), "3": priceText, "4": codeLink },
         };
       }
+    } else if (kind === "quote_accepted") {
+      // Fired once, from the jobs row itself (notify_client_on_job_change,
+      // 20260831zzzz), the moment worker_email is first set, whichever of
+      // the two doors set it: a portal tap or a WhatsApp reply. Payment is
+      // relayed here, not collected: Yaadly is not holding money yet
+      // (CLAUDE.md 9), so this states the same off-platform terms already
+      // published in the worker FAQ, word for word, rather than inventing
+      // new payment language.
+      const { data: q } = await admin.from("job_quotes")
+        .select("worker_name, labour_jmd, materials_jmd")
+        .eq("job_id", jobId).eq("status", "accepted")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      subject = `Booked: ${job.title}`;
+      line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
+        `Labour ${money(q?.labour_jmd ?? 0)}, materials ${money(q?.materials_jmd ?? 0)} paid at cost against the receipt. ` +
+        `Yaadly is not holding this payment: pay the worker directly, per stage as you approve it, ` +
+        `within 3 working days, by bank transfer, Lynk wallet or remittance pick up, whichever you agree between you. ` +
+        `${roomLink}`;
     } else if (kind === "evidence_landed") {
-      subject = `Evidence to review: ${job.title}`;
-      const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
-      // The photos themselves, not just a description of them, so a client
-      // does not have to open the portal to see what actually arrived.
-      // Founder's own requirement, 31 Aug 2026.
+      // Founder's own requirement, 31 Aug 2026, and a real change from how
+      // this kind worked that same morning: the AI's composed report does
+      // not go straight to the client any more. It goes to the worker
+      // first, honestly labelled as a draft, with a plain choice: send it
+      // as written, or write their own version instead. Confirmed hers to
+      // ask, and the worker's to decide, not the founder's: she is not the
+      // one who did the work, and a bottleneck through her was never the
+      // point.
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
-      // The reply-to-approve route only exists for whoever reads it here.
-      // Reply with the job's own code, same word for word as the code a
-      // worker sends back to confirm a photo, matched against
-      // approve_stage_via_whatsapp() in yaad-inbound.
-      const approveHint = clientPhone
-        ? `Reply with the code ${job.id} here on WhatsApp to approve it, or open the link to look first: `
-        : "Review it here: ";
-      line = composed
-        ? `${composed}\n\n${approveHint}${roomLink}`
-        : `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
-          `Nobody is paid until you approve them. ${approveHint}${roomLink}`;
-      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed, "yaadly.notify.photos_attached": photoUrls.length });
+
+      const [composed, findings] = workerPhone
+        ? await Promise.all([
+            composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace),
+            photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
+          ])
+        : [null, null];
+      const draftText = composed?.message
+        || `Photos have come in for stage ${job.stage ?? 1}, with no description from you yet.`;
+      const aiSummary = findings ? summariseFindings(findings, photoUrls) : "";
+      // Named once here, on more than one photo, so a reply naming a code
+      // means something without repeating "Items: ..." on every line below.
+      const itemsLine = photoUrls.length > 1
+        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}`
+        : null;
+
+      // The report's own "Next:" line finally does something, rather than
+      // sitting as narrative nobody acts on. A real next step named (not
+      // "nothing further", not blank) gets a follow-up flagged: if nothing
+      // has moved on this stage by the due date, the cron re-runs this
+      // exact draft/relay loop rather than a second, invented pattern.
+      const nextStep = composed?.nextStep?.trim() ?? "";
+      if (nextStep && !/^nothing/i.test(nextStep)) {
+        await admin.rpc("create_job_followup", { p_job: jobId, p_stage: job.stage ?? 1, p_reason: nextStep });
+      }
+
+      if (workerPhone) {
+        await admin.from("wa_intake_sessions").upsert({
+          wa_id: workerPhone.startsWith("+") ? workerPhone : `+${workerPhone.replace(/\D/g, "")}`,
+          answers: {
+            _lane: "report_confirm", job_id: jobId, stage: job.stage ?? 1,
+            draft_text: draftText, ai_summary: aiSummary,
+          },
+          photo_count: 0,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      subject = `Draft for the client: ${job.title}`;
+      line = [
+        `Here's what we'd tell the client about stage ${job.stage ?? 1} of ${job.title}:`,
+        `"${draftText}"`,
+        aiSummary ? `AI noticed: ${aiSummary}` : null,
+        itemsLine,
+        `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
+      ].filter(Boolean).join("\n\n");
+      root.setAttributes({
+        "yaadly.notify.evidence_report_composed": !!composed,
+        "yaadly.notify.ai_review_ran": findings !== null,
+        "yaadly.notify.ai_finding_count": findings?.length ?? 0,
+        "yaadly.notify.draft_sent_to_worker": !!workerPhone,
+      });
+    } else if (kind === "evidence_report_confirmed") {
+      // The other half of evidence_landed's new shape: fired only once the
+      // worker has actually said yes or written their own version, never
+      // automatically. override_text is always the FINAL wording by the
+      // time this runs; yaad-inbound already resolved "1" into the stored
+      // draft before calling relay_confirmed_report(), so this kind never
+      // has to know which one happened.
+      const overrideText = String(meta.override_text ?? "").trim();
+      const aiSummary = String(meta.ai_summary ?? "").trim();
+      subject = `Evidence to review: ${job.title}`;
+      photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
+      attachPhotos = photoUrls.map((p) => p.url);
+
+      const workerSays = overrideText || `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}.`;
+      const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
+      const itemsLine = photoUrls.length > 1
+        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}. Mention a code if your comment is about one specific photo.`
+        : null;
+      const actionHint = clientPhone
+        ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
+        : "Review it and reply from your portal.";
+      line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+      root.setAttributes({ "yaadly.notify.photos_attached": photoUrls.length, "yaadly.notify.was_customised": !!overrideText });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this
@@ -413,6 +809,25 @@ Deno.serve(async (req: Request) => {
       subject = `Confirmed: stage ${approval?.stage ?? ""} approved`;
       line = `You approved stage ${approval?.stage ?? ""} of ${job.title}. ` +
         `The worker is paid for it, and the job now carries the record. Nothing else to do here: ${roomLink}`;
+
+      // Stage 7. Convert at handover, the founder's own words: offered at
+      // the moment the client approves and feels relief, at the founding
+      // rate, never by email later. Only on the job's FINAL stage
+      // (sync_job_status marks the job complete once stage reaches 5), not
+      // on every approval along the way: pitching this mid-job would read
+      // as premature on a job that is not actually finished yet. No
+      // billing exists to switch on here (Phase 1, sell judgment, CLAUDE.md
+      // 9), so this captures a reply for the founder to follow up with
+      // personally, it does not pretend to start anything on its own.
+      if (job.status === "complete" && job.worker_email) {
+        const { data: worker } = await admin.from("worker_profiles")
+          .select("name").ilike("worker_email", job.worker_email).maybeSingle();
+        const workerName = String(worker?.name ?? "").trim() || "the same worker";
+        line += `\n\nOne more thing, now that this is off your list. Want ${workerName} to keep an eye on the place going forward, without you having to ask again? ` +
+          `It's called the Yaad Report: a monthly WhatsApp update, 6 to 10 timestamped photos, a short walkthrough video, three lines on the property's condition, and what's changed since last time. ` +
+          `Founding rate is £350 a month, or one 12 month term instead of twelve separate decisions.\n\n` +
+          `Reply INTERESTED and Monique will follow up with how it works.`;
+      }
     } else if (kind === "worker_on_site") {
       const { data: arrival } = await admin.from("arrival_log")
         .select("stage, arrived_at")
@@ -424,6 +839,19 @@ Deno.serve(async (req: Request) => {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
         `Read them and confirm they are accurate here: ${roomLink}`;
+    } else if (kind === "evidence_comment") {
+      // The one kind in this file that tells the worker, not the client.
+      // Founder's own requirement, 31 Aug 2026: a client should be able to
+      // say more than yes or no on a photo, and it should reach the worker
+      // wherever they actually are. Both routes back are named honestly:
+      // a WhatsApp reply here is captured the same as a fresh evidence
+      // photo would be, matched to this job and logged; the portal's own
+      // Job chat is logged the moment it lands, always.
+      const { data: c } = await admin.from("evidence_comments")
+        .select("body").eq("id", String(meta.comment_id ?? "")).maybeSingle();
+      subject = `A note from the client: ${job.title}`;
+      line = `On ${job.title}, the client wrote: "${(c?.body ?? "").slice(0, 300)}"\n\n` +
+        `Reply here on WhatsApp to answer, or open the job to reply there, either way the client sees it and it stays on the record: ${roomLink}`;
     } else if (kind === "job_delayed") {
       // Told honestly and early, before the client has to ask. Says nothing
       // about why: yaad-job-health knows a job has gone quiet, not the
@@ -436,14 +864,14 @@ Deno.serve(async (req: Request) => {
 
     let emailed = false;
     let emailReason = RESEND_KEY ? "" : "RESEND_API_KEY not set";
-    if (clientEmail && RESEND_KEY) {
+    if (recipientEmail && RESEND_KEY) {
       await trace.span("resend.send", SpanKind.CLIENT, { "server.address": "api.resend.com", "messaging.system": "resend" }, async (s) => {
         try {
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              from: `Yaadly <${FROM_EMAIL}>`, to: [clientEmail], reply_to: REPLY_TO,
+              from: `Yaadly <${FROM_EMAIL}>`, to: [recipientEmail], reply_to: REPLY_TO,
               subject, text: line, html: `<p>${line.replace(codeLink, `<a href="${codeLink}">${codeLink}</a>`).replace(roomLink, `<a href="${roomLink}">${roomLink}</a>`)}</p>`,
             }),
             signal: AbortSignal.timeout(15000),
@@ -453,23 +881,33 @@ Deno.serve(async (req: Request) => {
           if (!r.ok) { emailReason = `resend ${r.status}`; s.recordError(`${emailReason}: ${(await r.text()).slice(0, 160)}`); }
         } catch (e) { emailReason = String(e).slice(0, 160); s.recordError(emailReason); }
       });
-    } else if (!clientEmail) {
-      emailReason = "no client email on the job";
+    } else if (!recipientEmail) {
+      emailReason = "no recipient email on the job";
     }
 
-    let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no client phone on the job" };
-    if (clientPhone) {
+    let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no recipient phone on the job" };
+    if (recipientPhone) {
       // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
       // means the WhatsApp send itself failed, and a signed URL that was
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = await sendTwilio(clientPhone, line, "whatsapp", trace, photoUrls, waTemplate);
+      wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos);
+      // The rich, scope-carrying message could not be delivered at all,
+      // specifically because it landed outside WhatsApp's 24 hour window:
+      // the approved template is the fallback for exactly that failure,
+      // a plainer message that actually arrives beats a richer one that
+      // silently does not. Not attempted for any other failure reason,
+      // and never in place of the free-text attempt when that can still
+      // be sent.
+      if (!wa.sent && waTemplate && wa.reason === "outside WhatsApp's 24 hour window, needed an approved template") {
+        wa = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], waTemplate);
+      }
       if (!wa.sent) {
-        const meta = await sendMetaWhatsApp(clientPhone, line, trace);
-        if (meta.sent) wa = { ...meta, via: "meta whatsapp" };
+        const metaResult = await sendMetaWhatsApp(recipientPhone, line, trace);
+        if (metaResult.sent) wa = { ...metaResult, via: "meta whatsapp" };
         else {
-          const sms = await sendTwilio(clientPhone, line, "sms", trace);
+          const sms = await sendTwilio(recipientPhone, line, "sms", trace);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
       }

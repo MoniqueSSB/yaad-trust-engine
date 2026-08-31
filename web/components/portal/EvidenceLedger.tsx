@@ -15,6 +15,7 @@
  */
 
 import { ApproveButton } from "./ApproveButton";
+import { EvidenceItemComment } from "./EvidenceItemComment";
 
 export type EvidenceItem = {
   id: string;
@@ -215,6 +216,14 @@ export function EvidenceLedger({
                             <p className="mt-0.5 text-[11px] text-dim">
                               {stamp(e.created_at)}
                             </p>
+                          )}
+                          {/* Client only, the same rule the Approve button
+                              already follows: a worker commenting on their
+                              own photo is not what this exists for, and
+                              the RLS insert policy would refuse it anyway
+                              if a stray call ever got this far. */}
+                          {role === "client" && jobId && (
+                            <EvidenceItemComment jobId={jobId} evidenceId={e.id} />
                           )}
                         </div>
                       </li>

@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isCodeComplete, normalizeCode, signInButtonLabel } from "@/lib/portal/sign-in";
 
 /**
  * Where a WhatsApp conversation turns into a live job.
@@ -34,12 +35,14 @@ import { createClient } from "@/lib/supabase/client";
  * where those people stop, and it bought nothing: the job code was always the
  * real gate and a password was a second secret to lose on top of it.
  *
- * A six digit code goes to the mailbox, and to WhatsApp when we have a number
- * for them. Typing it back proves the mailbox exactly as the old confirmation
- * link did, and it does it without stranding somebody who opens the link in a
- * different browser than the one they started in, which is the classic way
- * magic links fail. It also costs them a retry rather than their job when
- * they mistype their own address, which is the likeliest thing to go wrong.
+ * ONE screen, all three fields, on purpose (rebuilt 31 Aug 2026 from a
+ * two-step ask-then-enter form, same rebuild sign-in already had, missed on
+ * this page the first time and found live: a person on this exact page said
+ * there was "no button" to sign in, only a way to ask for a code, because the
+ * code box was hidden until a first submit). Email and job code are both
+ * required, always, this page only exists to open a NEW account. The code
+ * itself is optional: type one straight in if you already have it from a
+ * message sent minutes ago, or leave it blank and the same button sends one.
  */
 
 const CODE_FN = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/yaad-portal-code`;
@@ -49,6 +52,9 @@ const field =
   "mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal";
 const label =
   "mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim";
+const labelRow = "mb-1.5 flex items-baseline justify-between";
+const required = "text-[10px] font-bold uppercase tracking-[.1em] text-coral";
+const optional = "text-[10px] font-bold uppercase tracking-[.1em] text-dim";
 
 function JoinForm() {
   const router = useRouter();
@@ -64,18 +70,14 @@ function JoinForm() {
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [stage, setStage] = useState<"ask" | "enter">("ask");
-  const [sentTo, setSentTo] = useState("");
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* Step one. Ask for a code. No password is chosen here and none is asked
-     for anywhere: the job code was always the real gate, and a password is a
-     second secret to lose on top of it. */
-  async function askForCode(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
+  /* No password is chosen here and none is asked for anywhere: the job code
+     was always the real gate, and a password is a second secret to lose on
+     top of it. */
+  async function sendCode() {
     try {
       const r = await fetch(CODE_FN, {
         method: "POST",
@@ -93,25 +95,18 @@ function JoinForm() {
           "Your account is ready but the code would not send, which is our end and not yours. Message Yaadly and we will get you in.",
         );
       }
-      setSentTo(email.trim());
-      setStage("enter");
+      setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work.");
-    } finally {
-      setBusy(false);
     }
   }
 
-  /* Step two. The six digits. Verifying happens against Supabase directly,
-     so the code never comes back through our own server: it went to their
-     mailbox or their phone, and only they can have it. */
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
+  /* The code itself. Verifying happens against Supabase directly, so it
+     never comes back through our own server: it went to their mailbox or
+     their phone, and only they can have it. */
+  async function verifyCode(otpDigits: string) {
     try {
       const supabase = createClient();
-      const token = otp.replace(/\D/g, "");
 
       /* type "email", and this is settled rather than assumed. The founder
          signed in through this page on 30 Aug 2026 and the auth log records
@@ -127,13 +122,14 @@ function JoinForm() {
          so a wrong type is indistinguishable from a wrong code and this
          cannot be rediscovered by probing. */
       const { error: otpErr } = await supabase.auth.verifyOtp({
-        email: sentTo,
-        token,
+        email: email.trim(),
+        token: otpDigits,
         type: "email",
       });
       if (otpErr) {
+        setOtp("");
         throw new Error(
-          "That code did not match, or it has expired. Ask for a new one and try again.",
+          "That code did not match, or it has expired. Press the button below to send a fresh one.",
         );
       }
 
@@ -165,56 +161,24 @@ function JoinForm() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work.");
-      setBusy(false);
     }
   }
 
-  if (stage === "enter") {
-    return (
-      <form onSubmit={verify}>
-        <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
-          We sent a six digit code to <b className="text-ink">{sentTo}</b>, and
-          to your WhatsApp number if we have one. It lasts about an hour.
-        </p>
-
-        <label className={label}>The six digit code</label>
-        <input
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          required
-          value={otp}
-          onChange={(e) => setOtp(e.target.value)}
-          placeholder="123456"
-          className={`${field} font-mono text-[20px] tracking-[6px]`}
-        />
-
-        {error && (
-          <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
-        >
-          {busy ? "Checking..." : "Open my portal"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setStage("ask"); setOtp(""); setError(null); }}
-          className="mt-3 w-full text-[12.5px] text-dim underline"
-        >
-          Send it again, or use a different address
-        </button>
-      </form>
-    );
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const digits = normalizeCode(otp);
+    if (isCodeComplete(otp)) {
+      await verifyCode(digits);
+    } else {
+      await sendCode();
+    }
+    setBusy(false);
   }
 
   return (
-    <form onSubmit={askForCode}>
+    <form onSubmit={onSubmit}>
       {job && (
         <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
           Finishing <b className="font-mono text-tealb">{job}</b>, the job you
@@ -223,7 +187,17 @@ function JoinForm() {
         </p>
       )}
 
-      <label className={label}>Email</label>
+      {sent && (
+        <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+          Sent. Check your email, and your WhatsApp if we have your number.
+          It lasts about an hour: type it in below.
+        </p>
+      )}
+
+      <div className={labelRow}>
+        <label className={label}>Email</label>
+        <span className={required}>Required</span>
+      </div>
       <input
         type="email"
         autoComplete="username"
@@ -234,11 +208,14 @@ function JoinForm() {
       />
       <p className="-mt-2 mb-4 text-[12px] text-dim">
         <b className="text-mute">No password to choose and none to remember.</b>{" "}
-        We send you a six digit code instead, here and on WhatsApp if we have
-        your number.
+        We send you a code instead, here and on WhatsApp if we have your
+        number.
       </p>
 
-      <label className={label}>Job code</label>
+      <div className={labelRow}>
+        <label className={label}>Job code</label>
+        <span className={required}>Required</span>
+      </div>
       <input
         required
         value={code}
@@ -246,6 +223,23 @@ function JoinForm() {
         placeholder="On the message we sent you"
         className={`${field} font-mono tracking-[2px]`}
       />
+
+      <div className={labelRow}>
+        <label className={label}>Your code</label>
+        <span className={optional}>Optional</span>
+      </div>
+      <input
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        value={otp}
+        onChange={(e) => setOtp(e.target.value)}
+        placeholder="Leave blank and we'll send you one"
+        className={`${field} font-mono text-[20px] tracking-[6px] placeholder:font-sans placeholder:text-[13px] placeholder:tracking-normal placeholder:text-dim`}
+      />
+      <p className="-mt-2 mb-4 text-[12px] text-dim">
+        Already got a code from a message we sent? Type it above and press
+        the button.
+      </p>
 
       {error && (
         <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] text-mute">
@@ -258,7 +252,7 @@ function JoinForm() {
         disabled={busy}
         className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
       >
-        {busy ? "Sending your code..." : "Send me a sign in code"}
+        {signInButtonLabel(otp, busy)}
       </button>
     </form>
   );
