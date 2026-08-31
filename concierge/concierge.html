@@ -1132,7 +1132,7 @@ const WA_WORKER_LABELS = {
   name:"their name", trade:"their trade", parishes:"which parishes they cover",
   years:"how long they have done this work", proof:"a photo of finished work",
 };
-const WA_LANE_LABEL = { client:"client, describing a job", worker:"worker, signing up", evidence:"worker, naming the job for a photo" };
+const WA_LANE_LABEL = { client:"client, describing a job", worker:"worker, signing up", evidence:"worker, naming the job for a photo", report_confirm:"you, confirming a drafted report" };
 
 // The lane is stored inside the answers jsonb rather than as its own column
 // (see the webhook's laneOf), so a session with no marker at all is read as
@@ -1144,7 +1144,7 @@ function waLane_(r){
   const l = String(r?.answers?._lane || "").trim();
   return l || "client";
 }
-const waKnownLane_ = (lane) => lane === "client" || lane === "worker" || lane === "evidence";
+const waKnownLane_ = (lane) => lane === "client" || lane === "worker" || lane === "evidence" || lane === "report_confirm";
 
 // The label shown next to the number. An unrecognised lane says so by name,
 // the same way the pricing lookup says "no public price exists" rather than
@@ -1164,6 +1164,9 @@ function waStuck_(r){
     return choices.length
       ? `confirming which job, ${choices.length} to choose from`
       : "naming the job the photo belongs to";
+  }
+  if (lane === "report_confirm") {
+    return `confirming the drafted report for ${a.job_id || "a job"} before it reaches the client`;
   }
   if (waKnownLane_(lane)) {
     const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
@@ -1191,6 +1194,13 @@ function waFacts_(r){
       `${n} photo${n === 1 ? "" : "s"} staged`,
       `worker: ${a.worker_email || "not matched"}`,
       `job choices offered: ${choices || "none yet"}`,
+    ];
+  }
+  if (lane === "report_confirm") {
+    return [
+      `job: ${a.job_id || "not recorded"}`,
+      `stage: ${a.stage ?? "not recorded"}`,
+      `draft: ${a.draft_text || "not recorded"}`,
     ];
   }
   if (waKnownLane_(lane)) {

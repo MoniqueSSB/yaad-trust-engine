@@ -813,6 +813,12 @@ Deno.serve(async (req: Request) => {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+      // The AI-drafted evidence report yaad-notify-client is holding for
+      // confirmation before it reaches a client, see 20260831z. wa_id here
+      // is report_confirm_phone, a fixed setting rather than any client or
+      // worker's own number, so only a reply from that one phone is ever
+      // read this way.
+      const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
 
       // A code prompt, shared by the "one job" and "several jobs" cases:
       // the code is always shown and always the answer asked for, never
@@ -856,6 +862,32 @@ Deno.serve(async (req: Request) => {
         const link = await mintPortalUploadLink(supabase, workerEmail, pick.id);
         if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
         return twiml(body);
+      }
+
+      // No "yes", no ordinal number, same discipline as Stage 6's client
+      // approval below and for the same reason: this reply, if it matches,
+      // sends AI-drafted words to a real client under Yaadly's name. Only an
+      // exact match on the job's own code confirms it; anything else is
+      // held rather than guessed at, and a stale one (48 hours, same clock
+      // as every other lane) is simply dropped, not sent on a hunch that it
+      // is still wanted.
+      if (reportSession) {
+        const stale = Date.now() - new Date(reportSession.updated_at as string).getTime() > 48 * 3600_000;
+        if (stale) {
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        } else {
+          const answers = reportSession.answers as any;
+          const jobId = String(answers.job_id ?? "");
+          const text = msg.text.trim();
+          if (jobId && text.toLowerCase() === jobId.toLowerCase()) {
+            const { error } = await supabase.rpc("confirm_evidence_report", { p_job_id: jobId });
+            await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+            root.setAttributes({ "yaadly.report_confirm.job": jobId, "yaadly.report_confirm.outcome": error ? "refused" : "sent" });
+            if (error) return twiml(`That did not go through: ${error.message}`);
+            return twiml(`Sent to the client on ${jobId}, exactly as written.`);
+          }
+          return twiml(`That does not match ${jobId || "the job waiting on you"}. Reply with the code to send it as written, or edit it on the desk instead.`);
+        }
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {

@@ -657,6 +657,32 @@ select policyname, qual from pg_policies
 
 **Two small orphaned test files remain in the evidence bucket from 31 Aug 2026's live verification**, `TEST-WA-LIVE-A/0cf5d7c6-512c-446f-a169-6ede09f9da89.jpg` and `TEST-WA-LIVE-A/12da67a9-8500-437b-b558-925cb2a85e4b.jpg`. Nothing references them; safe to delete by hand from the Storage dashboard whenever convenient. Postgres refuses a direct `DELETE` on `storage.objects`, by design, so removing them needs the Storage API or the dashboard, not a migration.
 
+## An evidence report is drafted but the client never got it
+
+**Check whether it is sitting in the founder's own WhatsApp, waiting on a reply.** As of 31 Aug 2026, `evidence_landed` holds an AI-composed digest for confirmation instead of sending it straight to the client, whenever `app_settings.report_confirm_phone` is set:
+
+```sql
+select value from app_settings where key = 'report_confirm_phone';
+select wa_id, answers->>'job_id' as job_id, answers->>'draft_text' as draft
+from wa_intake_sessions where answers->>'_lane' = 'report_confirm';
+```
+
+A row there means the draft went to that phone, not the client, and is waiting on a reply matching the job's own code exactly. No "yes", no partial match, same discipline as the Stage 6 client-approval reply below.
+
+**If she replied and nothing went out**, check the message actually matched the job id character for character (it is case-insensitive, nothing else is forgiving), and check `confirm_evidence_report` actually ran: `yaad-inbound`'s trace carries `yaadly.report_confirm.outcome`, `sent` or `refused`.
+
+**To send a held draft by hand** rather than waiting on a reply, call the function directly with the service role key (never with the anon or publishable key, it has no grant to either):
+
+```bash
+curl -X POST 'https://leffyisvfvjwzilydlwf.supabase.co/rest/v1/rpc/confirm_evidence_report' \
+  -H "apikey: $SERVICE_ROLE_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" -d '{"p_job_id":"JOB-0002"}'
+```
+
+**Editing a held draft is not built.** A reply that is not the exact job code is read and held, not applied to the text. To change the wording, fix it at the source (there is nowhere on the desk to hand-edit it yet either) and let a fresh `evidence_landed` event redraft it, or let it send as originally written.
+
+**Clearing a stuck confirmation** without sending it: delete the row, `delete from wa_intake_sessions where wa_id = (select value from app_settings where key = 'report_confirm_phone')`. The next evidence to land on any job will draft and hold a fresh one.
+
 ## Choosing a worker now refuses with "This job has no Kickoff Pack drafted yet"
 
 **That is the intended behaviour, not a bug.** As of 31 Aug 2026, `choose_worker()` approves the job's Kickoff Pack in the same transaction as assigning the worker, and refuses the whole choice if no pack row exists for the job, or the pack's `docs` column is still null. A pack has to be drafted (`yaad-kickoff`, or a row written directly into `kickoff_packs` with `job_id` set) before a client can accept any quote on that job. To check what a specific job actually has:

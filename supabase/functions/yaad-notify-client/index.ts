@@ -61,7 +61,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed"] as const;
+const KINDS = ["quote_arrived", "evidence_landed", "evidence_report_confirmed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -382,6 +382,33 @@ Deno.serve(async (req: Request) => {
     } else if (kind === "evidence_landed") {
       subject = `Evidence to review: ${job.title}`;
       const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
+
+      // A composed digest is a model's writing about a real job, and it used
+      // to reach a client's phone the moment it passed the guardrail screen,
+      // not the moment a person had read it. Founder's instruction, 31 Aug
+      // 2026: hold it for her to confirm first, the same shape as the
+      // Kickoff Pack's own approval gate. wa_id is report_confirm_phone
+      // itself, a fixed setting rather than a lookup, so this can only ever
+      // hold one pending confirmation at a time; a second evidence_landed
+      // call before the first is answered replaces it, on purpose kept
+      // simple rather than queued, and noted as a known limit in RUNBOOK.md.
+      // The fixed fallback sentence below is not a model's writing, so it is
+      // never held, there is nothing there for a human to confirm.
+      const { data: confirmPhoneRow } = await admin.from("app_settings").select("value").eq("key", "report_confirm_phone").maybeSingle();
+      const confirmPhone = String(confirmPhoneRow?.value ?? "").replace(/^"|"$/g, "").trim();
+      if (composed && confirmPhone) {
+        await admin.from("wa_intake_sessions").upsert({
+          wa_id: confirmPhone,
+          answers: { _lane: "report_confirm", job_id: jobId, stage: job.stage ?? 1, draft_text: composed },
+          photo_count: 0,
+          updated_at: new Date().toISOString(),
+        });
+        const prompt = `Ready to send to the client for ${job.title} (${job.id}):\n\n${composed}\n\nReply with ${job.id} to send it exactly as written. Anything else you reply is read, not sent, edit it on the desk instead.`;
+        const held = await sendTwilio(confirmPhone, prompt, "whatsapp", trace);
+        root.setAttributes({ "yaadly.notify.evidence_report_composed": true, "yaadly.notify.outcome": "held_for_confirmation", "yaadly.notify.founder_notified": held.sent });
+        return json({ ok: true, kind, held: true, founderNotified: held.sent });
+      }
+
       // The photos themselves, not just a description of them, so a client
       // does not have to open the portal to see what actually arrived.
       // Founder's own requirement, 31 Aug 2026.
@@ -393,11 +420,35 @@ Deno.serve(async (req: Request) => {
       const approveHint = clientPhone
         ? `Reply with the code ${job.id} here on WhatsApp to approve it, or open the link to look first: `
         : "Review it here: ";
-      line = composed
-        ? `${composed}\n\n${approveHint}${roomLink}`
+      line = `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
+        `Nobody is paid until you approve them. ${approveHint}${roomLink}`;
+      root.setAttributes({ "yaadly.notify.evidence_report_composed": false, "yaadly.notify.photos_attached": photoUrls.length });
+    } else if (kind === "evidence_report_confirmed") {
+      // Reached only from confirm_evidence_report() in Postgres, itself
+      // reachable only with the service role key (see that migration): the
+      // exact words sent here are read back from the session this same
+      // function wrote above, never trusted from whatever called this kind,
+      // so a leaked secret still cannot make Yaadly say an arbitrary thing.
+      subject = `Evidence to review: ${job.title}`;
+      const { data: confirmPhoneRow } = await admin.from("app_settings").select("value").eq("key", "report_confirm_phone").maybeSingle();
+      const confirmPhone = String(confirmPhoneRow?.value ?? "").replace(/^"|"$/g, "").trim();
+      const { data: session } = confirmPhone
+        ? await admin.from("wa_intake_sessions").select("wa_id, answers").eq("wa_id", confirmPhone).maybeSingle()
+        : { data: null };
+      const answers = (session?.answers ?? {}) as { _lane?: string; job_id?: string; stage?: number; draft_text?: string };
+      const isThisJob = answers._lane === "report_confirm" && answers.job_id === jobId;
+      const draftText = isThisJob ? String(answers.draft_text ?? "").trim() : "";
+      const draftStage = isThisJob ? Number(answers.stage ?? job.stage ?? 1) : (job.stage ?? 1);
+      const approveHint = clientPhone
+        ? `Reply with the code ${job.id} here on WhatsApp to approve it, or open the link to look first: `
+        : "Review it here: ";
+      line = draftText
+        ? `${draftText}\n\n${approveHint}${roomLink}`
         : `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
           `Nobody is paid until you approve them. ${approveHint}${roomLink}`;
-      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed, "yaadly.notify.photos_attached": photoUrls.length });
+      photoUrls = await evidencePhotoUrls(admin, jobId, draftStage, trace);
+      if (isThisJob) await admin.from("wa_intake_sessions").delete().eq("wa_id", confirmPhone);
+      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!draftText, "yaadly.notify.photos_attached": photoUrls.length });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this

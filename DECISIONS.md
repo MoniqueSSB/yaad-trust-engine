@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-08-31 · An AI-drafted evidence report waits for a WhatsApp confirm before it reaches a client
+
+`composeEvidenceReport()` in `yaad-notify-client` has existed since the Reporting agent went live (30 Aug): a real model call turns a worker's filed evidence labels into a client-facing digest, and it went straight from the model to the client's phone the moment it passed the guardrail screen. Founder's instruction, 31 Aug 2026: hold it for her to read and confirm first, the same shape as the Kickoff Pack's own approval gate landed the same day.
+
+The `evidence_landed` handler now checks `app_settings.report_confirm_phone` (a new setting, seeded from `invoice_issuer_phone`, her existing contact number in this system, kept as its own named key so a change to one never silently changes the other). When a digest composes successfully and that phone is set, the draft is written into `wa_intake_sessions` under `_lane: 'report_confirm'`, keyed on that phone number, and she is sent the draft on WhatsApp with instructions to reply with the job's own code to send it on, word for word. Nothing goes to the client at that point. The one thing this cannot do yet is take an edit: any reply that is not an exact match on the job code is read and held, not applied, she has to fix the wording on the desk and let the next `evidence_landed` event redraft, or send it as originally drafted. Flagged as a real gap, not built today because it needs its own design pass on what "edit" means for a model's draft.
+
+Confirming calls `confirm_evidence_report(p_job_id)` in Postgres, which is reachable only with the service role key (`yaad-inbound` runs as that, nothing else can), and which calls `yaad-notify-client` again with `kind: 'evidence_report_confirmed'`, the same shared-secret trigger pattern every other state-change notification already uses. That handler reads the exact drafted text back out of the session it wrote earlier, never trusting free text from whatever called it: a leaked secret still cannot make Yaadly say an arbitrary thing to a client, the same guarantee this file's header comment already claimed for every other kind.
+
+**Known limit, accepted rather than engineered around**: the pending confirmation lives at one fixed phone number (`wa_id = report_confirm_phone`), not a queue, so a second job's evidence landing before the first is confirmed replaces the first's pending draft. Rare in practice at today's volume, and a mismatched reply fails safely (nothing is sent to the wrong job) rather than silently.
+
+The fixed, non-AI fallback sentence `evidence_landed` has always sent when composition fails is untouched: there is nothing there for a human to confirm, so it is never held.
+
 ## 2026-08-31 · The Kickoff Pack approves with the quote, and drives the real stage rail
 
 `kickoff_packs.status` could be `approved`, the desk's own copy said "approving is what lets it reach a client," and RLS already correctly refused to show an unapproved pack to a client (`parties read approved packs`, status = 'approved' and the job matches their email). Nothing anywhere ever set that column. Every pack, forever, was invisible to every client: a fully built gate with no handle on the door. Founder's instruction, 31 Aug 2026: the pack approves at the exact moment the client accepts a quote, not as a separate admin action, so `choose_worker()` now looks up the job's pack, refuses the whole choice if no pack has been drafted (`docs is null`), and sets `status = 'approved', approved_by = <the client>, approved_at = now()` in the same transaction that assigns the worker and starts the job. One decision, one commit.
