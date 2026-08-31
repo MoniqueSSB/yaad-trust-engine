@@ -599,6 +599,7 @@ const ICON = {
   chat:'<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
   mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/>',
   tools:'<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.4"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
 };
 
 const VIEWS = [
@@ -701,6 +702,21 @@ const VIEWS = [
       {h:"Checked", f:r => r.ok ? chip_("ok","signed off") : chip_("warn","waiting on you")},
       {h:"Fingerprint", f:r => r.sha256 ? `<span class="mono" style="color:var(--dim)">${esc(String(r.sha256).slice(0,16))}&hellip;</span>` : mute_("none")},
       {h:"Filed", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"stalled", g:"Run the day", label:"Stalled jobs", icon:"clock",
+    title:"Stalled jobs", table:"worker_stall_history",
+    sub:"Every job the daily check found had gone quiet: no arrival check-in, no evidence, no stage approval for 72 hours or more, worker nudged automatically. A second row here after the nudge means the founder was told directly and the client got an honest heads up about the delay. This is a record for you to read and decide what it means, nothing here suspends a worker or scores them automatically. See worker_stall_history and job_stall_state in DECISIONS.md.",
+    select:"*",
+    order:"nudged_at", search:["job_id","worker_email","title","parish"],
+    empty:["Nothing stalled right now","The daily check runs at 08:00 Jamaica time and only writes a row here once a job has genuinely gone quiet."],
+    cols:[
+      {h:"Job", f:r => id_(r.job_id) + sub_(r.title || "")},
+      {h:"Worker", f:r => esc(r.worker_email || "")},
+      {h:"Where", f:r => mute_(r.parish || "")},
+      {h:"Nudged", f:r => mute_(ago_(r.nudged_at))},
+      {h:"State", f:r => r.escalated_at ? chip_("crit","escalated, told you and the client") : chip_("warn","worker nudged, watching")},
+      {h:"Escalated", f:r => r.escalated_at ? mute_(ago_(r.escalated_at)) : mute_("not yet")},
     ]},
 
   { k:"quotes", g:"Run the day", label:"Quotes", icon:"money",

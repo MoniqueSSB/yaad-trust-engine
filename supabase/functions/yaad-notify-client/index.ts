@@ -37,6 +37,8 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import * as guardrails from "./guardrails.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -51,7 +53,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready"] as const;
+const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -119,6 +121,117 @@ async function sendMetaWhatsApp(to: string, body: string, trace: Trace) {
       return { sent: false, reason: String(e).slice(0, 160) };
     }
   });
+}
+
+// ── the reporting agent, ported ──────────────────────────────────────────
+//
+// yaad/agents/reporting.py has existed since before this file did, fully
+// built and fully guardrailed, and had never once run against a real
+// notification: nothing in supabase/functions/ or web/ ever called it. This
+// is that port, same system prompt, same four fields, same rule that a
+// vague update says so rather than inventing detail, run here because the
+// live side is Deno and the Python engine is stateless and does not deploy.
+//
+// The "worker update" this reads from is not a separate text box: it is the
+// evidence labels already filed for the stage, "the joint before work",
+// "cleared and refilled", in the order they were filed. That is genuinely
+// what the worker told Yaadly happened, captured already, so this needed no
+// new capture step to exist.
+//
+// A vague or failed digest never blocks the notification. The existing
+// fixed sentence ("Photos have come in for stage N...") is what evidence_landed
+// said before this port existed, is guaranteed guardrail-clean because
+// nothing generated it, and is exactly what a client gets if the model has
+// no key, returns nothing usable, or the composed text fails the same
+// banned-language screen yaad-inbound's live replies already run through.
+const REPORTING_SYSTEM = `You are the Reporting Agent for Yaadly.
+
+A tradesperson in Jamaica has sent a progress update. It may be a Patois voice note transcript, a text, or photo captions. Convert it into a status report for a client who is overseas, probably in the UK, US or Canada, and who cannot see the property.
+
+Return STRICT JSON only, exactly this shape:
+{"headline":"one short factual sentence on where the job stands","plain_english":"two to four sentences describing what was actually done, in neutral standard English, keeping the worker's meaning exactly","what_happens_next":"the next step in the process","client_action_needed":"what the client must do now, or nothing right now"}
+
+Rules you must not break:
+- Report only what the worker said. Never add detail, never estimate progress as a percentage, never guess a completion date the worker did not give.
+- Never promise the work is good, finished, or that payment will be released. A human reviews the evidence and the client approves.
+- Never use the word escrow. Money is held safely with a licensed payment provider.
+- Never make the worker sound unprofessional. Translate register, not dignity.
+- If the update is too vague to report, say so plainly and put the missing detail in what_happens_next.
+- Never use dash characters, use a comma or colon instead.`;
+
+function stripReportingNoise(s: string): string {
+  return String(s).replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/```(?:json)?/gi, "").trim();
+}
+function extractReportingJson(s: string): Record<string, string> | null {
+  const text = stripReportingNoise(s);
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0, inStr = false, escNext = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (escNext) { escNext = false; continue; }
+    if (c === "\\") { if (inStr) escNext = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{") depth++;
+    else if (c === "}") { depth--; if (depth === 0) { try { return JSON.parse(text.slice(start, i + 1)); } catch (_) { return null; } } }
+  }
+  return null;
+}
+
+// Returns null on anything short of a clean, usable report, so the caller's
+// existing fixed sentence is what actually ships. Never throws.
+async function composeEvidenceReport(
+  admin: any, jobId: string, jobTitle: string, stage: number, trace: Trace,
+): Promise<string | null> {
+  try {
+    const prov = pickTextProvider();
+    if (!prov) return null;
+
+    const { data: items } = await admin
+      .from("evidence")
+      .select("label, created_at")
+      .eq("job_id", jobId).eq("stage", stage)
+      .order("created_at", { ascending: true });
+    const labels = (items ?? []).map((e: any) => String(e.label ?? "").trim()).filter(Boolean);
+    if (labels.length === 0) return null;
+
+    const { data: job } = await admin.from("jobs").select("trade").eq("id", jobId).maybeSingle();
+    const context = `JOB REF: ${jobTitle || jobId}\nTRADE: ${job?.trade || "not given"}\n\nWORKER UPDATE:\n${labels.join("\n")}`;
+
+    const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.agent.name": "reporting",
+    }, async (s) => {
+      const r = await fetch(prov.api, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
+        body: JSON.stringify({
+          model: prov.model, temperature: 0.3, max_tokens: 600,
+          messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      const j = await r.json().catch(() => ({}));
+      s.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) { s.recordError(`${prov.name} http ${r.status}`); return ""; }
+      return j?.choices?.[0]?.message?.content ?? "";
+    });
+
+    const data = extractReportingJson(String(raw));
+    if (!data) return null;
+
+    const headline = String(data.headline ?? "").trim();
+    const plain = String(data.plain_english ?? "").trim();
+    const next = String(data.what_happens_next ?? "").trim();
+    const action = String(data.client_action_needed ?? "nothing right now").trim();
+    if (!headline || !plain) return null;
+
+    const message = `${headline}\n\n${plain}\n\nNext: ${next}\nYou need to: ${action}`;
+    if (guardrails.scan(message).length > 0) return null;
+    return message;
+  } catch (_) {
+    return null;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -189,8 +302,12 @@ Deno.serve(async (req: Request) => {
         `Nothing is booked and nothing is charged until you choose. See it here: ${codeLink}`;
     } else if (kind === "evidence_landed") {
       subject = `Evidence to review: ${job.title}`;
-      line = `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
-        `Nobody is paid until you approve them. Review it here: ${roomLink}`;
+      const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
+      line = composed
+        ? `${composed}\n\nReview it here: ${roomLink}`
+        : `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
+          `Nobody is paid until you approve them. Review it here: ${roomLink}`;
+      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this
@@ -217,6 +334,14 @@ Deno.serve(async (req: Request) => {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
         `Read them and confirm they are accurate here: ${roomLink}`;
+    } else if (kind === "job_delayed") {
+      // Told honestly and early, before the client has to ask. Says nothing
+      // about why: yaad-job-health knows a job has gone quiet, not the
+      // reason, and guessing at one here would be exactly the kind of
+      // invented detail this repository's own agents are built to refuse.
+      subject = `A delay on your job: ${job.title}`;
+      line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
+        `We are checking in with the worker directly. Nothing is wrong with the money held on this job, and you can raise anything here: ${roomLink}`;
     }
 
     let emailed = false;

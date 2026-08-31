@@ -540,3 +540,33 @@ select wa_id, answers->>'worker_email' as worker_email,
 If a worker says they replied and nothing happened, check the reply actually matched: `pickJobChoice` accepts a plain number ("1", "2") or enough of the job's title to be unambiguous, nothing fuzzier. Anything else gets reprompted, not silently dropped, and the session stays open for another try.
 
 **A staged object that never made it into a job's folder** sits under `evidence/_pending/` in Storage, orphaned if its session expired before a job was chosen. There is no automatic sweep for these yet; a manual `storage.from('evidence').list('_pending')` finds them if one needs clearing by hand.
+
+---
+
+## The evidence digest reads like the fixed sentence instead of a real update
+
+**Check whether a text model provider is actually configured first.** `composeEvidenceReport()` returns null, silently, on anything short of a clean usable report: no provider key set (`pickTextProvider()` returns null), no evidence labels filed for that stage yet, a model call that fails or times out, unparseable JSON, or the composed text failing the same banned-language screen `yaad-inbound`'s live replies already run through. Every one of those is a deliberate fallback to the original fixed sentence, not a bug: a vague or failed digest never blocks the client being told evidence landed.
+
+**To see whether the AI version or the fallback actually shipped for a given notification**, there is no stored copy of the sent line: it goes out and is not written back to any table. If this needs checking after the fact, the honest answer is to ask the client what the message said, or re-run the notification once the underlying cause (usually no provider key, or thin evidence labels) is fixed.
+
+## A worker was never nudged, or a stall was never escalated
+
+**Read `job_stall_state` first**, the actual record of what has and has not happened yet:
+
+```sql
+select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s.nudged_at, s.escalated_at
+  from jobs j left join job_stall_state s on s.job_id = j.id
+ where j.id = 'JOB-XXXX';
+```
+
+**Under 72 hours silent, nothing is expected to have happened yet.** Between 72 and 168 hours, the worker should have one WhatsApp nudge and `nudged_at` should be set; the actual send can fail silently if `TWILIO_WHATSAPP_FROM` or the worker's `worker_profiles.phone` is unset; `nudged_at` gets set regardless of whether the send itself succeeded, because the STATE is "we attempted this," not "the worker definitely saw it," the same distinction every other notification in this file already draws. Past 168 hours, `escalated_at` should be set, the founder should have had an `ntfy_topic` push, and the client should have had a `job_delayed` notification; check `net._http_response` the same way as any other client notification for the actual send outcome.
+
+**A job stops being a candidate the moment it shows real activity again**, an arrival check-in, an evidence row, or a stage approval, whichever is newest. `clear_resolved_job_stalls()` removes its `job_stall_state` row on the next run, and the clock is genuinely gone, not paused: a future stall on the same job starts counting from zero, not from where the old one left off.
+
+**The daily check runs at 13:00 UTC (08:00 Jamaica), as `cron.job` "yaad-job-health".** To run it by hand rather than waiting for the schedule, sign in as an admin and POST to `yaad-job-health` with an `Authorization: Bearer <admin JWT>` header and no `secret` in the body; the function checks `is_admin()` as its second path, same as `yaad-vetting-purge`.
+
+## The Stalled jobs view in concierge is empty, or shows nothing for a worker you know stalled
+
+**It only ever shows what `job_stall_state` actually holds, and only for the last known nudge or escalation, not a live re-check.** If a job has clearly gone quiet but nothing shows, the daily cron has not run since it crossed 72 hours yet, or it ran and found the job did not qualify (check `job_silence_hours()` directly, above). This view is deliberately a record, not a dashboard that recalculates itself on every page load.
+
+**If it shows nothing at all, even after confirming real stalls exist, check `is_admin()` for the signed-in account first.** `worker_stall_history` is `security_invoker`, reading through an admin-only RLS policy on `job_stall_state`; a real, verified security fix (31 Aug 2026), and a signed-in account that is not in the `admins` table gets zero rows from this view by design, the same as it would from anywhere else in concierge.
