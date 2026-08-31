@@ -570,3 +570,33 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 **It only ever shows what `job_stall_state` actually holds, and only for the last known nudge or escalation, not a live re-check.** If a job has clearly gone quiet but nothing shows, the daily cron has not run since it crossed 72 hours yet, or it ran and found the job did not qualify (check `job_silence_hours()` directly, above). This view is deliberately a record, not a dashboard that recalculates itself on every page load.
 
 **If it shows nothing at all, even after confirming real stalls exist, check `is_admin()` for the signed-in account first.** `worker_stall_history` is `security_invoker`, reading through an admin-only RLS policy on `job_stall_state`; a real, verified security fix (31 Aug 2026), and a signed-in account that is not in the `admins` table gets zero rows from this view by design, the same as it would from anywhere else in concierge.
+
+---
+
+## Worker WhatsApp evidence now runs on Twilio, not Meta
+
+**There is no Meta setup to finish. It was tried, reverted, and moved.** `yaad-whatsapp-webhook` (Meta) is back to client intake and worker signup only, exactly as it was before 31 Aug 2026. The photo-texting feature lives in `yaad-inbound` now, on the number already registered with Twilio.
+
+**A worker's evidence message is recognised by three things, checked in this order inside `yaad-inbound`:** the channel is `whatsapp` (not plain SMS), the sender's number matches a published (`active = true`) worker's `worker_profiles.phone` on the last 9 digits, and the message carries an image or video attachment. Miss any one of those and the message falls through to the ordinary client-intake pipeline this endpoint has always run, unchanged.
+
+**To see whether a worker's number is actually linked**, same query as before, table and matching logic are unchanged by the provider switch:
+
+```sql
+select worker_email, phone, active from worker_profiles
+ where right(regexp_replace(coalesce(phone,''), '\D', '', 'g'), 9)
+     = right(regexp_replace('<their WhatsApp number>', '\D', '', 'g'), 9);
+```
+
+**A pending "which job" session lives in `wa_intake_sessions` under `_lane: 'evidence'`, exactly as it did on the Meta build**, since that table was never provider-specific. Same query to inspect it:
+
+```sql
+select wa_id, answers->>'worker_email' as worker_email,
+       jsonb_array_length(answers->'pending') as pending_count,
+       answers->'job_choices' as choices, updated_at
+  from wa_intake_sessions
+ where answers->>'_lane' = 'evidence';
+```
+
+**If a worker's photo genuinely never arrives, check Twilio's own delivery first, not this function.** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_WHATSAPP_FROM` are the same three secrets every other WhatsApp send in this app already depends on, confirmed live and working 31 Aug 2026. If those are fine and a real message still doesn't produce a reply, check the function's own logs for a signature rejection (`twilioSigned` returning `ok:false`) before assuming the evidence-intake logic itself is at fault; that check runs before any of this code does.
+
+**This was never fully proven with a real, signed inbound message during development**, because doing so requires `TWILIO_AUTH_TOKEN` to sign a test request, which nobody building this held. Every piece of logic underneath that signature check was verified directly against the live database; the signature check, the media fetch, and the reply mechanism are pre-existing code already handling real client messages on this same endpoint. The first real worker photo sent to the number is the genuine end-to-end proof. If it does not work as described here, that is the first place to look, not a reason to assume the whole design is wrong.

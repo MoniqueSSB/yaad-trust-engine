@@ -159,6 +159,113 @@ async function fetchMedia(url: string): Promise<{ bytes: Uint8Array; mime: strin
   } catch (_) { return null; }
 }
 
+// ── evidence intake from a worker's own WhatsApp number ─────────────────
+// Founder's own framing, 31 Aug 2026: a worker on site "has no time to log
+// on and carry out those steps in the web." First built against Meta's
+// Cloud API directly, then moved here the same day: Meta's own business
+// verification stood between the founder and testing anything at all,
+// while this endpoint already receives real Twilio WhatsApp traffic on the
+// number that already works. Same logic, a simpler media fetch (Twilio
+// hands over a URL directly; Meta needed a two-step id lookup first), and
+// the reply goes out as the TwiML response to the same message rather than
+// a second API call.
+//
+// The trust model is unchanged from the Meta build: no session exists on
+// an inbound message, so the check RLS would make for a portal upload
+// (this worker, this job, and no other) is made by hand instead, against
+// the phone match, before a single byte is trusted. The server-computed
+// sha256 is the same rule evidence-actions.ts and yaad-evidence-video
+// already use, a third time in a third place.
+
+const EVIDENCE_EXT_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic",
+  "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+};
+const EVIDENCE_MEDIA_BUCKET = "evidence";
+const EVIDENCE_MAX_BYTES = 20_000_000;
+
+async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string };
+
+// Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
+// a straight download rather than a two-step lookup: fetchMedia() above
+// already carries Twilio's own basic auth for a twilio.com host.
+async function downloadAndStageEvidence(admin: any, url: string, mime: string, caption: string): Promise<PendingEvidence | null> {
+  const ext = EVIDENCE_EXT_BY_MIME[mime.toLowerCase()];
+  if (!ext) return null;
+
+  const got = await fetchMedia(url);
+  if (!got || got.bytes.byteLength === 0 || got.bytes.byteLength > EVIDENCE_MAX_BYTES) return null;
+
+  const path = `_pending/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from(EVIDENCE_MEDIA_BUCKET).upload(path, got.bytes, { contentType: mime, upsert: false });
+  if (error) return null;
+
+  const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
+  return { path, mime, bytes: got.bytes.byteLength, sha256, label: (caption || "Sent on WhatsApp").slice(0, 140) };
+}
+
+async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence): Promise<boolean> {
+  const ext = item.path.split(".").pop();
+  const finalPath = `${jobId}/${crypto.randomUUID()}.${ext}`;
+  const { error: moveErr } = await admin.storage.from(EVIDENCE_MEDIA_BUCKET).move(item.path, finalPath);
+  if (moveErr) return false;
+
+  const { error: insErr } = await admin.from("evidence").insert({
+    job_id: jobId, label: item.label, img: null, storage_path: finalPath,
+    bytes: item.bytes, mime: item.mime, kind: "work", stage,
+    sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
+  });
+  if (insErr) {
+    await admin.storage.from(EVIDENCE_MEDIA_BUCKET).remove([finalPath]);
+    return false;
+  }
+  return true;
+}
+
+async function lookupWorkerByPhone(admin: any, from: string): Promise<{ email: string } | null> {
+  const tail = from.replace(/\D/g, "").slice(-9);
+  if (tail.length < 7) return null;
+  const { data } = await admin
+    .from("worker_profiles")
+    .select("worker_email, phone")
+    .eq("active", true)
+    .not("phone", "is", null);
+  const match = (data ?? []).find((w: any) => String(w.phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+  return match?.worker_email ? { email: String(match.worker_email).toLowerCase() } : null;
+}
+
+async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
+  const { data } = await admin.from("jobs").select("id, title, stage, status").ilike("worker_email", email).order("updated_at", { ascending: false });
+  return (data ?? [])
+    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
+    .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
+}
+
+function pickJobChoice(text: string, choices: { id: string; title: string; stage: number }[]) {
+  const t = text.trim().toLowerCase();
+  const n = parseInt(t.replace(/\D/g, ""), 10);
+  if (Number.isFinite(n) && n >= 1 && n <= choices.length) return choices[n - 1];
+  const hits = choices.filter((c) => t && c.title.toLowerCase().includes(t));
+  return hits.length === 1 ? hits[0] : null;
+}
+
+async function mintPortalUploadLink(admin: any, email: string, jobId: string): Promise<string | null> {
+  try {
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { redirectTo: `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(jobId)}?tab=evidence` },
+    });
+    if (error || !data?.properties?.action_link) return null;
+    return String(data.properties.action_link);
+  } catch (_) { return null; }
+}
+
 async function transcribeUrl(url: string, trace: Trace): Promise<string> {
   try {
     return await trace.span("transcribe voice note", SpanKind.CLIENT, { "yaadly.media.url": url.slice(0, 120) }, async (sp) => {
@@ -728,6 +835,90 @@ Deno.serve(async (req: Request) => {
                       : json({ ok: true, note: "Nothing to do." });
     }
 
+    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // A worker mid "which job" answer, or a fresh photo from a number
+    // linked to a published worker (worker_profiles.phone). Only on the
+    // WhatsApp channel and only ahead of the client-intake pipeline below:
+    // this endpoint's whole design assumes an inbound message is a client
+    // describing a job, and a worker's evidence needs to be recognised and
+    // diverted before that assumption ever applies to it.
+    if (msg.channel === "whatsapp" && msg.from) {
+      const { data: sess } = await supabase.from("wa_intake_sessions")
+        .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
+      const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+
+      if (evSession) {
+        const answers = evSession.answers as any;
+        const pending: PendingEvidence[] = answers.pending ?? [];
+        const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
+        const workerEmail: string = answers.worker_email ?? "";
+        const media = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
+
+        if (media.length) {
+          const items = (await Promise.all(media.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text)))).filter(Boolean) as PendingEvidence[];
+          const next = [...pending, ...items];
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
+            .eq("wa_id", msg.from);
+          const list = choices.map((c, i) => `${i + 1}) ${c.title}`).join("  ");
+          return twiml(items.length ? `Got that too, ${next.length} so far. Which job are these for?  ${list}` : `That one did not come through. Which job are the others for?  ${list}`);
+        }
+
+        const pick = pickJobChoice(msg.text, choices);
+        if (!pick) {
+          const list = choices.map((c, i) => `${i + 1}) ${c.title}`).join("  ");
+          return twiml(`Sorry, reply with just the number: ${list}`);
+        }
+        let filed = 0;
+        for (const item of pending) if (await finalizeEvidenceItem(supabase, pick.id, pick.stage, workerEmail, item)) filed++;
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        return twiml(`Filed ${filed} item${filed === 1 ? "" : "s"} against ${pick.title}, stage ${pick.stage}. Keep them coming.`);
+      }
+
+      if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
+        // A stale evidence session is dropped, not salvaged: there is no
+        // job description to write down, only an orphaned photo nobody
+        // answered for. Falls through and this message is read fresh.
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+      }
+
+      const evidenceMedia = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
+      if (evidenceMedia.length) {
+        const worker = await lookupWorkerByPhone(supabase, msg.from);
+        if (worker) {
+          const activeJobs = await lookupActiveJobsForWorker(supabase, worker.email);
+          if (activeJobs.length > 0) {
+            const items = (await Promise.all(evidenceMedia.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text)))).filter(Boolean) as PendingEvidence[];
+            if (!items.length) {
+              return twiml("That did not come through properly. Try sending it again, or if it is a longer video, use the portal instead.");
+            }
+
+            if (activeJobs.length === 1) {
+              const job = activeJobs[0];
+              let filed = 0;
+              for (const item of items) if (await finalizeEvidenceItem(supabase, job.id, job.stage, worker.email, item)) filed++;
+              root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_direct" : "filed_direct_failed" });
+              if (!filed) return twiml("That did not save properly. Try sending it again.");
+              let body = `Got it, filed on ${job.title}, stage ${job.stage}. Keep them coming.`;
+              const link = await mintPortalUploadLink(supabase, worker.email, job.id);
+              if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+              return twiml(body);
+            }
+
+            await supabase.from("wa_intake_sessions").upsert({
+              wa_id: msg.from,
+              answers: { _lane: "evidence", worker_email: worker.email, pending: items, job_choices: activeJobs },
+              photo_count: items.length,
+              updated_at: new Date().toISOString(),
+            });
+            const list = activeJobs.map((j, i) => `${i + 1}) ${j.title}`).join("  ");
+            return twiml(`Got it. Which job is this for?  ${list}`);
+          }
+        }
+      }
+    }
+
     // Voice first: it is how most of these actually arrive.
     let spoken = false;
     const voice = msg.media.find((m) => m.mime.startsWith("audio/") || (!m.mime && !msg.text));
@@ -736,8 +927,6 @@ Deno.serve(async (req: Request) => {
       if (said) { msg.text = said; spoken = true; }
     }
     if (!msg.text) msg.text = "[message with no readable text, review manually]";
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // An intake is a conversation. Somebody writes "roof a leak", then two
     // minutes later "it in Portland". Read against the whole thread or the
