@@ -142,6 +142,29 @@ h3.hx{font-size:clamp(21px,3vw,28px)}
 .rule>span{flex:none;font-size:17px}
 .rule.soft{background:var(--soft);border-color:var(--softline)}
 
+/* emoji verification cards */
+.vgrid{grid-template-columns:repeat(4,1fr)}
+@media(max-width:900px){.vgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.vgrid{grid-template-columns:1fr}}
+.vcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;text-align:center;transition:.16s}
+.vcard:hover{border-color:var(--teal);transform:translateY(-2px)}
+.vem{font-size:32px;line-height:1;margin-bottom:10px}
+.vcard h3{font-size:14.5px;margin-bottom:6px}
+.vcard p{font-size:12.5px;color:var(--mute);line-height:1.55}
+@media(prefers-reduced-motion:reduce){.vcard:hover{transform:none}}
+
+/* deposit cap bar. Fill is 0 width until its .rv wrapper scrolls on-screen and
+   the shared reveal observer in yaadly.js adds .on, same trigger as every
+   other .rv element on the site, just also driving a width instead of opacity. */
+.dcap{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.dcap-track{height:32px;border-radius:100px;background:var(--bg);border:1px solid var(--line2);overflow:hidden}
+.dcap-fill{width:25%;min-width:112px;height:100%;background:linear-gradient(90deg,var(--mango),var(--coral));border-radius:100px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px}
+html.jsrv .dcap.rv .dcap-fill{width:0;transition:width 1s ease .2s}
+html.jsrv .dcap.rv.on .dcap-fill{width:25%}
+.dcap-fill span{font:700 11px var(--mono);color:#1a1206;white-space:nowrap}
+.dcap-row{display:flex;justify-content:space-between;gap:8px;margin-top:12px;font-size:11px;color:var(--dim);flex-wrap:wrap}
+@media(prefers-reduced-motion:reduce){html.jsrv .dcap.rv .dcap-fill,html.jsrv .dcap.rv.on .dcap-fill{transition:none;width:25%}}
+
 /* ══ the trust engine ══
    The signature animation. Evidence tiles light one by one, the lock opens on
    the client's approval, and the money reaches the worker only on that last
