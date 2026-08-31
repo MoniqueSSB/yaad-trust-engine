@@ -26,13 +26,21 @@
  *
  * CHANNELS: the same order yaad-quote-landed already proved. Twilio
  * WhatsApp, then Meta's API, then Twilio SMS, then Resend email regardless.
- * None of the four kinds below has an approved WhatsApp Content Template of
- * its own yet, only the quote-landed wording does (yaadly_quote_landed_v2),
- * and this function does not reuse it: reusing a template approved for one
- * sentence to send a different sentence is exactly the kind of thing that
- * gets a WhatsApp sender flagged. So all four go over WhatsApp as free text,
- * which works inside the 24 hour window and fails honestly outside it, same
- * as everything else on this number until Trust Hub KYC clears (RUNBOOK.md).
+ * Six of the seven kinds below have no approved WhatsApp Content Template of
+ * their own, so they go over WhatsApp as free text, which works inside the
+ * 24 hour window and fails honestly outside it: reusing a template approved
+ * for one sentence to send a different sentence is exactly the kind of thing
+ * that gets a WhatsApp sender flagged, so free text is the only honest option
+ * for those six. quote_arrived is the exception, because it is not a
+ * different sentence: it is the same notification yaadly_quote_landed_v2 was
+ * approved for, word for word bar one clause (below). It reuses that
+ * template (TWILIO_CONTENT_SID_QUOTE) unconditionally whenever the template
+ * is configured, the same way the retired yaad-quote-landed did and for the
+ * same reason: a template is valid inside the 24 hour window too, so one
+ * path that always works beats two that each work half the time. Until
+ * Trust Hub KYC clears (RUNBOOK.md), that path is what carries quote_arrived
+ * over WhatsApp; the other six still depend on the client's own last message
+ * being recent.
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -66,6 +74,7 @@ async function sha256Hex(s: string): Promise<string> {
 
 async function sendTwilio(
   to: string, body: string, channel: "whatsapp" | "sms", trace: Trace, mediaUrls: string[] = [],
+  template?: { sid: string; vars: Record<string, string> },
 ) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
@@ -81,11 +90,22 @@ async function sendTwilio(
     "server.address": "api.twilio.com", "messaging.system": "twilio",
   }, async (s) => {
     try {
-      const params = new URLSearchParams({ To: dest, From: from, Body: body });
-      // Twilio's own form: MediaUrl repeated once per attachment, not
-      // indexed. Only ever populated for the WhatsApp send below; SMS keeps
-      // its existing role as a plain-text last resort.
-      for (const u of mediaUrls) params.append("MediaUrl", u);
+      // A template is only ever sent as itself: Content Templates carry
+      // fixed, Meta-approved wording and let the caller fill in variable
+      // slots, never free text of the caller's choosing, so this is not the
+      // same risk as putting an arbitrary sentence through it.
+      let params: URLSearchParams;
+      if (template?.sid && channel === "whatsapp") {
+        params = new URLSearchParams({
+          To: dest, From: from, ContentSid: template.sid, ContentVariables: JSON.stringify(template.vars),
+        });
+      } else {
+        params = new URLSearchParams({ To: dest, From: from, Body: body });
+        // Twilio's own form: MediaUrl repeated once per attachment, not
+        // indexed. Only ever populated for the WhatsApp send below; SMS keeps
+        // its existing role as a plain-text last resort.
+        for (const u of mediaUrls) params.append("MediaUrl", u);
+      }
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
@@ -335,6 +355,10 @@ Deno.serve(async (req: Request) => {
     let subject = "";
     let line = "";
     let photoUrls: string[] = [];
+    // Only quote_arrived has an approved WhatsApp Content Template
+    // (yaadly_quote_landed_v2); see the header comment for why it is the
+    // one kind that may reuse it.
+    let waTemplate: { sid: string; vars: Record<string, string> } | undefined;
 
     if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
@@ -342,10 +366,19 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId).eq("status", "submitted")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const total = (q?.labour_jmd ?? 0) + (q?.materials_jmd ?? 0);
+      const workerName = q?.worker_name ?? "A tradesperson";
+      const priceText = money(total);
       subject = `A price on your job: ${job.title}`;
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
-        `${q?.worker_name ?? "A tradesperson"} quoted ${money(total)}. ` +
+        `${workerName} quoted ${priceText}, labour and materials itemised separately. ` +
         `Nothing is booked and nothing is charged until you choose. See it here: ${codeLink}`;
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
+      if (contentSid) {
+        waTemplate = {
+          sid: contentSid,
+          vars: { "1": String(job.title ?? "your job"), "2": String(workerName), "3": priceText, "4": codeLink },
+        };
+      }
     } else if (kind === "evidence_landed") {
       subject = `Evidence to review: ${job.title}`;
       const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
@@ -431,7 +464,7 @@ Deno.serve(async (req: Request) => {
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = await sendTwilio(clientPhone, line, "whatsapp", trace, photoUrls);
+      wa = await sendTwilio(clientPhone, line, "whatsapp", trace, photoUrls, waTemplate);
       if (!wa.sent) {
         const meta = await sendMetaWhatsApp(clientPhone, line, trace);
         if (meta.sent) wa = { ...meta, via: "meta whatsapp" };
