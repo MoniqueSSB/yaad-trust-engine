@@ -656,3 +656,26 @@ select policyname, qual from pg_policies
 **The signed URL each photo travels on is good for five minutes, server-side, admin client, never exposed to a browser.** This has nothing to do with the portal's own signed URLs (which run through the *visitor's* session and the storage RLS policy above) or with the storage-object read policy at all; a WhatsApp send failing does not mean an admin or client has lost portal access to the same photo, and the reverse is also true.
 
 **Two small orphaned test files remain in the evidence bucket from 31 Aug 2026's live verification**, `TEST-WA-LIVE-A/0cf5d7c6-512c-446f-a169-6ede09f9da89.jpg` and `TEST-WA-LIVE-A/12da67a9-8500-437b-b558-925cb2a85e4b.jpg`. Nothing references them; safe to delete by hand from the Storage dashboard whenever convenient. Postgres refuses a direct `DELETE` on `storage.objects`, by design, so removing them needs the Storage API or the dashboard, not a migration.
+
+## Choosing a worker now refuses with "This job has no Kickoff Pack drafted yet"
+
+**That is the intended behaviour, not a bug.** As of 31 Aug 2026, `choose_worker()` approves the job's Kickoff Pack in the same transaction as assigning the worker, and refuses the whole choice if no pack row exists for the job, or the pack's `docs` column is still null. A pack has to be drafted (`yaad-kickoff`, or a row written directly into `kickoff_packs` with `job_id` set) before a client can accept any quote on that job. To check what a specific job actually has:
+
+```sql
+select id, status, approved_at, approved_by, (docs is not null) as has_docs
+from kickoff_packs where job_id = '<job id>' order by updated_at desc;
+```
+
+No row at all, or `has_docs = false`, is why the choose is being refused. Write the pack first.
+
+## The portal stage rail is showing generic labels instead of the Kickoff Pack's own stage names
+
+**Check that the job actually has an *approved* pack, not just a drafted one.** `jobStages()` in `web/lib/portal/journey.ts` only reads `payment_schedule.stages` from a pack whose `status = 'approved'` (`page.tsx`'s `trulyApprovedPack`, deliberately with no fallback to a draft) - showing unconfirmed AI content as if it were the live stage structure would be exactly the mistake the human-approval gate exists to prevent. A job whose worker was chosen before 31 Aug 2026 has no approved pack and will always show the old fixed rail; that is the correct fallback, not a defect, and nothing needs fixing for it.
+
+**The amount shown against the current stage** is computed on the page, not stored anywhere: `proportion_percent` of the accepted quote's `labour_jmd`. If it looks wrong, check those two numbers directly rather than looking for a third, cached figure, there isn't one.
+
+## The Kickoff Pack pages on the portal
+
+**Nine documents, each its own page**, `/portal/jobs/[id]/pack` (the table of contents) and `/portal/jobs/[id]/pack/[doc]` (one document, with prev/next), replacing the single long-scroll page from before 31 Aug 2026. The list of documents and how each one renders lives in one place, `web/lib/portal/packDocs.tsx`, shared by both pages so they can never drift into naming a document two different things.
+
+**`human_review_notes` is not one of the nine and never will be shown here.** It is Monique's own pre-issue checklist against the draft, not client-facing content; it stays visible only in the concierge desk's Kickoff Packs view.
