@@ -610,3 +610,11 @@ select wa_id, answers->>'worker_email' as worker_email,
 **To see a worker mid-confirmation**, same query as the general evidence-session lookup above: look at `answers->'job_choices'` for what they were shown and `answers->'pending'` for what is staged and waiting. Nothing in `evidence` or the job's own record changes until that row is deleted by a successful `finalizeEvidenceItem()` call, which only runs after a match.
 
 **If a worker seems stuck reprompting, check what they actually typed against `answers->'job_choices'` in that row first.** The most common real cause is a worker typing the bare digits ("0042") without the code's letters, which is deliberate, not a bug: the code match requires the string Twilio was shown, precisely so a worker cannot confirm a job by accident. Tell them to reply with the exact code shown in the message.
+
+## Proving the Twilio signature check without a real Twilio secret
+
+**Run `deno test supabase/functions/yaad-inbound/twilio-signature_test.ts` and `deno test supabase/functions/yaad-inbound/job-match_test.ts`.** Both run with no network and no live credentials, `twilio-signature_test.ts` signs a request the same way Twilio does using a throwaway test token, not the real `TWILIO_AUTH_TOKEN`, and checks `checkTwilioSignature()` in `twilio-signature.ts` agrees. This is what "the algorithm is proven, the live endpoint is not yet" actually means in practice: everything the signature check does is exercised here, the one thing not exercised is Twilio's real servers signing with the real production secret and reaching the real URL.
+
+**If `yaad-inbound` starts refusing genuine Twilio messages with a 403**, the first thing to check is which of the three URL candidates in `checkTwilioSignature()` Twilio is actually signing against, not the test file: the trailing-slash and no-trailing-slash forms are both tried because Twilio signs whatever was typed into its own console.
+
+**Both `twilio-signature.ts` and `job-match.ts` are separate files inside `yaad-inbound/`, deployed as part of the same function**, same as `guardrails.ts`, `otel.ts` and `textmodel.ts` already were. `supabase functions deploy yaad-inbound` picks all of them up; nothing extra needed.

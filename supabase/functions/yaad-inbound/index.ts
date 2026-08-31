@@ -3,6 +3,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { checkTwilioSignature } from "./twilio-signature.ts";
+import { pickJobChoice } from "./job-match.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -244,27 +246,6 @@ async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ i
   return (data ?? [])
     .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
     .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
-}
-
-// The job's own code is the primary way a worker confirms which job a
-// photo belongs to, founder's own requirement, 31 Aug 2026: "confirmation
-// of the job and the confirmation of the code... that photo will link to
-// the correct evidence." A number or a title match are still accepted, as
-// a convenience, but the code is what every prompt leads with and the code
-// is checked first, because it is the one answer that cannot be given by
-// accident.
-function pickJobChoice(text: string, choices: { id: string; title: string; stage: number }[]) {
-  const t = text.trim().toLowerCase();
-  if (!t) return null;
-
-  const byCode = choices.filter((c) => t.includes(c.id.toLowerCase()));
-  if (byCode.length === 1) return byCode[0];
-
-  const n = parseInt(t.replace(/\D/g, ""), 10);
-  if (Number.isFinite(n) && n >= 1 && n <= choices.length) return choices[n - 1];
-
-  const hits = choices.filter((c) => c.title.toLowerCase().includes(t));
-  return hits.length === 1 ? hits[0] : null;
 }
 
 async function mintPortalUploadLink(admin: any, email: string, jobId: string): Promise<string | null> {
@@ -617,42 +598,13 @@ async function resendSigned(req: Request, raw: string): Promise<{ ok: boolean; c
   return { ok: offered.includes(expected), checked: true };
 }
 
-/** Twilio signs with HMAC-SHA1 over the full URL plus sorted POST params */
+/** Twilio signs with HMAC-SHA1 over the full URL plus sorted POST params.
+ *  The check itself lives in ./twilio-signature.ts, which reads no
+ *  environment variable of its own, so a test can run the exact same
+ *  algorithm against a throwaway secret instead of only ever a real signed
+ *  message. This is the thin wrapper that hands it the two live secrets. */
 async function twilioSigned(req: Request, raw: string): Promise<{ ok: boolean; checked: boolean }> {
-  const token = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
-  if (!token) return { ok: true, checked: false };
-  const offered = req.headers.get("x-twilio-signature") ?? "";
-  if (!offered) return { ok: false, checked: true };
-  const params = new URLSearchParams(raw);
-  const sorted = [...params.keys()].sort();
-
-  // Twilio signs the URL it posted to. Inside the edge runtime `req.url` is
-  // NOT that URL: it comes through as
-  //   http://<ref>.supabase.co/yaad-inbound
-  // with the scheme downgraded and the /functions/v1 prefix stripped by the
-  // gateway. Signing over it rejects every genuine Twilio message with a 403,
-  // and the only way to notice is to send a correctly signed request, because
-  // a forged one is refused either way and looks like the check working.
-  //
-  // So rebuild the public URL and check against that, keeping `req.url` as a
-  // candidate for local dev where it is the real one. Twilio also signs
-  // whatever is typed into the console, so a trailing slash gets its own
-  // candidate rather than a support ticket.
-  const slug = new URL(req.url).pathname.replace(/^\/+/, "").replace(/^functions\/v1\//, "");
-  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
-  const candidates = [
-    `${base}/functions/v1/${slug}`,
-    `${base}/functions/v1/${slug}/`,
-    req.url,
-  ];
-
-  const key = new TextEncoder().encode(token);
-  for (const url of candidates) {
-    let msg = url;
-    for (const k of sorted) msg += k + params.get(k);
-    if (offered === b64(await hmac(key, msg, "SHA-1"))) return { ok: true, checked: true };
-  }
-  return { ok: false, checked: true };
+  return checkTwilioSignature(req, raw, Deno.env.get("TWILIO_AUTH_TOKEN") ?? "", Deno.env.get("SUPABASE_URL") ?? "");
 }
 
 
