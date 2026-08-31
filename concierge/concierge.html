@@ -193,6 +193,12 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .reqrow.ok{color:var(--ink)}
 .reqrow.miss i{border-color:var(--coral)}
 .reqrow.miss{color:var(--coral)}
+.reqdoc{border-top:1px solid var(--softline)}
+.reqlist .reqdoc:first-child{border-top:0}
+.reqdoc summary{padding:7px 0;font-size:12.5px;color:var(--ink);line-height:1.6;cursor:pointer}
+.reqdoc summary i{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--tealb);background:rgba(45,212,191,.16);color:var(--tealb);font-size:9px;font-style:normal;margin-right:6px}
+.reqdoc[open] summary{color:var(--tealb)}
+.docbody{white-space:pre-wrap;color:var(--mute);font-size:12.5px;line-height:1.65;padding:2px 4px 16px 21px;max-height:360px;overflow-y:auto;word-break:break-word}
 
 /* ---------- vetting ---------- */
 .vrec{margin-top:10px}
@@ -837,6 +843,11 @@ const VIEWS = [
     order:"created_at", search:["id","job_id","project_title","client_name"],
     empty:["No packs","A pack is drafted against a job once its scope is agreed."],
     pre: preKick, panel: panelKick,
+    // The panel above only ever shows the newest pack. Opening an older or a
+    // different job's row needs its own way to read what was drafted, since
+    // docs is hidden from the generic field dump on purpose, raw jsonb is
+    // not a document.
+    detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${kickDocsHtml(r.docs)}</div></div>`,
     cols:[
       {h:"Pack", f:r => id_(r.id) + sub_(r.model || "")},
       {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
@@ -844,6 +855,31 @@ const VIEWS = [
       {h:"Rev", n:true, f:r => String(r.rev ?? 1)},
       {h:"State", f:r => tone_(r.status)},
       {h:"Built", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"kickd", g:"Documents & money", label:"Kickoff Drafts", icon:"doc",
+    title:"Kickoff Drafts", table:"kickoff_drafts",
+    sub:"Every kickoff draft yaad-kickoff has written, whether or not anybody has done anything with it. A draft is not a pack: nothing here is client-facing, and nothing ever becomes a pack on its own. Link a ready draft to a job below, and it starts as a draft pack there too, unread by the client until they accept a quote on that job.",
+    select:"id,status,model,intake,error,created_at,finished_at",
+    order:"created_at", search:["id","title","client_name"],
+    empty:["No drafts yet","A draft is written when the kickoff wizard, or an admin request, asks yaad-kickoff for one."],
+    pre: preKickDrafts,
+    cols:[
+      {h:"Draft", f:r => id_(r.id) + sub_(r.model || "not recorded")},
+      {h:"Project", f:r => esc(r.title || "untitled") + sub_(r.client_name || "")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Drafted", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Link to a job", cls:"",
+        when:r => r.status === "ready",
+        rpc:"link_kickoff_draft_to_job",
+        ask:[
+          { k:"job_id", label:"Which job is this pack for?", type:"text",
+            placeholder:"JOB-0002", from:() => "" },
+        ],
+        args:(r, v) => ({ p_draft_id:r.id, p_job_id:(v.job_id || "").trim() }),
+        says:() => "Creates a Kickoff Pack for that job from this draft, listed under Kickoff Packs. It stays a draft, unread by the client, until they accept a quote on that job: that is the one moment anything ever approves it." },
     ]},
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
@@ -913,6 +949,21 @@ const VIEWS = [
       {h:"Turns", n:true, f:r => String(r.turns ?? 0)},
       {h:"The conversation", f:r => transcript_(r.transcript)},
       {h:"Last heard", f:r => mute_(ago_(r.last_at))},
+    ]},
+
+  { k:"wamid", g:"Inbox", label:"Mid-chat", icon:"clock",
+    title:"Mid-chat", table:"wa_intake_sessions",
+    sub:"Everybody caught partway through a WhatsApp conversation, before a job, an application or a photo has been filed anywhere else. The assistant asks one question at a time, and this is where you see exactly which question a person has been left sitting on. There is nothing to do here and no button to press: a row disappears on its own once the conversation finishes, and one gone quiet for more than two days is not lost, it restarts fresh the moment they write in again.",
+    select:"*", hide:["answers"],
+    order:"updated_at", search:["wa_id"],
+    empty:["Nobody mid-chat right now","When the WhatsApp assistant is partway through asking somebody about a job, a worker signup, or which job a photo belongs to, it shows here."],
+    pre: preWaMid,
+    cols:[
+      {h:"Number", f:r => id_(r.wa_id) + sub_(waLaneLabel_(r))},
+      {h:"Stuck on", f:r => esc(waStuck_(r))},
+      {h:"Told us so far", f:r => waAnswered_(r)},
+      {h:"Photos", n:true, f:r => r.photo_count ? String(r.photo_count) : mute_("none")},
+      {h:"Waiting since", f:r => waWaiting_(r)},
     ]},
 
   { k:"calls", g:"Inbox", label:"Calls", icon:"phone",
@@ -1063,6 +1114,140 @@ function ownWords(descr){
   const waiting = /Still gathering/i.test(raw);
   return `<span title="${esc(flat)}">${esc(cut)}</span>`
        + (waiting ? sub_("still gathering, the assistant has asked for more") : "");
+}
+
+// The fixed question order the WhatsApp assistant asks, one lane at a time.
+// Copied here rather than read from the webhook, because the desk has no
+// way to import from a Deno function. Kept in the same order and the same
+// keys as INTAKE_STEPS and WORKER_STEPS in yaad-whatsapp-webhook: if that
+// order changes, this copy goes stale and needs updating alongside it.
+const WA_CLIENT_STEPS = ["what","where","access","when","name","from","email"];
+const WA_CLIENT_LABELS = {
+  what:"what needs doing", where:"where the property is",
+  access:"who can let a worker in", when:"how soon they need it",
+  name:"their name", from:"where they are writing from", email:"their email",
+};
+const WA_WORKER_STEPS = ["name","trade","parishes","years","proof"];
+const WA_WORKER_LABELS = {
+  name:"their name", trade:"their trade", parishes:"which parishes they cover",
+  years:"how long they have done this work", proof:"a photo of finished work",
+};
+const WA_LANE_LABEL = { client:"client, describing a job", worker:"worker, signing up", evidence:"worker, naming the job for a photo" };
+
+// The lane is stored inside the answers jsonb rather than as its own column
+// (see the webhook's laneOf), so a session with no marker at all is read as
+// what it always was before evidence and worker lanes existed: a client.
+// Anything else is returned as-is rather than folded into "client": a lane
+// this view has never been taught is a fact worth seeing, not a guess worth
+// hiding.
+function waLane_(r){
+  const l = String(r?.answers?._lane || "").trim();
+  return l || "client";
+}
+const waKnownLane_ = (lane) => lane === "client" || lane === "worker" || lane === "evidence";
+
+// The label shown next to the number. An unrecognised lane says so by name,
+// the same way the pricing lookup says "no public price exists" rather than
+// inventing one.
+function waLaneLabel_(r){
+  const lane = waLane_(r);
+  return WA_LANE_LABEL[lane] || `not a lane this desk knows: ${lane}`;
+}
+
+// The one thing this view exists to answer: which question, in plain
+// English, is this person sitting on right now.
+function waStuck_(r){
+  const lane = waLane_(r);
+  const a = r.answers || {};
+  if (lane === "evidence") {
+    const choices = a.job_choices || [];
+    return choices.length
+      ? `confirming which job, ${choices.length} to choose from`
+      : "naming the job the photo belongs to";
+  }
+  if (waKnownLane_(lane)) {
+    const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
+    const labels = lane === "worker" ? WA_WORKER_LABELS : WA_CLIENT_LABELS;
+    const next = steps.find(k => !String(a[k] ?? "").trim());
+    return next ? labels[next] : "answered everything, about to be filed";
+  }
+  return "not a lane this desk recognises yet, open the row to see what is there";
+}
+
+// What has been gathered so far, as plain label-and-value lines. Shared by
+// the table cell (one truncated line, whole thing in the tooltip, same
+// never-truncate-silently shape as ownWords and said_) and the drawer (the
+// full block, one line per fact). A lane outside client, worker and
+// evidence is listed key by key rather than guessed at, so nothing this
+// view was never taught still shows up as readable text instead of raw
+// jsonb.
+function waFacts_(r){
+  const lane = waLane_(r);
+  const a = r.answers || {};
+  if (lane === "evidence") {
+    const n = (a.pending || []).length;
+    const choices = (a.job_choices || []).map(c => `${c.id} (${c.title})`).join(", ");
+    return [
+      `${n} photo${n === 1 ? "" : "s"} staged`,
+      `worker: ${a.worker_email || "not matched"}`,
+      `job choices offered: ${choices || "none yet"}`,
+    ];
+  }
+  if (waKnownLane_(lane)) {
+    const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
+    const lines = steps.filter(k => String(a[k] ?? "").trim()).map(k => `${k}: ${a[k]}`);
+    return lines.length ? lines : ["nothing yet"];
+  }
+  const lines = Object.entries(a).filter(([k]) => k !== "_lane")
+    .map(([k, v]) => `${k}: ${v && typeof v === "object" ? JSON.stringify(v) : (v === "" ? "(blank)" : v)}`);
+  return lines.length ? lines : ["nothing recorded"];
+}
+
+function waAnswered_(r){
+  const flat = waFacts_(r).join("  |  ").replace(/\s+/g, " ").trim();
+  const cut = flat.length > 110 ? flat.slice(0, 110) + "…" : flat;
+  return `<span title="${esc(flat)}">${esc(cut)}</span>`;
+}
+
+// The drawer has room the table cell does not, so it gets one fact per line
+// instead of one truncated line with the rest in a tooltip.
+function waToldUs_(r){
+  return waFacts_(r).join("\n");
+}
+
+// Rebuilds each row for the drawer so it reads top to bottom as lane, stuck
+// on, told us so far, then the raw fields. Without this the generic drawer
+// (openDetail, shared by every view) dumps the answers jsonb as a brace and
+// quote mark blob, which is exactly the column this view exists to make
+// readable. The raw answers field is kept on the row, just hidden, because
+// the table columns above still read it directly.
+async function preWaMid(rows){
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    rows[i] = {
+      wa_id: r.wa_id,
+      lane: waLaneLabel_(r),
+      stuck_on: waStuck_(r),
+      told_us: waToldUs_(r),
+      photo_count: r.photo_count,
+      started_at: r.started_at,
+      updated_at: r.updated_at,
+      answers: r.answers,
+      __i: r.__i,
+    };
+  }
+}
+
+// How long it has sat, and whether it is old enough that the next message
+// from this number will not resume it. 48 hours matches SESSION_STALE_MS in
+// the webhook: past that, an incoming message salvages what was gathered
+// into a needs-review job or application and starts over, it does not pick
+// up where the chat left off.
+function waWaiting_(r){
+  const stale = Date.now() - new Date(r.updated_at).getTime() > 48 * 3600_000;
+  return mute_(ago_(r.updated_at))
+       + sub_(`began ${ago_(r.started_at)}`)
+       + (stale ? sub_("quiet past two days, their next message starts fresh") : "");
 }
 
 // Where the client said materials are to be kept, and whether they said at
@@ -1441,12 +1626,49 @@ const KICK_DOCS = [
   ["human_review_notes","Notes for you"], ["cover_note","Cover note"],
 ];
 
+// Flattens each draft's intake jsonb onto the row as plain fields (title,
+// client_name, parish, brief) and drops the raw intake and docs blobs
+// rather than hiding them: this view is for finding the right draft to
+// link, not for reading the ten documents inside it, which the Kickoff
+// Packs view already does once one exists.
+async function preKickDrafts(rows){
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const intake = r.intake || {};
+    rows[i] = {
+      id: r.id, status: r.status, model: r.model,
+      title: intake.title || "", client_name: intake.client_name || "",
+      parish: intake.parish || "", brief: intake.brief || "",
+      error: r.error, created_at: r.created_at, finished_at: r.finished_at,
+      __i: r.__i,
+    };
+  }
+}
+
 async function preKick(rows){
   KICK_CTX = null;
   const draft = (rows || []).find(r => r.status === "draft") || (rows || [])[0];
   if (!draft) return;
   const { data, error } = await sb.from("kickoff_packs").select("*").eq("id", draft.id).maybeSingle();
   KICK_CTX = { pack: data || null, error: error ? error.message : null };
+}
+
+// One row per drafted document, named exactly as KICK_DOCS names them. A
+// present document opens, on click, to the full text the model wrote, not a
+// paraphrase and not a preview cut short: this panel used to say "read it
+// end to end before approving" while giving no way to actually do that.
+// A missing document stays a flat row, there is nothing to open.
+function kickDocsHtml(docs){
+  docs = docs || {};
+  return KICK_DOCS.map(d => {
+    const text = String(docs[d[0]] || "").trim();
+    const n = text.length;
+    const ok = n > 40;
+    const head = `<i>${ok ? "&#10003;" : ""}</i>${esc(d[1])}`
+      + (ok ? ` <span class="mono" style="color:var(--dim)">${n.toLocaleString("en-GB")} chars</span>` : " &mdash; <b>missing</b>");
+    if (!ok) return `<div class="reqrow miss">${head}</div>`;
+    return `<details class="reqdoc"><summary>${head}</summary><div class="docbody">${esc(text)}</div></details>`;
+  }).join("");
 }
 
 function panelKick(rows){
@@ -1464,18 +1686,11 @@ function panelKick(rows){
   const dashes = (all.match(/[–—]/g) || []).length;
   const cjk = (all.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length;
 
-  const rowsHtml = KICK_DOCS.map(d => {
-    const n = String(docs[d[0]] || "").trim().length;
-    const ok = n > 40;
-    return `<div class="reqrow ${ok ? "ok" : "miss"}"><i>${ok ? "&#10003;" : ""}</i>${esc(d[1])}`
-         + (ok ? ` <span class="mono" style="color:var(--dim)">${n.toLocaleString("en-GB")} chars</span>` : " &mdash; <b>missing</b>") + `</div>`;
-  }).join("");
-
   return `<div class="card">
       <div class="chd"><h3>${esc(pack.id)}${pack.job_id ? " &middot; " + esc(pack.job_id) : ""}</h3>`
     + tone_(pack.status)
     + `<span class="sp">${esc(pack.model || "no model recorded")} &middot; ${chars.toLocaleString("en-GB")} chars &middot; rev ${esc(String(pack.rev ?? 1))}</span></div>`
-    + `<div class="grid2"><div><div class="reqlist">${rowsHtml}</div></div>`
+    + `<div class="grid2"><div><div class="reqlist">${kickDocsHtml(docs)}</div></div>`
     + `<div><div class="kv">`
     + `<span class="k2">Documents present</span><span class="v2">${present.length} of ${KICK_DOCS.length}</span>`
     + `<span class="k2">Em and en dashes</span><span class="v2">${dashes ? `<span class="chip crit">${dashes} to strip</span>` : `<span class="chip ok">none</span>`}</span>`
@@ -1485,7 +1700,7 @@ function panelKick(rows){
     + `<div class="hr"></div>`
     + `<span class="k2 tot">Approved</span><span class="v2 tot">${pack.approved_at ? esc(day_(pack.approved_at)) + " by " + esc(pack.approved_by || "unknown") : "not yet"}</span>`
     + `</div>`
-    + `<p class="conseq" style="margin-top:11px">The database refuses to save or approve a pack whose documents are null. Read it end to end before approving: <b>approving is what lets it reach a client.</b></p>`
+    + `<p class="conseq" style="margin-top:11px">The database refuses to save or approve a pack whose documents are null. Click a document above to read it end to end before approving: <b>approving is what lets it reach a client.</b></p>`
     + `</div></div></div>`;
 }
 
@@ -1665,7 +1880,7 @@ function setCount(k, n, hot){
 // will refuse a job whose client has not signed the Client Guidelines, and
 // that refusal is the system working.
 
-const PK = { workers:"worker_email", clients:"user_id", threads:"job_id", set:"key" };
+const PK = { workers:"worker_email", clients:"user_id", threads:"job_id", set:"key", wamid:"wa_id" };
 const pkOf = (k) => PK[k] || "id";
 
 // Long free text is the point of opening a row, so it is never shortened here.
@@ -1704,6 +1919,12 @@ function openDetail(k, i){
   const fields = Object.keys(row).filter(f => !hide.has(f)).map(f =>
     `<div class="dfield"><span class="dk">${esc(f)}</span>${fieldValue(row[f])}</div>`).join("");
 
+  // A view can add its own hand-built block after the plain fields, for
+  // content the generic dump cannot show properly, such as the drafted
+  // documents on a kickoff pack: fieldValue would escape a <details>
+  // element into visible tags rather than render it.
+  const extra = v.detailExtra ? v.detailExtra(row) : "";
+
   const acts = (v.actions || []).filter(a => !a.when || a.when(row));
   const actHtml = acts.length
     ? `<div class="dacts"><div class="brow">${acts.map((a, n) =>
@@ -1717,6 +1938,7 @@ function openDetail(k, i){
   el.innerHTML = `<div class="drw" role="dialog" aria-label="Record detail">
       <div class="dhd"><h3>${esc(title)}</h3><button class="cls" aria-label="Close">&times;</button></div>
       ${fields}
+      ${extra}
       ${actHtml}
     </div>`;
   document.body.appendChild(el);

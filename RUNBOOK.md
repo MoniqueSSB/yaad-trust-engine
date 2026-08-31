@@ -832,3 +832,26 @@ select job_id, stage, created_at, due_at, fired_at from evidence_landed_pending
 **If a timer fires (`fired_at` set) but nobody was actually told**, check `yaad-evidence-landed-check`'s own logs for a `403` from `yaad-notify-client` first: `YAAD_CRON_SECRET` not matching `notify_trigger_secret_sha256` (see "The notify trigger secret gets out of sync (again)", above) is a live, confirmed cause as of 31 Aug 2026, not hypothetical. If that check comes back clean, the fault is downstream in `yaad-notify-client` itself (no worker phone on file, an AI review failure, a Twilio send failure), the same causes as `evidence_landed`'s existing failure modes elsewhere in this file, not anything specific to the debounce.
 
 **Retuning the 90 second window** is one constant, `interval '90 seconds'` in `schedule_evidence_landed_notify()`, plus the cron cadence itself if the check needs to run more or less often than once a minute (`cron.schedule('yaad-evidence-landed-check', ...)`, `20260831zzzz7`). Both need a new migration, not a dashboard edit, same as every other constant in this file that has one.
+
+## Choosing a worker now refuses with "This job has no Kickoff Pack drafted yet"
+
+**That is the intended behaviour, not a bug.** As of 31 Aug 2026, `choose_worker()` approves the job's Kickoff Pack in the same transaction as assigning the worker, and refuses the whole choice if no pack row exists for the job, or the pack's `docs` column is still null. A pack has to be drafted (`yaad-kickoff`, or a row written directly into `kickoff_packs` with `job_id` set) before a client can accept any quote on that job. To check what a specific job actually has:
+
+```sql
+select id, status, approved_at, approved_by, (docs is not null) as has_docs
+from kickoff_packs where job_id = '<job id>' order by updated_at desc;
+```
+
+No row at all, or `has_docs = false`, is why the choose is being refused. Write the pack first.
+
+## The portal stage rail is showing generic labels instead of the Kickoff Pack's own stage names
+
+**Check that the job actually has an *approved* pack, not just a drafted one.** `jobStages()` in `web/lib/portal/journey.ts` only reads `payment_schedule.stages` from a pack whose `status = 'approved'` (`page.tsx`'s `trulyApprovedPack`, deliberately with no fallback to a draft) - showing unconfirmed AI content as if it were the live stage structure would be exactly the mistake the human-approval gate exists to prevent. A job whose worker was chosen before 31 Aug 2026 has no approved pack and will always show the old fixed rail; that is the correct fallback, not a defect, and nothing needs fixing for it.
+
+**The amount shown against the current stage** is computed on the page, not stored anywhere: `proportion_percent` of the accepted quote's `labour_jmd`. If it looks wrong, check those two numbers directly rather than looking for a third, cached figure, there isn't one.
+
+## The Kickoff Pack pages on the portal
+
+**Nine documents, each its own page**, `/portal/jobs/[id]/pack` (the table of contents) and `/portal/jobs/[id]/pack/[doc]` (one document, with prev/next), replacing the single long-scroll page from before 31 Aug 2026. The list of documents and how each one renders lives in one place, `web/lib/portal/packDocs.tsx`, shared by both pages so they can never drift into naming a document two different things.
+
+**`human_review_notes` is not one of the nine and never will be shown here.** It is Monique's own pre-issue checklist against the draft, not client-facing content; it stays visible only in the concierge desk's Kickoff Packs view.
