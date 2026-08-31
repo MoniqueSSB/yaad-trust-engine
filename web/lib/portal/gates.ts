@@ -82,14 +82,26 @@ export function jobGates({
   jobBase,
   emailConfirmed,
   signed,
+  hasAcceptedMaterials,
 }: {
   job: GateJob;
   /** e.g. /portal/jobs/JOB-WA-1 , used for the #materials anchor */
   jobBase: string;
   emailConfirmed: boolean;
   signed: boolean;
+  /** True only when there is an ACCEPTED quote with materials money on it.
+      Stage 5.4, founder's own wording: "say where materials are kept"
+      becomes a go-live condition only when the accepted quote includes
+      materials; small jobs default to worker supplies. Before this the row
+      below always showed, so a two hour call-out with nothing to buy was
+      held up by a checklist item for a question that did not apply to it.
+      Postgres enforces the real rule (materials_store_nominated()); this
+      only decides whether the CHECKLIST asks the question, and the two
+      must agree or a client would see "nothing outstanding" while the
+      database still refuses to open the job. */
+  hasAcceptedMaterials: boolean;
 }): Gate[] {
-  return [
+  const gates: Gate[] = [
     {
       scope: "account",
       title: "Confirm your email address",
@@ -104,13 +116,18 @@ export function jobGates({
       href: "/portal/guidelines",
       cta: "Read and sign",
     },
-    {
+  ];
+
+  if (hasAcceptedMaterials) {
+    gates.push({
       scope: "job",
       title: "Say where materials are kept",
       why: "A worker cannot price this honestly without it. With nowhere securable he buys in drops and drives the surplus off site each night, and those trips belong in his quote.",
       done: storeNamed(job),
       href: jobBase + "#materials",
       cta: "Answer it",
-    },
-  ];
+    });
+  }
+
+  return gates;
 }

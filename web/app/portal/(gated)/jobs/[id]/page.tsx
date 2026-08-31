@@ -243,11 +243,19 @@ export default async function JobRoom({
     job.open === true && !job.worker_email && (job.stage ?? 0) === 0;
   const movedOn = !!job.worker_email || (job.stage ?? 0) > 0 || job.status === "complete";
 
+  /* Same test the database uses (materials_store_nominated), so the
+     checklist and Postgres never disagree about whether this question is
+     live: an accepted quote, materials money on it. */
+  const hasAcceptedMaterials = qs.some(
+    (q) => q.status === "accepted" && (q.materials_jmd ?? 0) > 0,
+  );
+
   const gates: Gate[] = jobGates({
     job,
     jobBase,
     emailConfirmed,
     signed,
+    hasAcceptedMaterials,
   });
 
   /* The board carries the trade filter so the job is not one card in a list
