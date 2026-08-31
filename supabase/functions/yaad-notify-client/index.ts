@@ -64,7 +64,9 @@ async function sha256Hex(s: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sendTwilio(to: string, body: string, channel: "whatsapp" | "sms", trace: Trace) {
+async function sendTwilio(
+  to: string, body: string, channel: "whatsapp" | "sms", trace: Trace, mediaUrls: string[] = [],
+) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = channel === "whatsapp"
@@ -79,10 +81,15 @@ async function sendTwilio(to: string, body: string, channel: "whatsapp" | "sms",
     "server.address": "api.twilio.com", "messaging.system": "twilio",
   }, async (s) => {
     try {
+      const params = new URLSearchParams({ To: dest, From: from, Body: body });
+      // Twilio's own form: MediaUrl repeated once per attachment, not
+      // indexed. Only ever populated for the WhatsApp send below; SMS keeps
+      // its existing role as a plain-text last resort.
+      for (const u of mediaUrls) params.append("MediaUrl", u);
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ To: dest, From: from, Body: body }),
+        body: params,
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
@@ -234,6 +241,44 @@ async function composeEvidenceReport(
   }
 }
 
+const MAX_PHOTOS_SENT_DIRECTLY = 5;
+
+/** Signed URLs for the photos filed against one stage, so a client sees them
+ *  right inside the WhatsApp message rather than only through a link.
+ *  Founder's own requirement, 31 Aug 2026: evidence should reach the client
+ *  directly, not only wait on the portal for them to open. Video is left
+ *  out on purpose: WhatsApp's own media handling makes sending a video this
+ *  way unreliable, and the portal is already the route for anything too
+ *  big to text. Capped, not because more would fail, but because a message
+ *  carrying ten photos reads as clutter, not proof.
+ *
+ *  Runs on the admin client, so it bypasses the same storage RLS the portal
+ *  page relies on for a signed-in client's own session: this is a
+ *  server-to-server send, not a page render, and the URL it hands back is
+ *  only good for five minutes and only ever reaches Twilio's own fetch. */
+async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<string[]> {
+  const { data: items } = await admin.from("evidence")
+    .select("storage_path, mime")
+    .eq("job_id", jobId).eq("stage", stage)
+    .not("storage_path", "is", null)
+    .like("mime", "image/%")
+    .order("created_at", { ascending: true })
+    .limit(MAX_PHOTOS_SENT_DIRECTLY);
+  const paths = (items ?? []).map((e: any) => e.storage_path).filter(Boolean);
+  if (!paths.length) return [];
+
+  return await trace.span("storage.sign_evidence_urls", SpanKind.CLIENT, {}, async (s) => {
+    try {
+      const { data, error } = await admin.storage.from("evidence").createSignedUrls(paths, 300);
+      if (error) { s.recordError(error.message); return []; }
+      return (data ?? []).map((r: any) => r.signedUrl).filter(Boolean) as string[];
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return [];
+    }
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -289,6 +334,7 @@ Deno.serve(async (req: Request) => {
 
     let subject = "";
     let line = "";
+    let photoUrls: string[] = [];
 
     if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
@@ -303,6 +349,10 @@ Deno.serve(async (req: Request) => {
     } else if (kind === "evidence_landed") {
       subject = `Evidence to review: ${job.title}`;
       const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
+      // The photos themselves, not just a description of them, so a client
+      // does not have to open the portal to see what actually arrived.
+      // Founder's own requirement, 31 Aug 2026.
+      photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
       // The reply-to-approve route only exists for whoever reads it here.
       // Reply with the job's own code, same word for word as the code a
       // worker sends back to confirm a photo, matched against
@@ -314,7 +364,7 @@ Deno.serve(async (req: Request) => {
         ? `${composed}\n\n${approveHint}${roomLink}`
         : `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
           `Nobody is paid until you approve them. ${approveHint}${roomLink}`;
-      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed });
+      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed, "yaadly.notify.photos_attached": photoUrls.length });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this
@@ -376,7 +426,12 @@ Deno.serve(async (req: Request) => {
 
     let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no client phone on the job" };
     if (clientPhone) {
-      wa = await sendTwilio(clientPhone, line, "whatsapp", trace);
+      // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
+      // means the WhatsApp send itself failed, and a signed URL that was
+      // good for five minutes has likely aged past useful by the time a
+      // second attempt runs; the text and the portal link still carry the
+      // fact either way.
+      wa = await sendTwilio(clientPhone, line, "whatsapp", trace, photoUrls);
       if (!wa.sent) {
         const meta = await sendMetaWhatsApp(clientPhone, line, trace);
         if (meta.sent) wa = { ...meta, via: "meta whatsapp" };

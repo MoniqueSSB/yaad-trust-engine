@@ -234,13 +234,11 @@ The quote is saved either way: `yaad-quote-landed` is called after the insert an
 **The three ordinary reasons, in the order they actually happen.**
 
 1. **The job has no email and no phone.** A job posted with only one channel has only that one to send on, and a WhatsApp intake job often has a number and no address. Nothing to fix in code: put the missing one on the job.
-2. **Twilio Trust Hub KYC is not approved.** This is the live blocker, 31 Aug 2026. The WhatsApp sender is registered and ONLINE (`whatsapp:+447878877567`, "Yaadly LTD"), `TWILIO_WHATSAPP_FROM` is set, the account is Full with a balance, and Twilio still refuses every send:
+2. **Twilio Trust Hub KYC was the live blocker until 31 Aug 2026, now cleared.** The compliance profile was approved same day, confirmed live: a real evidence_landed notification, with a real photo attached, reached a real phone over `whatsapp:+447878877567` ("Yaadly LTD") the same afternoon. If sends start failing again with
 
    > twilio 401 (20003): Primary compliance profile is not approved. Please refer to documentation and complete the KYC process in Trust Hub to gain access.
 
-   Everything else on the WhatsApp path is done and set: the sender, and the approved-template route below. This is the only thing standing between a quote and a client's phone.
-
-   **Fix it in Twilio Console, Trust Hub, Primary Customer Profile**, with the Yaadly Ltd details: England and Wales company **17358077**, the registered address, and a named authorised representative. It is business verification, not a technical step, and nothing in this repository can do it. Nothing else needs changing afterwards: the moment the profile is approved, sends start working with no deploy.
+   check Trust Hub, Primary Customer Profile in the Twilio Console first: something has lapsed or been unlinked, not a fresh version of the original gap. The Yaadly Ltd details on file are England and Wales company **17358077**, the registered address, and a named authorised representative. It is business verification, not a technical step, and nothing in this repository can do it. Nothing else needs changing once it clears: sends start working with no deploy.
 
 3. **No Twilio sender is configured.** Was the blocker before the above. The phone is tried in this order: Twilio WhatsApp, then Meta's own API, then Twilio SMS. Twilio is first because this project already runs on that account for inbound WhatsApp and SMS, so the credentials are real and working. What outbound needs and inbound never did is a number to send FROM.
 
@@ -639,3 +637,22 @@ select id, title, status, client_phone from public.jobs
 **Two confirmations land after a WhatsApp approval, on purpose left as is.** The function's own reply confirms immediately, and the existing `stage_released` notification (the same one a portal approval fires) follows moments later through the ordinary database trigger. Both are correct; nobody engineered around the overlap because doing so would add real complexity to a money-adjacent path to remove a harmless duplicate message.
 
 **If `yaad-notify-client`'s evidence_landed message stops mentioning the WhatsApp reply route**, check `clientPhone` is actually populated on the job first: the hint only appears when there is a phone on file to reply from.
+
+## A photo won't show, or an admin can't see one that should be there
+
+**Check which of two separate things is actually broken.** `public.evidence` is one gate (the row: label, sha256, who filed it, whether it's checked); `storage.objects` is a second, separate gate on the file itself, and they can disagree. As of 31 Aug 2026 both include `is_admin()`, so an admin sees everything a job's own client or worker would. If an admin genuinely cannot see a photo that should exist, this specific grant is the first thing to check:
+
+```sql
+select policyname, qual from pg_policies
+ where schemaname = 'storage' and tablename = 'objects' and policyname = 'job party can read evidence files';
+```
+
+**If a client or worker can't see their own photo**, the same policy answers it: their session's `auth.jwt()->>'email'` has to match `jobs.client_email` or `jobs.worker_email` for the specific job the file's path starts with. A mismatch there, not a broken image tag, is the usual real cause.
+
+## Evidence photos ride on WhatsApp directly now, not only a portal link
+
+**`evidencePhotoUrls()` in `yaad-notify-client` is what attaches them**, up to five per stage, image evidence only, video excluded. If a client says the photo never came through on WhatsApp but the portal shows it fine, check `yaadly.notify.photos_attached` on the trace for that send: zero means the function found nothing to attach (check `evidence.mime` actually starts `image/` and `evidence.stage` matches the job's current stage), a number above zero but no image received means Twilio itself rejected or failed to fetch a signed URL, worth checking the function logs for that specific send rather than assuming the attach code is at fault.
+
+**The signed URL each photo travels on is good for five minutes, server-side, admin client, never exposed to a browser.** This has nothing to do with the portal's own signed URLs (which run through the *visitor's* session and the storage RLS policy above) or with the storage-object read policy at all; a WhatsApp send failing does not mean an admin or client has lost portal access to the same photo, and the reverse is also true.
+
+**Two small orphaned test files remain in the evidence bucket from 31 Aug 2026's live verification**, `TEST-WA-LIVE-A/0cf5d7c6-512c-446f-a169-6ede09f9da89.jpg` and `TEST-WA-LIVE-A/12da67a9-8500-437b-b558-925cb2a85e4b.jpg`. Nothing references them; safe to delete by hand from the Storage dashboard whenever convenient. Postgres refuses a direct `DELETE` on `storage.objects`, by design, so removing them needs the Storage API or the dashboard, not a migration.
