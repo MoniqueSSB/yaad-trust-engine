@@ -2,7 +2,7 @@
 
 Read this before every task in this repository. It is not background reading. It is the set of rules that hold when nobody is checking the diff.
 
-Written 30 August 2026, following the Yaadly Technical Notes of 24 August. Monique owns this file. Do not rewrite it to suit a task. If a rule here blocks what you were asked to do, say so and stop.
+Written 30 August 2026, following the Yaadly Technical Notes of 24 August. Refreshed 31 August 2026, with Monique's approval, to match what is actually in the repository, mainly §11. The rules in the rest of this file are unchanged. Monique owns this file. Do not rewrite it to suit a task. If a rule here blocks what you were asked to do, say so and stop.
 
 ---
 
@@ -88,7 +88,8 @@ Adding a benchmark row from a real sourced price is the right way to widen cover
 - **The consent wording and `AI_CONSENT_VERSION` move together.** In `web/app/apply/JoinFlow.tsx`. A consent is only worth what the sentence that earned it said, so changing the copy without bumping the version silently reinterprets everybody's existing answer.
 - **A new third-party service that touches personal data gets flagged to Monique before it is added.** That is a legal decision, not a technical one.
 - **Never paste a secret into chat.** If it happens, say so immediately so it can be rotated.
-- Model provider is set by environment variable and stays that way. See §9.
+- **Model provider is a configuration value, never a hard-coded endpoint.** The Python engine reads `YAAD_API_KEY` / `YAAD_BASE_URL` / `YAAD_MODEL`. The live Edge Functions read it once, in `supabase/functions/_shared/textmodel.ts`, and CI fails a function that hard-codes a model URL instead. The text model is moving from MiniMax (China) to Mistral (EU) ahead of the December pilot, because real client and worker data crossing into China is a data protection question, not a technical one. See [`RUNBOOK.md`](RUNBOOK.md) §9 and [`DECISIONS.md`](DECISIONS.md) for the reasoning and the exact steps. Do not add a new hard-coded provider anywhere; do not do the switch quietly, it changes which country receives personal data.
+- **Identity documents in the admin desk stay behind Cloudflare Access, `is_admin()` and RLS, in that order.** The desk (`concierge/concierge.html`) is a single static page reading Postgres directly with the publishable key; nothing about its filename or its URL is a control. Access is bound to a hostname, not to the page, so renaming or moving the desk without adding the new hostname to the Access application serves it openly to anyone who finds it. Verify with `curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/`: 302 means Access is in front of it, 200 means it is open to the world.
 
 ---
 
@@ -131,13 +132,14 @@ Say "held safely with a licensed payment provider". **Never say escrow.** Never 
 Going bare minimum to a December pilot in Kingston and Portmore. The following are out of scope right now. If asked for one, **say it is on this list first**, then do it if she still wants it.
 
 - Payment integration of any kind, before the legal review lands.
-- Automatic Patois transcription.
 - Yaad Score computation.
 - A market-rate comparison agent.
 - A full worker dashboard. The worker in Portmore is on a phone mid-job and will do everything over WhatsApp. The worker web surface stays thin on purpose: structured onboarding with credentials, and file upload. Nothing else.
 - Dispute ruling logic. The pack is assembled by machine, the ruling is a human decision on a published timeline.
 
 Scope creep with an agent is frictionless, which is exactly the danger.
+
+Patois voice notes are now transcribed automatically (`supabase/functions/yaad-transcribe`, Cloudflare Workers AI Whisper first, OpenAI, Deepgram, Scribe and AssemblyAI as failover), so that item has come off this list. It does not change §4: the transcript still only ever reaches the Intake agent as text, and Intake still cannot quote a price or promise a timeline.
 
 ---
 
@@ -155,23 +157,56 @@ Also hers alone: whether this repository is public or private, and the timing of
 
 ## 11. What is actually in this repository
 
-The Technical Notes describe three repositories. Today there is one, and the split inside it does the same job. See [`DECISIONS.md`](DECISIONS.md) for why.
+The Technical Notes describe three repositories. Today there is one, and the split inside it does the same job. See [`DECISIONS.md`](DECISIONS.md) for why. This section is the part of the file most likely to drift, because it describes what got built rather than a rule, so treat the table below as a starting map and confirm anything load bearing against the code before relying on it.
 
 | Path | What it is | Where it runs |
 |---|---|---|
-| `yaad/` | The Python engine. Four agents, guardrails, benchmarks. No user interface, no database, no auth. Job Card in, structured result out. | Local and CI today |
+| `yaad/` | The Python engine. Four agents (§4), guardrails, benchmarks. No user interface, no database, no auth. Job Card in, structured result out. | Local and CI |
 | `tests/` | The guardrail and engine tests. The asset. | CI, every push |
-| `supabase/functions/_shared/` | Modules shared by the Edge Functions: the tracer, the model provider, the banned-language screen, and the Deno guardrail tests. Copied into each function by `sync-shared.sh` because Supabase deploys self-contained bundles, and CI fails if a copy drifts. | CI and Supabase |
-| `run_demo.py` | Runs three scenarios on a laptop with no setup and no API key. Keep it working. A demo that needs no infrastructure is a better sales tool than a deployed system nobody can poke at. | Local |
-| `web/` | Next.js on Cloudflare Workers via OpenNext. The client and worker portals. | `app.yaadly.co.uk` |
-| `supabase/functions/` | Deno Edge Functions. Intake, WhatsApp webhook, vetting, invoicing, completion. The live server-side work. | Supabase |
-| `supabase/migrations/` | Schema and RLS policies. | Supabase |
-| `docs/` | The static marketing site, GitHub Pages. | `yaadly.co.uk` |
+| `run_demo.py` | Runs three scripted scenarios (JOB-001 to JOB-003) on a laptop with no setup and no API key. Keep it working. A demo that needs no infrastructure is a better sales tool than a deployed system nobody can poke at. | Local |
+| `web/` | Next.js on Cloudflare Workers via OpenNext. The public job form, `/apply` (worker onboarding, Persona identity check), and the client and worker portals. Has its own `web/CLAUDE.md`, which just points at Next.js's own generated `AGENTS.md`; read that before touching routing or server actions. | `app.yaadly.co.uk` |
+| `supabase/functions/` | Deno Edge Functions, the live server-side work. Intake and Reporting (`yaad-agent`), the WhatsApp webhook, voice transcription, vetting (upload, review, purge), invoicing, sketch packs, worker matching, kickoff packs, completion, the public website intake and enquiry forms, portal signup, resend setup. See `supabase/functions/README.md` for the current per-function table; it is closer to source of truth than this file for that level of detail, and it is itself known to lag what is actually deployed, so when it matters, check the function's own `index.ts`. | Supabase |
+| `supabase/functions/_shared/` | Modules shared by the Edge Functions: the tracer (`otel.ts`), the model provider (`textmodel.ts`), the banned-language screen (`guardrails.ts`), and the Deno guardrail tests. Copied into each function by `sync-shared.sh` because Supabase deploys self-contained bundles, and CI fails if a copy drifts. | CI and Supabase |
+| `supabase/migrations/` | Schema and RLS policies, including database-level publish gates such as `trg_profile_publish_checks`. | Supabase |
+| `supabase/seeds/` and `supabase/tests/` | A SQL test rig and SQL-level guard tests (invoicing, sketch packs) run against the database directly, separate from the CI jobs above. | Local, by hand |
+| `concierge/` | The admin desk, `concierge.html`: one file, twenty-plus views, reading Postgres directly with the publishable key. `concierge/README.md` explains the view registry and the colour convention (teal proven, mango held, coral blocked). Deliberately kept outside `docs/` so GitHub Pages never publishes it. | `concierge.yaadly.co.uk`, behind Cloudflare Access |
+| `concierge-deploy/` | The Cloudflare Worker that serves `concierge/concierge.html` as static assets on its own hostname, kept separate from the marketing site and the app for blast radius, cookies and Access reasons. Copy the source in before deploying; see its README. | Cloudflare Workers |
+| `site-headers/` | A thin Cloudflare Worker that sits in front of `yaadly.co.uk` on a route, not a custom domain, and adds security headers GitHub Pages cannot set itself (HSTS, frame options, a report-only CSP). Deleting it just removes the headers; it never touches the page. | Cloudflare Workers, in front of GitHub Pages |
+| `docs/` | The static marketing site, no build step. | `yaadly.co.uk`, GitHub Pages |
+| `preview/` | A clickable, illustrative prototype (no Supabase, nothing saved) used to settle product and pricing decisions before they are built into `docs/`. | `yaadly.co.uk/preview/` |
 | `specs/` | Build specifications for the surfaces. | Reference |
+| `data/job-taxonomy.js` | The generated source of truth for every trade and job type dropdown, copied into both `docs/` and the app. | Reference, imported by `web/` and `docs/` |
+| `scripts/backup-db.sh` | The only backup path while Supabase is on the free plan (no daily backups, no point-in-time recovery). Writes outside any git repository on purpose; refuses to run into a working tree. | Run by hand |
+| `.github/workflows/ci.yml` | Engine tests on two Python versions plus the mock-mode demo, Edge Function typechecking and shared-copy drift check plus the banned-endpoint check, web typecheck and tests, and the committed-secrets scan. Read the comments in the file itself before changing a job; several exist because a specific incident happened. | GitHub Actions, every push and PR |
 
 **Keep the engine stateless.** No database access, no auth, no session state. Everything stateful lives in Postgres. That boundary is what keeps two languages cheap instead of painful.
 
-**The marketing site and the app are deployed separately on purpose.** A broken app build must never take down `yaadly.co.uk` during a launch window.
+**The marketing site and the app are deployed separately on purpose.** A broken app build must never take down `yaadly.co.uk` during a launch window. The admin desk is separate again, for the reasons in `concierge-deploy/README.md`: a bad script on a public page must never share an origin with a page that reads client addresses and money.
+
+### Running and testing each part
+
+```bash
+# Engine: demo, and the guardrail and engine tests
+pip install -r requirements.txt
+python run_demo.py                 # all three scenarios, mock mode with no YAAD_API_KEY
+python -m pytest -q
+
+# Web app
+cd web
+npm ci
+npm run typecheck
+npm test                            # node's own test runner, no network, HubSpot stubbed
+npm run dev                         # localhost:3000, or use the "app" config in .claude/launch.json
+
+# Admin desk, marketing site, prototype: plain static servers, also in .claude/launch.json
+python3 -m http.server 8931 --directory concierge
+python3 -m http.server 8932 --directory docs
+python3 -m http.server 8934 --directory preview
+```
+
+`npm run lint` exists but is not yet wired into CI: it currently reports one pre-existing error that predates the job. Do not add it to CI and silently change behaviour to make it pass; fix the error first, in its own change, then wire the job in the same commit. See the comment in `.github/workflows/ci.yml`.
+
+Edge Functions are deployed by hand, from disk, never by pasting file contents (§12): `supabase functions deploy <name> --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`. If you touched anything in `_shared/`, run `supabase/functions/sync-shared.sh` first and redeploy every function that imports it, or the thing you tested is not the thing you deployed.
 
 ---
 
