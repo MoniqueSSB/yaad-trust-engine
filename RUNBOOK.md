@@ -710,6 +710,8 @@ Every `fn_hash` should equal `stored_hash`. If one does not, that function was r
 
 **The same drift exists in a shape this query does not check: an environment secret, not a trigger function.** `yaad-job-health`, `yaad-followup-check` and `yaad-evidence-landed-check` are Edge Functions, not `pg_proc` triggers, so they cannot bake a plaintext into their own source the way a trigger does; they read `YAAD_CRON_SECRET` from the environment instead and send that as `secret` when calling `yaad-notify-client` directly. Confirmed live, 31 Aug 2026: `YAAD_CRON_SECRET`'s current value does **not** hash to `notify_trigger_secret_sha256` (checked with a temporary diagnostic log comparing the two SHA-256 digests directly, then removed). Every `yaad-notify-client` call these three functions make gets a silent `403`, `net._http_response`-invisible the same way a trigger's own mismatch is, since none of these three go through `net.http_post`, they call `fetch()` from inside the function itself: check `function_logs` for `"notify-client" ... 403` on the calling function, not `net._http_response`. Not yet fixed: correcting it means rotating `YAAD_CRON_SECRET` to a fresh value, hashing it, and updating `notify_trigger_secret_sha256` in `app_settings` to match, which touches every live trigger that checks that same stored hash, a bigger blast radius than any one of these three functions on its own. Confirm with Monique before rotating it.
 
+**Fixed, 1 Sep 2026.** The secret had already been exposed and rotated; the new value sat in a Supabase Vault entry (`notify_trigger_secret_plaintext_20260831x`) with its own note to copy it into `YAAD_CRON_SECRET` via the dashboard or CLI, then delete the entry. Two attempts at the copy landed a value that still did not hash-match before a third attempt, copied by hand in the Edge Functions Secrets page, finally did: confirmed live by checking `supabase secrets list`'s displayed hash for `YAAD_CRON_SECRET` against `notify_trigger_secret_sha256` directly, not assumed from "I copied it." The Vault entry has been deleted, its job done.
+
 ## The AI photo review comes back empty
 
 **Check the function's own console output, not just the trace.** `reviewEvidencePhotos()` in `yaad-notify-client` logs a specific reason with `console.error` on every failure path as of 31 Aug 2026: `NVIDIA_API_KEY` unset, no image URLs to review, an HTTP error from NVIDIA, or the model's response not containing a JSON array at all. Query `function_logs` for the function around the time of the send:
@@ -872,4 +874,21 @@ order by p.updated_at desc;
 ```
 Two rows (`client`, `worker`) for the current `rev` and `both_confirmed_at` set means both sides have signed this exact revision. One row, or none, means it is still waiting on someone.
 
-**Not yet built, so do not expect it:** nothing currently tells the worker this pack exists. There is no WhatsApp message carrying the link and code, and no automatic draft on quote acceptance; today a pack still has to be manually drafted and linked to the job by an admin before a quote can even be accepted. Both are planned, tracked in DECISIONS.md's "Kickoff Pack dual agreement" entry, not yet built.
+## A worker never gets told a Kickoff Pack exists, or a job never gets one drafted at all
+
+**As of 1 Sep 2026 this should no longer happen on its own.** Choosing a worker (portal click or WhatsApp reply, both go through `_do_choose_worker()`) no longer requires a pack to exist first, and `yaad-kickoff-check` (pg_cron, once a minute) automatically requests one for any job with a chosen worker and none yet, links a guardrail-clean finished draft straight to `'approved'`, and that same transition fires `notify_worker_kickoff_pack_ready`, which is what actually tells the worker.
+
+**If a job has had a chosen worker for more than a couple of minutes with still no pack:**
+```sql
+select d.id, d.status, d.error, d.created_at, d.finished_at
+from kickoff_drafts d
+where d.job_id = '<job id>'
+order by d.created_at desc;
+```
+- No rows at all: `yaad-kickoff-check` has not picked it up yet, or the job does not qualify. It only considers jobs with `status = 'in_progress'` and a non-empty `descr` (used as the intake's `brief`); a job missing either sits out of the poll silently, not stuck, just never eligible. Check `jobs.descr` is actually set.
+- A row stuck at `'drafting'` for several minutes: the background model call is still running (normal, up to a few minutes) or was culled by the platform's worker lifetime limit without ever writing `'failed'` (rare; `yaad-kickoff`'s own header comments describe this failure shape). Three consecutive `'failed'` drafts for the same job stop the poller from retrying it automatically, on purpose, so a persistently bad job does not hammer the model API forever; that ceiling is in the code, not a setting.
+- A row at `'ready'` but still no pack: check its `guardrail` column. Any of `price_language_detected`, `banned_language_detected` or `foreign_text_detected` being `true` holds it back deliberately, same hard rule the manual `link_kickoff_draft_to_job()` door enforces. It stays visible in the concierge desk's Kickoff Drafts view; fix or redraft it, or link it manually from there once clean.
+
+**If a pack shows `status = 'approved'` but the worker says they never heard anything**, that is the notify side, not the drafting side: check `function_logs` for `yaad-notify-client` for a `403` (secret mismatch, see "The notify trigger secret gets out of sync (again)" above) or check the worker actually has a phone on `worker_profiles` (no phone means `emailed: false, whatsapp: {sent: false, reason: "no recipient phone on the job"}` in the response, since this kind never attempts email).
+
+**The service role key is what authorises the automatic path, not a shared secret.** `yaad-kickoff` accepts a call as either a real admin session or a request whose `Authorization` bearer exactly equals `SUPABASE_SERVICE_ROLE_KEY`. If that secret is ever rotated in the Supabase dashboard, `yaad-kickoff-check` picks up the new value automatically on its next cold start (both read the same project secret), so there is nothing to keep in sync by hand the way `YAAD_CRON_SECRET` needs to be, the whole reason this path was built this way rather than with another baked-in trigger secret.
