@@ -417,3 +417,24 @@ select id, created, status_code, content::text
 **This function holds no service role key and repeats no authorisation check of its own.** Every call inside it runs as the calling worker's own session, so if something is refused, the RLS policies on `public.evidence` and the `evidence` storage bucket (20260827a, 20260830b) are where to look, not this function's own code. There is nothing here overriding what those already decide.
 
 **The offline queue only runs while the tab is open.** There is no service worker and no background sync in this codebase yet. A worker who queues a video and then force-quits the browser (not just backgrounds it) before it finishes uploading will find it still queued next time that page opens, not silently sent in the background. That is a known, considered gap, not an oversight: see DECISIONS.md, Stage 5.5.
+
+---
+
+## A worker's money figure looks wrong
+
+**It is computed live from `job_quotes`, not stored anywhere.** There is no cached total to be stale; if a figure looks wrong, the accepted quote for that job is where to look:
+
+```sql
+select j.id, j.status, q.labour_jmd, q.materials_jmd, q.status as quote_status
+  from jobs j
+  left join job_quotes q on q.job_id = j.id and q.status = 'accepted'
+ where j.worker_email = 'them@example.com';
+```
+
+`round(labour_jmd * 0.88) + materials_jmd` is the figure shown, the same 88% every other money panel in this repository uses. A job with no `accepted` row shows nothing on the money page at all, correctly: there is no money to show yet.
+
+**Held versus Released is `jobs.status <> 'complete'` versus `= 'complete'`, nothing finer.** A job does not partially release as stages complete; the whole figure moves at once, when `sync_job_status()` marks the job complete. If a worker expects a partial figure for a partially finished multi-stage job, that expectation is ahead of what this repository tracks today: no per-stage money split exists anywhere.
+
+**"Released" never means paid.** There is no payment integration in this codebase. It means the client has approved and Yaadly's part is done; the actual transfer happens off-platform, by whichever of bank transfer, Lynk or remittance the worker and client already arranged, within the 3 working days the portal promises. If a worker says they were never paid after a job released, that is a real-world payment problem between them and the client, not a bug in this page.
+
+**Recording how they were paid is the worker's own note**, through `record_pay_info()`, refused for any method that is not `bank_transfer`, `lynk` or `remittance`, and refused outright for a job that is not theirs. It does not confirm anything to the client and does not touch `job_quotes` or `stage_approvals`. If a worker's recorded method or reference is wrong, they change it themselves on the same page; there is no admin override for this because there is nothing here for an admin to be more right about than the worker.
