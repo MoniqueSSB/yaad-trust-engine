@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { STAGES, jobStage } from "@/lib/portal/journey";
+import { jobStages, packPaymentStages } from "@/lib/portal/journey";
 import { StageRail } from "@/components/portal/StageRail";
+import { PackStageProgress } from "@/components/portal/PackStageProgress";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
@@ -71,6 +72,7 @@ type Pack = {
   status: string | null;
   rev: number | null;
   updated_at: string | null;
+  docs: unknown;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -134,7 +136,7 @@ export default async function JobRoom({
         .order("created_at", { ascending: true }),
       supabase
         .from("kickoff_packs")
-        .select("id,project_title,status,rev,updated_at")
+        .select("id,project_title,status,rev,updated_at,docs")
         .eq("job_id", id)
         .order("updated_at", { ascending: false }),
       supabase.from("scope_agreements").select("side,email").eq("job_id", id),
@@ -153,12 +155,6 @@ export default async function JobRoom({
          site" strip, not a full attendance record. */
       supabase.from("arrival_log").select("stage,arrived_at,arrived_on").eq("job_id", id).order("arrived_at", { ascending: false }).limit(10),
     ]);
-
-  const current = jobStage(job.status);
-  const viewing = (() => {
-    const n = Number(sParam);
-    return Number.isInteger(n) && n >= 0 && n < STAGES.length ? n : current;
-  })();
 
   const { data: myReview } = await supabase
     .from("reviews")
@@ -235,6 +231,27 @@ export default async function JobRoom({
   const takeHome = labour == null ? null : Math.round(labour * 0.88) + (won?.materials_jmd ?? 0);
 
   const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
+
+  /* The rail a client actually signs against. Only a genuinely APPROVED
+     pack drives this - a draft is unconfirmed AI output and has no business
+     naming what money releases against, whatever else it is used for below. */
+  const trulyApprovedPack = pk.find((x) => x.status === "approved") ?? null;
+  const packStages = packPaymentStages(trulyApprovedPack?.docs ?? null);
+  const { stages: railStages, current: railCurrent } = jobStages(job.status, job.stage, packStages);
+  const current = railCurrent;
+  const viewing = (() => {
+    const n = Number(sParam);
+    return Number.isInteger(n) && n >= 0 && n < railStages.length ? n : current;
+  })();
+  const currentPackStage = packStages[Math.max((job.stage ?? 1) - 1, 0)] ?? null;
+  const amountDue =
+    currentPackStage?.proportion_percent != null && labour != null
+      ? Math.round((labour * currentPackStage.proportion_percent) / 100)
+      : null;
+  const timelinePhases = (
+    (trulyApprovedPack?.docs as { timeline?: { phases?: unknown } } | undefined)
+      ?.timeline?.phases as { name?: string; duration?: string; milestone?: string }[] | undefined
+  ) ?? [];
 
   /* THE GO LIVE GATES.
      Read off the triggers, in the order Postgres applies them, so the list a
@@ -329,7 +346,7 @@ export default async function JobRoom({
     {
       label: "Stage",
       value: String(Math.max(job.stage ?? 0, 0)) + " of " + String(stageCount),
-      note: STAGES[current] ?? "",
+      note: railStages[current] ?? "",
     },
     {
       label: "Evidence on this stage",
@@ -456,10 +473,17 @@ export default async function JobRoom({
       )}
 
       <StageRail
-        stages={STAGES}
+        stages={railStages}
         current={current}
         viewing={viewing}
         base={"/portal/jobs/" + encodeURIComponent(job.id)}
+      />
+
+      <PackStageProgress
+        stage={currentPackStage}
+        amountDue={amountDue}
+        timelinePhases={timelinePhases}
+        packHref={jobBase + "/pack"}
       />
 
       <PortalTiles tiles={tiles} />
