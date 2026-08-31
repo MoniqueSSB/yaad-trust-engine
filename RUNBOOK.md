@@ -464,3 +464,32 @@ select walk_platform, walk_link, walk_date, walk_who, walk_notes, signoff_method
 **This never blocks the Approve button.** `approve_stage()` does not read `signoff_method` at all. If a client says they cannot approve because a walkthrough is pending, that is a UI question or a misunderstanding, not this system enforcing an order; the button is available regardless of where a walkthrough request stands.
 
 **Nothing here calls a video API.** There is no Zoom, Meet or WhatsApp integration in this repository. The link a worker enters through `confirm_walkthrough` is whatever they pasted in themselves, from a call they arranged over WhatsApp the ordinary way. If a link does not work, that is between the worker and whichever service they used to create it, not something to look for in this code.
+
+---
+
+## A worker's arrival check-in did nothing, or the client says they were not told
+
+**Check whether the row actually landed:**
+
+```sql
+select stage, arrived_at, arrived_on, arrived_by
+  from arrival_log where job_id = 'JOB-XXXX'
+ order by arrived_at desc;
+```
+
+No row for today at all means `log_arrival()` was never called successfully; check the caller was actually signed in as `jobs.worker_email` for that job. A row exists but the client says they heard nothing: check `net._http_response` the same way as any other notification (see "A client says they were never told" above) for a `worker_on_site` entry against that job id and timestamp.
+
+**A second tap the same day is expected to do nothing new.** `arrival_log` has a unique constraint on `(job_id, stage, arrived_on)`; `log_arrival()` detects the existing row and returns `already_logged_today: true` rather than inserting again, so there is no second notification to look for. This is not a bug, it is the whole point: one fact per stage per day, not one per tap.
+
+**"Today" is Jamaica-local, fixed UTC-5, not the server's UTC and not the client's own timezone.** A worker checking in at 11pm Jamaica time (4am UTC the next calendar day) still logs against the Jamaica date, which is what both the check-in button's "already checked in today" state and the client's readout compare against.
+
+## A walkthrough's notes are stuck, or a confirmation will not take
+
+**Read the refusal.** `record_walkthrough_notes()` and `confirm_walkthrough_notes()` follow the same pattern as every other function in this file: the message names the reason.
+
+- **"No confirmed call exists on this job to write notes against, or it is not yours."** Either `walk_link` is still null (the call was requested but never confirmed by the worker) or the caller is not `jobs.worker_email`. Notes cannot be written up for a call that never happened.
+- **"There are no call notes on this job yet to confirm, or it is not yours."** `walk_call_notes` is still null, or the caller is not `jobs.client_email`.
+
+**Editing notes after the client already confirmed them is not a bug clearing the confirmation.** It is the rule: `walk_notes_confirmed_at` and `walk_notes_confirmed_by` are reset to null the moment `walk_call_notes` changes, because a client's confirmation was given for a specific piece of text and a changed text is a new claim needing a new confirmation. If a worker says "I only fixed a typo and now it says unconfirmed again," that is working as designed; ask the client to confirm again.
+
+**The Completion Report only ever shows the confirmed version.** A job can complete with an outstanding, unconfirmed set of walkthrough notes; the report at `/portal/jobs/[id]/completion` simply omits the whole walkthrough section until `walk_notes_confirmed_at` is set. The job page itself stays available for exactly this case: `WalkthroughPanel` keeps rendering on a completed job when `signoff_method = 'walkthrough'`, so the outstanding confirmation is never unreachable, it just will not appear on the report until it lands.

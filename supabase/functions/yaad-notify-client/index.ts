@@ -51,7 +51,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released"] as const;
+const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -206,6 +206,17 @@ Deno.serve(async (req: Request) => {
       subject = `Confirmed: stage ${approval?.stage ?? ""} approved`;
       line = `You approved stage ${approval?.stage ?? ""} of ${job.title}. ` +
         `The worker is paid for it, and the job now carries the record. Nothing else to do here: ${roomLink}`;
+    } else if (kind === "worker_on_site") {
+      const { data: arrival } = await admin.from("arrival_log")
+        .select("stage, arrived_at")
+        .eq("job_id", jobId).order("arrived_at", { ascending: false }).limit(1).maybeSingle();
+      subject = `On site today: ${job.title}`;
+      line = `Your worker checked in on site today for stage ${arrival?.stage ?? job.stage ?? 1} of ${job.title}. ` +
+        `Follow along here: ${roomLink}`;
+    } else if (kind === "walkthrough_notes_ready") {
+      subject = `Notes from your video walkthrough: ${job.title}`;
+      line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
+        `Read them and confirm they are accurate here: ${roomLink}`;
     }
 
     let emailed = false;

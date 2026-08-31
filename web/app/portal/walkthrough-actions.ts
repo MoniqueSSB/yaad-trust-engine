@@ -58,3 +58,30 @@ export async function clearWalkthrough(formData: FormData): Promise<void> {
 
   revalidatePath("/portal/jobs/" + jobId);
 }
+
+export async function recordWalkthroughNotes(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  if (!jobId) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_walkthrough_notes", {
+    p_job: jobId,
+    p_notes: String(formData.get("notes") ?? ""),
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/portal/jobs/" + jobId);
+}
+
+export async function confirmWalkthroughNotes(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  if (!jobId) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("confirm_walkthrough_notes", { p_job: jobId });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/portal/jobs/" + jobId);
+}

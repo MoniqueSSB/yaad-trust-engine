@@ -22,7 +22,9 @@ export default async function Completion({ params }: { params: Promise<{ id: str
 
   const { data: job } = await supabase
     .from("jobs")
-    .select("id,title,trade,parish,descr,status,worker_name,updated_at")
+    .select(
+      "id,title,trade,parish,descr,status,worker_name,updated_at,walk_platform,walk_date,walk_who,walk_call_notes,walk_notes_confirmed_at",
+    )
     .eq("id", id).maybeSingle();
   if (!job || job.status !== "complete") notFound();
 
@@ -65,13 +67,33 @@ export default async function Completion({ params }: { params: Promise<{ id: str
         </ul>
       </section>
 
+      {/* Only the confirmed loop counts. An unconfirmed set of notes, or a
+          walkthrough requested but never followed through, is not a record
+          either side has agreed to, and a report is not the place to show
+          something nobody signed off on. */}
+      {job.walk_notes_confirmed_at && (
+        <section className="mt-5">
+          <h2 className="mb-1.5 text-[14px] font-bold text-ink">3 · Video walkthrough</h2>
+          <p className="mb-2 text-[12.5px] text-dim">
+            {job.walk_platform ?? "A call"}{job.walk_date ? ", " + job.walk_date : ""}
+            {job.walk_who ? " · " + job.walk_who : ""}
+          </p>
+          <p className="whitespace-pre-wrap rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] leading-relaxed text-mute">
+            {job.walk_call_notes}
+          </p>
+          <p className="mt-1.5 text-[11px] text-dim">
+            Confirmed {String(job.walk_notes_confirmed_at).slice(0, 16).replace("T", " ")}
+          </p>
+        </section>
+      )}
+
       <section className="mt-5">
-        <h2 className="mb-1.5 text-[14px] font-bold text-ink">3 · What this report is not</h2>
+        <h2 className="mb-1.5 text-[14px] font-bold text-ink">{job.walk_notes_confirmed_at ? "4" : "3"} · What this report is not</h2>
         <div className="text-[13px] leading-relaxed" dangerouslySetInnerHTML={{ __html: legal.completion_section6 }} />
       </section>
 
       <section className="mt-5 border-t border-line pt-3.5">
-        <h2 className="mb-1.5 text-[14px] font-bold text-ink">4 · Aftercare</h2>
+        <h2 className="mb-1.5 text-[14px] font-bold text-ink">{job.walk_notes_confirmed_at ? "5" : "4"} · Aftercare</h2>
         <p className="text-[13px] leading-relaxed text-mute">
           Any defect in this work, raised within 12 months, is put right at
           the worker&apos;s cost. Keep this report with the house papers. Forward

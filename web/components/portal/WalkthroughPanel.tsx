@@ -1,4 +1,10 @@
-import { requestWalkthrough, confirmWalkthrough, clearWalkthrough } from "@/app/portal/walkthrough-actions";
+import {
+  requestWalkthrough,
+  confirmWalkthrough,
+  clearWalkthrough,
+  recordWalkthroughNotes,
+  confirmWalkthroughNotes,
+} from "@/app/portal/walkthrough-actions";
 
 /**
  * The video walkthrough, PORTAL-SPEC's own FAQ copy given a real path: "At
@@ -27,6 +33,8 @@ export function WalkthroughPanel({
   walkDate,
   walkWho,
   walkNotes,
+  walkCallNotes,
+  walkNotesConfirmedAt,
 }: {
   jobId: string;
   role: "client" | "worker";
@@ -35,9 +43,12 @@ export function WalkthroughPanel({
   walkDate: string | null;
   walkWho: string | null;
   walkNotes: string | null;
+  walkCallNotes: string | null;
+  walkNotesConfirmedAt: string | null;
 }) {
   const requested = !!walkPlatform;
   const confirmed = requested && !!walkLink;
+  const notesConfirmed = !!walkNotesConfirmedAt;
 
   return (
     <section className="mt-4 rounded-2xl border border-line bg-panel p-4">
@@ -136,6 +147,66 @@ export function WalkthroughPanel({
           {walkNotes && (
             <p className="mt-2 text-[12.5px] leading-relaxed text-dim">&ldquo;{walkNotes}&rdquo;</p>
           )}
+
+          {/* The other half of the FAQ's sentence: "the notes are recorded,
+              you confirm them, and both land on your Completion Report."
+              Worker writes, client confirms, editing after confirmation
+              re-opens it, same rule as a fresh request outdating an old
+              link. */}
+          <div className="mt-3 border-t border-line pt-3">
+            <p className="text-[10.5px] font-bold uppercase tracking-[.18em] text-mango">Notes from the call</p>
+            {!walkCallNotes && role === "worker" && (
+              <form action={recordWalkthroughNotes} className="mt-2">
+                <input type="hidden" name="jobId" value={jobId} />
+                <textarea
+                  name="notes"
+                  required
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="What you found and raised on the call"
+                  className="w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
+                />
+                <button className="mt-2 rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D]">
+                  Save notes
+                </button>
+              </form>
+            )}
+            {!walkCallNotes && role === "client" && (
+              <p className="mt-1.5 text-[12.5px] text-dim">Waiting on the worker to write these up.</p>
+            )}
+            {walkCallNotes && (
+              <>
+                <p className="mt-1.5 whitespace-pre-wrap text-[12.5px] leading-relaxed text-mute">{walkCallNotes}</p>
+                <p className={"mt-1.5 text-[11px] font-bold uppercase tracking-wide " + (notesConfirmed ? "text-tealb" : "text-coral")}>
+                  {notesConfirmed ? "Confirmed by the client" : "Waiting on the client to confirm"}
+                </p>
+                {!notesConfirmed && role === "client" && (
+                  <form action={confirmWalkthroughNotes} className="mt-2">
+                    <input type="hidden" name="jobId" value={jobId} />
+                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D]">
+                      Confirm these notes
+                    </button>
+                  </form>
+                )}
+                {role === "worker" && (
+                  <form action={recordWalkthroughNotes} className="mt-2.5">
+                    <input type="hidden" name="jobId" value={jobId} />
+                    <textarea
+                      name="notes"
+                      required
+                      rows={3}
+                      maxLength={2000}
+                      defaultValue={walkCallNotes}
+                      className="w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
+                    />
+                    <button className="mt-2 rounded-full border border-line2 px-4 py-2 text-[12.5px] font-bold text-ink">
+                      {notesConfirmed ? "Edit (re-opens confirmation)" : "Save changes"}
+                    </button>
+                  </form>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
 
