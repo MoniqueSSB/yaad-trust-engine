@@ -8,6 +8,7 @@ import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
 import { VideoEvidenceUpload } from "@/components/portal/VideoEvidenceUpload";
+import { WalkthroughPanel } from "@/components/portal/WalkthroughPanel";
 import { MaterialsStore } from "@/components/portal/MaterialsStore";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
@@ -103,7 +104,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
     )
     .eq("id", id)
     .maybeSingle();
@@ -713,6 +714,21 @@ export default async function JobRoom({
             awaitingApproval={awaitingApproval}
             jobId={job.id}
           />
+      {/* The FAQ's own "or": at sign-off a client can approve straight off
+          the evidence above, or ask to walk the site live instead. Sits next
+          to the moment it is an alternative to, not buried in a settings
+          tab. */}
+      {job.worker_email && job.status !== "complete" && (
+        <WalkthroughPanel
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          walkPlatform={job.walk_platform ?? null}
+          walkLink={job.walk_link ?? null}
+          walkDate={job.walk_date ?? null}
+          walkWho={job.walk_who ?? null}
+          walkNotes={job.walk_notes ?? null}
+        />
+      )}
       {job.status !== "complete" && (
         <EvidenceUpload
           jobId={job.id}

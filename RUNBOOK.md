@@ -438,3 +438,29 @@ select j.id, j.status, q.labour_jmd, q.materials_jmd, q.status as quote_status
 **"Released" never means paid.** There is no payment integration in this codebase. It means the client has approved and Yaadly's part is done; the actual transfer happens off-platform, by whichever of bank transfer, Lynk or remittance the worker and client already arranged, within the 3 working days the portal promises. If a worker says they were never paid after a job released, that is a real-world payment problem between them and the client, not a bug in this page.
 
 **Recording how they were paid is the worker's own note**, through `record_pay_info()`, refused for any method that is not `bank_transfer`, `lynk` or `remittance`, and refused outright for a job that is not theirs. It does not confirm anything to the client and does not touch `job_quotes` or `stage_approvals`. If a worker's recorded method or reference is wrong, they change it themselves on the same page; there is no admin override for this because there is nothing here for an admin to be more right about than the worker.
+
+---
+
+## A video walkthrough request or confirmation is refused
+
+**Read the refusal, it names the reason**, same as `approve_stage`.
+
+- **"That is not your job to request a walkthrough on, or it has no worker yet."** Either the signed-in email is not `jobs.client_email`, or `jobs.worker_email` is empty. There is nobody to walk the site yet.
+- **"Choose WhatsApp video, Google Meet or Zoom."** Only those three platform values exist; nothing else is accepted on either `request_walkthrough` or `confirm_walkthrough`.
+- **"No walkthrough has been requested on this job, or it is not yours to confirm."** From `confirm_walkthrough`: either `signoff_method` is not `'walkthrough'` yet (nobody asked), or the signed-in email is not `jobs.worker_email`.
+- **"A link is needed to confirm the call."** `confirm_walkthrough` refuses an empty link outright; there is no such thing as confirming without a real one.
+
+**To see the current state of a walkthrough on a job:**
+
+```sql
+select walk_platform, walk_link, walk_date, walk_who, walk_notes, signoff_method
+  from jobs where id = 'JOB-XXXX';
+```
+
+`walk_platform` set with `walk_link` null means requested, waiting on the worker. Both set means confirmed. All null means nothing has ever been asked for, or it was cancelled.
+
+**A worker confirming a second time, or the client requesting again, is not a bug.** A fresh client request clears any confirmed link and `walk_who`, on purpose: a changed date makes the old link stale, and the worker needs to see the request has changed rather than a link nobody would show up for looking still current.
+
+**This never blocks the Approve button.** `approve_stage()` does not read `signoff_method` at all. If a client says they cannot approve because a walkthrough is pending, that is a UI question or a misunderstanding, not this system enforcing an order; the button is available regardless of where a walkthrough request stands.
+
+**Nothing here calls a video API.** There is no Zoom, Meet or WhatsApp integration in this repository. The link a worker enters through `confirm_walkthrough` is whatever they pasted in themselves, from a call they arranged over WhatsApp the ordinary way. If a link does not work, that is between the worker and whichever service they used to create it, not something to look for in this code.
