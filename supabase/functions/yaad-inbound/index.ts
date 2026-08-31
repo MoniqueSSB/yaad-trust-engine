@@ -246,11 +246,24 @@ async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ i
     .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
 }
 
+// The job's own code is the primary way a worker confirms which job a
+// photo belongs to, founder's own requirement, 31 Aug 2026: "confirmation
+// of the job and the confirmation of the code... that photo will link to
+// the correct evidence." A number or a title match are still accepted, as
+// a convenience, but the code is what every prompt leads with and the code
+// is checked first, because it is the one answer that cannot be given by
+// accident.
 function pickJobChoice(text: string, choices: { id: string; title: string; stage: number }[]) {
   const t = text.trim().toLowerCase();
+  if (!t) return null;
+
+  const byCode = choices.filter((c) => t.includes(c.id.toLowerCase()));
+  if (byCode.length === 1) return byCode[0];
+
   const n = parseInt(t.replace(/\D/g, ""), 10);
   if (Number.isFinite(n) && n >= 1 && n <= choices.length) return choices[n - 1];
-  const hits = choices.filter((c) => t && c.title.toLowerCase().includes(t));
+
+  const hits = choices.filter((c) => c.title.toLowerCase().includes(t));
   return hits.length === 1 ? hits[0] : null;
 }
 
@@ -848,6 +861,17 @@ Deno.serve(async (req: Request) => {
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
 
+      // A code prompt, shared by the "one job" and "several jobs" cases:
+      // the code is always shown and always the answer asked for, never
+      // assumed from a single option alone. Founder's own requirement, 31
+      // Aug 2026: "There should be approval for it to link to the right
+      // job where they ask for the confirmation of the job and the
+      // confirmation of the code."
+      const codePrompt = (choices: { id: string; title: string }[]) =>
+        choices.length === 1
+          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply with the code ${choices[0].id} to confirm, or tell us the right job.`
+          : `Which job is this for? Reply with the code:  ${choices.map((c) => `${c.id} (${c.title})`).join("  ")}`;
+
       if (evSession) {
         const answers = evSession.answers as any;
         const pending: PendingEvidence[] = answers.pending ?? [];
@@ -861,19 +885,24 @@ Deno.serve(async (req: Request) => {
           await supabase.from("wa_intake_sessions")
             .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
-          const list = choices.map((c, i) => `${i + 1}) ${c.title}`).join("  ");
-          return twiml(items.length ? `Got that too, ${next.length} so far. Which job are these for?  ${list}` : `That one did not come through. Which job are the others for?  ${list}`);
+          return twiml(items.length
+            ? `Got that too, ${next.length} so far. ${codePrompt(choices)}`
+            : `That one did not come through. ${codePrompt(choices)}`);
         }
 
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) {
-          const list = choices.map((c, i) => `${i + 1}) ${c.title}`).join("  ");
-          return twiml(`Sorry, reply with just the number: ${list}`);
+          return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
         }
         let filed = 0;
         for (const item of pending) if (await finalizeEvidenceItem(supabase, pick.id, pick.stage, workerEmail, item)) filed++;
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
-        return twiml(`Filed ${filed} item${filed === 1 ? "" : "s"} against ${pick.title}, stage ${pick.stage}. Keep them coming.`);
+        root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_after_confirm" : "confirm_but_nothing_filed" });
+        if (!filed) return twiml("Confirmed, but nothing saved properly. Try sending the photo again.");
+        let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${pick.id} (${pick.title}), stage ${pick.stage}. Keep them coming.`;
+        const link = await mintPortalUploadLink(supabase, workerEmail, pick.id);
+        if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+        return twiml(body);
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
@@ -894,26 +923,17 @@ Deno.serve(async (req: Request) => {
               return twiml("That did not come through properly. Try sending it again, or if it is a longer video, use the portal instead.");
             }
 
-            if (activeJobs.length === 1) {
-              const job = activeJobs[0];
-              let filed = 0;
-              for (const item of items) if (await finalizeEvidenceItem(supabase, job.id, job.stage, worker.email, item)) filed++;
-              root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_direct" : "filed_direct_failed" });
-              if (!filed) return twiml("That did not save properly. Try sending it again.");
-              let body = `Got it, filed on ${job.title}, stage ${job.stage}. Keep them coming.`;
-              const link = await mintPortalUploadLink(supabase, worker.email, job.id);
-              if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
-              return twiml(body);
-            }
-
+            // Never filed on the strength of a single option alone, even
+            // when there is only one job it could possibly be. The code is
+            // always asked for and always checked; nothing moves onto a job
+            // until the worker names it.
             await supabase.from("wa_intake_sessions").upsert({
               wa_id: msg.from,
               answers: { _lane: "evidence", worker_email: worker.email, pending: items, job_choices: activeJobs },
               photo_count: items.length,
               updated_at: new Date().toISOString(),
             });
-            const list = activeJobs.map((j, i) => `${i + 1}) ${j.title}`).join("  ");
-            return twiml(`Got it. Which job is this for?  ${list}`);
+            return twiml(`Got it. ${codePrompt(activeJobs)}`);
           }
         }
       }
