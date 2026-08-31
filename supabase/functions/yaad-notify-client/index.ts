@@ -279,6 +279,109 @@ async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace
   });
 }
 
+// ── the AI overview, ported from yaad-vision ────────────────────────────
+//
+// yaad-vision has existed since 17 Aug and nothing ever called it: it
+// requires a signed-in caller's own JWT (may_use_agents), which a
+// server-to-server notification has no way to present. Rather than loosen
+// a working function's auth model for one new caller, the review itself is
+// ported here, same system prompt, same model, same rule that a finding
+// says only what is visible and never states a structural or safety
+// diagnosis with certainty.
+//
+// Photos only. A video needs frames pulled out of it before any
+// vision-language model can look at it, and nothing in an edge function
+// does that today; asked for, 31 Aug 2026, not yet built, said so rather
+// than silently reviewing nothing and calling it done.
+const VISION_SYSTEM_PROMPT = `You are a construction and property condition reviewer working for Yaadly, a property oversight service in Jamaica. You look at photos of a property or completed work and report ONLY what is visibly evident in the image itself. You are not a licensed surveyor, engineer, or inspector, and your findings are a starting point for a human project manager, not a final judgement.
+
+For each photo, look for visible issues in these categories where present:
+- Water damage or staining
+- Cracks (wall, foundation, ceiling)
+- Peeling, bubbling, or flaking paint
+- Missing, cracked, or degraded sealant or grout
+- Mould or damp
+- Rust or corrosion on metalwork
+- Roofing issues (missing tiles, visible sagging, rust on zinc)
+- Visible electrical hazards (exposed wiring, damaged fixtures)
+- Visible plumbing issues (leaks, staining under fixtures)
+- Structural concerns (visible sagging, leaning, significant cracking)
+- Incomplete or inconsistent work versus the agreed scope, if scope is provided
+- General visible safety hazards
+
+Respond with a JSON array ONLY, no other text before or after it, in this exact shape:
+[
+  {
+    "issue": "short label, e.g. Sealant missing on right column",
+    "category": "one of: cosmetic, maintenance, safety, structural, scope_mismatch",
+    "severity": "low, medium, or high",
+    "note": "one sentence, plain English, describing only what is visible",
+    "recommend_professional": true or false
+  }
+]
+
+Rules:
+- If nothing notable is visible, return an empty array: []
+- Never state a structural or safety diagnosis with certainty. Use language like "appears to show" or "worth checking in person"
+- Any finding in the "structural" or "safety" category MUST have "recommend_professional": true
+- Do not invent detail that is not visible in the image
+- If the photo is unclear, too dark, or too zoomed to judge, say so as a low-severity "cosmetic" note rather than guessing
+- Output ONLY the JSON array`;
+
+type VisionFinding = { issue?: string; category?: string; severity?: string; note?: string; recommend_professional?: boolean };
+
+async function reviewEvidencePhotos(images: string[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
+  const key = Deno.env.get("NVIDIA_API_KEY");
+  if (!key || !images.length) return null;
+  const model = Deno.env.get("NVIDIA_VISION_MODEL") || "nvidia/nemotron-nano-12b-v2-vl";
+
+  return await trace.span(`chat ${model}`, SpanKind.CLIENT, {
+    "gen_ai.system": "nvidia_nim", "gen_ai.operation.name": "chat", "gen_ai.request.model": model,
+    "server.address": "integrate.api.nvidia.com", "yaadly.agent.name": "photo_review",
+  }, async (s) => {
+    try {
+      const userContent: Record<string, unknown>[] = [
+        { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview the following photo(s) and return findings as instructed.` },
+        ...images.slice(0, 6).map((url) => ({ type: "image_url", image_url: { url } })),
+      ];
+      const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model, temperature: 0.2, max_tokens: 1200,
+          messages: [{ role: "system", content: VISION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) { s.recordError(`nvidia http ${r.status}`); return null; }
+      const j = await r.json();
+      const raw = j?.choices?.[0]?.message?.content ?? "[]";
+      const match = String(raw).match(/\[[\s\S]*\]/);
+      const findings = match ? JSON.parse(match[0]) : [];
+      s.setAttributes({ "yaadly.vision.finding_count": findings.length });
+      return findings;
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return null;
+    }
+  });
+}
+
+/** One line the client can actually read, not a JSON dump. Null return
+ *  (the model call failed) is handled by the caller, which just leaves the
+ *  AI section out rather than claim a review happened when it did not. */
+function summariseFindings(findings: VisionFinding[]): string {
+  if (!findings.length) return "Nothing of concern visible in what was sent.";
+  const worst = findings.some((f) => f.severity === "high") ? "high"
+    : findings.some((f) => f.severity === "medium") ? "medium" : "low";
+  const escalate = findings.some((f) => f.recommend_professional);
+  const items = findings.slice(0, 3).map((f) => f.note || f.issue).filter(Boolean).join(" ");
+  const tail = escalate ? " Worth a professional look in person." : "";
+  const more = findings.length > 3 ? ` (${findings.length - 3} more noted on the job.)` : "";
+  return `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -348,23 +451,49 @@ Deno.serve(async (req: Request) => {
         `Nothing is booked and nothing is charged until you choose. See it here: ${codeLink}`;
     } else if (kind === "evidence_landed") {
       subject = `Evidence to review: ${job.title}`;
-      const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
       // The photos themselves, not just a description of them, so a client
       // does not have to open the portal to see what actually arrived.
       // Founder's own requirement, 31 Aug 2026.
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
+
+      // Two accounts, kept visibly separate: what the worker said happened,
+      // and what an AI model can independently see in the photo. Neither
+      // stands in for the other, and the client is shown the difference
+      // rather than one blended sentence. Run concurrently, not one after
+      // the other: two sequential model calls inside one request blew past
+      // the trigger's own 15 second budget the first time this ran, and
+      // net._http_response recorded no response at all rather than a
+      // clean failure. Skipped entirely when there is nobody to tell:
+      // running either call for a job with no email and no phone was
+      // wasted latency and exactly what caused that first timeout.
+      const [composed, findings] = (clientEmail || clientPhone)
+        ? await Promise.all([
+            composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace),
+            photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
+          ])
+        : [null, null];
+      const workerSays = composed
+        || `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}, with no description from the worker.`;
+      const aiSays = findings ? `AI noticed: ${summariseFindings(findings)}` : null;
+
       // The reply-to-approve route only exists for whoever reads it here.
       // Reply with the job's own code, same word for word as the code a
       // worker sends back to confirm a photo, matched against
-      // approve_stage_via_whatsapp() in yaad-inbound.
-      const approveHint = clientPhone
-        ? `Reply with the code ${job.id} here on WhatsApp to approve it, or open the link to look first: `
-        : "Review it here: ";
-      line = composed
-        ? `${composed}\n\n${approveHint}${roomLink}`
-        : `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
-          `Nobody is paid until you approve them. ${approveHint}${roomLink}`;
-      root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed, "yaadly.notify.photos_attached": photoUrls.length });
+      // approve_stage_via_whatsapp() in yaad-inbound. Anything else typed
+      // back is read as a comment, not a new job, and goes to the worker:
+      // founder's own requirement, 31 Aug 2026, "if they're not [satisfied],
+      // there should be a way to respond back", confirmed to mean the
+      // worker answers it, matched in yaad-inbound's own comment lane.
+      const actionHint = clientPhone
+        ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
+        : "Review it and reply from your portal.";
+      line = [workerSays, aiSays, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+      root.setAttributes({
+        "yaadly.notify.evidence_report_composed": !!composed,
+        "yaadly.notify.photos_attached": photoUrls.length,
+        "yaadly.notify.ai_review_ran": findings !== null,
+        "yaadly.notify.ai_finding_count": findings?.length ?? 0,
+      });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this

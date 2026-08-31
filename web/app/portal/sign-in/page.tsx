@@ -39,7 +39,7 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
   const [arriving, setArriving] = useState(true);
 
-  /* A six digit code is the only way in, and there is no password anywhere on
+  /* A code is the only way in, and there is no password anywhere on
      this page. Accounts opened since 31 Aug never chose one, so a password box
      was asking those people for something they do not have. The founder
      confirmed there are no live client accounts holding an old password, so
@@ -216,7 +216,7 @@ export default function SignIn() {
 
         <div className="mb-1.5 flex items-baseline justify-between">
           <label className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
-            The six digit code
+            Your code
           </label>
           <span className="text-[10px] font-bold uppercase tracking-[.1em] text-dim">
             Optional

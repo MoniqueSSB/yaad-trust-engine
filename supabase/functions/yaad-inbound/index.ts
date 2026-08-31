@@ -192,7 +192,12 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string };
+// hasCaption is the record of whether a worker actually said what this is,
+// separate from label itself: label always holds something displayable
+// ("Sent on WhatsApp" when nothing was said), but that fallback text is not
+// context, and the dispatch loop needs to tell the two apart to know
+// whether to ask.
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean };
 
 // Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
 // a straight download rather than a two-step lookup: fetchMedia() above
@@ -209,7 +214,8 @@ async function downloadAndStageEvidence(admin: any, url: string, mime: string, c
   if (error) return null;
 
   const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
-  return { path, mime, bytes: got.bytes.byteLength, sha256, label: (caption || "Sent on WhatsApp").slice(0, 140) };
+  const trimmed = caption.trim();
+  return { path, mime, bytes: got.bytes.byteLength, sha256, label: (trimmed || "Sent on WhatsApp").slice(0, 140), hasCaption: !!trimmed };
 }
 
 async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence): Promise<boolean> {
@@ -259,6 +265,36 @@ async function mintPortalUploadLink(admin: any, email: string, jobId: string): P
     if (error || !data?.properties?.action_link) return null;
     return String(data.properties.action_link);
   } catch (_) { return null; }
+}
+
+// Everything else in this file replies to whoever just messaged, via
+// TwiML. Telling the WORKER about a client's comment is a different
+// person than the one who sent this request, so that mechanism cannot
+// reach them: this is a genuine outbound send, same shape as the ones
+// yaad-notify-client and yaad-job-health already carry their own copy of.
+async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<boolean> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+  const digits = to.replace(/\D/g, "");
+  if (!sid || !tok || !from || digits.length < 7) return false;
+  return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
+    "server.address": "api.twilio.com", "messaging.system": "twilio",
+  }, async (s) => {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body }),
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      return r.ok;
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return false;
+    }
+  });
 }
 
 async function transcribeUrl(url: string, trace: Trace): Promise<string> {
@@ -830,6 +866,11 @@ Deno.serve(async (req: Request) => {
         const pending: PendingEvidence[] = answers.pending ?? [];
         const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
         const workerEmail: string = answers.worker_email ?? "";
+        // Set once the job code is confirmed, ahead of asking for context,
+        // so a context reply never has to re-run pickJobChoice against
+        // free text that was never meant to answer that question.
+        const confirmedJob: { id: string; stage: number } | null =
+          answers.confirmed_job ? { id: answers.confirmed_job, stage: answers.confirmed_stage } : null;
         const media = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
 
         if (media.length) {
@@ -838,15 +879,48 @@ Deno.serve(async (req: Request) => {
           await supabase.from("wa_intake_sessions")
             .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
+          const prompt = confirmedJob ? "What do these show?" : codePrompt(choices);
           return twiml(items.length
-            ? `Got that too, ${next.length} so far. ${codePrompt(choices)}`
-            : `That one did not come through. ${codePrompt(choices)}`);
+            ? `Got that too, ${next.length} so far. ${prompt}`
+            : `That one did not come through. ${prompt}`);
+        }
+
+        // The job is already confirmed and this reply is standing in for
+        // context, not a job code: founder's own requirement, 31 Aug 2026,
+        // a worker sending a photo or video with no caption gets asked what
+        // it shows rather than it being filed as "Sent on WhatsApp" and
+        // left for the client to guess at.
+        if (confirmedJob) {
+          const context = msg.text.trim().slice(0, 140);
+          const described = context
+            ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
+            : pending;
+          let filed = 0;
+          for (const item of described) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_after_context" : "context_but_nothing_filed" });
+          if (!filed) return twiml("Confirmed, but nothing saved properly. Try sending the photo again.");
+          let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, stage ${confirmedJob.stage}. Keep them coming.`;
+          const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
+          if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+          return twiml(body);
         }
 
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) {
           return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
         }
+
+        // Only asked once per batch, and only when something still needs
+        // it: an item that already carried a real caption keeps it exactly
+        // as sent, never overwritten by a later answer meant for the others.
+        if (pending.some((p) => !p.hasCaption)) {
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage }, updated_at: new Date().toISOString() })
+            .eq("wa_id", msg.from);
+          return twiml(`Got it, that's for ${pick.id}. What does this show? A line on what was done helps the client understand it faster.`);
+        }
+
         let filed = 0;
         for (const item of pending) if (await finalizeEvidenceItem(supabase, pick.id, pick.stage, workerEmail, item)) filed++;
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
@@ -905,7 +979,7 @@ Deno.serve(async (req: Request) => {
       // an approval rather than guessed at.
       if (!msg.media.length && msg.text.trim()) {
         const { data: awaiting } = await supabase.from("jobs")
-          .select("id, title, stage, client_phone")
+          .select("id, title, stage, client_phone, worker_email")
           .eq("status", "evidence")
           .not("client_phone", "is", null);
         const tail = msg.from.replace(/\D/g, "").slice(-9);
@@ -918,6 +992,37 @@ Deno.serve(async (req: Request) => {
           root.setAttributes({ "yaadly.whatsapp_approval.job": target.id, "yaadly.whatsapp_approval.outcome": error ? "refused" : "approved" });
           if (error) return twiml(`That did not go through: ${error.message}`);
           return twiml(`Approved. Stage ${target.stage ?? 1} of ${target.title} is confirmed, and the worker is paid for it. Nothing else to do.`);
+        }
+
+        // Not a code, and exactly one job is waiting on this client's
+        // review: read as a comment on that evidence, not a new job
+        // description. Founder's own requirement, 31 Aug 2026: a client
+        // who is not satisfied should have a way to say so, and it should
+        // reach the worker to answer, not vanish or get misread as
+        // somebody describing a fresh problem.
+        if (mine.length === 1) {
+          const job = mine[0] as { id: string; title: string; stage: number; worker_email: string | null };
+          await supabase.from("evidence_comments").insert({
+            job_id: job.id, stage: job.stage, from_role: "client", body: msg.text.trim().slice(0, 1000),
+          });
+          root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "client" });
+
+          let notified = false;
+          if (job.worker_email) {
+            const { data: worker } = await supabase.from("worker_profiles")
+              .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+            if (worker?.phone) {
+              notified = await sendWhatsAppTo(
+                String(worker.phone),
+                `A note from the client on ${job.id} (${job.title}), stage ${job.stage}: "${msg.text.trim().slice(0, 300)}"\n\nReply to this number to answer, and it goes straight back to them.`,
+                trace,
+              );
+            }
+          }
+          root.setAttributes({ "yaadly.evidence_comment.worker_notified": notified });
+          return twiml(notified
+            ? `Got it, passed on to the worker on ${job.id}. They'll get back to you.`
+            : `Got it, on record against ${job.id}. We could not reach the worker directly just now, but it is saved and Yaadly can follow up.`);
         }
       }
     }

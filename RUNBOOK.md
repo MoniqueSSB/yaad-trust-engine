@@ -656,3 +656,15 @@ select policyname, qual from pg_policies
 **The signed URL each photo travels on is good for five minutes, server-side, admin client, never exposed to a browser.** This has nothing to do with the portal's own signed URLs (which run through the *visitor's* session and the storage RLS policy above) or with the storage-object read policy at all; a WhatsApp send failing does not mean an admin or client has lost portal access to the same photo, and the reverse is also true.
 
 **Two small orphaned test files remain in the evidence bucket from 31 Aug 2026's live verification**, `TEST-WA-LIVE-A/0cf5d7c6-512c-446f-a169-6ede09f9da89.jpg` and `TEST-WA-LIVE-A/12da67a9-8500-437b-b558-925cb2a85e4b.jpg`. Nothing references them; safe to delete by hand from the Storage dashboard whenever convenient. Postgres refuses a direct `DELETE` on `storage.objects`, by design, so removing them needs the Storage API or the dashboard, not a migration.
+
+## Nobody can sign in, the code box never accepts what looks like a correct code
+
+**Check `CODE_LENGTH` in `web/lib/portal/sign-in.ts` against what Supabase is actually issuing before assuming anything else is wrong.** This exact failure happened for real, 31 Aug 2026: the check was hardcoded to 6 digits, the project actually issues 8, and every correctly typed code was silently read as incomplete, so the button never did anything but send a fresh one. The fastest way to confirm the real length without guessing: trigger a real send and read the actual email or WhatsApp message, not the page copy, which can independently be wrong even after the number is fixed here.
+
+```bash
+grep -n "CODE_LENGTH" web/lib/portal/sign-in.ts
+```
+
+**If this number is ever wrong again, it is the one line to change**, and nowhere in `/portal/sign-in` or `/portal/join`'s own visible text should need to change alongside it: neither page names a specific digit count any more, on purpose, exactly so this class of bug cannot silently reopen the same way.
+
+**To prove a fix to this actually works, prove it against a real code, not a fabricated one.** `web/tests/sign-in.test.mjs` covers the logic with a code built from `CODE_LENGTH` itself, which proves the branching is internally consistent, but it cannot prove the number itself is correct, only that the app trusts whatever number it is given. The only real proof is a live send: request a code from the actual deployed site, read what actually arrives, and use exactly that.

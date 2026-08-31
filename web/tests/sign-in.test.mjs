@@ -9,6 +9,14 @@
  * page still shows both fields together rather than gating one behind the
  * other again.
  *
+ * Every test code here is built from CODE_LENGTH, never a literal digit
+ * string. The first version of this file hardcoded "123456", six digits,
+ * matching what every page's own copy claimed. It was wrong: Supabase
+ * actually issues an eight digit code for this project, confirmed against a
+ * real email, and a real code typed correctly was being read as incomplete
+ * because the check here disagreed with reality. A hardcoded test length
+ * would have stayed green through that entire bug.
+ *
  * Run: npm test   (from web/)
  */
 import { test, describe, before } from "node:test";
@@ -23,43 +31,46 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(HERE, "ts-resolve-hooks.mjs")));
 
 let signIn;
+let CODE;
 before(async () => {
   signIn = await import(pathToFileURL(join(HERE, "../lib/portal/sign-in.ts")).href);
+  CODE = "1".repeat(signIn.CODE_LENGTH);
 });
 
 describe("normalizeCode", () => {
   test("strips anything that is not a digit", () => {
-    assert.equal(signIn.normalizeCode("123 456"), "123456");
-    assert.equal(signIn.normalizeCode("12-3456"), "123456");
+    assert.equal(signIn.normalizeCode("12 34"), "1234");
+    assert.equal(signIn.normalizeCode("12-34"), "1234");
     assert.equal(signIn.normalizeCode(""), "");
   });
 });
 
 describe("isCodeComplete", () => {
-  test("exactly six digits is complete", () => {
-    assert.equal(signIn.isCodeComplete("123456"), true);
+  test("exactly CODE_LENGTH digits is complete", () => {
+    assert.equal(signIn.isCodeComplete(CODE), true);
   });
 
-  test("digits with formatting in between still count", () => {
-    assert.equal(signIn.isCodeComplete("123 456"), true);
+  test("digits with formatting spread through them still count", () => {
+    const spaced = CODE.slice(0, Math.ceil(CODE.length / 2)) + " " + CODE.slice(Math.ceil(CODE.length / 2));
+    assert.equal(signIn.isCodeComplete(spaced), true);
   });
 
-  test("five digits is not complete", () => {
-    assert.equal(signIn.isCodeComplete("12345"), false);
+  test("one digit short is not complete", () => {
+    assert.equal(signIn.isCodeComplete(CODE.slice(0, -1)), false);
   });
 
-  test("seven digits is not complete, not truncated and accepted", () => {
-    assert.equal(signIn.isCodeComplete("1234567"), false);
+  test("one digit too many is not complete, not truncated and accepted", () => {
+    assert.equal(signIn.isCodeComplete(CODE + "1"), false);
   });
 
   test("an empty box is not complete", () => {
     assert.equal(signIn.isCodeComplete(""), false);
   });
 
-  test("six characters that are not all digits is not complete", () => {
+  test("the right length but not all digits is not complete", () => {
     // A pasted code with a typo should not be waved through as if it were
-    // six real digits.
-    assert.equal(signIn.isCodeComplete("12a456"), false);
+    // the real thing.
+    assert.equal(signIn.isCodeComplete("a" + CODE.slice(1)), false);
   });
 });
 
@@ -68,8 +79,8 @@ describe("signInButtonLabel", () => {
     assert.equal(signIn.signInButtonLabel("", false), "Send me a sign in code");
   });
 
-  test("a complete code offers to open the portal", () => {
-    assert.equal(signIn.signInButtonLabel("123456", false), "Open my portal");
+  test("a complete code offers to sign in", () => {
+    assert.equal(signIn.signInButtonLabel(CODE, false), "Sign in");
   });
 
   test("busy while sending says so", () => {
@@ -77,7 +88,7 @@ describe("signInButtonLabel", () => {
   });
 
   test("busy while checking a code says so, not the sending copy", () => {
-    assert.equal(signIn.signInButtonLabel("123456", true), "Checking...");
+    assert.equal(signIn.signInButtonLabel(CODE, true), "Signing in...");
   });
 });
 
@@ -89,7 +100,7 @@ describe("the sign in page itself", () => {
     assert.match(source, />\s*Required\s*</);
   });
 
-  test("shows the six digit code field on the same screen, marked optional", () => {
+  test("shows the code field on the same screen, marked optional", () => {
     assert.match(source, /autoComplete="one-time-code"/);
     assert.match(source, />\s*Optional\s*</);
   });
@@ -106,7 +117,32 @@ describe("the sign in page itself", () => {
     assert.match(source, /from "@\/lib\/portal\/sign-in"/);
   });
 
+  test("does not commit to a specific digit count in its own visible copy", () => {
+    // The bug this guards against: page text claiming "six digit code"
+    // while the real length is a different number, silently again.
+    assert.doesNotMatch(source, /six digit/i);
+  });
+
   test("still asks for no job code on this page, that belongs to /portal/join", () => {
     assert.doesNotMatch(source, /Job code/);
+  });
+});
+
+describe("the join page", () => {
+  const source = readFileSync(join(HERE, "../app/portal/join/page.tsx"), "utf8");
+
+  test("shows email, job code and the code field, all required or optional, never hidden", () => {
+    assert.match(source, /type="email"/);
+    assert.match(source, />Job code</);
+    assert.match(source, /autoComplete="one-time-code"/);
+    assert.doesNotMatch(source, /stage === "enter"/);
+  });
+
+  test("does not commit to a specific digit count in its own visible copy", () => {
+    assert.doesNotMatch(source, /six digit/i);
+  });
+
+  test("uses the shared decision logic rather than its own copy", () => {
+    assert.match(source, /from "@\/lib\/portal\/sign-in"/);
   });
 });
