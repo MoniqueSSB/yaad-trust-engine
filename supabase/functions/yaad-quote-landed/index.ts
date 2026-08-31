@@ -67,6 +67,7 @@ const money = (n: number | null) =>
    which is why that code is named rather than passed through as a number. */
 async function sendTwilio(
   to: string, body: string, channel: "whatsapp" | "sms", trace: Trace,
+  template?: { sid: string; vars: Record<string, string> },
 ) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
@@ -94,7 +95,20 @@ async function sendTwilio(
     "messaging.system": "twilio",
   }, async (s) => {
     try {
-      const form = new URLSearchParams({ To: dest, From: from, Body: body });
+      /* A registered WhatsApp sender still cannot send free text outside the
+         24 hour window: that needs a template approved in advance. When a
+         ContentSid is configured we use it always, because a template is
+         valid inside the window too and one path that always works beats two
+         that each work half the time. Body is the fallback for SMS, and for
+         WhatsApp before any template exists. */
+      const form = template?.sid && channel === "whatsapp"
+        ? new URLSearchParams({
+            To: dest,
+            From: from,
+            ContentSid: template.sid,
+            ContentVariables: JSON.stringify(template.vars),
+          })
+        : new URLSearchParams({ To: dest, From: from, Body: body });
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: {
@@ -263,7 +277,19 @@ Deno.serve(async (req) => {
       { sent: false, reason: "no client phone on the job" };
 
     if (clientPhone) {
-      wa = await sendTwilio(clientPhone, line, "whatsapp", trace);
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
+      wa = await sendTwilio(clientPhone, line, "whatsapp", trace,
+        contentSid
+          ? {
+              sid: contentSid,
+              vars: {
+                "1": String(job.title ?? "your job"),
+                "2": String(quote.worker_name ?? "a tradesperson"),
+                "3": money(total),
+                "4": link,
+              },
+            }
+          : undefined);
       if (!wa.sent) {
         const meta = await sendMetaWhatsApp(clientPhone, line, trace);
         if (meta.sent) wa = { ...meta, via: "meta whatsapp" };

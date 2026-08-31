@@ -221,6 +221,16 @@ Deno.serve(async (req: Request) => {
       .not("client_phone", "is", null).neq("client_phone", "")
       .order("updated_at", { ascending: false }).limit(1).maybeSingle();
 
+    /* Deliberately NOT a content template, unlike the quote notification.
+       A sign in code is an AUTHENTICATION message in WhatsApp's own
+       categories, which has its own template rules, and Twilio's Verify
+       product is the supported way to send one. Pushing an OTP through an
+       ordinary utility template is the kind of thing that gets a sender
+       flagged, and a flagged sender takes every other message down with it.
+
+       So over WhatsApp this stays free text, which works inside the 24 hour
+       window and fails honestly outside it. Email is the reliable path for a
+       sign in code and always will be. */
     if (job?.client_phone) {
       phoneResult = await sendTwilio(String(job.client_phone), line, "whatsapp", trace);
       if (!phoneResult.sent) {
