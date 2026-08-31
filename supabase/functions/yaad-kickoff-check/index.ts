@@ -178,7 +178,15 @@ Deno.serve(async (req: Request) => {
       const packId = "KO-" + Math.floor(Date.now() * 1) + "-" + Math.floor(Math.random() * 1000);
       const confirmCode = Array.from(crypto.getRandomValues(new Uint8Array(4)))
         .map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase().slice(0, 6);
-      const { error } = await admin.from("kickoff_packs").insert({
+      // Inserted at 'draft' and then updated to 'approved' as two steps, not
+      // one insert straight at 'approved': trg_notify_kickoff_pack_ready
+      // (20260831zzzz12) fires on the UPDATE transition into 'approved',
+      // comparing OLD against NEW, and an insert has no OLD row to compare
+      // against. Skipping the update step would auto-issue the pack
+      // correctly but never tell the worker it exists, silently defeating
+      // the one piece built specifically to solve that. Caught by checking
+      // the actual pack status was right for the wrong reason, not assumed.
+      const { error: insErr } = await admin.from("kickoff_packs").insert({
         id: packId,
         job_id: d.job_id,
         project_title: String(intake.title ?? "").trim() || "Untitled project",
@@ -187,12 +195,16 @@ Deno.serve(async (req: Request) => {
         intake: d.intake,
         docs: d.docs,
         model: d.model,
+        confirm_code: confirmCode,
+      });
+      if (insErr) { console.error(`yaad-kickoff-check: link failed for draft ${d.id}: ${insErr.message}`); linkFailed++; continue; }
+
+      const { error: updErr } = await admin.from("kickoff_packs").update({
         status: "approved",
         approved_by: "system: auto-issued, guardrail-clean",
         approved_at: new Date().toISOString(),
-        confirm_code: confirmCode,
-      });
-      if (error) { console.error(`yaad-kickoff-check: link failed for draft ${d.id}: ${error.message}`); linkFailed++; }
+      }).eq("id", packId);
+      if (updErr) { console.error(`yaad-kickoff-check: approve failed for pack ${packId}: ${updErr.message}`); linkFailed++; }
       else { linked++; hasPack.add(d.job_id); }
     }
 
