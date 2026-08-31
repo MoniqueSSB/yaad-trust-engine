@@ -362,3 +362,37 @@ select stage, approved_by, approved_at, jsonb_pretty(evidence)
 **If the evidence tab shows "Evidence waiting on you" but there is no Approve button**, check `role`: the button only renders for the client, on purpose. A worker approving their own work is the exact thing this exists to prevent.
 
 **`jobs.status` is fully owned by `sync_job_status()`.** It recomputes the column from scratch on every insert or update to the `jobs` row: worker assigned, current stage's evidence state, `open`, and the client's go-live status, in that order. Do not add a second trigger or a direct `update jobs set status = ...` anywhere expecting it to stick outside this function; it will be silently overwritten on the same statement. If a new state is ever needed, it goes inside `sync_job_status`, not beside it.
+
+---
+
+## A client says they were never told
+
+**Check `net._http_response` first, not the trigger source.** Every client notification goes through `net.http_post` to `yaad-notify-client`, and every call it makes is logged there whether it succeeded or not:
+
+```sql
+select id, created, status_code, content::text
+  from net._http_response
+ order by id desc
+ limit 10;
+```
+
+`{"ok":true,"told":true,"emailed":true}` means it sent. `{"told":false,...}` or a non-200 `status_code` means the function ran but declined or failed; read `content` for why. No row at all for the event you expected means the trigger's condition never evaluated true, which is a database question, not a delivery question. Check `jobs.status`, `jobs.stage` and `stage_approvals` for that job directly against what the trigger in `20260831i`/`20260831j` actually tests.
+
+**What each `kind` fires from, and nothing else:**
+
+| Kind | Fires from |
+|---|---|
+| `quote_arrived` | `job_quotes` AFTER INSERT WHEN `status = 'submitted'` |
+| `evidence_landed` | `jobs` AFTER UPDATE, `status` transitions into `'evidence'` |
+| `stage_released` | `jobs` AFTER UPDATE, `stage` increases and a `stage_approvals` row exists for `new.stage - 1` |
+| `dispute_raised` | `disputes` AFTER INSERT, unconditional |
+
+**"Worker on site today" does not exist yet, and will not show up in this table.** There is no Arrival Log column anywhere to fire it from. This is not a bug to chase; it needs schema work first.
+
+**`whatsapp.sent: false, reason: "no client phone on the job"`** is expected and correct for any job where the client never gave a number. Email through Resend is not conditional on that; check `emailed` and `emailReason` separately.
+
+**None of this fires twice for the same event.** `evidence_landed`'s trigger condition is a transition (`old.status IS DISTINCT FROM 'evidence' AND new.status = 'evidence'`), not a state, so a second evidence item filed against a stage that already flipped the status does not notify again. If a client reports being told the same thing twice, that is two genuinely separate events, most likely two different stages, not a repeat.
+
+**The shared secret lives only as a hash.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. The plaintext is baked into the three trigger function bodies (`notify_client_quote_arrived`, `notify_client_on_job_change`, `notify_client_dispute_raised`) at the point they were created. If it ever needs rotating, regenerate it the way `20260831i` did and rewrite all three function bodies together; a mismatch between what a trigger sends and what the hash expects fails closed; `yaad-notify-client` returns 401 rather than notifying on a bad secret.
+
+**`yaad-quote-landed` is retired.** It answers 410 and names where the work went. If something still calls it, `console.warn` inside the stub logs the referer, visible in that function's logs.

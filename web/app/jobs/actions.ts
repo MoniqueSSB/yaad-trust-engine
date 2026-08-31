@@ -27,7 +27,7 @@ export async function submitQuote(formData: FormData): Promise<void> {
     .eq("worker_email", email)
     .maybeSingle();
 
-  const { data: inserted, error: insertErr } = await supabase.from("job_quotes").insert({
+  await supabase.from("job_quotes").insert({
     job_id: jobId,
     worker_user: user.id,
     worker_email: email,
@@ -39,28 +39,12 @@ export async function submitQuote(formData: FormData): Promise<void> {
     days_estimate: days,
     note,
     status: "submitted",
-  }).select("id").single();
+  });
 
-  /* Tell the client a price has landed. Until this call existed nothing did:
-     the quote sat on a page that was honest when empty, and the client had to
-     think to come back and look. For somebody four thousand miles away that
-     reads as silence, and a quote nobody is told about does not convert.
-
-     It goes through an edge function rather than happening here because the
-     client's email and phone are on the job and a WORKER must never read
-     them. This action runs on the worker's session, so the lookup and the
-     send happen somewhere holding the service key, and the worker never sees
-     what it read. The function checks the caller's token against the quote's
-     own worker, so this cannot be used to make Yaadly message anybody else.
-
-     A failure here must never lose the quote, which is already saved. */
-  if (!insertErr && inserted?.id) {
-    try {
-      await supabase.functions.invoke("yaad-quote-landed", { body: { quoteId: inserted.id } });
-    } catch (e) {
-      console.error("quote notification:", String(e).slice(0, 200));
-    }
-  }
+  /* Telling the client a price has landed is now a database trigger
+     (notify_client_quote_arrived, fired on this same insert), not something
+     the UI asks for. That is deliberate: the state change is the trigger,
+     never the click. See 20260831i_notify_client_from_the_state_change.sql. */
 
   revalidatePath("/jobs");
 }
