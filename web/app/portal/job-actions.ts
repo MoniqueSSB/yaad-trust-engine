@@ -18,6 +18,22 @@ export async function agreeScope(formData: FormData): Promise<void> {
   revalidatePath("/portal/jobs/" + jobId);
 }
 
+/** Confirming your side of a Kickoff Pack runs entirely inside
+ *  agree_kickoff_pack() in Postgres: it checks the code against the
+ *  pack's CURRENT revision, so a stale link fails closed rather than
+ *  silently confirming content that has since changed. */
+export async function agreeKickoffPack(formData: FormData): Promise<void> {
+  await requireUser();
+  const packId = String(formData.get("packId") ?? "");
+  const code = String(formData.get("code") ?? "");
+  const jobId = String(formData.get("jobId") ?? "");
+  if (!packId || !code) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("agree_kickoff_pack", { p_pack_id: packId, p_code: code });
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal/jobs/" + jobId + "/pack");
+}
+
 /** Choosing runs entirely inside choose_worker() in Postgres. */
 export async function chooseQuote(formData: FormData): Promise<void> {
   await requireUser();

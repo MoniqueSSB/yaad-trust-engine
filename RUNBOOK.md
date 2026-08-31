@@ -855,3 +855,21 @@ No row at all, or `has_docs = false`, is why the choose is being refused. Write 
 **Nine documents, each its own page**, `/portal/jobs/[id]/pack` (the table of contents) and `/portal/jobs/[id]/pack/[doc]` (one document, with prev/next), replacing the single long-scroll page from before 31 Aug 2026. The list of documents and how each one renders lives in one place, `web/lib/portal/packDocs.tsx`, shared by both pages so they can never drift into naming a document two different things.
 
 **`human_review_notes` is not one of the nine and never will be shown here.** It is Monique's own pre-issue checklist against the draft, not client-facing content; it stays visible only in the concierge desk's Kickoff Packs view.
+
+## A client or worker can't confirm the Kickoff Pack, or the "both confirmed" tick never appears
+
+**The confirm section only shows once the pack is `approved`** (the moment a client chooses that worker, `choose_worker()`), and only to the client or worker actually on that job (`jobs.client_email` / `jobs.worker_email` matched against the signed-in email). Signed in as neither, or the pack still sitting at `draft`, and there is nothing to click, by design.
+
+**"That confirmation code does not match the current version of this pack"** means exactly what it says: the code being submitted does not match `kickoff_packs.confirm_code` right now. The two ordinary causes are someone confirming from an old WhatsApp link after the pack was revised (a real revision issues a new code, on purpose, so a stale link fails rather than silently confirming content that changed), or a copy-paste error. Reopening the pack page fetches the current code fresh; the on-page button never needs one typed by hand.
+
+**To check who has confirmed what, for a given job:**
+```sql
+select p.id, p.rev, p.both_confirmed_at, a.side, a.email, a.agreed_at
+from kickoff_packs p
+left join kickoff_pack_agreements a on a.pack_id = p.id and a.rev = p.rev
+where p.job_id = '<job id>'
+order by p.updated_at desc;
+```
+Two rows (`client`, `worker`) for the current `rev` and `both_confirmed_at` set means both sides have signed this exact revision. One row, or none, means it is still waiting on someone.
+
+**Not yet built, so do not expect it:** nothing currently tells the worker this pack exists. There is no WhatsApp message carrying the link and code, and no automatic draft on quote acceptance; today a pack still has to be manually drafted and linked to the job by an admin before a quote can even be accepted. Both are planned, tracked in DECISIONS.md's "Kickoff Pack dual agreement" entry, not yet built.

@@ -380,17 +380,39 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-    // Admin session only. These documents are commercial terms for a real client.
+    // Admin session, or this repository's own automation, calling as the
+    // service role. Nothing weaker than that: these documents are
+    // commercial terms for a real client. verify_jwt stays on for this
+    // function, so by the time this code runs the platform has already
+    // confirmed whichever JWT arrived was genuinely signed by Supabase;
+    // this only reads the role it already verified, the same trust the
+    // "authenticated" branch below already relied on.
     const caller = callerJwt(req);
-    if (caller.role !== "authenticated") {
-      root.setAttributes({ "yaadly.auth.outcome": "rejected" });
-      return json({ error: "Sign in required. The kickoff agent only answers to the Yaadly admin session." }, 401);
+    // Not a JWT role check: this project's service role secret is the
+    // newer opaque sb_secret_... form, not a JWT, so it has no "role"
+    // claim to decode - callerJwt() silently returns role:"" for it, which
+    // the JWT check below would have wrongly treated as "reject". Direct
+    // string comparison against this function's own copy of the secret is
+    // correct either way, legacy JWT or opaque key, and is what actually
+    // ran clean, not the first version.
+    const presentedToken = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    let isServiceRole = false;
+    if (SB_SERVICE && presentedToken.length === SB_SERVICE.length) {
+      let diff = 0;
+      for (let i = 0; i < SB_SERVICE.length; i++) diff |= presentedToken.charCodeAt(i) ^ SB_SERVICE.charCodeAt(i);
+      isServiceRole = diff === 0;
     }
-    if (!(await callerIsAdmin(req))) {
-      root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
-      return json({ error: "Admin only. The kickoff agent answers only to the Yaadly admin." }, 403);
+    if (!isServiceRole) {
+      if (caller.role !== "authenticated") {
+        root.setAttributes({ "yaadly.auth.outcome": "rejected" });
+        return json({ error: "Sign in required. The kickoff agent only answers to the Yaadly admin session." }, 401);
+      }
+      if (!(await callerIsAdmin(req))) {
+        root.setAttributes({ "yaadly.auth.outcome": "not_admin" });
+        return json({ error: "Admin only. The kickoff agent answers only to the Yaadly admin." }, 403);
+      }
     }
-    root.setAttributes({ "yaadly.auth.outcome": "authenticated" });
+    root.setAttributes({ "yaadly.auth.outcome": isServiceRole ? "service_role" : "authenticated" });
 
     const body = await req.json().catch(() => ({}));
     const intake = (body && typeof body.intake === "object" && body.intake) ? body.intake : null;
@@ -400,6 +422,11 @@ Deno.serve(async (req: Request) => {
     if (!SB_URL || !SB_SERVICE) {
       return json({ error: "Function is missing its Supabase service configuration." }, 500);
     }
+    // Only a service-role caller (this repository's own automation) may
+    // stamp a job onto the draft. An admin's own manual draft from the desk
+    // stays unattributed, exactly as it works today, so this never changes
+    // that path's behaviour.
+    const jobId = isServiceRole && typeof body.jobId === "string" && body.jobId.trim() ? body.jobId.trim() : undefined;
     // Optional per-draft model override, for reading the same brief drafted by
     // different models side by side. Admin session only; OpenRouter slugs only.
     const overrideModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
@@ -415,9 +442,13 @@ Deno.serve(async (req: Request) => {
     // Register the draft, hand back its id, and do the slow work after the
     // response. The desk polls kickoff_drafts for the result.
     const ins = await draftsWrite("POST", "", {
-      requested_by: caller.sub || crypto.randomUUID(),
+      // A service-role JWT's sub is not a user id worth trusting into this
+      // column; a fresh id for every automatic request is honest about who
+      // this is, same as the fallback already did for a missing sub.
+      requested_by: isServiceRole ? crypto.randomUUID() : (caller.sub || crypto.randomUUID()),
       status: "drafting",
       intake,
+      job_id: jobId ?? null,
     });
     if (!ins.ok) {
       const t = await ins.text().catch(() => "");
