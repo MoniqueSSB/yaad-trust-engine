@@ -19,9 +19,13 @@ export async function approveStage(formData: FormData): Promise<void> {
   await requireUser();
   const jobId = String(formData.get("jobId") ?? "");
   if (!jobId) return;
+  // Anything other than "in_person" is the original path, evidence review.
+  // Not a form the caller can get wrong: approve_stage() applies the same
+  // fallback itself, this just avoids sending a stray value needlessly.
+  const method = String(formData.get("method") ?? "") === "in_person" ? "in_person" : "evidence";
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("approve_stage", { p_job: jobId });
+  const { error } = await supabase.rpc("approve_stage", { p_job: jobId, p_method: method });
 
   // The database's own sentence is the one worth keeping: "A dispute is open
   // on this job" or "Nothing has been filed for this stage yet" tells the

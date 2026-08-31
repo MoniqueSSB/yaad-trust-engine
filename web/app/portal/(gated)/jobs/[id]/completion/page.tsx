@@ -33,7 +33,20 @@ export default async function Completion({ params }: { params: Promise<{ id: str
     .select("label,created_at,sha256,stage,ok")
     .eq("job_id", id).order("created_at");
 
+  const { data: approvals } = await supabase
+    .from("stage_approvals")
+    .select("stage,approved_by,approved_at,confirmed_method")
+    .eq("job_id", id).order("stage");
+
   const ev = evidence ?? [];
+  const stageApprovals = approvals ?? [];
+
+  // Sections after the fixed first two are conditional on what actually
+  // happened on this job, so the numbering counts up rather than being
+  // hardcoded per section: adding or skipping one never leaves a report
+  // that reads "3 · ... 5 · ..." with no 4.
+  let sectionNo = 2;
+  const nextSection = () => ++sectionNo;
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-6">
@@ -67,13 +80,31 @@ export default async function Completion({ params }: { params: Promise<{ id: str
         </ul>
       </section>
 
+      {/* How each stage was actually confirmed: reviewing the evidence
+          remotely, or standing on the property and looking at it. A
+          stronger record than a bare approval, and the whole reason
+          confirmed_method exists (31 Aug 2026). */}
+      {stageApprovals.length > 0 && (
+        <section className="mt-5">
+          <h2 className="mb-1.5 text-[14px] font-bold text-ink">{nextSection()} · How each stage was confirmed</h2>
+          <ul className="grid gap-1.5">
+            {stageApprovals.map((a, i) => (
+              <li key={i} className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[12.5px] text-mute">
+                <b className="text-ink">Stage {a.stage}</b> · {a.confirmed_method === "in_person" ? "confirmed in person" : "confirmed from the evidence"}
+                <span> · {String(a.approved_at).slice(0, 16).replace("T", " ")}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Only the confirmed loop counts. An unconfirmed set of notes, or a
           walkthrough requested but never followed through, is not a record
           either side has agreed to, and a report is not the place to show
           something nobody signed off on. */}
       {job.walk_notes_confirmed_at && (
         <section className="mt-5">
-          <h2 className="mb-1.5 text-[14px] font-bold text-ink">3 · Video walkthrough</h2>
+          <h2 className="mb-1.5 text-[14px] font-bold text-ink">{nextSection()} · Video walkthrough</h2>
           <p className="mb-2 text-[12.5px] text-dim">
             {job.walk_platform ?? "A call"}{job.walk_date ? ", " + job.walk_date : ""}
             {job.walk_who ? " · " + job.walk_who : ""}
@@ -88,12 +119,12 @@ export default async function Completion({ params }: { params: Promise<{ id: str
       )}
 
       <section className="mt-5">
-        <h2 className="mb-1.5 text-[14px] font-bold text-ink">{job.walk_notes_confirmed_at ? "4" : "3"} · What this report is not</h2>
+        <h2 className="mb-1.5 text-[14px] font-bold text-ink">{nextSection()} · What this report is not</h2>
         <div className="text-[13px] leading-relaxed" dangerouslySetInnerHTML={{ __html: legal.completion_section6 }} />
       </section>
 
       <section className="mt-5 border-t border-line pt-3.5">
-        <h2 className="mb-1.5 text-[14px] font-bold text-ink">{job.walk_notes_confirmed_at ? "5" : "4"} · Aftercare</h2>
+        <h2 className="mb-1.5 text-[14px] font-bold text-ink">{nextSection()} · Aftercare</h2>
         <p className="text-[13px] leading-relaxed text-mute">
           Any defect in this work, raised within 12 months, is put right at
           the worker&apos;s cost. Keep this report with the house papers. Forward

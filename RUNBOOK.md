@@ -493,3 +493,18 @@ No row for today at all means `log_arrival()` was never called successfully; che
 **Editing notes after the client already confirmed them is not a bug clearing the confirmation.** It is the rule: `walk_notes_confirmed_at` and `walk_notes_confirmed_by` are reset to null the moment `walk_call_notes` changes, because a client's confirmation was given for a specific piece of text and a changed text is a new claim needing a new confirmation. If a worker says "I only fixed a typo and now it says unconfirmed again," that is working as designed; ask the client to confirm again.
 
 **The Completion Report only ever shows the confirmed version.** A job can complete with an outstanding, unconfirmed set of walkthrough notes; the report at `/portal/jobs/[id]/completion` simply omits the whole walkthrough section until `walk_notes_confirmed_at` is set. The job page itself stays available for exactly this case: `WalkthroughPanel` keeps rendering on a completed job when `signoff_method = 'walkthrough'`, so the outstanding confirmation is never unreachable, it just will not appear on the report until it lands.
+
+---
+
+## A stage's confirmation method looks wrong, or a dispute needs to know how a stage was approved
+
+```sql
+select stage, approved_by, approved_at, confirmed_method
+  from stage_approvals where job_id = 'JOB-XXXX' order by stage;
+```
+
+`confirmed_method` is `evidence` (the client reviewed the filed evidence remotely) or `in_person` (the client attested to physically inspecting the property themselves). It is set once, at the moment of approval, and is never edited afterward, same as everything else on `stage_approvals`.
+
+**This never loosens anything else about the gate.** A dispute still blocks approval regardless of method, and evidence still has to be filed for the stage first: `in_person` is an additional attestation layered on top of that requirement, not an alternative to it. If a client says "I approved it, why does it still say I needed evidence filed first," the answer is: because it always does, for either method.
+
+**`approve_stage` now takes two arguments, `p_job` and `p_method`, with `p_method` defaulting to `'evidence'`.** There is only one `approve_stage` function in the database; the original one-argument version was dropped when this landed, deliberately, because a second overload with the same effective call shape would have made every ordinary call ambiguous. If a caller sends anything other than exactly `'in_person'` for `p_method`, it is silently treated as `'evidence'` rather than refused: this field is attribution, not a gate, and a stray value should never cost somebody an otherwise-valid approval.
