@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { JobList, WORKER_STATUS, type Job } from "@/components/portal/JobList";
 import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
+import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
 export const dynamic = "force-dynamic";
@@ -42,6 +43,12 @@ export default async function WorkerPortal() {
       "id,title,trade,parish,stage,status,client_email,worker_email,updated_at,pay_method,pay_ref",
     )
     .order("updated_at", { ascending: false });
+
+  const { data: profile } = await supabase
+    .from("worker_profiles")
+    .select("phone")
+    .eq("worker_user", user.id)
+    .maybeSingle();
 
   const email = (user.email ?? "").toLowerCase();
   const jobs = ((data ?? []) as (Job & { pay_method: string | null; pay_ref: string | null })[]).filter(
@@ -121,6 +128,8 @@ export default async function WorkerPortal() {
       )}
 
       {moneyJobs.length > 0 && <PortalTiles tiles={tiles} />}
+
+      <LinkWorkerPhone phone={profile?.phone ?? null} />
 
       <WorkerMoneyPanel jobs={moneyJobs} />
 

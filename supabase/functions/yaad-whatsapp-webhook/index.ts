@@ -186,6 +186,168 @@ async function transcribe(mediaId: string, trace: Trace): Promise<string> {
   } catch (_) { return ""; }
 }
 
+// ── evidence intake from a worker's own WhatsApp number ─────────────────
+// Founder's own framing, 31 Aug 2026: a worker on site "has no time to log
+// on and carry out those steps in the web." Photos and video sent from a
+// LINKED number (worker_profiles.phone, set by link_worker_phone() in the
+// portal, or automatically at WhatsApp signup) land straight in evidence,
+// no portal visit needed. Portal upload is not replaced, only demoted from
+// the first route: a bigger video still goes there, and this flow points
+// a worker at it rather than pretending the limit is not real.
+//
+// The trust model this repository already enforces stays exactly as it
+// is: this writes into public.evidence with the same columns and the same
+// server-computed sha256 evidence-actions.ts and yaad-evidence-video
+// already use, "computed HERE, on the server, from the exact bytes
+// stored." A WhatsApp message has no session, so it cannot lean on RLS the
+// way the portal upload does; the check RLS would have made (this worker,
+// this job, and no other) is made by hand instead, against the phone
+// match, before a single byte is trusted.
+
+const EVIDENCE_EXT_BY_MIME: Record<string, string> = {
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic",
+  "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+};
+const EVIDENCE_MEDIA_BUCKET = "evidence";
+// WhatsApp itself refuses to send a video over 16MB before this webhook
+// ever sees it, so this is a sanity backstop, not the real limit.
+const EVIDENCE_MAX_BYTES = 20_000_000;
+
+async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Same two-step fetch yaad-transcribe already proved for voice notes: ask
+// Meta for a short-lived URL by media id, then download with the same
+// bearer token. Kept as its own copy rather than a shared import, matching
+// how this repository already treats small per-function helpers.
+async function fetchMetaMedia(mediaId: string, trace: Trace): Promise<{ bytes: Uint8Array; mime: string } | null> {
+  const wa = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
+  if (!wa || !mediaId) return null;
+  return await trace.span("fetch inbound media", SpanKind.CLIENT, { "yaadly.media.id": mediaId }, async (s) => {
+    try {
+      const meta = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, { headers: { Authorization: `Bearer ${wa}` } });
+      if (!meta.ok) { s.recordError(`meta media lookup ${meta.status}`); return null; }
+      const info = await meta.json();
+      const file = await fetch(String(info.url), { headers: { Authorization: `Bearer ${wa}` } });
+      if (!file.ok) { s.recordError(`meta media fetch ${file.status}`); return null; }
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      s.setAttributes({ "yaadly.media.bytes": bytes.byteLength });
+      return { bytes, mime: String(info.mime_type ?? "") };
+    } catch (e) { s.recordError(String(e).slice(0, 200)); return null; }
+  });
+}
+
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string };
+
+// Downloads whatever image or video is on this message and parks it under a
+// path outside any job's own folder, since which job it belongs to may not
+// be known yet (a worker with more than one live job is asked). Moved into
+// the job's real folder once that is settled, in finalizeEvidenceItem.
+async function downloadAndStageMedia(
+  admin: any, message: any, caption: string, trace: Trace,
+): Promise<PendingEvidence | null> {
+  const kind = message.type === "image" ? "image" : message.type === "video" ? "video" : null;
+  if (!kind) return null;
+  const mediaId = message?.[kind]?.id ?? "";
+  if (!mediaId) return null;
+
+  const got = await fetchMetaMedia(mediaId, trace);
+  if (!got || got.bytes.byteLength === 0) return null;
+  if (got.bytes.byteLength > EVIDENCE_MAX_BYTES) return null;
+
+  const mime = (message?.[kind]?.mime_type || got.mime || "").toLowerCase();
+  const ext = EVIDENCE_EXT_BY_MIME[mime];
+  if (!ext) return null;
+
+  const path = `_pending/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from(EVIDENCE_MEDIA_BUCKET).upload(path, got.bytes, { contentType: mime, upsert: false });
+  if (error) return null;
+
+  const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
+  return { path, mime, bytes: got.bytes.byteLength, sha256, label: (caption || "Sent on WhatsApp").slice(0, 140) };
+}
+
+// Moves a staged object into its real job folder (the same convention the
+// evidence storage RLS policies key on, storage.foldername(name)[1] =
+// job.id) and writes the row. One path, used whether the job was known
+// immediately or only after a worker answered which one.
+async function finalizeEvidenceItem(
+  admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence,
+): Promise<boolean> {
+  const ext = item.path.split(".").pop();
+  const finalPath = `${jobId}/${crypto.randomUUID()}.${ext}`;
+  const { error: moveErr } = await admin.storage.from(EVIDENCE_MEDIA_BUCKET).move(item.path, finalPath);
+  if (moveErr) return false;
+
+  const { error: insErr } = await admin.from("evidence").insert({
+    job_id: jobId, label: item.label, img: null, storage_path: finalPath,
+    bytes: item.bytes, mime: item.mime, kind: "work", stage,
+    sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
+  });
+  if (insErr) {
+    await admin.storage.from(EVIDENCE_MEDIA_BUCKET).remove([finalPath]);
+    return false;
+  }
+  return true;
+}
+
+// worker_profiles carries no phone-linked identity other than this: the
+// last 9 digits, the same tolerance findHistory() already applies to a
+// client's phone, because WhatsApp's own "From" field arrives with
+// inconsistent country-code prefixes and pretending to E.164 precision
+// nobody's numbers actually have would just mean real matches missed.
+async function lookupWorkerByPhone(admin: any, waId: string): Promise<{ email: string } | null> {
+  const tail = waId.replace(/\D/g, "").slice(-9);
+  if (tail.length < 7) return null;
+  const { data } = await admin
+    .from("worker_profiles")
+    .select("worker_email, phone")
+    .eq("active", true)
+    .not("phone", "is", null);
+  const match = (data ?? []).find((w: any) => String(w.phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+  return match?.worker_email ? { email: String(match.worker_email).toLowerCase() } : null;
+}
+
+async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
+  const { data } = await admin
+    .from("jobs")
+    .select("id, title, stage, status")
+    .ilike("worker_email", email)
+    .order("updated_at", { ascending: false });
+  return (data ?? [])
+    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
+    .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
+}
+
+// "1", "1)", or enough of the title to be unambiguous. Loose on purpose:
+// this is a worker replying from a moving job site, not filling in a form.
+function pickJobChoice(text: string, choices: { id: string; title: string; stage: number }[]) {
+  const t = text.trim().toLowerCase();
+  const n = parseInt(t.replace(/\D/g, ""), 10);
+  if (Number.isFinite(n) && n >= 1 && n <= choices.length) return choices[n - 1];
+  const hits = choices.filter((c) => t && c.title.toLowerCase().includes(t));
+  return hits.length === 1 ? hits[0] : null;
+}
+
+// The deep link for a video too big for WhatsApp to have carried here in
+// the first place (WhatsApp's own client-side cap is 16MB). One tap, the
+// worker is signed in and already on the job's evidence tab, "so all they
+// have to do is upload the file, nothing else" (founder's own wording).
+// Same generateLink mechanism yaad-portal-code already uses for sign-in.
+async function mintPortalUploadLink(admin: any, email: string, jobId: string): Promise<string | null> {
+  try {
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { redirectTo: `https://app.yaadly.co.uk/portal/jobs/${encodeURIComponent(jobId)}?tab=evidence` },
+    });
+    if (error || !data?.properties?.action_link) return null;
+    return String(data.properties.action_link);
+  } catch (_) { return null; }
+}
+
 // The intake questions, in the order they are asked. Fixed text on purpose:
 // the client experience Monique specified is exact, and a question that needs
 // no model cannot be taken down by one. Each key is also the slot the answer
@@ -937,6 +1099,105 @@ Deno.serve(async (req: Request) => {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", fromWaId).maybeSingle();
       session = sess ?? null;
+    }
+
+    // ── a worker mid "which job" answer, or a fresh photo from a linked
+    // number ────────────────────────────────────────────────────────────────
+    // Runs before the salvage logic below on purpose: an evidence-lane
+    // session is not an abandoned intake, and letting it reach the salvage
+    // blocks would misfile a worker's pending photo as a stranded client
+    // job. It resolves or expires entirely here, one way or the other.
+    if (session && String(session.answers?._lane ?? "") === "evidence"
+        && Date.now() - new Date(session.updated_at).getTime() <= SESSION_STALE_MS) {
+      const answers = session.answers ?? {};
+      const pending: PendingEvidence[] = answers.pending ?? [];
+      const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
+      const workerEmail: string = answers.worker_email ?? "";
+
+      if (isMedia) {
+        const item = await downloadAndStageMedia(supabase, message, text, trace);
+        const next = item ? [...pending, item] : pending;
+        await supabase.from("wa_intake_sessions")
+          .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
+          .eq("wa_id", fromWaId);
+        const list = choices.map((c, i) => `${i + 1}) ${c.title}`).join("  ");
+        const replyResult = await maybeSendReply(fromWaId,
+          item ? `Got that too, ${next.length} so far. Which job are these for?  ${list}` : `That one did not come through. Which job are the others for?  ${list}`,
+          trace);
+        return jsonReply({ note: "evidence: appended pending item", replyResult }, "evidence_appended");
+      }
+
+      const pick = pickJobChoice(text, choices);
+      if (!pick) {
+        const list = choices.map((c, i) => `${i + 1}) ${c.title}`).join("  ");
+        const replyResult = await maybeSendReply(fromWaId, `Sorry, reply with just the number: ${list}`, trace);
+        return jsonReply({ note: "evidence: reprompt which job", replyResult }, "evidence_reprompt");
+      }
+
+      let filed = 0;
+      for (const item of pending) {
+        if (await finalizeEvidenceItem(supabase, pick.id, pick.stage, workerEmail, item)) filed++;
+      }
+      await supabase.from("wa_intake_sessions").delete().eq("wa_id", fromWaId);
+      root.setAttributes({ "yaadly.evidence_intake.outcome": "filed_after_choice", "yaadly.evidence_intake.count": filed });
+      const replyResult = await maybeSendReply(fromWaId, `Filed ${filed} item${filed === 1 ? "" : "s"} against ${pick.title}, stage ${pick.stage}. Keep them coming.`, trace);
+      return jsonReply({ note: "evidence: filed after job chosen", filed, replyResult }, "evidence_filed");
+    }
+
+    // A stale evidence session is dropped, not salvaged into a job record:
+    // there is no "what needs doing" to write down, only an orphaned photo
+    // nobody answered for. It falls through and this message is read fresh.
+    if (session && String(session.answers?._lane ?? "") === "evidence") {
+      await supabase.from("wa_intake_sessions").delete().eq("wa_id", fromWaId);
+      session = null;
+    }
+
+    // A photo or video from a number linked to a published worker
+    // (worker_profiles.phone, set in the portal or automatically at
+    // WhatsApp signup) files straight onto their job. Only fires with no
+    // session already open and only on media: a linked worker's plain text
+    // message is not evidence and falls through to whatever it would
+    // otherwise have meant.
+    if (!session && isMedia && fromWaId) {
+      const worker = await lookupWorkerByPhone(supabase, fromWaId);
+      if (worker) {
+        const activeJobs = await lookupActiveJobsForWorker(supabase, worker.email);
+        if (activeJobs.length > 0) {
+          const item = await downloadAndStageMedia(supabase, message, text, trace);
+          if (!item) {
+            const replyResult = await maybeSendReply(fromWaId, "That did not come through properly. Try sending it again, or if it is a longer video, use the portal instead.", trace);
+            return jsonReply({ note: "evidence: media fetch failed", replyResult }, "evidence_media_failed");
+          }
+
+          if (activeJobs.length === 1) {
+            const job = activeJobs[0];
+            const ok = await finalizeEvidenceItem(supabase, job.id, job.stage, worker.email, item);
+            root.setAttributes({ "yaadly.evidence_intake.outcome": ok ? "filed_direct" : "filed_direct_failed" });
+            let body = ok
+              ? `Got it, filed on ${job.title}, stage ${job.stage}. Keep them coming.`
+              : "That did not save properly. Try sending it again.";
+            // Offered once the direct route is proven to work, not on every
+            // message: a standing reminder on every photo would bury the
+            // confirmation it is meant to sit alongside.
+            if (ok) {
+              const link = await mintPortalUploadLink(supabase, worker.email, job.id);
+              if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+            }
+            const replyResult = await maybeSendReply(fromWaId, body, trace);
+            return jsonReply({ note: "evidence: filed directly, one active job", replyResult }, "evidence_filed_direct");
+          }
+
+          await supabase.from("wa_intake_sessions").upsert({
+            wa_id: fromWaId,
+            answers: { _lane: "evidence", worker_email: worker.email, pending: [item], job_choices: activeJobs },
+            photo_count: 1,
+            updated_at: new Date().toISOString(),
+          });
+          const list = activeJobs.map((j, i) => `${i + 1}) ${j.title}`).join("  ");
+          const replyResult = await maybeSendReply(fromWaId, `Got it. Which job is this for?  ${list}`, trace);
+          return jsonReply({ note: "evidence: asked which job", replyResult }, "evidence_ask_job");
+        }
+      }
     }
 
     // An abandoned half-intake is salvaged, never resumed: whatever this new

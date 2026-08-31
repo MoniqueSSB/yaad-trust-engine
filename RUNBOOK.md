@@ -508,3 +508,35 @@ select stage, approved_by, approved_at, confirmed_method
 **This never loosens anything else about the gate.** A dispute still blocks approval regardless of method, and evidence still has to be filed for the stage first: `in_person` is an additional attestation layered on top of that requirement, not an alternative to it. If a client says "I approved it, why does it still say I needed evidence filed first," the answer is: because it always does, for either method.
 
 **`approve_stage` now takes two arguments, `p_job` and `p_method`, with `p_method` defaulting to `'evidence'`.** There is only one `approve_stage` function in the database; the original one-argument version was dropped when this landed, deliberately, because a second overload with the same effective call shape would have made every ordinary call ambiguous. If a caller sends anything other than exactly `'in_person'` for `p_method`, it is silently treated as `'evidence'` rather than refused: this field is attribution, not a gate, and a stray value should never cost somebody an otherwise-valid approval.
+
+---
+
+## A worker's WhatsApp evidence never landed
+
+**Check whether their number is actually linked first.**
+
+```sql
+select worker_email, phone, active from worker_profiles
+ where right(regexp_replace(coalesce(phone,''), '\D', '', 'g'), 9)
+     = right(regexp_replace('<their WhatsApp number>', '\D', '', 'g'), 9);
+```
+
+No row: they have never linked a number, or linked a different one than the one they are texting from. Send them to the worker portal, "Send evidence from WhatsApp." A row with `active = false`: their profile is not published yet, and evidence intake only recognises published workers, the same gate everything else keyed on `active` already uses.
+
+**A linked, active worker's photo still did not file: check they actually have a live job.** `lookupActiveJobsForWorker` excludes only `complete` and `cancelled`; anything else counts, including `disputed`. A worker with zero qualifying jobs right now falls through the whole evidence-intake branch untouched, exactly as if their number had never been linked, and whatever they sent is handled as it would have been before this feature existed.
+
+**`WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` are what actually move the bytes and the reply, and they are unset on this project as of 31 Aug 2026, confirmed live.** Until Meta's Cloud API credentials exist, every media download fails cleanly (`fetchMetaMedia` returns null before attempting a network call) and every reply silently fails to send (`maybeSendReply` returns `{sent:false, reason:"WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID not set yet"}`), but nothing crashes and nothing is filed on a lie. This is a different credential from the Twilio ones the rest of this app's WhatsApp sending uses (Twilio Trust Hub cleared 31 Aug 2026): Meta's Cloud API is a separate setup, its own app, its own phone number registration, its own access token.
+
+**A worker with more than one live job stuck waiting on "which job":** their pending items sit in `wa_intake_sessions` under `_lane: "evidence"` until they reply with a number, or 48 hours passes and the session is dropped (not salvaged into anything, since an orphaned photo is not a job description to write down).
+
+```sql
+select wa_id, answers->>'worker_email' as worker_email,
+       jsonb_array_length(answers->'pending') as pending_count,
+       answers->'job_choices' as choices, updated_at
+  from wa_intake_sessions
+ where answers->>'_lane' = 'evidence';
+```
+
+If a worker says they replied and nothing happened, check the reply actually matched: `pickJobChoice` accepts a plain number ("1", "2") or enough of the job's title to be unambiguous, nothing fuzzier. Anything else gets reprompted, not silently dropped, and the session stays open for another try.
+
+**A staged object that never made it into a job's folder** sits under `evidence/_pending/` in Storage, orphaned if its session expired before a job was chosen. There is no automatic sweep for these yet; a manual `storage.from('evidence').list('_pending')` finds them if one needs clearing by hand.
