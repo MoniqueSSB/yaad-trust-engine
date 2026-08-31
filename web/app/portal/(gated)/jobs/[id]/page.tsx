@@ -681,7 +681,14 @@ export default async function JobRoom({
       {job.worker_email && (
         <>
           <ChatThread jobId={job.id} messages={chat} self={role === "client" ? "the client" : "the worker"} />
-          <DisputePanel jobId={job.id} role={role} dispute={dispute} workerName={job.worker_name ?? "the worker"} />
+          {/* id="dispute" is what the Evidence tab's "Something wrong
+              instead?" link points at (?tab=job#dispute). Tabs are URLs on
+              this page, so the honest way to offer "raise it instead" next
+              to Approve is a real address, not a modal duplicating
+              DisputePanel. */}
+          <div id="dispute">
+            <DisputePanel jobId={job.id} role={role} dispute={dispute} workerName={job.worker_name ?? "the worker"} />
+          </div>
         </>
       )}
         </>
@@ -695,6 +702,7 @@ export default async function JobRoom({
             currentStage={job.stage ?? 0}
             role={role === "worker" ? "worker" : "client"}
             awaitingApproval={awaitingApproval}
+            jobId={job.id}
           />
       {job.status !== "complete" && (
         <EvidenceUpload

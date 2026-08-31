@@ -338,3 +338,27 @@ The country already defaults to Jamaica (JM), set 30 Aug 2026. **The Persona API
 **There is a way out in the product, and it does not depend on the above.** On the ID step a worker can press "It would not take my ID. Let me send it another way." That switches to the in-page capture and upload, and a person at the desk checks it by hand. It exists because the old fallback only triggered when Persona failed to LOAD; somebody whose voter card the template refuses sees Persona work perfectly and turn them away, which was a dead end.
 
 **How to spot one of those at the desk:** the application has `photo_id`, `selfie_with_id` and `face_video` uploaded, and `persona_status` is empty. That combination means they took the escape, not that they skipped the check.
+
+---
+
+## A client cannot approve a stage
+
+**Read the refusal, it names the reason.** All of them come from `approve_stage()`, so no deploy can talk past them.
+
+- **"That is not your job to approve."** The signed-in email does not match `jobs.client_email`.
+- **"A dispute is open on this job. Nothing can be approved while it is."** Resolve the dispute (`disputes.state = 'resolved'`) first; that is the only door.
+- **"Nothing has been filed for this stage yet."** No evidence rows exist for `greatest(jobs.stage, 1)`. The worker has not filed anything against the stage actually being worked.
+- **"Not signed in." / "Confirm your email address first."** Ordinary auth states, same as `client_go_live`.
+
+**To see what was actually approved**, `stage_approvals` carries who, when, and the exact fingerprint of every item at the moment of approval:
+
+```sql
+select stage, approved_by, approved_at, jsonb_pretty(evidence)
+  from stage_approvals
+ where job_id = 'JOB-XXXX'
+ order by stage;
+```
+
+**If the evidence tab shows "Evidence waiting on you" but there is no Approve button**, check `role`: the button only renders for the client, on purpose. A worker approving their own work is the exact thing this exists to prevent.
+
+**`jobs.status` is fully owned by `sync_job_status()`.** It recomputes the column from scratch on every insert or update to the `jobs` row: worker assigned, current stage's evidence state, `open`, and the client's go-live status, in that order. Do not add a second trigger or a direct `update jobs set status = ...` anywhere expecting it to stick outside this function; it will be silently overwritten on the same statement. If a new state is ever needed, it goes inside `sync_job_status`, not beside it.

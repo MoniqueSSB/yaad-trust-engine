@@ -14,6 +14,8 @@
  * client who never opens it loses nothing; a client in a dispute has it all.
  */
 
+import { ApproveButton } from "./ApproveButton";
+
 export type EvidenceItem = {
   id: string;
   label: string | null;
@@ -36,6 +38,7 @@ export function EvidenceLedger({
   currentStage,
   role,
   awaitingApproval,
+  jobId,
 }: {
   items: EvidenceItem[];
   stageCount: number;
@@ -43,6 +46,10 @@ export function EvidenceLedger({
   currentStage: number;
   role: "client" | "worker";
   awaitingApproval: boolean;
+  /** Only used to build the Approve button and the link to the dispute form,
+      neither of which render for a worker. Optional so nothing else calling
+      this component needs to change. */
+  jobId?: string;
 }) {
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const filed = items.length;
@@ -50,17 +57,23 @@ export function EvidenceLedger({
 
   /* One sentence, before any list, answering the question the page is open
      for. Everything below it is the supporting detail. */
-  const headline =
-    currentStage === 0
+  /* awaitingApproval is checked FIRST, before the currentStage === 0 branch.
+     Found by testing the approve button rather than by reading this: a job
+     at stage 0 with evidence already filed for stage 1 (the ordinary shape
+     the moment a worker files a first photo) said "Nothing filed yet" in
+     the same breath the ledger below it listed two items and put an Approve
+     button on screen. Whether anything is waiting on a human is a more
+     urgent fact than which stage number the job happens to be on. */
+  const headline = awaitingApproval
+    ? role === "client"
+      ? "Photos are in and waiting on you. Money moves when you approve them."
+      : "Photos are in. The client has been asked to approve them."
+    : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."
-      : awaitingApproval
-        ? role === "client"
-          ? "Photos are in and waiting on you. Money moves when you approve them."
-          : "Photos are in. The client has been asked to approve them."
-        : filed === 0
-          ? "Stage " + currentStage + " is under way. No photos filed against it yet."
-          : "Stage " + currentStage + " is under way, with " + filed +
-            " item" + (filed === 1 ? "" : "s") + " filed so far.";
+      : filed === 0
+        ? "Stage " + currentStage + " is under way. No photos filed against it yet."
+        : "Stage " + currentStage + " is under way, with " + filed +
+          " item" + (filed === 1 ? "" : "s") + " filed so far.";
 
   return (
     <section className="mt-6">
@@ -95,6 +108,15 @@ export function EvidenceLedger({
             <b className="text-mute">{checked}</b> checked
           </span>
         </div>
+
+        {/* The button the product is named after. Client only: a worker
+            approving his own work is the thing this whole ledger exists to
+            rule out. jobId is optional on the type only so nothing else
+            calling EvidenceLedger has to change; the page that matters
+            always passes it. */}
+        {awaitingApproval && role === "client" && jobId && (
+          <ApproveButton jobId={jobId} queryHref="?tab=job#dispute" />
+        )}
       </div>
 
       <ul className="mt-3 grid gap-2.5">
