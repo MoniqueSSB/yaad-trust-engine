@@ -227,7 +227,7 @@ update public.worker_profiles
 
 ## A client says they never heard about their quote
 
-The quote is saved either way: `yaad-quote-landed` is called after the insert and a failure there never loses it. The function reports what it managed, so ask it rather than guess.
+The quote is saved either way: a database trigger on `job_quotes` calls `yaad-notify-client` after the insert and a failure there never loses it. The function reports what it managed, so ask it rather than guess.
 
 **Look at the trace.** `yaadly.notify.outcome` reads `told` when at least one channel worked and `nobody_told` when neither did. `yaadly.notify.emailed` and `yaadly.notify.whatsapp` say which.
 
@@ -280,7 +280,7 @@ supabase secrets set TWILIO_SMS_FROM='+1XXXXXXXXXX' --project-ref leffyisvfvjwzi
 
 **Why there is one at all.** A registered WhatsApp sender still cannot send free text to somebody who has not messaged in the last 24 hours. That needs a template approved in advance by Meta. Most clients get a quote more than a day after posting the job, so without a template most notifications would fail.
 
-**What is set.** `TWILIO_CONTENT_SID_QUOTE` points at `yaadly_quote_landed_v2`, submitted 31 Aug 2026, category UTILITY. `yaad-quote-landed` uses it whenever it is set and falls back to free text when it is not. A template is valid inside the 24 hour window too, so there is one path rather than two half-paths.
+**What is set.** `TWILIO_CONTENT_SID_QUOTE` points at `yaadly_quote_landed_v2`, submitted 31 Aug 2026, category UTILITY. `yaad-notify-client`'s `quote_arrived` kind uses it whenever it is set, unconditionally rather than only outside the 24 hour window: a template is valid inside the window too, so there is one path rather than two half-paths. It is the only one of that function's seven kinds that reuses this template, because it is the only one whose wording matches what Meta approved; see the header comment in `supabase/functions/yaad-notify-client/index.ts` for why the other six stay free text. `yaad-quote-landed`, the function this template was originally built for, is retired (below) and calls nothing today.
 
 **Check whether Meta has approved it**, in Twilio Console under Messaging, Content Template Builder. `received` means in review, `approved` means live, `rejected` carries a reason.
 

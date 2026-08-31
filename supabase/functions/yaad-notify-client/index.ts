@@ -26,19 +26,29 @@
  *
  * CHANNELS: the same order yaad-quote-landed already proved. Twilio
  * WhatsApp, then Meta's API, then Twilio SMS, then Resend email regardless.
- * None of the four kinds below has an approved WhatsApp Content Template of
- * its own yet, only the quote-landed wording does (yaadly_quote_landed_v2),
- * and this function does not reuse it: reusing a template approved for one
- * sentence to send a different sentence is exactly the kind of thing that
- * gets a WhatsApp sender flagged. So all four go over WhatsApp as free text,
- * which works inside the 24 hour window and fails honestly outside it, same
- * as everything else on this number until Trust Hub KYC clears (RUNBOOK.md).
+ * Six of the seven kinds below have no approved WhatsApp Content Template of
+ * their own, so they go over WhatsApp as free text, which works inside the
+ * 24 hour window and fails honestly outside it: reusing a template approved
+ * for one sentence to send a different sentence is exactly the kind of thing
+ * that gets a WhatsApp sender flagged, so free text is the only honest option
+ * for those six. quote_arrived is the exception, because it is not a
+ * different sentence: it is the same notification yaadly_quote_landed_v2 was
+ * approved for, word for word bar one clause (below). It reuses that
+ * template (TWILIO_CONTENT_SID_QUOTE) unconditionally whenever the template
+ * is configured, the same way the retired yaad-quote-landed did and for the
+ * same reason: a template is valid inside the 24 hour window too, so one
+ * path that always works beats two that each work half the time. Until
+ * Trust Hub KYC clears (RUNBOOK.md), that path is what carries quote_arrived
+ * over WhatsApp; the other six still depend on the client's own last message
+ * being recent.
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { Image } from "jsr:@matmen/imagescript";
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -66,6 +76,7 @@ async function sha256Hex(s: string): Promise<string> {
 
 async function sendTwilio(
   to: string, body: string, channel: "whatsapp" | "sms", trace: Trace, mediaUrls: string[] = [],
+  template?: { sid: string; vars: Record<string, string> },
 ) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
@@ -81,11 +92,22 @@ async function sendTwilio(
     "server.address": "api.twilio.com", "messaging.system": "twilio",
   }, async (s) => {
     try {
-      const params = new URLSearchParams({ To: dest, From: from, Body: body });
-      // Twilio's own form: MediaUrl repeated once per attachment, not
-      // indexed. Only ever populated for the WhatsApp send below; SMS keeps
-      // its existing role as a plain-text last resort.
-      for (const u of mediaUrls) params.append("MediaUrl", u);
+      // A template is only ever sent as itself: Content Templates carry
+      // fixed, Meta-approved wording and let the caller fill in variable
+      // slots, never free text of the caller's choosing, so this is not the
+      // same risk as putting an arbitrary sentence through it.
+      let params: URLSearchParams;
+      if (template?.sid && channel === "whatsapp") {
+        params = new URLSearchParams({
+          To: dest, From: from, ContentSid: template.sid, ContentVariables: JSON.stringify(template.vars),
+        });
+      } else {
+        params = new URLSearchParams({ To: dest, From: from, Body: body });
+        // Twilio's own form: MediaUrl repeated once per attachment, not
+        // indexed. Only ever populated for the WhatsApp send below; SMS keeps
+        // its existing role as a plain-text last resort.
+        for (const u of mediaUrls) params.append("MediaUrl", u);
+      }
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
@@ -429,6 +451,46 @@ function findingLabel(f: VisionFinding, images: EvidencePhoto[]): string {
 // photo a finding is about is no longer something the model has to get
 // right and echo back, it is simply which call produced it, assigned here
 // with certainty rather than parsed from the model's own words.
+//
+// A phone photo is commonly 8-12MB at full resolution, and nothing in this
+// codebase resizes evidence before it is stored, deliberately: the stored
+// copy is the proof, fingerprinted and timestamped exactly as filed, and
+// stays that way. What NVIDIA fetches and decodes today is that same full
+// original, over a shared free-tier inference service, which is a real
+// part of why it times out. This shrinks a THROWAWAY copy for the review
+// call only: nothing here writes to storage, nothing here touches
+// evidence.sha256 or the signed URL the client and worker actually see.
+// Supabase's own image transform could do this on the free tier for
+// nobody, only paid plans, confirmed before reaching for a library instead.
+const MAX_REVIEW_DIMENSION = 1024;
+const REVIEW_JPEG_QUALITY = 70;
+
+async function shrinkForReview(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) { console.error(`yaad-vision: shrink fetch http ${r.status}`); return null; }
+    const original = new Uint8Array(await r.arrayBuffer());
+    const img = await Image.decode(original);
+    if (img.width > MAX_REVIEW_DIMENSION || img.height > MAX_REVIEW_DIMENSION) {
+      if (img.width >= img.height) img.resize(MAX_REVIEW_DIMENSION, Image.RESIZE_AUTO);
+      else img.resize(Image.RESIZE_AUTO, MAX_REVIEW_DIMENSION);
+    }
+    const encoded = await img.encodeJPEG(REVIEW_JPEG_QUALITY);
+    // Silent success and silent fallback look identical from the outside,
+    // the same gap this file already closed once for the review call
+    // itself: a number here proves the resize actually ran rather than
+    // hoping a fast response means it did.
+    console.error(`yaad-vision: shrink ${original.length}b -> ${encoded.length}b (${img.width}x${img.height})`);
+    return `data:image/jpeg;base64,${encodeBase64(encoded)}`;
+  } catch (e) {
+    // A photo NVIDIA cannot be handed at all is worse than a slow one it
+    // is handed at full size: fall back to the original URL rather than
+    // dropping the review entirely over a decode failure on one photo.
+    console.error(`yaad-vision: shrink failed, using original: ${String(e).slice(0, 200)}`);
+    return null;
+  }
+}
+
 async function reviewOnePhoto(
   model: string, key: string, photo: EvidencePhoto, jobTitle: string, trace: Trace,
 ): Promise<VisionFinding[] | null> {
@@ -437,9 +499,11 @@ async function reviewOnePhoto(
     "server.address": "integrate.api.nvidia.com", "yaadly.agent.name": "photo_review",
     "yaadly.vision.photo_code": photo.code ?? "",
   }, async (s) => {
+    const shrunk = await shrinkForReview(photo.url);
+    s.setAttributes({ "yaadly.vision.image_shrunk": !!shrunk });
     const userContent: Record<string, unknown>[] = [
       { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview this photo and return findings as instructed.` },
-      { type: "image_url", image_url: { url: photo.url } },
+      { type: "image_url", image_url: { url: shrunk ?? photo.url } },
     ];
     let result = await attemptVisionReview(model, key, userContent, s);
     let attempts = 1;
@@ -583,6 +647,13 @@ Deno.serve(async (req: Request) => {
     let line = "";
     let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
+    // Only quote_arrived has an approved WhatsApp Content Template
+    // (yaadly_quote_landed_v2); see the header comment for why it is the
+    // one kind that may reuse it, and only as a fallback for the specific
+    // failure it exists to fix (outside the 24 hour window), never as a
+    // substitute for the richer free-text message when that can still be
+    // delivered: see the send site below.
+    let waTemplate: { sid: string; vars: Record<string, string> } | undefined;
 
     if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
@@ -590,6 +661,8 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId).eq("status", "submitted")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const total = (q?.labour_jmd ?? 0) + (q?.materials_jmd ?? 0);
+      const workerName = q?.worker_name ?? "A tradesperson";
+      const priceText = money(total);
       subject = `A price on your job: ${job.title}`;
       // Stage 6, continued: a client with a phone on file can book straight
       // from this message rather than needing to open the link at all. The
@@ -606,8 +679,15 @@ Deno.serve(async (req: Request) => {
         ? `Reply with the code ${job.id} to confirm that and book ${q?.worker_name ?? "them"}, or `
         : "";
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
-        `${q?.worker_name ?? "A tradesperson"} quoted ${money(total)}.${scopeLine} ` +
+        `${workerName} quoted ${priceText}, labour and materials itemised separately.${scopeLine} ` +
         `Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
+      if (contentSid) {
+        waTemplate = {
+          sid: contentSid,
+          vars: { "1": String(job.title ?? "your job"), "2": String(workerName), "3": priceText, "4": codeLink },
+        };
+      }
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
@@ -810,6 +890,16 @@ Deno.serve(async (req: Request) => {
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
       wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos);
+      // The rich, scope-carrying message could not be delivered at all,
+      // specifically because it landed outside WhatsApp's 24 hour window:
+      // the approved template is the fallback for exactly that failure,
+      // a plainer message that actually arrives beats a richer one that
+      // silently does not. Not attempted for any other failure reason,
+      // and never in place of the free-text attempt when that can still
+      // be sent.
+      if (!wa.sent && waTemplate && wa.reason === "outside WhatsApp's 24 hour window, needed an approved template") {
+        wa = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], waTemplate);
+      }
       if (!wa.sent) {
         const metaResult = await sendMetaWhatsApp(recipientPhone, line, trace);
         if (metaResult.sent) wa = { ...metaResult, via: "meta whatsapp" };
