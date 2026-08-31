@@ -53,7 +53,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed"] as const;
+const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -332,7 +332,8 @@ type VisionFinding = { issue?: string; category?: string; severity?: string; not
 
 async function reviewEvidencePhotos(images: string[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
   const key = Deno.env.get("NVIDIA_API_KEY");
-  if (!key || !images.length) return null;
+  if (!key) { console.error("yaad-vision: NVIDIA_API_KEY is not set"); return null; }
+  if (!images.length) { console.error("yaad-vision: no image URLs to review"); return null; }
   const model = Deno.env.get("NVIDIA_VISION_MODEL") || "nvidia/nemotron-nano-12b-v2-vl";
 
   return await trace.span(`chat ${model}`, SpanKind.CLIENT, {
@@ -354,14 +355,21 @@ async function reviewEvidencePhotos(images: string[], jobTitle: string, trace: T
         signal: AbortSignal.timeout(20000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { s.recordError(`nvidia http ${r.status}`); return null; }
+      if (!r.ok) {
+        const errText = await r.text().catch(() => "");
+        console.error(`yaad-vision: nvidia http ${r.status}: ${errText.slice(0, 300)}`);
+        s.recordError(`nvidia http ${r.status}`);
+        return null;
+      }
       const j = await r.json();
       const raw = j?.choices?.[0]?.message?.content ?? "[]";
       const match = String(raw).match(/\[[\s\S]*\]/);
+      if (!match) console.error(`yaad-vision: no JSON array in model response: ${String(raw).slice(0, 300)}`);
       const findings = match ? JSON.parse(match[0]) : [];
       s.setAttributes({ "yaadly.vision.finding_count": findings.length });
       return findings;
     } catch (e) {
+      console.error(`yaad-vision: threw: ${String(e).slice(0, 300)}`);
       s.recordError(String(e).slice(0, 200));
       return null;
     }
@@ -403,6 +411,7 @@ Deno.serve(async (req: Request) => {
     const secret = String(b.secret ?? "");
     const jobId = String(b.jobId ?? "");
     const kind = String(b.kind ?? "") as Kind;
+    const meta = (b.meta ?? {}) as Record<string, unknown>;
     if (!secret || !jobId || !KINDS.includes(kind)) {
       return json({ error: "secret, jobId and a valid kind are required." }, 400);
     }
@@ -418,12 +427,34 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: job } = await admin.from("jobs")
-      .select("id, title, parish, stage, portal_code, client_email, client_phone")
+      .select("id, title, parish, stage, portal_code, client_email, client_phone, worker_email")
       .eq("id", jobId).maybeSingle();
     if (!job) return json({ error: "No such job." }, 404);
 
     const clientEmail = String(job.client_email ?? "").trim();
     const clientPhone = String(job.client_phone ?? "").trim();
+
+    // Most kinds tell the client. Two do not: evidence_comment, because a
+    // client left it and the worker is who answers; evidence_landed,
+    // because 31 Aug 2026 that stopped meaning "tell the client" and
+    // started meaning "draft it for the worker first." The client only
+    // hears from evidence_report_confirmed now, once the worker has said
+    // yes or written their own version. Everything below still reads
+    // "client" in its own variable names because that is what it is for
+    // every other kind; these two are what the actual send at the bottom
+    // uses.
+    let recipientEmail = clientEmail;
+    let recipientPhone = clientPhone;
+    let workerPhone = "";
+    if ((kind === "evidence_comment" || kind === "evidence_landed") && job.worker_email) {
+      const { data: worker } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+      workerPhone = String(worker?.phone ?? "").trim();
+    }
+    if (kind === "evidence_comment" || kind === "evidence_landed") {
+      recipientEmail = "";
+      recipientPhone = workerPhone;
+    }
 
     // Post-booking every client has an account (Stage 2's own rule), so the
     // link always goes to the portal room rather than the no-account quotes
@@ -438,6 +469,7 @@ Deno.serve(async (req: Request) => {
     let subject = "";
     let line = "";
     let photoUrls: string[] = [];
+    let attachPhotos: string[] = [];
 
     if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
@@ -450,50 +482,71 @@ Deno.serve(async (req: Request) => {
         `${q?.worker_name ?? "A tradesperson"} quoted ${money(total)}. ` +
         `Nothing is booked and nothing is charged until you choose. See it here: ${codeLink}`;
     } else if (kind === "evidence_landed") {
-      subject = `Evidence to review: ${job.title}`;
-      // The photos themselves, not just a description of them, so a client
-      // does not have to open the portal to see what actually arrived.
-      // Founder's own requirement, 31 Aug 2026.
+      // Founder's own requirement, 31 Aug 2026, and a real change from how
+      // this kind worked that same morning: the AI's composed report does
+      // not go straight to the client any more. It goes to the worker
+      // first, honestly labelled as a draft, with a plain choice: send it
+      // as written, or write their own version instead. Confirmed hers to
+      // ask, and the worker's to decide, not the founder's: she is not the
+      // one who did the work, and a bottleneck through her was never the
+      // point.
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
 
-      // Two accounts, kept visibly separate: what the worker said happened,
-      // and what an AI model can independently see in the photo. Neither
-      // stands in for the other, and the client is shown the difference
-      // rather than one blended sentence. Run concurrently, not one after
-      // the other: two sequential model calls inside one request blew past
-      // the trigger's own 15 second budget the first time this ran, and
-      // net._http_response recorded no response at all rather than a
-      // clean failure. Skipped entirely when there is nobody to tell:
-      // running either call for a job with no email and no phone was
-      // wasted latency and exactly what caused that first timeout.
-      const [composed, findings] = (clientEmail || clientPhone)
+      const [composed, findings] = workerPhone
         ? await Promise.all([
             composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace),
             photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
           ])
         : [null, null];
-      const workerSays = composed
-        || `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}, with no description from the worker.`;
-      const aiSays = findings ? `AI noticed: ${summariseFindings(findings)}` : null;
+      const draftText = composed
+        || `Photos have come in for stage ${job.stage ?? 1}, with no description from you yet.`;
+      const aiSummary = findings ? summariseFindings(findings) : "";
 
-      // The reply-to-approve route only exists for whoever reads it here.
-      // Reply with the job's own code, same word for word as the code a
-      // worker sends back to confirm a photo, matched against
-      // approve_stage_via_whatsapp() in yaad-inbound. Anything else typed
-      // back is read as a comment, not a new job, and goes to the worker:
-      // founder's own requirement, 31 Aug 2026, "if they're not [satisfied],
-      // there should be a way to respond back", confirmed to mean the
-      // worker answers it, matched in yaad-inbound's own comment lane.
+      if (workerPhone) {
+        await admin.from("wa_intake_sessions").upsert({
+          wa_id: workerPhone.startsWith("+") ? workerPhone : `+${workerPhone.replace(/\D/g, "")}`,
+          answers: {
+            _lane: "report_confirm", job_id: jobId, stage: job.stage ?? 1,
+            draft_text: draftText, ai_summary: aiSummary,
+          },
+          photo_count: 0,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      subject = `Draft for the client: ${job.title}`;
+      line = [
+        `Here's what we'd tell the client about stage ${job.stage ?? 1} of ${job.title}:`,
+        `"${draftText}"`,
+        aiSummary ? `AI noticed: ${aiSummary}` : null,
+        `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
+      ].filter(Boolean).join("\n\n");
+      root.setAttributes({
+        "yaadly.notify.evidence_report_composed": !!composed,
+        "yaadly.notify.ai_review_ran": findings !== null,
+        "yaadly.notify.ai_finding_count": findings?.length ?? 0,
+        "yaadly.notify.draft_sent_to_worker": !!workerPhone,
+      });
+    } else if (kind === "evidence_report_confirmed") {
+      // The other half of evidence_landed's new shape: fired only once the
+      // worker has actually said yes or written their own version, never
+      // automatically. override_text is always the FINAL wording by the
+      // time this runs; yaad-inbound already resolved "1" into the stored
+      // draft before calling relay_confirmed_report(), so this kind never
+      // has to know which one happened.
+      const overrideText = String(meta.override_text ?? "").trim();
+      const aiSummary = String(meta.ai_summary ?? "").trim();
+      subject = `Evidence to review: ${job.title}`;
+      photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
+      attachPhotos = photoUrls;
+
+      const workerSays = overrideText || `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}.`;
+      const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
       const actionHint = clientPhone
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
         : "Review it and reply from your portal.";
       line = [workerSays, aiSays, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
-      root.setAttributes({
-        "yaadly.notify.evidence_report_composed": !!composed,
-        "yaadly.notify.photos_attached": photoUrls.length,
-        "yaadly.notify.ai_review_ran": findings !== null,
-        "yaadly.notify.ai_finding_count": findings?.length ?? 0,
-      });
+      root.setAttributes({ "yaadly.notify.photos_attached": photoUrls.length, "yaadly.notify.was_customised": !!overrideText });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this
@@ -520,6 +573,19 @@ Deno.serve(async (req: Request) => {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
         `Read them and confirm they are accurate here: ${roomLink}`;
+    } else if (kind === "evidence_comment") {
+      // The one kind in this file that tells the worker, not the client.
+      // Founder's own requirement, 31 Aug 2026: a client should be able to
+      // say more than yes or no on a photo, and it should reach the worker
+      // wherever they actually are. Both routes back are named honestly:
+      // a WhatsApp reply here is captured the same as a fresh evidence
+      // photo would be, matched to this job and logged; the portal's own
+      // Job chat is logged the moment it lands, always.
+      const { data: c } = await admin.from("evidence_comments")
+        .select("body").eq("id", String(meta.comment_id ?? "")).maybeSingle();
+      subject = `A note from the client: ${job.title}`;
+      line = `On ${job.title}, the client wrote: "${(c?.body ?? "").slice(0, 300)}"\n\n` +
+        `Reply here on WhatsApp to answer, or open the job to reply there, either way the client sees it and it stays on the record: ${roomLink}`;
     } else if (kind === "job_delayed") {
       // Told honestly and early, before the client has to ask. Says nothing
       // about why: yaad-job-health knows a job has gone quiet, not the
@@ -532,14 +598,14 @@ Deno.serve(async (req: Request) => {
 
     let emailed = false;
     let emailReason = RESEND_KEY ? "" : "RESEND_API_KEY not set";
-    if (clientEmail && RESEND_KEY) {
+    if (recipientEmail && RESEND_KEY) {
       await trace.span("resend.send", SpanKind.CLIENT, { "server.address": "api.resend.com", "messaging.system": "resend" }, async (s) => {
         try {
           const r = await fetch("https://api.resend.com/emails", {
             method: "POST",
             headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-              from: `Yaadly <${FROM_EMAIL}>`, to: [clientEmail], reply_to: REPLY_TO,
+              from: `Yaadly <${FROM_EMAIL}>`, to: [recipientEmail], reply_to: REPLY_TO,
               subject, text: line, html: `<p>${line.replace(codeLink, `<a href="${codeLink}">${codeLink}</a>`).replace(roomLink, `<a href="${roomLink}">${roomLink}</a>`)}</p>`,
             }),
             signal: AbortSignal.timeout(15000),
@@ -549,23 +615,23 @@ Deno.serve(async (req: Request) => {
           if (!r.ok) { emailReason = `resend ${r.status}`; s.recordError(`${emailReason}: ${(await r.text()).slice(0, 160)}`); }
         } catch (e) { emailReason = String(e).slice(0, 160); s.recordError(emailReason); }
       });
-    } else if (!clientEmail) {
-      emailReason = "no client email on the job";
+    } else if (!recipientEmail) {
+      emailReason = "no recipient email on the job";
     }
 
-    let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no client phone on the job" };
-    if (clientPhone) {
+    let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no recipient phone on the job" };
+    if (recipientPhone) {
       // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
       // means the WhatsApp send itself failed, and a signed URL that was
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = await sendTwilio(clientPhone, line, "whatsapp", trace, photoUrls);
+      wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos);
       if (!wa.sent) {
-        const meta = await sendMetaWhatsApp(clientPhone, line, trace);
-        if (meta.sent) wa = { ...meta, via: "meta whatsapp" };
+        const metaResult = await sendMetaWhatsApp(recipientPhone, line, trace);
+        if (metaResult.sent) wa = { ...metaResult, via: "meta whatsapp" };
         else {
-          const sms = await sendTwilio(clientPhone, line, "sms", trace);
+          const sms = await sendTwilio(recipientPhone, line, "sms", trace);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
       }

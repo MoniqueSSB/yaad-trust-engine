@@ -668,3 +668,52 @@ grep -n "CODE_LENGTH" web/lib/portal/sign-in.ts
 **If this number is ever wrong again, it is the one line to change**, and nowhere in `/portal/sign-in` or `/portal/join`'s own visible text should need to change alongside it: neither page names a specific digit count any more, on purpose, exactly so this class of bug cannot silently reopen the same way.
 
 **To prove a fix to this actually works, prove it against a real code, not a fabricated one.** `web/tests/sign-in.test.mjs` covers the logic with a code built from `CODE_LENGTH` itself, which proves the branching is internally consistent, but it cannot prove the number itself is correct, only that the app trusts whatever number it is given. The only real proof is a live send: request a code from the actual deployed site, read what actually arrives, and use exactly that.
+
+## A worker never received the draft report, or a client never got the confirmed one
+
+**`evidence_landed` sends to the worker now, not the client.** Check `wa_intake_sessions` for a row keyed by the worker's number with `answers->>'_lane' = 'report_confirm'`: if it exists, the draft was written and sent (or attempted); if the job has no `worker_email`, or the worker has no phone on `worker_profiles`, nothing was sent and nothing was stored, silently, by design, since there is nobody to draft it for.
+
+```sql
+select wa_id, answers->>'job_id', answers->>'draft_text', answers->>'ai_summary', updated_at
+  from wa_intake_sessions where answers->>'_lane' = 'report_confirm';
+```
+
+**The client only ever hears from `evidence_report_confirmed`.** If a worker replied and the client still heard nothing, check `net._http_response` for that kind specifically; a `403` there means the shared secret is out of sync again, see the entry below on regenerating it correctly. If the worker's reply never registered at all, check that the `report_confirm` session row above still exists at the moment they replied: a fresh evidence photo sent in the meantime overwrites it, since `wa_intake_sessions` holds one row per phone number, and that is a known, accepted limitation, not yet solved.
+
+## The notify trigger secret gets out of sync (again)
+
+**Never generate a fresh secret when adding a new trigger function that calls `yaad-notify-client`.** This mistake happened twice in one afternoon before being caught both times. The correct pattern, every time:
+
+```sql
+select substring(prosrc from '''secret'', ''([0-9a-f]+)''')
+  from pg_proc where proname = 'notify_client_quote_arrived';
+```
+
+Extract the existing plaintext from an already-deployed, already-correct trigger function's own body, and bake that same value into the new one. Never call `gen_random_bytes` again once the first trigger in this file already has, or every other trigger sharing the stored hash starts failing its own check with a `403`, silently, since `net._http_response` records that as a normal completed request, not a crash.
+
+**To check all triggers sharing this secret agree, right now:**
+
+```sql
+select
+  (select value from app_settings where key = 'notify_trigger_secret_sha256') as stored_hash,
+  proname,
+  encode(extensions.digest(substring(prosrc from '''secret'', ''([0-9a-f]+)'''), 'sha256'), 'hex') as fn_hash
+from pg_proc
+where proname in ('notify_client_quote_arrived','notify_client_on_job_change','notify_client_dispute_raised','notify_worker_of_portal_comment','relay_confirmed_report');
+```
+
+Every `fn_hash` should equal `stored_hash`. If one does not, that function was regenerated with a new secret by mistake; fix it the same way, extracting the value every OTHER function still agrees on and re-baking that into the broken one, never picking a fresh value to settle the disagreement.
+
+## The AI photo review comes back empty
+
+**Check the function's own console output, not just the trace.** `reviewEvidencePhotos()` in `yaad-notify-client` logs a specific reason with `console.error` on every failure path as of 31 Aug 2026: `NVIDIA_API_KEY` unset, no image URLs to review, an HTTP error from NVIDIA, or the model's response not containing a JSON array at all. Query `function_logs` for the function around the time of the send:
+
+```sql
+select timestamp, event_message from logs
+where source = 'function_logs' and event_message ilike '%yaad-vision%'
+order by timestamp desc limit 20
+```
+
+**A known, live cause as of 31 Aug 2026: the model itself sometimes declines the request outright**, returning a plain refusal sentence instead of the JSON array the system prompt asks for, "I'm not going to engage in this discussion topic." The call succeeds (HTTP 200), `photoUrls` resolves correctly, the request reaches NVIDIA; the model's own response is the failure. Not yet fixed. Worth trying, in rough order: a different `NVIDIA_VISION_MODEL`, rewording the system prompt to read less like a content-moderation trigger, or treating a non-JSON response as a distinct, reportable outcome rather than folding it into the same silent `null` every other failure returns.
+
+**Log query timing note.** `function_logs` entries were not reliably queryable for roughly a minute after the request that produced them, in testing 31 Aug 2026; `net._http_response`, by contrast, reflected a completed request within a few seconds every time. When chasing a fresh failure, check `net._http_response` first to confirm the request actually landed, then allow real time before concluding `function_logs` has nothing to show.

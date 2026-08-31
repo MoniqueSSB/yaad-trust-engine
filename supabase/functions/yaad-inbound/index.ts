@@ -849,6 +849,27 @@ Deno.serve(async (req: Request) => {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+      const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
+
+      // A worker answering the "send this draft, or write your own"
+      // prompt. "1" means send exactly what was drafted; anything else
+      // typed is read as their own version and that is what goes out
+      // instead. Founder's own requirement, 31 Aug 2026, confirmed to the
+      // worker to decide, not routed through anyone else first.
+      if (reportSession && !msg.media.length && msg.text.trim()) {
+        const a = reportSession.answers as any;
+        const said = msg.text.trim();
+        const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
+        const { error } = await supabase.rpc("relay_confirmed_report", {
+          p_job: a.job_id, p_override_text: overrideText, p_ai_summary: a.ai_summary ?? "",
+        });
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.customised": said !== "1" });
+        if (error) return twiml("That did not go through. Try again, or send it again in a moment.");
+        return twiml(said === "1"
+          ? "Sent to the client as drafted."
+          : "Sent to the client, your own words.");
+      }
 
       // A code prompt, shared by the "one job" and "several jobs" cases:
       // the code is always shown and always the answer asked for, never
@@ -961,6 +982,49 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             });
             return twiml(`Got it. ${codePrompt(activeJobs)}`);
+          }
+        }
+      }
+
+      // A worker's plain reply, answering a client's comment. The mirror
+      // of the client-comment lane below: exactly one job may be awaiting
+      // this worker's answer for it to be read this way, never guessed
+      // among several. "Awaiting" means the newest comment on that job is
+      // still from the client, nobody has answered it yet.
+      if (!msg.media.length && msg.text.trim()) {
+        const worker = await lookupWorkerByPhone(supabase, msg.from);
+        if (worker) {
+          const activeJobs = await lookupActiveJobsForWorker(supabase, worker.email);
+          const awaitingReply: { id: string; title: string; stage: number }[] = [];
+          for (const j of activeJobs) {
+            const { data: latest } = await supabase.from("evidence_comments")
+              .select("from_role").eq("job_id", j.id)
+              .order("created_at", { ascending: false }).limit(1).maybeSingle();
+            if (latest?.from_role === "client") awaitingReply.push(j);
+          }
+
+          if (awaitingReply.length === 1) {
+            const job = awaitingReply[0];
+            await supabase.from("evidence_comments").insert({
+              job_id: job.id, stage: job.stage, from_role: "worker", origin: "whatsapp",
+              body: msg.text.trim().slice(0, 1000),
+            });
+            root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "worker" });
+
+            const { data: jobRow } = await supabase.from("jobs")
+              .select("client_phone").eq("id", job.id).maybeSingle();
+            let notified = false;
+            if (jobRow?.client_phone) {
+              notified = await sendWhatsAppTo(
+                String(jobRow.client_phone),
+                `The worker replied on ${job.id} (${job.title}): "${msg.text.trim().slice(0, 300)}"\n\nReply with the code ${job.id} to approve, or say more and we will pass it on.`,
+                trace,
+              );
+            }
+            root.setAttributes({ "yaadly.evidence_comment.client_notified": notified });
+            return twiml(notified
+              ? `Got it, passed on to the client on ${job.id}.`
+              : `Got it, on record against ${job.id}. We could not reach the client directly just now, but it is saved.`);
           }
         }
       }
