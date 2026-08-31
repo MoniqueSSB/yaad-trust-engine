@@ -26,21 +26,24 @@
  *
  * CHANNELS: the same order yaad-quote-landed already proved. Twilio
  * WhatsApp, then Meta's API, then Twilio SMS, then Resend email regardless.
- * Six of the seven kinds below have no approved WhatsApp Content Template of
- * their own, so they go over WhatsApp as free text, which works inside the
- * 24 hour window and fails honestly outside it: reusing a template approved
- * for one sentence to send a different sentence is exactly the kind of thing
- * that gets a WhatsApp sender flagged, so free text is the only honest option
- * for those six. quote_arrived is the exception, because it is not a
- * different sentence: it is the same notification yaadly_quote_landed_v2 was
- * approved for, word for word bar one clause (below). It reuses that
- * template (TWILIO_CONTENT_SID_QUOTE) unconditionally whenever the template
- * is configured, the same way the retired yaad-quote-landed did and for the
- * same reason: a template is valid inside the 24 hour window too, so one
- * path that always works beats two that each work half the time. Until
- * Trust Hub KYC clears (RUNBOOK.md), that path is what carries quote_arrived
- * over WhatsApp; the other six still depend on the client's own last message
- * being recent.
+ * None of the kinds below reuses an approved WhatsApp Content Template as
+ * its FIRST attempt, free text only: reusing a template approved for one
+ * sentence to send a different sentence is exactly the kind of thing that
+ * gets a WhatsApp sender flagged, and it would mean sending a fixed
+ * sentence instead of the real one, missing whatever the free text alone
+ * carries. quote_arrived is the one exception, and only as a fallback: if
+ * the free-text send fails specifically for landing outside WhatsApp's 24
+ * hour window, and TWILIO_CONTENT_SID_QUOTE is configured, it retries once
+ * with that approved template (yaadly_quote_landed_v2) rather than
+ * reporting the failure and stopping there. Deliberately not used
+ * unconditionally: quote_arrived's free text carries the worker's own
+ * proposed scope in words (Stage 6, founder's decision 31 Aug 2026, the
+ * client's reply to THIS message is what stands in for the portal's scope
+ * tick), which the template's four fixed variable slots cannot hold. A
+ * message that only sometimes has the scope in it is worse than one that
+ * sometimes arrives a little later; the template exists so a client
+ * outside the 24 hour window still gets something, not so the richer
+ * message gets skipped when it does not need to be.
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
