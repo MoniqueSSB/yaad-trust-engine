@@ -6,6 +6,12 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-08-31 · The concierge desk learns the report_confirm lane a second, correct time
+
+A separate session had already built and shipped the real mechanism for holding an AI-drafted evidence report for confirmation before it reaches a client (`relay_confirmed_report()`, the worker confirms, not the founder) while this one was independently designing and briefly deploying a different, competing version of the same idea from a single leftover test row, unaware the real thing already existed a few commits back on `main`. The duplicate (`confirm_evidence_report()`, `report_confirm_phone`) was live in production for a few minutes before the collision was caught, reverted by redeploying the correct code, and dropped from the database. Full account in this session's own record; the only thing worth keeping from it is here.
+
+What survives: the concierge desk's Mid-chat view (`wa_intake_sessions`) did not recognise `report_confirm` as a lane at all before either session touched it, and the real shipped answers shape (`job_id`, `stage`, `draft_text`, `ai_summary`) is exactly what this view now reads. Small, additive, and correct against the actual mechanism, so it stayed.
+
 ## 2026-08-31 · The Kickoff Pack approves with the quote, and drives the real stage rail
 
 `kickoff_packs.status` could be `approved`, the desk's own copy said "approving is what lets it reach a client," and RLS already correctly refused to show an unapproved pack to a client (`parties read approved packs`, status = 'approved' and the job matches their email). Nothing anywhere ever set that column. Every pack, forever, was invisible to every client: a fully built gate with no handle on the door. Founder's instruction, 31 Aug 2026: the pack approves at the exact moment the client accepts a quote, not as a separate admin action, so `choose_worker()` now looks up the job's pack, refuses the whole choice if no pack has been drafted (`docs is null`), and sets `status = 'approved', approved_by = <the client>, approved_at = now()` in the same transaction that assigns the worker and starts the job. One decision, one commit.
