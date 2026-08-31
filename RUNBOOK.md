@@ -704,6 +704,10 @@ where proname in ('notify_client_quote_arrived','notify_client_on_job_change','n
 
 Every `fn_hash` should equal `stored_hash`. If one does not, that function was regenerated with a new secret by mistake; fix it the same way, extracting the value every OTHER function still agrees on and re-baking that into the broken one, never picking a fresh value to settle the disagreement.
 
+**Confirmed live, 31 Aug 2026: two separate instances of this drift, currently both live.** The query above, run against the real database while verifying the burst-photo debounce fix, shows `notify_worker_of_portal_comment` and `relay_confirmed_report` both reporting a `fn_hash` that does not match `stored_hash` right now, meaning a worker's WhatsApp comment notification and a confirmed evidence report relay to the client are both silently failing their own secret check today. Fix the same way as above: extract the plaintext every other trigger still agrees on, re-bake it into these two.
+
+**The same drift exists in a shape this query does not check: an environment secret, not a trigger function.** `yaad-job-health`, `yaad-followup-check` and `yaad-evidence-landed-check` are Edge Functions, not `pg_proc` triggers, so they cannot bake a plaintext into their own source the way a trigger does; they read `YAAD_CRON_SECRET` from the environment instead and send that as `secret` when calling `yaad-notify-client` directly. Confirmed live, 31 Aug 2026: `YAAD_CRON_SECRET`'s current value does **not** hash to `notify_trigger_secret_sha256` (checked with a temporary diagnostic log comparing the two SHA-256 digests directly, then removed). Every `yaad-notify-client` call these three functions make gets a silent `403`, `net._http_response`-invisible the same way a trigger's own mismatch is, since none of these three go through `net.http_post`, they call `fetch()` from inside the function itself: check `function_logs` for `"notify-client" ... 403` on the calling function, not `net._http_response`. Not yet fixed: correcting it means rotating `YAAD_CRON_SECRET` to a fresh value, hashing it, and updating `notify_trigger_secret_sha256` in `app_settings` to match, which touches every live trigger that checks that same stored hash, a bigger blast radius than any one of these three functions on its own. Confirm with Monique before rotating it.
+
 ## The AI photo review comes back empty
 
 **Check the function's own console output, not just the trace.** `reviewEvidencePhotos()` in `yaad-notify-client` logs a specific reason with `console.error` on every failure path as of 31 Aug 2026: `NVIDIA_API_KEY` unset, no image URLs to review, an HTTP error from NVIDIA, or the model's response not containing a JSON array at all. Query `function_logs` for the function around the time of the send:
@@ -714,6 +718,115 @@ where source = 'function_logs' and event_message ilike '%yaad-vision%'
 order by timestamp desc limit 20
 ```
 
-**A known, live cause as of 31 Aug 2026: the model itself sometimes declines the request outright**, returning a plain refusal sentence instead of the JSON array the system prompt asks for, "I'm not going to engage in this discussion topic." The call succeeds (HTTP 200), `photoUrls` resolves correctly, the request reaches NVIDIA; the model's own response is the failure. Not yet fixed. Worth trying, in rough order: a different `NVIDIA_VISION_MODEL`, rewording the system prompt to read less like a content-moderation trigger, or treating a non-JSON response as a distinct, reportable outcome rather than folding it into the same silent `null` every other failure returns.
+**Fixed, 31 Aug 2026: the refusal was the model, not the wiring.** `nvidia/nemotron-nano-12b-v2-vl` was declining outright, "I'm not going to engage in this discussion topic," on a system prompt that read like a content-moderation trigger ("reviewer", "hazards", "diagnosis", a preamble about not being a licensed surveyor). Switched to `meta/llama-3.2-11b-vision-instruct` and reworded the prompt to describe visible condition for a job log rather than "review for hazards," same categories, same JSON shape. Confirmed live: the refusal did not recur across seven live test calls after the switch. `microsoft/phi-3.5-vision-instruct` was tried as a second option and returns 404, not a valid model slug on NVIDIA's `integrate.api.nvidia.com` catalog; do not reach for it without checking the model actually exists first.
+
+**Not fixed, and not going to be from this side: NVIDIA's hosted latency for the working model is uneven call to call.** Confirmed live the same day, same single photo, same everything else: one request back in about fifteen seconds, the next past thirty five with nothing, the next a flat `http 500 Internal Server Error`. `reviewEvidencePhotos()` now retries once, only on a timeout or a 5xx (25s per attempt), and gives up rather than trying a third time; a refusal or unparseable body is not retried, since asking the same question again is unlikely to change the answer. In a small sample of live tests after the fix, this still failed outright (both attempts) more often than it succeeded. That is a real, current characteristic of NVIDIA's free-tier hosted inference for this model, not a bug in this repository: the feature degrades correctly when it happens (the client still gets the fixed sentence, nothing crashes, nothing blocks), and `yaadly.vision.outcome` (`ok`, `timeout`/`infra_error`, `unusable_response`) plus `yaadly.vision.attempts` on the span tell you which happened without reading function_logs. If this needs to be more reliable than that, the next lever is a different vision provider entirely, not a longer timeout on this one.
+
+**Findings are now attributed to a specific photo, not just the stage** (evidence item codes, below): each image is labelled `Photo P1:` before it in the prompt, and the model is asked to echo `photo_code` back per finding. A model that drops the label on a single-photo stage still resolves correctly (there is only one candidate); on a multi-photo stage a dropped label is left unattributed rather than guessed onto the wrong photo.
 
 **Log query timing note.** `function_logs` entries were not reliably queryable for roughly a minute after the request that produced them, in testing 31 Aug 2026; `net._http_response`, by contrast, reflected a completed request within a few seconds every time. When chasing a fresh failure, check `net._http_response` first to confirm the request actually landed, then allow real time before concluding `function_logs` has nothing to show.
+
+## A deployed Edge Function is suddenly missing hours of work
+
+**This happened live, 31 Aug 2026, to `yaad-notify-client`, mid-session, with two Claude sessions working in the same tree.** `supabase functions list` showed the live version had reverted to code with no `evidence_report_confirmed`, no `evidence_comment`, no AI vision review, nothing from that day's Stage 6 or reporting-agent work, roughly six hours of shipped features gone from production in one deploy. The working tree on disk was correct the whole time; only the deployed bundle was stale.
+
+**The cause was almost certainly a deploy tool that takes pasted file contents rather than reading from disk**, the exact failure CLAUDE.md already names ("Never paste file contents into a deploy tool. It has silently shipped a different intake flow before"), now confirmed a second, different way: a second session (or the same one, at a different point) deployed an old in-memory copy of the file over a newer one already live on the CLI path, with no warning and no version conflict shown to either side.
+
+**Found by symptom, not by suspicion.** A live call that should have worked returned `{"error":"secret, jobId and a valid kind are required."}` for a `kind` that plainly existed in the source on disk. Reading the deployed source back (`get_edge_function` in the Supabase MCP tools, or the dashboard) showed a `KINDS` array missing that value entirely, i.e. a genuinely different, older file than the one in the working tree.
+
+**Fixed by redeploying from disk immediately**, the ordinary `supabase functions deploy <name> --project-ref <ref>` path, which is always the fix once this is spotted: the file on disk is the source of truth, so redeploying it always wins.
+
+**If a live call fails in a way that makes no sense against the code you are reading, check the deployed source before debugging the code further.** `get_edge_function` (or the dashboard's function source view) shows exactly what is running, which may not be exactly what is in the file in front of you, especially with more than one session active. Cheap to check, expensive to assume.
+
+## A worker or client's comment did not attribute to the right photo
+
+**Every evidence row now carries a short `item_code`** (`P1`, `P2`, ...), assigned automatically at insert, sequential per job in filing order (20260831zzzz2). Check it directly:
+
+```sql
+select item_code, label, stage, created_at from evidence
+ where job_id = 'JOB-XXXX' order by created_at;
+```
+
+**A comment only attributes to one photo when the message actually names its code.** `pickEvidenceItem()` in `supabase/functions/yaad-inbound/evidence-item-match.ts` requires a `p` or `P` immediately before the digits, word-bounded (`p1` matches, `p12` does not match `P1`, a bare `1` never matches). A plain comment with no code sets `evidence_comments.evidence_id` to null, exactly as it did before item codes existed: it is still read as being about the whole stage, not guessed onto one photo.
+
+**The portal writes `evidence_id` directly**, no code-parsing involved: `EvidenceItemComment.tsx` on `EvidenceLedger.tsx` calls `commentOnEvidence()` in `web/app/portal/job-actions.ts` with the exact evidence row's own id, since the client is looking straight at the photo they are commenting on.
+
+**A stray code that matches nothing on that job's own list attributes to nothing**, same as no code at all, rather than guessing the nearest one. If a client swears they typed a code and it did not attribute, check the digits against `item_code` on that stage exactly: `P9` on a stage that only goes up to `P3` will not match.
+
+**Two AI vision findings for the same stage now carry a `photo_code` each, assigned by which call produced them, not parsed from the model.** `reviewOnePhoto()` in `yaad-notify-client` reviews exactly one photo per call, run in parallel across a stage's photos, because NVIDIA's hosted `meta/llama-3.2-11b-vision-instruct` refuses more than one image in a single request (`http 400`, "At most 1 image(s) may be provided in one prompt"), confirmed live 31 Aug 2026. `summariseFindings()` prefixes each note with its code in the text a worker reads, but only when the stage has more than one photo, so a single-photo stage's message stays uncluttered. A partial result is expected and correct, not a bug: if one photo's call fails and another's succeeds, the ones that worked still ship.
+
+## A client's comment on one specific photo went nowhere, or a worker never saw the button
+
+**The button is `EvidenceItemComment.tsx`, client-only, one per photo in `EvidenceLedger.tsx`.** It only renders for `role === "client"`; a worker never sees it, and even a stray client-side bypass would be refused by the RLS insert policy on `evidence_comments` (`client writes an evidence comment from the portal`, 20260831z), which locks `from_role = 'client'` and `origin = 'portal'` and checks the signed-in email against `jobs.client_email` itself. Checked live by impersonating three identities directly against the database: the job's real client succeeds, its own worker is refused, and a stranger is refused, all before any application code runs.
+
+**It is write-only, on purpose, matching the WhatsApp half of the same loop.** There is no persisted thread view in the portal for either channel yet: a client's WhatsApp comment isn't shown back to them there either. Building a full comment thread view is a separate, bigger piece of work than the button that was asked for; if a client says "I don't know if the worker saw it," the honest answer today is that they get a "Sent to the worker" confirmation and the worker gets a real WhatsApp notification (`yaadly.evidence_comment.worker_notified` on the trace), not a visible reply back in the portal.
+
+**To see what was actually written**, `evidence_comments.origin = 'portal'` is the whole filter:
+
+```sql
+select stage, evidence_id, body, created_at from evidence_comments
+ where job_id = 'JOB-XXXX' and origin = 'portal' order by created_at;
+```
+
+## A promised next step was never followed up, or a worker got an unexpected draft to confirm
+
+**Read `job_followups` first**, the actual record of what was promised and when it is due:
+
+```sql
+select stage, reason, created_at, due_at, fired_at from job_followups
+ where job_id = 'JOB-XXXX' order by created_at desc;
+```
+
+**A row only exists when the reporting agent actually named a real next step.** `composeEvidenceReport()`'s own `what_happens_next` field creates or refreshes one (`create_job_followup`, called from `yaad-notify-client`'s `evidence_landed` branch) whenever that text is non-empty and does not start with "nothing"; a report that said there was nothing further leaves no row, correctly, since there is nothing to check back on.
+
+**One pending row per job and stage.** A fresh report on the same stage before the old promise is due replaces it (same reason column, refreshed due date), rather than the two piling up: `job_followups_pending_uniq` is a partial unique index on `(job_id, stage) where fired_at is null`, and `create_job_followup` upserts against exactly that.
+
+**`fired_at is null` rows disappear on their own once the stage shows real activity, before the reply.** `clear_resolved_followups()`, run first on every `yaad-followup-check` call, deletes a pending row the moment evidence, an arrival, or a stage approval lands on that job and stage AFTER the row's own `created_at`. This is not a bug if a follow-up "vanishes" before its due date: it means the promised thing (or something else on that stage) already happened.
+
+**If `due_at` has passed and `fired_at` is still null, the daily check has not run yet, or it ran and the re-notify call itself failed.** `yaad-followup-check` runs at 14:00 UTC as `cron.job` "yaad-followup-check", one hour after `yaad-job-health`. It marks a row fired whether or not the re-notify call to `yaad-notify-client` succeeded, the same "we attempted this" distinction every other notification in this file already draws; check `net._http_response` for a fresh `evidence_landed` call against that job around the time `fired_at` was set to see whether it actually landed.
+
+**What actually happens when one fires: the exact same worker-confirms-first draft/relay loop `evidence_landed` already runs**, not a second, different reminder. The worker gets a fresh drafted report to confirm or rewrite, based on whatever evidence exists on the stage right now; nothing here invents new wording or messages the client directly. If a worker says "I got a random draft to confirm out of nowhere," check `job_followups` for a row on that job whose `due_at` matches: this is very likely why.
+
+**To run the check by hand rather than waiting for the schedule**, sign in as an admin and POST to `yaad-followup-check` with an `Authorization: Bearer <admin JWT>` header and no `secret` in the body, same as `yaad-job-health`.
+
+**Never a payment decision.** `approve_stage()` does not read this table, and nothing in `yaad-followup-check` touches `jobs.status`, `stage_approvals` or `evidence` directly; it only ever calls `yaad-notify-client`, the same door every other coordination notification in this repository already goes through.
+
+## A client can book a worker by replying on WhatsApp, no account needed
+
+**If a client says they replied to book a worker and nothing happened**, first check which of three things actually occurred, in `job_quotes` and `scope_agreements` for that job:
+
+```sql
+select id, status, worker_email from job_quotes where job_id = 'JOB-XXXX';
+select side, email, agreed_at from scope_agreements where job_id = 'JOB-XXXX';
+```
+
+- No `scope_agreements` row with `side = 'client'` at all: the reply never reached `choose_worker_via_whatsapp()`, most likely the reply did not contain the job's own code exactly, the same strict match `approve_stage_via_whatsapp()` uses. Check `yaadly.whatsapp_quote_accept.outcome` on the trace for that message.
+- A `client` row exists, no `worker` row for that quote's `worker_email`: this is working as designed, not a bug. The client's reply is on record; booking completes the moment the worker also agrees the scope (today, only through the portal's own tick, `agreeScope()`), and nothing re-checks this automatically. The client's reply from earlier does not need to be repeated once the worker catches up: whoever's action lands second is what actually books it, so tell the worker to tick their side and it resolves on its own.
+- Both rows exist, but `job_quotes.status` is still `submitted`: something else already has `jobs.worker_email` set (a worker was chosen a different way in between), and `choose_worker_via_whatsapp()` correctly refused. Check `jobs.worker_email` and go from there; this is not this door's bug to fix.
+
+**The price message a client replies to now states the worker's proposed scope, not only the price.** `yaad-notify-client`'s `quote_arrived` kind reads `job_quotes.note`; if a worker left that blank, the client only sees the price and the reply-to-book hint is still offered, since there is nothing further to withhold, but there is also nothing to have actually agreed to in words. If this matters for a specific job, ask the worker to add a line to their quote and re-submit.
+
+**`choose_worker_via_whatsapp()` and `choose_worker()` are two doors onto the exact same `_do_choose_worker()` core**, same as `approve_stage()`/`approve_stage_via_whatsapp()`. A change to booking rules belongs in `_do_choose_worker()`, never duplicated into either door separately.
+
+## `accept_quote_as_me()` (the no-account `/jobs/[id]/quotes` page) actually books now
+
+**If a client on this specific page says they accepted a quote and the job still shows no worker, or a rival quote is stuck on `submitted` forever**, that was a real, live bug before 31 Aug 2026, fixed the same day: the function never set the `yaadly.choosing` session flag `job_quotes_touch`'s trigger requires before it lets a non-admin move a quote's status at all, so bookings through this specific page silently did nothing to the quote row while still reporting success. If a client reports this after that date, something has regressed; check `job_quotes_touch`'s definition is still what `choose_worker()` and `accept_quote_as_me()` both expect (`set_config('yaadly.choosing', '1', true)` around the status-changing updates).
+
+**This page still does not require the scope agreement `choose_worker()` enforces.** That is a live product gap, not a bug: flagged in `DECISIONS.md`, not decided. If it ever needs closing, the fix is deleting `accept_quote_as_me()`'s own duplicate mutation logic and having it call `_do_choose_worker()` instead, the same shared core the WhatsApp door uses, not patching this function a third time.
+
+## A burst of WhatsApp photos only got one evidence_landed message, later than the first photo
+
+**This is by design, not a delay to chase.** `evidence_landed` no longer fires the moment the first photo of a stage lands; every evidence insert resets a 90 second quiet timer for that job and stage (`evidence_landed_pending`, `20260831zzzz6`), and the notification only actually goes out once nothing new has landed for the full 90 seconds, checked once a minute by `yaad-evidence-landed-check` (`20260831zzzz7`). One photo still notifies, just after a short pause; several photos sent close together get one notification covering all of them instead of one covering whichever photo happened to land first, which was the actual bug this replaced.
+
+**To see an open timer, or check whether one already fired:**
+
+```sql
+select job_id, stage, created_at, due_at, fired_at from evidence_landed_pending
+ where job_id = 'JOB-XXXX' order by created_at desc;
+```
+
+`fired_at is null` means still waiting out the quiet window (or waiting on the once-a-minute check to notice it has elapsed, up to a minute past `due_at`). `fired_at` set with no `evidence_landed` having reached anyone means `due_evidence_landed_notifies()` found the stage no longer worth notifying about at check time, evidence landed but the stage was approved, disputed, or moved past in the meantime, the same "real activity already answered it" clearing `job_followups` does; this is correct behaviour, not a dropped notification.
+
+**If a timer fires (`fired_at` set) but nobody was actually told**, check `yaad-evidence-landed-check`'s own logs for a `403` from `yaad-notify-client` first: `YAAD_CRON_SECRET` not matching `notify_trigger_secret_sha256` (see "The notify trigger secret gets out of sync (again)", above) is a live, confirmed cause as of 31 Aug 2026, not hypothetical. If that check comes back clean, the fault is downstream in `yaad-notify-client` itself (no worker phone on file, an AI review failure, a Twilio send failure), the same causes as `evidence_landed`'s existing failure modes elsewhere in this file, not anything specific to the debounce.
+
+**Retuning the 90 second window** is one constant, `interval '90 seconds'` in `schedule_evidence_landed_notify()`, plus the cron cadence itself if the check needs to run more or less often than once a minute (`cron.schedule('yaad-evidence-landed-check', ...)`, `20260831zzzz7`). Both need a new migration, not a dashboard edit, same as every other constant in this file that has one.

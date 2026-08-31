@@ -6,6 +6,7 @@ import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
 import { matchApprovingJob } from "./approval-match.ts";
+import { pickEvidenceItem } from "./evidence-item-match.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -1005,9 +1006,18 @@ Deno.serve(async (req: Request) => {
 
           if (awaitingReply.length === 1) {
             const job = awaitingReply[0];
+            // A code in the worker's reply ("P2 is done now") attributes
+            // the answer to one specific photo rather than the whole
+            // stage, when one is actually named; a plain reply with no
+            // code stays exactly as it was, about the stage, since a
+            // worker answering generally has not necessarily seen the
+            // client's own point about one item.
+            const { data: stageItems } = await supabase.from("evidence")
+              .select("id, item_code").eq("job_id", job.id).eq("stage", job.stage);
+            const namedItem = pickEvidenceItem(msg.text, stageItems ?? []);
             await supabase.from("evidence_comments").insert({
               job_id: job.id, stage: job.stage, from_role: "worker", origin: "whatsapp",
-              body: msg.text.trim().slice(0, 1000),
+              body: msg.text.trim().slice(0, 1000), evidence_id: namedItem?.id ?? null,
             });
             root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "worker" });
 
@@ -1026,6 +1036,54 @@ Deno.serve(async (req: Request) => {
               ? `Got it, passed on to the client on ${job.id}.`
               : `Got it, on record against ${job.id}. We could not reach the client directly just now, but it is saved.`);
           }
+        }
+      }
+
+      // Stage 6: a client booking a worker by replying with the job's own
+      // code, rather than tapping Accept in the portal. Same guard as the
+      // approval block below and the same reason: every plain text message
+      // a client sends passes through here, so only an exact code match is
+      // trusted, never a bare "yes". A job with more than one open price at
+      // once refuses the reply rather than guessing which one was meant.
+      //
+      // This calls choose_worker_via_whatsapp(), not the older
+      // accept_quote_via_whatsapp() the first version of this block called:
+      // that was built on accept_quote_as_me(), a stale duplicate of the
+      // real booking path found only once this was tested live against a
+      // real database. choose_worker() is what the signed-in portal
+      // actually uses, and it will not book a worker until both the client
+      // and the worker have separately agreed the job's scope. The
+      // client's side of that agreement is what this reply IS, per the
+      // founder's own decision, 31 Aug 2026: yaad-notify-client sends the
+      // worker's proposed scope in words before this reply is ever asked
+      // for, so replying with the code is a real yes to a real proposal,
+      // not a rubber stamp. If the worker has not agreed their own side
+      // yet, choose_worker_via_whatsapp() does not fail on that: the
+      // client's own agreement is recorded either way, and it returns a
+      // distinct marker rather than an error so that recording is never
+      // rolled back by a refusal that follows it in the same call. Nothing
+      // then auto-completes the booking the moment the worker's side
+      // lands, on purpose, matching the portal's own agreeScope(), which
+      // does not retry choose_worker() on its own either: whoever tries
+      // second, client or worker, is the one whose action actually books
+      // it.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: openToBook } = await supabase.from("jobs")
+          .select("id, title, stage, client_phone")
+          .eq("status", "quoted")
+          .not("client_phone", "is", null);
+        const bookTail = msg.from.replace(/\D/g, "").slice(-9);
+        const mineToBook = (openToBook ?? []).filter((j: any) =>
+          String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === bookTail);
+
+        const bookTarget = matchApprovingJob(msg.text, mineToBook);
+        if (bookTarget) {
+          const { data: bookResult, error } = await supabase.rpc("choose_worker_via_whatsapp", { p_job: bookTarget.id, p_phone: msg.from });
+          const pending = bookResult === "PENDING_WORKER_SCOPE";
+          root.setAttributes({ "yaadly.whatsapp_quote_accept.job": bookTarget.id, "yaadly.whatsapp_quote_accept.outcome": error ? "refused" : pending ? "pending_worker" : "accepted" });
+          if (error) return twiml(`That did not go through: ${error.message}`);
+          if (pending) return twiml(`Got it, that's on record. ${bookTarget.title} books the moment the worker also confirms the scope, and you'll hear the moment it does.`);
+          return twiml(`Booked. ${bookTarget.title} is on. A message with the price and how payment works is coming through next.`);
         }
       }
 
@@ -1066,8 +1124,15 @@ Deno.serve(async (req: Request) => {
         // somebody describing a fresh problem.
         if (mine.length === 1) {
           const job = mine[0] as { id: string; title: string; stage: number; worker_email: string | null };
+          // Same attribution as the worker's reply above: "P2 has a gap
+          // still" names one photo, a plain complaint stays about the
+          // whole stage, exactly as it always has.
+          const { data: stageItems } = await supabase.from("evidence")
+            .select("id, item_code").eq("job_id", job.id).eq("stage", job.stage);
+          const namedItem = pickEvidenceItem(msg.text, stageItems ?? []);
           await supabase.from("evidence_comments").insert({
             job_id: job.id, stage: job.stage, from_role: "client", body: msg.text.trim().slice(0, 1000),
+            evidence_id: namedItem?.id ?? null,
           });
           root.setAttributes({ "yaadly.evidence_comment.job": job.id, "yaadly.evidence_comment.from": "client" });
 

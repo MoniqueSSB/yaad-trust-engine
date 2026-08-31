@@ -36,7 +36,7 @@
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 
@@ -53,7 +53,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed"] as const;
+const KINDS = ["quote_arrived", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -186,11 +186,16 @@ function extractReportingJson(s: string): Record<string, string> | null {
   return null;
 }
 
+type ComposedReport = { message: string; nextStep: string };
+
 // Returns null on anything short of a clean, usable report, so the caller's
-// existing fixed sentence is what actually ships. Never throws.
+// existing fixed sentence is what actually ships. Never throws. nextStep is
+// carried separately from the composed message, not re-parsed out of it
+// later, so the follow-up mechanism (job_followups, below) acts on exactly
+// what the model said rather than a second reading of its own words.
 async function composeEvidenceReport(
   admin: any, jobId: string, jobTitle: string, stage: number, trace: Trace,
-): Promise<string | null> {
+): Promise<ComposedReport | null> {
   try {
     const prov = pickTextProvider();
     if (!prov) return null;
@@ -216,7 +221,7 @@ async function composeEvidenceReport(
           model: prov.model, temperature: 0.3, max_tokens: 600,
           messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
         }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(25000),
       });
       const j = await r.json().catch(() => ({}));
       s.setAttributes({ "http.response.status_code": r.status });
@@ -235,7 +240,7 @@ async function composeEvidenceReport(
 
     const message = `${headline}\n\n${plain}\n\nNext: ${next}\nYou need to: ${action}`;
     if (guardrails.scan(message).length > 0) return null;
-    return message;
+    return { message, nextStep: next };
   } catch (_) {
     return null;
   }
@@ -256,22 +261,28 @@ const MAX_PHOTOS_SENT_DIRECTLY = 5;
  *  page relies on for a signed-in client's own session: this is a
  *  server-to-server send, not a page render, and the URL it hands back is
  *  only good for five minutes and only ever reaches Twilio's own fetch. */
-async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<string[]> {
+type EvidencePhoto = { url: string; code: string | null; label: string | null };
+
+async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<EvidencePhoto[]> {
   const { data: items } = await admin.from("evidence")
-    .select("storage_path, mime")
+    .select("storage_path, mime, item_code, label")
     .eq("job_id", jobId).eq("stage", stage)
     .not("storage_path", "is", null)
     .like("mime", "image/%")
     .order("created_at", { ascending: true })
     .limit(MAX_PHOTOS_SENT_DIRECTLY);
-  const paths = (items ?? []).map((e: any) => e.storage_path).filter(Boolean);
-  if (!paths.length) return [];
+  const rows = (items ?? []).filter((e: any) => e.storage_path);
+  if (!rows.length) return [];
 
   return await trace.span("storage.sign_evidence_urls", SpanKind.CLIENT, {}, async (s) => {
     try {
+      const paths = rows.map((e: any) => e.storage_path);
       const { data, error } = await admin.storage.from("evidence").createSignedUrls(paths, 300);
       if (error) { s.recordError(error.message); return []; }
-      return (data ?? []).map((r: any) => r.signedUrl).filter(Boolean) as string[];
+      const byPath = new Map((data ?? []).map((r: any) => [r.path, r.signedUrl]));
+      return rows
+        .map((e: any) => ({ url: byPath.get(e.storage_path), code: e.item_code ?? null, label: e.label ?? null }))
+        .filter((p: EvidencePhoto) => p.url) as EvidencePhoto[];
     } catch (e) {
       s.recordError(String(e).slice(0, 200));
       return [];
@@ -293,21 +304,34 @@ async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace
 // vision-language model can look at it, and nothing in an edge function
 // does that today; asked for, 31 Aug 2026, not yet built, said so rather
 // than silently reviewing nothing and calling it done.
-const VISION_SYSTEM_PROMPT = `You are a construction and property condition reviewer working for Yaadly, a property oversight service in Jamaica. You look at photos of a property or completed work and report ONLY what is visibly evident in the image itself. You are not a licensed surveyor, engineer, or inspector, and your findings are a starting point for a human project manager, not a final judgement.
+//
+// Reworded 31 Aug 2026: the original prompt ("reviewer", "hazards",
+// "diagnosis", a preamble about not being a licensed surveyor) reads like
+// exactly the shape of prompt a safety-tuned model is trained to decline,
+// and in practice NVIDIA's model was declining it outright rather than
+// returning findings, confirmed live in function_logs ("I'm not going to
+// engage in this discussion topic"). Nothing about what the feature needs
+// changed: same categories, same JSON shape, same refusal to overstate
+// certainty. What changed is the framing, from "review this for hazards"
+// to "note the visible condition for a job log", which is a description
+// task rather than a judgement one.
+const VISION_SYSTEM_PROMPT = `You write short, factual condition notes for a property maintenance job log in Jamaica, based on photos a tradesperson has taken on site. You describe only what is plainly visible in each image.
 
-For each photo, look for visible issues in these categories where present:
-- Water damage or staining
-- Cracks (wall, foundation, ceiling)
-- Peeling, bubbling, or flaking paint
-- Missing, cracked, or degraded sealant or grout
-- Mould or damp
-- Rust or corrosion on metalwork
-- Roofing issues (missing tiles, visible sagging, rust on zinc)
-- Visible electrical hazards (exposed wiring, damaged fixtures)
-- Visible plumbing issues (leaks, staining under fixtures)
-- Structural concerns (visible sagging, leaning, significant cracking)
-- Incomplete or inconsistent work versus the agreed scope, if scope is provided
-- General visible safety hazards
+Note anything visible in these categories, where present:
+- Water staining or damp marks
+- Cracks in a wall, ceiling or floor
+- Paint that is peeling, bubbling or flaking
+- Sealant or grout that is missing, cracked or worn
+- Mould
+- Rust on metalwork
+- Roofing wear (missing tiles, sagging, rust on zinc)
+- Wiring or fixtures that look damaged or exposed
+- Plumbing marks (leaks, staining under fixtures)
+- Visible sagging, leaning or significant cracking in the structure
+- Work that looks incomplete or does not match the stated scope, if a scope is given
+- Anything else visibly out of place for a completed or in-progress job
+
+You are shown one photo at a time.
 
 Respond with a JSON array ONLY, no other text before or after it, in this exact shape:
 [
@@ -315,76 +339,165 @@ Respond with a JSON array ONLY, no other text before or after it, in this exact 
     "issue": "short label, e.g. Sealant missing on right column",
     "category": "one of: cosmetic, maintenance, safety, structural, scope_mismatch",
     "severity": "low, medium, or high",
-    "note": "one sentence, plain English, describing only what is visible",
+    "note": "one plain sentence describing only what is visible",
     "recommend_professional": true or false
   }
 ]
 
 Rules:
 - If nothing notable is visible, return an empty array: []
-- Never state a structural or safety diagnosis with certainty. Use language like "appears to show" or "worth checking in person"
-- Any finding in the "structural" or "safety" category MUST have "recommend_professional": true
-- Do not invent detail that is not visible in the image
-- If the photo is unclear, too dark, or too zoomed to judge, say so as a low-severity "cosmetic" note rather than guessing
+- Describe only what the image shows. Use phrasing like "appears to show" or "worth a closer look in person" rather than stating a firm diagnosis
+- Any note in the "structural" or "safety" category should have "recommend_professional": true
+- Do not add anything you cannot see in the photo
+- If a photo is unclear, too dark, or too zoomed to make out, note that as a low-severity "cosmetic" item rather than guessing
 - Output ONLY the JSON array`;
 
-type VisionFinding = { issue?: string; category?: string; severity?: string; note?: string; recommend_professional?: boolean };
+type VisionFinding = {
+  photo_code?: string; issue?: string; category?: string; severity?: string;
+  note?: string; recommend_professional?: boolean;
+};
 
-async function reviewEvidencePhotos(images: string[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
-  const key = Deno.env.get("NVIDIA_API_KEY");
-  if (!key) { console.error("yaad-vision: NVIDIA_API_KEY is not set"); return null; }
-  if (!images.length) { console.error("yaad-vision: no image URLs to review"); return null; }
-  const model = Deno.env.get("NVIDIA_VISION_MODEL") || "nvidia/nemotron-nano-12b-v2-vl";
+// nvidia/nemotron-nano-12b-v2-vl was both declining the request outright
+// ("I'm not going to engage in this discussion topic") and, separately,
+// running past a 20s timeout on ordinary requests, confirmed live 31 Aug
+// 2026. Llama 3.2's vision model is a mainstream instruction-tuned
+// checkpoint with none of a "nano" experimental build's rough edges, and
+// is what most NIM users actually run for photo description tasks. It
+// stopped refusing once switched, but NVIDIA's hosted infrastructure for
+// it is still uneven call to call, confirmed live the same day across
+// three different shapes: a clean 15s response, a request that ran past
+// 35s with nothing back, and a flat "http 500 Internal Server Error" on
+// the very next attempt after that. A timeout and a 5xx are both "NVIDIA's
+// side had a bad moment," worth one retry; a refusal or unparseable body
+// is NVIDIA answering and answering badly, which asking again is unlikely
+// to fix and isn't tried a second time.
+async function attemptVisionReview(
+  model: string, key: string, userContent: Record<string, unknown>[], s: { setAttributes: (a: Record<string, AttrValue>) => unknown },
+): Promise<{ ok: true; findings: VisionFinding[] } | { ok: false; retryable: boolean }> {
+  try {
+    const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model, temperature: 0.2, max_tokens: 1200,
+        messages: [{ role: "system", content: VISION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
+      }),
+      signal: AbortSignal.timeout(25000),
+    });
+    s.setAttributes({ "http.response.status_code": r.status });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      console.error(`yaad-vision: nvidia http ${r.status}: ${errText.slice(0, 300)}`);
+      return { ok: false, retryable: r.status >= 500 };
+    }
+    const j = await r.json();
+    const raw = j?.choices?.[0]?.message?.content ?? "[]";
+    const match = String(raw).match(/\[[\s\S]*\]/);
+    if (!match) {
+      // A non-JSON reply is a distinct, reportable outcome, not the same
+      // silent null as "never ran" (no key, no images): it means NVIDIA
+      // answered and the answer was not usable, most likely a refusal.
+      // Told apart in telemetry so a repeat can be seen without reading
+      // function_logs every time, per RUNBOOK.md.
+      console.error(`yaad-vision: no JSON array in model response: ${String(raw).slice(0, 300)}`);
+      return { ok: false, retryable: false };
+    }
+    return { ok: true, findings: JSON.parse(match[0]) };
+  } catch (e) {
+    const isTimeout = e instanceof Error && e.name === "TimeoutError";
+    console.error(`yaad-vision: ${isTimeout ? "timed out" : "threw"}: ${String(e).slice(0, 300)}`);
+    return { ok: false, retryable: isTimeout };
+  }
+}
 
+function findingLabel(f: VisionFinding, images: EvidencePhoto[]): string {
+  const code = f.photo_code?.trim();
+  if (code && images.some((p) => p.code === code)) return code;
+  return "";
+}
+
+// Discovered live, 31 Aug 2026: NVIDIA's hosted meta/llama-3.2-11b-vision-
+// instruct refuses more than one image in a single request outright
+// ("At most 1 image(s) may be provided in one prompt"), an http 400, not a
+// refusal or a timeout. A stage with more than one photo was silently
+// getting no review at all rather than a partial one, since the whole
+// batched call failed before any image was looked at.
+//
+// The fix turns out better than the batched design it replaces: one call
+// per photo, run together rather than one after another so the wall clock
+// stays close to a single photo's own latency, not the sum of five. Which
+// photo a finding is about is no longer something the model has to get
+// right and echo back, it is simply which call produced it, assigned here
+// with certainty rather than parsed from the model's own words.
+async function reviewOnePhoto(
+  model: string, key: string, photo: EvidencePhoto, jobTitle: string, trace: Trace,
+): Promise<VisionFinding[] | null> {
   return await trace.span(`chat ${model}`, SpanKind.CLIENT, {
     "gen_ai.system": "nvidia_nim", "gen_ai.operation.name": "chat", "gen_ai.request.model": model,
     "server.address": "integrate.api.nvidia.com", "yaadly.agent.name": "photo_review",
+    "yaadly.vision.photo_code": photo.code ?? "",
   }, async (s) => {
-    try {
-      const userContent: Record<string, unknown>[] = [
-        { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview the following photo(s) and return findings as instructed.` },
-        ...images.slice(0, 6).map((url) => ({ type: "image_url", image_url: { url } })),
-      ];
-      const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model, temperature: 0.2, max_tokens: 1200,
-          messages: [{ role: "system", content: VISION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
-        }),
-        signal: AbortSignal.timeout(20000),
-      });
-      s.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) {
-        const errText = await r.text().catch(() => "");
-        console.error(`yaad-vision: nvidia http ${r.status}: ${errText.slice(0, 300)}`);
-        s.recordError(`nvidia http ${r.status}`);
-        return null;
-      }
-      const j = await r.json();
-      const raw = j?.choices?.[0]?.message?.content ?? "[]";
-      const match = String(raw).match(/\[[\s\S]*\]/);
-      if (!match) console.error(`yaad-vision: no JSON array in model response: ${String(raw).slice(0, 300)}`);
-      const findings = match ? JSON.parse(match[0]) : [];
-      s.setAttributes({ "yaadly.vision.finding_count": findings.length });
-      return findings;
-    } catch (e) {
-      console.error(`yaad-vision: threw: ${String(e).slice(0, 300)}`);
-      s.recordError(String(e).slice(0, 200));
+    const userContent: Record<string, unknown>[] = [
+      { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview this photo and return findings as instructed.` },
+      { type: "image_url", image_url: { url: photo.url } },
+    ];
+    let result = await attemptVisionReview(model, key, userContent, s);
+    let attempts = 1;
+    if (!result.ok && result.retryable) {
+      result = await attemptVisionReview(model, key, userContent, s);
+      attempts = 2;
+    }
+    s.setAttributes({ "yaadly.vision.attempts": attempts });
+    if (!result.ok) {
+      s.setAttributes({ "yaadly.vision.outcome": result.retryable ? "infra_error" : "unusable_response" });
+      s.recordError(result.retryable ? "infra_error" : "unusable_response");
       return null;
     }
+    s.setAttributes({ "yaadly.vision.outcome": "ok", "yaadly.vision.finding_count": result.findings.length });
+    // Assigned from the call that produced it, not from anything the model
+    // said: this call only ever saw one photo, so there is nothing to
+    // attribute wrong.
+    return result.findings.map((f) => ({ ...f, photo_code: photo.code ?? undefined }));
   });
+}
+
+/** Null only when nothing could be reviewed at all (no key, no images, or
+ *  every photo's call failed): the caller's existing fixed sentence is what
+ *  ships then. A stage where some photos reviewed and others did not still
+ *  returns the findings that did, rather than discarding a partial result
+ *  because one photo out of several had a bad moment. */
+async function reviewEvidencePhotos(images: EvidencePhoto[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
+  const key = Deno.env.get("NVIDIA_API_KEY");
+  if (!key) { console.error("yaad-vision: NVIDIA_API_KEY is not set"); return null; }
+  if (!images.length) { console.error("yaad-vision: no image URLs to review"); return null; }
+  const model = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-11b-vision-instruct";
+
+  const perPhoto = await Promise.all(
+    images.slice(0, 6).map((p) => reviewOnePhoto(model, key, p, jobTitle, trace)),
+  );
+  const reviewed = perPhoto.filter((r): r is VisionFinding[] => r !== null);
+  if (!reviewed.length) return null;
+  return reviewed.flat();
 }
 
 /** One line the client can actually read, not a JSON dump. Null return
  *  (the model call failed) is handled by the caller, which just leaves the
- *  AI section out rather than claim a review happened when it did not. */
-function summariseFindings(findings: VisionFinding[]): string {
+ *  AI section out rather than claim a review happened when it did not.
+ *  Prefixes each note with its photo's code, but only when there is more
+ *  than one photo to tell apart: on a single-photo stage, "P1:" in front
+ *  of every sentence is noise nobody needs to disambiguate anything. */
+function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): string {
   if (!findings.length) return "Nothing of concern visible in what was sent.";
   const worst = findings.some((f) => f.severity === "high") ? "high"
     : findings.some((f) => f.severity === "medium") ? "medium" : "low";
   const escalate = findings.some((f) => f.recommend_professional);
-  const items = findings.slice(0, 3).map((f) => f.note || f.issue).filter(Boolean).join(" ");
+  const multi = images.length > 1;
+  const items = findings.slice(0, 3).map((f) => {
+    const text = f.note || f.issue;
+    if (!text) return null;
+    const code = multi ? findingLabel(f, images) : "";
+    return code ? `${code}: ${text}` : text;
+  }).filter(Boolean).join(" ");
   const tail = escalate ? " Worth a professional look in person." : "";
   const more = findings.length > 3 ? ` (${findings.length - 3} more noted on the job.)` : "";
   return `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
@@ -427,7 +540,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: job } = await admin.from("jobs")
-      .select("id, title, parish, stage, portal_code, client_email, client_phone, worker_email")
+      .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
       .eq("id", jobId).maybeSingle();
     if (!job) return json({ error: "No such job." }, 404);
 
@@ -468,19 +581,51 @@ Deno.serve(async (req: Request) => {
 
     let subject = "";
     let line = "";
-    let photoUrls: string[] = [];
+    let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
 
     if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd")
+        .select("worker_name, labour_jmd, materials_jmd, note")
         .eq("job_id", jobId).eq("status", "submitted")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const total = (q?.labour_jmd ?? 0) + (q?.materials_jmd ?? 0);
       subject = `A price on your job: ${job.title}`;
+      // Stage 6, continued: a client with a phone on file can book straight
+      // from this message rather than needing to open the link at all. The
+      // founder's own decision, 31 Aug 2026: replying with the code is
+      // what stands in for the portal's own scope tick, so what the
+      // worker actually proposed to do has to be in this message in
+      // words, not only the price, before that reply is ever asked for.
+      // The link stays too, both because it is the fallback when more
+      // than one price is open at once, and because it remains the
+      // system of record.
+      const proposal = String(q?.note ?? "").trim();
+      const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
+      const bookHint = clientPhone
+        ? `Reply with the code ${job.id} to confirm that and book ${q?.worker_name ?? "them"}, or `
+        : "";
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
-        `${q?.worker_name ?? "A tradesperson"} quoted ${money(total)}. ` +
-        `Nothing is booked and nothing is charged until you choose. See it here: ${codeLink}`;
+        `${q?.worker_name ?? "A tradesperson"} quoted ${money(total)}.${scopeLine} ` +
+        `Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
+    } else if (kind === "quote_accepted") {
+      // Fired once, from the jobs row itself (notify_client_on_job_change,
+      // 20260831zzzz), the moment worker_email is first set, whichever of
+      // the two doors set it: a portal tap or a WhatsApp reply. Payment is
+      // relayed here, not collected: Yaadly is not holding money yet
+      // (CLAUDE.md 9), so this states the same off-platform terms already
+      // published in the worker FAQ, word for word, rather than inventing
+      // new payment language.
+      const { data: q } = await admin.from("job_quotes")
+        .select("worker_name, labour_jmd, materials_jmd")
+        .eq("job_id", jobId).eq("status", "accepted")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      subject = `Booked: ${job.title}`;
+      line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
+        `Labour ${money(q?.labour_jmd ?? 0)}, materials ${money(q?.materials_jmd ?? 0)} paid at cost against the receipt. ` +
+        `Yaadly is not holding this payment: pay the worker directly, per stage as you approve it, ` +
+        `within 3 working days, by bank transfer, Lynk wallet or remittance pick up, whichever you agree between you. ` +
+        `${roomLink}`;
     } else if (kind === "evidence_landed") {
       // Founder's own requirement, 31 Aug 2026, and a real change from how
       // this kind worked that same morning: the AI's composed report does
@@ -498,9 +643,24 @@ Deno.serve(async (req: Request) => {
             photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
           ])
         : [null, null];
-      const draftText = composed
+      const draftText = composed?.message
         || `Photos have come in for stage ${job.stage ?? 1}, with no description from you yet.`;
-      const aiSummary = findings ? summariseFindings(findings) : "";
+      const aiSummary = findings ? summariseFindings(findings, photoUrls) : "";
+      // Named once here, on more than one photo, so a reply naming a code
+      // means something without repeating "Items: ..." on every line below.
+      const itemsLine = photoUrls.length > 1
+        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}`
+        : null;
+
+      // The report's own "Next:" line finally does something, rather than
+      // sitting as narrative nobody acts on. A real next step named (not
+      // "nothing further", not blank) gets a follow-up flagged: if nothing
+      // has moved on this stage by the due date, the cron re-runs this
+      // exact draft/relay loop rather than a second, invented pattern.
+      const nextStep = composed?.nextStep?.trim() ?? "";
+      if (nextStep && !/^nothing/i.test(nextStep)) {
+        await admin.rpc("create_job_followup", { p_job: jobId, p_stage: job.stage ?? 1, p_reason: nextStep });
+      }
 
       if (workerPhone) {
         await admin.from("wa_intake_sessions").upsert({
@@ -519,6 +679,7 @@ Deno.serve(async (req: Request) => {
         `Here's what we'd tell the client about stage ${job.stage ?? 1} of ${job.title}:`,
         `"${draftText}"`,
         aiSummary ? `AI noticed: ${aiSummary}` : null,
+        itemsLine,
         `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
       ].filter(Boolean).join("\n\n");
       root.setAttributes({
@@ -538,14 +699,17 @@ Deno.serve(async (req: Request) => {
       const aiSummary = String(meta.ai_summary ?? "").trim();
       subject = `Evidence to review: ${job.title}`;
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
-      attachPhotos = photoUrls;
+      attachPhotos = photoUrls.map((p) => p.url);
 
       const workerSays = overrideText || `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
+      const itemsLine = photoUrls.length > 1
+        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}. Mention a code if your comment is about one specific photo.`
+        : null;
       const actionHint = clientPhone
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
         : "Review it and reply from your portal.";
-      line = [workerSays, aiSays, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+      line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
       root.setAttributes({ "yaadly.notify.photos_attached": photoUrls.length, "yaadly.notify.was_customised": !!overrideText });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
@@ -562,6 +726,25 @@ Deno.serve(async (req: Request) => {
       subject = `Confirmed: stage ${approval?.stage ?? ""} approved`;
       line = `You approved stage ${approval?.stage ?? ""} of ${job.title}. ` +
         `The worker is paid for it, and the job now carries the record. Nothing else to do here: ${roomLink}`;
+
+      // Stage 7. Convert at handover, the founder's own words: offered at
+      // the moment the client approves and feels relief, at the founding
+      // rate, never by email later. Only on the job's FINAL stage
+      // (sync_job_status marks the job complete once stage reaches 5), not
+      // on every approval along the way: pitching this mid-job would read
+      // as premature on a job that is not actually finished yet. No
+      // billing exists to switch on here (Phase 1, sell judgment, CLAUDE.md
+      // 9), so this captures a reply for the founder to follow up with
+      // personally, it does not pretend to start anything on its own.
+      if (job.status === "complete" && job.worker_email) {
+        const { data: worker } = await admin.from("worker_profiles")
+          .select("name").ilike("worker_email", job.worker_email).maybeSingle();
+        const workerName = String(worker?.name ?? "").trim() || "the same worker";
+        line += `\n\nOne more thing, now that this is off your list. Want ${workerName} to keep an eye on the place going forward, without you having to ask again? ` +
+          `It's called the Yaad Report: a monthly WhatsApp update, 6 to 10 timestamped photos, a short walkthrough video, three lines on the property's condition, and what's changed since last time. ` +
+          `Founding rate is £350 a month, or one 12 month term instead of twelve separate decisions.\n\n` +
+          `Reply INTERESTED and Monique will follow up with how it works.`;
+      }
     } else if (kind === "worker_on_site") {
       const { data: arrival } = await admin.from("arrival_log")
         .select("stage, arrived_at")
