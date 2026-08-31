@@ -7,6 +7,7 @@ import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
+import { VideoEvidenceUpload } from "@/components/portal/VideoEvidenceUpload";
 import { MaterialsStore } from "@/components/portal/MaterialsStore";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
@@ -714,6 +715,17 @@ export default async function JobRoom({
           />
       {job.status !== "complete" && (
         <EvidenceUpload
+          jobId={job.id}
+          maxStage={stages.length}
+          storeType={job.materials_store_type ?? null}
+          store={job.materials_store ?? null}
+        />
+      )}
+      {/* Video is a worker thing. A stage walkthrough is the worker proving
+          their own work; the photo form above stays open to both sides,
+          unchanged, because that question was never Stage 5.5's to answer. */}
+      {job.status !== "complete" && role === "worker" && (
+        <VideoEvidenceUpload
           jobId={job.id}
           maxStage={stages.length}
           storeType={job.materials_store_type ?? null}

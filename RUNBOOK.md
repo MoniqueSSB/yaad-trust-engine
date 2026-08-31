@@ -396,3 +396,24 @@ select id, created, status_code, content::text
 **The shared secret lives only as a hash.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. The plaintext is baked into the three trigger function bodies (`notify_client_quote_arrived`, `notify_client_on_job_change`, `notify_client_dispute_raised`) at the point they were created. If it ever needs rotating, regenerate it the way `20260831i` did and rewrite all three function bodies together; a mismatch between what a trigger sends and what the hash expects fails closed; `yaad-notify-client` returns 401 rather than notifying on a bad secret.
 
 **`yaad-quote-landed` is retired.** It answers 410 and names where the work went. If something still calls it, `console.warn` inside the stub logs the referer, visible in that function's logs.
+
+---
+
+## A worker's video evidence will not send
+
+**Ask what the item's own error says first.** The video queue on the job page shows the actual refusal text under a failed item, taken straight from `yaad-evidence-video`. It is not a generic "upload failed": it is the same sentence `evidence-actions.ts` would show for the same underlying reason.
+
+- **"You may not be on this job."** The signed-in worker's email does not match `jobs.worker_email`. RLS refused it, not a bug; check which account they are actually signed in as.
+- **A materials-store sentence** ("...no materials store nominated by the client...") means exactly what it says: the client has not named a store yet. The video is still sitting queued in the worker's browser, not lost; it sends the moment the client answers.
+- **"That file type is not accepted."** Only MP4, WebM and MOV. An iPhone recording in HEVC inside a `.mov` container still reports as `video/quicktime` and is fine; a different container is not.
+- **"That video is too large."** 80MB. This is a memory limit on the edge function that hashes the file, not a Storage limit (the bucket itself allows up to 500MB), so it cannot be raised by a settings change alone.
+
+**Where the video actually is while this is being sorted:** in the worker's own browser, in IndexedDB, not on the server and not lost. It only leaves the browser once `start` and the PUT both succeed. Closing the tab is safe; the item is still there next time that job's evidence tab is open on that same browser and device. It will **not** appear on a different phone or after clearing site data.
+
+**A failed item stops retrying itself after five attempts on reconnect**, so a video failing for a real reason does not hammer the connection forever. The worker taps "Try again" on it, which resets the count and it retries once more.
+
+**To see what actually reached the server**, every attempt shows up in that function's logs the normal way (`supabase functions logs yaad-evidence-video --project-ref <ref>`), and a written row is the same `evidence` table the photo path writes, so a landed video is indistinguishable from a photo in `select * from evidence where job_id = 'JOB-XXXX'` except for `mime` starting `video/`.
+
+**This function holds no service role key and repeats no authorisation check of its own.** Every call inside it runs as the calling worker's own session, so if something is refused, the RLS policies on `public.evidence` and the `evidence` storage bucket (20260827a, 20260830b) are where to look, not this function's own code. There is nothing here overriding what those already decide.
+
+**The offline queue only runs while the tab is open.** There is no service worker and no background sync in this codebase yet. A worker who queues a video and then force-quits the browser (not just backgrounds it) before it finishes uploading will find it still queued next time that page opens, not silently sent in the background. That is a known, considered gap, not an oversight: see DECISIONS.md, Stage 5.5.
