@@ -303,10 +303,17 @@ Deno.serve(async (req: Request) => {
     } else if (kind === "evidence_landed") {
       subject = `Evidence to review: ${job.title}`;
       const composed = await composeEvidenceReport(admin, jobId, job.title, job.stage ?? 1, trace);
+      // The reply-to-approve route only exists for whoever reads it here.
+      // Reply with the job's own code, same word for word as the code a
+      // worker sends back to confirm a photo, matched against
+      // approve_stage_via_whatsapp() in yaad-inbound.
+      const approveHint = clientPhone
+        ? `Reply with the code ${job.id} here on WhatsApp to approve it, or open the link to look first: `
+        : "Review it here: ";
       line = composed
-        ? `${composed}\n\nReview it here: ${roomLink}`
+        ? `${composed}\n\n${approveHint}${roomLink}`
         : `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}. ` +
-          `Nobody is paid until you approve them. Review it here: ${roomLink}`;
+          `Nobody is paid until you approve them. ${approveHint}${roomLink}`;
       root.setAttributes({ "yaadly.notify.evidence_report_composed": !!composed });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client

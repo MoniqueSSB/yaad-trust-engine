@@ -5,6 +5,7 @@ import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
+import { matchApprovingJob } from "./approval-match.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -887,6 +888,36 @@ Deno.serve(async (req: Request) => {
             });
             return twiml(`Got it. ${codePrompt(activeJobs)}`);
           }
+        }
+      }
+
+      // Stage 6: a client approving a stage by replying, rather than
+      // tapping Approve in the portal. Unlike the worker lanes above, this
+      // one is not gated behind an open multi-turn session: every plain
+      // text message a client ever sends passes through it, so it only
+      // ever acts on an exact, close to uncoincidental match against a
+      // job's own code, the same code yaad-notify-client's evidence_landed
+      // message tells them to reply with. No "yes", no ordinal number, no
+      // title guess here: those are safe conveniences inside a session
+      // that is already known to be about picking a job, and this is not
+      // that. Anything that does not contain a code it recognises falls
+      // straight through to the ordinary pipeline below, unrecognised as
+      // an approval rather than guessed at.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: awaiting } = await supabase.from("jobs")
+          .select("id, title, stage, client_phone")
+          .eq("status", "evidence")
+          .not("client_phone", "is", null);
+        const tail = msg.from.replace(/\D/g, "").slice(-9);
+        const mine = (awaiting ?? []).filter((j: any) =>
+          String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+
+        const target = matchApprovingJob(msg.text, mine);
+        if (target) {
+          const { error } = await supabase.rpc("approve_stage_via_whatsapp", { p_job: target.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_approval.job": target.id, "yaadly.whatsapp_approval.outcome": error ? "refused" : "approved" });
+          if (error) return twiml(`That did not go through: ${error.message}`);
+          return twiml(`Approved. Stage ${target.stage ?? 1} of ${target.title} is confirmed, and the worker is paid for it. Nothing else to do.`);
         }
       }
     }

@@ -618,3 +618,24 @@ select wa_id, answers->>'worker_email' as worker_email,
 **If `yaad-inbound` starts refusing genuine Twilio messages with a 403**, the first thing to check is which of the three URL candidates in `checkTwilioSignature()` Twilio is actually signing against, not the test file: the trailing-slash and no-trailing-slash forms are both tried because Twilio signs whatever was typed into its own console.
 
 **Both `twilio-signature.ts` and `job-match.ts` are separate files inside `yaad-inbound/`, deployed as part of the same function**, same as `guardrails.ts`, `otel.ts` and `textmodel.ts` already were. `supabase functions deploy yaad-inbound` picks all of them up; nothing extra needed.
+
+## A client approves a stage by replying on WhatsApp instead of tapping the portal button
+
+**A client's evidence_landed message always names the job's own code and says to reply with it, when there is a `client_phone` on file.** Replying with that code, on the number the job has on record, calls `approve_stage_via_whatsapp()` in Postgres, the same underlying check as the portal button (`approve_stage()`): a dispute open or nothing filed refuses it exactly the same way either route.
+
+**To see whether a client's phone would actually be recognised**, same tail-matching convention as everywhere else in this repository:
+
+```sql
+select id, title, status, client_phone from public.jobs
+ where status = 'evidence'
+   and right(regexp_replace(coalesce(client_phone,''), '\D', '', 'g'), 9)
+     = right(regexp_replace('<their WhatsApp number>', '\D', '', 'g'), 9);
+```
+
+**A reply only approves on an exact match against the job's own code.** No "yes", no ordinal number, no title guess, unlike the worker evidence flow: there is no session boundary on a client's plain text message, every one they send passes through the check, so only the code (copy-pasted from the message that showed it to them) is trusted. If a client says a stage was approved and nothing changed, the first thing to check is whether their reply actually contained the exact code string, not a shortened or misremembered version of it.
+
+**`deno test supabase/functions/yaad-inbound/approval-match_test.ts`** proves the matcher, including the two cases that matter: a bare "yes" and a bare ordinal number both correctly fail to approve anything, even with only one job waiting on that client.
+
+**Two confirmations land after a WhatsApp approval, on purpose left as is.** The function's own reply confirms immediately, and the existing `stage_released` notification (the same one a portal approval fires) follows moments later through the ordinary database trigger. Both are correct; nobody engineered around the overlap because doing so would add real complexity to a money-adjacent path to remove a harmless duplicate message.
+
+**If `yaad-notify-client`'s evidence_landed message stops mentioning the WhatsApp reply route**, check `clientPhone` is actually populated on the job first: the hint only appears when there is a phone on file to reply from.
