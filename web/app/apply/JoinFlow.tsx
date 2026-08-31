@@ -212,7 +212,7 @@ const CHECKS: Check[] = [
 
 type DocType =
   | "cv" | "portfolio" | "certificate"
-  | "photo_id" | "selfie_with_id" | "face_video" | "trn" | "proof_of_address"
+  | "photo_id" | "selfie_with_id" | "face_video" | "intro_video" | "trn" | "proof_of_address"
   | "police_check";
 
 type DocState = { state: "idle" | "busy" | "done" | "error"; file?: string; bytes?: number; error?: string };
@@ -942,6 +942,34 @@ export function JoinFlow() {
 
             {d.body === "id" && (
               <div className="grid gap-3">
+                {/* Thirty seconds, and the only thing on this page a client
+                    ever sees. Everything else here is a check somebody at the
+                    desk reads once; this is the tradesperson in their own
+                    voice, which is worth more to a woman in London deciding
+                    who to let onto her mother's roof than another PDF.
+
+                    Optional on purpose. Somebody on a thin connection or a
+                    borrowed phone should not be stopped by it, and a worker
+                    who would rather not be filmed is not a worse worker.
+
+                    Held to the same rule as the ID captures: it is a face and
+                    a voice, so it is on IDENTITY_DOCS in yaad-vetting-review
+                    and is never sent to a model. */}
+                <div className="rounded-xl border border-line bg-bg px-4 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <b className="text-[13.5px]">Say hello, thirty seconds</b>
+                    <span className="src ok">Optional</span>
+                  </div>
+                  <p className="mt-1 mb-3 text-[12px] leading-relaxed text-dim">
+                    Your name, your trade, how long you have been doing it, and
+                    one job you were proud of. No script and no need to dress
+                    up. <b className="text-mute">This is the one thing on this
+                    page a client actually sees.</b>
+                  </p>
+                  <LiveCapture kind="video" label="A short introduction" seconds={30}
+                    doc="intro_video" docs={docs} onFile={upload} />
+                </div>
+
                 {personaActive ? (
                   <div className={"upl" + (persona.state === "done" ? " done" : persona.state === "error" ? " bad" : "")}>
                     <div className="uplb">
@@ -988,17 +1016,43 @@ export function JoinFlow() {
                           : "Opening…"}
                       </button>
                     )}
+
+                    {/* THE WAY OUT FOR SOMEBODY PERSONA WILL NOT TAKE.
+                        The fallback above only fires when Persona fails to
+                        LOAD: a timeout, an ad blocker, a thin connection.
+                        Somebody whose Jamaican voter card or driver's licence
+                        the template does not accept sees Persona work
+                        perfectly and refuse them, and until now that was a
+                        dead end with no way forward.
+
+                        Most Jamaican tradespeople do not hold a passport. A
+                        check that only a passport satisfies excludes the
+                        supply side this business is built on, so the escape
+                        is deliberate and it is theirs to take, not something
+                        they have to ask for. */}
+                    <button
+                      type="button"
+                      onClick={() => setPersonaFallback(
+                        "You told us the ID check would not take your document.",
+                      )}
+                      className="mt-3 w-full text-left text-[12.5px] leading-relaxed text-dim underline"
+                    >
+                      It would not take my ID. Let me send it another way.
+                    </button>
                   </div>
                 ) : (
                   <>
                     {personaFallback && (
                       <p className="rounded-xl border border-softline bg-soft px-4 py-2.5 text-[12px] leading-relaxed text-mute">
                         <b className="text-ink">The Persona check is not running on this visit.</b>{" "}
-                        {personaFallback} The in-page capture below stands in, and a
-                        person at the desk checks it by hand.
+                        {personaFallback} Send your ID below instead and a person
+                        at the desk checks it by hand.{" "}
+                        <b className="text-ink">A voter card or a driver&rsquo;s
+                        licence is fine.</b> This does not count against you and
+                        it does not slow your application down.
                       </p>
                     )}
-                    <Upload label="Government photo ID" hint="Passport, driver's licence or national ID"
+                    <Upload label="Government photo ID" hint="Voter card, driver's licence, national ID or passport"
                       accept={PAPERS} doc="photo_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="photo" label="A live photo, with your ID beside your face"
                       doc="selfie_with_id" docs={docs} onFile={upload} />

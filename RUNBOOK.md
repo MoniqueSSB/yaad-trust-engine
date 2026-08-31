@@ -319,3 +319,22 @@ update public.worker_profiles
 **The J$105,000 line is £500 at roughly J$211 to the pound.** The rate moves. It is a single constant, `top_tier_jmd`, in that one function, and changing it needs a migration rather than a settings change, on purpose: it is the line between a call-out and somebody's savings.
 
 **The access test reads `jobs.access_type`**, which carries the client's own words, like "Neighbour holds a key" or "Family member on site". A job with no access type set is treated as standard, so a job posted without that answer will not be caught by it. The money test still applies.
+
+---
+
+## A worker cannot get through the ID check
+
+**Most Jamaican tradespeople do not hold a passport.** If the Persona template only accepts passports it silently excludes the supply side this business is built on, and the failure looks like ordinary rejection rather than a configuration mistake, so nobody reports it.
+
+**Check the template accepts the documents they actually hold.** Persona Dashboard, Inquiry Templates, "KYC: GovID + Selfie", the Government ID step, then the document types for Jamaica:
+
+- **Driver's licence**
+- **Voter ID**, the Electoral Commission card, which is the one most widely held
+- **National ID**
+- Passport
+
+The country already defaults to Jamaica (JM), set 30 Aug 2026. **The Persona API does not expose which document types a template accepts**, checked on 31 Aug: the config it returns lists Persona's generic field schema rather than the enabled ID classes. So this cannot be confirmed or changed from code, and it cannot be monitored either. It is a console setting and it needs a human eye.
+
+**There is a way out in the product, and it does not depend on the above.** On the ID step a worker can press "It would not take my ID. Let me send it another way." That switches to the in-page capture and upload, and a person at the desk checks it by hand. It exists because the old fallback only triggered when Persona failed to LOAD; somebody whose voter card the template refuses sees Persona work perfectly and turn them away, which was a dead end.
+
+**How to spot one of those at the desk:** the application has `photo_id`, `selfie_with_id` and `face_video` uploaded, and `persona_status` is empty. That combination means they took the escape, not that they skipped the check.

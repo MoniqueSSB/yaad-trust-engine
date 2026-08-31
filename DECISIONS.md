@@ -146,3 +146,13 @@ The plan said to retire `yaad-post-job`. That would have broken the funnel, beca
 **One stale link found and fixed:** the portal's `ServiceNext` still sent clients to `yaadly.co.uk/#post`, the deleted funnel, and to `#services`, which moved to its own page in Stage 1.
 
 **What can create a job now:** `/jobs/new` through `yaad-post-job` draft mode, plus the WhatsApp webhook and `yaad-inbound` for email and SMS. Those are channels rather than rival funnels: they land in the same tables with the same portal code model, which is what the plan meant by one code path plus WhatsApp intake.
+
+## The ID check must not exclude the people it is for (31 Aug 2026)
+
+Persona's template decides which government documents it accepts, and **most Jamaican tradespeople do not hold a passport**. A passport-only template would silently exclude the supply side this business is built on, and would do it in a way that looks like ordinary rejection.
+
+**The Persona API does not expose enabled ID classes.** Checked directly: the template config it returns carries Persona's generic field schema, not the document types the template accepts. So this cannot be verified, changed or monitored from code. It is a dashboard setting and the runbook says which documents to enable.
+
+**So the product does not depend on it being right.** A worker can press "It would not take my ID. Let me send it another way." on the ID step, which switches to the in-page capture and upload for a person to check by hand. The existing fallback only fired when Persona failed to LOAD, so somebody whose voter card was refused saw Persona work perfectly and turn them away with nowhere to go. The escape is theirs to take rather than something they must ask for, the copy names the voter card and the driver's licence, and it says plainly that it does not count against them.
+
+**The thirty second introduction** is Phase 2's, optional, and the only thing on that page a client ever sees. It is held to the same rule as the identity captures: a face and a voice is the same category of thing as a selfie whatever it is called, so `intro_video` is on `IDENTITY_DOCS` in `yaad-vetting-review` and is never sent to a model.
