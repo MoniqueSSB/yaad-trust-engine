@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { TRADES, PARISHES } from "@/lib/taxonomy";
 
 /**
  * Join as a pro.
@@ -97,19 +98,7 @@ const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT
 // what is done under v2. Bumping anyway, because the sentence changed and a
 // consent is tied to its sentence.
 
-const TRADES = [
-  "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
-  "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
-  "Landscaping", "General Handyman", "Solar Install", "Water Tank & Pump",
-  "Locks & Security Doors", "Windows & Glazing", "Carpentry & Joinery",
-  "Drainage & Septic", "Fencing", "CCTV & Alarms",
-];
-
-const PARISHES = [
-  "Kingston", "St Andrew", "St Catherine", "Clarendon", "Manchester",
-  "St Elizabeth", "Westmoreland", "Hanover", "St James", "Trelawny",
-  "St Ann", "St Mary", "Portland", "St Thomas",
-];
+/* TRADES and PARISHES are shared with the client funnel. See web/lib/taxonomy.ts. */
 
 type Phase = 1 | 2 | 3;
 type Step = { n: string; h: string; p: string; body: BodyKind; note: string; phase: Phase };
@@ -127,9 +116,23 @@ const PHASES: Record<Phase, { name: string; sub: string }> = {
   1: { name: "Phase 1 · Your profile",
        sub: "About two minutes. This is the whole first sitting, and it goes to a person as soon as you send it." },
   2: { name: "Phase 2 · Trust and verification",
-       sub: "After a person has said yes. We chase these on WhatsApp, so you do not have to sit here for them." },
+       sub: "After a person has said yes. We chase these on WhatsApp, so you do not have to sit here for them. Verified within 48 hours of your documents arriving." },
   3: { name: "Phase 3 · On the board",
        sub: "What your account can and cannot do once it is live." },
+} as const;
+
+/* Phase 3 in words, shown once on the last screen rather than as steps to
+   walk. The decline wording is the founder's own, chosen 30 Aug, and it is
+   never phrased as a strike, a warning or discipline: with a discrete
+   contract per job there is no continuing relationship to discipline inside,
+   so you decline to offer the next one. */
+const ON_THE_BOARD = {
+  probation:
+    "Your account goes live in Probation. You can see the whole board and quote on standard jobs from the day you are approved.",
+  topTier:
+    "Jobs over £500, work inside an occupied home, and anything where you hold keys stay hidden until your police check and your telephoned references are done. That is most of the money on the board, so it is worth finishing.",
+  standard:
+    "We only keep working with people who meet the evidence standard. Fall short once and we stop sending work.",
 };
 type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "trial" | "live";
 
@@ -166,9 +169,9 @@ const LATER_STEPS: Step[] = [
     p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
     note: "A file proves somebody holds a document. A turn taken in front of us proves somebody was sitting there when it was sent. If your browser will not hand over a camera we say so on the row, take an upload instead, and a person checks that one by hand." },
 { phase: 2, n: "5 · References", body: "refs",
-    h: "Three people who know we are calling",
-    p: "Past clients, or trades you have worked alongside. We phone them, an emailed reference is a form somebody filled in. <b>You must confirm each one has been told we will call.</b> If we ring and they have no idea who we are, that is not a reference, and it does not count.",
-    note: "This rule exists because a name on a form is not a referee. Somebody who was never asked cannot vouch for you, and putting them down is a mark against the application, not a neutral." },
+    h: "Three people who will vouch for you",
+    p: "Past clients, or trades you have worked alongside. Paste a WhatsApp message where they say what you did, or give a name and number. <b>Either is enough to get you on the board.</b> Before you can take the bigger jobs we telephone them, so tell them to expect a call.",
+    note: "A forwarded message gets you moving today. The phone call happens before the jobs over £500, because a message can be written by anybody and a conversation cannot." },
 { phase: 3, n: "7 · Sign", body: "sign",
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
@@ -199,7 +202,7 @@ const CHECKS: Check[] = [
   { k: "id",     b: "Government photo ID",     s: "Live photo and a left-to-right video turn" },
   { k: "id2",    b: "TRN verified",            s: "Matched to the name on the ID" },
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
-  { k: "refs",   b: "3 references, confirmed and called", s: "Each one told in advance that we would call", req: true },
+  { k: "refs",   b: "3 referees", s: "A message they sent, or a name and number we can call", req: true },
   { k: "sign",   b: "Worker Guidelines signed", s: "The current version, once" },
   { k: "trial",  b: "Trial job reviewed",      s: "Independent reviewer on site, at our cost" },
   { k: "live",   b: "Profile published",       s: "You are on the board" },
@@ -209,7 +212,7 @@ const CHECKS: Check[] = [
 
 type DocType =
   | "cv" | "portfolio" | "certificate"
-  | "photo_id" | "selfie_with_id" | "face_video" | "trn" | "proof_of_address"
+  | "photo_id" | "selfie_with_id" | "face_video" | "intro_video" | "trn" | "proof_of_address"
   | "police_check";
 
 type DocState = { state: "idle" | "busy" | "done" | "error"; file?: string; bytes?: number; error?: string };
@@ -304,9 +307,9 @@ export function JoinFlow() {
 
   // Step 5
   const [refs, setRefs] = useState([
-    { name: "", phone: "", told: false },
-    { name: "", phone: "", told: false },
-    { name: "", phone: "", told: false },
+    { name: "", phone: "", told: false, quote: "" },
+    { name: "", phone: "", told: false, quote: "" },
+    { name: "", phone: "", told: false, quote: "" },
   ]);
 
   // Step 7
@@ -564,8 +567,16 @@ export function JoinFlow() {
 
   /* ── send ──────────────────────────────────────────────────────────── */
 
-  const refLine = (r: { name: string; phone: string }) =>
-    r.name.trim() || r.phone.trim() ? `${r.name.trim()} ${r.phone.trim()}`.trim() : "";
+  /* One line per referee for the desk, carrying whichever of the two the
+     applicant actually gave. A pasted message is worth as much as a number
+     for getting them on the board, and it is worth reading either way. */
+  const refLine = (r: { name: string; phone: string; quote: string }) => {
+    const who = `${r.name.trim()} ${r.phone.trim()}`.trim();
+    const said = r.quote.trim();
+    if (!who && !said) return "";
+    if (!said) return who;
+    return who ? `${who} — said: ${said}` : `Said: ${said}`;
+  };
 
   async function send() {
     setError(""); setBusy(true);
@@ -600,7 +611,11 @@ export function JoinFlow() {
   /* ── what is actually done ─────────────────────────────────────────── */
 
   const has = (t: DocType) => docs[t]?.state === "done";
-  const refsDone = refs.every((r) => r.name.trim() && r.phone.trim() && r.told);
+  /* Founder ruling, 30 Aug: a forwarded WhatsApp message is enough for the
+     Probation tier, so a referee counts when there is either a way to reach
+     them or something they actually said. The phone call still happens before
+     top tier, which is enforced at the publish gate rather than here. */
+  const refsDone = refs.every((r) => (r.name.trim() && r.phone.trim()) || r.quote.trim());
 
   const done: Record<string, boolean> = {
     form: step1Ready,
@@ -927,6 +942,34 @@ export function JoinFlow() {
 
             {d.body === "id" && (
               <div className="grid gap-3">
+                {/* Thirty seconds, and the only thing on this page a client
+                    ever sees. Everything else here is a check somebody at the
+                    desk reads once; this is the tradesperson in their own
+                    voice, which is worth more to a woman in London deciding
+                    who to let onto her mother's roof than another PDF.
+
+                    Optional on purpose. Somebody on a thin connection or a
+                    borrowed phone should not be stopped by it, and a worker
+                    who would rather not be filmed is not a worse worker.
+
+                    Held to the same rule as the ID captures: it is a face and
+                    a voice, so it is on IDENTITY_DOCS in yaad-vetting-review
+                    and is never sent to a model. */}
+                <div className="rounded-xl border border-line bg-bg px-4 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <b className="text-[13.5px]">Say hello, thirty seconds</b>
+                    <span className="src ok">Optional</span>
+                  </div>
+                  <p className="mt-1 mb-3 text-[12px] leading-relaxed text-dim">
+                    Your name, your trade, how long you have been doing it, and
+                    one job you were proud of. No script and no need to dress
+                    up. <b className="text-mute">This is the one thing on this
+                    page a client actually sees.</b>
+                  </p>
+                  <LiveCapture kind="video" label="A short introduction" seconds={30}
+                    doc="intro_video" docs={docs} onFile={upload} />
+                </div>
+
                 {personaActive ? (
                   <div className={"upl" + (persona.state === "done" ? " done" : persona.state === "error" ? " bad" : "")}>
                     <div className="uplb">
@@ -973,17 +1016,43 @@ export function JoinFlow() {
                           : "Opening…"}
                       </button>
                     )}
+
+                    {/* THE WAY OUT FOR SOMEBODY PERSONA WILL NOT TAKE.
+                        The fallback above only fires when Persona fails to
+                        LOAD: a timeout, an ad blocker, a thin connection.
+                        Somebody whose Jamaican voter card or driver's licence
+                        the template does not accept sees Persona work
+                        perfectly and refuse them, and until now that was a
+                        dead end with no way forward.
+
+                        Most Jamaican tradespeople do not hold a passport. A
+                        check that only a passport satisfies excludes the
+                        supply side this business is built on, so the escape
+                        is deliberate and it is theirs to take, not something
+                        they have to ask for. */}
+                    <button
+                      type="button"
+                      onClick={() => setPersonaFallback(
+                        "You told us the ID check would not take your document.",
+                      )}
+                      className="mt-3 w-full text-left text-[12.5px] leading-relaxed text-dim underline"
+                    >
+                      It would not take my ID. Let me send it another way.
+                    </button>
                   </div>
                 ) : (
                   <>
                     {personaFallback && (
                       <p className="rounded-xl border border-softline bg-soft px-4 py-2.5 text-[12px] leading-relaxed text-mute">
                         <b className="text-ink">The Persona check is not running on this visit.</b>{" "}
-                        {personaFallback} The in-page capture below stands in, and a
-                        person at the desk checks it by hand.
+                        {personaFallback} Send your ID below instead and a person
+                        at the desk checks it by hand.{" "}
+                        <b className="text-ink">A voter card or a driver&rsquo;s
+                        licence is fine.</b> This does not count against you and
+                        it does not slow your application down.
                       </p>
                     )}
-                    <Upload label="Government photo ID" hint="Passport, driver's licence or national ID"
+                    <Upload label="Government photo ID" hint="Voter card, driver's licence, national ID or passport"
                       accept={PAPERS} doc="photo_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="photo" label="A live photo, with your ID beside your face"
                       doc="selfie_with_id" docs={docs} onFile={upload} />
@@ -1079,16 +1148,29 @@ export function JoinFlow() {
                       <input className="jf" placeholder="Phone number" inputMode="tel" value={r.phone}
                         onChange={(e) => setRefs(refs.map((x, j) => j === i ? { ...x, phone: e.target.value } : x))} />
                     </div>
+                    {/* The founder's ruling, 30 Aug: a forwarded WhatsApp
+                        message is enough for the Probation tier, and the desk
+                        telephones before top tier unlocks. So this is a second
+                        way to answer the question, not a second question. */}
+                    <textarea
+                      className="jf mt-2"
+                      rows={2}
+                      placeholder="Or paste what they said about your work, or a link to it"
+                      value={r.quote}
+                      onChange={(e) => setRefs(refs.map((x, j) => j === i ? { ...x, quote: e.target.value } : x))}
+                    />
                     <label className="mt-3 flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
                       <input type="checkbox" checked={r.told} className="mt-0.5 size-4 accent-teal"
                         onChange={() => setRefs(refs.map((x, j) => j === i ? { ...x, told: !x.told } : x))} />
-                      I have told this person that Yaadly will call them.
+                      I have told this person that Yaadly will call them before I take a job over £500.
                     </label>
                   </div>
                 ))}
                 <p className="text-[12.5px] leading-relaxed text-dim">
-                  We phone every one. If we ring and they have no idea who we are,
-                  it does not count.
+                  <b className="text-mute">A message or a number, whichever you
+                  have.</b> A forwarded WhatsApp message is enough to get you on
+                  the board. We telephone your referees before you can take work
+                  over £500, so tell them a call is coming.
                 </p>
               </div>
             )}
@@ -1118,6 +1200,20 @@ export function JoinFlow() {
                   Recorded with a timestamp and the exact consent sentence, when you
                   send the application. No edit, no delete.
                 </p>
+              </div>
+            )}
+
+            {d.body === "trial" && (
+              <div className="mb-3 grid gap-2.5">
+                {[
+                  ["On the board", ON_THE_BOARD.probation],
+                  ["What stays locked", ON_THE_BOARD.topTier],
+                  ["The standard, afterwards", ON_THE_BOARD.standard],
+                ].map(([head, body]) => (
+                  <div key={head} className="rounded-xl border border-line bg-bg px-4 py-3 text-[13px] leading-relaxed text-mute">
+                    <b className="text-ink">{head}.</b> {body}
+                  </div>
+                ))}
               </div>
             )}
 
@@ -1191,6 +1287,22 @@ export function JoinFlow() {
                           ? all.join(", ")
                           : "nothing yet. You can still send this, and add work later.";
                       })()}
+                    </div>
+
+                    {/* The payoff, said where it means most: at the point
+                        somebody is deciding whether this is worth their time.
+                        It sat on the last of nine steps before, which nobody
+                        reached. */}
+                    <div className="rounded-xl border border-softline bg-soft px-4 py-4 text-[13.5px] leading-relaxed text-mute">
+                      <b className="text-ink">What this costs you: nothing.</b>
+                      <p className="mt-2">
+                        Free to join and <b className="text-ink">free to quote,
+                        win or lose</b>. You are never charged for a lead. Your
+                        price is agreed with you per job, in writing, before you
+                        start, and your materials are paid at cost on top of it.{" "}
+                        <b className="text-ink">Once the client approves the
+                        evidence you are paid within 24 hours.</b>
+                      </p>
                     </div>
 
                     <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">

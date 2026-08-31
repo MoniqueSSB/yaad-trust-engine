@@ -26,7 +26,7 @@ export function ServiceNext() {
           </p>
           <p className="mt-3.5">
             <a
-              href="https://yaadly.co.uk/#post"
+              href="/jobs/new"
               className="inline-flex rounded-full border border-line2 px-4 py-2 text-[12.5px] font-bold transition hover:border-teal hover:text-tealb"
             >
               Post this job
@@ -49,7 +49,7 @@ export function ServiceNext() {
           </p>
           <p className="mt-3.5">
             <a
-              href="https://yaadly.co.uk/#services"
+              href="https://yaadly.co.uk/services.html"
               className="inline-flex rounded-full border border-line2 px-4 py-2 text-[12.5px] font-bold transition hover:border-teal hover:text-tealb"
             >
               See the ladder

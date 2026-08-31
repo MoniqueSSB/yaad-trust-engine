@@ -7,6 +7,9 @@ import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
+import { VideoEvidenceUpload } from "@/components/portal/VideoEvidenceUpload";
+import { WalkthroughPanel } from "@/components/portal/WalkthroughPanel";
+import { ArrivalCheckIn } from "@/components/portal/ArrivalCheckIn";
 import { MaterialsStore } from "@/components/portal/MaterialsStore";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
@@ -102,7 +105,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_date,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_call_notes,walk_notes_confirmed_at,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
     )
     .eq("id", id)
     .maybeSingle();
@@ -115,7 +118,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -146,6 +149,9 @@ export default async function JobRoom({
          reads, so the preview below cannot show a photo the board would
          not. */
       supabase.from("job_photos").select("caption,img").eq("job_id", id).order("position"),
+      /* The Arrival Log. Newest first, capped: this renders a short "on
+         site" strip, not a full attendance record. */
+      supabase.from("arrival_log").select("stage,arrived_at,arrived_on").eq("job_id", id).order("arrived_at", { ascending: false }).limit(10),
     ]);
 
   const current = jobStage(job.status);
@@ -243,11 +249,19 @@ export default async function JobRoom({
     job.open === true && !job.worker_email && (job.stage ?? 0) === 0;
   const movedOn = !!job.worker_email || (job.stage ?? 0) > 0 || job.status === "complete";
 
+  /* Same test the database uses (materials_store_nominated), so the
+     checklist and Postgres never disagree about whether this question is
+     live: an accepted quote, materials money on it. */
+  const hasAcceptedMaterials = qs.some(
+    (q) => q.status === "accepted" && (q.materials_jmd ?? 0) > 0,
+  );
+
   const gates: Gate[] = jobGates({
     job,
     jobBase,
     emailConfirmed,
     signed,
+    hasAcceptedMaterials,
   });
 
   /* The board carries the trade filter so the job is not one card in a list
@@ -349,6 +363,16 @@ export default async function JobRoom({
   /* jobs.status = 'evidence' is the moment the money is waiting on a human
      rather than on the work. The ledger leads with it. */
   const awaitingApproval = job.status === "evidence";
+
+  /* "Today" read the same way log_arrival() reads it: Jamaica-local,
+     fixed UTC-5, no daylight saving to chase. */
+  const jamaicaToday = new Date(new Date().getTime() - 5 * 3600_000).toISOString().slice(0, 10);
+  const arrivalRows = arrivals ?? [];
+  const checkedInToday = arrivalRows.some((a) => a.arrived_on === jamaicaToday);
+  const recentArrivals = arrivalRows.map((a) => ({
+    stage: a.stage as number,
+    arrivedAt: String(a.arrived_at).slice(0, 16).replace("T", " "),
+  }));
 
   return (
     <>
@@ -548,6 +572,15 @@ export default async function JobRoom({
 
       {tab === "job" && (
         <>
+      {job.worker_email && job.status !== "complete" && (
+        <ArrivalCheckIn
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          stage={Math.max(job.stage ?? 0, 1)}
+          checkedInToday={checkedInToday}
+          recent={recentArrivals}
+        />
+      )}
       {/* Before the evidence ledger on purpose. Until this is answered no
           materials money can move and no materials evidence can be filed, so
           it belongs above the thing it is blocking rather than below it. */}
@@ -681,7 +714,14 @@ export default async function JobRoom({
       {job.worker_email && (
         <>
           <ChatThread jobId={job.id} messages={chat} self={role === "client" ? "the client" : "the worker"} />
-          <DisputePanel jobId={job.id} role={role} dispute={dispute} workerName={job.worker_name ?? "the worker"} />
+          {/* id="dispute" is what the Evidence tab's "Something wrong
+              instead?" link points at (?tab=job#dispute). Tabs are URLs on
+              this page, so the honest way to offer "raise it instead" next
+              to Approve is a real address, not a modal duplicating
+              DisputePanel. */}
+          <div id="dispute">
+            <DisputePanel jobId={job.id} role={role} dispute={dispute} workerName={job.worker_name ?? "the worker"} />
+          </div>
         </>
       )}
         </>
@@ -695,9 +735,43 @@ export default async function JobRoom({
             currentStage={job.stage ?? 0}
             role={role === "worker" ? "worker" : "client"}
             awaitingApproval={awaitingApproval}
+            jobId={job.id}
           />
+      {/* The FAQ's own "or": at sign-off a client can approve straight off
+          the evidence above, or ask to walk the site live instead. Sits next
+          to the moment it is an alternative to, not buried in a settings
+          tab. */}
+      {/* A job completing (stage >= 5) has nothing to do with whether a
+          walkthrough's notes are confirmed yet. The panel stays available
+          once a walkthrough is in play so an unconfirmed set of notes is
+          never stranded off-screen; it only stops offering a fresh
+          request once the job is done. */}
+      {job.worker_email && (job.status !== "complete" || job.signoff_method === "walkthrough") && (
+        <WalkthroughPanel
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          walkPlatform={job.walk_platform ?? null}
+          walkLink={job.walk_link ?? null}
+          walkDate={job.walk_date ?? null}
+          walkWho={job.walk_who ?? null}
+          walkNotes={job.walk_notes ?? null}
+          walkCallNotes={job.walk_call_notes ?? null}
+          walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
+        />
+      )}
       {job.status !== "complete" && (
         <EvidenceUpload
+          jobId={job.id}
+          maxStage={stages.length}
+          storeType={job.materials_store_type ?? null}
+          store={job.materials_store ?? null}
+        />
+      )}
+      {/* Video is a worker thing. A stage walkthrough is the worker proving
+          their own work; the photo form above stays open to both sides,
+          unchanged, because that question was never Stage 5.5's to answer. */}
+      {job.status !== "complete" && role === "worker" && (
+        <VideoEvidenceUpload
           jobId={job.id}
           maxStage={stages.length}
           storeType={job.materials_store_type ?? null}

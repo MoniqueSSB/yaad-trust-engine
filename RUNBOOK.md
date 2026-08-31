@@ -39,9 +39,27 @@ With no `YAAD_API_KEY` it runs in mock mode: deterministic, rule based, every mo
 
 Deploy from disk only. Never paste file contents into a deploy tool: doing that has silently shipped a different intake flow before.
 
+**Check the auth setting before you deploy, every time.** `--no-verify-jwt` is not a house style, it is a per-function setting, and passing it to a function that should verify tokens turns platform authentication off without any warning and without failing the deploy.
+
 ```bash
-supabase functions deploy yaad-agent --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+supabase functions list --project-ref leffyisvfvjwzilydlwf
 ```
+
+Read `verify_jwt` for the function you are about to deploy, then match it.
+
+**`verify_jwt` is true**, which is most of them, so deploy with no flag:
+
+```bash
+supabase functions deploy yaad-agent --project-ref leffyisvfvjwzilydlwf
+```
+
+**`verify_jwt` is false**, only the endpoints that carry their own authentication (`yaad-inbound`, `yaad-whatsapp-webhook`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`), so deploy with the flag:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+Afterwards, run `supabase functions list` again and confirm `verify_jwt` is what it was. A deploy that quietly flipped it looks exactly like a deploy that worked.
 
 To see what is actually happening, read the function logs in the Supabase dashboard before changing code. Most failures here are a missing environment variable or a 403 from a downstream API, not a logic bug.
 
@@ -203,3 +221,438 @@ update public.worker_profiles
 **A published profile still cannot be sent a job until the Worker Guidelines are signed.** `yaad_match` requires a signature on the current version and skips anybody without one, so publishing and being matchable are two separate gates on purpose. If a worker is live and getting no jobs, check the signature first.
 
 **Suspending somebody** is `vetting_state = 'suspended'` plus `active = false`. Keep the row. Deleting it loses the record of why.
+
+
+---
+
+## A client says they never heard about their quote
+
+The quote is saved either way: `yaad-quote-landed` is called after the insert and a failure there never loses it. The function reports what it managed, so ask it rather than guess.
+
+**Look at the trace.** `yaadly.notify.outcome` reads `told` when at least one channel worked and `nobody_told` when neither did. `yaadly.notify.emailed` and `yaadly.notify.whatsapp` say which.
+
+**The three ordinary reasons, in the order they actually happen.**
+
+1. **The job has no email and no phone.** A job posted with only one channel has only that one to send on, and a WhatsApp intake job often has a number and no address. Nothing to fix in code: put the missing one on the job.
+2. **Twilio Trust Hub KYC was the live blocker until 31 Aug 2026, now cleared.** The compliance profile was approved same day, confirmed live: a real evidence_landed notification, with a real photo attached, reached a real phone over `whatsapp:+447878877567` ("Yaadly LTD") the same afternoon. If sends start failing again with
+
+   > twilio 401 (20003): Primary compliance profile is not approved. Please refer to documentation and complete the KYC process in Trust Hub to gain access.
+
+   check Trust Hub, Primary Customer Profile in the Twilio Console first: something has lapsed or been unlinked, not a fresh version of the original gap. The Yaadly Ltd details on file are England and Wales company **17358077**, the registered address, and a named authorised representative. It is business verification, not a technical step, and nothing in this repository can do it. Nothing else needs changing once it clears: sends start working with no deploy.
+
+3. **No Twilio sender is configured.** Was the blocker before the above. The phone is tried in this order: Twilio WhatsApp, then Meta's own API, then Twilio SMS. Twilio is first because this project already runs on that account for inbound WhatsApp and SMS, so the credentials are real and working. What outbound needs and inbound never did is a number to send FROM.
+
+```bash
+supabase secrets set TWILIO_WHATSAPP_FROM='whatsapp:+1XXXXXXXXXX' --project-ref leffyisvfvjwzilydlwf
+supabase secrets set TWILIO_SMS_FROM='+1XXXXXXXXXX' --project-ref leffyisvfvjwzilydlwf
+```
+
+   Both come from the Twilio console: Messaging, then Senders. Use the WhatsApp sender for the first and any SMS-capable number for the second. Setting only one is fine; the other simply reports itself as unset. `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are already set.
+
+   **The 24 hour rule is WhatsApp's, not Twilio's, so changing provider does not escape it.** A business may send free text only within 24 hours of the person's last message. Outside that, it must be a template approved in advance. A client who posted their job on WhatsApp this morning and gets a quote this afternoon is inside the window. One who posted last week is not, and the send comes back Twilio error 63016, which the function reports in words rather than as a number. **SMS has no such window**, which is why it is the last resort rather than no resort: it costs money and it still arrives.
+4. **`RESEND_API_KEY` missing or the send returned non-2xx.** `emailReason` carries the status. Resend also refuses obviously fake domains like `example.com`, which only bites in testing.
+
+**Until a Twilio sender is set**, a phone-only client is told nothing automatically. The quotes page is honest when empty and the link keeps working, so the fallback is a person messaging them. Worth doing deliberately rather than discovering later that somebody waited a week on a price that was sitting there.
+
+
+---
+
+## A client cannot get into their portal
+
+**There is no password any more.** Clients sign in with a six digit code, so "reset my password" is not the answer to anything. `yaad-portal-code` issues one, and it reports what it managed rather than assuming.
+
+**Ask the function first.** Its response carries `delivered`, `emailed`, `emailReason` and `phone`. The page refuses to say "check your email" when `delivered` is false, so a client who saw that message got one sent.
+
+**The ordinary reasons.**
+
+1. **`emailReason` says `resend 422 ... Invalid to field`.** Resend refuses obviously fake domains like `example.com`. Real client addresses are fine; this only bites in testing. Use `delivered@resend.dev` to test a real send.
+2. **`phone` says a `TWILIO_*_FROM` is not set.** Then only email went, which is fine when they have one and fatal when they do not. See the quote notification section for the two commands.
+3. **"That job code will not open an account."** One message covers a wrong code, a code already claimed by somebody else, and too many tries, on purpose: naming which would tell a guesser which half they got right. Check the code against what was sent, and check `pend_portal_code` rate limiting has not tripped.
+
+**A returning client is never asked for a job code.** `email_has_account` decides that, and locking somebody out of their own history because they lost a code from months ago would be the wrong trade. That function is granted to nobody and callable only with the service role, because "is this person a Yaadly client" is the question an enumeration attack asks.
+
+**Existing accounts that still have a password keep working.** Nothing was deleted from them. They simply have a second way in that needs nothing remembered, and the sign in page no longer asks for the password.
+
+
+---
+
+## The WhatsApp template for quote notifications
+
+**Why there is one at all.** A registered WhatsApp sender still cannot send free text to somebody who has not messaged in the last 24 hours. That needs a template approved in advance by Meta. Most clients get a quote more than a day after posting the job, so without a template most notifications would fail.
+
+**What is set.** `TWILIO_CONTENT_SID_QUOTE` points at `yaadly_quote_landed_v2`, submitted 31 Aug 2026, category UTILITY. `yaad-quote-landed` uses it whenever it is set and falls back to free text when it is not. A template is valid inside the 24 hour window too, so there is one path rather than two half-paths.
+
+**Check whether Meta has approved it**, in Twilio Console under Messaging, Content Template Builder. `received` means in review, `approved` means live, `rejected` carries a reason.
+
+**A rejected template cannot be edited.** Twilio returns error 92009 and you make a new one. The first attempt was rejected for exactly one reason, worth knowing before writing another:
+
+> Variables can't be at the start or end of the template.
+
+The body ended with the link variable. It now ends with a sentence after it. Keep that rule in mind for any future template: never open or close with `{{n}}`.
+
+**The four variables, in order:** job title, worker name, price, link.
+
+**Sign in codes deliberately do NOT use a template.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules, and Twilio Verify is the supported product for one. Pushing an OTP through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Over WhatsApp a sign in code stays free text: it works inside the 24 hour window and fails honestly outside it, and email remains the reliable path for it.
+
+---
+
+## A worker says they cannot quote a job
+
+The refusal names the reason, so read it before changing anything. All of them come from `enforce_vetted_worker_on_quote`, which runs in Postgres, so no deploy can talk past it.
+
+**"Only an active vetted worker can submit a quote."** No published profile. Either they were never published, or somebody set `active = false`. See the publishing section.
+
+**"While your account is in Probation..."** Working as intended. A probation worker quotes standard jobs and is refused three things: work over about **J$105,000**, any job where they would hold keys, and any job inside an occupied home. Those are the founder's top tier, and they open when `vetting_state` becomes `verified`, which happens at publishing after the police check and the telephoned references.
+
+**To lift somebody out of Probation**, only once those are genuinely done:
+
+```sql
+update public.worker_profiles
+   set vetting_state = 'verified', updated_at = now()
+ where worker_email = 'them@example.com';
+```
+
+**"This account is suspended."** Deliberate. Set `vetting_state = 'suspended'` and keep the row; deleting it loses the record of why.
+
+**The J$105,000 line is £500 at roughly J$211 to the pound.** The rate moves. It is a single constant, `top_tier_jmd`, in that one function, and changing it needs a migration rather than a settings change, on purpose: it is the line between a call-out and somebody's savings.
+
+**The access test reads `jobs.access_type`**, which carries the client's own words, like "Neighbour holds a key" or "Family member on site". A job with no access type set is treated as standard, so a job posted without that answer will not be caught by it. The money test still applies.
+
+---
+
+## A worker cannot get through the ID check
+
+**Most Jamaican tradespeople do not hold a passport.** If the Persona template only accepts passports it silently excludes the supply side this business is built on, and the failure looks like ordinary rejection rather than a configuration mistake, so nobody reports it.
+
+**Check the template accepts the documents they actually hold.** Persona Dashboard, Inquiry Templates, "KYC: GovID + Selfie", the Government ID step, then the document types for Jamaica:
+
+- **Driver's licence**
+- **Voter ID**, the Electoral Commission card, which is the one most widely held
+- **National ID**
+- Passport
+
+The country already defaults to Jamaica (JM), set 30 Aug 2026. **The Persona API does not expose which document types a template accepts**, checked on 31 Aug: the config it returns lists Persona's generic field schema rather than the enabled ID classes. So this cannot be confirmed or changed from code, and it cannot be monitored either. It is a console setting and it needs a human eye.
+
+**There is a way out in the product, and it does not depend on the above.** On the ID step a worker can press "It would not take my ID. Let me send it another way." That switches to the in-page capture and upload, and a person at the desk checks it by hand. It exists because the old fallback only triggered when Persona failed to LOAD; somebody whose voter card the template refuses sees Persona work perfectly and turn them away, which was a dead end.
+
+**How to spot one of those at the desk:** the application has `photo_id`, `selfie_with_id` and `face_video` uploaded, and `persona_status` is empty. That combination means they took the escape, not that they skipped the check.
+
+---
+
+## A client cannot approve a stage
+
+**Read the refusal, it names the reason.** All of them come from `approve_stage()`, so no deploy can talk past them.
+
+- **"That is not your job to approve."** The signed-in email does not match `jobs.client_email`.
+- **"A dispute is open on this job. Nothing can be approved while it is."** Resolve the dispute (`disputes.state = 'resolved'`) first; that is the only door.
+- **"Nothing has been filed for this stage yet."** No evidence rows exist for `greatest(jobs.stage, 1)`. The worker has not filed anything against the stage actually being worked.
+- **"Not signed in." / "Confirm your email address first."** Ordinary auth states, same as `client_go_live`.
+
+**To see what was actually approved**, `stage_approvals` carries who, when, and the exact fingerprint of every item at the moment of approval:
+
+```sql
+select stage, approved_by, approved_at, jsonb_pretty(evidence)
+  from stage_approvals
+ where job_id = 'JOB-XXXX'
+ order by stage;
+```
+
+**If the evidence tab shows "Evidence waiting on you" but there is no Approve button**, check `role`: the button only renders for the client, on purpose. A worker approving their own work is the exact thing this exists to prevent.
+
+**`jobs.status` is fully owned by `sync_job_status()`.** It recomputes the column from scratch on every insert or update to the `jobs` row: worker assigned, current stage's evidence state, `open`, and the client's go-live status, in that order. Do not add a second trigger or a direct `update jobs set status = ...` anywhere expecting it to stick outside this function; it will be silently overwritten on the same statement. If a new state is ever needed, it goes inside `sync_job_status`, not beside it.
+
+---
+
+## A client says they were never told
+
+**Check `net._http_response` first, not the trigger source.** Every client notification goes through `net.http_post` to `yaad-notify-client`, and every call it makes is logged there whether it succeeded or not:
+
+```sql
+select id, created, status_code, content::text
+  from net._http_response
+ order by id desc
+ limit 10;
+```
+
+`{"ok":true,"told":true,"emailed":true}` means it sent. `{"told":false,...}` or a non-200 `status_code` means the function ran but declined or failed; read `content` for why. No row at all for the event you expected means the trigger's condition never evaluated true, which is a database question, not a delivery question. Check `jobs.status`, `jobs.stage` and `stage_approvals` for that job directly against what the trigger in `20260831i`/`20260831j` actually tests.
+
+**What each `kind` fires from, and nothing else:**
+
+| Kind | Fires from |
+|---|---|
+| `quote_arrived` | `job_quotes` AFTER INSERT WHEN `status = 'submitted'` |
+| `evidence_landed` | `jobs` AFTER UPDATE, `status` transitions into `'evidence'` |
+| `stage_released` | `jobs` AFTER UPDATE, `stage` increases and a `stage_approvals` row exists for `new.stage - 1` |
+| `dispute_raised` | `disputes` AFTER INSERT, unconditional |
+
+**"Worker on site today" does not exist yet, and will not show up in this table.** There is no Arrival Log column anywhere to fire it from. This is not a bug to chase; it needs schema work first.
+
+**`whatsapp.sent: false, reason: "no client phone on the job"`** is expected and correct for any job where the client never gave a number. Email through Resend is not conditional on that; check `emailed` and `emailReason` separately.
+
+**None of this fires twice for the same event.** `evidence_landed`'s trigger condition is a transition (`old.status IS DISTINCT FROM 'evidence' AND new.status = 'evidence'`), not a state, so a second evidence item filed against a stage that already flipped the status does not notify again. If a client reports being told the same thing twice, that is two genuinely separate events, most likely two different stages, not a repeat.
+
+**The shared secret lives only as a hash.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. The plaintext is baked into the three trigger function bodies (`notify_client_quote_arrived`, `notify_client_on_job_change`, `notify_client_dispute_raised`) at the point they were created. If it ever needs rotating, regenerate it the way `20260831i` did and rewrite all three function bodies together; a mismatch between what a trigger sends and what the hash expects fails closed; `yaad-notify-client` returns 401 rather than notifying on a bad secret.
+
+**`yaad-quote-landed` is retired.** It answers 410 and names where the work went. If something still calls it, `console.warn` inside the stub logs the referer, visible in that function's logs.
+
+---
+
+## A worker's video evidence will not send
+
+**Ask what the item's own error says first.** The video queue on the job page shows the actual refusal text under a failed item, taken straight from `yaad-evidence-video`. It is not a generic "upload failed": it is the same sentence `evidence-actions.ts` would show for the same underlying reason.
+
+- **"You may not be on this job."** The signed-in worker's email does not match `jobs.worker_email`. RLS refused it, not a bug; check which account they are actually signed in as.
+- **A materials-store sentence** ("...no materials store nominated by the client...") means exactly what it says: the client has not named a store yet. The video is still sitting queued in the worker's browser, not lost; it sends the moment the client answers.
+- **"That file type is not accepted."** Only MP4, WebM and MOV. An iPhone recording in HEVC inside a `.mov` container still reports as `video/quicktime` and is fine; a different container is not.
+- **"That video is too large."** 80MB. This is a memory limit on the edge function that hashes the file, not a Storage limit (the bucket itself allows up to 500MB), so it cannot be raised by a settings change alone.
+
+**Where the video actually is while this is being sorted:** in the worker's own browser, in IndexedDB, not on the server and not lost. It only leaves the browser once `start` and the PUT both succeed. Closing the tab is safe; the item is still there next time that job's evidence tab is open on that same browser and device. It will **not** appear on a different phone or after clearing site data.
+
+**A failed item stops retrying itself after five attempts on reconnect**, so a video failing for a real reason does not hammer the connection forever. The worker taps "Try again" on it, which resets the count and it retries once more.
+
+**To see what actually reached the server**, every attempt shows up in that function's logs the normal way (`supabase functions logs yaad-evidence-video --project-ref <ref>`), and a written row is the same `evidence` table the photo path writes, so a landed video is indistinguishable from a photo in `select * from evidence where job_id = 'JOB-XXXX'` except for `mime` starting `video/`.
+
+**This function holds no service role key and repeats no authorisation check of its own.** Every call inside it runs as the calling worker's own session, so if something is refused, the RLS policies on `public.evidence` and the `evidence` storage bucket (20260827a, 20260830b) are where to look, not this function's own code. There is nothing here overriding what those already decide.
+
+**The offline queue only runs while the tab is open.** There is no service worker and no background sync in this codebase yet. A worker who queues a video and then force-quits the browser (not just backgrounds it) before it finishes uploading will find it still queued next time that page opens, not silently sent in the background. That is a known, considered gap, not an oversight: see DECISIONS.md, Stage 5.5.
+
+---
+
+## A worker's money figure looks wrong
+
+**It is computed live from `job_quotes`, not stored anywhere.** There is no cached total to be stale; if a figure looks wrong, the accepted quote for that job is where to look:
+
+```sql
+select j.id, j.status, q.labour_jmd, q.materials_jmd, q.status as quote_status
+  from jobs j
+  left join job_quotes q on q.job_id = j.id and q.status = 'accepted'
+ where j.worker_email = 'them@example.com';
+```
+
+`round(labour_jmd * 0.88) + materials_jmd` is the figure shown, the same 88% every other money panel in this repository uses. A job with no `accepted` row shows nothing on the money page at all, correctly: there is no money to show yet.
+
+**Held versus Released is `jobs.status <> 'complete'` versus `= 'complete'`, nothing finer.** A job does not partially release as stages complete; the whole figure moves at once, when `sync_job_status()` marks the job complete. If a worker expects a partial figure for a partially finished multi-stage job, that expectation is ahead of what this repository tracks today: no per-stage money split exists anywhere.
+
+**"Released" never means paid.** There is no payment integration in this codebase. It means the client has approved and Yaadly's part is done; the actual transfer happens off-platform, by whichever of bank transfer, Lynk or remittance the worker and client already arranged, within the 3 working days the portal promises. If a worker says they were never paid after a job released, that is a real-world payment problem between them and the client, not a bug in this page.
+
+**Recording how they were paid is the worker's own note**, through `record_pay_info()`, refused for any method that is not `bank_transfer`, `lynk` or `remittance`, and refused outright for a job that is not theirs. It does not confirm anything to the client and does not touch `job_quotes` or `stage_approvals`. If a worker's recorded method or reference is wrong, they change it themselves on the same page; there is no admin override for this because there is nothing here for an admin to be more right about than the worker.
+
+---
+
+## A video walkthrough request or confirmation is refused
+
+**Read the refusal, it names the reason**, same as `approve_stage`.
+
+- **"That is not your job to request a walkthrough on, or it has no worker yet."** Either the signed-in email is not `jobs.client_email`, or `jobs.worker_email` is empty. There is nobody to walk the site yet.
+- **"Choose WhatsApp video, Google Meet or Zoom."** Only those three platform values exist; nothing else is accepted on either `request_walkthrough` or `confirm_walkthrough`.
+- **"No walkthrough has been requested on this job, or it is not yours to confirm."** From `confirm_walkthrough`: either `signoff_method` is not `'walkthrough'` yet (nobody asked), or the signed-in email is not `jobs.worker_email`.
+- **"A link is needed to confirm the call."** `confirm_walkthrough` refuses an empty link outright; there is no such thing as confirming without a real one.
+
+**To see the current state of a walkthrough on a job:**
+
+```sql
+select walk_platform, walk_link, walk_date, walk_who, walk_notes, signoff_method
+  from jobs where id = 'JOB-XXXX';
+```
+
+`walk_platform` set with `walk_link` null means requested, waiting on the worker. Both set means confirmed. All null means nothing has ever been asked for, or it was cancelled.
+
+**A worker confirming a second time, or the client requesting again, is not a bug.** A fresh client request clears any confirmed link and `walk_who`, on purpose: a changed date makes the old link stale, and the worker needs to see the request has changed rather than a link nobody would show up for looking still current.
+
+**This never blocks the Approve button.** `approve_stage()` does not read `signoff_method` at all. If a client says they cannot approve because a walkthrough is pending, that is a UI question or a misunderstanding, not this system enforcing an order; the button is available regardless of where a walkthrough request stands.
+
+**Nothing here calls a video API.** There is no Zoom, Meet or WhatsApp integration in this repository. The link a worker enters through `confirm_walkthrough` is whatever they pasted in themselves, from a call they arranged over WhatsApp the ordinary way. If a link does not work, that is between the worker and whichever service they used to create it, not something to look for in this code.
+
+---
+
+## A worker's arrival check-in did nothing, or the client says they were not told
+
+**Check whether the row actually landed:**
+
+```sql
+select stage, arrived_at, arrived_on, arrived_by
+  from arrival_log where job_id = 'JOB-XXXX'
+ order by arrived_at desc;
+```
+
+No row for today at all means `log_arrival()` was never called successfully; check the caller was actually signed in as `jobs.worker_email` for that job. A row exists but the client says they heard nothing: check `net._http_response` the same way as any other notification (see "A client says they were never told" above) for a `worker_on_site` entry against that job id and timestamp.
+
+**A second tap the same day is expected to do nothing new.** `arrival_log` has a unique constraint on `(job_id, stage, arrived_on)`; `log_arrival()` detects the existing row and returns `already_logged_today: true` rather than inserting again, so there is no second notification to look for. This is not a bug, it is the whole point: one fact per stage per day, not one per tap.
+
+**"Today" is Jamaica-local, fixed UTC-5, not the server's UTC and not the client's own timezone.** A worker checking in at 11pm Jamaica time (4am UTC the next calendar day) still logs against the Jamaica date, which is what both the check-in button's "already checked in today" state and the client's readout compare against.
+
+## A walkthrough's notes are stuck, or a confirmation will not take
+
+**Read the refusal.** `record_walkthrough_notes()` and `confirm_walkthrough_notes()` follow the same pattern as every other function in this file: the message names the reason.
+
+- **"No confirmed call exists on this job to write notes against, or it is not yours."** Either `walk_link` is still null (the call was requested but never confirmed by the worker) or the caller is not `jobs.worker_email`. Notes cannot be written up for a call that never happened.
+- **"There are no call notes on this job yet to confirm, or it is not yours."** `walk_call_notes` is still null, or the caller is not `jobs.client_email`.
+
+**Editing notes after the client already confirmed them is not a bug clearing the confirmation.** It is the rule: `walk_notes_confirmed_at` and `walk_notes_confirmed_by` are reset to null the moment `walk_call_notes` changes, because a client's confirmation was given for a specific piece of text and a changed text is a new claim needing a new confirmation. If a worker says "I only fixed a typo and now it says unconfirmed again," that is working as designed; ask the client to confirm again.
+
+**The Completion Report only ever shows the confirmed version.** A job can complete with an outstanding, unconfirmed set of walkthrough notes; the report at `/portal/jobs/[id]/completion` simply omits the whole walkthrough section until `walk_notes_confirmed_at` is set. The job page itself stays available for exactly this case: `WalkthroughPanel` keeps rendering on a completed job when `signoff_method = 'walkthrough'`, so the outstanding confirmation is never unreachable, it just will not appear on the report until it lands.
+
+---
+
+## A stage's confirmation method looks wrong, or a dispute needs to know how a stage was approved
+
+```sql
+select stage, approved_by, approved_at, confirmed_method
+  from stage_approvals where job_id = 'JOB-XXXX' order by stage;
+```
+
+`confirmed_method` is `evidence` (the client reviewed the filed evidence remotely) or `in_person` (the client attested to physically inspecting the property themselves). It is set once, at the moment of approval, and is never edited afterward, same as everything else on `stage_approvals`.
+
+**This never loosens anything else about the gate.** A dispute still blocks approval regardless of method, and evidence still has to be filed for the stage first: `in_person` is an additional attestation layered on top of that requirement, not an alternative to it. If a client says "I approved it, why does it still say I needed evidence filed first," the answer is: because it always does, for either method.
+
+**`approve_stage` now takes two arguments, `p_job` and `p_method`, with `p_method` defaulting to `'evidence'`.** There is only one `approve_stage` function in the database; the original one-argument version was dropped when this landed, deliberately, because a second overload with the same effective call shape would have made every ordinary call ambiguous. If a caller sends anything other than exactly `'in_person'` for `p_method`, it is silently treated as `'evidence'` rather than refused: this field is attribution, not a gate, and a stray value should never cost somebody an otherwise-valid approval.
+
+---
+
+## A worker's WhatsApp evidence never landed
+
+**Check whether their number is actually linked first.**
+
+```sql
+select worker_email, phone, active from worker_profiles
+ where right(regexp_replace(coalesce(phone,''), '\D', '', 'g'), 9)
+     = right(regexp_replace('<their WhatsApp number>', '\D', '', 'g'), 9);
+```
+
+No row: they have never linked a number, or linked a different one than the one they are texting from. Send them to the worker portal, "Send evidence from WhatsApp." A row with `active = false`: their profile is not published yet, and evidence intake only recognises published workers, the same gate everything else keyed on `active` already uses.
+
+**A linked, active worker's photo still did not file: check they actually have a live job.** `lookupActiveJobsForWorker` excludes only `complete` and `cancelled`; anything else counts, including `disputed`. A worker with zero qualifying jobs right now falls through the whole evidence-intake branch untouched, exactly as if their number had never been linked, and whatever they sent is handled as it would have been before this feature existed.
+
+**`WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` are what actually move the bytes and the reply, and they are unset on this project as of 31 Aug 2026, confirmed live.** Until Meta's Cloud API credentials exist, every media download fails cleanly (`fetchMetaMedia` returns null before attempting a network call) and every reply silently fails to send (`maybeSendReply` returns `{sent:false, reason:"WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID not set yet"}`), but nothing crashes and nothing is filed on a lie. This is a different credential from the Twilio ones the rest of this app's WhatsApp sending uses (Twilio Trust Hub cleared 31 Aug 2026): Meta's Cloud API is a separate setup, its own app, its own phone number registration, its own access token.
+
+**A worker with more than one live job stuck waiting on "which job":** their pending items sit in `wa_intake_sessions` under `_lane: "evidence"` until they reply with a number, or 48 hours passes and the session is dropped (not salvaged into anything, since an orphaned photo is not a job description to write down).
+
+```sql
+select wa_id, answers->>'worker_email' as worker_email,
+       jsonb_array_length(answers->'pending') as pending_count,
+       answers->'job_choices' as choices, updated_at
+  from wa_intake_sessions
+ where answers->>'_lane' = 'evidence';
+```
+
+If a worker says they replied and nothing happened, check the reply actually matched: `pickJobChoice` accepts a plain number ("1", "2") or enough of the job's title to be unambiguous, nothing fuzzier. Anything else gets reprompted, not silently dropped, and the session stays open for another try.
+
+**A staged object that never made it into a job's folder** sits under `evidence/_pending/` in Storage, orphaned if its session expired before a job was chosen. There is no automatic sweep for these yet; a manual `storage.from('evidence').list('_pending')` finds them if one needs clearing by hand.
+
+---
+
+## The evidence digest reads like the fixed sentence instead of a real update
+
+**Check whether a text model provider is actually configured first.** `composeEvidenceReport()` returns null, silently, on anything short of a clean usable report: no provider key set (`pickTextProvider()` returns null), no evidence labels filed for that stage yet, a model call that fails or times out, unparseable JSON, or the composed text failing the same banned-language screen `yaad-inbound`'s live replies already run through. Every one of those is a deliberate fallback to the original fixed sentence, not a bug: a vague or failed digest never blocks the client being told evidence landed.
+
+**To see whether the AI version or the fallback actually shipped for a given notification**, there is no stored copy of the sent line: it goes out and is not written back to any table. If this needs checking after the fact, the honest answer is to ask the client what the message said, or re-run the notification once the underlying cause (usually no provider key, or thin evidence labels) is fixed.
+
+## A worker was never nudged, or a stall was never escalated
+
+**Read `job_stall_state` first**, the actual record of what has and has not happened yet:
+
+```sql
+select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s.nudged_at, s.escalated_at
+  from jobs j left join job_stall_state s on s.job_id = j.id
+ where j.id = 'JOB-XXXX';
+```
+
+**Under 72 hours silent, nothing is expected to have happened yet.** Between 72 and 168 hours, the worker should have one WhatsApp nudge and `nudged_at` should be set; the actual send can fail silently if `TWILIO_WHATSAPP_FROM` or the worker's `worker_profiles.phone` is unset; `nudged_at` gets set regardless of whether the send itself succeeded, because the STATE is "we attempted this," not "the worker definitely saw it," the same distinction every other notification in this file already draws. Past 168 hours, `escalated_at` should be set, the founder should have had an `ntfy_topic` push, and the client should have had a `job_delayed` notification; check `net._http_response` the same way as any other client notification for the actual send outcome.
+
+**A job stops being a candidate the moment it shows real activity again**, an arrival check-in, an evidence row, or a stage approval, whichever is newest. `clear_resolved_job_stalls()` removes its `job_stall_state` row on the next run, and the clock is genuinely gone, not paused: a future stall on the same job starts counting from zero, not from where the old one left off.
+
+**The daily check runs at 13:00 UTC (08:00 Jamaica), as `cron.job` "yaad-job-health".** To run it by hand rather than waiting for the schedule, sign in as an admin and POST to `yaad-job-health` with an `Authorization: Bearer <admin JWT>` header and no `secret` in the body; the function checks `is_admin()` as its second path, same as `yaad-vetting-purge`.
+
+## The Stalled jobs view in concierge is empty, or shows nothing for a worker you know stalled
+
+**It only ever shows what `job_stall_state` actually holds, and only for the last known nudge or escalation, not a live re-check.** If a job has clearly gone quiet but nothing shows, the daily cron has not run since it crossed 72 hours yet, or it ran and found the job did not qualify (check `job_silence_hours()` directly, above). This view is deliberately a record, not a dashboard that recalculates itself on every page load.
+
+**If it shows nothing at all, even after confirming real stalls exist, check `is_admin()` for the signed-in account first.** `worker_stall_history` is `security_invoker`, reading through an admin-only RLS policy on `job_stall_state`; a real, verified security fix (31 Aug 2026), and a signed-in account that is not in the `admins` table gets zero rows from this view by design, the same as it would from anywhere else in concierge.
+
+---
+
+## Worker WhatsApp evidence now runs on Twilio, not Meta
+
+**There is no Meta setup to finish. It was tried, reverted, and moved.** `yaad-whatsapp-webhook` (Meta) is back to client intake and worker signup only, exactly as it was before 31 Aug 2026. The photo-texting feature lives in `yaad-inbound` now, on the number already registered with Twilio.
+
+**A worker's evidence message is recognised by three things, checked in this order inside `yaad-inbound`:** the channel is `whatsapp` (not plain SMS), the sender's number matches a published (`active = true`) worker's `worker_profiles.phone` on the last 9 digits, and the message carries an image or video attachment. Miss any one of those and the message falls through to the ordinary client-intake pipeline this endpoint has always run, unchanged.
+
+**To see whether a worker's number is actually linked**, same query as before, table and matching logic are unchanged by the provider switch:
+
+```sql
+select worker_email, phone, active from worker_profiles
+ where right(regexp_replace(coalesce(phone,''), '\D', '', 'g'), 9)
+     = right(regexp_replace('<their WhatsApp number>', '\D', '', 'g'), 9);
+```
+
+**A pending "which job" session lives in `wa_intake_sessions` under `_lane: 'evidence'`, exactly as it did on the Meta build**, since that table was never provider-specific. Same query to inspect it:
+
+```sql
+select wa_id, answers->>'worker_email' as worker_email,
+       jsonb_array_length(answers->'pending') as pending_count,
+       answers->'job_choices' as choices, updated_at
+  from wa_intake_sessions
+ where answers->>'_lane' = 'evidence';
+```
+
+**If a worker's photo genuinely never arrives, check Twilio's own delivery first, not this function.** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_WHATSAPP_FROM` are the same three secrets every other WhatsApp send in this app already depends on, confirmed live and working 31 Aug 2026. If those are fine and a real message still doesn't produce a reply, check the function's own logs for a signature rejection (`twilioSigned` returning `ok:false`) before assuming the evidence-intake logic itself is at fault; that check runs before any of this code does.
+
+**This was never fully proven with a real, signed inbound message during development**, because doing so requires `TWILIO_AUTH_TOKEN` to sign a test request, which nobody building this held. Every piece of logic underneath that signature check was verified directly against the live database; the signature check, the media fetch, and the reply mechanism are pre-existing code already handling real client messages on this same endpoint. The first real worker photo sent to the number is the genuine end-to-end proof. If it does not work as described here, that is the first place to look, not a reason to assume the whole design is wrong.
+
+## A worker's photo never files itself. It always waits for the job's code back.
+
+**Even with exactly one live job, nothing is filed until the worker replies with that job's own code.** This was a deliberate safety fix, 31 Aug 2026, replacing an earlier version that filed straight away when a worker's number matched only one active job. A photo is staged the moment it arrives either way, but staged is not filed: it sits in `wa_intake_sessions.answers->'pending'` until `pickJobChoice()` in `yaad-inbound` accepts the reply.
+
+**What counts as a valid reply, in the order it is checked:** the job's own code appearing anywhere in the message (`JOB-0042`, case-insensitive, works inside a longer sentence too) beats everything else and is the one every prompt leads with; failing that, a bare ordinal number matching the position in the list Twilio was shown (`1`, `2`); failing that, an unambiguous match against a job's title. A bare "yes", the digits alone without the job's own prefix, or anything that matches more than one candidate all correctly fail and reprompt rather than guess.
+
+**To see a worker mid-confirmation**, same query as the general evidence-session lookup above: look at `answers->'job_choices'` for what they were shown and `answers->'pending'` for what is staged and waiting. Nothing in `evidence` or the job's own record changes until that row is deleted by a successful `finalizeEvidenceItem()` call, which only runs after a match.
+
+**If a worker seems stuck reprompting, check what they actually typed against `answers->'job_choices'` in that row first.** The most common real cause is a worker typing the bare digits ("0042") without the code's letters, which is deliberate, not a bug: the code match requires the string Twilio was shown, precisely so a worker cannot confirm a job by accident. Tell them to reply with the exact code shown in the message.
+
+## Proving the Twilio signature check without a real Twilio secret
+
+**Run `deno test supabase/functions/yaad-inbound/twilio-signature_test.ts` and `deno test supabase/functions/yaad-inbound/job-match_test.ts`.** Both run with no network and no live credentials, `twilio-signature_test.ts` signs a request the same way Twilio does using a throwaway test token, not the real `TWILIO_AUTH_TOKEN`, and checks `checkTwilioSignature()` in `twilio-signature.ts` agrees. This is what "the algorithm is proven, the live endpoint is not yet" actually means in practice: everything the signature check does is exercised here, the one thing not exercised is Twilio's real servers signing with the real production secret and reaching the real URL.
+
+**If `yaad-inbound` starts refusing genuine Twilio messages with a 403**, the first thing to check is which of the three URL candidates in `checkTwilioSignature()` Twilio is actually signing against, not the test file: the trailing-slash and no-trailing-slash forms are both tried because Twilio signs whatever was typed into its own console.
+
+**Both `twilio-signature.ts` and `job-match.ts` are separate files inside `yaad-inbound/`, deployed as part of the same function**, same as `guardrails.ts`, `otel.ts` and `textmodel.ts` already were. `supabase functions deploy yaad-inbound` picks all of them up; nothing extra needed.
+
+## A client approves a stage by replying on WhatsApp instead of tapping the portal button
+
+**A client's evidence_landed message always names the job's own code and says to reply with it, when there is a `client_phone` on file.** Replying with that code, on the number the job has on record, calls `approve_stage_via_whatsapp()` in Postgres, the same underlying check as the portal button (`approve_stage()`): a dispute open or nothing filed refuses it exactly the same way either route.
+
+**To see whether a client's phone would actually be recognised**, same tail-matching convention as everywhere else in this repository:
+
+```sql
+select id, title, status, client_phone from public.jobs
+ where status = 'evidence'
+   and right(regexp_replace(coalesce(client_phone,''), '\D', '', 'g'), 9)
+     = right(regexp_replace('<their WhatsApp number>', '\D', '', 'g'), 9);
+```
+
+**A reply only approves on an exact match against the job's own code.** No "yes", no ordinal number, no title guess, unlike the worker evidence flow: there is no session boundary on a client's plain text message, every one they send passes through the check, so only the code (copy-pasted from the message that showed it to them) is trusted. If a client says a stage was approved and nothing changed, the first thing to check is whether their reply actually contained the exact code string, not a shortened or misremembered version of it.
+
+**`deno test supabase/functions/yaad-inbound/approval-match_test.ts`** proves the matcher, including the two cases that matter: a bare "yes" and a bare ordinal number both correctly fail to approve anything, even with only one job waiting on that client.
+
+**Two confirmations land after a WhatsApp approval, on purpose left as is.** The function's own reply confirms immediately, and the existing `stage_released` notification (the same one a portal approval fires) follows moments later through the ordinary database trigger. Both are correct; nobody engineered around the overlap because doing so would add real complexity to a money-adjacent path to remove a harmless duplicate message.
+
+**If `yaad-notify-client`'s evidence_landed message stops mentioning the WhatsApp reply route**, check `clientPhone` is actually populated on the job first: the hint only appears when there is a phone on file to reply from.
+
+## A photo won't show, or an admin can't see one that should be there
+
+**Check which of two separate things is actually broken.** `public.evidence` is one gate (the row: label, sha256, who filed it, whether it's checked); `storage.objects` is a second, separate gate on the file itself, and they can disagree. As of 31 Aug 2026 both include `is_admin()`, so an admin sees everything a job's own client or worker would. If an admin genuinely cannot see a photo that should exist, this specific grant is the first thing to check:
+
+```sql
+select policyname, qual from pg_policies
+ where schemaname = 'storage' and tablename = 'objects' and policyname = 'job party can read evidence files';
+```
+
+**If a client or worker can't see their own photo**, the same policy answers it: their session's `auth.jwt()->>'email'` has to match `jobs.client_email` or `jobs.worker_email` for the specific job the file's path starts with. A mismatch there, not a broken image tag, is the usual real cause.
+
+## Evidence photos ride on WhatsApp directly now, not only a portal link
+
+**`evidencePhotoUrls()` in `yaad-notify-client` is what attaches them**, up to five per stage, image evidence only, video excluded. If a client says the photo never came through on WhatsApp but the portal shows it fine, check `yaadly.notify.photos_attached` on the trace for that send: zero means the function found nothing to attach (check `evidence.mime` actually starts `image/` and `evidence.stage` matches the job's current stage), a number above zero but no image received means Twilio itself rejected or failed to fetch a signed URL, worth checking the function logs for that specific send rather than assuming the attach code is at fault.
+
+**The signed URL each photo travels on is good for five minutes, server-side, admin client, never exposed to a browser.** This has nothing to do with the portal's own signed URLs (which run through the *visitor's* session and the storage RLS policy above) or with the storage-object read policy at all; a WhatsApp send failing does not mean an admin or client has lost portal access to the same photo, and the reverse is also true.
+
+**Two small orphaned test files remain in the evidence bucket from 31 Aug 2026's live verification**, `TEST-WA-LIVE-A/0cf5d7c6-512c-446f-a169-6ede09f9da89.jpg` and `TEST-WA-LIVE-A/12da67a9-8500-437b-b558-925cb2a85e4b.jpg`. Nothing references them; safe to delete by hand from the Storage dashboard whenever convenient. Postgres refuses a direct `DELETE` on `storage.objects`, by design, so removing them needs the Storage API or the dashboard, not a migration.

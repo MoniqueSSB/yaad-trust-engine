@@ -78,12 +78,21 @@ export default async function ClientPortal() {
      and not moved past it. A job with a worker on it is not "not live". */
   const waiting = (jobs as GateJob[]).filter(stillWaiting);
 
+  /* hasAcceptedMaterials is always false here, and that is not a shortcut.
+     Every job on this page is still WAITING to go live (stillWaiting()), and
+     client_go_live() only opens a job that has no worker_email yet: a quote
+     cannot be accepted before a job is open, so no job on this pre-go-live
+     list can possibly have an accepted quote at all. "Say where materials
+     are kept" genuinely does not belong on this checklist; it belongs on
+     the job room once a quote naming materials has actually been chosen,
+     which is a state this list never contains. */
   const gatesFor = (j: GateJob) =>
     jobGates({
       job: j,
       jobBase: "/portal/jobs/" + encodeURIComponent(j.id),
       emailConfirmed,
       signed,
+      hasAcceptedMaterials: false,
     });
 
   /* Account gates are the same answer for every job, so they are counted once

@@ -40,5 +40,11 @@ export async function submitQuote(formData: FormData): Promise<void> {
     note,
     status: "submitted",
   });
+
+  /* Telling the client a price has landed is now a database trigger
+     (notify_client_quote_arrived, fired on this same insert), not something
+     the UI asks for. That is deliberate: the state change is the trigger,
+     never the click. See 20260831i_notify_client_from_the_state_change.sql. */
+
   revalidatePath("/jobs");
 }

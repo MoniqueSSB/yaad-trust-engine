@@ -113,7 +113,11 @@ const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address", "pol
 //
 // Adding a doc_type here is safe. Removing one is a data protection decision
 // and belongs to the founder, not to whoever is editing this file.
-const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video"];
+// intro_video joined this list the day it was created (31 Aug 2026). It is a
+// tradesperson's face and voice, which is the same category of thing as the
+// selfie and the liveness turn, whatever it is called and whatever it is for.
+// The file says "adding a doc_type here is safe", and this is that case.
+const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video", "intro_video"];
 
 // When Persona has confirmed the government ID and selfie, those two are not
 // missing, they are somewhere better: checked by a vendor with real document

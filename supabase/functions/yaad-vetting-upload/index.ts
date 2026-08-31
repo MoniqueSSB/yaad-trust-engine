@@ -44,6 +44,10 @@ const KEEP_DAYS = 90;                             // purge clock on the file
 const DOC_TYPES = [
   "photo_id", "selfie_with_id", "face_video", "police_check", "proof_of_address", "trn",
   "cv", "portfolio", "certificate",
+  // Phase 2's thirty second introduction. A tradesperson saying what they do,
+  // in their own voice, which is worth more to a client deciding who to let
+  // onto their mother's roof than another PDF.
+  "intro_video",
 ];
 
 // Video is here for one reason: the left-to-right face turn in step 3. A still
