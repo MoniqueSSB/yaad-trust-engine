@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PACK_DOC_ORDER, packDocHasContent, type Dict } from "@/lib/portal/packDocs";
+import { agreeKickoffPack } from "@/app/portal/job-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,20 +13,51 @@ export const dynamic = "force-dynamic";
  * under /pack/[doc], reached from here. Only approved packs are readable by
  * the parties; drafts stay internal (kickoff_packs RLS enforces that, not
  * this page).
+ *
+ * Dual agreement, same day: a change after issue creates a new revision and
+ * both sides re-sign, so the confirm code shown below is only ever the
+ * CURRENT revision's. A code baked into an older link fails closed in
+ * agree_kickoff_pack() rather than silently confirming stale content.
  */
-export default async function PackIndex({ params }: { params: Promise<{ id: string }> }) {
+export default async function PackIndex({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ code?: string }>;
+}) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
   const { id } = await params;
+  const { code: linkCode } = await searchParams;
   const supabase = await createClient();
-  const { data: pack } = await supabase
-    .from("kickoff_packs")
-    .select("id,project_title,client_name,parish,status,rev,updated_at,docs,approved_by,approved_at")
-    .eq("job_id", id)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: pack }, { data: job }] = await Promise.all([
+    supabase
+      .from("kickoff_packs")
+      .select("id,project_title,client_name,parish,status,rev,updated_at,docs,approved_by,approved_at,confirm_code,both_confirmed_at")
+      .eq("job_id", id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("jobs").select("client_email,worker_email").eq("id", id).maybeSingle(),
+  ]);
   if (!pack) notFound();
+
+  const email = (user.email ?? "").toLowerCase();
+  const role = job && job.client_email?.toLowerCase() === email
+    ? "client"
+    : job && job.worker_email?.toLowerCase() === email
+    ? "worker"
+    : null;
+
+  const { data: agreements } = await supabase
+    .from("kickoff_pack_agreements")
+    .select("side")
+    .eq("pack_id", pack.id)
+    .eq("rev", pack.rev ?? 1);
+  const clientAgreed = (agreements ?? []).some((a) => a.side === "client");
+  const workerAgreed = (agreements ?? []).some((a) => a.side === "worker");
+  const iAgreed = role === "client" ? clientAgreed : role === "worker" ? workerAgreed : false;
 
   const d = (pack.docs ?? {}) as Dict;
   const base = "/portal/jobs/" + encodeURIComponent(id) + "/pack";
@@ -46,6 +78,38 @@ export default async function PackIndex({ params }: { params: Promise<{ id: stri
         Nine documents, each on its own page. Read them in order or jump straight
         to the one you need.
       </p>
+
+      {pack.status === "approved" && role && (
+        <section className="mt-4 rounded-xl border border-line2 bg-panel2 p-4">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Confirm this revision
+          </h2>
+          <p className="mb-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
+            Both sides confirm this exact revision before it is treated as final.
+            {pack.both_confirmed_at
+              ? " Both sides have confirmed rev " + (pack.rev ?? 1) + "."
+              : " If the pack changes after this, a new revision is issued and both sides confirm again."}
+          </p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (clientAgreed ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
+              {clientAgreed ? "✓ Client confirmed" : "Client not yet confirmed"}
+            </span>
+            <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (workerAgreed ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
+              {workerAgreed ? "✓ Worker confirmed" : "Worker not yet confirmed"}
+            </span>
+            {!iAgreed && (
+              <form action={agreeKickoffPack}>
+                <input type="hidden" name="jobId" value={id} />
+                <input type="hidden" name="packId" value={pack.id} />
+                <input type="hidden" name="code" value={linkCode || pack.confirm_code || ""} />
+                <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                  Confirm as the {role}
+                </button>
+              </form>
+            )}
+          </div>
+        </section>
+      )}
 
       <ol className="mt-4 grid gap-2">
         {PACK_DOC_ORDER.map((doc, i) => {

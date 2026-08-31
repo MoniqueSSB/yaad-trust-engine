@@ -66,7 +66,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed"] as const;
+const KINDS = ["quote_arrived", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -626,12 +626,12 @@ Deno.serve(async (req: Request) => {
     let recipientEmail = clientEmail;
     let recipientPhone = clientPhone;
     let workerPhone = "";
-    if ((kind === "evidence_comment" || kind === "evidence_landed") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -860,6 +860,25 @@ Deno.serve(async (req: Request) => {
       subject = `A delay on your job: ${job.title}`;
       line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
         `We are checking in with the worker directly. Nothing is wrong with the money held on this job, and you can raise anything here: ${roomLink}`;
+    } else if (kind === "kickoff_pack_ready") {
+      // The worker's own door into the Kickoff Pack, same page the client
+      // already reads (parties_read_approved_packs covers both), reached
+      // here because a worker's web surface is thin on purpose (CLAUDE.md
+      // §9: onboarding and file upload, nothing else) - WhatsApp is where
+      // they actually are. The code in the link is this exact revision's;
+      // if the pack changes before it is opened, agree_kickoff_pack()
+      // refuses the stale code rather than silently confirming new content
+      // under an old link.
+      const { data: pack } = await admin.from("kickoff_packs")
+        .select("id, rev, confirm_code")
+        .eq("job_id", jobId).eq("status", "approved")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+      const packLink = pack?.confirm_code
+        ? `${APP_URL}/portal/jobs/${encodeURIComponent(jobId)}/pack?code=${encodeURIComponent(pack.confirm_code)}`
+        : roomLink;
+      subject = `Your Kickoff Pack is ready: ${job.title}`;
+      line = `The Kickoff Pack for ${job.title} is ready: scope, timeline, payment stages and the evidence checklist, all in one place. ` +
+        `Read it and confirm your side here: ${packLink}`;
     }
 
     let emailed = false;
