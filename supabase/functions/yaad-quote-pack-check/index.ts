@@ -6,15 +6,24 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // yaad-kickoff-check: a scheduler's own secret held here only as its
 // SHA-256 hash, or a signed-in admin for a manual run.
 //
-// One job, unlike yaad-kickoff-check's two: a job that is open, unassigned
-// and at stage 0 (exactly open_jobs' own definition of "live", see the
-// migration) with no draft yet, gets one requested. There is no second
-// phase here, because there is nothing to auto-issue: a Quote Kickoff Pack
-// is never client-facing on its own, it is a starting point a worker edits
-// and folds into their own quote on job_quotes. status 'ready' plus a
-// clean guardrail is already the whole gate; QuotePanel.tsx checks both
-// before showing a draft to a worker, so nothing here needs to flip a
-// second switch the way link_kickoff_draft_to_job() does for the big pack.
+// Two phases now, not one. Founder's own correction, 1 Sep 2026, live:
+// "I never saw when the small pack was issued for review" - the design as
+// first built had no review step anywhere, a guardrail-clean 'ready'
+// draft went straight into a worker's quote form the instant it finished.
+//
+// 1. A job that is open, unassigned and at stage 0 (exactly open_jobs' own
+//    definition of "live", see the migration) with no draft yet, gets one
+//    requested.
+//
+// 2. A finished, guardrail-clean draft is auto-approved directly, the
+//    automatic half of what approve_quote_pack_draft() does by hand for
+//    the admin desk - same shape as yaad-kickoff-check's own Phase 2 for
+//    the big pack. A dirty draft is left exactly where it is, visible in
+//    the desk's own Quote Pack Drafts view, for a human to notice and
+//    fix; nothing here ever approves flagged content, the same hard rule
+//    the manual door enforces. QuotePanel.tsx's own usableDraft() check
+//    is a courtesy, not the gate: RLS is what actually keeps an
+//    unapproved draft off a worker's screen (20260901r).
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -123,8 +132,27 @@ Deno.serve(async (req: Request) => {
       if (!errMsg) requested++; else { requestFailed++; requestErrors.push(errMsg); }
     }
 
-    root.setAttributes({ "yaadly.quote_pack_check.requested": requested });
-    return json({ ok: true, requested, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors });
+    // ── Phase 2: a finished, guardrail-clean draft is approved directly.
+    // A dirty one is left at 'ready' for a human in the concierge desk's
+    // Quote Pack Drafts view. ──────────────────────────────────────────
+    const { data: readyDrafts } = await admin.from("quote_pack_drafts")
+      .select("id,guardrail").eq("status", "ready");
+    let approved = 0, heldForReview = 0, approveFailed = 0;
+    for (const d of readyDrafts ?? []) {
+      const g = (d.guardrail ?? {}) as Record<string, unknown>;
+      const dirty = Boolean(g.price_language_detected) || Boolean(g.banned_language_detected);
+      if (dirty) { heldForReview++; continue; }
+      const { error: updErr } = await admin.from("quote_pack_drafts").update({
+        status: "approved",
+        approved_by: "system: auto-issued, guardrail-clean",
+        approved_at: new Date().toISOString(),
+      }).eq("id", d.id).eq("status", "ready"); // second poll caught it mid-flight
+      if (updErr) { console.error(`yaad-quote-pack-check: approve failed for draft ${d.id}: ${updErr.message}`); approveFailed++; }
+      else approved++;
+    }
+
+    root.setAttributes({ "yaadly.quote_pack_check.requested": requested, "yaadly.quote_pack_check.approved": approved });
+    return json({ ok: true, requested, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors, approved, heldForReview, approveFailed });
   } catch (e) {
     root.recordError(e);
     return json({ error: String(e).slice(0, 200) }, 500);

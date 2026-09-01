@@ -237,7 +237,28 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
   return true;
 }
 
-async function lookupWorkerByPhone(admin: any, from: string): Promise<{ email: string } | null> {
+async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
+  const { data } = await admin.from("jobs").select("id, title, stage, status").ilike("worker_email", email).order("updated_at", { ascending: false });
+  return (data ?? [])
+    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
+    .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
+}
+
+// More than one worker_profiles row can share a phone number - an old
+// seed/test profile whose only job finished long ago, sitting alongside the
+// profile that number actually belongs to now. Found live, testing this for
+// real: a single-match lookup silently picked the finished-job profile, its
+// zero active jobs then read as "this phone is not a worker with anything to
+// file", and every message after that fell through and was read as a
+// client's instead. Tries every phone match in turn, oldest code untouched,
+// and returns the first one that actually has active work, so a stale
+// duplicate can never shadow the profile that matters. Returns null only
+// when NONE of the matches have active work, same meaning the old function's
+// null already carried.
+async function lookupWorkerWithActiveJobs(
+  admin: any,
+  from: string,
+): Promise<{ email: string; jobs: { id: string; title: string; stage: number }[] } | null> {
   const tail = from.replace(/\D/g, "").slice(-9);
   if (tail.length < 7) return null;
   const { data } = await admin
@@ -245,15 +266,15 @@ async function lookupWorkerByPhone(admin: any, from: string): Promise<{ email: s
     .select("worker_email, phone")
     .eq("active", true)
     .not("phone", "is", null);
-  const match = (data ?? []).find((w: any) => String(w.phone ?? "").replace(/\D/g, "").slice(-9) === tail);
-  return match?.worker_email ? { email: String(match.worker_email).toLowerCase() } : null;
-}
-
-async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
-  const { data } = await admin.from("jobs").select("id, title, stage, status").ilike("worker_email", email).order("updated_at", { ascending: false });
-  return (data ?? [])
-    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
-    .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
+  const candidates = (data ?? [])
+    .filter((w: any) => String(w.phone ?? "").replace(/\D/g, "").slice(-9) === tail)
+    .map((w: any) => String(w.worker_email ?? "").toLowerCase())
+    .filter(Boolean);
+  for (const email of candidates) {
+    const jobs = await lookupActiveJobsForWorker(admin, email);
+    if (jobs.length) return { email, jobs };
+  }
+  return null;
 }
 
 async function mintPortalUploadLink(admin: any, email: string, jobId: string): Promise<string | null> {
@@ -671,6 +692,33 @@ async function twilioSigned(req: Request, raw: string): Promise<{ ok: boolean; c
   return checkTwilioSignature(req, raw, Deno.env.get("TWILIO_AUTH_TOKEN") ?? "", Deno.env.get("SUPABASE_URL") ?? "");
 }
 
+/** What a stage number actually means to the person reading the message.
+ *  Founder's own correction, live, testing this for real: every WhatsApp
+ *  message about a stage said only "Stage 1" or "Stage 2", a raw number
+ *  with no connection to what the approved Kickoff Pack itself calls that
+ *  stage or what share of the total it releases - even though the portal
+ *  rail (jobStages() in journey.ts) has read the pack's own stage names
+ *  since 31 Aug. The data was always right; the WhatsApp copy never said
+ *  it. Falls back to the bare number for a job with no approved pack,
+ *  same as the rail itself does. */
+async function stageLabel(
+  supabase: { from: (t: string) => any },
+  jobId: string,
+  stageNum: number,
+): Promise<string> {
+  const { data: pack } = await supabase.from("kickoff_packs")
+    .select("docs").eq("job_id", jobId).eq("status", "approved")
+    .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  const stages = (pack?.docs as { payment_schedule?: { stages?: unknown } } | null)
+    ?.payment_schedule?.stages;
+  const s = Array.isArray(stages) ? (stages as any[])[stageNum - 1] : null;
+  if (s && typeof s.stage === "string" && s.stage.trim()) {
+    const pct = typeof s.proportion_percent === "number" ? ` (${s.proportion_percent}% of the total)` : "";
+    return `${s.stage}${pct}`;
+  }
+  return `Stage ${stageNum}`;
+}
+
 
 /** The nudge to Monique's own inbox.
  *
@@ -877,6 +925,7 @@ Deno.serve(async (req: Request) => {
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
+      const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
 
       // A worker answering the "send this draft, or write your own"
       // prompt. "1" means send exactly what was drafted; anything else
@@ -908,6 +957,27 @@ Deno.serve(async (req: Request) => {
         choices.length === 1
           ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply with the code ${choices[0].id} to confirm, or tell us the right job.`
           : `Which job is this for? Reply with the code:  ${choices.map((c) => `${c.id} (${c.title})`).join("  ")}`;
+
+      // The job-code answer to a freeform update that named more than one
+      // active job (see the text_update lane further down). Same shape as
+      // evSession's own code-confirm step, filing straight into evidence
+      // rather than staging anything further: there is no photo to attach
+      // context to here, the text itself was always the whole update.
+      if (textUpdateSession && !msg.media.length && msg.text.trim()) {
+        const a = textUpdateSession.answers as any;
+        const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
+        const pick = pickJobChoice(msg.text, choices);
+        if (!pick) return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
+        const { error } = await supabase.from("evidence").insert({
+          job_id: pick.id, label: String(a.text ?? "").trim().slice(0, 1000), stage: pick.stage,
+          kind: "work", uploaded_by: a.worker_email,
+        });
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        root.setAttributes({ "yaadly.worker_update.job": pick.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
+        return twiml(error
+          ? "That did not save properly. Try again."
+          : `Got it, on record for ${pick.id} (${pick.title}). The client hears about it once it is drafted.`);
+      }
 
       if (evSession) {
         const answers = evSession.answers as any;
@@ -948,7 +1018,8 @@ Deno.serve(async (req: Request) => {
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_after_context" : "context_but_nothing_filed" });
           if (!filed) return twiml("Confirmed, but nothing saved properly. Try sending the photo again.");
-          let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, stage ${confirmedJob.stage}. Keep them coming.`;
+          const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
+          let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. Keep them coming.`;
           const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
           if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
           return twiml(body);
@@ -989,27 +1060,25 @@ Deno.serve(async (req: Request) => {
 
       const evidenceMedia = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
       if (evidenceMedia.length) {
-        const worker = await lookupWorkerByPhone(supabase, msg.from);
-        if (worker) {
-          const activeJobs = await lookupActiveJobsForWorker(supabase, worker.email);
-          if (activeJobs.length > 0) {
-            const items = (await Promise.all(evidenceMedia.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text)))).filter(Boolean) as PendingEvidence[];
-            if (!items.length) {
-              return twiml("That did not come through properly. Try sending it again, or if it is a longer video, use the portal instead.");
-            }
-
-            // Never filed on the strength of a single option alone, even
-            // when there is only one job it could possibly be. The code is
-            // always asked for and always checked; nothing moves onto a job
-            // until the worker names it.
-            await supabase.from("wa_intake_sessions").upsert({
-              wa_id: msg.from,
-              answers: { _lane: "evidence", worker_email: worker.email, pending: items, job_choices: activeJobs },
-              photo_count: items.length,
-              updated_at: new Date().toISOString(),
-            });
-            return twiml(`Got it. ${codePrompt(activeJobs)}`);
+        const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+        if (found) {
+          const { email: workerEmail, jobs: activeJobs } = found;
+          const items = (await Promise.all(evidenceMedia.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text)))).filter(Boolean) as PendingEvidence[];
+          if (!items.length) {
+            return twiml("That did not come through properly. Try sending it again, or if it is a longer video, use the portal instead.");
           }
+
+          // Never filed on the strength of a single option alone, even
+          // when there is only one job it could possibly be. The code is
+          // always asked for and always checked; nothing moves onto a job
+          // until the worker names it.
+          await supabase.from("wa_intake_sessions").upsert({
+            wa_id: msg.from,
+            answers: { _lane: "evidence", worker_email: workerEmail, pending: items, job_choices: activeJobs },
+            photo_count: items.length,
+            updated_at: new Date().toISOString(),
+          });
+          return twiml(`Got it. ${codePrompt(activeJobs)}`);
         }
       }
 
@@ -1019,9 +1088,9 @@ Deno.serve(async (req: Request) => {
       // among several. "Awaiting" means the newest comment on that job is
       // still from the client, nobody has answered it yet.
       if (!msg.media.length && msg.text.trim()) {
-        const worker = await lookupWorkerByPhone(supabase, msg.from);
-        if (worker) {
-          const activeJobs = await lookupActiveJobsForWorker(supabase, worker.email);
+        const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+        if (found) {
+          const activeJobs = found.jobs;
           const awaitingReply: { id: string; title: string; stage: number }[] = [];
           for (const j of activeJobs) {
             const { data: latest } = await supabase.from("evidence_comments")
@@ -1065,6 +1134,122 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Stage 6: confirming a Kickoff Pack by replying with the job's own
+      // code. Founder's own correction, 1 Sep 2026, live: a worker's whole
+      // surface is WhatsApp by design (CLAUDE.md §9 - "the worker web
+      // surface stays thin on purpose"), so confirming a pack cannot be a
+      // portal-only button the way it was drafted a few hours earlier the
+      // same night (20260901f). Works for either side's phone, same as
+      // every other job-code reply in this function: whichever side
+      // replies with the code confirms their own, via
+      // agree_kickoff_pack_via_whatsapp() (20260901i), which re-derives
+      // which side this phone actually is rather than trusting the match
+      // below for anything but which job was meant.
+      //
+      // MUST run before the booking block below. Both blocks recognise the
+      // exact same reply (a bare job code from the client's phone), and the
+      // booking block used to run first - found live, testing this for
+      // real: a client confirming their side for the first time got routed
+      // into choose_worker_via_whatsapp() instead, which correctly refused
+      // ("choose unlocks once this worker's Kickoff Pack is confirmed by
+      // both sides") since nothing had been confirmed yet, but the client's
+      // own confirmation was never recorded at all. Once a pack is fully
+      // confirmed this block's own candidate query stops matching it (the
+      // pack no longer needs confirming), so the identical reply correctly
+      // falls through to the booking block on a second send - the intended
+      // two-step shape, which only works with this block going first.
+      if (!msg.media.length && msg.text.trim()) {
+        const tail = msg.from.replace(/\D/g, "").slice(-9);
+
+        // Plain queries and a manual join in JS, not an embedded-resource
+        // select: found live, testing this for real, that
+        // .select("id, jobs!inner(...)").not("jobs.client_phone", "is",
+        // null) was silently returning candidates that never matched
+        // anything (the embed resolved in a shape .map((p) => p.jobs)
+        // did not expect), so a correctly-confirmed pack never showed up
+        // as a candidate and every reply fell through to the booking
+        // block below. No other block in this file uses an embed; this
+        // one should not have either.
+        const { data: approvedPacks } = await supabase.from("kickoff_packs")
+          .select("id, job_id, quote_id, rev").eq("status", "approved");
+        const packs = (approvedPacks ?? []) as { id: string; job_id: string; quote_id: string | null; rev: number | null }[];
+
+        // A pack this phone's side has already confirmed is not a
+        // candidate for THIS block - found live, testing this for real:
+        // once both sides confirm, the identical reply kept matching here
+        // anyway, agree_kickoff_pack_via_whatsapp() correctly refused
+        // ("No Kickoff Pack on this job is waiting on your confirmation"),
+        // and the reply never reached the booking block below at all. The
+        // candidate list has to know the same thing the RPC already
+        // enforces, or a confirmed pack can never fall through to booking.
+        const packIds = packs.map((p) => p.id);
+        const { data: agreementRows } = packIds.length
+          ? await supabase.from("kickoff_pack_agreements").select("pack_id, rev, side").in("pack_id", packIds)
+          : { data: [] as { pack_id: string; rev: number; side: string }[] };
+        const confirmedSides = new Set(
+          (agreementRows ?? []).map((a: any) => `${a.pack_id}:${a.rev}:${a.side}`),
+        );
+
+        const jobIds = [...new Set(packs.map((p) => p.job_id))];
+        const { data: jobRows } = jobIds.length
+          ? await supabase.from("jobs").select("id, title, stage, client_phone").in("id", jobIds)
+          : { data: [] as { id: string; title: string; stage: number; client_phone: string | null }[] };
+        const jobsById = new Map((jobRows ?? []).map((j: any) => [j.id, j]));
+
+        const quoteIds = [...new Set(packs.filter((p) => p.quote_id).map((p) => p.quote_id as string))];
+        const { data: quoteRows } = quoteIds.length
+          ? await supabase.from("job_quotes").select("id, worker_email").in("id", quoteIds)
+          : { data: [] as { id: string; worker_email: string }[] };
+        const workerEmailByQuote = new Map((quoteRows ?? []).map((q: any) => [q.id, q.worker_email]));
+
+        const clientCandidates = packs
+          .filter((p) => !confirmedSides.has(`${p.id}:${p.rev ?? 1}:client`))
+          .map((p) => jobsById.get(p.job_id))
+          .filter((j: any) => j && String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+
+        const workerJobIds = new Set<string>();
+        const workerCandidates: { id: string; title: string; stage: number }[] = [];
+        for (const p of packs) {
+          if (confirmedSides.has(`${p.id}:${p.rev ?? 1}:worker`)) continue;
+          const workerEmail = p.quote_id ? workerEmailByQuote.get(p.quote_id) : undefined;
+          if (!workerEmail) continue;
+          const { data: wp } = await supabase.from("worker_profiles")
+            .select("phone").ilike("worker_email", workerEmail).maybeSingle();
+          const workerTail = String(wp?.phone ?? "").replace(/\D/g, "").slice(-9);
+          const j = jobsById.get(p.job_id);
+          if (j && workerTail && workerTail === tail && !workerJobIds.has(j.id)) {
+            workerJobIds.add(j.id);
+            workerCandidates.push(j);
+          }
+        }
+
+        const kickoffCandidates = [...clientCandidates, ...workerCandidates.filter((j) => !clientCandidates.some((c: any) => c.id === j.id))];
+        const kickoffTarget = matchApprovingJob(msg.text, kickoffCandidates as any);
+        if (kickoffTarget) {
+          // The job named in the reply, not a global "which phone is this"
+          // search: a phone with more than one pack pending across
+          // different jobs must still resolve the one it actually typed.
+          const { data: kResult, error: kErr } = await supabase.rpc("agree_kickoff_pack_via_whatsapp", { p_job: kickoffTarget.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_kickoff_confirm.job": kickoffTarget.id, "yaadly.whatsapp_kickoff_confirm.outcome": kErr ? "refused" : "confirmed" });
+          if (kErr) return twiml(`That did not go through: ${kErr.message}`);
+          const row = Array.isArray(kResult) ? kResult[0] : kResult;
+          // The client's own next action has to be spelled out here: found
+          // live, testing this for real - "ready to be chosen" told the
+          // client nothing had gone wrong, but nothing told them what to
+          // do next, and choosing is a second, separate reply with the
+          // same code, not something that happens on its own. Worker
+          // confirmations get no such line: choosing is the client's
+          // action alone, and telling a worker to "reply again to book"
+          // would be false.
+          if (row?.both_confirmed) {
+            return twiml(row.agreed_side === "client"
+              ? `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}. Reply ${kickoffTarget.id} again to book them.`
+              : `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}, ready for the client to choose.`);
+          }
+          return twiml(`Confirmed on your side for ${kickoffTarget.title}. Waiting on the other side now, you'll hear the moment they confirm.`);
+        }
+      }
+
       // Stage 6: a client booking a worker by replying with the job's own
       // code, rather than tapping Choose in the portal. Same guard as the
       // approval block below and the same reason: every plain text message
@@ -1082,7 +1267,9 @@ Deno.serve(async (req: Request) => {
       // never be true once a quote is actually ready to book. If the pack
       // is not yet confirmed by both sides, the RPC raises its own honest
       // exception and that is what the client reads below, rather than a
-      // separate "pending" branch pretending to know why.
+      // separate "pending" branch pretending to know why. Runs AFTER the
+      // Kickoff Pack confirm block above - see that block's own comment
+      // for why the order matters.
       if (!msg.media.length && msg.text.trim()) {
         const { data: openToBook } = await supabase.from("jobs")
           .select("id, title, stage, client_phone")
@@ -1098,62 +1285,6 @@ Deno.serve(async (req: Request) => {
           root.setAttributes({ "yaadly.whatsapp_quote_accept.job": bookTarget.id, "yaadly.whatsapp_quote_accept.outcome": error ? "refused" : "accepted" });
           if (error) return twiml(`That did not go through: ${error.message}`);
           return twiml(`Booked. ${bookTarget.title} is on. A message with the price and how payment works is coming through next.`);
-        }
-      }
-
-      // Stage 6: confirming a Kickoff Pack by replying with the job's own
-      // code. Founder's own correction, 1 Sep 2026, live: a worker's whole
-      // surface is WhatsApp by design (CLAUDE.md §9 - "the worker web
-      // surface stays thin on purpose"), so confirming a pack cannot be a
-      // portal-only button the way it was drafted a few hours earlier the
-      // same night (20260901f). Works for either side's phone, same as
-      // every other job-code reply in this function: whichever side
-      // replies with the code confirms their own, via
-      // agree_kickoff_pack_via_whatsapp() (20260901i), which re-derives
-      // which side this phone actually is rather than trusting the match
-      // below for anything but which job was meant.
-      if (!msg.media.length && msg.text.trim()) {
-        const tail = msg.from.replace(/\D/g, "").slice(-9);
-
-        const { data: clientPacks } = await supabase.from("kickoff_packs")
-          .select("id, job_id, jobs!inner(id, title, stage, client_phone)")
-          .eq("status", "approved")
-          .not("jobs.client_phone", "is", null);
-        const clientCandidates = (clientPacks ?? [])
-          .map((p: any) => p.jobs)
-          .filter((j: any) => String(j?.client_phone ?? "").replace(/\D/g, "").slice(-9) === tail);
-
-        const { data: workerPacks } = await supabase.from("kickoff_packs")
-          .select("id, job_id, quote_id, jobs!inner(id, title, stage), job_quotes!inner(worker_email)")
-          .eq("status", "approved")
-          .not("quote_id", "is", null);
-        const workerJobIds = new Set<string>();
-        const workerCandidates: { id: string; title: string; stage: number }[] = [];
-        for (const p of (workerPacks ?? []) as any[]) {
-          const workerEmail = String(p.job_quotes?.worker_email ?? "");
-          if (!workerEmail) continue;
-          const { data: wp } = await supabase.from("worker_profiles")
-            .select("phone").ilike("worker_email", workerEmail).maybeSingle();
-          const workerTail = String(wp?.phone ?? "").replace(/\D/g, "").slice(-9);
-          if (workerTail && workerTail === tail && !workerJobIds.has(p.jobs.id)) {
-            workerJobIds.add(p.jobs.id);
-            workerCandidates.push(p.jobs);
-          }
-        }
-
-        const kickoffCandidates = [...clientCandidates, ...workerCandidates.filter((j) => !clientCandidates.some((c: any) => c.id === j.id))];
-        const kickoffTarget = matchApprovingJob(msg.text, kickoffCandidates as any);
-        if (kickoffTarget) {
-          // The job named in the reply, not a global "which phone is this"
-          // search: a phone with more than one pack pending across
-          // different jobs must still resolve the one it actually typed.
-          const { data: kResult, error: kErr } = await supabase.rpc("agree_kickoff_pack_via_whatsapp", { p_job: kickoffTarget.id, p_phone: msg.from });
-          root.setAttributes({ "yaadly.whatsapp_kickoff_confirm.job": kickoffTarget.id, "yaadly.whatsapp_kickoff_confirm.outcome": kErr ? "refused" : "confirmed" });
-          if (kErr) return twiml(`That did not go through: ${kErr.message}`);
-          const row = Array.isArray(kResult) ? kResult[0] : kResult;
-          return twiml(row?.both_confirmed
-            ? `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}, ready to be chosen.`
-            : `Confirmed on your side for ${kickoffTarget.title}. Waiting on the other side now, you'll hear the moment they confirm.`);
         }
       }
 
@@ -1183,7 +1314,8 @@ Deno.serve(async (req: Request) => {
           const { error } = await supabase.rpc("approve_stage_via_whatsapp", { p_job: target.id, p_phone: msg.from });
           root.setAttributes({ "yaadly.whatsapp_approval.job": target.id, "yaadly.whatsapp_approval.outcome": error ? "refused" : "approved" });
           if (error) return twiml(`That did not go through: ${error.message}`);
-          return twiml(`Approved. Stage ${target.stage ?? 1} of ${target.title} is confirmed, and the worker is paid for it. Nothing else to do.`);
+          const label = await stageLabel(supabase, target.id, target.stage ?? 1);
+          return twiml(`Approved. ${label} of ${target.title} is confirmed, and the worker is paid for it. Nothing else to do.`);
         }
 
         // Not a code, and exactly one job is waiting on this client's
@@ -1222,6 +1354,51 @@ Deno.serve(async (req: Request) => {
           return twiml(notified
             ? `Got it, passed on to the worker on ${job.id}. They'll get back to you.`
             : `Got it, on record against ${job.id}. We could not reach the worker directly just now, but it is saved and Yaadly can follow up.`);
+        }
+      }
+
+      // A worker's own freeform update, unclaimed by anything more
+      // specific above: a reply to yaad-daily-checkin most days, but this
+      // is the general door, not a check-in-only one. Voice transcribed
+      // right here, locally, so a worker's own voice note never falls
+      // through into the client-intake pipeline below and gets read as a
+      // stranger describing a brand new job (nothing above this point
+      // transcribes, and until this lane existed nothing needed to).
+      //
+      // Filed straight into evidence, no new pipeline: composeEvidenceReport
+      // (yaad-notify-client) already reads evidence.label text for the
+      // stage, photo or not, and schedule_evidence_landed_notify() already
+      // fires on any insert into evidence, not only one carrying a photo.
+      // The worker still confirms the drafted report before the client
+      // ever sees it, same as a photo update always has.
+      if (!msg.media.length || msg.media.every((m) => m.mime.startsWith("audio/"))) {
+        let text = msg.text.trim();
+        if (!text) {
+          const voiceNote = msg.media.find((m) => m.mime.startsWith("audio/"));
+          if (voiceNote) text = (await transcribeUrl(voiceNote.url, trace)).trim();
+        }
+        if (text) {
+          const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+          if (found && found.jobs.length === 1) {
+            const job = found.jobs[0];
+            const { error } = await supabase.from("evidence").insert({
+              job_id: job.id, label: text.slice(0, 1000), stage: job.stage,
+              kind: "work", uploaded_by: found.email,
+            });
+            root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
+            return twiml(error
+              ? "That did not save properly. Try sending it again."
+              : `Got it, on record for ${job.id}. The client hears about it once it is drafted.`);
+          }
+          if (found && found.jobs.length > 1) {
+            await supabase.from("wa_intake_sessions").upsert({
+              wa_id: msg.from,
+              answers: { _lane: "text_update", worker_email: found.email, text, job_choices: found.jobs },
+              photo_count: 0,
+              updated_at: new Date().toISOString(),
+            });
+            return twiml(`Got it. ${codePrompt(found.jobs)}`);
+          }
         }
       }
     }

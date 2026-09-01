@@ -22,7 +22,7 @@ import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmode
 const SYSTEM = `You are the Invoicing Agent for Yaadly Ltd, a UK company providing construction project management and oversight for property work in Jamaica. You read a short instruction from the founder and turn it into the lines of a draft invoice.
 
 Return STRICT JSON only, no markdown fences, exactly this shape:
-{"client_name":"","client_email":"","period_label":"","lines":[{"catalogue_id":"","description":"","qty":1,"tier":"founding"}],"covering_note":"","questions":[]}
+{"client_name":"","client_email":"","client_company":"","po_number":"","period_label":"","lines":[{"catalogue_id":"","description":"","qty":1,"tier":"founding"}],"covering_note":"","questions":[]}
 
 Rules, all of them absolute:
 1. You may NEVER state, calculate, estimate or imply an amount of money. There is no field for one. Do not put a number in a description.
@@ -30,7 +30,7 @@ Rules, all of them absolute:
 3. "tier" is "founding" or "full". Use "founding" when the instruction says founding, founder price, first five, or names an existing founding client. Use "full" otherwise. If the item is UNKNOWN, set tier to "founding" and it will be ignored.
 4. "qty" is a plain number. For a monthly retainer covering one month, qty is 1 and period_label says which month, for example "August 2026". For several site visits, qty is the number of visits.
 5. "description" is what appears on the client's invoice: one clear line naming the service and, where it helps, the property or month. No prices, no promises about the quality of anyone's work, no legal or title language.
-6. Never invent a client. If no name or email is in the instruction, leave those fields empty and ask for them in questions.
+6. Never invent a client, a company name, or a PO number. If any of them are not in the instruction, leave that field empty. Only client name and email need a question raised for them; company and PO number are optional and simply stay blank.
 7. "covering_note" is two or three warm, plain sentences to the client saying what this invoice covers and what happens next. British English. No em dashes or en dashes anywhere. Never promise an outcome, a date or a result.
 8. "questions" lists anything a person must confirm before this is sent. Always add a question for every UNKNOWN line.
 
@@ -82,8 +82,16 @@ async function isAdmin(req: Request): Promise<boolean> {
   } catch (_) { return false; }
 }
 
-const money = (pence: number) =>
-  "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Two currencies live on invoices now (20260901v): GBP for everything this
+// function has always drafted, JMD for a marketplace job's own stage fee,
+// raised in the job's own currency rather than inventing an FX rate and a
+// rate policy here. J$ with no decimal places, matching how a Jamaican
+// dollar figure reads everywhere else in this codebase (job_quotes.labour_jmd,
+// the portal's own jmd() formatters) - GBP keeps its pence.
+const money = (pence: number, currency = "GBP") =>
+  currency === "JMD"
+    ? "J$" + Math.round(pence).toLocaleString("en-JM")
+    : "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) =>
@@ -97,8 +105,8 @@ function renderInvoice(inv: Record<string, any>, lines: Record<string, any>[], s
       <tr${l.price_source === "needs_price" ? ' class="unpriced"' : ""}>
         <td>${esc(l.description)}${l.price_source === "needs_price" ? '<span class="flag">price not set</span>' : ""}</td>
         <td class="num">${Number(l.qty) % 1 === 0 ? Number(l.qty) : Number(l.qty).toFixed(2)}</td>
-        <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.unit_amount_pence)}</td>
-        <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.line_total_pence)}</td>
+        <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.unit_amount_pence, inv.currency)}</td>
+        <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.line_total_pence, inv.currency)}</td>
       </tr>`).join("");
 
   const dt = (d: string) =>
@@ -175,7 +183,7 @@ ${esc(settings.invoice_issuer_email)} · ${esc(settings.invoice_issuer_phone)}</
   <div class="meta">
     <div>
       <h2>Billed to</h2>
-      <p>${esc(inv.client_name)}
+      <p>${esc(inv.client_name)}${inv.client_company ? "\n" + esc(inv.client_company) : ""}
 ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : ""}</p>
     </div>
     <div>
@@ -185,6 +193,7 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
       <h2>Due</h2><p>${dt(inv.due_date)}</p>
     </div>
     ${inv.period_label ? `<div><h2>Period</h2><p>${esc(inv.period_label)}</p></div>` : ""}
+    ${inv.po_number ? `<div><h2>PO number</h2><p>${esc(inv.po_number)}</p></div>` : ""}
   </div>
 
   <table>
@@ -193,9 +202,9 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
   </table>
 
   <div class="totals">
-    <div><span>Subtotal</span><span>${money(inv.subtotal_pence)}</span></div>
+    <div><span>Subtotal</span><span>${money(inv.subtotal_pence, inv.currency)}</span></div>
     <div><span>VAT</span><span>${esc(settings.invoice_vat_status)}</span></div>
-    <div class="grand"><span>Total</span><span>${money(inv.total_pence)}</span></div>
+    <div class="grand"><span>Total</span><span>${money(inv.total_pence, inv.currency)}</span></div>
   </div>
 
   ${unpriced.length ? `<div class="warn"><strong>Not ready to send.</strong> ${unpriced.length} line${unpriced.length > 1 ? "s have" : " has"} no price. The agent will not guess one. Price ${unpriced.length > 1 ? "them" : "it"} or remove ${unpriced.length > 1 ? "them" : "it"} first.</div>` : ""}
@@ -254,6 +263,82 @@ Deno.serve(async (req) => {
 
     if (action === "catalogue") {
       return done(JSON.stringify({ catalogue }), 200);
+    }
+
+    // -------------------------------------------------------------- send
+    // Founder's own instruction, live: raising an invoice per the published
+    // payment terms (raise_service_invoice(), not this function's own
+    // AI-drafted "draft" path) should end in one click, not a click to
+    // raise and a second, separate click to mark it sent. This is that
+    // second half: render the exact document the client will read, email
+    // it, and only on a successful send does the invoice actually move to
+    // 'sent' - a failed send leaves it a draft, so nothing is marked gone
+    // out that never actually reached anyone.
+    //
+    // Deliberately NOT offered for an 'ai' drafted_by invoice: those still
+    // need a human to read the model's proposed lines before anything
+    // leaves this desk, the same gate the free-text drafting flow's own
+    // "mark sent" button already enforces by requiring a separate click.
+    // A policy-raised invoice carries no model-written content at all -
+    // catalogue name, a fixed amount, a fixed sentence naming which
+    // published rule it follows - so there is nothing here for a human to
+    // check that raising it did not already guarantee.
+    if (action === "send") {
+      const id = String(body.invoice_id || "");
+      if (!id) return fail("invoice_id required", 400);
+
+      const [iR, lR, sR] = await Promise.all([
+        db(req, `invoices?select=*&id=eq.${encodeURIComponent(id)}`),
+        db(req, `invoice_lines?select=*&invoice_id=eq.${encodeURIComponent(id)}&order=sort,id`),
+        db(req, `app_settings?select=key,value&key=like.invoice_*`),
+      ]);
+      if (!iR.ok) return fail(`invoice read failed: http ${iR.status}`, 502);
+      const inv = (await iR.json())[0];
+      if (!inv) return fail("no such invoice", 404);
+      if (inv.status !== "draft") return fail(`invoice ${id} is ${inv.status}, not a draft to send`, 409);
+      if (inv.drafted_by === "ai") return fail("an AI-drafted invoice needs a human to read it first: use render, then mark it sent from there.", 409);
+
+      const lines = lR.ok ? await lR.json() : [];
+      if (lines.some((l: any) => l.price_source === "needs_price")) return fail(`invoice ${id} has an unpriced line and cannot be sent`, 409);
+      const settings: Record<string, string> = {};
+      if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
+      const html = renderInvoice(inv, lines, settings);
+
+      const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+      if (!resendKey) return fail("RESEND_API_KEY is not set, so this cannot email anybody yet. Render and send it by hand instead.", 500);
+
+      const sendRes = await trace.span("resend.send invoice", SpanKind.CLIENT, { "server.address": "api.resend.com" }, async (s) => {
+        const r = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from: `${settings.invoice_issuer_name || "Yaadly"} <invoices@in.yaadly.co.uk>`,
+            to: [inv.client_email],
+            reply_to: settings.invoice_issuer_email || undefined,
+            subject: `Invoice ${inv.id}${inv.period_label ? ", " + inv.period_label : ""} — ${money(inv.total_pence, inv.currency)}`,
+            html,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        s.setAttributes({ "http.response.status_code": r.status });
+        return r;
+      });
+      if (!sendRes.ok) {
+        const t = await sendRes.text().catch(() => "");
+        root.recordError(`resend send ${sendRes.status}: ${t.slice(0, 200)}`);
+        return fail(`Could not email this: ${t.slice(0, 200)}`, 502);
+      }
+
+      const updRes = await db(req, `invoices?id=eq.${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ status: "sent" }),
+      });
+      if (!updRes.ok) return fail(`emailed, but could not mark ${id} sent: ${await updRes.text()}`, 502);
+      const updated = (await updRes.json())[0];
+
+      root.setAttributes({ "yaadly.invoice.id": id, "yaadly.invoice.action": "send", "yaadly.invoice.outcome": "emailed" });
+      return done(JSON.stringify({ invoice: updated, emailed_to: inv.client_email }), 200);
     }
 
     // ------------------------------------------------------------- render
@@ -383,6 +468,8 @@ Deno.serve(async (req) => {
         client_name: clientName,
         client_email: clientEmail,
         client_address: String(body.client_address || ""),
+        client_company: String(body.client_company || parsed.client_company || ""),
+        po_number: String(body.po_number || parsed.po_number || ""),
         service_id: body.service_id || null,
         job_id: body.job_id || null,
         drafted_by: "ai",

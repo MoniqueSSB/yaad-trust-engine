@@ -39,11 +39,14 @@ function stagesToText(stages: { stage: string; proportion_percent: number; evide
   return stages.map((s) => `${s.stage} — ${s.proportion_percent}% — ${s.evidence_note}`).join("\n");
 }
 
-/** A draft is usable only once it is ready AND clean. A dirty or still-
- *  drafting one falls back to blank fields rather than showing a worker
- *  something that read a price or the word escrow into a live document. */
+/** A draft is usable only once an admin, or the automatic clean-guardrail
+ *  check standing in for one, has approved it - 'ready' alone is not
+ *  enough (20260901r, founder's own correction: "I never saw when the
+ *  small pack was issued for review"). RLS is the real gate; this is a
+ *  courtesy so a still-drafting or unapproved row never renders even if
+ *  it somehow reached this component. */
 function usableDraft(draft: QuotePackDraft | null): QuotePackDraft["docs"] | null {
-  if (!draft || draft.status !== "ready" || !draft.docs) return null;
+  if (!draft || draft.status !== "approved" || !draft.docs) return null;
   if (draft.guardrail?.price_language_detected || draft.guardrail?.banned_language_detected) return null;
   return draft.docs;
 }

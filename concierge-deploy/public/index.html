@@ -184,6 +184,9 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 /* ---------- evidence ---------- */
 .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
 .thumbs>i{height:74px;border-radius:9px;background:linear-gradient(135deg,#14231E,#0F2B26);border:1px solid var(--softline);display:flex;align-items:flex-end;padding:6px;font-size:9.5px;color:var(--dim);font-style:normal;line-height:1.3}
+.thumbs>a.thumb{position:relative;height:74px;border-radius:9px;overflow:hidden;border:1px solid var(--softline);display:block}
+.thumbs>a.thumb img,.thumbs>a.thumb video{width:100%;height:100%;object-fit:cover;display:block;background:#0F2B26}
+.thumbs>a.thumb span{position:absolute;left:0;right:0;bottom:0;padding:5px 6px;font-size:9.5px;color:#fff;line-height:1.3;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent)}
 .fp{font-family:var(--mono);font-size:9.5px;color:var(--dim);word-break:break-all;margin-top:9px;padding-top:9px;border-top:1px solid var(--softline)}
 .reqlist{margin-top:10px}
 .reqrow{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-top:1px solid var(--softline);font-size:12.5px;color:var(--mute);line-height:1.5}
@@ -315,6 +318,38 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   .top{padding:10px 16px}
 }
 @media(max-width:700px){.thumbs{grid-template-columns:repeat(2,1fr)}}
+
+/* ---------- job invoices ---------- */
+.jicard{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);overflow:hidden;margin-bottom:20px}
+.jihead{padding:16px 18px;border-bottom:1px solid var(--line);background:var(--panel2);display:flex;flex-wrap:wrap;align-items:center;gap:11px}
+.jicode{font-family:var(--mono);font-size:12.5px;color:var(--tealb);font-weight:700}
+.jititle{font-size:13.5px;font-weight:700}
+.jimeta{font-size:11.5px;color:var(--dim);margin-left:auto;display:flex;gap:13px;flex-wrap:wrap}
+.jistrip{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.jistrip>div{background:var(--panel);padding:12px 18px}
+.jistrip .k{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin:0 0 4px}
+.jistrip .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:16px;font-weight:700}
+.jistrip .v.raised{color:var(--teal)}
+.jistrip .v.ready{color:var(--mango)}
+.jistrip .v.wait{color:var(--dim);font-weight:500}
+.jitable{width:100%;border-collapse:collapse}
+.jitable th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:700;padding:10px 18px 8px;border-bottom:1px solid var(--line)}
+.jitable th.num,.jitable td.num{text-align:right}
+.jitable td{padding:13px 18px;border-bottom:1px solid var(--line);vertical-align:top}
+.jitable tr:last-child td{border-bottom:0}
+.jistagename{font-weight:700;font-size:13px}
+.jistagepct{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.jicond{font-size:11.5px;color:var(--mute);line-height:1.5;max-width:32ch;margin-top:3px}
+.jiamt{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13.5px;font-weight:700}
+.jichip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:100px;font-size:10.5px;font-weight:700;white-space:nowrap}
+.jichip .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.jichip.raised{background:var(--soft);color:var(--tealb);border:1px solid var(--softline)}
+.jichip.raised .dot{background:var(--teal)}
+.jichip.ready{background:#2b2210;color:var(--mango);border:1px solid #4a3a12}
+.jichip.ready .dot{background:var(--mango)}
+.jichip.wait{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+.jichip.wait .dot{background:var(--dim)}
+.jiref{display:block;margin-top:5px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
 </style>
 </head>
 <body>
@@ -398,8 +433,27 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
       <div><label>Client email</label><input id="clientEmail" type="email" placeholder="marcia@example.com"></div>
     </div>
     <div class="row"><div><label>Client address, optional</label><input id="clientAddress"></div></div>
+    <div class="row">
+      <div><label>Client company, optional</label><input id="clientCompany"></div>
+      <div><label>PO number, optional</label><input id="poNumber"></div>
+    </div>
     <div class="brow"><button class="btn" id="draft">Draft it</button></div>
     <p class="conseq">Drafting writes a numbered invoice to your record straight away. It emails nobody and sends nothing.</p>
+  </div>
+
+  <div class="card">
+    <div class="chd"><h3>Raise & send, per your own published terms</h3></div>
+    <div id="policyMsg"></div>
+    <p class="hint">Reads the price straight off your service list, never typed by hand, and follows the same rule as <a href="https://yaadly.co.uk/payments.html" target="_blank" rel="noopener">the payment terms page</a>: one invoice, the full published price, due before work starts, whatever the price; the Oversight Retainer, one invoice for the month, cancel with 30 days notice. One click raises it, renders it and emails it to the client, then marks it sent.</p>
+    <label>Which service</label>
+    <select id="policyCatalogue"></select>
+    <div class="row" style="margin-top:13px">
+      <div><label>Client name</label><input id="policyClientName" placeholder="Marcia Brown"></div>
+      <div><label>Client email</label><input id="policyClientEmail" type="email" placeholder="marcia@example.com"></div>
+    </div>
+    <div class="row"><div><label>Client address, optional</label><input id="policyClientAddress"></div></div>
+    <div class="brow"><button class="btn" id="policyRaise">Raise &amp; send</button></div>
+    <p class="conseq">Writes one or two numbered invoices to your record, emails each one to the client, and marks it sent, all in this one click. Nothing here is model-drafted, so there is no separate review step: the amount comes straight from your service list and the wording is fixed, the same reason a policy-raised invoice does not need the "mark sent" click a free-text drafted one still does.</p>
   </div>
 
   <div class="card hidden" id="invCard">
@@ -480,6 +534,44 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   </div>
 </section>
 
+<!-- ============================================ JOB INVOICES -->
+<section class="view" data-view="jobinv">
+  <h1 class="vh">Job Invoices</h1>
+  <p class="vsub">One row per booked job. Raises Yaadly's own 15% Guarantee &amp; Support fee as a single invoice, due at the start of the job, 15% of the whole accepted quote's labour price: never the worker's own pay, which the client still pays the worker direct, per the payment terms agreed between them.</p>
+  <div id="jiMsg"></div>
+  <div id="jiBody"><div class="empty"><b>Reading your booked jobs&hellip;</b></div></div>
+
+  <div class="card hidden" id="jiPreviewCard">
+    <div class="chd"><h3>What the client reads</h3><span class="sp"><button class="btn g" id="jiPrint">Print or save as PDF</button></span></div>
+    <iframe id="jiPreview" title="Job invoice preview"></iframe>
+  </div>
+</section>
+
+<!-- ============================================ AGENCY FEES -->
+<section class="view" data-view="fees">
+  <h1 class="vh">Agency Fees</h1>
+  <p class="vsub">Every invoice on this account is Yaadly's own cut, from a job's per-stage fee or from a drafted service, never the worker's pay. This is the one place both live side by side, so nothing owed to Yaadly sits uncollected because it was only visible on a different screen.</p>
+  <div id="feesMsg"></div>
+
+  <div class="card">
+    <div class="chd"><h3>Ready to raise, not yet raised</h3></div>
+    <div id="feesDue"><div class="empty"><b>Checking every booked job&hellip;</b></div></div>
+  </div>
+
+  <div class="card">
+    <div class="chd"><h3>Every agency fee invoice, jobs and services together</h3></div>
+    <div class="tw"><table>
+      <thead><tr><th>Invoice</th><th>Client</th><th>Source</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
+      <tbody id="feesAll"></tbody>
+    </table></div>
+  </div>
+
+  <div class="card hidden" id="feesPreviewCard">
+    <div class="chd"><h3>What the client reads</h3><span class="sp"><button class="btn g" id="feesPrint">Print or save as PDF</button></span></div>
+    <iframe id="feesPreview" title="Agency fee invoice preview"></iframe>
+  </div>
+</section>
+
       <div class="rule">&#9878;&#65039; <b>The governing rule holds here:</b> the agents draft and flag.
         Prices come from your service list, not from the model. Only you send an invoice,
         and only you mark one paid.</div>
@@ -555,7 +647,7 @@ const TONE = {
   // quotes
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
-  draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok",
+  draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
   // calls / waitlist
   requested:"warn", booked:"ok", held:"warn",
   // enquiries. "replied" and not "answered": disputes already own answered,
@@ -701,6 +793,11 @@ const VIEWS = [
     order:"created_at", search:["job_id","label","uploaded_by"],
     empty:["No evidence filed","Workers upload from their portal. Nothing has been filed against a job yet."],
     pre: preEvidence, panel: panelEvidence,
+    detailExtra: r => r.img
+      ? (String(r.mime || "").startsWith("video/")
+          ? `<div class="dfield"><span class="dk">file</span><video controls preload="metadata" src="${esc(r.img)}" style="max-width:100%;border-radius:10px"></video></div>`
+          : `<div class="dfield"><span class="dk">file</span><a href="${esc(r.img)}" target="_blank" rel="noopener"><img src="${esc(r.img)}" alt="${esc(r.label || "evidence")}" style="max-width:100%;border-radius:10px"></a></div>`)
+      : `<div class="dfield"><span class="dk">file</span><span class="dv empty">${r.storage_path ? "could not sign a link to this file just now, reopen the row to try again" : "no file recorded against this row"}</span></div>`,
     cols:[
       {h:"Job", f:r => id_(r.job_id) + sub_("stage " + (r.stage ?? "none"))},
       {h:"Item", f:r => esc(r.label || "unlabelled") + sub_(r.mime || "")},
@@ -856,6 +953,34 @@ const VIEWS = [
       {h:"Built", f:r => mute_(ago_(r.created_at))},
     ]},
 
+  { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
+    title:"Quote Pack Drafts", table:"quote_pack_drafts",
+    sub:"Yaadly's own starting draft for a worker's quote, written for every open, unassigned job. A guardrail-clean draft is approved automatically and folds into whichever quote the worker actually submits; a dirty one is held here, exactly as it was written, until a named human clears it or a fresh draft replaces it. Nothing here is client-facing on its own.",
+    select:"id,job_id,status,model,guardrail,error,approved_by,approved_at,created_at,finished_at",
+    order:"created_at", search:["id","job_id"],
+    empty:["No drafts yet","A draft is written when yaad-quote-pack-check finds a live, unassigned job with none yet."],
+    cols:[
+      {h:"Draft", f:r => id_(r.id) + sub_(r.model || "not recorded")},
+      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Flags", f:r => {
+        const g = r.guardrail || {};
+        const flags = [];
+        if (g.price_language_detected) flags.push("price language");
+        if (g.banned_language_detected) flags.push("banned language");
+        return flags.length ? chip_("crit", flags.join(", ")) : (r.status === "approved" || r.status === "ready" ? chip_("ok","clean") : mute_("—"));
+      }},
+      {h:"Approved by", f:r => r.approved_by ? esc(r.approved_by) + sub_(ago_(r.approved_at)) : mute_("not yet")},
+      {h:"Drafted", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Approve", cls:"",
+        when:r => r.status === "ready",
+        rpc:"approve_quote_pack_draft",
+        args:(r) => ({ p_draft_id:r.id }),
+        says:() => "Marks this draft approved. A worker writing a quote on this job sees it as the starting point for their own scope, timeline and payment stages the moment they open the form. Refused outright if the guardrail still flags price or banned language: fix the draft or wait for a fresh one first." },
+    ]},
+
   { k:"kickd", g:"Documents & money", label:"Kickoff Drafts", icon:"doc",
     title:"Kickoff Drafts", table:"kickoff_drafts",
     sub:"Every kickoff draft yaad-kickoff has written, whether or not anybody has done anything with it. A draft is not a pack: nothing here is client-facing, and nothing ever becomes a pack on its own. Link a ready draft to a job below, and it starts as a draft pack there too, unread by the client until they accept a quote on that job.",
@@ -882,6 +1007,8 @@ const VIEWS = [
     ]},
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
+  { k:"jobinv", g:"Documents & money", label:"Job Invoices", icon:"bill", hand:true },
+  { k:"fees", g:"Documents & money", label:"Agency Fees", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
 
   { k:"docs", g:"Documents & money", label:"Signatures", icon:"pen",
@@ -1442,8 +1569,31 @@ function panelIntake(){
 // You look before the client does. The card shows the newest stage that has
 // something unchecked in it: what the pack asked for, what actually arrived,
 // the fingerprint the approval binds to, and what money moves if you pass it.
+// The evidence bucket is private (storage.buckets.evidence.public = false),
+// so a row's storage_path is only ever a path, never a picture, until it is
+// signed. "admins read every bucket" (storage RLS) covers this desk's own
+// session, the same way the client's own signed link in the portal is
+// covered by "job party can read evidence files". 3600s, not the 300s used
+// for a one-shot WhatsApp/portal notification: a review here can sit open
+// on a screen for a while, and a broken image mid-review reads as a missing
+// photo, not an expired link. Signs onto the row's own `img` column, which
+// every insert path already leaves null for exactly this: a place to put
+// the real thing once it exists.
+async function signEvidenceImgs(rows){
+  const items = (rows || []).filter(r => r.storage_path && !r.img);
+  if (!items.length) return;
+  try {
+    const { data, error } = await sb.storage.from("evidence")
+      .createSignedUrls(items.map(r => r.storage_path), 3600);
+    if (error || !data) return;
+    const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
+    for (const r of items) r.img = byPath.get(r.storage_path) || null;
+  } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
 async function preEvidence(rows){
   EVID_CTX = null;
+  await signEvidenceImgs(rows);
   const waiting = (rows || []).filter(r => r.ok === false);
   if (!waiting.length) return;
 
@@ -1505,6 +1655,19 @@ function journeyRail(stage){
   }).join("") + "</div>";
 }
 
+// The actual picture, not a caption standing in for it. Falls back to the
+// old label chip when a link could not be signed (no storage_path on an
+// older row, or the sign call itself failed) - a gap shown honestly is
+// still better than a broken <img>.
+function evidenceThumb(r){
+  const label = esc(r.label || "unlabelled");
+  if (!r.img) return `<i title="${label}">${label}</i>`;
+  const media = String(r.mime || "").startsWith("video/")
+    ? `<video src="${esc(r.img)}" muted preload="metadata"></video>`
+    : `<img src="${esc(r.img)}" alt="${label}" loading="lazy">`;
+  return `<a class="thumb" href="${esc(r.img)}" target="_blank" rel="noopener" title="${label}">${media}<span>${label}</span></a>`;
+}
+
 function panelEvidence(rows){
   if (!(rows || []).length) return "";
   if (!EVID_CTX) {
@@ -1528,7 +1691,7 @@ function panelEvidence(rows){
       : `<p class="conseq" style="margin-top:14px">No kickoff pack exists for this job, so nothing states what this stage was supposed to produce. That is the gap, not the photographs.</p>`;
 
   const thumbs = `<p class="sechd" style="margin:16px 0 0">What arrived</p><div class="thumbs">`
-    + group.slice(0, 12).map(r => `<i title="${esc(r.label || "unlabelled")}">${esc(r.label || "unlabelled")}</i>`).join("")
+    + group.slice(0, 12).map(r => evidenceThumb(r)).join("")
     + `</div>`;
 
   const prints = group.filter(r => r.sha256).map(r => String(r.sha256));
@@ -2073,7 +2236,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 
 // ---------------------------------------------------------------- router
 
-const BESPOKE = { over: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth };
+const BESPOKE = { over: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees };
 let currentView = "over";
 
 function go(v){
@@ -2518,7 +2681,9 @@ $("draft").addEventListener("click", async () => {
       action: "draft", text,
       client_name: $("clientName").value.trim(),
       client_email: $("clientEmail").value.trim(),
-      client_address: $("clientAddress").value.trim()
+      client_address: $("clientAddress").value.trim(),
+      client_company: $("clientCompany").value.trim(),
+      po_number: $("poNumber").value.trim()
     });
     if (out.needs === "client") {
       say("draftMsg","warn", out.message);
@@ -2572,7 +2737,7 @@ function renderInvoice(){
     </tr>`).join("");
 
   $("invBody").innerHTML = `
-    <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}</p>
+    <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)}${inv.client_company ? " (" + esc(inv.client_company) + ")" : ""} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}${inv.po_number ? " &middot; PO " + esc(inv.po_number) : ""}</p>
     <div class="tw"><table>
       <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th><th></th></tr></thead>
       <tbody id="lineRows">${rows}</tbody>
@@ -2596,6 +2761,30 @@ function renderInvoice(){
 
   $("invBody").querySelectorAll(".rm").forEach(b => b.addEventListener("click", async (e) => {
     const { error } = await sb.from("invoice_lines").delete().eq("id", e.target.closest("tr").dataset.id);
+    if (error) return say("invMsg","err",error.message);
+    await reload(inv.id);
+  }));
+
+  // Tier and service picked here take effect immediately, same trigger that
+  // prices everything else (invoice_line_price_guard), so what you see after
+  // picking is the real number, not a preview of one. Previously this only
+  // took effect once "Save changes" was clicked, which read as the dropdown
+  // doing nothing.
+  $("invBody").querySelectorAll(".t").forEach(sel => sel.addEventListener("change", async (e) => {
+    const tr = e.target.closest("tr");
+    if (!tr.querySelector(".c").value) return;
+    const { error } = await sb.from("invoice_lines").update({ price_source: sel.value }).eq("id", tr.dataset.id);
+    if (error) return say("invMsg","err",error.message);
+    await reload(inv.id);
+  }));
+
+  $("invBody").querySelectorAll(".c").forEach(sel => sel.addEventListener("change", async (e) => {
+    const tr = e.target.closest("tr");
+    const cid = sel.value;
+    const { error } = await sb.from("invoice_lines").update({
+      catalogue_id: cid || null,
+      price_source: cid ? tr.querySelector(".t").value : "needs_price"
+    }).eq("id", tr.dataset.id);
     if (error) return say("invMsg","err",error.message);
     await reload(inv.id);
   }));
@@ -2696,7 +2885,328 @@ async function loadInvoices(){
   if (error) return;
   INV_LIST = data || [];
   renderInvoiceList();
+  await loadCatalogueOptions();
 }
+
+// ------------------------------------------------------------- job invoices
+//
+// Yaadly's own 15% Guarantee & Support fee on a marketplace job, one
+// invoice, raised at the start of the job, 15% of the whole accepted
+// quote's labour price - never the worker's own pay, which stays a direct
+// arrangement between the client and the worker, and never split by
+// payment stage. Founder's instruction, 1 Sep 2026: agency fee invoices are
+// not milestone payments.
+const jmdFmt = (n) => "J$" + Math.round(n).toLocaleString("en-JM");
+
+async function loadJobInvoices(){
+  const host = $("jiBody");
+  host.innerHTML = `<div class="empty"><b>Reading your booked jobs&hellip;</b></div>`;
+  say("jiMsg", "", "");
+
+  const { data: jobs, error: jobsErr } = await sb.from("jobs")
+    .select("id,title,client_email,worker_email")
+    .not("worker_email", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  if (jobsErr) {
+    host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read jobs</b><p>${esc(jobsErr.message)}</p></div></div>`;
+    return;
+  }
+  if (!jobs || !jobs.length) {
+    host.innerHTML = `<div class="empty"><b>No booked jobs yet</b>A job needs a chosen worker before its agency fee can be raised.</div>`;
+    return;
+  }
+
+  const jobIds = jobs.map((j) => j.id);
+  const [{ data: quotes }, { data: invs }] = await Promise.all([
+    sb.from("job_quotes").select("job_id,worker_name,labour_jmd").eq("status", "accepted").in("job_id", jobIds),
+    sb.from("invoices").select("id,job_id,status,total_pence,sent_at").in("job_id", jobIds).is("stage", null),
+  ]);
+
+  const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
+  const invByJob = new Map();
+  for (const i of invs || []) if (i.status !== "void") invByJob.set(i.job_id, i);
+
+  const rows = jobs.map((job) => {
+    const quote = quoteByJob.get(job.id);
+    if (!quote) return "";
+    const fee = Math.round((quote.labour_jmd || 0) * 0.15);
+    const inv = invByJob.get(job.id);
+
+    let statusHtml, actionHtml;
+    if (inv) {
+      const when = inv.sent_at ? String(inv.sent_at).slice(0, 10) : "not sent yet";
+      statusHtml = `<span class="jichip raised"><span class="dot"></span>${esc(inv.status)}</span>`
+        + `<span class="jiref">${esc(inv.id)} · ${esc(when)}</span>`;
+      actionHtml = `<button class="btn g" data-preview-inv="${esc(inv.id)}">Preview</button>`
+        + (inv.status === "sent" ? `<button class="btn" data-paid-inv="${esc(inv.id)}" data-paid-total="${inv.total_pence}">Mark as paid</button>` : "")
+        + (inv.status === "draft" || inv.status === "sent" ? `<button class="btn d" data-void-inv="${esc(inv.id)}">Void</button>` : "");
+    } else {
+      statusHtml = `<span class="jichip ready"><span class="dot"></span>Ready to raise</span>`;
+      actionHtml = `<button class="btn" data-raise-job="${esc(job.id)}">Raise &amp; send</button>`;
+    }
+
+    return `<tr>
+      <td><div class="jistagename">${esc(job.id)}</div><div class="jistagepct">${esc(job.title || "")}</div></td>
+      <td><div class="jicond">${esc(quote.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Labour ${jmdFmt(quote.labour_jmd || 0)}</div></td>
+      <td class="num"><span class="jiamt">${jmdFmt(fee)}</span></td>
+      <td>${statusHtml}</td>
+      <td>${actionHtml}</td>
+    </tr>`;
+  }).filter(Boolean);
+
+  host.innerHTML = rows.length
+    ? `<table class="jitable">
+        <thead><tr><th>Job</th><th>Who</th><th class="num">Yaadly's fee, 15% of labour</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows.join("")}</tbody>
+      </table>`
+    : `<div class="empty"><b>No booked job here has an accepted quote yet</b>An accepted quote is needed before the agency fee can be computed.</div>`;
+
+  host.querySelectorAll("[data-raise-job]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const job = btn.dataset.raiseJob;
+      btn.disabled = true;
+      say("jiMsg", "ok", `Raising the agency fee on ${job}…`);
+      try {
+        const { data, error } = await sb.rpc("raise_job_agency_fee_invoice", { p_job: job });
+        if (error) throw error;
+        const row = (data || [])[0];
+        if (!row) throw new Error("Raised nothing to send.");
+        say("jiMsg", "ok", `Raised ${row.invoice_id} (${jmdFmt(row.total_jmd)}). Sending…`);
+        const out = await fn({ action: "send", invoice_id: row.invoice_id });
+        say("jiMsg", "ok", `Sent ${row.invoice_id} (${jmdFmt(row.total_jmd)}) to ${out?.emailed_to || "the client"}. Marked sent.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
+        if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set, so it could not be emailed. Find it under Invoices, drafted, and send it from there once that is fixed.";
+        say("jiMsg", "err", hint);
+      }
+      await loadJobInvoices();
+    });
+  });
+
+  host.querySelectorAll("[data-preview-inv]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      say("jiMsg", "", "");
+      try {
+        const { html } = await fn({ action: "render", invoice_id: btn.dataset.previewInv, as: "json" });
+        $("jiPreview").srcdoc = html;
+        show("jiPreviewCard", true);
+        $("jiPreviewCard").scrollIntoView({ behavior: "smooth" });
+      } catch (e) { say("jiMsg", "err", e.message); }
+    });
+  });
+
+  host.querySelectorAll("[data-paid-inv]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.paidInv;
+      const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
+      if (ref === null) return;
+      const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", id);
+      if (error) return say("jiMsg", "err", error.message);
+      say("jiMsg", "ok", `${jmdFmt(Number(btn.dataset.paidTotal))} logged as paid against ${id}.`);
+      await loadJobInvoices();
+    });
+  });
+
+  host.querySelectorAll("[data-void-inv]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.voidInv;
+      if (!confirm("Void " + id + "? It stays on the record, marked void.")) return;
+      const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", id);
+      if (error) return say("jiMsg", "err", error.message);
+      await loadJobInvoices();
+    });
+  });
+}
+
+$("jiPrint").addEventListener("click", () => $("jiPreview").contentWindow.print());
+
+// ------------------------------------------------------- agency fees
+//
+// Every row in `invoices` is already Yaadly's own cut, never the worker's
+// pay, whether it came from a job's per-stage fee or a drafted service.
+// This view exists so both are checkable in one place: what's ready to
+// raise but hasn't been, and everything that has, jobs and services mixed,
+// one list, so a fee owed to Yaadly is never sitting uncollected just
+// because it only showed up on a different screen.
+const feeAmt = (pence, currency) => currency === "JMD" ? jmdFmt(pence) : money(pence);
+
+async function loadAgencyFees(){
+  say("feesMsg", "", "");
+  const dueHost = $("feesDue"), allHost = $("feesAll");
+  dueHost.innerHTML = `<div class="empty"><b>Checking every booked job&hellip;</b></div>`;
+
+  const { data: jobs, error: jobsErr } = await sb.from("jobs")
+    .select("id,title,client_email")
+    .not("worker_email", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  if (jobsErr) {
+    dueHost.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read jobs</b><p>${esc(jobsErr.message)}</p></div></div>`;
+  } else if (!jobs || !jobs.length) {
+    dueHost.innerHTML = `<div class="empty"><b>No booked jobs yet</b></div>`;
+  } else {
+    const jobIds = jobs.map((j) => j.id);
+    const [{ data: quotes }, { data: invs }] = await Promise.all([
+      sb.from("job_quotes").select("job_id,labour_jmd").eq("status", "accepted").in("job_id", jobIds),
+      sb.from("invoices").select("job_id").in("job_id", jobIds).is("stage", null).neq("status", "void"),
+    ]);
+    const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
+    const raised = new Set((invs || []).map((i) => i.job_id));
+
+    const dueRows = [];
+    for (const job of jobs) {
+      if (raised.has(job.id)) continue;
+      const quote = quoteByJob.get(job.id);
+      if (!quote) continue;
+      const fee = Math.round((quote.labour_jmd || 0) * 0.15);
+      dueRows.push({ job, fee });
+    }
+
+    dueHost.innerHTML = dueRows.length
+      ? `<div class="list">${dueRows.map((r) => `
+        <div class="item">
+          <div><b>${esc(r.job.id)}</b> &middot; ${esc(r.job.title || "")}<div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(r.job.client_email || "")}</div></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-weight:700;font-variant-numeric:tabular-nums">${jmdFmt(r.fee)}</span>
+            <button class="btn" data-due-job="${esc(r.job.id)}">Raise &amp; send</button>
+          </div>
+        </div>`).join("")}</div>`
+      : `<div class="empty"><b>Nothing outstanding</b>Every booked job already has its agency fee raised.</div>`;
+
+    dueHost.querySelectorAll("[data-due-job]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const job = btn.dataset.dueJob;
+        btn.disabled = true;
+        say("feesMsg", "ok", `Raising the agency fee on ${job}…`);
+        try {
+          const { data, error } = await sb.rpc("raise_job_agency_fee_invoice", { p_job: job });
+          if (error) throw error;
+          const row = (data || [])[0];
+          if (!row) throw new Error("Raised nothing to send.");
+          const out = await fn({ action: "send", invoice_id: row.invoice_id });
+          say("feesMsg", "ok", `Sent ${row.invoice_id} (${jmdFmt(row.total_jmd)}) to ${out?.emailed_to || "the client"}.`);
+        } catch (e) {
+          let hint = e.message;
+          if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
+          if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set, so it could not be emailed. Find it under Invoices, drafted, and send it from there once that is fixed.";
+          say("feesMsg", "err", hint);
+        }
+        await loadAgencyFees();
+      });
+    });
+  }
+
+  const { data: all, error: allErr } = await sb.from("invoices")
+    .select("id,client_name,job_id,status,total_pence,currency,created_at")
+    .order("created_at", { ascending: false }).limit(100);
+  if (allErr) {
+    allHost.innerHTML = `<tr><td colspan="6"><div class="alert crit"><span class="ic">!</span><div><b>Could not read invoices</b><p>${esc(allErr.message)}</p></div></div></td></tr>`;
+    return;
+  }
+
+  allHost.innerHTML = (all || []).map((i) => {
+    const source = i.job_id ? `Job ${esc(i.job_id)}` : "Service";
+    return `<tr>
+      <td>${esc(i.id)}</td>
+      <td>${esc(i.client_name)}</td>
+      <td>${source}</td>
+      <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
+      <td>${chipFor(INV_CHIP, i.status)}</td>
+      <td>
+        <button class="btn g" data-fp="${esc(i.id)}">Preview</button>
+        ${i.status === "sent" ? `<button class="btn" data-fpaid="${esc(i.id)}" data-fpaidtotal="${i.total_pence}" data-fpaidcur="${esc(i.currency)}">Mark as paid</button>` : ""}
+        ${i.status === "draft" || i.status === "sent" ? `<button class="btn d" data-fvoid="${esc(i.id)}">Void</button>` : ""}
+      </td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6"><div class="empty"><b>Nothing raised yet</b></div></td></tr>`;
+
+  allHost.querySelectorAll("[data-fp]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      say("feesMsg", "", "");
+      try {
+        const { html } = await fn({ action: "render", invoice_id: btn.dataset.fp, as: "json" });
+        $("feesPreview").srcdoc = html;
+        show("feesPreviewCard", true);
+        $("feesPreviewCard").scrollIntoView({ behavior: "smooth" });
+      } catch (e) { say("feesMsg", "err", e.message); }
+    });
+  });
+
+  allHost.querySelectorAll("[data-fpaid]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.fpaid;
+      const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
+      if (ref === null) return;
+      const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", id);
+      if (error) return say("feesMsg", "err", error.message);
+      say("feesMsg", "ok", `${feeAmt(Number(btn.dataset.fpaidtotal), btn.dataset.fpaidcur)} logged as paid against ${id}.`);
+      await loadAgencyFees();
+    });
+  });
+
+  allHost.querySelectorAll("[data-fvoid]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.fvoid;
+      if (!confirm("Void " + id + "? It stays on the record, marked void.")) return;
+      const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", id);
+      if (error) return say("feesMsg", "err", error.message);
+      await loadAgencyFees();
+    });
+  });
+}
+
+$("feesPrint").addEventListener("click", () => $("feesPreview").contentWindow.print());
+
+// The dropdown for "Raise, per your own published terms": every active
+// catalogue item, priced from service_catalogue itself, never a typed one.
+async function loadCatalogueOptions(){
+  const sel = $("policyCatalogue");
+  if (!sel || sel.dataset.loaded) return;
+  const { data, error } = await sb.from("service_catalogue")
+    .select("id,name,full_pence").eq("active", true).order("sort");
+  if (error || !data) return;
+  sel.innerHTML = data.map(c =>
+    `<option value="${esc(c.id)}">${esc(c.name)} — ${money(c.full_pence)}</option>`
+  ).join("");
+  sel.dataset.loaded = "1";
+}
+
+$("policyRaise").addEventListener("click", async () => {
+  const catalogueId = $("policyCatalogue").value;
+  const clientName = $("policyClientName").value.trim();
+  const clientEmail = $("policyClientEmail").value.trim();
+  const clientAddress = $("policyClientAddress").value.trim();
+  if (!catalogueId) return say("policyMsg","err","Pick a service first.");
+  if (!clientEmail) return say("policyMsg","err","A client email is required.");
+  $("policyRaise").disabled = true;
+  say("policyMsg","ok","Raising, against your service list price.");
+  try {
+    const { data, error } = await sb.rpc("raise_service_invoice", {
+      p_catalogue_id: catalogueId,
+      p_client_name: clientName,
+      p_client_email: clientEmail,
+      p_client_address: clientAddress,
+    });
+    if (error) throw error;
+    const row = (data || [])[0];
+    if (!row) throw new Error("Raised nothing to send.");
+
+    say("policyMsg","ok", `Raised ${row.invoice_id}. Sending to ${clientEmail}…`);
+    await fn({ action: "send", invoice_id: row.invoice_id });
+
+    say("policyMsg","ok", `Sent ${row.invoice_id} (${money(row.total_pence)}) to ${clientEmail}. It is now marked sent.`);
+    $("policyClientName").value = ""; $("policyClientEmail").value = ""; $("policyClientAddress").value = "";
+    await loadInvoices();
+  } catch (e) {
+    let hint = e.message;
+    if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
+    if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set as an Edge Function secret, so it could not be emailed. Find it under Invoices below, drafted, and send it from there once that is fixed.";
+    say("policyMsg","err", hint + " Check Recent invoices below: what raised before the failure is still there as a draft.");
+  }
+  $("policyRaise").disabled = false;
+});
 
 // ---------------------------------------------------------------- sketch packs
 //

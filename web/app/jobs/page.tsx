@@ -112,11 +112,12 @@ export default async function Board({
     : { data: [] };
   const draftsByJob = new Map<string, QuotePackDraft>();
   for (const d of (draftData ?? []) as QuotePackDraft[]) {
-    // A job can have a stale 'failed' row from an earlier attempt sitting
-    // alongside nothing newer; only 'ready' should ever reach the panel,
-    // and only the most useful row per job either way.
+    // RLS already refuses anything but an 'approved' row to a worker
+    // (20260901r): a still-drafting, dirty-but-'ready', or failed row
+    // never reaches this query at all. This preference is what is left
+    // once that gate is doing its job - only the most useful row per job.
     const existing = draftsByJob.get(d.job_id);
-    if (!existing || d.status === "ready") draftsByJob.set(d.job_id, d);
+    if (!existing || d.status === "approved") draftsByJob.set(d.job_id, d);
   }
 
   const workers = (workersData ?? []) as Worker[];

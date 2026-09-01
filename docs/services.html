@@ -22,6 +22,18 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="yaadly.css">
+<!-- This page only, per founder request: one accent colour instead of the
+     site's usual teal+mango+coral. Redefines the shared variables so every
+     rule in yaadly.css that already reads them falls in line automatically;
+     the two hardcoded amber card colours below are the only rules that
+     don't use a variable, so they're overridden directly. -->
+<style>
+:root{
+  --mango:var(--teal); --coral:var(--teal); --grad:var(--teal); --sand:var(--tealb);
+  --l-amber:var(--l-grad-teal); --l-coral:var(--l-grad-teal); --l-grad-amber:var(--l-grad-teal);
+}
+.sect.light .svc.star{background:#DCEBE6;border-color:#B9D6CC}
+</style>
 <!-- Error monitoring (Sentry). Errors only, no tracing, no replay. PII is
      scrubbed before anything leaves the browser. -->
 <script src="https://browser.sentry-cdn.com/10.70.0/bundle.min.js"
@@ -108,32 +120,38 @@
     <div class="svc star rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg></span>Deposit Protection Check</h4>
       <p class="what">Before you pay anybody. Your contractor and their quote checked against real Jamaican material costs and day rates. <b>Written go or no-go, 72 hours.</b></p>
-      <div class="prices-row"><span class="pnow">£149</span><span class="punit">fixed fee</span><span class="pfull">Full price <b>£249</b> · founding rate, first five clients</span></div>
+      <div class="prices-row"><span class="pnow">£149</span><span class="punit">fixed fee</span><span class="pfull">Founding rate · first five clients</span></div>
+      <a class="btn ghost sm pay" data-pay="deposit" data-label="Deposit Protection Check, £149" style="margin-top:12px">Pay £149 now</a>
     </div>
     <div class="svc rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg></span>Visual Check</h4>
       <p class="what">A trained checker attends, photographs everything against a written checklist, files a one-page note in 72 hours. <b>They record. They do not rate or advise.</b></p>
-      <div class="prices-row"><span class="pnow">£95</span><span class="punit">per visit</span><span class="pfull">Full price <b>£149</b> · inside 48 hours £185</span></div>
+      <div class="prices-row"><span class="pnow">£95</span><span class="punit">per visit</span><span class="pfull">Inside 48 hours <b>£185</b></span></div>
+      <a class="btn ghost sm pay" data-pay="visual" data-label="Visual Check, £95" style="margin-top:12px">Pay £95 now</a>
     </div>
     <div class="svc rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9"/></svg></span>Condition Report</h4>
       <p class="what">System by system: roof and hurricane fixings, structure, water, electrics, drainage, termites, security. <b>Every finding rated Severe, Moderate or Low.</b></p>
-      <div class="prices-row"><span class="pnow">£245</span><span class="punit">fixed fee</span><span class="pfull">Full price <b>£325</b> · founding rate, first five clients</span></div>
+      <div class="prices-row"><span class="pnow">£245</span><span class="punit">fixed fee</span><span class="pfull">Founding rate · first five clients</span></div>
+      <a class="btn ghost sm pay" data-pay="condition" data-label="Condition Report, £245" style="margin-top:12px">Pay £245 now</a>
     </div>
     <div class="svc rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg></span>Technical Sign-off</h4>
       <p class="what">A qualified trade inspector judges one stage against the standard for that job. <b>Pass, fail, or a written put-right list.</b></p>
-      <div class="prices-row"><span class="pnow">£245</span><span class="punit">per sign-off</span><span class="pfull">Full price <b>£300</b> · inside 48 hours £395</span></div>
+      <div class="prices-row"><span class="pnow">£245</span><span class="punit">per sign-off</span><span class="pfull">Inside 48 hours <b>£395</b></span></div>
+      <a class="btn ghost sm pay" data-pay="signoff" data-label="Technical Sign-off, £245" style="margin-top:12px">Pay £245 now</a>
     </div>
     <div class="svc star rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>Oversight Retainer</h4>
       <p class="what">Documented visits, a monthly cost-and-progress report, an accountability call, a WhatsApp line to me. <b>Pick your frequency.</b></p>
-      <div class="prices-row"><span class="pnow">£495</span><span class="punit">per month, fortnightly visits</span><span class="pfull">Full price <b>£595</b> · weekly £895 (full £1,095)</span></div>
+      <div class="prices-row"><span class="pnow">£495</span><span class="punit">per month, fortnightly visits</span><span class="pfull">Weekly visits <b>£895</b></span></div>
+      <a class="btn ghost sm pay" data-pay="retainer" data-label="Oversight Retainer, £495 per month" style="margin-top:12px">Pay £495 now</a>
     </div>
     <div class="svc rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><circle cx="7.5" cy="14.5" r="3.5"/><path d="M10.3 11.7 19 3"/><path d="m15.5 6.5 2.5 2.5M18 4l2.5 2.5"/></svg></span>Property Care</h4>
       <p class="what">The same checklist every visit, so change is visible. <b>An empty or elder-occupied home, watched from four thousand miles away.</b></p>
-      <div class="prices-row"><span class="pnow">£75</span><span class="punit">per visit, standard</span><span class="pfull">Full price <b>£95</b> · large or rental £135 · villa £175</span></div>
+      <div class="prices-row"><span class="pnow">£75</span><span class="punit">per visit, standard</span><span class="pfull">Large or rental <b>£135</b> · villa £175</span></div>
+      <a class="btn ghost sm pay" data-pay="care" data-label="Property Care, £75 per visit" style="margin-top:12px">Pay £75 now</a>
     </div>
     <div class="svc rv">
       <h4><span class="emo"><svg class="gl" viewBox="0 0 24 24"><path d="M5 21V10l5-3 5 3v11"/><path d="M15 10l4-2v9"/><path d="M3 21h18"/></svg></span>Full Project Management</h4>
@@ -227,6 +245,26 @@
 const SVC_EMAIL = "monique@yaadly.co.uk";
 const ENQUIRY_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-enquiry";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
+
+/* Paste the real Stripe Payment Link URL for each service here, between the
+   quotes. Until a link is pasted in, that service's "Pay now" button opens
+   WhatsApp instead, pre-filled with the service name, so nothing on the
+   page is ever a dead link. */
+const STRIPE_LINKS = {
+  deposit:   "",  // Deposit Protection Check, £149
+  visual:    "",  // Visual Check, £95
+  condition: "",  // Condition Report, £245
+  signoff:   "",  // Technical Sign-off, £245
+  retainer:  "",  // Oversight Retainer, £495 per month
+  care:      ""   // Property Care, £75 per visit
+};
+document.querySelectorAll(".pay").forEach(el => {
+  const url = STRIPE_LINKS[el.dataset.pay];
+  el.href = url
+    ? url
+    : "https://wa.me/447878877567?text=" + encodeURIComponent("Hello Yaadly, I would like to pay for: " + el.dataset.label);
+  el.target = "_blank"; el.rel = "noopener";
+});
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
