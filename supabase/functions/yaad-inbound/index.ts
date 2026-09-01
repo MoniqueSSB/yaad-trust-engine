@@ -1066,33 +1066,23 @@ Deno.serve(async (req: Request) => {
       }
 
       // Stage 6: a client booking a worker by replying with the job's own
-      // code, rather than tapping Accept in the portal. Same guard as the
+      // code, rather than tapping Choose in the portal. Same guard as the
       // approval block below and the same reason: every plain text message
       // a client sends passes through here, so only an exact code match is
       // trusted, never a bare "yes". A job with more than one open price at
       // once refuses the reply rather than guessing which one was meant.
       //
-      // This calls choose_worker_via_whatsapp(), not the older
-      // accept_quote_via_whatsapp() the first version of this block called:
-      // that was built on accept_quote_as_me(), a stale duplicate of the
-      // real booking path found only once this was tested live against a
-      // real database. choose_worker() is what the signed-in portal
-      // actually uses, and it will not book a worker until both the client
-      // and the worker have separately agreed the job's scope. The
-      // client's side of that agreement is what this reply IS, per the
-      // founder's own decision, 31 Aug 2026: yaad-notify-client sends the
-      // worker's proposed scope in words before this reply is ever asked
-      // for, so replying with the code is a real yes to a real proposal,
-      // not a rubber stamp. If the worker has not agreed their own side
-      // yet, choose_worker_via_whatsapp() does not fail on that: the
-      // client's own agreement is recorded either way, and it returns a
-      // distinct marker rather than an error so that recording is never
-      // rolled back by a refusal that follows it in the same call. Nothing
-      // then auto-completes the booking the moment the worker's side
-      // lands, on purpose, matching the portal's own agreeScope(), which
-      // does not retry choose_worker() on its own either: whoever tries
-      // second, client or worker, is the one whose action actually books
-      // it.
+      // This calls choose_worker_via_whatsapp(), which defers entirely to
+      // _do_choose_worker() for whether booking is actually allowed. Since
+      // 1 Sep 2026 that gate is the chosen quote's own Kickoff Pack having
+      // both_confirmed_at set (20260901f), not a scope agreement - fixed
+      // the same night (20260901m) after this door was found live still
+      // looking for a job_quotes status ('submitted') and a readiness
+      // check (scope_agreements) that both predate the rework and can
+      // never be true once a quote is actually ready to book. If the pack
+      // is not yet confirmed by both sides, the RPC raises its own honest
+      // exception and that is what the client reads below, rather than a
+      // separate "pending" branch pretending to know why.
       if (!msg.media.length && msg.text.trim()) {
         const { data: openToBook } = await supabase.from("jobs")
           .select("id, title, stage, client_phone")
@@ -1104,12 +1094,66 @@ Deno.serve(async (req: Request) => {
 
         const bookTarget = matchApprovingJob(msg.text, mineToBook);
         if (bookTarget) {
-          const { data: bookResult, error } = await supabase.rpc("choose_worker_via_whatsapp", { p_job: bookTarget.id, p_phone: msg.from });
-          const pending = bookResult === "PENDING_WORKER_SCOPE";
-          root.setAttributes({ "yaadly.whatsapp_quote_accept.job": bookTarget.id, "yaadly.whatsapp_quote_accept.outcome": error ? "refused" : pending ? "pending_worker" : "accepted" });
+          const { error } = await supabase.rpc("choose_worker_via_whatsapp", { p_job: bookTarget.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_quote_accept.job": bookTarget.id, "yaadly.whatsapp_quote_accept.outcome": error ? "refused" : "accepted" });
           if (error) return twiml(`That did not go through: ${error.message}`);
-          if (pending) return twiml(`Got it, that's on record. ${bookTarget.title} books the moment the worker also confirms the scope, and you'll hear the moment it does.`);
           return twiml(`Booked. ${bookTarget.title} is on. A message with the price and how payment works is coming through next.`);
+        }
+      }
+
+      // Stage 6: confirming a Kickoff Pack by replying with the job's own
+      // code. Founder's own correction, 1 Sep 2026, live: a worker's whole
+      // surface is WhatsApp by design (CLAUDE.md §9 - "the worker web
+      // surface stays thin on purpose"), so confirming a pack cannot be a
+      // portal-only button the way it was drafted a few hours earlier the
+      // same night (20260901f). Works for either side's phone, same as
+      // every other job-code reply in this function: whichever side
+      // replies with the code confirms their own, via
+      // agree_kickoff_pack_via_whatsapp() (20260901i), which re-derives
+      // which side this phone actually is rather than trusting the match
+      // below for anything but which job was meant.
+      if (!msg.media.length && msg.text.trim()) {
+        const tail = msg.from.replace(/\D/g, "").slice(-9);
+
+        const { data: clientPacks } = await supabase.from("kickoff_packs")
+          .select("id, job_id, jobs!inner(id, title, stage, client_phone)")
+          .eq("status", "approved")
+          .not("jobs.client_phone", "is", null);
+        const clientCandidates = (clientPacks ?? [])
+          .map((p: any) => p.jobs)
+          .filter((j: any) => String(j?.client_phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+
+        const { data: workerPacks } = await supabase.from("kickoff_packs")
+          .select("id, job_id, quote_id, jobs!inner(id, title, stage), job_quotes!inner(worker_email)")
+          .eq("status", "approved")
+          .not("quote_id", "is", null);
+        const workerJobIds = new Set<string>();
+        const workerCandidates: { id: string; title: string; stage: number }[] = [];
+        for (const p of (workerPacks ?? []) as any[]) {
+          const workerEmail = String(p.job_quotes?.worker_email ?? "");
+          if (!workerEmail) continue;
+          const { data: wp } = await supabase.from("worker_profiles")
+            .select("phone").ilike("worker_email", workerEmail).maybeSingle();
+          const workerTail = String(wp?.phone ?? "").replace(/\D/g, "").slice(-9);
+          if (workerTail && workerTail === tail && !workerJobIds.has(p.jobs.id)) {
+            workerJobIds.add(p.jobs.id);
+            workerCandidates.push(p.jobs);
+          }
+        }
+
+        const kickoffCandidates = [...clientCandidates, ...workerCandidates.filter((j) => !clientCandidates.some((c: any) => c.id === j.id))];
+        const kickoffTarget = matchApprovingJob(msg.text, kickoffCandidates as any);
+        if (kickoffTarget) {
+          // The job named in the reply, not a global "which phone is this"
+          // search: a phone with more than one pack pending across
+          // different jobs must still resolve the one it actually typed.
+          const { data: kResult, error: kErr } = await supabase.rpc("agree_kickoff_pack_via_whatsapp", { p_job: kickoffTarget.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_kickoff_confirm.job": kickoffTarget.id, "yaadly.whatsapp_kickoff_confirm.outcome": kErr ? "refused" : "confirmed" });
+          if (kErr) return twiml(`That did not go through: ${kErr.message}`);
+          const row = Array.isArray(kResult) ? kResult[0] : kResult;
+          return twiml(row?.both_confirmed
+            ? `Confirmed. Both sides have signed off on the Kickoff Pack for ${kickoffTarget.title}, ready to be chosen.`
+            : `Confirmed on your side for ${kickoffTarget.title}. Waiting on the other side now, you'll hear the moment they confirm.`);
         }
       }
 

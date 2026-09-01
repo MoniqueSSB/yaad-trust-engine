@@ -821,6 +821,8 @@ select id, status, worker_email, worker_name from job_quotes where job_id = 'JOB
 
 `kickoff_requested` on more than one row at once is expected and fine. `submitted` never moves on its own; nothing polls for it. If a quote is stuck on `kickoff_requested` with no draft or pack appearing, see "A worker never gets told a Kickoff Pack exists" below.
 
+**If a client says they pressed the button and nothing ever happens** (status stays `submitted`, no draft, no pack, ever), check `job_quotes_touch()` is still the version from `20260901h`. This function silently reverts any status change from a non-admin caller unless the transaction first sets `set_config('yaadly.choosing', '1', true)` — the whole reason `request_kickoff_as_me()`, `_do_choose_worker()` and `choose_worker_via_whatsapp()` all wrap their own status updates in it. A new status-changing function that forgets this will look exactly like this: the RPC succeeds, returns a job id, and nothing in `job_quotes` moves. This has now happened twice for two different functions (`accept_quote_as_me()` before 31 Aug, `request_kickoff_as_me()` on 1 Sep) — if a THIRD function ever needs to write `job_quotes.status`, set the flag around it on the first draft, not after finding this section.
+
 ## A burst of WhatsApp photos only got one evidence_landed message, later than the first photo
 
 **This is by design, not a delay to chase.** `evidence_landed` no longer fires the moment the first photo of a stage lands; every evidence insert resets a 90 second quiet timer for that job and stage (`evidence_landed_pending`, `20260831zzzz6`), and the notification only actually goes out once nothing new has landed for the full 90 seconds, checked once a minute by `yaad-evidence-landed-check` (`20260831zzzz7`). One photo still notifies, just after a short pause; several photos sent close together get one notification covering all of them instead of one covering whichever photo happened to land first, which was the actual bug this replaced.
@@ -879,6 +881,30 @@ order by p.updated_at desc;
 ```
 Two rows (`client`, `worker`) for the current `rev` and `both_confirmed_at` set means both sides have signed this exact revision. One row, or none, means it is still waiting on someone.
 
+## A client replies with a job code to book a worker and nothing happens, or "No price is open on this job to accept"
+
+**Check `job_quotes.status` and `jobs.status` together, not either alone:**
+```sql
+select id, status from job_quotes where job_id = '<job id>';
+select id, status, client_phone from jobs where id = '<job id>';
+```
+As of 1 Sep 2026, a quote ready to book sits at `kickoff_requested`, never `submitted` - `submitted` means nobody has asked for a Kickoff Pack against it yet. If `jobs.status` reads `open_for_quotes` instead of `quoted` while a real quote exists, that is stale: touch the row (any update fires `sync_job_status()`) and it corrects itself, matching `20260901l`. If it stays wrong after that, `sync_job_status()` itself has regressed - it must count `kickoff_requested` alongside `submitted` when deciding a job has a live quote.
+
+**If the reply is accepted but refuses with "choose unlocks once this worker's Kickoff Pack is confirmed by both sides"**, that is the real, correct gate: see "Choosing a worker now refuses" below for how to check both sides have actually confirmed. There is no other path to booking by WhatsApp; `choose_worker_via_whatsapp()` no longer has its own separate readiness check to get out of sync with this one (`20260901m` removed it, and the `PENDING_WORKER_SCOPE` message with it - if anyone reports seeing that exact phrase, the code they are running predates that fix).
+
+## A worker (or client) can confirm a Kickoff Pack by replying with the job code, no portal needed
+
+**As of 1 Sep 2026 this is the worker's ONLY way to confirm.** The portal's "Confirm as the worker" button is gone, on purpose (CLAUDE.md §9: the worker's surface is WhatsApp, full stop). The client still has a portal button too; either side can also just reply to the WhatsApp message with the job's own code.
+
+```sql
+select p.id, p.job_id, p.both_confirmed_at,
+  exists(select 1 from kickoff_pack_agreements a where a.pack_id=p.id and a.rev=p.rev and a.side='client') as client_confirmed,
+  exists(select 1 from kickoff_pack_agreements a where a.pack_id=p.id and a.rev=p.rev and a.side='worker') as worker_confirmed
+from kickoff_packs p where p.job_id = '<job id>' order by p.updated_at desc;
+```
+
+**"That did not go through: No Kickoff Pack on this job is waiting on your confirmation right now."** Either this phone is not on file as the client (`jobs.client_phone`) or the worker (`worker_profiles.phone`, matched through that job's own quote) for this specific job, or that side already confirmed. `agree_kickoff_pack_via_whatsapp(p_job, p_phone)` checks only the named job, never "does this phone have anything pending anywhere" - a worker can have more than one real pack waiting at once, on different jobs, and replying with one job's code must never touch the other. Getting this wrong is exactly the bug found and fixed live the night this shipped (`20260901j`, `20260901k`); if this ever regresses, that is what broke.
+
 ## A worker never gets told a Kickoff Pack exists, or a quote never gets one drafted at all
 
 **As of 1 Sep 2026 a pack is requested BEFORE anyone is chosen, not after.** `request_kickoff_as_me()` (portal click) moves a quote to `job_quotes.status = 'kickoff_requested'`; `yaad-kickoff-check` (pg_cron, once a minute) polls for exactly that, per quote, not per job, requests a draft from `yaad-kickoff` carrying that `quote_id`, links a guardrail-clean finished draft straight to `'approved'` against that same `quote_id`, and that transition fires `notify_worker_kickoff_pack_ready`, which now also carries `quote_id` so the right worker gets told about the right pack.
@@ -909,6 +935,23 @@ Reads `jobs` where `status = 'awaiting_client_setup'`, as of 1 Sep 2026. It used
 **There is one WhatsApp path now: `yaad-inbound`, over Twilio.** `yaad-whatsapp-webhook`, a second, direct-Meta-Cloud-API function that duplicated part of this, never received real traffic (Meta was never approved) and was deleted 1 Sep 2026. Its `notifyAdmin()` fires twice per conversation: once on the first message of a new thread, so a lead is never silently sitting there before it is even a real job, and once when the job reaches `stage = 'done'`. If neither push nor email arrived for a real message, check `app_settings.ntfy_topic` and `admin_email`, and `RESEND_API_KEY`, the same three this function's own error logging names.
 
 A session in this repo spent real effort fixing two bugs in `yaad-whatsapp-webhook`'s dormant guided-intake code (`trade` not written to the column, no admin notification) before realising it was testing a function that could never receive a real message; `yaad-inbound` already did both correctly on its own, independently, before either fix existed. Founder's instruction, same session: strip the dead code and delete the file rather than leave it to confuse whoever reads this next. Both the client-intake code that prompted the fixes and the worker-signup lane living in the same file went with it. Full account in DECISIONS.md, 1 Sep 2026.
+
+## A worker's quote form shows blank scope/timeline/payment fields instead of a drafted starting point
+
+**Expected the first minute or two after a job goes live.** `yaad-quote-pack-check` polls once a minute for jobs matching `open_jobs`' own definition of live (`open = true`, unassigned, `stage = 0`) with no `quote_pack_drafts` row yet, and requests one from `yaad-quote-pack`. Check the draft directly:
+
+```sql
+select id, status, error, guardrail from quote_pack_drafts where job_id = 'JOB-XXXX' order by created_at desc;
+```
+
+- No row at all: the cron has not caught it yet (wait up to a minute), or the job is missing a `descr` (`skippedNoBrief` in the cron's own response) — nothing drafts without a brief.
+- `status = 'drafting'` for more than a few minutes: check `yaad-quote-pack`'s own logs; the model call has a 120s timeout, so it should resolve to `ready` or `failed` well before that.
+- `status = 'failed'` three times running: the cron stops requesting more (`skippedTooManyFailures`), same backoff shape as `yaad-kickoff-check`. Read `error` and fix the underlying cause before it will try again; nothing auto-retries past three.
+- `status = 'ready'` but the worker still sees blank fields: check `guardrail`. `QuotePanel.tsx`'s `usableDraft()` refuses to show a draft with `price_language_detected` or `banned_language_detected` set, on purpose, and falls back to blank editable fields rather than a document that leaked a price or the word escrow into a live quote. There is no admin-desk view onto this yet (unlike the big Kickoff Pack's own Kickoff Drafts view); a dirty draft is only visible by querying the table directly, as above.
+
+**One draft per job, not per worker.** Every worker who opens the quote form for that job sees and edits their own copy of the same starting draft; editing it happens client-side in `QuotePanel.tsx` and is never written back to `quote_pack_drafts`. What actually goes to the client lives on `job_quotes` (`scope_summary`, `included_note`, `excluded_note`, `timeline_note`, `payment_stage_note`), written once, by `submitQuote()`, when the worker sends.
+
+**This is a different agent from the big Kickoff Pack and fires at a different moment.** `yaad-quote-pack` drafts once, when a job goes live, and is never client-facing on its own. `yaad-kickoff` drafts per accepted quote, when a client requests one (`kickoff_requested`), and becomes the actual client-facing document once guardrail-clean. If a worker reports the wrong one (a 12-section document instead of a short overview, or vice versa), check which function actually ran in the trace, not just which cron fired: both poll once a minute and can look similar in the logs at a glance.
 
 ## WhatsApp only ever means Twilio in this repository now
 

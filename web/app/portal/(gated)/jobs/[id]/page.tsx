@@ -26,7 +26,7 @@ import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
-import { agreeKickoffPack, chooseQuote, requestKickoff } from "@/app/portal/job-actions";
+import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 
 export const dynamic = "force-dynamic";
@@ -65,6 +65,11 @@ type Quote = {
   days_estimate: string | null;
   note: string | null;
   status: string | null;
+  scope_summary: string | null;
+  included_note: string | null;
+  excluded_note: string | null;
+  timeline_note: string | null;
+  payment_stage_note: string | null;
 };
 
 type Pack = {
@@ -134,7 +139,7 @@ export default async function JobRoom({
       supabase
         .from("job_quotes")
         .select(
-          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status",
+          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note",
         )
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
@@ -294,15 +299,14 @@ export default async function JobRoom({
                 >
                   Read the Kickoff Pack &rarr;
                 </Link>
+                {/* A button here is exactly the surface CLAUDE.md §9 rules
+                    out for a worker. Confirming is a WhatsApp reply, same
+                    message that told them the pack was ready. */}
                 {!myPack.both_confirmed_at && (
-                  <form action={agreeKickoffPack} className="mt-3">
-                    <input type="hidden" name="jobId" value={job.id} />
-                    <input type="hidden" name="packId" value={myPack.id} />
-                    <input type="hidden" name="code" value={myPack.confirm_code ?? ""} />
-                    <button className="rounded-full border border-line bg-panel2 px-4 py-2 text-[13px] font-bold text-ink">
-                      Confirm as the worker
-                    </button>
-                  </form>
+                  <p className="mt-3 text-[13px] leading-relaxed text-mute">
+                    Reply to Yaadly&apos;s WhatsApp message with{" "}
+                    <b className="font-mono text-ink">{job.id}</b> to confirm your side.
+                  </p>
                 )}
               </div>
             )}
@@ -787,6 +791,45 @@ export default async function JobRoom({
                   <p className="mt-2 text-[13px] leading-relaxed text-mute">
                     {q.note}
                   </p>
+                )}
+
+                {(q.scope_summary || q.included_note || q.excluded_note || q.timeline_note || q.payment_stage_note) && (
+                  <div className="mt-3 grid gap-2.5 border-t border-line pt-3 text-[12.5px] leading-relaxed">
+                    {q.scope_summary && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[.14em] text-dim">Scope</p>
+                        <p className="mt-1 whitespace-pre-wrap text-mute">{q.scope_summary}</p>
+                      </div>
+                    )}
+                    {(q.included_note || q.excluded_note) && (
+                      <div className="grid gap-2.5 sm:grid-cols-2">
+                        {q.included_note && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[.14em] text-dim">Included</p>
+                            <p className="mt-1 whitespace-pre-wrap text-mute">{q.included_note}</p>
+                          </div>
+                        )}
+                        {q.excluded_note && (
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-[.14em] text-dim">Excluded</p>
+                            <p className="mt-1 whitespace-pre-wrap text-mute">{q.excluded_note}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {q.timeline_note && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[.14em] text-dim">Timeline</p>
+                        <p className="mt-1 whitespace-pre-wrap text-mute">{q.timeline_note}</p>
+                      </div>
+                    )}
+                    {q.payment_stage_note && (
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[.14em] text-dim">Payment stages</p>
+                        <p className="mt-1 whitespace-pre-wrap text-mute">{q.payment_stage_note}</p>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {role === "client" && chooseOpen && q.status === "submitted" && (

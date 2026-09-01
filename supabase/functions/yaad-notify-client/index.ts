@@ -879,14 +879,18 @@ Deno.serve(async (req: Request) => {
       line = `There has been no update on ${job.title} for a few days, so we wanted you to hear it from us rather than notice the silence yourself. ` +
         `We are checking in with the worker directly. Nothing is wrong with the money held on this job, and you can raise anything here: ${roomLink}`;
     } else if (kind === "kickoff_pack_ready") {
-      // The worker's own door into the Kickoff Pack, same page the client
-      // already reads (parties_read_approved_packs covers both), reached
-      // here because a worker's web surface is thin on purpose (CLAUDE.md
-      // §9: onboarding and file upload, nothing else) - WhatsApp is where
-      // they actually are. The code in the link is this exact revision's;
-      // if the pack changes before it is opened, agree_kickoff_pack()
-      // refuses the stale code rather than silently confirming new content
-      // under an old link.
+      // The worker READS the Kickoff Pack via the link, the same page the
+      // client already reads (parties_read_approved_packs covers both).
+      // CONFIRMING it is a WhatsApp reply, not a portal button: the
+      // worker's web surface is thin on purpose (CLAUDE.md §9: onboarding
+      // and file upload, nothing else), and a portal "Confirm as the
+      // worker" button was exactly the surface that principle rules out -
+      // built that way for a few hours the same night before the founder
+      // caught it live, fixed in agree_kickoff_pack_via_whatsapp()
+      // (20260901i). The code in the link is this exact revision's; if the
+      // pack changes before it is opened, agree_kickoff_pack() and its
+      // WhatsApp door both refuse a stale code or a stale reply rather
+      // than silently confirming new content under an old one.
       // Scoped to the specific quote this pack was drafted against where
       // known, so two packs in flight on the same job can never cross:
       // the worker in this message must be the one who is actually being
@@ -899,7 +903,7 @@ Deno.serve(async (req: Request) => {
         : roomLink;
       subject = `Your Kickoff Pack is ready: ${job.title}`;
       line = `The Kickoff Pack for ${job.title} is ready: scope, timeline, payment stages and the evidence checklist, all in one place. ` +
-        `Read it and confirm your side here: ${packLink}`;
+        `Read it here: ${packLink}\n\nWhen you're ready to confirm your side, just reply to this message with ${jobId}.`;
     }
 
     let emailed = false;

@@ -13,9 +13,50 @@ function jmd(n: number) {
   return "J$" + n.toLocaleString("en-US");
 }
 
-export function QuotePanel({ jobId }: { jobId: string }) {
+type QuotePackDraft = {
+  status: string;
+  docs: {
+    scope_summary?: string; included?: string[]; excluded?: string[];
+    rough_timeline?: string; payment_stages?: { stage: string; proportion_percent: number; evidence_note: string }[];
+  } | null;
+  guardrail: { price_language_detected?: boolean; banned_language_detected?: boolean } | null;
+};
+
+/** included/excluded as plain bullet lines, same reasoning as
+ *  stagesToText: the founder's own description is "editable text" for
+ *  every one of these fields, not a structured form. */
+function linesToText(items: string[] | undefined): string {
+  return items?.length ? items.join("\n") : "";
+}
+
+/** payment_stages as plain lines, the shape the worker actually edits and
+ *  the shape job_quotes.payment_stage_note stores. Founder's own
+ *  description: all three fields are "editable text", not a structured
+ *  form, so the stage list is flattened to text at the door rather than
+ *  carrying jsonb into the textarea. */
+function stagesToText(stages: { stage: string; proportion_percent: number; evidence_note: string }[] | undefined): string {
+  if (!stages?.length) return "";
+  return stages.map((s) => `${s.stage} — ${s.proportion_percent}% — ${s.evidence_note}`).join("\n");
+}
+
+/** A draft is usable only once it is ready AND clean. A dirty or still-
+ *  drafting one falls back to blank fields rather than showing a worker
+ *  something that read a price or the word escrow into a live document. */
+function usableDraft(draft: QuotePackDraft | null): QuotePackDraft["docs"] | null {
+  if (!draft || draft.status !== "ready" || !draft.docs) return null;
+  if (draft.guardrail?.price_language_detected || draft.guardrail?.banned_language_detected) return null;
+  return draft.docs;
+}
+
+export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackDraft | null }) {
+  const docs = usableDraft(draft ?? null);
   const [labour, setLabour] = useState(0);
   const [materials, setMaterials] = useState(0);
+  const [scopeSummary, setScopeSummary] = useState(docs?.scope_summary ?? "");
+  const [includedNote, setIncludedNote] = useState(linesToText(docs?.included));
+  const [excludedNote, setExcludedNote] = useState(linesToText(docs?.excluded));
+  const [timelineNote, setTimelineNote] = useState(docs?.rough_timeline ?? "");
+  const [paymentStageNote, setPaymentStageNote] = useState(stagesToText(docs?.payment_stages));
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -25,10 +66,10 @@ export function QuotePanel({ jobId }: { jobId: string }) {
       <div className="mt-3.5 rounded-xl border border-mango/30 bg-mango/5 p-4 text-[13.5px] leading-relaxed text-mute">
         <b className="font-mono text-[11px] font-bold text-mango">✦ quote sent</b>
         <p className="mt-2">
-          Your quote is with the client. They see your Yaad Score, jobs
-          completed and evidence from past work alongside it. If they accept,
-          the Kickoff Pack and payment stages are drafted from your figures,
-          then Monique reviews before anything is signed.
+          Your quote is with the client, scope, timeline and payment stages
+          included. They see your Yaad Score, jobs completed and evidence
+          from past work alongside it. If they accept, the Kickoff Pack is
+          drafted from it, then Monique reviews before anything is signed.
         </p>
       </div>
     );
@@ -119,6 +160,82 @@ export function QuotePanel({ jobId }: { jobId: string }) {
         />
       </label>
 
+      <div className="mt-4 border-t border-line2 pt-3.5">
+        <p className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[.18em] text-tealb">
+          {docs ? "Yaadly's starting draft, edit to your own terms" : "Scope, timeline and payment stages"}
+        </p>
+        <label className="mt-2 block">
+          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+            Scope summary
+          </span>
+          <textarea
+            name="scopeSummary"
+            rows={3}
+            value={scopeSummary}
+            onChange={(e) => setScopeSummary(e.target.value)}
+            placeholder="What the job involves, in your own words."
+            className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
+          />
+        </label>
+        <div className="mt-2.5 grid gap-3.5 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+              What&apos;s included
+            </span>
+            <textarea
+              name="includedNote"
+              rows={3}
+              value={includedNote}
+              onChange={(e) => setIncludedNote(e.target.value)}
+              placeholder="One line per item. What you are taking on."
+              className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+              What&apos;s excluded
+            </span>
+            <textarea
+              name="excludedNote"
+              rows={3}
+              value={excludedNote}
+              onChange={(e) => setExcludedNote(e.target.value)}
+              placeholder="One line per item. What is not covered by this price."
+              className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
+            />
+          </label>
+        </div>
+        <label className="mt-2.5 block">
+          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+            Rough timeline
+          </span>
+          <textarea
+            name="timelineNote"
+            rows={2}
+            value={timelineNote}
+            onChange={(e) => setTimelineNote(e.target.value)}
+            placeholder="How long this runs and what it depends on."
+            className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
+          />
+        </label>
+        <label className="mt-2.5 block">
+          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+            Payment stages
+          </span>
+          <textarea
+            name="paymentStageNote"
+            rows={3}
+            value={paymentStageNote}
+            onChange={(e) => setPaymentStageNote(e.target.value)}
+            placeholder="Stage name — proportion — what proves it's done. One per line."
+            className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
+          />
+          <span className="mt-1.5 block text-[11.5px] text-dim">
+            Percentages of your total, never amounts. This is what gets checked before you're paid, so be specific.
+          </span>
+        </label>
+      </div>
+
       {labour > 0 && (
         <div className="mt-3.5 rounded-xl border border-line bg-panel2 p-4 text-[13.5px] tabular-nums">
           <div className="flex justify-between text-mute"><span>Your labour price</span><span>{jmd(labour)}</span></div>
@@ -141,8 +258,10 @@ export function QuotePanel({ jobId }: { jobId: string }) {
       )}
 
       <p className="mt-3 text-[11.5px] leading-relaxed text-dim">
-        Payment stages are not set here. They are drafted into the Kickoff
-        Pack once the client accepts, so there is only ever one stage list.
+        This is your quote to the client, scope, timeline and stages
+        included. If they accept, the Kickoff Pack and its own payment
+        schedule are drafted from it, then Monique reviews before anything
+        is signed.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button disabled={busy} className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40">
