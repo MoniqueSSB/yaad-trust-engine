@@ -10,7 +10,6 @@ that actually serves real users. That is why these files are here.
 |---|---|---|
 | `yaad-agent` | true | Intake and Reporting agents (MiniMax-M2.7), admin session only |
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
-| `yaad-whatsapp-webhook` | false | Meta Cloud API inbound webhook: verify → guided intake (one question at a time, state in `wa_intake_sessions`), answer a follow-up from the record, or escalate it to Monique → reply |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |
 | `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
@@ -37,21 +36,12 @@ OTLP-compatible backend understands them without custom mapping.
 directory, because Supabase deploys each function as a self-contained bundle.
 After editing the shared copy, run `./sync-shared.sh` before deploying.
 
-A single inbound WhatsApp message produces one trace containing:
-
-```
-POST /yaad-whatsapp-webhook          (SERVER)
-├── webhook.verify_signature          (INTERNAL)  signature checked / valid
-├── chat MiniMax-M2.7                 (CLIENT)    gen_ai.*, token usage, parsed?
-├── db.insert jobs                    (CLIENT)    db.*, portal code issued?
-└── whatsapp.send_reply               (CLIENT)    delivery status
-```
-
-When the model classifies the message as a follow-up rather than a new job,
-`db.insert jobs` is replaced by `db.lookup client history` (jobs, enquiries
-and call requests matched by phone number) and `db.insert enquiries` (the
-desk row). On the escalated path the email to the desk and the ntfy push run
-after the response, so their failures land on the console, not the trace.
+Real WhatsApp traffic runs through `yaad-inbound` (Twilio), which carries the
+same shape of trace: a signature check, a model call, a `db.insert jobs` (or
+`db.update jobs` for a message continuing an existing thread), and a reply.
+(This section used to describe `yaad-whatsapp-webhook`, a direct Meta Cloud
+API webhook that never received real traffic and was deleted 1 Sep 2026, see
+DECISIONS.md.)
 
 A new job runs as a guided intake instead of a single-shot card: the agent
 asks Monique's seven questions one at a time, holding the answers between

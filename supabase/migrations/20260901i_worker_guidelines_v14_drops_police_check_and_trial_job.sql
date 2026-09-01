@@ -1,0 +1,14 @@
+-- Founder correction, 1 Sep 2026: the police record check and the
+-- independent-reviewer trial job described in Worker Guidelines section 2
+-- are not things Yaadly actually does. web/lib/legal-copy.json's worker
+-- guidelines moved to v1.4 with that section rewritten; this is the matching
+-- half in the database.
+--
+-- current_doc_version('worker_guidelines') reads app_settings, and the
+-- job-matching gate in enforce_vetted_worker_on_quote's neighbour
+-- (yaad_match's own matching query) requires a worker's signed doc_version to
+-- equal it exactly. Bump the code without this and every worker who signs
+-- the new v1.4 text fails that match on the old '1.3', while a worker who
+-- signed the removed v1.3 text keeps matching. Same drift as 20260828e,
+-- same fix.
+update public.app_settings set value = '1.4' where key = 'worker_guidelines_version';

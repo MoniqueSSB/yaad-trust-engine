@@ -63,8 +63,8 @@ Yaadly has two places server code can run. This is settled, do not drift.
 **Edge Functions (`../supabase/functions`) own anything called from outside
 this app:**
 
-- Inbound third-party webhooks (`yaad-whatsapp-webhook`). Meta calls that URL
-  directly, so it must not change when this app deploys.
+- Inbound third-party webhooks (`yaad-inbound`, Twilio SMS/WhatsApp/email). Twilio calls that URL
+  directly, so it must not change when this app deploys. (`yaad-whatsapp-webhook`, a direct Meta Cloud API webhook, held this role until 1 Sep 2026; it never received real traffic and was deleted, see DECISIONS.md.)
 - `yaad-website-intake` was the marketing site's public intake and was retired on 31 Aug 2026. It answers 410. Jobs are created at `/jobs/new`, which posts to `yaad-post-job` in draft mode.
   yaadly.co.uk is hand-written HTML on GitHub Pages and cannot call a Server
   Action.

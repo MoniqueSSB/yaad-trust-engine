@@ -15,8 +15,8 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //                      size and mime, hashes it, and writes the row.
 //
 // The row is written by the server after the object is verified, never by the
-// browser. If the browser could write it, an applicant could claim a police
-// check that does not exist and the checklist would pass on a lie.
+// browser. If the browser could write it, an applicant could claim a proof of
+// address that does not exist and the checklist would pass on a lie.
 //
 // The hash is computed HERE, from the bytes actually in the bucket, not taken
 // from the client. A fingerprint you were handed proves nothing.
@@ -42,7 +42,7 @@ const KEEP_DAYS = 90;                             // purge clock on the file
 // documents like any other: same private bucket, same purge clock, same rule
 // that the server writes the row only after it has seen the bytes.
 const DOC_TYPES = [
-  "photo_id", "selfie_with_id", "face_video", "police_check", "proof_of_address", "trn",
+  "photo_id", "selfie_with_id", "face_video", "proof_of_address", "trn",
   "cv", "portfolio", "certificate",
   // Phase 2's thirty second introduction. A tradesperson saying what they do,
   // in their own voice, which is worth more to a client deciding who to let
@@ -354,7 +354,6 @@ Deno.serve(async (req: Request) => {
         ref2:     s(b.ref2)   || undefined,
         ref3:     s(b.ref3)   || undefined,
         refs_told: b.refsTold === true,
-        police_status: s(b.policeStatus) || undefined,
         // Signed once, at submit, with the name they typed. The timestamp is
         // the server's, never the browser's: a signature dated by the thing
         // being signed against is not a signature.

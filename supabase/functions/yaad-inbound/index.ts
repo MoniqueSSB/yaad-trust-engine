@@ -407,7 +407,16 @@ async function readTheJob(text: string, trace: Trace) {
         method: "POST",
         headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: prov.model, temperature: 0.3, max_tokens: 1100,
+          // 1100 until 1 Sep 2026: too tight. This model reasons in a <think>
+          // block before it ever writes the JSON answer, and that reasoning
+          // counts against the same budget. Caught live: a real message got
+          // cut off mid-thought, no closing </think>, no JSON, ever, and the
+          // client got the hardcoded generic opener instead of an answer.
+          // 1100 was also the smallest budget of any model call in this
+          // codebase; every sibling call is 1200 or higher, some far higher,
+          // and this is the one call that both classifies AND writes a full
+          // conversational reply, never the lightest job of the set.
+          model: prov.model, temperature: 0.3, max_tokens: 3500,
           messages: [
             { role: "system", content:
 `You are reading a WhatsApp conversation with somebody who needs property work
@@ -428,9 +437,10 @@ General Handyman, Solar Install, Water Tank & Pump, Locks & Security Doors,
 Windows & Glazing, Carpentry & Joinery, Drainage & Septic, Fencing,
 CCTV & Alarms. Empty if unclear.
 
-"enough" is true only when you know all three of: what the work is, roughly
-where in Jamaica, and who can let a worker in. A greeting, "I have a problem",
-or a trade with no location is NOT enough.
+"enough" is true only when you know all three of: what the work is, which
+parish the property is in (this is the field workers and matching actually
+use, not just a town or an area), and who can let a worker in. A greeting,
+"I have a problem", or a trade with no parish is NOT enough.
 
 "confirmed" is true only when the LAST thing they said agrees that the summary
 you read back to them is right and complete. "yes", "that\u2019s it", "correct",
@@ -508,15 +518,31 @@ guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
       });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { sp.recordError(`${prov.name} ${r.status}`); return null; }
+      // Every return null below used to be silent: recorded on the span only,
+      // which does not surface in function_logs, so a client falling through
+      // to the hardcoded generic opener left no console trail at all to say
+      // why. Found live, 1 Sep 2026, chasing exactly that with nothing to go
+      // on. console.error alongside the span from here down, every path.
+      if (!r.ok) {
+        const msg = `readTheJob: ${prov.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        sp.recordError(msg); console.error(msg); return null;
+      }
       let j: Record<string, unknown> = {};
-      try { j = JSON.parse(raw); } catch (_) { return null; }
+      try { j = JSON.parse(raw); } catch (e) {
+        console.error("readTheJob: response body was not JSON:", String(e).slice(0, 200)); return null;
+      }
       const content = String((j as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "");
       const m = content.match(/\{[\s\S]*\}/);
-      if (!m) return null;
-      try { return JSON.parse(m[0]); } catch (_) { return null; }
+      if (!m) {
+        console.error("readTheJob: no JSON object in model content:", content.slice(0, 300)); return null;
+      }
+      try { return JSON.parse(m[0]); } catch (e) {
+        console.error("readTheJob: matched text was not valid JSON:", String(e).slice(0, 200), m[0].slice(0, 300)); return null;
+      }
     });
-  } catch (_) { return null; }
+  } catch (e) {
+    console.error("readTheJob: threw:", String(e).slice(0, 300)); return null;
+  }
 }
 
 
@@ -1177,7 +1203,16 @@ Deno.serve(async (req: Request) => {
       .select("job_id,transcript,turns,last_at,stage")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
-    const continuing = !!prior &&
+    // A thread already at 'done' produced its job; nothing left to gather.
+    // A reply about THAT job (approving a stage, replying to a comment) is
+    // already intercepted above, before this point, by its own lane. So a
+    // message that reaches here with the prior thread 'done' is not a reply
+    // about the old job, it is the next thing this number has said, and the
+    // comment above this block has called that "genuinely a new job" since
+    // before this line ever enforced it. Found live, 1 Sep 2026: a second,
+    // unrelated job sent within the window read back a stale summary of the
+    // first one and never started gathering the second at all.
+    const continuing = !!prior && prior.stage !== "done" &&
       (Date.now() - new Date(prior.last_at as string).getTime()) < THREAD_HOURS * 3600_000;
 
     // Tell the assistant what came with the message. Without this it thanks
@@ -1191,9 +1226,22 @@ Deno.serve(async (req: Request) => {
       .map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(" and ");
     const thisTurn = [msg.text, attached ? `[they attached ${attached}]` : ""].filter(Boolean).join("\n");
 
-    const transcript = continuing
-      ? `${prior!.transcript}\n\n${thisTurn}`.slice(-8000)
-      : thisTurn;
+    // A repeat of the immediately preceding turn, word for word, is not new
+    // information: it is WhatsApp retrying, or someone impatient tapping
+    // send twice. Folding it into the transcript anyway made the model read
+    // an increasingly repetitive conversation and increasingly convince
+    // itself there was a great deal to reason through before answering,
+    // until it ran out of room mid-thought and never answered at all.
+    // Caught live, 1 Sep 2026: the same opening line sent three times over,
+    // each one costing more of the model's own token budget than the last
+    // for content it had already read. Recorded once, not once per repeat.
+    const priorTranscript = continuing ? String(prior!.transcript ?? "") : "";
+    const isRepeat = continuing && priorTranscript.trimEnd().endsWith(thisTurn.trim()) && thisTurn.trim().length > 0;
+    const transcript = !continuing
+      ? thisTurn
+      : isRepeat
+        ? priorTranscript.slice(-8000)
+        : `${priorTranscript}\n\n${thisTurn}`.slice(-8000);
 
     const card = await readTheJob(transcript, trace);
     const enough = card?.enough === true;
@@ -1202,7 +1250,22 @@ Deno.serve(async (req: Request) => {
     // Three stages, and the client owns the last one. The assistant may decide
     // it has enough; only they can say it is right and complete.
     const wasStage = continuing ? String(prior!.stage ?? "gathering") : "gathering";
-    const confirmedNow = enough && wasStage === "confirming" && card?.confirmed === true;
+    // card.confirmed is one model call's read of one message, and it can miss
+    // an unambiguous yes the way any single classification can. Found live,
+    // 1 Sep 2026: "Monique Sewell-Bennett, [email]. Yes, that's everything, go
+    // ahead." came back confirmed: false, the client was told nothing more
+    // than a plain thank you, and the portal link never went out; the job
+    // still wrote to the database because the row write is unconditional
+    // every turn, so it looked finished from the data alone while the
+    // conversation logic still thought it was waiting. A plain word match on
+    // THIS turn's own text is the backstop under the model, the same shape
+    // wantsOut() already is for "cancel": only ever adds a true the model
+    // missed, on this turn's own words, never overrides a model that read it
+    // right. A false positive here costs nothing worse than the "already
+    // finished and still talking" path already handles for a late detail.
+    const saidConfirmed = /\b(yes|yeah|yep|yup|correct|that'?s\s+(it|right|correct|all\s+correct|everything)|go\s*ahead|all\s+good|sounds\s+good|good\s+to\s+go|confirmed|perfect)\b/i
+      .test(msg.text.trim());
+    const confirmedNow = enough && wasStage === "confirming" && (card?.confirmed === true || saidConfirmed);
     const stage = confirmedNow || wasStage === "done" ? "done"
       : enough ? "confirming"
       : "gathering";
@@ -1224,6 +1287,24 @@ Deno.serve(async (req: Request) => {
     const lostMedia = Math.max(0, wanted - kept.saved);
     root.setAttributes({ "yaadly.inbound.media_saved": kept.saved, "yaadly.inbound.media_lost": lostMedia });
 
+    // On email the sender address IS the client's email: they had to control
+    // that mailbox to send from it, so binding it straight to the job is
+    // proof, not trust. On every other channel, an email the model read out
+    // of the message text is only ever a claim someone typed, and binding it
+    // directly would let a typo, or somebody else's real address entered on
+    // purpose, hand that stranger the job the next time they sign in and
+    // sign the current Client Guidelines for any reason of their own,
+    // anywhere in the product, with the actual client locked out and nothing
+    // to click their way back in with. yaad-post-job's draft mode and the
+    // deleted Meta webhook both held this line already; found live, 1 Sep
+    // 2026, that this channel never had. The portal link still goes to
+    // whatever address they gave, same as before: sending them a link proves
+    // nothing about who reads it. Attaching client_email to the row is what
+    // proves it, and that only happens through claim_code_as_me(), when
+    // someone signs in with that address and the code matches.
+    const provenEmail = msg.channel === "email" ? bareEmail(msg.from) : "";
+    const typedEmail = msg.channel !== "email" ? s(card?.client_email).toLowerCase() : "";
+
     const descr = [
       s(card?.scope) || transcript,
       s(card?.access_note) ? `Access: ${s(card.access_note)}` : "",
@@ -1235,18 +1316,21 @@ Deno.serve(async (req: Request) => {
       `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}${turns > 1 ? `, over ${turns} messages` : ""}.`,
       enough ? "" : "[Still gathering. The assistant has asked for what is missing and this stays a draft until it comes back.]",
       lostMedia ? `[${lostMedia} attachment${lostMedia > 1 ? "s" : ""} came through but could not be stored. Ask them to send again.]` : "",
-      (s(card?.client_email) || msg.channel === "email") ? "" : "[No email yet, and none needed from us. The job code is theirs to claim, and the email they sign up with is the one that gets attached to this job.]",
+      typedEmail
+        ? `[EMAIL GIVEN, NOT YET ATTACHED. ${typedEmail} was typed into the chat and the portal link has been sent there. It attaches to this job when they click it and not before, so a typo costs nothing.]`
+        : (provenEmail ? "" : "[No email yet, and none needed from us. The job code is theirs to claim, and the email they sign up with is the one that gets attached to this job.]"),
     ].filter(Boolean).join("\n");
 
-    const row = {
+    const row: Record<string, unknown> = {
       title: s(card?.title) || (enough ? `Job from ${msg.channel}` : `Someone writing in on ${msg.channel}`),
       parish: s(card?.parish),
       client_name: s(card?.client_name) || msg.name,
-      // On email the sender address IS the client's email. The agent only
-      // reads the body, and correctly returns nothing when it is not written
-      // there, so take it from the envelope rather than losing it.
-      client_email: (s(card?.client_email) || (msg.channel === "email" ? bareEmail(msg.from) : "")).toLowerCase(),
       client_phone: msg.channel === "email" ? "" : msg.from,
+      // jobs.access_contact is NOT NULL DEFAULT ''. s() already returns "" for
+      // nothing given; the || null above this comment briefly sent NULL over
+      // the wire instead and every continuing-conversation update on a job
+      // failed outright, 23502, until caught live the same session.
+      access_contact: s(card?.access_note),
       descr,
       trade: s(card?.trade) || null,
       trade_source: s(card?.trade) ? "model" : null,
@@ -1258,10 +1342,20 @@ Deno.serve(async (req: Request) => {
       // and keeps the desk's real queue free of things nobody can act on yet.
       status: stage === "done" ? "awaiting_client_setup" : "draft",
     };
+    // client_email only ever appears in this row when it is proven (the email
+    // channel's own envelope). On a fresh insert, leaving it out is the same
+    // as the "" every other creation path in this codebase writes on purpose.
+    // On an update to a job already claimed through claim_code_as_me(), never
+    // writing the key at all is what stops this turn silently blanking a
+    // client_email a later message has no way of knowing was already proven.
+    if (provenEmail) row.client_email = provenEmail;
 
     const { data, error } = continuing
       ? await supabase.from("jobs").update(row).eq("id", jobId).select("portal_code").single()
-      : await supabase.from("jobs").insert({ id: jobId, ...row }).select("portal_code").single();
+      // client_email defaults to "" here, matching every other creation path in
+      // this codebase, and only when row.client_email (proven) is not already
+      // present to override it: the column has no database default of its own.
+      : await supabase.from("jobs").insert({ id: jobId, client_email: "", ...row }).select("portal_code").single();
 
     if (error) {
       root.recordError(error.message);
@@ -1351,8 +1445,18 @@ Deno.serve(async (req: Request) => {
       // Read back, then wait. The assistant may believe it has enough; only
       // the client can say it is right. Nobody wants to discover afterwards
       // that the thing they thought they mentioned never landed.
+      //
+      // The model's own read-back usually ends by asking if it is right, but
+      // "asks a yes or no question" and "tells them what word moves this
+      // along" are not the same sentence, and a client who does not know
+      // what makes this finish is a client left guessing. Founder's own
+      // point, live, 1 Sep 2026: name the action, do not just imply it. Said
+      // in code, not left to the model, for the same reason the confirmation
+      // detection itself now has a code backstop below this: consistent
+      // every time beats well phrased most of the time.
       if (stage === "confirming") {
-        return twiml(safe || "Let me read that back. Have I got it right, and is there anything else before I write it up?");
+        const readBack = safe || "Let me read that back. Have I got it right, and is there anything else before I write it up?";
+        return twiml(`${readBack} Reply yes if that is right, or just tell me what to change.`);
       }
 
       // Confirmed. This is the only point a link goes out, because it is the
@@ -1395,7 +1499,7 @@ Deno.serve(async (req: Request) => {
         // teaches people the number means nothing.
         return twiml(
           safe ||
-          "Thanks for writing in. Yaadly gets property work done in Jamaica for people who are not there to watch it. Tell me what needs doing, whereabouts the property is, and who can let a worker in.",
+          "Thanks for writing in. Yaadly gets property work done in Jamaica for people who are not there to watch it. Tell me what needs doing, which parish the property is in, and who can let a worker in.",
         );
       }
 
@@ -1407,6 +1511,16 @@ Deno.serve(async (req: Request) => {
 
     return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, channel: msg.channel, transcribed: spoken, enough, turns });
   } catch (e) {
+    // This used to be the only place in the whole function that recorded an
+    // uncaught throw, and it only ever went to root.recordError, which lands
+    // on the trace span and nowhere in function_logs. A client whose message
+    // hit this branch got a bare 500 in reply, Twilio never even attempted a
+    // send (confirmed live, 1 Sep 2026, checking Twilio's own message log:
+    // the inbound message was there, no outbound reply anywhere near it),
+    // and there was nothing in this project's own logs to say why. console
+    // .error alongside the trace record now, same as every other silent
+    // catch found and fixed this same session.
+    console.error("yaad-inbound: uncaught, replying 500 with no TwiML:", String(e instanceof Error ? e.stack ?? e.message : e).slice(0, 800));
     root.recordError(e);
     return json({ error: "Inbound failed." }, 500);
   }

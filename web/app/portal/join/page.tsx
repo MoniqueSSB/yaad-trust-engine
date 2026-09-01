@@ -141,18 +141,20 @@ function JoinForm() {
         );
       }
 
-      /* Arriving here from a quote means the account WAS the booking step.
-         Finish what they pressed rather than landing them in a portal and
-         making them find the quote again. accept_quote_as_me still decides,
-         and it still refuses anybody who is not this job's client. */
+      /* Arriving here from a quote means the account WAS the step that
+         requesting a Kickoff Pack needed. Finish what they pressed rather
+         than landing them in a portal and making them find the quote
+         again. request_kickoff_as_me still decides, and it still refuses
+         anybody who is not this job's client. This does not book anyone;
+         it asks the worker to write a Kickoff Pack against their price. */
       const quote = params.get("quote");
       if (quote) {
-        const { error: acceptErr } = await supabase.rpc("accept_quote_as_me", { p_quote: quote });
-        if (acceptErr) {
+        const { error: requestErr } = await supabase.rpc("request_kickoff_as_me", { p_quote: quote });
+        if (requestErr) {
           throw new Error(
-            "Your account is ready and you are signed in, but the booking did not go through: " +
-              acceptErr.message +
-              " Open your quotes again and press book.",
+            "Your account is ready and you are signed in, but the request did not go through: " +
+              requestErr.message +
+              " Open your quotes again and press the button.",
           );
         }
       }

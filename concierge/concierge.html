@@ -773,7 +773,6 @@ const VIEWS = [
         const hasId = (VDOC[r.id] || []).some(x => x.doc_type === "photo_id");
         return hasId ? chip_("mute", "uploaded, check by hand") : chip_("warn", "nothing yet");
       }},
-      {h:"Police check", f:r => r.police_status ? tone_(r.police_status) : chip_("warn","not started")},
       {h:"Signed", f:r => r.signed_at ? chip_("ok", day_(r.signed_at)) : chip_("warn","not signed")},
       {h:"State", f:r => tone_(r.status)},
       {h:"Applied", f:r => mute_(ago_(r.created_at))},
@@ -1405,13 +1404,21 @@ async function writeSetting(key, value, el){
 
 // ---- Intake: the drafts that stopped before anybody signed.
 //
-// A job with no client account behind it is somebody who built the whole thing
-// and walked away at sign-up. The trade, the parish and their own words are all
-// still here, which makes it a lead rather than a loss.
+// A job stuck at awaiting_client_setup is somebody who built the whole thing
+// and walked away before an account existed to attach it to. The trade, the
+// parish and their own words are all still here, which makes it a lead rather
+// than a loss.
+//
+// This used to filter on client_user is null. Nothing in this codebase ever
+// writes jobs.client_user, on any intake path, so that filter matched almost
+// every job in the table forever, including live, quoted and finished ones,
+// and never cleared once a client actually did sign up. status is the column
+// client_go_live() itself checks before it will open a job, so it is the one
+// that tells the truth about whether this is still stuck.
 async function preIntake(){
   const { data } = await sb.from("jobs")
     .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at")
-    .is("client_user", null).order("updated_at", { ascending:false }).limit(50);
+    .eq("status", "awaiting_client_setup").order("updated_at", { ascending:false }).limit(50);
   INTAKE_DRAFTS = data || [];
 }
 
@@ -1426,7 +1433,7 @@ function panelIntake(){
   return `<div class="sechd">Built a job, never signed</div>`
     + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send.</p>`
     + `<div class="card pad0"><div class="tw"><table><thead><tr><th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th></tr></thead><tbody>${rows}</tbody></table></div></div>`
-    + `<p class="hint">${INTAKE_DRAFTS.length} row${INTAKE_DRAFTS.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">client_user</span> is null. These are not in the queue below; they are already jobs.</p>`
+    + `<p class="hint">${INTAKE_DRAFTS.length} row${INTAKE_DRAFTS.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">status</span> is <span class="mono">awaiting_client_setup</span>. These are not in the queue below; they are already jobs.</p>`
     + `<div class="sechd">The queue</div>`;
 }
 
@@ -1635,6 +1642,7 @@ const KICK_DOCS = [
   ["timeline","Timeline"], ["document_pack","Document pack"],
   ["communications_list","Who to call"], ["open_questions","Open questions"],
   ["human_review_notes","Notes for you"], ["cover_note","Cover note"],
+  ["cost_breakdown","Cost breakdown"], ["terms_placeholders","Terms to confirm"],
 ];
 
 // Flattens each draft's intake jsonb onto the row as plain fields (title,
@@ -2290,7 +2298,7 @@ async function loadOverview(){
     countOf("waitlist",    null),
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
-    countOf("jobs",        q => q.is("client_user", null)),
+    countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
     countOf("enquiries",   q => q.neq("status", "replied")),
   ]);
 
@@ -2435,7 +2443,7 @@ async function loadHealth(){
     countOf("app_state", null),
     countOf("jobs", q => q.is("trade", null)),
     countOf("job_quotes", q => q.is("worker_user", null)),
-    countOf("jobs", q => q.is("client_user", null)),
+    countOf("jobs", q => q.eq("status", "awaiting_client_setup")),
     countOf("evidence", q => q.is("sha256", null)),
   ]);
   const staleSigs = staleW + staleC;
@@ -2464,7 +2472,7 @@ async function loadHealth(){
     "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. Two functions are not covered, because nothing here starts them: yaad-inbound and yaad-whatsapp-webhook are woken by an incoming message and call a model before this desk knows the message exists. Reading app_settings.agents_paused at the top of those two is what would make the switch mean everything it looks like it means.");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
-    "client_user is null, so the go-live check refuses to put them on the board however complete they look. They are at the top of the Intake view.");
+    "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view.");
 
   if (noTrade) add("warn", noTrade + " job" + (noTrade === 1 ? " has" : "s have") + " no trade classified",
     "yaad-match routes on trade. A job without one reaches nobody.");

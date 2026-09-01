@@ -130,11 +130,11 @@ const ON_THE_BOARD = {
   probation:
     "Your account goes live in Probation. You can see the whole board and quote on standard jobs from the day you are approved.",
   topTier:
-    "Jobs over £500, work inside an occupied home, and anything where you hold keys stay hidden until your police check and your telephoned references are done. That is most of the money on the board, so it is worth finishing.",
+    "Jobs over £500, work inside an occupied home, and anything where you hold keys stay hidden until your telephoned references are done. That is most of the money on the board, so it is worth finishing.",
   standard:
     "We only keep working with people who meet the evidence standard. Fall short once and we stop sending work.",
 };
-type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "trial" | "live";
+type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "live";
 
 /* ── the two sittings ──────────────────────────────────────────────────────
    Phase 1 is the whole first visit and it is three screens: what you do,
@@ -176,10 +176,6 @@ const LATER_STEPS: Step[] = [
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
     note: "Written with a timestamp and the exact consent sentence. No edit, no delete." },
-{ phase: 3, n: "8 · Trial job", body: "trial",
-    h: "One job with an independent reviewer, at our cost",
-    p: "Your first job carries an independent reviewer on site, paid for by Yaadly, not by you and not by the client. They record what they see against the same evidence standard you will be held to afterwards.",
-    note: "It is the only way to know the standard holds on a real site rather than in an application form." },
 { phase: 3, n: "Save it", body: "live",
     h: "Save what you have added",
     p: "Your application is already with the desk. This adds what you have just done to it: your ID check, your referees and your signature.",
@@ -204,7 +200,6 @@ const CHECKS: Check[] = [
   { k: "id3",    b: "Proof of address",        s: "Dated within three months" },
   { k: "refs",   b: "3 referees", s: "A message they sent, or a name and number we can call", req: true },
   { k: "sign",   b: "Worker Guidelines signed", s: "The current version, once" },
-  { k: "trial",  b: "Trial job reviewed",      s: "Independent reviewer on site, at our cost" },
   { k: "live",   b: "Profile published",       s: "You are on the board" },
 ];
 
@@ -212,8 +207,7 @@ const CHECKS: Check[] = [
 
 type DocType =
   | "cv" | "portfolio" | "certificate"
-  | "photo_id" | "selfie_with_id" | "face_video" | "intro_video" | "trn" | "proof_of_address"
-  | "police_check";
+  | "photo_id" | "selfie_with_id" | "face_video" | "intro_video" | "trn" | "proof_of_address";
 
 type DocState = { state: "idle" | "busy" | "done" | "error"; file?: string; bytes?: number; error?: string };
 
@@ -301,9 +295,6 @@ export function JoinFlow() {
     inquiryId?: string; status?: string; verified?: boolean; error?: string;
   }>({ state: "idle" });
   const [personaFallback, setPersonaFallback] = useState("");
-
-  // Step 4
-  const [policeStatus, setPoliceStatus] = useState("");
 
   // Step 5
   const [refs, setRefs] = useState([
@@ -449,7 +440,6 @@ export function JoinFlow() {
         remember({ docs: next });
         return next;
       });
-      if (docType === "police_check") setPoliceStatus("uploaded");
     } catch (e) {
       setDocs((d) => ({
         ...d,
@@ -592,7 +582,6 @@ export function JoinFlow() {
         trn: trn.replace(/\D/g, ""),
         ref1: refLine(refs[0]), ref2: refLine(refs[1]), ref3: refLine(refs[2]),
         refsTold: refs.every((r) => r.told),
-        policeStatus: policeStatus || "not_yet",
         // Unanswered goes over as "declined". The server treats it that way too,
         // but sending it explicitly means the row records a decision rather than
         // a gap somebody could later read either way.
@@ -630,7 +619,6 @@ export function JoinFlow() {
     id3: has("proof_of_address"),
     refs: refsDone,
     sign: signed && signedName.trim().length > 1,
-    trial: false,
     live: false,
   };
 
@@ -1203,7 +1191,7 @@ export function JoinFlow() {
               </div>
             )}
 
-            {d.body === "trial" && (
+            {d.body === "sign" && (
               <div className="mb-3 grid gap-2.5">
                 {[
                   ["On the board", ON_THE_BOARD.probation],
@@ -1214,17 +1202,6 @@ export function JoinFlow() {
                     <b className="text-ink">{head}.</b> {body}
                   </div>
                 ))}
-              </div>
-            )}
-
-            {d.body === "trial" && (
-              <div className="rounded-xl border border-softline bg-soft px-4 py-4 text-[13.5px] leading-relaxed text-mute">
-                <b className="text-ink">One job, with somebody watching, at our cost.</b>
-                <p className="mt-2">
-                  An independent reviewer attends your first job and records what they
-                  see against the same evidence standard you will be held to
-                  afterwards. Yaadly pays for it. Not you, and not the client.
-                </p>
               </div>
             )}
 

@@ -203,9 +203,9 @@ Yaad Score  4.8/5      31 jobs completed
    better than any badge, so give it room.
 2. **Verified** — the checks that passed, as a list, each with what it means:
    government photo ID on a live video call · TRN verified · proof of address ·
-   **JCF police record check** · certification checked with the issuing body · 3 references called ·
-   walkthrough call completed · trial job reviewed on site.
-   Police check shows a state chip: `Current` / `Not on file`. Where it is not on file, the profile
+   certification checked with the issuing body · 3 references called ·
+   walkthrough call completed.
+   References show a state chip: `Confirmed` / `Not yet`. Where they are not yet confirmed, the profile
    says plainly: *"Cannot be matched to jobs over £500 or work inside an occupied home."*
 3. **Portfolio** — past jobs as cards: title, month, `"3 stages · 12 evidence items"`. Tapping opens
    the evidence gallery for that job — real before-and-afters at matched angles, not marketing shots.
@@ -221,9 +221,9 @@ Everything above, plus:
 - **Vetting record** — every line as `Done` / `Now` / `Waiting`, with any GAP named and what clears it.
 - **Trades and parishes** — editable. Multi-select, plus add-your-own trade.
 - **Availability diary** — the calendar, their own days, tap to open or close.
-- **Documents** — Worker Guidelines v1.1 with signature date, ID, police check with expiry, certificates.
+- **Documents**: Worker Guidelines v1.1 with signature date, ID, certificates.
 - **First-timer state.** A brand-new profile shows *"First-timers start at nothing, not at zero"* —
-  no score yet, trial job pending, and what the reviewer will look at. Never render `0.0★`.
+  no score yet, and what to expect from a first job. Never render `0.0★`.
 
 ---
 
@@ -336,7 +336,7 @@ The single hardest requirement. A worker will capture a full stage on a roof wit
 | No gallery uploads on evidence | Camera | In-app capture only |
 | Contact details scrubbed from chat | Messaging | `scrub()` on insert **and** on render |
 | Quoting requires vetting | Quote button | Published profile + current-version `worker_guidelines` signature |
-| Police check gates high-value work | Job matching | No match to jobs > £500 or occupied homes without a current check |
+| References gate high-value work | Job matching | No match to jobs > £500 or occupied homes without confirmed references |
 | Score moves on signed-off jobs only | Profile | DB trigger, once per job |
 | Evidence hash set at capture | Camera | Never recomputed |
 
@@ -427,7 +427,7 @@ future developer forgets to exclude.
 - [ ] Stage cannot be submitted at 4 of 6
 - [ ] Quote cannot be submitted without exclusions
 - [ ] Unvetted account can browse, cannot quote
-- [ ] Worker without a current police check sees no job over £500 and no occupied-home job
+- [ ] Worker without confirmed references sees no job over £500 and no occupied-home job
 - [ ] Review cannot be written against a job the account was not party to
 - [ ] Reviews stay sealed until both are written or 14 days pass
 - [ ] New profile shows the first-timer state, never `0.0★`

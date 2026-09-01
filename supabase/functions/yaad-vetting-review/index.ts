@@ -29,9 +29,9 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // adding a check anybody relies on. The consent gate made that lawful to ask
 // for. It did not make it worth asking for.
 //
-// What it still reads is the paperwork around the person: police record,
-// proof of address, TRN, certificates, CV, portfolio. That is where the machine
-// read genuinely saves the desk time, and none of it is an identity document.
+// What it still reads is the paperwork around the person: proof of address,
+// TRN, certificates, CV, portfolio. That is where the machine read genuinely
+// saves the desk time, and none of it is an identity document.
 //
 // ── Why it reads one document at a time ──
 //
@@ -95,13 +95,12 @@ const DOC_LABEL: Record<string, string> = {
   face_video: "Video of the face turning left to right",
   trn: "TRN document",
   proof_of_address: "Proof of address",
-  police_check: "JCF police record check",
   cv: "CV",
   portfolio: "Portfolio or photos of finished work",
   certificate: "Trade certificate",
 };
 
-const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address", "police_check"];
+const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address"];
 
 // Identity documents. These never reach a model, consent or no consent.
 //
@@ -136,7 +135,7 @@ Return STRICT JSON only, no markdown fences, exactly this shape:
 {"appears_to_be":"what this document actually is, in your own words","matches_label":"yes|no|unsure","readable":"yes|partly|no","names":["every personal name printed on it, exactly as written"],"dates":[{"label":"what the date is for, e.g. expiry, issued, bill date","value":"as printed"}],"numbers":[{"label":"what the number is, e.g. licence number, TRN, certificate number","value":"as printed"}],"address":"any postal address printed on it, or empty string","concerns":["anything that looks wrong: mismatched fonts, uneven edges, text not sitting on the background, a photograph of a screen rather than a document, a crop that hides part of the page"],"notes":"one sentence a human reviewer would want to know"}
 
 Rules:
-- You will be told what the document is SUPPOSED to be. "matches_label" is whether it actually is that. A page filed as a police check that is plainly a payslip is the single most important thing you can catch.
+- You will be told what the document is SUPPOSED to be. "matches_label" is whether it actually is that. A page filed as proof of address that is plainly a payslip is the single most important thing you can catch.
 - Copy dates EXACTLY as printed and do not convert, reformat or interpret them. Something else does the arithmetic. Your only job with a date is to read it correctly.
 - Never invent a name, a date or a number. If you cannot read it, leave it out and set "readable" honestly.
 - Copy names and numbers exactly as printed, including middle names and initials. Do not tidy them up.
@@ -210,7 +209,6 @@ function b64(buf: ArrayBuffer): string {
 
 const DAY = 86400000;
 const ADDRESS_MAX_DAYS = 92;    // "within three months", generously
-const POLICE_MAX_DAYS = 365;    // a check much older than a year is stale
 
 /** Parse a date as printed on a document. Returns null rather than guessing. */
 function parseDocDate(v: unknown): { at: Date } | { ambiguous: true } | null {
@@ -279,16 +277,6 @@ function dateChecks(extracted: Extraction[]): { name: string; verdict: string; n
           note: `Expired ${Math.abs(days)} days ago, on ${exp.printed}.` }
       : { name: `${DOC_LABEL[doc] ?? doc} expiry, computed`, verdict: "pass",
           note: `Expires ${exp.printed}, ${days} days from now.` });
-  }
-
-  const pc = pick("police_check", /issue|date|dated/i);
-  if (pc && !("ambiguous" in pc.parsed)) {
-    const days = Math.floor((now - pc.parsed.at.getTime()) / DAY);
-    out.push(days > POLICE_MAX_DAYS
-      ? { name: "Police check age, computed", verdict: "flag",
-          note: `Issued ${pc.printed}, ${days} days ago. Over a year old, so treat it as out of date and ask for a current one.` }
-      : { name: "Police check age, computed", verdict: "pass",
-          note: `Issued ${pc.printed}, ${days} days ago.` });
   }
 
   return out;
@@ -373,7 +361,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
 
   const { data: app, error: appErr } = await admin
     .from("applications")
-    .select("id, app_id, name, trade, trade_other, parish, parishes, years, police_status, signed_name, ai_review_consent, persona_inquiry_id, persona_status")
+    .select("id, app_id, name, trade, trade_other, parish, parishes, years, signed_name, ai_review_consent, persona_inquiry_id, persona_status")
     .eq("id", appId).maybeSingle();
   if (appErr || !app) return { body: { error: "No such application." }, status: 404 };
 
@@ -411,7 +399,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     const idDone = personaPassed(app.persona_status);
     return save({
       summary: idDone
-        ? "No documents were uploaded here, so there was nothing for the model to read. The identity check itself is done: Persona confirmed the government ID and selfie. What is still owed is the TRN, the proof of address and the police check."
+        ? "No documents were uploaded here, so there was nothing for the model to read. The identity check itself is done: Persona confirmed the government ID and selfie. What is still owed is the TRN and the proof of address."
         : "No documents were uploaded with this application, so there was nothing to read.",
       checks: [
         ...(idDone
@@ -558,7 +546,6 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     `Parishes: ${s(app.parishes) || s(app.parish) || "not given"}`,
     `Years at the trade: ${s(app.years) || "not given"}`,
     s(app.signed_name) ? `Name typed as a signature on the Worker Guidelines: ${s(app.signed_name)}` : "",
-    app.police_status === "not_yet" ? "They stated they do not have a police record check yet." : "",
     idByPersona
       ? `Identity: the government ID and live selfie were checked by Persona, status "${s(app.persona_status)}". No ID images are on this file and their absence is not a gap. Do not ask for them.`
       : s(app.persona_inquiry_id)

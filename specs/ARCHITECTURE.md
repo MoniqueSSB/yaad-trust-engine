@@ -55,7 +55,7 @@ yaadly/
     ├── functions/                  THE BACKEND. 21 of them.         LIVE
     │   Flat on purpose, see the constraint below.
     │
-    │   intake      yaad-whatsapp-webhook · yaad-inbound · yaad-transcribe
+    │   intake      yaad-inbound · yaad-transcribe
     │               yaad-website-intake · yaad-post-job · yaad-enquiry
     │   vetting     yaad-vetting-upload · yaad-vetting-review · yaad-vetting-purge
     │   money       yaad-invoice · yaad-completion

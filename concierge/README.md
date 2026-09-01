@@ -73,7 +73,7 @@ What each panel is for:
 
 | View | The panel says |
 |---|---|
-| Intake | The jobs somebody built and never signed for. `client_user` is null, so the go-live check refuses them however complete they look. Trade, parish and their own words are all still there, which makes each one a lead |
+| Intake | The jobs somebody built and never signed for. `status` is stuck at `awaiting_client_setup`, so `client_go_live()` has nothing signed in to open them however complete they look. Trade, parish and their own words are all still there, which makes each one a lead |
 | Evidence | The newest stage with something unchecked: the journey rail, what the kickoff pack asked for, what actually arrived, the fingerprints your approval binds to, and the money that moves if you pass it |
 | Quotes | That the comparison column is against the other quotes on the same job and nothing else. There is no published price book to benchmark against, and Yaadly does oversight, not price estimation |
 | Applications | The vetting record: every check the agent ran, its note, and PASS / GAP / UNCLEAR. The agent flags. A person decides |
@@ -96,14 +96,16 @@ this desk makes to a model goes through the one guard behind it, in `fn()` and
 `skFn()`. Paused means invoice drafting and sketch description refuse to send
 anything.
 
-**It does not reach everything, and it names what it misses.** Two functions
-call a model without this desk starting them: `yaad-inbound` and
-`yaad-whatsapp-webhook` are woken by an incoming message and have replied to
-somebody before the desk knows the message exists. Neither reads
-`agents_paused`. Settings says so, Health says so, and the Overview says so
-while the pause is on.
+**It does not reach everything, and it names what it misses.** `yaad-inbound`
+calls a model without this desk starting it: woken by an incoming message, it
+has replied to somebody before the desk knows the message exists, and it does
+not read `agents_paused`. Settings says so, Health says so, and the Overview
+says so while the pause is on. (`yaad-whatsapp-webhook` shared this gap until
+1 Sep 2026; it spoke to Meta's Cloud API directly, never received real
+traffic, and was deleted, see DECISIONS.md. `yaad-inbound`, over Twilio, is
+the one live WhatsApp path now.)
 
-Reading that row at the top of those two is the whole remaining job. There is
+Reading that row at the top of that one is the whole remaining job. There is
 already a per-person gate, `may_use_agents(email)`, which `yaad-agent` and
 `yaad-vision` both call, so a global pause folded into it would reach further
 still. Until that is done, the desk is precise about its reach rather than

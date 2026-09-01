@@ -1,6 +1,6 @@
 {
- "WG_VERSION": "1.3",
- "WG_DATE": "28 August 2026",
+ "WG_VERSION": "1.4",
+ "WG_DATE": "1 September 2026",
  "CG_VERSION": "1.3",
  "CG_DATE": "28 August 2026",
  "worker_guidelines": [
@@ -12,7 +12,7 @@
   {
    "n": 2,
    "title": "Verification, before your first job",
-   "html": "<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide a <b>live photo and a short video turning your face left to right</b>, proof of address dated within three months, and your TRN. You give <b>three references we will call</b>, and you confirm each one has been told we are calling. Certified trades have their certification checked with the body that issued it.</p><div class=\"callout warn\"><b>Police record check, Jamaica Constabulary Force.</b> Mandatory for any job over <b>&pound;500</b>, any work inside an occupied home, and any job where you hold keys or attend an empty property. Optional below &pound;500 with the owner present, and a client may still require it. Without a current check on file you cannot be matched to any job in the mandatory categories.</div><p><b>Your first job carries an independent reviewer on site, at Yaadly’s cost.</b> They walk the work with you and their notes join the record. This is not a probation you can fail quietly, it is how a brand-new profile carries the same promise as a worker with thirty jobs behind them.</p>"
+   "html": "<p>Nobody attends a client property unverified. Before your first job you will show government photo ID on a video call, provide a <b>live photo and a short video turning your face left to right</b>, proof of address dated within three months, and your TRN. You give <b>three references we will call</b>, and you confirm each one has been told we are calling. Certified trades have their certification checked with the body that issued it.</p><p>Jobs over <b>&pound;500</b>, work inside an occupied home, and anything where you would hold keys stay closed to you until those three references have actually been telephoned. That is most of the money on the board, so it is worth finishing that step.</p><p class=\"amend\"><b>Removed in v1.4.</b> This section previously required a police record check from the Jamaica Constabulary Force before certain jobs, and described an independent reviewer attending your first job at Yaadly’s cost. Neither is part of how Yaadly actually vets a worker, and both are removed rather than left standing as something they are not.</p>"
   },
   {
    "n": 3,

@@ -1,0 +1,17 @@
+-- 20260901c was wrong, corrected within the hour, same session.
+--
+-- jobs.descr is not a draft the client is polishing before publication, it
+-- is the record: the raw transcript of what the client actually said,
+-- "In their own words", and the system's own working notes on it (whether
+-- an email is proven yet, whether photos were promised). Founder's own
+-- correction, live, 1 Sep 2026, on seeing the edit form pre-filled with
+-- exactly that text: letting a client overwrite it would let them rewrite
+-- the log the whole evidence and trust model depends on, not correct a
+-- summary.
+--
+-- Kept edit_job_description() defined rather than dropped, so its existence
+-- is not silently erased from anyone reading migrations in order, but
+-- revoked from every role that could call it. If an editable, client-facing
+-- summary is wanted later, it is a new column and a new function, never
+-- this one re-granted.
+revoke all on function public.edit_job_description(text, text) from public, anon, authenticated;
