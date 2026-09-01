@@ -113,17 +113,26 @@ export default async function PackIndex({
             <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (workerAgreed ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
               {workerAgreed ? "✓ Worker confirmed" : "Worker not yet confirmed"}
             </span>
-            {!iAgreed && (
+            {!iAgreed && role === "client" && (
               <form action={agreeKickoffPack}>
                 <input type="hidden" name="jobId" value={id} />
                 <input type="hidden" name="packId" value={pack.id} />
                 <input type="hidden" name="code" value={linkCode || pack.confirm_code || ""} />
                 <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
-                  Confirm as the {role}
+                  Confirm as the client
                 </button>
               </form>
             )}
           </div>
+          {/* Reading happens here; confirming does not. The worker's whole
+              surface is WhatsApp by design (CLAUDE.md §9), so this is a
+              reply, not a button - agree_kickoff_pack_via_whatsapp() reads
+              which job was meant from the reply text itself. */}
+          {!iAgreed && role === "worker" && (
+            <p className="mt-3 text-[13px] leading-relaxed text-mute">
+              Reply to Yaadly&apos;s WhatsApp message with <b className="font-mono text-ink">{id}</b> to confirm your side.
+            </p>
+          )}
         </section>
       )}
 

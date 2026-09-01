@@ -17,6 +17,11 @@ export async function submitQuote(formData: FormData): Promise<void> {
   const start = String(formData.get("start") ?? "");
   const days = String(formData.get("days") ?? "");
   const note = String(formData.get("note") ?? "");
+  const scopeSummary = String(formData.get("scopeSummary") ?? "").trim() || null;
+  const includedNote = String(formData.get("includedNote") ?? "").trim() || null;
+  const excludedNote = String(formData.get("excludedNote") ?? "").trim() || null;
+  const timelineNote = String(formData.get("timelineNote") ?? "").trim() || null;
+  const paymentStageNote = String(formData.get("paymentStageNote") ?? "").trim() || null;
   if (!jobId || !Number.isFinite(labour) || labour <= 0) return;
 
   const supabase = await createClient();
@@ -38,6 +43,11 @@ export async function submitQuote(formData: FormData): Promise<void> {
     earliest_start: start,
     days_estimate: days,
     note,
+    scope_summary: scopeSummary,
+    included_note: includedNote,
+    excluded_note: excludedNote,
+    timeline_note: timelineNote,
+    payment_stage_note: paymentStageNote,
     status: "submitted",
   });
 

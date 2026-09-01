@@ -50,6 +50,8 @@ export default async function Quotes({
     id: string; worker_name: string; labour_jmd: number; materials_jmd: number;
     materials_at_cost: boolean; earliest_start: string; days_estimate: string;
     note: string; status: string;
+    scope_summary: string | null; timeline_note: string | null; payment_stage_note: string | null;
+    included_note: string | null; excluded_note: string | null;
   }[];
 
   const booked = String(job.worker_email ?? "") !== "";
@@ -132,6 +134,45 @@ export default async function Quotes({
 
                   {q.note && (
                     <p className="mt-3 text-[13px] leading-relaxed text-mute">{q.note}</p>
+                  )}
+
+                  {(q.scope_summary || q.included_note || q.excluded_note || q.timeline_note || q.payment_stage_note) && (
+                    <div className="mt-4 grid gap-3 border-t border-line pt-4 text-[13px] leading-relaxed">
+                      {q.scope_summary && (
+                        <div>
+                          <p className="text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">Scope</p>
+                          <p className="mt-1 whitespace-pre-wrap text-mute">{q.scope_summary}</p>
+                        </div>
+                      )}
+                      {(q.included_note || q.excluded_note) && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {q.included_note && (
+                            <div>
+                              <p className="text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">Included</p>
+                              <p className="mt-1 whitespace-pre-wrap text-mute">{q.included_note}</p>
+                            </div>
+                          )}
+                          {q.excluded_note && (
+                            <div>
+                              <p className="text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">Excluded</p>
+                              <p className="mt-1 whitespace-pre-wrap text-mute">{q.excluded_note}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {q.timeline_note && (
+                        <div>
+                          <p className="text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">Timeline</p>
+                          <p className="mt-1 whitespace-pre-wrap text-mute">{q.timeline_note}</p>
+                        </div>
+                      )}
+                      {q.payment_stage_note && (
+                        <div>
+                          <p className="text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">Payment stages</p>
+                          <p className="mt-1 whitespace-pre-wrap text-mute">{q.payment_stage_note}</p>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {!booked && q.status === "submitted" && (

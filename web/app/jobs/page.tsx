@@ -38,6 +38,14 @@ const STORE_LABEL: Record<string, string> = {
 };
 type Photo = { job_id: string; caption: string; img: string | null; position: number };
 type Worker = { name: string | null; trade: string | null; parish: string | null; lane: string | null; jobs_completed: number | null; slug: string | null };
+type QuotePackDraft = {
+  job_id: string; status: string;
+  docs: {
+    scope_summary?: string; included?: string[]; excluded?: string[];
+    rough_timeline?: string; payment_stages?: { stage: string; proportion_percent: number; evidence_note: string }[];
+  } | null;
+  guardrail: { price_language_detected?: boolean; banned_language_detected?: boolean } | null;
+};
 
 export const metadata = {
   title: "The marketplace · Yaadly",
@@ -94,6 +102,21 @@ export default async function Board({
     const l = photosByJob.get(p.job_id) ?? [];
     l.push(p);
     photosByJob.set(p.job_id, l);
+  }
+
+  // A worker considering any open job should see the Quote Kickoff Pack
+  // draft the moment they expand it, not wait on a client fetch: fetched
+  // here, once, alongside everything else the board already loads.
+  const { data: draftData } = jobIds.length && vmode === "worker"
+    ? await supabase.from("quote_pack_drafts").select("job_id,status,docs,guardrail").in("job_id", jobIds)
+    : { data: [] };
+  const draftsByJob = new Map<string, QuotePackDraft>();
+  for (const d of (draftData ?? []) as QuotePackDraft[]) {
+    // A job can have a stale 'failed' row from an earlier attempt sitting
+    // alongside nothing newer; only 'ready' should ever reach the panel,
+    // and only the most useful row per job either way.
+    const existing = draftsByJob.get(d.job_id);
+    if (!existing || d.status === "ready") draftsByJob.set(d.job_id, d);
   }
 
   const workers = (workersData ?? []) as Worker[];
@@ -253,7 +276,9 @@ export default async function Board({
                         </span>
                       </div>
                     )}
-                    {open && vmode === "worker" && <QuotePanel jobId={j.id} />}
+                    {open && vmode === "worker" && (
+                      <QuotePanel jobId={j.id} draft={draftsByJob.get(j.id) ?? null} />
+                    )}
                   </div>
                 );
               })}
