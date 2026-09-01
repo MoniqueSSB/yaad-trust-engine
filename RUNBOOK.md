@@ -881,6 +881,27 @@ order by p.updated_at desc;
 ```
 Two rows (`client`, `worker`) for the current `rev` and `both_confirmed_at` set means both sides have signed this exact revision. One row, or none, means it is still waiting on someone.
 
+## A job doesn't show up on the Job Invoices view, or its "Raise & send" button won't light up
+
+**Check three things exist, in this order**, in concierge or SQL:
+```sql
+select id, worker_email from jobs where id = '<job id>';
+select job_id, status from job_quotes where job_id = '<job id>' and status = 'accepted';
+select job_id, status from kickoff_packs where job_id = '<job id>' and status = 'approved';
+select job_id, stage from stage_approvals where job_id = '<job id>';
+```
+No `worker_email`: the job never appears on this view at all, it only lists booked jobs. No accepted quote, or no approved pack: the job appears in neither the "no jobs" empty state nor a card - `raise_job_stage_invoice()` and the view's own render both need both to compute a fee, and silently skip a job missing either rather than showing a broken card. A stage's button stays disabled ("Waiting on evidence") until a `stage_approvals` row exists for that exact stage number - the same gate `_do_approve_stage()` writes, portal or WhatsApp.
+
+**"Stage % on this job has already been raised."** Not a bug: `invoices.stage` plus `job_id` is the exact check, and any invoice in a non-void status counts, including a `draft` one you haven't sent yet. Void it first if it was raised in error, then raise again.
+
+## Raise & send didn't email anybody, or a client can't see their invoice
+
+**"RESEND_API_KEY is not set..."** means the invoice raised correctly (check Recent invoices in concierge, it will be sitting there as a `draft`) but `yaad-invoice`'s `send` action could not reach Resend. Set the secret, then open that draft, render it, and mark it sent by hand, or re-raise once the secret is in place - raising again for the same service is harmless, it just numbers a fresh pair.
+
+**A client says they can't see an invoice in their portal.** Check `invoices.service_id` is actually set on the row - `/portal/services/[id]/page.tsx` filters on it, so an invoice raised without one (the free-text drafting flow only sets it if the admin passes one) is invisible there even though RLS would let the client read it. `raise_service_invoice()` always sets it when called with `p_service_id`; the concierge "Raise & send" card does not currently ask for one, since no real service booking carries a `catalogue_id` yet for it to look up (`services.type` is free text, not linked to `service_catalogue`) - that link is the next real gap, not this one.
+
+**"An AI-drafted invoice needs a human to read it first."** Working as designed: `send` refuses a `drafted_by = 'ai'` invoice outright. Render it from the free-text drafting card's own flow, check the lines, then use that card's own "mark sent" instead.
+
 ## A client replies with a job code to book a worker and nothing happens, or "No price is open on this job to accept"
 
 **Check `job_quotes.status` and `jobs.status` together, not either alone:**
@@ -904,6 +925,22 @@ from kickoff_packs p where p.job_id = '<job id>' order by p.updated_at desc;
 ```
 
 **"That did not go through: No Kickoff Pack on this job is waiting on your confirmation right now."** Either this phone is not on file as the client (`jobs.client_phone`) or the worker (`worker_profiles.phone`, matched through that job's own quote) for this specific job, or that side already confirmed. `agree_kickoff_pack_via_whatsapp(p_job, p_phone)` checks only the named job, never "does this phone have anything pending anywhere" - a worker can have more than one real pack waiting at once, on different jobs, and replying with one job's code must never touch the other. Getting this wrong is exactly the bug found and fixed live the night this shipped (`20260901j`, `20260901k`); if this ever regresses, that is what broke.
+
+## A worker's quote form never shows Yaadly's own starting draft
+
+**Check `quote_pack_drafts.status` for that job, not just whether a row exists.** As of 1 Sep 2026 (`20260901r`) a draft has to be `approved` before RLS will even let a worker read it - `ready` alone used to be enough and no longer is, on purpose, the same review gate the big Kickoff Pack already had.
+
+```sql
+select job_id, status, approved_by, approved_at, guardrail from quote_pack_drafts where job_id = '<job id>' order by created_at desc;
+```
+
+- No row: `yaad-quote-pack-check` has not picked the job up yet, or it does not qualify - open, unassigned, stage 0, non-empty `descr`.
+- `status = 'ready'`, no `approved_by`: waiting on the automatic guardrail check (runs alongside the request poll, once a minute) or held for a human. Check `guardrail` for `price_language_detected` / `banned_language_detected`; either one means it is held on purpose, visible in the concierge desk's Quote Pack Drafts view, approve manually from there once fixed (`approve_quote_pack_draft`, refuses outright while either flag is set, same as the big pack's own manual door).
+- `status = 'approved'`: should be visible. If a worker still reports nothing, check `/jobs`'s own query is filtering to `vmode === "worker"` and the job is genuinely still open, unassigned, stage 0 - the same `jobs` conditions the RLS policy checks independently.
+
+## A quote somehow has two Kickoff Packs, with two different confirm codes
+
+**Should be impossible as of 1 Sep 2026** (`20260901q`): `kickoff_packs.quote_id` is now unique. Caused once, live: `yaad-kickoff-check` triggered by hand (concierge, or testing) landing in the same window as pg_cron's own minute-tick - Phase 2 reads every ready, unlinked draft once per call, and two calls close enough together can both read before either writes. The constraint turns that race into a clean insert failure (already handled, logged as `linkFailed`) instead of a silent duplicate. If this ever shows up again, check for a second thing invoking `yaad-kickoff-check` on the same cadence as the cron.
 
 ## A worker never gets told a Kickoff Pack exists, or a quote never gets one drafted at all
 
@@ -952,6 +989,57 @@ select id, status, error, guardrail from quote_pack_drafts where job_id = 'JOB-X
 **One draft per job, not per worker.** Every worker who opens the quote form for that job sees and edits their own copy of the same starting draft; editing it happens client-side in `QuotePanel.tsx` and is never written back to `quote_pack_drafts`. What actually goes to the client lives on `job_quotes` (`scope_summary`, `included_note`, `excluded_note`, `timeline_note`, `payment_stage_note`), written once, by `submitQuote()`, when the worker sends.
 
 **This is a different agent from the big Kickoff Pack and fires at a different moment.** `yaad-quote-pack` drafts once, when a job goes live, and is never client-facing on its own. `yaad-kickoff` drafts per accepted quote, when a client requests one (`kickoff_requested`), and becomes the actual client-facing document once guardrail-clean. If a worker reports the wrong one (a 12-section document instead of a short overview, or vice versa), check which function actually ran in the trace, not just which cron fired: both poll once a minute and can look similar in the logs at a glance.
+
+## Signing in to the admin desk dead-ends on desk.yaadly.co.uk
+
+**Fixed 1 Sep 2026, dashboard only, nothing in this repo changed.** The Cloudflare Access application "Yaadly Desk" (Zero Trust, self-hosted app id `b9426e96-86a0-4c66-9fdd-ed4832dc08f7`) had two Destinations by original design, `desk.yaadly.co.uk` and `concierge.yaadly.co.uk` (see `[C] Admin Desk Move 25 Aug 2026.md` and `[C] Handover Prompt - 27 Aug 2026.md` in the YaadlyHub folder, one deliberately kept as lockout insurance for the other). At some point `desk.yaadly.co.uk`'s own DNS and Pages site stopped resolving; its source lives unmerged on branch `claude/festive-shtern-a29961` and was never brought into `main`. With the DNS gone, a sign-in attempt through this Access application still redirected back through `desk.yaadly.co.uk`'s `/cdn-cgi/access/authorized` and dead-ended there.
+
+Fixed by removing `desk.yaadly.co.uk` from that application's Destinations, leaving only `concierge.yaadly.co.uk`. Confirmed live the same day. If `desk.yaadly.co.uk` is ever brought back, it must be re-added to this application's Destinations before it is used, or it will be open to the internet behind whatever DNS points at it, no sign-in wall.
+
+## The Evidence view in the concierge desk shows a label but not the photo itself
+
+**Should not happen since 1 Sep 2026** (see DECISIONS.md, "The concierge desk could read an evidence row, but never actually asked storage for the photo"). A row with no picture falls back to a plain text chip with an honest reason rather than a broken image, so check which one you are seeing:
+
+- **"no file recorded against this row"** means `evidence.storage_path` is null on that row. Check which function filed it (`yaad-inbound`, `yaad-evidence-video`, or the portal's `evidence-actions.ts`) and whether its upload step actually succeeded; a row can exist with nothing behind it if the insert ran but the upload failed first, though every filing path is written to avoid exactly that ordering.
+- **"could not sign a link to this file just now"** means `storage_path` is set but `sb.storage.from("evidence").createSignedUrls()` came back empty or errored for that admin session. Check `pg_policies` on `storage.objects` still has "admins read every bucket" covering `bucket_id = 'evidence'`, and that the signed-in admin session's `is_admin()` still returns true. If the policy is intact and it is still failing, check whether the object actually exists at that path (a `move()` from `_pending/` to its final path can fail after the database row was already written).
+- **Nothing rendering at all, no fallback text either:** open the browser console. Signing runs in a batch on every view load (`preEvidence` -> `signEvidenceImgs`), wrapped in its own try/catch so one bad path cannot blank the rest of the view; a console error here is the actual `createSignedUrls` failure, not a rendering bug.
+
+Signed links here last 3600 seconds, not the 300 used for a one-shot WhatsApp or portal notification link, on purpose: a review can sit open on screen for a while. A photo that rendered fine a couple of hours ago and now shows broken is very likely just that link expiring; reload the view to sign fresh ones rather than treating it as a fault.
+
+## An arrival check-in is not showing a location, or `far_from_site` looks wrong
+
+**Missing lat/lon is normal, not a bug.** `log_arrival()` never refuses a check-in for missing coordinates: a worker who says no to the browser's location prompt, whose phone could not get a fix inside 8 seconds, or whose browser has no geolocation at all still checks in, with `arrival_log.lat`/`lon`/`accuracy_m` left null. Only check `ArrivalCheckIn.tsx`'s `readLocation()` and the browser's own permission state if location is missing on every single check-in from one worker, not on an occasional one.
+
+**`far_from_site` is a sanity flag for a human to glance at, not a verdict.** It compares the one captured point against the job's own `parish` text, matched through `normalize_parish()` to a static table of 14 parish (plus Portmore) town centroids in the same migration (`20260901za`), flagged `true` past 30km. `null` means either no coordinates were captured, or `jobs.parish` did not match any known spelling, check `select normalize_parish(parish) from jobs where id = '<job>'` first. A `true` flag on its own proves nothing: a legitimate trip to the materials store, a big parish, or a bad GPS fix all read the same as a wrong site. It is not shown to the worker or the client anywhere, and nothing in this repository refuses or escalates on it automatically; treat it exactly like `worker_stall_history`, something to query and look at, not something with a listener attached.
+
+**Retuning the 30km radius or adding a parish** is one constant (`v_km > 30` in `log_arrival()`) and one row in `parish_centroid()`'s VALUES list, both needing a new migration, same as every other constant in this file that has one.
+
+## The daily worker prompt (`yaad-daily-checkin`) says "nothing sent" every time it runs
+
+**That is the honest, expected answer until a WhatsApp Content Template is approved and its ContentSid is set.** This ping is business-initiated on a fixed schedule, every day, on every live job, so it can never rely on the free 24 hour customer-service window `yaad-notify-client` and `yaad-job-health` sometimes get to use: it always sends through a Meta-approved template, no exceptions, or it sends nothing at all rather than gambling on Twilio error 63016 mid-run. To bring it live:
+
+1. Twilio console → Messaging → Content Template Builder → new WhatsApp template, category **Utility** (this is an operational check-in on an existing job, not marketing, category matters for approval speed).
+2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title.
+3. Submit for WhatsApp approval. Usually resolves within a day; Twilio's console shows the status.
+4. Once approved, copy its ContentSid (`HX...`) and set it as the `TWILIO_CONTENT_SID_DAILY_CHECKIN` function secret on the `leffyisvfvjwzilydlwf` project. No redeploy needed, it is read fresh from the environment on every run.
+
+**Runs once a day, 21:00 UTC (16:00 Jamaica), via pg_cron.** Same shape as `yaad-job-health`: a shared secret, generated once and kept only as a SHA-256 hash in `app_settings.daily_checkin_cron_secret_sha256`, plaintext living solely in the cron job's own stored command (`select command from cron.job where jobname = 'yaad-daily-checkin'` if it ever needs re-deriving). A manual run is available to a signed-in admin the same way `yaad-job-health` is, no secret needed, `is_admin()` is enough.
+
+**One row per job per Jamaica-local day** in `daily_checkin_log` stops a re-run, or a cron overlap, from messaging the same worker twice. It is written whether or not the send actually succeeded, same reasoning as `job_stall_state`'s own nudge marker: this is a once-a-day ask, not a retry queue.
+
+**This is deliberately separate from `yaad-job-health`'s nudge.** That one waits for three days of silence before saying anything; this one asks every day regardless of silence, because the daily ask is the point, not a symptom of a job going quiet. A worker on a genuinely healthy job still gets asked daily. If that turns out to be more noise than it is worth once it is live, skipping the day a worker already reported through is a small, later change to `yaad-daily-checkin`'s own candidate query, not a redesign.
+
+## A worker's voice note or text reply is not turning into a report
+
+**Check `yaad-inbound`'s trace for which lane actually claimed the message first.** A worker's freeform update (the general "here's where things stand" lane, `yaadly.worker_update.*` attributes) only ever gets a turn once every more specific lane above it in the file has already passed: `report_confirm` (answering an existing draft), the client-comment-reply lane, the Kickoff Pack code confirm, the booking code. If a worker's reply was meant to answer one of those and got read as a fresh update instead, or the reverse, that ordering is the first thing to check, the same way DECISIONS.md already documents for this file's other lanes.
+
+**A voice note only transcribes if the phone number resolves to a worker with at least one active job.** `lookupWorkerWithActiveJobs()` has to find that number in `worker_profiles.phone`, `active = true`, with a job in `jobs.worker_email` that is not `complete` or `cancelled`. A worker replying from a different phone than the one on file, or a job that has already moved to `complete`, both read as "not a worker," and the message falls through to the client-intake pipeline instead, exactly the fallback that already existed before this lane did.
+
+**More than one active job asks for the job's code first**, same shape as the evidence-photo lane: a `text_update` session opens (`wa_intake_sessions`, one row, expires the same way an evidence session does) holding the update text until a code comes back. If a worker seems stuck mid-conversation, `select answers from wa_intake_sessions where wa_id = '<their WhatsApp number>'` shows exactly what it is waiting on.
+
+**Filed straight into `evidence`, no separate table.** `label` carries the update text, `storage_path`/`img`/`bytes`/`mime`/`sha256` are all left null, same as the portal and the concierge desk already render for "filed without an image." `schedule_evidence_landed_notify()` (on `evidence`, any insert) and `sync_job_status()` (recomputing `jobs.status` to `evidence` once there is unapproved evidence against the stage being worked, via `poke_job_on_evidence_insert()`'s update to `jobs.updated_at`) both fire exactly the same as they do for a photo. `yaad-evidence-landed-check` picks it up on its usual minute-by-minute pass, 90 seconds after the last thing landed on that stage, and `composeEvidenceReport` already reads `evidence.label` text regardless of whether the row carries a file: nothing in `yaad-notify-client` needed to change for this to work. The worker still confirms the drafted report before the client sees it, the same "1" or their own words prompt a photo update gets.
+
+**Verified against the live database, evidence insert through to `jobs.status = 'evidence'` and a scheduled debounce timer, both confirmed with real SQL against real (rolled-back) rows.** The one thing this could not verify locally is `yaad-inbound` actually recognising a live, Twilio-signed WhatsApp message as this lane: that needs a real signature from the real `TWILIO_AUTH_TOKEN`, which this session never has and should not have. Send one real WhatsApp message from a phone number on file in `worker_profiles` (text or a voice note, no photo, on an active job) to confirm this end to end; the reply should be "Got it, on record for `<job id>`..." and an `evidence` row should appear against that job's current stage within a few seconds.
 
 ## WhatsApp only ever means Twilio in this repository now
 

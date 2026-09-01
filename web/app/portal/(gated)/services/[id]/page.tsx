@@ -51,6 +51,22 @@ export default async function ServiceRoom({
 
   if (!svc) notFound();
 
+  // RLS (invoices_client_read) already refuses a draft to anyone but an
+  // admin, so what reaches this query is exactly what this client is
+  // allowed to see: nothing here needs its own status filter to be safe,
+  // only to be readable.
+  const { data: invoiceRows } = await supabase
+    .from("invoices")
+    .select("id,status,period_label,notes,total_pence,issue_date,due_date,sent_at,paid_at")
+    .eq("service_id", svc.id)
+    .order("issue_date", { ascending: false });
+  const invoices = (invoiceRows ?? []) as {
+    id: string; status: string; period_label: string; notes: string;
+    total_pence: number; issue_date: string; due_date: string;
+    sent_at: string | null; paid_at: string | null;
+  }[];
+  const gbp = (pence: number) => "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   const stage = Math.max(0, Math.min(svc.stage ?? 0, TRACK.length - 1));
   const current = svcStage(svc.stage);
   const viewing = (() => {
@@ -164,6 +180,107 @@ export default async function ServiceRoom({
             Where this goes next
           </h2>
           <ServiceNext />
+        </section>
+      )}
+
+      {/* Word for word with docs/payments.html's own "Paying for a report
+          or a retainer" section. That page is the public, canonical
+          statement of these terms; this is the same text where a client
+          who has actually booked can read it against their own invoice,
+          not just in the abstract. Keep the two in sync by hand if either
+          changes - there is no shared source between the static
+          marketing site and this app to drift-check them automatically,
+          the same limitation legal-copy.json's own versioning exists to
+          solve for signed documents, which this is not. */}
+      <section className="mt-7 rounded-2xl border border-line bg-panel p-5">
+        <h2 className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+          How you pay, and how we know it landed
+        </h2>
+        <div className="grid gap-3 text-[13px] leading-relaxed text-mute">
+          <p>
+            <b className="text-ink">By bank transfer, against an invoice we send you</b>, in
+            whichever of GBP, USD or CAD suits you. We do not take card
+            details over the phone or in a message, and we do not send a
+            payment link.
+          </p>
+          <p>
+            <b className="text-ink">The account details on that invoice are the only ones we
+            will ever give you.</b> We will never change them by phone, email
+            or WhatsApp part way through a job. If a message asks you to pay
+            a different account, do not pay it. Check with us first, through
+            this site&apos;s contact form or the WhatsApp number you already
+            have for us, not by replying to the message that asked.
+          </p>
+          <p>
+            <b className="text-ink">Reports under £200 are paid in full before we start.</b>{" "}
+            £200 and over is half before we start and half on delivery. The
+            Oversight Retainer is billed monthly, and you can cancel with 30
+            days notice.
+          </p>
+          <p>
+            <b className="text-ink">We check the account ourselves</b> and start work once the
+            payment has actually arrived, not once it has been sent. That is
+            usually within one working day.
+          </p>
+          <p>
+            Cancellation and refund terms for these reports are being
+            finalised with legal advice, and will be added here before they
+            are needed.
+          </p>
+        </div>
+      </section>
+
+      {/* RLS (invoices_client_read) already refuses a draft to anyone but
+          an admin, so every row that reaches this page is genuinely this
+          client's own. Sits right after the terms above on purpose: read
+          the rule, then see it applied to your own invoice. */}
+      {invoices.length > 0 && (
+        <section className="mt-7">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Your invoices
+          </h2>
+          <p className="mb-4 max-w-[62ch] text-[13px] leading-relaxed text-mute">
+            Each one follows the payment terms above; the note on it says
+            exactly which part.
+          </p>
+          <ul className="grid gap-2.5">
+            {invoices.map((inv) => (
+              <li
+                key={inv.id}
+                className="rounded-2xl border border-line bg-panel p-4"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <b className="font-mono text-[13px]">{inv.id}</b>
+                  <span
+                    className={
+                      "rounded-full border px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-wide " +
+                      (inv.status === "paid"
+                        ? "border-softline bg-soft text-tealb"
+                        : inv.status === "void"
+                          ? "border-line text-dim"
+                          : "border-mango/40 bg-mango/5 text-mango")
+                    }
+                  >
+                    {inv.status}
+                  </span>
+                  {inv.period_label && (
+                    <span className="text-[12px] text-dim">{inv.period_label}</span>
+                  )}
+                  <span className="ml-auto text-[15px] font-bold text-tealb">
+                    {gbp(inv.total_pence)}
+                  </span>
+                </div>
+                {inv.notes && (
+                  <p className="mt-2 text-[13px] leading-relaxed text-mute">{inv.notes}</p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-3.5 text-[11.5px] text-dim">
+                  <span>Issued {inv.issue_date}</span>
+                  <span>Due {inv.due_date}</span>
+                  {inv.paid_at && <span>Paid {inv.paid_at.slice(0, 10)}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

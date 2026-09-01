@@ -288,6 +288,28 @@ const MAX_PHOTOS_SENT_DIRECTLY = 5;
  *  only good for five minutes and only ever reaches Twilio's own fetch. */
 type EvidencePhoto = { url: string; code: string | null; label: string | null };
 
+/** What a stage number actually means to the person reading the message.
+ *  Founder's own correction, live, testing this for real: every message
+ *  about a stage said only "stage 1" or "stage 2", a raw number with no
+ *  connection to what the approved Kickoff Pack itself calls that stage
+ *  or what share of the total it releases - even though the portal rail
+ *  (jobStages() in journey.ts) has read the pack's own stage names since
+ *  31 Aug. The data was always right; the message copy never said it.
+ *  Falls back to the bare number for a job with no approved pack, same
+ *  as the rail itself does. */
+async function stageLabel(admin: any, jobId: string, stageNum: number): Promise<string> {
+  const { data: pack } = await admin.from("kickoff_packs")
+    .select("docs").eq("job_id", jobId).eq("status", "approved")
+    .order("updated_at", { ascending: false }).limit(1).maybeSingle();
+  const stages = pack?.docs?.payment_schedule?.stages;
+  const s = Array.isArray(stages) ? stages[stageNum - 1] : null;
+  if (s && typeof s.stage === "string" && s.stage.trim()) {
+    const pct = typeof s.proportion_percent === "number" ? ` (${s.proportion_percent}% of the total)` : "";
+    return `${s.stage}${pct}`;
+  }
+  return `stage ${stageNum}`;
+}
+
 async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<EvidencePhoto[]> {
   const { data: items } = await admin.from("evidence")
     .select("storage_path, mime, item_code, label")
@@ -744,8 +766,9 @@ Deno.serve(async (req: Request) => {
             photoUrls.length ? reviewEvidencePhotos(photoUrls, job.title, trace) : Promise.resolve(null),
           ])
         : [null, null];
+      const evLandedLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const draftText = composed?.message
-        || `Photos have come in for stage ${job.stage ?? 1}, with no description from you yet.`;
+        || `Photos have come in for ${evLandedLabel}, with no description from you yet.`;
       const aiSummary = findings ? summariseFindings(findings, photoUrls) : "";
       // Named once here, on more than one photo, so a reply naming a code
       // means something without repeating "Items: ..." on every line below.
@@ -777,7 +800,7 @@ Deno.serve(async (req: Request) => {
 
       subject = `Draft for the client: ${job.title}`;
       line = [
-        `Here's what we'd tell the client about stage ${job.stage ?? 1} of ${job.title}:`,
+        `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
         `"${draftText}"`,
         aiSummary ? `AI noticed: ${aiSummary}` : null,
         itemsLine,
@@ -802,7 +825,8 @@ Deno.serve(async (req: Request) => {
       photoUrls = await evidencePhotoUrls(admin, jobId, job.stage ?? 1, trace);
       attachPhotos = photoUrls.map((p) => p.url);
 
-      const workerSays = overrideText || `Photos have come in for stage ${job.stage ?? 1} of your job, ${job.title}.`;
+      const reportLabel = await stageLabel(admin, jobId, job.stage ?? 1);
+      const workerSays = overrideText || `Photos have come in for ${reportLabel} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
       const itemsLine = photoUrls.length > 1
         ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}. Mention a code if your comment is about one specific photo.`
@@ -851,7 +875,8 @@ Deno.serve(async (req: Request) => {
         .select("stage, arrived_at")
         .eq("job_id", jobId).order("arrived_at", { ascending: false }).limit(1).maybeSingle();
       subject = `On site today: ${job.title}`;
-      line = `Your worker checked in on site today for stage ${arrival?.stage ?? job.stage ?? 1} of ${job.title}. ` +
+      const arrivalLabel = await stageLabel(admin, jobId, arrival?.stage ?? job.stage ?? 1);
+      line = `Your worker checked in on site today for ${arrivalLabel} of ${job.title}. ` +
         `Follow along here: ${roomLink}`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
