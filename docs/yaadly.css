@@ -10,15 +10,24 @@
   --disp:'Anton',Impact,sans-serif; --body:'Space Grotesk',-apple-system,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --wrap:1080px; --gutter:20px; --r:14px; --r-lg:18px; --tr:.15s;
+
+  /* Light-section tokens, added 1 Sep 2026 for the visual review's "reading
+     sections move to a light ground" item. Plain white, not tinted: a warm
+     cream and then a warmer autumn gold were both tried and rejected on the
+     actual page before landing here. Every colour below is darkened by
+     measured contrast, not by eye, until it clears 7:1 against --l-bg, or is
+     called out where it deliberately sits a little under that. */
+  --l-bg:#FFFFFF; --l-panel2:#F3F2EE; --l-line:#E2E0D9; --l-line2:#CFCBBE;
+  --l-ink:#221f1a; --l-mute:#423f3a; --l-dim:#4c4943;
+  --l-amber:#6d3c0c; --l-coral:#8d1900;
+  --l-grad-teal:#09534b; --l-grad-amber:#633f00;
 }
 
-/* Reveal on scroll. html.jsrv is set by script, so with JavaScript blocked
-   nothing is ever hidden and the page reads normally. */
-html.jsrv .rv{opacity:0;transform:translateY(24px)}
-.rv{transition:opacity .7s ease, transform .7s ease}
-.rv.on{opacity:1!important;transform:none!important}
-.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}
-@media(prefers-reduced-motion:reduce){html.jsrv .rv{opacity:1;transform:none}.rv{transition:none}*{animation-duration:.01ms!important}}
+/* Scroll reveal removed 1 Sep 2026: sections were reading as blank for two
+   seconds or more on slow connections while waiting on the IntersectionObserver
+   to fire. Content is visible on paint now, JavaScript on or off. The .rv/.on
+   classes are left in the markup, harmless, so nothing else has to change. */
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important}}
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--ink);font:15.5px/1.6 var(--body);-webkit-font-smoothing:antialiased}
@@ -33,11 +42,18 @@ nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-f
 .mark{width:34px;height:34px;border-radius:9px;background:var(--teal);display:grid;place-items:center;color:#04211D;font-family:var(--disp);font-size:18px}
 .brand b{font-size:17px}.brand b span{color:var(--tealb)}
 .views{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.vbtn{background:none;border:0;color:var(--mute);font:600 13.5px var(--body);padding:8px 11px;border-radius:9px;cursor:pointer;text-decoration:none}
-.vbtn:hover{color:var(--ink);background:var(--panel2)}
+.vbtn{background:none;border:0;color:var(--ink);font:600 13.5px var(--body);padding:8px 11px;border-radius:9px;cursor:pointer;text-decoration:none}
+.vbtn:hover{background:var(--panel2)}
+/* Current-page tab. No fill, so the header still shows only one filled
+   element sitewide, the app nav's "Post a job" button. Added 1 Sep 2026,
+   the .on class was already on the right link on every page but had no
+   rule to act on, so the current tab never actually lit up. */
+.vbtn.on{color:var(--tealb);font-weight:700}
+.vbtn.on:hover{background:none}
 .quiet-links{display:flex;gap:14px;font-size:12.5px}
-.quiet-links a{color:var(--dim);text-decoration:none}
+.quiet-links a{color:var(--ink);text-decoration:none}
 .quiet-links a:hover{color:var(--tealb)}
+.quiet-links a.on{color:var(--tealb);font-weight:700}
 
 /* type */
 h1.hx,h2.hx,h3.hx{font-family:var(--disp);font-weight:400;letter-spacing:.5px;line-height:1.08;text-transform:uppercase}
@@ -153,17 +169,13 @@ h3.hx{font-size:clamp(21px,3vw,28px)}
 .vcard p{font-size:12.5px;color:var(--mute);line-height:1.55}
 @media(prefers-reduced-motion:reduce){.vcard:hover{transform:none}}
 
-/* deposit cap bar. Fill is 0 width until its .rv wrapper scrolls on-screen and
-   the shared reveal observer in yaadly.js adds .on, same trigger as every
-   other .rv element on the site, just also driving a width instead of opacity. */
+/* deposit cap bar. Fill sits at its resting width on paint, no more
+   scroll-triggered grow, same reasoning as the .rv removal above. */
 .dcap{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
 .dcap-track{height:32px;border-radius:100px;background:var(--bg);border:1px solid var(--line2);overflow:hidden}
 .dcap-fill{width:25%;min-width:112px;height:100%;background:linear-gradient(90deg,var(--mango),var(--coral));border-radius:100px;display:flex;align-items:center;justify-content:flex-end;padding:0 12px}
-html.jsrv .dcap.rv .dcap-fill{width:0;transition:width 1s ease .2s}
-html.jsrv .dcap.rv.on .dcap-fill{width:25%}
 .dcap-fill span{font:700 11px var(--mono);color:#1a1206;white-space:nowrap}
 .dcap-row{display:flex;justify-content:space-between;gap:8px;margin-top:12px;font-size:11px;color:var(--dim);flex-wrap:wrap}
-@media(prefers-reduced-motion:reduce){html.jsrv .dcap.rv .dcap-fill,html.jsrv .dcap.rv.on .dcap-fill{transition:none;width:25%}}
 
 /* ══ the trust engine ══
    The signature animation. Evidence tiles light one by one, the lock opens on
@@ -196,24 +208,45 @@ html.jsrv .dcap.rv.on .dcap-fill{width:25%}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.25}}
 @media(prefers-reduced-motion:reduce){.eng-dot{animation:none}.eng-ev i,.eng-mid .lockw,.eng-ev i .gl{transition:none}}
 
-/* ══ the gate, three lanes ══ */
-.fork{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}
-@media(max-width:900px){.fork{grid-template-columns:1fr}}
-.fk{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px;display:flex;flex-direction:column;transition:var(--tr);text-decoration:none;color:inherit}
-.fk:hover{border-color:var(--teal);transform:translateY(-3px)}
-.fk .fkic{width:52px;height:52px;border-radius:14px;background:var(--soft);border:1px solid var(--softline);display:grid;place-items:center;color:var(--tealb);margin-bottom:16px}
-.fk .fkic .gl{width:26px;height:26px}
-.fk.hi .fkic{border-color:#4a3a14;background:#1e1808;color:var(--mango)}
-.fk .kick{margin-bottom:9px}
-.fk h3{font-size:19px;line-height:1.28;margin:0 0 9px;color:var(--ink)}
-.fk .fkd{font-size:13.5px;color:var(--mute);line-height:1.6;margin:0}
-.fk .fkm{font-size:12px;color:var(--dim);line-height:1.5;margin:12px 0 0;padding-top:12px;border-top:1px solid var(--line)}
-.fk .fkgo{margin-top:auto;padding-top:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.fk .fkarrow{font-weight:700;color:var(--tealb);font-size:14px}
-.fk.hi .fkarrow{color:var(--mango)}
-.fk .fks{font-size:11.5px;font-weight:700;color:var(--dim);letter-spacing:.02em}
-.fk .fks.live{color:var(--tealb)}
-@media(prefers-reduced-motion:reduce){.fk:hover{transform:none}}
+/* ══ the hero: headline and how-list beside the demo video ══
+   Redesigned 1 Sep 2026 from the founder's homepage mockup. */
+.herogrid{display:grid;grid-template-columns:1.25fr 1fr;gap:28px;align-items:center;margin-top:18px}
+@media(max-width:820px){.herogrid{grid-template-columns:1fr}}
+.how{list-style:none;margin-top:16px;display:flex;flex-direction:column;gap:7px;font-size:14.5px;color:var(--mute)}
+.how li{padding-left:18px;position:relative}
+.how li::before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:50%;background:var(--teal)}
+.how b{color:var(--ink);font-weight:700}
+.herovid{display:flex;flex-direction:column;gap:8px}
+.herovid video{width:100%;aspect-ratio:1/1;border-radius:var(--r-lg);border:1px solid var(--line);background:#000;object-fit:cover;display:block}
+.herovid .cap{font:11px var(--mono);letter-spacing:.06em;color:var(--dim);text-align:center}
+
+/* ══ the two doors, and business demoted to a strip underneath ══
+   Was three equal cards (.fork/.fk); the mockup's read was that "business"
+   competing with the two consumer doors buried it and diluted them both. */
+.dpanel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 24px;display:flex;flex-direction:column;gap:10px}
+.dpanel.sv{background:var(--soft);border-color:var(--softline)}
+.dpanel .eyebrow{font:700 10.5px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--tealb)}
+.dpanel.sv .eyebrow{color:var(--mango)}
+.dpanel h2{margin:2px 0 2px}
+.dpanel p{color:var(--mute);font-size:14.5px;line-height:1.6}
+.dpanel .btn{align-self:flex-start;margin-top:6px}
+.dpanel.sv .btn{background:var(--mango);color:#221808}
+.dpanel .tiny{margin-top:2px}
+.dpanel.sv .tiny a{color:var(--mango)}
+
+.bizstrip{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid var(--line);border-radius:var(--r);padding:16px 20px;margin-top:14px;font-size:14px;color:var(--mute);text-decoration:none}
+.bizstrip:hover{border-color:var(--teal)}
+.bizstrip b{color:var(--ink);font-weight:700}
+.bizstrip .eyebrow{display:block;margin-bottom:4px;color:var(--mango);font:700 10.5px var(--body);letter-spacing:2px;text-transform:uppercase}
+.bizstrip .btn{flex:none}
+@media(max-width:640px){.bizstrip{flex-direction:column;align-items:flex-start}}
+
+.trustrow{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font-size:14px;color:var(--mute);margin-top:22px}
+.trustrow b{color:var(--ink);font-weight:700}
+.trustrow .dot{color:var(--dim)}
+
+.jobsph{border:1px dashed var(--line2);border-radius:var(--r);padding:16px 18px;color:var(--dim);font-size:13px;margin-top:22px}
+.jobsph b{color:var(--mute)}
 
 /* WhatsApp. The audience's default channel and the one the intake backend
    actually runs on, so it is a visible destination in the hero rather than a
@@ -285,3 +318,58 @@ table.ptable tbody tr:hover{background:var(--panel2)}
 .conf.none{color:var(--dim);background:var(--panel2);border:1px solid var(--line2)}
 .gapcard{background:var(--redsoft);border:1px solid #542020;border-radius:var(--r);padding:18px 20px;margin-top:16px}
 .gapcard b{color:#F3C9C9}
+
+/* Light section. Add the "light" class to a .sect that should read as
+   reference material rather than marketing: reading sections, tables, ladders,
+   the FAQ, the contact form, per the visual review. Approved on prices.html
+   through six rounds (mint, then a brown that read as muddy, then autumn
+   gold twice, then plain white). Nav and footer are untouched: they sit
+   outside .sect, so they keep the site's normal dark chrome as a bookend
+   automatically, nothing extra to write for that. */
+.sect.light{background:var(--l-bg);color:var(--l-ink)}
+.sect.light a{color:var(--l-amber)}
+.sect.light a:hover{color:var(--l-ink)}
+.sect.light .kick,.sect.light .kick.m{color:var(--l-amber)}
+.sect.light h1.hx,.sect.light h2.hx,.sect.light h3.hx{color:var(--l-ink)}
+/* Same teal-to-mango gradient as everywhere else on the site, darkened at
+   both ends so it stays legible here: the raw brand teal and mango measure
+   under 2.5:1 against a light ground. */
+.sect.light .g1,.sect.light .g2{
+  background:linear-gradient(90deg,var(--l-grad-teal),var(--l-grad-amber));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.sect.light .lead{color:var(--l-mute)}
+.sect.light .lead b{color:var(--l-ink)}
+.sect.light .tiny{color:var(--l-dim)}
+.sect.light .gapcard{background:#FCF3E4;border-color:#F0DBB0}
+.sect.light .gapcard b{color:#722608}
+.sect.light .btn.ghost{border-color:var(--l-line2);color:var(--l-ink)}
+.sect.light .btn.ghost:hover{border-color:var(--l-amber);color:var(--l-amber)}
+.sect.light .ctarow .aside{color:var(--l-dim)}
+.sect.light .ptable-wrap{border-color:var(--l-line);background:var(--l-bg)}
+.sect.light table.ptable th{background:var(--l-panel2);color:var(--l-mute)}
+.sect.light table.ptable th,.sect.light table.ptable td{border-bottom-color:var(--l-line)}
+.sect.light table.ptable td{color:var(--l-ink)}
+.sect.light table.ptable tbody tr:hover{background:var(--l-panel2)}
+.sect.light .conf.high{color:var(--l-grad-teal);background:#DCEBE6;border-color:#B9D6CC}
+.sect.light .conf.medium{color:var(--l-amber);background:#F3E3C4;border-color:#E5C98F}
+.sect.light .conf.low{color:var(--l-coral);background:#F5DED0;border-color:#E8B89C}
+.sect.light .conf.none{color:var(--l-dim);background:var(--l-panel2);border-color:var(--l-line)}
+/* Cards and callouts get the same treatment where they land inside a light
+   section: a soft neutral fill instead of pure white so they still read as
+   a card against the page, not just text floating on the same white. */
+.sect.light .rule{background:var(--l-panel2);border-color:var(--l-line);color:var(--l-mute)}
+.sect.light .rule b{color:var(--l-ink)}
+.sect.light .svc{background:var(--l-panel2);border-color:var(--l-line)}
+.sect.light .svc.star{background:#FCF3E4;border-color:#F0DBB0}
+.sect.light .svc p.what{color:var(--l-mute)}
+.sect.light .svc p.what b{color:var(--l-ink)}
+.sect.light .prices-row{border-top-color:var(--l-line)}
+.sect.light .pnow s{color:var(--l-dim)}
+.sect.light .punit{color:var(--l-dim)}
+.sect.light .pfull{color:var(--l-mute)}
+.sect.light .pfull b{color:var(--l-ink)}
+.sect.light details.fq{border-color:var(--l-line);background:var(--l-panel2)}
+.sect.light details.fq summary::after{color:var(--l-grad-teal)}
+.sect.light details.fq .ans{color:var(--l-mute)}
+.sect.light details.fq .ans b{color:var(--l-ink)}
