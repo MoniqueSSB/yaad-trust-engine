@@ -27,6 +27,7 @@ export const PACK_DOC_ORDER: { slug: string; title: string }[] = [
   { slug: "risks", title: "Risk register" },
   { slug: "comms", title: "Who to call" },
   { slug: "questions", title: "Open questions" },
+  { slug: "terms", title: "Terms to confirm" },
 ];
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -52,6 +53,7 @@ export function packDocHasContent(slug: string, d: Dict): boolean {
     case "risks": return L(d.risk_register).length > 0;
     case "comms": return L(d.communications_list).length > 0;
     case "questions": return L(d.open_questions).length > 0;
+    case "terms": return L((d.terms_placeholders as Dict)?.items).length > 0;
     default: return false;
   }
 }
@@ -85,6 +87,11 @@ export function renderPackDoc(slug: string, d: Dict): ReactNode {
         {L(scope.acceptance_criteria).length > 0 && (
           <Field label="How you will know it is done"><ul className="ml-4 list-disc">{L(scope.acceptance_criteria).map((x, i) => <li key={i}>{S(x)}</li>)}</ul></Field>
         )}
+        {L(scope.client_responsibilities).length > 0 && (
+          <Field label="What you need to do">
+            <ul className="ml-4 list-disc">{L(scope.client_responsibilities).map((x, i) => <li key={i}>{S(x)}</li>)}</ul>
+          </Field>
+        )}
       </>
     );
   }
@@ -113,6 +120,8 @@ export function renderPackDoc(slug: string, d: Dict): ReactNode {
   if (slug === "payment") {
     const pay = (d.payment_schedule ?? {}) as Dict;
     const stages = L(pay.stages);
+    const cost = (d.cost_breakdown ?? {}) as Dict;
+    const costRows = L(cost.rows);
     return (
       <>
         {S(pay.note) && <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{S(pay.note)}</p>}
@@ -130,6 +139,53 @@ export function renderPackDoc(slug: string, d: Dict): ReactNode {
                     {L(st.evidence_required).map((x, j) => <li key={j}>{S(x)}</li>)}
                   </ul>
                 )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {costRows.length > 0 && (
+          <Field label="Cost breakdown, itemised against the scope">
+            {S(cost.note) && <p className="mb-2 text-[12.5px] text-dim">{S(cost.note)}</p>}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] border-collapse text-[12.5px]">
+                <thead>
+                  <tr className="border-b border-line text-left text-dim">
+                    <th className="py-1.5 pr-3 font-bold">Scope item</th>
+                    <th className="py-1.5 pr-3 font-bold">Materials</th>
+                    <th className="py-1.5 pr-3 font-bold">Labour</th>
+                    <th className="py-1.5 font-bold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costRows.map((r, i) => (
+                    <tr key={i} className="border-b border-softline">
+                      <td className="py-1.5 pr-3 text-ink">{S(r.item)}</td>
+                      <td className="py-1.5 pr-3 text-dim">{S(r.materials) || "—"}</td>
+                      <td className="py-1.5 pr-3 text-dim">{S(r.labour) || "—"}</td>
+                      <td className="py-1.5 text-dim">{S(r.total) || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Field>
+        )}
+      </>
+    );
+  }
+
+  if (slug === "terms") {
+    const terms = (d.terms_placeholders ?? {}) as Dict;
+    const items = L(terms.items);
+    return (
+      <>
+        {S(terms.note) && <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-ink">{S(terms.note)}</p>}
+        {items.length > 0 && (
+          <ul className="mt-4 grid gap-2.5">
+            {items.map((t, i) => (
+              <li key={i} className="rounded-xl border border-line bg-bg px-3.5 py-3">
+                <b className="text-ink">{S(t.term)}</b>
+                <p className="mt-1 text-[12.5px] text-dim">{S(t.placeholder)}</p>
               </li>
             ))}
           </ul>

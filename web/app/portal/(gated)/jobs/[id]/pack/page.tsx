@@ -24,31 +24,46 @@ export default async function PackIndex({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; quote?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
   const { id } = await params;
-  const { code: linkCode } = await searchParams;
+  const { code: linkCode, quote: quoteParam } = await searchParams;
   const supabase = await createClient();
+
+  // A job can carry more than one Kickoff Pack in flight since 1 Sep 2026 (a
+  // client can accept more than one quote and compare). "Latest updated for
+  // this job" is no longer a safe way to pick one: this prefers the quote
+  // named in the link, falling back to the confirm code (the shape of the
+  // WhatsApp notification link, which does not carry a quote id), and only
+  // falls back to "latest for the job" for an older link with neither.
+  let packQuery = supabase
+    .from("kickoff_packs")
+    .select("id,quote_id,project_title,client_name,parish,status,rev,updated_at,docs,approved_by,approved_at,confirm_code,both_confirmed_at")
+    .eq("job_id", id);
+  if (quoteParam) packQuery = packQuery.eq("quote_id", quoteParam);
+  else if (linkCode) packQuery = packQuery.eq("confirm_code", linkCode.toUpperCase());
+
   const [{ data: pack }, { data: job }] = await Promise.all([
-    supabase
-      .from("kickoff_packs")
-      .select("id,project_title,client_name,parish,status,rev,updated_at,docs,approved_by,approved_at,confirm_code,both_confirmed_at")
-      .eq("job_id", id)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    packQuery.order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("jobs").select("client_email,worker_email").eq("id", id).maybeSingle(),
   ]);
   if (!pack) notFound();
 
   const email = (user.email ?? "").toLowerCase();
-  const role = job && job.client_email?.toLowerCase() === email
+  let role: "client" | "worker" | null = job && job.client_email?.toLowerCase() === email
     ? "client"
     : job && job.worker_email?.toLowerCase() === email
     ? "worker"
     : null;
+
+  // Pre-booking, jobs.worker_email is still blank while this exact worker's
+  // own pack exists: match them by the quote it was drafted against instead.
+  if (!role && pack.quote_id) {
+    const { data: quote } = await supabase.from("job_quotes").select("worker_user").eq("id", pack.quote_id).maybeSingle();
+    if (quote && quote.worker_user === user.id) role = "worker";
+  }
 
   const { data: agreements } = await supabase
     .from("kickoff_pack_agreements")
@@ -61,6 +76,7 @@ export default async function PackIndex({
 
   const d = (pack.docs ?? {}) as Dict;
   const base = "/portal/jobs/" + encodeURIComponent(id) + "/pack";
+  const docQs = pack.quote_id ? "?quote=" + encodeURIComponent(pack.quote_id) : "";
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-6">
@@ -117,7 +133,7 @@ export default async function PackIndex({
           return (
             <li key={doc.slug}>
               <Link
-                href={base + "/" + doc.slug}
+                href={base + "/" + doc.slug + docQs}
                 className="flex items-center gap-3 rounded-xl border border-line bg-bg px-4 py-3 transition hover:border-teal"
               >
                 <span className="grid size-6 place-items-center rounded-[7px] border border-softline bg-soft font-mono text-[11px] text-tealb">

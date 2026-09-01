@@ -55,7 +55,6 @@ export default async function WorkerProfile({
     ]);
 
   const reviews = (revs ?? []) as Review[];
-  const hasPolice = (checks ?? []).some((c) => c.passed && /police/i.test(c.label));
   const isSelf = Boolean(wEmail) && user?.email?.toLowerCase() === wEmail.toLowerCase();
 
   return (
@@ -124,12 +123,6 @@ export default async function WorkerProfile({
               </li>
             ))}
           </ul>
-        )}
-        {!hasPolice && (
-          <p className="mt-3 rounded-xl border border-mango/30 bg-mango/5 px-3.5 py-2.5 text-[12.5px] leading-relaxed text-mute">
-            No current JCF police record check on file. Cannot be matched to
-            jobs over £500 or work inside an occupied home.
-          </p>
         )}
       </section>
 

@@ -4,7 +4,7 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 
 // The deletion clock for vetting documents.
 //
-// Holding a government ID scan and a police record check forever is a
+// Holding a government ID scan or a proof of address forever is a
 // liability, not an asset, under UK GDPR and the Jamaican Data Protection
 // Act. The useful artefact is the decision, not the document.
 //

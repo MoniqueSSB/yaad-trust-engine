@@ -5,7 +5,11 @@ import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { scrub } from "@/lib/scrub";
 
-/** Tick your side of the scope. Postgres checks you are that side. */
+/** Tick your side of the scope. Postgres checks you are that side.
+ *  Superseded as the gate on choosing a worker (20260901f): the Kickoff
+ *  Pack, confirmed per quote via agreeKickoffPack() below, is the real
+ *  scope and payment terms agreement now. Left in place, unread by the
+ *  choose gate; retiring its own UI is a follow-up. */
 export async function agreeScope(formData: FormData): Promise<void> {
   const user = await requireUser();
   const jobId = String(formData.get("jobId") ?? "");
@@ -15,6 +19,22 @@ export async function agreeScope(formData: FormData): Promise<void> {
   await supabase.from("scope_agreements").insert({
     job_id: jobId, side, email: (user.email ?? "").toLowerCase(),
   });
+  revalidatePath("/portal/jobs/" + jobId);
+}
+
+/** Accepting a quote used to book it outright. Since 1 Sep 2026 a client can
+ *  accept more than one: this only asks that worker to write a Kickoff Pack
+ *  against their own price. Booking itself waits for chooseQuote(), below,
+ *  which only unlocks once that specific quote's pack is confirmed by both
+ *  sides. Runs entirely inside request_kickoff_as_me() in Postgres. */
+export async function requestKickoff(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  const quoteId = String(formData.get("quoteId") ?? "");
+  if (!jobId || !quoteId) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("request_kickoff_as_me", { p_quote: quoteId });
+  if (error) throw new Error(error.message);
   revalidatePath("/portal/jobs/" + jobId);
 }
 

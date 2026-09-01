@@ -8,34 +8,36 @@ export const dynamic = "force-dynamic";
 
 export default async function PackDoc({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; doc: string }>;
+  searchParams: Promise<{ quote?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
   const { id, doc } = await params;
+  const { quote: quoteParam } = await searchParams;
 
   const idx = PACK_DOC_ORDER.findIndex((x) => x.slug === doc);
   if (idx < 0) notFound();
 
   const supabase = await createClient();
-  const { data: pack } = await supabase
-    .from("kickoff_packs")
-    .select("id,project_title,status,rev,docs")
-    .eq("job_id", id)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Same reason as pack/page.tsx: a job can carry more than one pack in
+  // flight, so this has to name which one when it can.
+  let packQuery = supabase.from("kickoff_packs").select("id,project_title,status,rev,docs").eq("job_id", id);
+  if (quoteParam) packQuery = packQuery.eq("quote_id", quoteParam);
+  const { data: pack } = await packQuery.order("updated_at", { ascending: false }).limit(1).maybeSingle();
   if (!pack) notFound();
 
   const d = (pack.docs ?? {}) as Dict;
+  const qs = quoteParam ? "?quote=" + encodeURIComponent(quoteParam) : "";
   const base = "/portal/jobs/" + encodeURIComponent(id) + "/pack";
   const prev = PACK_DOC_ORDER[idx - 1];
   const next = PACK_DOC_ORDER[idx + 1];
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-6">
-      <Link href={base} className="text-[13px] text-tealb underline-offset-2 hover:underline">
+      <Link href={base + qs} className="text-[13px] text-tealb underline-offset-2 hover:underline">
         &larr; All documents in this pack
       </Link>
 
@@ -52,16 +54,16 @@ export default async function PackDoc({
 
       <div className="mt-8 flex items-center justify-between border-t border-line pt-4">
         {prev ? (
-          <Link href={base + "/" + prev.slug} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
+          <Link href={base + "/" + prev.slug + qs} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
             &larr; {prev.title}
           </Link>
         ) : <span />}
         {next ? (
-          <Link href={base + "/" + next.slug} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
+          <Link href={base + "/" + next.slug + qs} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
             {next.title} &rarr;
           </Link>
         ) : (
-          <Link href={base} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
+          <Link href={base + qs} className="text-[13px] font-bold text-tealb underline-offset-2 hover:underline">
             Back to the pack &rarr;
           </Link>
         )}

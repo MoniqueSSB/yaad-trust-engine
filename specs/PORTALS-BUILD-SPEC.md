@@ -244,9 +244,14 @@ row, display on read. **Never recompute on read.**
 
 ### 5.4 `jobChat()` — in-portal chat with the contact scrub
 
-Client and worker message each other in the portal. Messages relay to WhatsApp both ways via
-`yaad-whatsapp-webhook` — **fully automated, nobody forwards anything by hand.** Service replies
-inside the 24-hour window are free; the window resets on every inbound message.
+Client and worker message each other in the portal. Messages relay to WhatsApp both ways —
+**fully automated, nobody forwards anything by hand.** Service replies inside the 24-hour window
+are free; the window resets on every inbound message. (Named `yaad-whatsapp-webhook` here; that
+function spoke to Meta's Cloud API directly, never received real traffic, and was deleted 1 Sep
+2026. The inbound half of this relay, a worker replying to a client's comment, is live in
+`yaad-inbound` over Twilio, confirmed by reading its source; which function carries the outbound
+half, a client's portal message reaching the worker's WhatsApp, was not reverified before this
+spec was corrected and needs checking against the actual code before this line is trusted again.)
 
 The scrub must run **on insert and on render**:
 

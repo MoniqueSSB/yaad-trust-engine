@@ -308,8 +308,7 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
       <p className="mt-5 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
         The worker network is being built parish by parish, and nobody is
         listed before verification is complete: government photo ID on a video
-        call, references called, and a trial job. Profiles appear here as
-        workers pass.
+        call, and references called. Profiles appear here as workers pass.
       </p>
     );
   }

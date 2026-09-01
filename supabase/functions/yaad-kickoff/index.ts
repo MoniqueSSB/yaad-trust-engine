@@ -107,7 +107,7 @@ ABSOLUTE RULES, these override everything else:
 Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
 {
  "cover_note": "3 to 5 short paragraphs addressed to the client by name where known, separated by \\n\\n. Name the specific fear or constraint the intake states and answer it directly. Explain in plain words that no figures appear anywhere in this pack and why, and that the client drops their own contractor's figures into the tracking table. Close with exactly what happens next before anything is instructed. Warm, direct, never salesy. No prices.",
- "scope_of_works": {"summary":"3 to 4 short paragraphs separated by \\n\\n, written for a non-builder: what is wrong today, in plain words; the order the work will run in and WHY the building demands that order (open up before diagnosing, diagnose before repairing, prove watertight before covering, decorate last); anything inspected but not worked on, framed explicitly as an inspection and not a work item; and what the property will be like when it is finished","included":["specific items of work"],"excluded":["what is explicitly not covered"],"assumptions":["what this scope assumes to be true"],"acceptance_criteria":["how each party knows the work is done"]},
+ "scope_of_works": {"summary":"3 to 4 short paragraphs separated by \\n\\n, written for a non-builder: what is wrong today, in plain words; the order the work will run in and WHY the building demands that order (open up before diagnosing, diagnose before repairing, prove watertight before covering, decorate last); anything inspected but not worked on, framed explicitly as an inspection and not a work item; and what the property will be like when it is finished","included":["specific items of work"],"excluded":["what is explicitly not covered"],"assumptions":["what this scope assumes to be true"],"acceptance_criteria":["how each party knows the work is done"],"client_responsibilities":["specific things the client, or whoever is on the ground for them, must do or provide, concrete to THIS job and THIS property: clearing a room, securing pets, keeping power and water connected, being reachable for the diagnosis-and-decision phase. Never a generic line like 'cooperate with the contractor'"]},
  "timeline": {"basis":"3 to 5 sentences: what the sequence depends on, including the season and weather reality for this specific job, which phases are rain-stoppable and how the programme absorbs that without stopping internal work, and what site access assumes. Wherever the job involves opening something up or an unknown, the phases MUST include a dedicated diagnosis-and-client-decision phase between opening up and repair, so nothing is bought or covered before the client has instructed in writing","phases":[{"name":"phase name","duration":"working days or weeks, as a range","depends_on":"what must finish first, or Start","milestone":"the observable thing that marks it complete"}]},
  "payment_schedule": {"note":"2 to 3 short paragraphs separated by \\n\\n: why the money is staged this way for THIS job, naming which stages are deliberately weighted and the reason (an opening-up stage paid early and generously so the contractor has every reason to open up fully; a final stage held back so the retention still has something in it), and that no amounts appear because the client inserts figures from their own contractor quote","stages":[{"stage":"stage name","proportion_percent":0,"release_condition":"the evidence that must be approved before release","evidence_required":["specific photo, video or document"]}],"cost_tracking_template":{"columns":["Stage","Agreed amount (client to enter)","Released to date","Balance remaining","Evidence approved date"],"instruction":"one sentence on how to use it"}},
  "evidence_checklist": [{"stage":"stage name","items":[{"item":"what to capture","type":"photo | video | document","why":"what it proves","timestamped_geotagged":true}]}],
@@ -121,6 +121,7 @@ Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
 QUALITY BARS - a pack that misses these is not issuable:
 - Write complete sentences everywhere. Specific beats short. Never pad, and never use filler words like "ensure", "appropriate", "as needed", "properly", "high quality".
 - Every included and excluded scope item must be concrete to THIS job: name the rooms, elevations, materials or elements involved, never generic lines like "carry out repairs".
+- Every client responsibility is something a person overseas can actually action from their phone or ask the person on the ground to do, concrete to this property, never a generic line like "provide access as needed".
 - Every acceptance criterion must be observable in a photograph, video or document - something a person overseas could verify from their phone.
 - Every mitigation starts with an action verb and names who does it. Every early warning sign is a specific observable event, not a feeling.
 - Every evidence item states what would prove the work rather than merely show it: angles, counts, before-and-after pairing, receipts.
@@ -288,6 +289,15 @@ async function draftPart(
   });
   const parsed = extractJson(String(raw));
   if (!parsed) {
+    // The thrown message reached kickoff_drafts.error and stopped there:
+    // enough to say a part failed, nothing about what the model actually
+    // sent back. Found live, 1 Sep 2026, a real failed draft with nothing
+    // to diagnose it from. console.error alongside the throw, same as
+    // every other silent parse failure found and fixed this session.
+    console.error(
+      `yaad-kickoff part ${part.name}: ${finishReason === "length" ? "ran out of room" : "no usable JSON"}, finish_reason=${finishReason}:`,
+      String(raw).slice(0, 1200),
+    );
     throw new Error(finishReason === "length"
       ? `part ${part.name}: ran out of room before it finished`
       : `part ${part.name}: did not return usable JSON`);
@@ -320,6 +330,48 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     const docs: Record<string, unknown> = Object.assign({}, ...partDocs);
     const absent = ALL_KEYS.filter((k) => !(k in docs));
     if (absent.length) { await fail(`Merged draft is missing sections: ${absent.join(", ")}`); return; }
+
+    // Two sections the model never writes, added here instead of asked for
+    // in the prompt, founder's own instruction, 1 Sep 2026, working from a
+    // reference quote template she supplied.
+    //
+    // cost_breakdown: one row per scope item, materials and labour columns
+    // both blank. Deliberately built from scope_of_works.included rather
+    // than asked of the model a second time, so the row names can never
+    // drift from the scope the client is actually agreeing to, and so rule
+    // 1 (never price, never estimate) cannot be tested by a second prompt
+    // that might answer it differently under load. The client fills every
+    // cell from their own accepted quote, same reasoning as the existing
+    // payment_schedule.cost_tracking_template, itemised by task instead of
+    // by stage because that is the shape a contractor's own quote already
+    // comes in.
+    const scopeItems = Array.isArray((docs.scope_of_works as Record<string, unknown> | undefined)?.included)
+      ? ((docs.scope_of_works as { included: unknown[] }).included as unknown[]).map((x) => String(x)).filter(Boolean)
+      : [];
+    docs.cost_breakdown = {
+      note: "Materials and labour, itemised against the scope above rather than the payment stages. Blank throughout: fill it in from the contractor's own accepted quote, never from this document.",
+      columns: ["Scope item", "Materials", "Labour", "Total"],
+      rows: scopeItems.map((item) => ({ item, materials: "", labour: "", total: "" })),
+    };
+
+    // terms_placeholders: never authored by the model, on purpose. Warranty
+    // length, dispute process and who pulls permits are legal and
+    // insurance questions, CLAUDE.md §10's "what counts as verified" and
+    // "anything touching money" both landing on the founder, not on a
+    // language model's judgement. Fixed, honest placeholder text naming
+    // exactly what is still open, the same pattern this codebase already
+    // uses for compliance items elsewhere: a question for an adviser,
+    // never an asserted answer.
+    docs.terms_placeholders = {
+      note: "None of this is decided by Yaadly or by this document. Each line is a real term that belongs in the agreement between the client and the contractor, confirmed with Yaadly's own solicitor before it is issued as standard wording.",
+      items: [
+        { term: "Warranty on workmanship", placeholder: "[Contractor to state, in writing, before work begins]" },
+        { term: "Warranty on materials", placeholder: "[Passed through from the manufacturer, reference to be attached]" },
+        { term: "Who pulls permits and building approvals", placeholder: "[Client | Contractor, to be confirmed for this job and this parish]" },
+        { term: "Dispute process if either side disagrees on the evidence", placeholder: "[Yaadly's Resolution Center process, wording pending solicitor review]" },
+        { term: "What happens if a hidden defect is found once work opens up", placeholder: "[Change order process, wording pending solicitor review]" },
+      ],
+    };
 
     // Guardrail. The model is told never to price; this checks whether it did
     // anyway, and reports it rather than trusting the instruction held.
@@ -427,6 +479,13 @@ Deno.serve(async (req: Request) => {
     // stays unattributed, exactly as it works today, so this never changes
     // that path's behaviour.
     const jobId = isServiceRole && typeof body.jobId === "string" && body.jobId.trim() ? body.jobId.trim() : undefined;
+    // Which quote this draft is written against. A job can now carry more
+    // than one Kickoff Pack in flight at once (founder's own correction,
+    // 1 Sep 2026: a client can accept more than one quote and compare the
+    // documents before choosing), so the draft has to say which worker's
+    // price it is drafted for. Same trust boundary as jobId: only this
+    // repository's own automation may stamp it.
+    const quoteId = isServiceRole && typeof body.quoteId === "string" && body.quoteId.trim() ? body.quoteId.trim() : undefined;
     // Optional per-draft model override, for reading the same brief drafted by
     // different models side by side. Admin session only; OpenRouter slugs only.
     const overrideModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
@@ -449,6 +508,7 @@ Deno.serve(async (req: Request) => {
       status: "drafting",
       intake,
       job_id: jobId ?? null,
+      quote_id: quoteId ?? null,
     });
     if (!ins.ok) {
       const t = await ins.text().catch(() => "");

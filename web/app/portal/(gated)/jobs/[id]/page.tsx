@@ -26,7 +26,7 @@ import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
-import { agreeScope, chooseQuote } from "@/app/portal/job-actions";
+import { agreeKickoffPack, chooseQuote, requestKickoff } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +57,7 @@ type Evidence = {
 type Quote = {
   id: string;
   worker_name: string | null;
+  worker_email: string | null;
   labour_jmd: number | null;
   materials_jmd: number | null;
   materials_at_cost: boolean | null;
@@ -68,10 +69,13 @@ type Quote = {
 
 type Pack = {
   id: string;
+  quote_id: string | null;
   project_title: string | null;
   status: string | null;
   rev: number | null;
   updated_at: string | null;
+  confirm_code: string | null;
+  both_confirmed_at: string | null;
   docs: unknown;
 };
 
@@ -120,7 +124,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: scopeRows }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -130,16 +134,15 @@ export default async function JobRoom({
       supabase
         .from("job_quotes")
         .select(
-          "id,worker_name,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status",
+          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status",
         )
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase
         .from("kickoff_packs")
-        .select("id,project_title,status,rev,updated_at,docs")
+        .select("id,quote_id,project_title,status,rev,updated_at,confirm_code,both_confirmed_at,docs")
         .eq("job_id", id)
         .order("updated_at", { ascending: false }),
-      supabase.from("scope_agreements").select("side,email").eq("job_id", id),
       supabase.from("messages").select("id,sender_email,body,created_at").eq("job_id", id).order("created_at").limit(200),
       supabase.from("disputes").select("id,state,body,reply,kinds").eq("job_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       /* The conversation this job came out of. Row level security returns
@@ -195,9 +198,6 @@ export default async function JobRoom({
   const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
-  const scopeTicks = scopeRows ?? [];
-  const clientTicked = scopeTicks.some((t) => t.side === "client");
-  const iTicked = scopeTicks.some((t) => t.email.toLowerCase() === email);
   const chooseOpen = !job.worker_email && job.status !== "complete";
   const chat = (msgRows ?? []).map((m) => ({
     id: m.id,
@@ -209,6 +209,108 @@ export default async function JobRoom({
     ? { id: disputeRow.id, state: disputeRow.state, body: disputeRow.body, reply: disputeRow.reply, kinds: (disputeRow.kinds ?? []) as string[] }
     : null;
   const pk = (packs ?? []) as Pack[];
+
+  /* A worker with a live quote but no booking (since 20260901f: a client can
+     accept more than one quote, and a Kickoff Pack is drafted and confirmed
+     BEFORE anyone is chosen). role fell to "worker" only by exclusion above,
+     and RLS now lets that row through on the strength of job_quotes alone,
+     not job.worker_email. The rest of this page assumes a booked worker
+     everywhere it says role === "worker" - the arrival log, materials store,
+     evidence upload - none of which apply yet. Rather than audit every one
+     of those sections for a state that cannot happen until this migration,
+     this renders a small, honest, separate view: their own quote, and their
+     own Kickoff Pack once one exists. */
+  if (role === "worker" && !job.worker_email) {
+    const myQuote = qs.find((q) => q.worker_email?.toLowerCase() === email) ?? qs[0];
+    const myPack = myQuote ? pk.find((p) => p.quote_id === myQuote.id) : undefined;
+    return (
+      <div className="mx-auto max-w-[720px] px-5 py-10">
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Your quote</p>
+        <h1 className="mt-2 font-display text-[clamp(24px,4vw,36px)] uppercase leading-[.95]">
+          {job.title}
+        </h1>
+        <p className="mt-2 text-[13px] text-mute">
+          {job.parish} · <span className="font-mono text-[12px]">{job.id}</span>
+        </p>
+
+        {!myQuote && (
+          <p className="mt-6 max-w-[58ch] text-[14px] leading-relaxed text-mute">
+            No live quote of yours found on this job.
+          </p>
+        )}
+
+        {myQuote && (
+          <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <b className="text-[15px]">Your price</b>
+              <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-bold text-mute">
+                {myQuote.status}
+              </span>
+              <span className="ml-auto text-[15px] font-bold text-tealb">
+                {jmd(myQuote.labour_jmd) ?? "No labour figure"}
+              </span>
+            </div>
+
+            {myQuote.status === "submitted" && (
+              <p className="mt-3 text-[13px] leading-relaxed text-mute">
+                Waiting on the client. Nothing to do here yet: if they want to
+                move forward with your price, they will ask you to write a
+                Kickoff Pack against it.
+              </p>
+            )}
+
+            {myQuote.status === "declined" && (
+              <p className="mt-3 text-[13px] leading-relaxed text-mute">
+                The client went with a different price for this job.
+              </p>
+            )}
+
+            {myQuote.status === "kickoff_requested" && !myPack && (
+              <p className="mt-3 text-[13px] leading-relaxed text-mute">
+                The client wants a Kickoff Pack against your price. It is
+                being written now; check back shortly.
+              </p>
+            )}
+
+            {myQuote.status === "kickoff_requested" && myPack && myPack.status !== "approved" && (
+              <p className="mt-3 text-[13px] leading-relaxed text-mute">
+                Your Kickoff Pack is drafted and waiting on review before it
+                is issued.
+              </p>
+            )}
+
+            {myQuote.status === "kickoff_requested" && myPack && myPack.status === "approved" && (
+              <div className="mt-4 border-t border-line pt-4">
+                <p className="text-[13px] leading-relaxed text-mute">
+                  Your Kickoff Pack is ready: scope, timeline, payment stages
+                  and the evidence checklist. Read it, then confirm your side.
+                  {myPack.both_confirmed_at
+                    ? " Both sides have confirmed it."
+                    : " Once both you and the client confirm it, they can choose you for the job."}
+                </p>
+                <Link
+                  href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
+                  className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]"
+                >
+                  Read the Kickoff Pack &rarr;
+                </Link>
+                {!myPack.both_confirmed_at && (
+                  <form action={agreeKickoffPack} className="mt-3">
+                    <input type="hidden" name="jobId" value={job.id} />
+                    <input type="hidden" name="packId" value={myPack.id} />
+                    <input type="hidden" name="code" value={myPack.confirm_code ?? ""} />
+                    <button className="rounded-full border border-line bg-panel2 px-4 py-2 text-[13px] font-bold text-ink">
+                      Confirm as the worker
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   /* The accepted quote is what the money panels read from. Before a worker is
      chosen there is no agreed number, and the panels stay away rather than
@@ -632,33 +734,16 @@ export default async function JobRoom({
         role={role === "worker" ? "worker" : "client"}
       />
 
-      {chooseOpen && (
+      {chooseOpen && qs.length > 0 && (
         <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
           <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-            The scope gate
+            How choosing works
           </h2>
-          <p className="mb-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
-            Nobody is chosen on a price alone. Both sides tick the written
-            scope; until both ticks land there is no Choose button, and the
-            database refuses even if there were.
+          <p className="max-w-[62ch] text-[13px] leading-relaxed text-mute">
+            {role === "client"
+              ? "Ask any price below for a Kickoff Pack: scope of work and payment terms, written against that worker's own quote. You can do this for more than one at once and compare the documents. Choosing unlocks once you and that worker have both confirmed a pack."
+              : "Once the client asks for a Kickoff Pack against your price, it is drafted here and you confirm your side. They can compare more than one before choosing."}
           </p>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (clientTicked ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
-              {clientTicked ? "✓ Client agreed" : "Client not yet agreed"}
-            </span>
-            <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (scopeTicks.some((t) => t.side === "worker") ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
-              {scopeTicks.some((t) => t.side === "worker") ? "✓ A worker agreed" : "No worker agreed yet"}
-            </span>
-            {!iTicked && (role === "client" || qs.length > 0) && (
-              <form action={agreeScope}>
-                <input type="hidden" name="jobId" value={job.id} />
-                <input type="hidden" name="side" value={role} />
-                <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
-                  I agree to this scope
-                </button>
-              </form>
-            )}
-          </div>
         </section>
       )}
 
@@ -668,7 +753,11 @@ export default async function JobRoom({
             Quotes · {qs.length}
           </h2>
           <ul className="grid gap-3">
-            {qs.map((q) => (
+            {qs.map((q) => {
+              const myPack = pk.find((p) => p.quote_id === q.id);
+              const packReady = myPack?.status === "approved";
+              const packConfirmed = !!myPack?.both_confirmed_at;
+              return (
               <li
                 key={q.id}
                 className="rounded-2xl border border-line bg-panel p-4"
@@ -699,23 +788,59 @@ export default async function JobRoom({
                     {q.note}
                   </p>
                 )}
+
                 {role === "client" && chooseOpen && q.status === "submitted" && (
-                  clientTicked && scopeTicks.some((t) => t.side === "worker") ? (
-                    <form action={chooseQuote} className="mt-3">
-                      <input type="hidden" name="jobId" value={job.id} />
-                      <input type="hidden" name="quoteId" value={q.id} />
-                      <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
-                        Choose this worker
-                      </button>
-                    </form>
-                  ) : (
-                    <span className="mt-3 inline-block rounded-full border border-line bg-panel2 px-3.5 py-2 text-[12px] font-bold text-dim">
-                      Choose unlocks when both have agreed
-                    </span>
-                  )
+                  <form action={requestKickoff} className="mt-3">
+                    <input type="hidden" name="jobId" value={job.id} />
+                    <input type="hidden" name="quoteId" value={q.id} />
+                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                      Get a Kickoff Pack for this price
+                    </button>
+                  </form>
+                )}
+
+                {role === "client" && chooseOpen && q.status === "kickoff_requested" && (
+                  <div className="mt-3">
+                    {!myPack && (
+                      <span className="inline-block rounded-full border border-line bg-panel2 px-3.5 py-2 text-[12px] font-bold text-dim">
+                        Kickoff Pack being written
+                      </span>
+                    )}
+                    {myPack && !packReady && (
+                      <span className="inline-block rounded-full border border-line bg-panel2 px-3.5 py-2 text-[12px] font-bold text-dim">
+                        Kickoff Pack drafted, awaiting review
+                      </span>
+                    )}
+                    {myPack && packReady && !packConfirmed && (
+                      <>
+                        <Link
+                          href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack?quote=" + encodeURIComponent(q.id)}
+                          className="inline-block rounded-full border border-teal bg-soft px-3.5 py-2 text-[12px] font-bold text-tealb"
+                        >
+                          Read and confirm the Kickoff Pack &rarr;
+                        </Link>
+                        <p className="mt-1.5 max-w-[46ch] text-[11.5px] leading-snug text-dim">
+                          Choosing unlocks once you and {q.worker_name} have both confirmed it.
+                        </p>
+                      </>
+                    )}
+                    {myPack && packReady && packConfirmed && (
+                      <form action={chooseQuote}>
+                        <input type="hidden" name="jobId" value={job.id} />
+                        <input type="hidden" name="quoteId" value={q.id} />
+                        <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                          Choose {q.worker_name} for the job
+                        </button>
+                        <p className="mt-1.5 max-w-[46ch] text-[11.5px] leading-snug text-dim">
+                          Both sides have confirmed this Kickoff Pack. Choosing books the job.
+                        </p>
+                      </form>
+                    )}
+                  </div>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
       )}

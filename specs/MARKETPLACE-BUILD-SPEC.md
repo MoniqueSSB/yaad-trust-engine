@@ -186,7 +186,7 @@ Grid of `workerCard(w)`, three across on desktop, one on mobile.
 │ (DC)  Delroy Campbell    4.8 │  avatar initials on a gradient
 │       Plumbing            /5 │
 │       Kingston 8       31 jobs│
-│ [ID verified] [Police check] │  tags
+│ [ID verified]                │  tags
 │ [ ][ ][ ][ ]                 │  4 evidence thumbnails from past jobs
 │ [    View profile     ]      │
 └──────────────────────────────┘
@@ -224,16 +224,14 @@ Each check as a passed line, in this order:
 ✓ Government photo ID on video call
 ✓ TRN verified
 ✓ Proof of address
-✓ JCF police record check — required, works over £500
 ✓ Certification checked with the issuing body   (certified trades only)
 ✓ 3 trade references called — spoken to, not emailed
 ✓ Walkthrough call completed
-✓ Trial job before a first client
 ```
 
-**Police check state is explicit.** Where it is not on file the profile says plainly:
-*"Cannot be matched to jobs over £500 or work inside an occupied home."* Not a missing tick — a
-stated consequence.
+**The reference gate is explicit.** Where the three references are not yet confirmed the profile
+says plainly: *"Cannot be matched to jobs over £500 or work inside an occupied home."* Not a
+missing tick, a stated consequence.
 
 ### 4.4 Portfolio
 
@@ -391,7 +389,7 @@ Headless at **390 / 768 / 1280 / 1600**. Zero horizontal overflow, zero JS error
 - [ ] Visitor mode: Quote opens the lock note, naming the three policy conditions
 - [ ] Worker mode: typing a labour figure renders the split, and `client sees one number` = labour × 1.15 + materials
 - [ ] Trade filter narrows the list and updates the count
-- [ ] Worker profile shows all vetting checks; a worker without a police check shows the consequence line
+- [ ] Worker profile shows all vetting checks; a worker without confirmed references shows the consequence line
 - [ ] Profile switches between worker-reviews and client-reviews panes
 - [ ] Review cannot be posted against a job the account was not party to
 - [ ] Reviews stay sealed until both are written or 14 days pass

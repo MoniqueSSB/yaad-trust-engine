@@ -592,6 +592,11 @@ Deno.serve(async (req: Request) => {
     const jobId = String(b.jobId ?? "");
     const kind = String(b.kind ?? "") as Kind;
     const meta = (b.meta ?? {}) as Record<string, unknown>;
+    // Which quote's Kickoff Pack this is, for kickoff_pack_ready. A job can
+    // carry more than one pack in flight since 1 Sep 2026 (a client can
+    // accept more than one quote and compare), so job_id alone no longer
+    // says which worker or which pack this notification is about.
+    const quoteId = typeof meta.quoteId === "string" && meta.quoteId.trim() ? meta.quoteId.trim() : "";
     if (!secret || !jobId || !KINDS.includes(kind)) {
       return json({ error: "secret, jobId and a valid kind are required." }, 400);
     }
@@ -626,9 +631,22 @@ Deno.serve(async (req: Request) => {
     let recipientEmail = clientEmail;
     let recipientPhone = clientPhone;
     let workerPhone = "";
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready") && job.worker_email) {
+    // kickoff_pack_ready can fire before booking, while jobs.worker_email is
+    // still blank: the worker to notify is whoever is on the quote this
+    // pack was drafted against, not (yet) the job's own worker_email.
+    let kickoffWorkerEmail = job.worker_email ?? "";
+    if (kind === "kickoff_pack_ready" && quoteId) {
+      const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
+      if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
+    }
+    if ((kind === "evidence_comment" || kind === "evidence_landed") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+      workerPhone = String(worker?.phone ?? "").trim();
+    }
+    if (kind === "kickoff_pack_ready" && kickoffWorkerEmail) {
+      const { data: worker } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", kickoffWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
     if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready") {
@@ -869,9 +887,12 @@ Deno.serve(async (req: Request) => {
       // if the pack changes before it is opened, agree_kickoff_pack()
       // refuses the stale code rather than silently confirming new content
       // under an old link.
-      const { data: pack } = await admin.from("kickoff_packs")
-        .select("id, rev, confirm_code")
-        .eq("job_id", jobId).eq("status", "approved")
+      // Scoped to the specific quote this pack was drafted against where
+      // known, so two packs in flight on the same job can never cross:
+      // the worker in this message must be the one who is actually being
+      // linked to their own pack, not whichever pack updated most recently.
+      const packQuery = admin.from("kickoff_packs").select("id, rev, confirm_code").eq("status", "approved");
+      const { data: pack } = await (quoteId ? packQuery.eq("quote_id", quoteId) : packQuery.eq("job_id", jobId))
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       const packLink = pack?.confirm_code
         ? `${APP_URL}/portal/jobs/${encodeURIComponent(jobId)}/pack?code=${encodeURIComponent(pack.confirm_code)}`

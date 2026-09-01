@@ -20,9 +20,11 @@ const money = (n: number | null) =>
  * not true: a client had to make an account before seeing a single price.
  *
  * The job code is the bearer token, the same secret the WhatsApp link already
- * rides on. Holding it is enough to LOOK. It is never enough to CHOOSE:
- * accept_quote_as_me refuses anybody who is not the job's signed-in client,
- * so the booking still needs the account and the account still needs the code.
+ * rides on. Holding it is enough to LOOK. It is never enough to move a quote
+ * forward: request_kickoff_as_me refuses anybody who is not the job's
+ * signed-in client, so even asking for a Kickoff Pack needs the account and
+ * the account still needs the code. A client can do this for more than one
+ * quote; nothing here books a worker, only choosing one later does.
  */
 export default async function Quotes({
   params,
@@ -51,7 +53,6 @@ export default async function Quotes({
   }[];
 
   const booked = String(job.worker_email ?? "") !== "";
-  const accepted = quotes.find((q) => q.status === "accepted");
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-10">
@@ -79,7 +80,8 @@ export default async function Quotes({
           <p className="mt-6 max-w-[62ch] text-[14.5px] leading-relaxed text-mute">
             <b className="text-ink">Labour is split from materials</b>, and
             materials are passed through at cost with the receipt filed against
-            your job. Nothing here is charged, and{" "}
+            your job. Nothing here is charged. Ask for a Kickoff Pack from
+            more than one worker if you want to compare, and{" "}
             <b className="text-ink">nothing is booked until you choose one.</b>
           </p>
 
@@ -87,6 +89,7 @@ export default async function Quotes({
             {quotes.map((q) => {
               const total = (q.labour_jmd ?? 0) + (q.materials_jmd ?? 0);
               const isAccepted = q.status === "accepted";
+              const kickoffRequested = q.status === "kickoff_requested";
               return (
                 <div key={q.id}
                   className={"rounded-2xl border p-5 " + (isAccepted ? "border-teal bg-soft" : "border-line bg-panel")}>
@@ -101,6 +104,11 @@ export default async function Quotes({
                     {isAccepted && (
                       <span className="rounded-full border border-softline bg-soft px-3 py-1 text-[11px] font-bold text-tealb">
                         Booked
+                      </span>
+                    )}
+                    {kickoffRequested && (
+                      <span className="rounded-full border border-line bg-panel2 px-3 py-1 text-[11px] font-bold text-mute">
+                        Kickoff Pack requested
                       </span>
                     )}
                   </div>
@@ -126,8 +134,18 @@ export default async function Quotes({
                     <p className="mt-3 text-[13px] leading-relaxed text-mute">{q.note}</p>
                   )}
 
-                  {!booked && !accepted && (
+                  {!booked && q.status === "submitted" && (
                     <AcceptPanel jobId={job.id} code={code} quoteId={q.id} workerName={q.worker_name} />
+                  )}
+                  {!booked && kickoffRequested && (
+                    <p className="mt-4 border-t border-line pt-4 text-[13px] leading-relaxed text-mute">
+                      {q.worker_name} is writing their Kickoff Pack. Sign in to
+                      your portal to read it, confirm it, and choose between
+                      quotes once more than one is ready.{" "}
+                      <Link href="/portal" className="font-bold text-tealb">
+                        Open your portal &rarr;
+                      </Link>
+                    </p>
                   )}
                 </div>
               );

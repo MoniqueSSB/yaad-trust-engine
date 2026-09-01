@@ -43,9 +43,9 @@ signed and have a profile. The first job is a fully manual intake.
 budget band is client-side only and carries a "never shown to workers" marker. Yaadly
 does project management and oversight, not price estimation.
 
-**Police checks.** A JCF record check is mandatory on any job over £500, any work
-inside an occupied home, and any job where the worker holds keys or attends an empty
-property. Optional below £500 with the owner present.
+**Reference gate.** A worker cannot quote any job over £500, any work inside an
+occupied home, or any job where they hold keys or attend an empty property, until
+their telephoned references are done.
 
 **Documents.** Worker Guidelines v1.1 and Client Guidelines v1.1 are full signed
 agreements with acknowledgement blocks, not tickboxes. Both carry a visible

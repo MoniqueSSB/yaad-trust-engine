@@ -29,6 +29,7 @@
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { TRADES, PARISHES } from "@/lib/taxonomy";
 
@@ -51,6 +52,7 @@ export function PostJob({ initialTrade }: { initialTrade?: string }) {
   const [contact, setContact] = useState("");
 
   const [jobId, setJobId] = useState("");
+  const [portalCode, setPortalCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
@@ -91,6 +93,7 @@ export function PostJob({ initialTrade }: { initialTrade?: string }) {
         desc: desc.trim(),
       });
       if (d.jobId) setJobId(String(d.jobId));
+      if (d.portalCode) setPortalCode(String(d.portalCode));
       setStep(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save your job.");
@@ -103,6 +106,9 @@ export function PostJob({ initialTrade }: { initialTrade?: string }) {
     setError("");
     setBusy(true);
     try {
+      const joinLink = jobId && portalCode
+        ? `https://app.yaadly.co.uk/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}`
+        : "";
       await call(ENQUIRY_FN, {
         name: name.trim(),
         contact: contact.trim(),
@@ -110,7 +116,8 @@ export function PostJob({ initialTrade }: { initialTrade?: string }) {
         message:
           `Job posted from the site, no account.\n\n` +
           `Reference: ${jobId || "draft not saved"}\n` +
-          `Trade: ${trade}\nParish: ${parish}\n\n${desc.trim()}`,
+          `Trade: ${trade}\nParish: ${parish}\n\n${desc.trim()}` +
+          (joinLink ? `\n\nSet up your portal: ${joinLink}\nJob code, if asked: ${portalCode}` : ""),
       });
       setSent(true);
     } catch (e) {
@@ -135,6 +142,33 @@ export function PostJob({ initialTrade }: { initialTrade?: string }) {
             </>
           )}
         </h1>
+        {/* This used to be the end of the road: the wizard told the client
+            "job received" and then had no way to reach them again except a
+            person reading a free text enquiry and copying a reference number
+            by eye. The portal link and code were always generated, at draft
+            time, and never shown. WhatsApp already hands a client this exact
+            link the moment they ask about a job in this state; the wizard is
+            the same product and should not be a worse route to the same
+            door. */}
+        {jobId && portalCode && (
+          <div className="mt-6 max-w-[62ch] rounded-2xl border border-teal/40 bg-teal/5 p-6 text-[14.5px] leading-relaxed text-mute">
+            <b className="text-ink">One more thing, thirty seconds: set up your portal.</b>
+            <p className="mt-2">
+              This is what lets quotes, evidence and approvals reach you.
+              We would send you this same link by message either way, but
+              there is no reason to wait for it.
+            </p>
+            <Link
+              href={`/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}`}
+              className="mt-4 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+            >
+              Finish setting up your portal
+            </Link>
+            <p className="mt-3 text-[12.5px]">
+              Your job code, if you are asked for it: <span className="font-mono text-ink">{portalCode}</span>
+            </p>
+          </div>
+        )}
         {/* Not "your job is saved". That says nothing about what happens to
             somebody who has just described a problem with their mother's roof
             and wants to know when a human will look at it. */}

@@ -92,7 +92,7 @@ const PARISHES = [
 
 export const CONTACT_PROPERTIES = {
   contactType: { name: "contact_type", label: "Contact type", type: "dropdown", options: ["Client", "Worker", "Inspector", "Other"] },
-  certificationStatus: { name: "certification_status", label: "Certification status", type: "dropdown", options: ["JCF Police Check", "ID Verified", "Trade Certification", "None"] },
+  certificationStatus: { name: "certification_status", label: "Certification status", type: "dropdown", options: ["ID Verified", "Trade Certification", "None"] },
   tradeSpecialization: { name: "trade_specialization", label: "Trade specialization", type: "dropdown", options: ["Roofing", "Plumbing", "Electrical", "Carpentry", "Masonry", "Painting", "Tiling", "General repairs"] },
   yearsOfExperience: { name: "years_of_experience", label: "Years of experience", type: "number" },
   countryOfResidence: { name: "country_of_residence", label: "Country of residence", type: "dropdown", options: ["UK", "US", "Canada", "Jamaica"] },

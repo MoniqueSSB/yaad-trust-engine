@@ -50,9 +50,23 @@ export default async function WorkerPortal() {
     .eq("worker_user", user.id)
     .maybeSingle();
 
+  // A live quote with no booking is not nothing: since 1 Sep 2026 a client
+  // can accept it (ask for a Kickoff Pack) well before choosing anyone, and
+  // that worker has real work to do in the meantime (read it, confirm it).
+  // jobs.worker_email alone used to be the whole story; it no longer is.
+  // Only submitted/kickoff_requested/accepted count as this worker's stake:
+  // withdrawn or declined means someone else's job now, and jobs.status
+  // never says so on its own once another worker is chosen.
+  const { data: myQuotes } = await supabase
+    .from("job_quotes")
+    .select("job_id")
+    .eq("worker_user", user.id)
+    .in("status", ["submitted", "kickoff_requested", "accepted"]);
+  const quotedJobIds = new Set((myQuotes ?? []).map((q) => q.job_id));
+
   const email = (user.email ?? "").toLowerCase();
   const jobs = ((data ?? []) as (Job & { pay_method: string | null; pay_ref: string | null })[]).filter(
-    (j) => j.worker_email?.toLowerCase() === email,
+    (j) => j.worker_email?.toLowerCase() === email || quotedJobIds.has(j.id),
   );
 
   const live = jobs.filter((j) => j.status !== "complete");

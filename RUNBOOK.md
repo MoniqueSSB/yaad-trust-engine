@@ -196,7 +196,7 @@ update public.applications
    If it does not match the ID, set `'rejected'` instead and ask them again. We hold the number, not a photograph of the card.
 3. The three referees were **telephoned**, not emailed, and each had been told in advance the call was coming.
 4. The Worker Guidelines are signed on the current version.
-5. Anything the trade needs: a JCF police check for work over £500, inside an occupied home, or where keys are held, and certification confirmed with the body that issued it.
+5. Certification confirmed with the body that issued it, where the trade holds one.
 
 **The database refuses a publish that skips these.** `trg_profile_publish_checks` will not let `active` become true without an email address, a Persona pass and an approved TRN, and it says which one is missing. That is the same list as above, enforced rather than remembered. It refuses a bad publish; it never performs one, so publishing stays a human act.
 
@@ -302,7 +302,7 @@ The refusal names the reason, so read it before changing anything. All of them c
 
 **"Only an active vetted worker can submit a quote."** No published profile. Either they were never published, or somebody set `active = false`. See the publishing section.
 
-**"While your account is in Probation..."** Working as intended. A probation worker quotes standard jobs and is refused three things: work over about **J$105,000**, any job where they would hold keys, and any job inside an occupied home. Those are the founder's top tier, and they open when `vetting_state` becomes `verified`, which happens at publishing after the police check and the telephoned references.
+**"While your account is in Probation..."** Working as intended. A probation worker quotes standard jobs and is refused three things: work over about **J$105,000**, any job where they would hold keys, and any job inside an occupied home. Those are the founder's top tier, and they open when `vetting_state` becomes `verified`, which happens at publishing after the telephoned references.
 
 **To lift somebody out of Probation**, only once those are genuinely done:
 
@@ -797,26 +797,29 @@ select stage, reason, created_at, due_at, fired_at from job_followups
 
 ## A client can book a worker by replying on WhatsApp, no account needed
 
-**If a client says they replied to book a worker and nothing happened**, first check which of three things actually occurred, in `job_quotes` and `scope_agreements` for that job:
+**Since 1 Sep 2026 this only ever works when exactly one quote is open on the job.** `choose_worker_via_whatsapp()` refuses outright, telling the client to use the portal link, the moment more than one `job_quotes` row is `status = 'submitted'` — deliberately, because more than one quote can now be live at once (a client can accept more than one and compare Kickoff Packs) and this door has no way to ask which one a bare "yes" was about. Its own `scope_agreements` pre-check is no longer what actually books anyone; the real gate lives one call further in, inside `_do_choose_worker()` (next section). A reply that passes this door's own check can still be refused there if that quote's Kickoff Pack is not yet confirmed by both sides.
 
 ```sql
 select id, status, worker_email from job_quotes where job_id = 'JOB-XXXX';
-select side, email, agreed_at from scope_agreements where job_id = 'JOB-XXXX';
 ```
 
-- No `scope_agreements` row with `side = 'client'` at all: the reply never reached `choose_worker_via_whatsapp()`, most likely the reply did not contain the job's own code exactly, the same strict match `approve_stage_via_whatsapp()` uses. Check `yaadly.whatsapp_quote_accept.outcome` on the trace for that message.
-- A `client` row exists, no `worker` row for that quote's `worker_email`: this is working as designed, not a bug. The client's reply is on record; booking completes the moment the worker also agrees the scope (today, only through the portal's own tick, `agreeScope()`), and nothing re-checks this automatically. The client's reply from earlier does not need to be repeated once the worker catches up: whoever's action lands second is what actually books it, so tell the worker to tick their side and it resolves on its own.
-- Both rows exist, but `job_quotes.status` is still `submitted`: something else already has `jobs.worker_email` set (a worker was chosen a different way in between), and `choose_worker_via_whatsapp()` correctly refused. Check `jobs.worker_email` and go from there; this is not this door's bug to fix.
+- More than one row `status = 'submitted'`: the reply was refused with "More than one price is open on this job. Use the link to choose." Working as designed; send the client their portal link.
+- Exactly one `submitted` row and nothing happened: check `yaadly.whatsapp_quote_accept.outcome` on the trace for that message; most likely the reply did not contain the job's own code exactly, the same strict match `approve_stage_via_whatsapp()` uses.
+- The reply went through but the job still shows no worker: check that quote's own Kickoff Pack next (see "Choosing a worker now refuses" below) — `_do_choose_worker()` needs `both_confirmed_at` set on it, which a bare WhatsApp "yes" cannot produce on its own.
 
-**The price message a client replies to now states the worker's proposed scope, not only the price.** `yaad-notify-client`'s `quote_arrived` kind reads `job_quotes.note`; if a worker left that blank, the client only sees the price and the reply-to-book hint is still offered, since there is nothing further to withhold, but there is also nothing to have actually agreed to in words. If this matters for a specific job, ask the worker to add a line to their quote and re-submit.
+**The price message a client replies to states the worker's proposed scope, not only the price.** `yaad-notify-client`'s `quote_arrived` kind reads `job_quotes.note`; if a worker left that blank, the client only sees the price. If this matters for a specific job, ask the worker to add a line to their quote and re-submit.
 
 **`choose_worker_via_whatsapp()` and `choose_worker()` are two doors onto the exact same `_do_choose_worker()` core**, same as `approve_stage()`/`approve_stage_via_whatsapp()`. A change to booking rules belongs in `_do_choose_worker()`, never duplicated into either door separately.
 
-## `accept_quote_as_me()` (the no-account `/jobs/[id]/quotes` page) actually books now
+## `request_kickoff_as_me()` (the no-account `/jobs/[id]/quotes` page, and the signed-in portal) asks for a Kickoff Pack, it does not book
 
-**If a client on this specific page says they accepted a quote and the job still shows no worker, or a rival quote is stuck on `submitted` forever**, that was a real, live bug before 31 Aug 2026, fixed the same day: the function never set the `yaadly.choosing` session flag `job_quotes_touch`'s trigger requires before it lets a non-admin move a quote's status at all, so bookings through this specific page silently did nothing to the quote row while still reporting success. If a client reports this after that date, something has regressed; check `job_quotes_touch`'s definition is still what `choose_worker()` and `accept_quote_as_me()` both expect (`set_config('yaadly.choosing', '1', true)` around the status-changing updates).
+**As of 1 Sep 2026 this replaced `accept_quote_as_me()`, which is deleted.** Accepting a quote used to book it outright; now it only flips that quote's `job_quotes.status` from `submitted` to `kickoff_requested`, touching nothing on `jobs`. A client can call it again for a different quote on the same job — that is the point, not a bug to guard against. If a client says they "accepted" a price and the job still shows no worker, that is correct: booking now only happens through `choose_worker()`/`chooseQuote`, once that quote's Kickoff Pack is confirmed by both sides (next section).
 
-**This page still does not require the scope agreement `choose_worker()` enforces.** That is a live product gap, not a bug: flagged in `DECISIONS.md`, not decided. If it ever needs closing, the fix is deleting `accept_quote_as_me()`'s own duplicate mutation logic and having it call `_do_choose_worker()` instead, the same shared core the WhatsApp door uses, not patching this function a third time.
+```sql
+select id, status, worker_email, worker_name from job_quotes where job_id = 'JOB-XXXX';
+```
+
+`kickoff_requested` on more than one row at once is expected and fine. `submitted` never moves on its own; nothing polls for it. If a quote is stuck on `kickoff_requested` with no draft or pack appearing, see "A worker never gets told a Kickoff Pack exists" below.
 
 ## A burst of WhatsApp photos only got one evidence_landed message, later than the first photo
 
@@ -835,16 +838,16 @@ select job_id, stage, created_at, due_at, fired_at from evidence_landed_pending
 
 **Retuning the 90 second window** is one constant, `interval '90 seconds'` in `schedule_evidence_landed_notify()`, plus the cron cadence itself if the check needs to run more or less often than once a minute (`cron.schedule('yaad-evidence-landed-check', ...)`, `20260831zzzz7`). Both need a new migration, not a dashboard edit, same as every other constant in this file that has one.
 
-## Choosing a worker now refuses with "This job has no Kickoff Pack drafted yet"
+## Choosing a worker now refuses with "choose unlocks once this worker's Kickoff Pack is confirmed by both sides"
 
-**That is the intended behaviour, not a bug.** As of 31 Aug 2026, `choose_worker()` approves the job's Kickoff Pack in the same transaction as assigning the worker, and refuses the whole choice if no pack row exists for the job, or the pack's `docs` column is still null. A pack has to be drafted (`yaad-kickoff`, or a row written directly into `kickoff_packs` with `job_id` set) before a client can accept any quote on that job. To check what a specific job actually has:
+**That is the intended behaviour, not a bug.** As of 1 Sep 2026, `_do_choose_worker()` requires the specific quote being chosen to have its own `kickoff_packs` row with `both_confirmed_at` set — drafted, approved, and signed by both the client and that worker. Not any pack on the job: that quote's own, matched by `quote_id`. To check what a specific quote actually has:
 
 ```sql
-select id, status, approved_at, approved_by, (docs is not null) as has_docs
-from kickoff_packs where job_id = '<job id>' order by updated_at desc;
+select p.id, p.quote_id, p.status, p.both_confirmed_at
+from kickoff_packs p where p.job_id = '<job id>' order by p.updated_at desc;
 ```
 
-No row at all, or `has_docs = false`, is why the choose is being refused. Write the pack first.
+No row for that `quote_id`: the client has not requested one yet (`job_quotes.status` should be `kickoff_requested`; if it is still `submitted`, that is why), or it is still drafting — see the next section. A row with `both_confirmed_at` null: one or both sides have not confirmed it yet, check `kickoff_pack_agreements` (see "A client or worker can't confirm the Kickoff Pack" below).
 
 ## The portal stage rail is showing generic labels instead of the Kickoff Pack's own stage names
 
@@ -860,7 +863,9 @@ No row at all, or `has_docs = false`, is why the choose is being refused. Write 
 
 ## A client or worker can't confirm the Kickoff Pack, or the "both confirmed" tick never appears
 
-**The confirm section only shows once the pack is `approved`** (the moment a client chooses that worker, `choose_worker()`), and only to the client or worker actually on that job (`jobs.client_email` / `jobs.worker_email` matched against the signed-in email). Signed in as neither, or the pack still sitting at `draft`, and there is nothing to click, by design.
+**The confirm section only shows once the pack is `approved`.** Since 1 Sep 2026 that can happen before anyone is booked (`yaad-kickoff-check` auto-issues a guardrail-clean draft), so `agree_kickoff_pack()` no longer matches the worker side against `jobs.worker_email` alone: it checks the pack's own `quote_id` first, via `job_quotes.worker_email`, and only falls back to `jobs.worker_email` for the post-booking case. Same for the RLS that lets the page load at all (`kickoff_packs`, `kickoff_pack_agreements`, and `jobs` itself for a worker's own portal pages) — all three also match a worker via `job_quotes.worker_user`, not only a booked `jobs.worker_email`. If a worker with a live quote can't even open `/portal/jobs/[id]` or `/portal/jobs/[id]/pack`, check those three policies are still the versions from `20260901g`, not reverted.
+
+**A job with more than one Kickoff Pack in flight**: `/pack` and `/pack/[doc]` take an optional `?quote=` to say which one; failing that, they fall back to matching the confirm code in the link, and only fall back to "the job's latest updated pack" for an old link with neither. If someone reports seeing the wrong worker's pack, check which of the three the URL they used actually carried.
 
 **"That confirmation code does not match the current version of this pack"** means exactly what it says: the code being submitted does not match `kickoff_packs.confirm_code` right now. The two ordinary causes are someone confirming from an old WhatsApp link after the pack was revised (a real revision issues a new code, on purpose, so a stale link fails rather than silently confirming content that changed), or a copy-paste error. Reopening the pack page fetches the current code fresh; the on-page button never needs one typed by hand.
 
@@ -874,21 +879,37 @@ order by p.updated_at desc;
 ```
 Two rows (`client`, `worker`) for the current `rev` and `both_confirmed_at` set means both sides have signed this exact revision. One row, or none, means it is still waiting on someone.
 
-## A worker never gets told a Kickoff Pack exists, or a job never gets one drafted at all
+## A worker never gets told a Kickoff Pack exists, or a quote never gets one drafted at all
 
-**As of 1 Sep 2026 this should no longer happen on its own.** Choosing a worker (portal click or WhatsApp reply, both go through `_do_choose_worker()`) no longer requires a pack to exist first, and `yaad-kickoff-check` (pg_cron, once a minute) automatically requests one for any job with a chosen worker and none yet, links a guardrail-clean finished draft straight to `'approved'`, and that same transition fires `notify_worker_kickoff_pack_ready`, which is what actually tells the worker.
+**As of 1 Sep 2026 a pack is requested BEFORE anyone is chosen, not after.** `request_kickoff_as_me()` (portal click) moves a quote to `job_quotes.status = 'kickoff_requested'`; `yaad-kickoff-check` (pg_cron, once a minute) polls for exactly that, per quote, not per job, requests a draft from `yaad-kickoff` carrying that `quote_id`, links a guardrail-clean finished draft straight to `'approved'` against that same `quote_id`, and that transition fires `notify_worker_kickoff_pack_ready`, which now also carries `quote_id` so the right worker gets told about the right pack.
 
-**If a job has had a chosen worker for more than a couple of minutes with still no pack:**
+**If a quote has been `kickoff_requested` for more than a couple of minutes with still no pack:**
 ```sql
-select d.id, d.status, d.error, d.created_at, d.finished_at
+select d.id, d.quote_id, d.status, d.error, d.created_at, d.finished_at
 from kickoff_drafts d
 where d.job_id = '<job id>'
 order by d.created_at desc;
 ```
-- No rows at all: `yaad-kickoff-check` has not picked it up yet, or the job does not qualify. It only considers jobs with `status = 'in_progress'` and a non-empty `descr` (used as the intake's `brief`); a job missing either sits out of the poll silently, not stuck, just never eligible. Check `jobs.descr` is actually set.
-- A row stuck at `'drafting'` for several minutes: the background model call is still running (normal, up to a few minutes) or was culled by the platform's worker lifetime limit without ever writing `'failed'` (rare; `yaad-kickoff`'s own header comments describe this failure shape). Three consecutive `'failed'` drafts for the same job stop the poller from retrying it automatically, on purpose, so a persistently bad job does not hammer the model API forever; that ceiling is in the code, not a setting.
-- A row at `'ready'` but still no pack: check its `guardrail` column. Any of `price_language_detected`, `banned_language_detected` or `foreign_text_detected` being `true` holds it back deliberately, same hard rule the manual `link_kickoff_draft_to_job()` door enforces. It stays visible in the concierge desk's Kickoff Drafts view; fix or redraft it, or link it manually from there once clean.
+- No rows at all: `yaad-kickoff-check` has not picked it up yet, or the job does not qualify. It only considers a quote whose job has a non-empty `descr` (used as the intake's `brief`); missing that, the quote sits out of the poll silently, not stuck, just never eligible. Check `jobs.descr` is actually set.
+- A row stuck at `'drafting'` for several minutes: the background model call is still running (normal, up to a few minutes) or was culled by the platform's worker lifetime limit without ever writing `'failed'` (rare). Three consecutive `'failed'` drafts for the same quote stop the poller from retrying it automatically, on purpose. `draftPart()` logs the actual raw model content on a parse failure (`console.error`, added 1 Sep 2026) — check `function_logs` for `yaad-kickoff` before guessing at the cause.
+- A row at `'ready'` but still no pack: check its `guardrail` column. Any of `price_language_detected`, `banned_language_detected` or `foreign_text_detected` being `true` holds it back deliberately. It stays visible in the concierge desk's Kickoff Drafts view; fix or redraft it, or link it manually from there once clean.
 
-**If a pack shows `status = 'approved'` but the worker says they never heard anything**, that is the notify side, not the drafting side: check `function_logs` for `yaad-notify-client` for a `403` (secret mismatch, see "The notify trigger secret gets out of sync (again)" above) or check the worker actually has a phone on `worker_profiles` (no phone means `emailed: false, whatsapp: {sent: false, reason: "no recipient phone on the job"}` in the response, since this kind never attempts email).
+**If a pack shows `status = 'approved'` but the worker says they never heard anything**, that is the notify side, not the drafting side: check `function_logs` for `yaad-notify-client` for a `403` (secret mismatch, see "The notify trigger secret gets out of sync (again)" above) or check the worker actually has a phone on `worker_profiles` (no phone means `emailed: false, whatsapp: {sent: false, reason: "no recipient phone on the job"}` in the response, since this kind never attempts email). `yaad-notify-client` resolves the worker via the quote named in `meta.quoteId`, not `jobs.worker_email` (still blank pre-booking) — if that `meta` is missing on the trigger's own payload, check `notify_worker_kickoff_pack_ready()` is the `20260901g` version.
+
+**A worker with a live, unbooked quote appears on their own worker portal job list.** `/portal/worker` and the door page (`(gated)/page.tsx`) both widen their worker filter with a direct `job_quotes` lookup (`worker_user = auth.uid()`), not only `jobs.worker_email`, so the WhatsApp link is a shortcut into the job, not the only way in. It reads `status = 'quoted'` ("You have quoted, waiting on the client") through the whole compare-and-choose window; that label already existed and needed no change, since it was already true.
 
 **The service role key is what authorises the automatic path, not a shared secret.** `yaad-kickoff` accepts a call as either a real admin session or a request whose `Authorization` bearer exactly equals `SUPABASE_SERVICE_ROLE_KEY`. If that secret is ever rotated in the Supabase dashboard, `yaad-kickoff-check` picks up the new value automatically on its next cold start (both read the same project secret), so there is nothing to keep in sync by hand the way `YAAD_CRON_SECRET` needs to be, the whole reason this path was built this way rather than with another baked-in trigger secret.
+
+## The concierge "Built a job, never signed" (Intake) panel and its badge count
+
+Reads `jobs` where `status = 'awaiting_client_setup'`, as of 1 Sep 2026. It used to read `client_user is null`, and nothing in this repository, on any intake path, has ever written `jobs.client_user`, so before that date the panel showed almost every job forever, live and finished ones included, and never cleared once a client actually signed up. If this panel is ever showing something that does not match what you would expect from `status`, that is the thing to check, not the `client_user` column, which is dead.
+
+## You expect a "New job" push or email for something that arrived on WhatsApp
+
+**There is one WhatsApp path now: `yaad-inbound`, over Twilio.** `yaad-whatsapp-webhook`, a second, direct-Meta-Cloud-API function that duplicated part of this, never received real traffic (Meta was never approved) and was deleted 1 Sep 2026. Its `notifyAdmin()` fires twice per conversation: once on the first message of a new thread, so a lead is never silently sitting there before it is even a real job, and once when the job reaches `stage = 'done'`. If neither push nor email arrived for a real message, check `app_settings.ntfy_topic` and `admin_email`, and `RESEND_API_KEY`, the same three this function's own error logging names.
+
+A session in this repo spent real effort fixing two bugs in `yaad-whatsapp-webhook`'s dormant guided-intake code (`trade` not written to the column, no admin notification) before realising it was testing a function that could never receive a real message; `yaad-inbound` already did both correctly on its own, independently, before either fix existed. Founder's instruction, same session: strip the dead code and delete the file rather than leave it to confuse whoever reads this next. Both the client-intake code that prompted the fixes and the worker-signup lane living in the same file went with it. Full account in DECISIONS.md, 1 Sep 2026.
+
+## WhatsApp only ever means Twilio in this repository now
+
+`yaad-whatsapp-webhook`, a direct Meta Cloud API webhook, is gone (1 Sep 2026; see above and DECISIONS.md). It never received real traffic: `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` were never set, and the founder's own instruction on 31 Aug 2026 was to stop pursuing Meta entirely: "remove meta from this moving forward." **Real WhatsApp traffic flows through `yaad-inbound`**, via Twilio, `whatsapp:` prefixed sender addresses on the same webhook Twilio SMS uses, `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` the secrets that matter. If a real WhatsApp message is not reaching the system, look at `yaad-inbound`'s Twilio signature check and Twilio's own console configuration. If code or a doc anywhere still names `yaad-whatsapp-webhook`, that reference is stale; say so rather than trying to make it work.

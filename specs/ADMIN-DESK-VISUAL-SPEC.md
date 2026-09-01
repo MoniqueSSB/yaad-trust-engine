@@ -287,7 +287,6 @@ application, with the operator's verdict controls added:
 │ ✓ TRN verified                         PASS      teal  │
 │ ! Proof of address                     GAP      mango  │
 │   Dated 4 months ago. Needs one inside three.          │
-│ ✓ JCF police record check              PASS      teal  │
 │ ✓ 3 references — confirmed and called  PASS      teal  │
 ├────────────────────────────────────────────────────────┤
 │ yaad-docs flagged 2 · a person decides                 │

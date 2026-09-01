@@ -1,27 +1,7 @@
-/* Shared behaviour for the marketing pages: reveal on scroll, and the trust
-   engine animation on the marketplace page.
-
-   Everything here is decoration. The pages are readable and complete with this
-   file blocked, which is why html.jsrv is set from script rather than sitting
-   in the stylesheet: no script, nothing ever hidden. */
-
-/* Reveal on scroll. Set the flag first so the initial hidden state applies
-   only when we are actually able to reveal things again. */
-document.documentElement.classList.add('jsrv');
-(function(){
-  var els = document.querySelectorAll('.rv');
-  if(!els.length) return;
-  if(!('IntersectionObserver' in window)){
-    els.forEach(function(n){ n.classList.add('on') });
-    return;
-  }
-  var io = new IntersectionObserver(function(entries){
-    entries.forEach(function(e){
-      if(e.isIntersecting){ e.target.classList.add('on'); io.unobserve(e.target); }
-    });
-  }, {threshold:.12, rootMargin:'0px 0px -40px 0px'});
-  els.forEach(function(n){ io.observe(n) });
-})();
+/* Shared behaviour for the marketing pages: the trust engine animation on the
+   marketplace page. Scroll reveal was removed 1 Sep 2026, it was hiding
+   content for two seconds or more on slow connections; the pages are readable
+   and complete with this file blocked. */
 
 /* The trust engine. Six evidence tiles light in order, then the lock opens and
    the money moves, once, when the client approves. It only runs when it is
@@ -43,7 +23,8 @@ document.documentElement.classList.add('jsrv');
   var tiles = eng.querySelectorAll('.eng-ev i');
   var cap = $('eng-cap'), lab = $('eng-lab'), lock = $('eng-lock'),
       you = $('eng-you'), wk = $('eng-w'), you2 = $('eng-you2'), w2 = $('eng-w2');
-  var LOCKED = lock.innerHTML, OPEN = '<span class="lockem">🔓</span>';
+  var LOCKED = lock.innerHTML,
+      OPEN = '<span class="lockem"><svg class="gl" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.4-2.2"/></svg></span>';
   var i = -1, t = null;
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
