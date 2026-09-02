@@ -55,25 +55,22 @@ a{color:var(--purpleb);text-decoration:none}
 .rv.in{opacity:1;transform:none}
 .d1{transition-delay:.08s}.d2{transition-delay:.18s}.d3{transition-delay:.28s}.d4{transition-delay:.38s}
 
-/* nav */
-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.75);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-bottom:1px solid var(--line)}
-.nav-in{max-width:1100px;margin:0 auto;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
-.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;font-family:var(--disp);font-size:17px;font-weight:600;color:#fff;box-shadow:0 0 20px rgba(155,115,245,0.4),0 0 0 1px rgba(155,115,245,0.25)}
-.brand b{font-size:16px;font-weight:600;letter-spacing:-0.02em}
+/* nav — matches site-wide pattern */
+nav.site-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1100px;margin:0 auto;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
+.mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;font-family:var(--disp);font-size:16px;font-weight:600;color:#fff}
+.brand b{font-size:15.5px;font-weight:600;letter-spacing:-0.02em}
 .brand b span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.navlinks{display:flex;gap:2px}
-.nl{padding:7px 12px;border-radius:8px;font:500 13.5px var(--body);color:var(--mute);transition:.18s;cursor:pointer;background:none;border:0;text-decoration:none}
-.nl:hover{color:var(--ink);background:rgba(155,115,245,0.07)}
-.nav-cta{padding:8px 18px;border-radius:100px;font:600 13px var(--body);color:var(--purpleb);border:1px solid rgba(155,115,245,0.3);background:rgba(155,115,245,0.07);transition:.18s;cursor:pointer;text-decoration:none}
-.nav-cta:hover{background:rgba(155,115,245,0.15);border-color:rgba(155,115,245,0.5)}
-.nav-toggle{display:none;background:none;border:1px solid var(--line2);color:var(--ink);width:34px;height:34px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center}
-@media(max-width:760px){
-  .navlinks{display:none;position:absolute;top:60px;left:0;right:0;flex-direction:column;background:rgba(7,7,26,0.96);backdrop-filter:blur(24px);padding:12px 16px;border-bottom:1px solid var(--line)}
-  .navlinks.open{display:flex}
-  .nl{width:100%;padding:10px 12px}
-  .nav-toggle{display:flex}
-}
+.views{display:flex;gap:2px;align-items:center}
+.vbtn{background:none;border:0;color:var(--mute);font:500 13.5px var(--body);padding:7px 11px;border-radius:8px;cursor:pointer;text-decoration:none;transition:.15s}
+.vbtn:hover{background:rgba(155,115,245,0.08);color:var(--ink)}
+.vbtn.on{color:var(--purpleb);font-weight:700}
+.quiet-links{display:flex;gap:12px;font-size:12.5px}
+.quiet-links a{color:var(--mute);text-decoration:none;transition:.15s}
+.quiet-links a:hover{color:var(--purpleb)}
+@media(max-width:1024px){.quiet-links{display:none}}
+@media(max-width:760px){.views{display:none}}
 
 /* ══════════════════════════════════════════════
    HERO — full-width, centered, cinematic
@@ -361,18 +358,21 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
 <div class="canvas-bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
 <div class="mesh"></div>
 
-<nav><div class="nav-in">
+<nav class="site-nav"><div class="nav-in">
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
-  <button class="nav-toggle" id="nt" aria-label="Menu">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="1" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="15" y2="12"/></svg>
-  </button>
-  <div class="navlinks" id="nvl">
-    <a class="nl" href="marketplace.html">How it works</a>
-    <a class="nl" href="services.html">Managed services</a>
-    <a class="nl" href="business.html">For business</a>
-    <a class="nl" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
+  <div class="views">
+    <a class="vbtn" href="/marketplace">Overview</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
+    <a class="vbtn" href="/services">Managed services</a>
+    <a class="vbtn" href="/business">For business</a>
+    <a class="vbtn" href="/contact">Contact</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
-  <a class="nav-cta" href="https://wa.me/447878877567" target="_blank" rel="noopener">Talk to us</a>
+  <div class="quiet-links">
+    <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
+    <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
+    <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
+  </div>
 </div></nav>
 
 <!-- HERO -->
@@ -558,8 +558,17 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
 
 <script>
 (function(){
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.1});
+  // Reveal elements already in view on load (above-fold / fast paint)
+  function revealInView(){
+    document.querySelectorAll('.rv:not(.in)').forEach(function(el){
+      var r=el.getBoundingClientRect();
+      if(r.top < window.innerHeight+80){el.classList.add('in')}
+    });
+  }
+  revealInView();
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.05,rootMargin:'0px 0px 80px 0px'});
   document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+  window.addEventListener('load',revealInView);
   var t=document.getElementById('nt'),v=document.getElementById('nvl');
   if(t)t.addEventListener('click',function(){v.classList.toggle('open')});
 })();
