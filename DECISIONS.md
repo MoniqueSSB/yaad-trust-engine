@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-02 · A second, separate invoice: what the client owes the worker, raised as a record only
+
+**Founder's own instruction, direct: Yaadly raises two invoices per booked job, not one, paid separately, to different parties.** The agency fee invoice (20260901y) already existed: Yaadly's own 15%, billed to and paid by the client, to Yaadly. Nothing anywhere raised the second one, a record of what the client owes the worker, labour plus materials at cost. `20260901v`'s own comment already said the client pays the worker directly; this gives that arrangement paperwork instead of leaving it entirely informal.
+
+**Not payment integration, and checked against CLAUDE.md 9 before building it.** No money moves through Yaadly on this invoice, no provider, no holding structure, no release condition changes: the client still pays the worker exactly as before, off-platform, on their own terms. It reuses the existing `invoices`/`invoice_lines` machinery and its existing guards (`invoice_line_price_guard`, `invoice_status_guard`) unchanged, admin-raised and admin-marked-paid exactly like the agency fee invoice already is. `payable_to` (`'yaadly' | 'worker'`, default `'yaadly'`) is the only new column, so every invoice raised before today keeps its existing meaning.
+
+**Gated on the job actually being `complete`.** Raising a bill for work not yet finished and approved would be inviting a client to pay before the evidence exists to back it; `raise_job_worker_pay_invoice()` refuses otherwise. One per job, same discipline as the agency fee.
+
+**A real mistake caught before it shipped, not after.** The rendered invoice document's footer prints `app_settings.invoice_pay_to`, Yaadly's own bank details, unconditionally, on every invoice, because until today every invoice was Yaadly's own. Left as is, a worker-pay invoice would have told a client to pay a bill for the worker's labour into Yaadly's bank account, the exact confusion this whole feature exists to prevent. `renderInvoice()` in `yaad-invoice` now branches on `payable_to`: a worker-pay invoice's footer says plainly that Yaadly is not the payee and does not hold the money, instead of showing bank details at all. Caught by reading the render function fully before wiring the desk button to it, not by testing the button and noticing the output looked wrong.
+
+**Verified live.** `raise_job_worker_pay_invoice('JOB-TEST-WAPAY-3')` raised `INV-2026-0008`, J$9,500 (labour J$8,000 + materials J$1,500, no fee added), sent, and its rendered footer read back with the corrected worker-pay text, not Yaadly's bank details. `deno check` clean on `yaad-invoice`, deployed from disk with `verify_jwt` read first and left at its existing `true`.
+
+**Not committed: `concierge/concierge.html`.** Already carried substantial unrelated uncommitted work before this session touched it (101 lines changed once combined). The new Job Invoices UI, two rows per job instead of one, is verified live in the local desk; `supabase/functions/yaad-invoice/index.ts` and the new migration are committed, `concierge.html` is left as a working-tree change for whoever owns the rest of it.
+
+---
+
 ## 2026-09-02 · The same fix, reapplied on top of a second session's newer work; the portal's own stage display gets it too
 
 **Two sessions on this branch at once, `sync_job_status()` changed under this one mid-task.** Minutes after `20260902g` (below) shipped, the live function had already moved on: a fee-paid-first gate (`if not fee_paid then new.status := 'awaiting_payment'; return new;`, ahead of what that migration's own file on disk shows) and `coalesce(final_stage_count, 1)` in place of `5 - 1`, neither of which this session wrote. The Quote Pack fallback `g` added had been silently dropped, reverted to reading `kickoff_packs` alone. Nobody's change was wrong on its own; they landed on top of each other. `20260902h` re-adds only the fallback, inside the structure actually live at the time (re-read via `pg_get_functiondef`, not assumed from the last file this session wrote), the fee-paid gate and its own default left exactly as found.

@@ -1056,3 +1056,15 @@ select
 ```
 
 If the relevant one isn't `approved`, that's the actual problem, not the trigger. **The two documents store their stage count differently**: a Kickoff Pack keeps it nested at `docs->'payment_schedule'->'stages'`, a Quote Pack draft keeps a plain array at `docs->'payment_stages'`. A job can only ever have gone through one path (`20260902d`), so exactly one of the two should ever be populated for it; both being empty, or both being approved, is itself worth a second look. Recompute a job stuck on a now-fixed lookup by touching it: `update jobs set updated_at = now() where id = '<job id>'`, which re-fires `sync_job_status()` without changing anything else.
+
+## A job needs two invoices raised, not one, and someone raised the wrong one or only one
+
+**There are two separate invoice types on the same `invoices` table now (`20260902i`), told apart by `payable_to`.** `payable_to = 'yaadly'` (the default, and every invoice raised before 2 Sep 2026) is Yaadly's own 15% Guarantee & Support fee, paid to Yaadly. `payable_to = 'worker'` is a record of what the client owes the worker, labour plus materials at cost, paid to the worker directly, off-platform, exactly as before this existed. Raising one never raises or requires the other; check both explicitly:
+
+```sql
+select id, status, payable_to, total_pence from invoices where job_id = '<job id>' and status <> 'void';
+```
+
+**The worker pay invoice can only be raised once the job is `status = 'complete'`.** `raise_job_worker_pay_invoice()` refuses otherwise, on purpose: a bill for work not yet finished and approved has nothing to back it. The concierge desk's Job Invoices view shows "Waiting on the job to complete" in that slot until then, that is the gate working, not a bug.
+
+**If a worker-pay invoice's rendered document ever shows Yaadly's own bank details, that is a real bug, stop and fix it before sending another.** `renderInvoice()` in `yaad-invoice` branches its footer on `inv.payable_to`: a worker-pay invoice must never print `app_settings.invoice_pay_to`, since that would tell a client to pay the worker's money into Yaadly's own account. Preview any worker-pay invoice before it goes out if the function has been touched since: `Job Invoices → Preview` on the desk, check the footer reads "This is a record of what you agreed to pay your tradesperson, not a bill from Yaadly," not a bank sort code.
