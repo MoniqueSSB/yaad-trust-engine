@@ -2,9 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { jobStages, packPaymentStages } from "@/lib/portal/journey";
-import { StageRail } from "@/components/portal/StageRail";
-import { PackStageProgress } from "@/components/portal/PackStageProgress";
+import { packPaymentStages, quotePackPaymentStages } from "@/lib/portal/journey";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
@@ -15,8 +13,6 @@ import { ArrivalCheckIn } from "@/components/portal/ArrivalCheckIn";
 import { MaterialsStore } from "@/components/portal/MaterialsStore";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
-import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
-import { FeeBreakdown } from "@/components/portal/FeeBreakdown";
 import { PortalCard } from "@/components/portal/PortalCard";
 import { JobBrief } from "@/components/portal/JobBrief";
 import { IntakeThread } from "@/components/portal/IntakeThread";
@@ -122,13 +118,13 @@ export default async function JobRoom({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ s?: string; cal?: string; d?: string; tab?: string }>;
+  searchParams: Promise<{ cal?: string; d?: string; tab?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
-  const { s: sParam, cal, d, tab: tabParam } = await searchParams;
+  const { cal, d, tab: tabParam } = await searchParams;
   const supabase = await createClient();
 
   const { data: job } = await supabase
@@ -147,7 +143,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }, { data: quotePackRow }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -192,6 +188,18 @@ export default async function JobRoom({
         .select("id,status,total_pence,currency,stage,payable_to,issue_date,paid_at,period_label")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
+      /* The other route to a payment schedule. A job goes through EITHER a
+         Kickoff Pack OR a Quote Pack (20260902d), so a job on the lighter
+         path has no kickoff_packs row at all and its stages live here.
+         RLS returns this to the job's client, and to a worker only while
+         the job is still open on the board. */
+      supabase
+        .from("quote_pack_drafts")
+        .select("docs,status")
+        .eq("job_id", id)
+        .eq("status", "approved")
+        .limit(1)
+        .maybeSingle(),
     ]);
 
   const { data: myReview } = await supabase
@@ -400,22 +408,20 @@ export default async function JobRoom({
      pack drives this - a draft is unconfirmed AI output and has no business
      naming what money releases against, whatever else it is used for below. */
   const trulyApprovedPack = pk.find((x) => x.status === "approved") ?? null;
-  const packStages = packPaymentStages(trulyApprovedPack?.docs ?? null);
-  const { stages: railStages, current: railCurrent } = jobStages(job.status, job.stage, packStages);
-  const current = railCurrent;
-  const viewing = (() => {
-    const n = Number(sParam);
-    return Number.isInteger(n) && n >= 0 && n < railStages.length ? n : current;
-  })();
-  const currentPackStage = packStages[Math.max((job.stage ?? 1) - 1, 0)] ?? null;
-  const amountDue =
-    currentPackStage?.proportion_percent != null && labour != null
-      ? Math.round((labour * currentPackStage.proportion_percent) / 100)
+  /* Whichever of the two documents this job actually went through. Kickoff
+     Pack keeps priority, the same order sync_job_status() uses (20260902g),
+     so a job that somehow had both is read the same way by the screen and
+     by the trigger that completes it. */
+  const kickoffStages = packPaymentStages(trulyApprovedPack?.docs ?? null);
+  const quotePackStages = quotePackPaymentStages(
+    (quotePackRow as { docs?: unknown } | null)?.docs ?? null,
+  );
+  const packStages = kickoffStages.length ? kickoffStages : quotePackStages;
+  const packSource: "kickoff" | "quote" | null = kickoffStages.length
+    ? "kickoff"
+    : quotePackStages.length
+      ? "quote"
       : null;
-  const timelinePhases = (
-    (trulyApprovedPack?.docs as { timeline?: { phases?: unknown } } | undefined)
-      ?.timeline?.phases as { name?: string; duration?: string; milestone?: string }[] | undefined
-  ) ?? [];
 
   /* THE GO LIVE GATES.
      Read off the triggers, in the order Postgres applies them, so the list a
@@ -742,43 +748,6 @@ export default async function JobRoom({
     },
   ];
 
-  const evidenceThisStage = ev.filter((e) => (e.stage ?? 1) === Math.max(job.stage ?? 1, 1)).length;
-
-  const tiles: Tile[] = [
-    {
-      label: role === "client" ? "You pay, all in" : "You receive",
-      value: (role === "client" ? money(allIn) : money(takeHome)) ?? "Not agreed yet",
-      held: job.status !== "complete",
-      note:
-        labour == null
-          ? "Agreed once you choose a quote"
-          : job.status === "complete"
-            ? "Released"
-            : "Held until you approve the evidence",
-    },
-    {
-      label: "Stage",
-      value: String(Math.max(job.stage ?? 0, 0)) + " of " + String(stageCount),
-      note: railStages[current] ?? "",
-    },
-    {
-      label: "Evidence on this stage",
-      value: String(evidenceThisStage),
-      note: evidenceThisStage === 0 ? "Nothing uploaded yet" : "Timestamped and fingerprinted",
-    },
-    {
-      label: "Waiting on",
-      value:
-        job.status === "complete"
-          ? "Nobody"
-          : job.status === "evidence"
-            ? role === "client" ? "You" : "The client"
-            : job.worker_email ? "The work" : "Quotes",
-      held: job.status === "evidence" && role === "client",
-      note: job.status === "complete" ? "Closed and paid" : "",
-    },
-  ];
-
   /* The tab is a search param, so every pane is a real address that survives
      a reload and can be pasted into a message. Anything unrecognised falls
      back to the job itself rather than an empty screen. */
@@ -897,30 +866,6 @@ export default async function JobRoom({
 
       <JobProgress phases={phases} />
 
-      <StageRail
-        stages={railStages}
-        current={current}
-        viewing={viewing}
-        base={"/portal/jobs/" + encodeURIComponent(job.id)}
-      />
-
-      <PackStageProgress
-        stage={currentPackStage}
-        amountDue={amountDue}
-        timelinePhases={timelinePhases}
-        packHref={jobBase + "/pack"}
-      />
-
-      <PortalTiles tiles={tiles} />
-
-      <FeeBreakdown
-        side={role === "worker" ? "worker" : "client"}
-        labour={labour}
-        materials={won?.materials_jmd ?? null}
-        materialsAtCost={won?.materials_at_cost ?? null}
-        workerName={won?.worker_name ?? job.worker_name}
-      />
-
       <TabBar base={jobBase} active={tab} counts={tabCounts} />
 
       {tab === "money" && (
@@ -929,6 +874,7 @@ export default async function JobRoom({
           stages={ledgerStages}
           side={role === "worker" ? "worker" : "client"}
           jobBase={jobBase}
+          source={packSource}
         />
         <MoneyPanel
           side={role === "worker" ? "worker" : "client"}

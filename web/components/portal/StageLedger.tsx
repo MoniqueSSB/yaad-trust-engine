@@ -10,11 +10,12 @@ import Link from "next/link";
  * money moves in: the client approves a stage, and that approval is what
  * raises the worker's pay invoice for it (20260902j, 20260902l).
  *
- * Stage names, proportions and release conditions are read from the
- * approved Kickoff Pack and never invented here. A job whose pack has no
- * payment schedule renders nothing rather than a plausible-looking
- * default, because a made-up stage list on a page about money would be
- * worse than no list at all.
+ * Stage names, proportions and release conditions are read from whichever
+ * agreement the job actually went through, a Kickoff Pack or the lighter
+ * Quote Pack (20260902d), and never invented here. A job with neither
+ * renders nothing rather than a plausible-looking default, because a
+ * made-up stage list on a page about money would be worse than no list at
+ * all.
  */
 
 export type LedgerStage = {
@@ -57,10 +58,13 @@ export function StageLedger({
   stages,
   side,
   jobBase,
+  source,
 }: {
   stages: LedgerStage[];
   side: "client" | "worker";
   jobBase: string;
+  /** which of the two agreements these stages were read from */
+  source: "kickoff" | "quote" | null;
 }) {
   if (stages.length === 0) return null;
 
@@ -68,7 +72,9 @@ export function StageLedger({
     <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
       <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">The payment stages</h3>
       <p className="mb-4 mt-1 text-[12.5px] text-dim">
-        From the approved Kickoff Pack. Each stage names its own evidence and releases its own share of the price.
+        From the{" "}
+        {source === "quote" ? "Quote Pack you both agreed" : "approved Kickoff Pack"}. Each stage
+        names its own evidence and releases its own share of the price.
       </p>
 
       {stages.map((s) => {

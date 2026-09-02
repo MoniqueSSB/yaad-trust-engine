@@ -90,6 +90,35 @@ export function packPaymentStages(docs: unknown): PackStage[] {
     : [];
 }
 
+/**
+ * The same list, off a Quote Pack instead.
+ *
+ * A job reaches its payment stages down one of two routes, not one
+ * (20260902d): the original Kickoff Pack, or the lighter Quote Pack the
+ * worker and client agree between them. The founder's own words for why
+ * the second exists: "they dont have to use it, the kick off pack, if they
+ * are happy with the agreement they already have."
+ *
+ * The two store the same idea in different places. A Kickoff Pack nests
+ * its stages at docs.payment_schedule.stages; a Quote Pack keeps a plain
+ * array at docs.payment_stages and calls the release wording evidence_note
+ * rather than release_condition. sync_job_status() already had to learn
+ * both shapes (20260902g) after a job's stage count was read from the
+ * wrong one and three parts of the product disagreed about how many stages
+ * it had. This is that same lookup, for the screens.
+ */
+export function quotePackPaymentStages(docs: unknown): PackStage[] {
+  const raw = (docs as { payment_stages?: unknown } | null)?.payment_stages;
+  if (!Array.isArray(raw)) return [];
+  return (raw as { stage?: unknown; proportion_percent?: number; evidence_note?: string }[])
+    .filter((s) => s && typeof s.stage === "string")
+    .map((s) => ({
+      stage: s.stage as string,
+      proportion_percent: s.proportion_percent,
+      release_condition: s.evidence_note,
+    }));
+}
+
 const PRE_WORK_STAGES = STAGES.slice(0, 6); // "Job live" .. "Kickoff issued"
 const POST_WORK_TAIL = ["Closed & paid", "Reviews"];
 const NOT_YET_STARTED = new Set([
