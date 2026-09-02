@@ -66,8 +66,13 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready"] as const;
+const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
+
+// The services lane (2 Sep 2026): the same hub, the same channel ladder,
+// a different table. These kinds carry serviceId instead of jobId and read
+// public.services; everything else about how a person is reached is shared.
+const SERVICE_KINDS: readonly Kind[] = ["service_booked", "service_confirmed", "service_live"];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
 
@@ -612,15 +617,17 @@ Deno.serve(async (req: Request) => {
 
     const secret = String(b.secret ?? "");
     const jobId = String(b.jobId ?? "");
+    const serviceId = String(b.serviceId ?? "");
     const kind = String(b.kind ?? "") as Kind;
+    const isService = SERVICE_KINDS.includes(kind);
     const meta = (b.meta ?? {}) as Record<string, unknown>;
     // Which quote's Kickoff Pack this is, for kickoff_pack_ready. A job can
     // carry more than one pack in flight since 1 Sep 2026 (a client can
     // accept more than one quote and compare), so job_id alone no longer
     // says which worker or which pack this notification is about.
     const quoteId = typeof meta.quoteId === "string" && meta.quoteId.trim() ? meta.quoteId.trim() : "";
-    if (!secret || !jobId || !KINDS.includes(kind)) {
-      return json({ error: "secret, jobId and a valid kind are required." }, 400);
+    if (!secret || !KINDS.includes(kind) || (isService ? !serviceId : !jobId)) {
+      return json({ error: "secret, a valid kind, and jobId (or serviceId for a service kind) are required." }, 400);
     }
 
     // The trigger proves itself with the secret, not a user session. Only a
@@ -633,13 +640,29 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Not authorised." }, 403);
     }
 
-    const { data: job } = await admin.from("jobs")
-      .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
-      .eq("id", jobId).maybeSingle();
-    if (!job) return json({ error: "No such job." }, 404);
+    // A service kind reads services and never touches jobs; job stays null
+    // and every job-only path below is either kind-gated or null-guarded.
+    // deno-lint-ignore no-explicit-any
+    let job: any = null;
+    // deno-lint-ignore no-explicit-any
+    let svc: any = null;
+    if (isService) {
+      const { data } = await admin.from("services")
+        .select("id, type, parish, price, stage, status, portal_code, client_name, client_email, client_phone, due_at")
+        .eq("id", serviceId).maybeSingle();
+      if (!data) return json({ error: "No such service booking." }, 404);
+      svc = data;
+    } else {
+      const { data } = await admin.from("jobs")
+        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
+        .eq("id", jobId).maybeSingle();
+      if (!data) return json({ error: "No such job." }, 404);
+      job = data;
+    }
 
-    const clientEmail = String(job.client_email ?? "").trim();
-    const clientPhone = String(job.client_phone ?? "").trim();
+    const who = isService ? svc : job;
+    const clientEmail = String(who.client_email ?? "").trim();
+    const clientPhone = String(who.client_phone ?? "").trim();
 
     // Most kinds tell the client. Two do not: evidence_comment, because a
     // client left it and the worker is who answers; evidence_landed,
@@ -656,7 +679,7 @@ Deno.serve(async (req: Request) => {
     // kickoff_pack_ready can fire before booking, while jobs.worker_email is
     // still blank: the worker to notify is whoever is on the quote this
     // pack was drafted against, not (yet) the job's own worker_email.
-    let kickoffWorkerEmail = job.worker_email ?? "";
+    let kickoffWorkerEmail = job?.worker_email ?? "";
     if (kind === "kickoff_pack_ready" && quoteId) {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
@@ -695,10 +718,16 @@ Deno.serve(async (req: Request) => {
     // page: quote_arrived is the one kind that can happen before booking, on
     // a job that may not have a client_email at all yet if it arrived on
     // WhatsApp with only a phone number, so it links by portal_code instead.
-    const roomLink = `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`;
-    const codeLink = job.portal_code
-      ? `${APP_URL}/jobs/${encodeURIComponent(job.id)}/quotes?code=${encodeURIComponent(job.portal_code)}`
-      : roomLink;
+    const roomLink = isService
+      ? `${APP_URL}/portal/services/${encodeURIComponent(svc.id)}`
+      : `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`;
+    const codeLink = isService
+      ? (svc.portal_code
+        ? `${APP_URL}/portal/join?code=${encodeURIComponent(svc.portal_code)}`
+        : roomLink)
+      : (job.portal_code
+        ? `${APP_URL}/jobs/${encodeURIComponent(job.id)}/quotes?code=${encodeURIComponent(job.portal_code)}`
+        : roomLink);
 
     let subject = "";
     let line = "";
@@ -712,7 +741,34 @@ Deno.serve(async (req: Request) => {
     // delivered: see the send site below.
     let waTemplate: { sid: string; vars: Record<string, string> } | undefined;
 
-    if (kind === "quote_arrived") {
+    if (kind === "service_booked") {
+      // Fires the moment an enquiry is converted in the desk. A receipt with
+      // expectations set honestly: held means held, nothing is charged, and
+      // the founder's confirm is the next thing that happens. The portal
+      // code rides in this first message because a service client has no
+      // account yet; the join page is the door and the code is the key.
+      subject = `We have your booking: ${svc.type}`;
+      line = `Your ${svc.type} booking with Yaadly is in, reference ${svc.id}. ` +
+        `It is held while Monique agrees the scope and dates with you: nothing is charged and nothing starts until you hear from us that it is confirmed. ` +
+        `When you want to see it online, set up your portal with the code ${svc.portal_code}: ${codeLink}`;
+    } else if (kind === "service_confirmed") {
+      // Fires when the founder clicks "Confirm the work": the booking is now
+      // real, the invoice exists, and payment is the one thing between here
+      // and the work starting. The date is only named when one was promised.
+      const dueLine = svc.due_at ? ` Delivery is planned for ${svc.due_at}.` : "";
+      subject = `Confirmed: ${svc.type}`;
+      line = `Your booking ${svc.id} (${svc.type}) is confirmed at ${svc.price ?? "the agreed price"}. ` +
+        `The invoice is on its way to you by email, and the work is scheduled once it is paid.${dueLine} ` +
+        `Track everything here: ${roomLink}`;
+    } else if (kind === "service_live") {
+      // Fires from the invoice being marked paid by a named admin: the same
+      // click that moves the booking moves this message, so a client is
+      // never told "under way" by anything other than the payment gate.
+      const dueLine = svc.due_at ? ` Delivery is planned for ${svc.due_at}.` : "";
+      subject = `Under way: ${svc.type}`;
+      line = `Payment received on ${svc.id}, thank you. Your ${svc.type} is now under way.${dueLine} ` +
+        `Progress and everything we deliver lands in your portal: ${roomLink}`;
+    } else if (kind === "quote_arrived") {
       const { data: q } = await admin.from("job_quotes")
         .select("worker_name, labour_jmd, materials_jmd, note")
         .eq("job_id", jobId).eq("status", "submitted")
