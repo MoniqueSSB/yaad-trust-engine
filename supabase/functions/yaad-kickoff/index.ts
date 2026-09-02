@@ -486,6 +486,10 @@ Deno.serve(async (req: Request) => {
     // price it is drafted for. Same trust boundary as jobId: only this
     // repository's own automation may stamp it.
     const quoteId = isServiceRole && typeof body.quoteId === "string" && body.quoteId.trim() ? body.quoteId.trim() : undefined;
+    // A service booking's own pack (2 Sep 2026): the second parent a draft
+    // can have. Same trust boundary again: only this repository's own
+    // automation may stamp it.
+    const serviceId = isServiceRole && typeof body.serviceId === "string" && body.serviceId.trim() ? body.serviceId.trim() : undefined;
     // Optional per-draft model override, for reading the same brief drafted by
     // different models side by side. Admin session only; OpenRouter slugs only.
     const overrideModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
@@ -509,6 +513,7 @@ Deno.serve(async (req: Request) => {
       intake,
       job_id: jobId ?? null,
       quote_id: quoteId ?? null,
+      service_id: serviceId ?? null,
     });
     if (!ins.ok) {
       const t = await ins.text().catch(() => "");

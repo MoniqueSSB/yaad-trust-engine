@@ -240,7 +240,13 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
 async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
   const { data } = await admin.from("jobs").select("id, title, stage, status").ilike("worker_email", email).order("updated_at", { ascending: false });
   return (data ?? [])
-    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
+    // 'awaiting_payment' excluded 2 Sep 2026, alongside the RLS gate on
+    // evidence itself: a job cannot progress until Yaadly's agency fee is
+    // marked paid, and a worker filing evidence over WhatsApp goes through
+    // the service role, which RLS alone cannot stop. Re-applied 2 Sep 2026
+    // after another session's deploy overwrote this file with a copy that
+    // predated it.
+    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled" && j.status !== "awaiting_payment")
     .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
 }
 
@@ -1134,6 +1140,82 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Confirming a Quote Pack by replying with the job's own code. 2 Sep
+      // 2026, founder's own correction: a quote used to go straight from
+      // "submitted" to bookable the moment the client replied once, with
+      // nothing ever asking the worker to agree to anything. Client and
+      // worker each confirm the quote itself now, same shape as the
+      // Kickoff Pack block just below, before the job's booking block will
+      // recognise the price as open. MUST run before that block: a quote
+      // still sitting at 'submitted' is not a booking candidate any more
+      // (see choose_worker_via_whatsapp), so an unconfirmed reply has to be
+      // claimed here or it is lost, not fall through and refuse. Runs
+      // before the Kickoff Pack block too, though the two never actually
+      // compete for the same reply: a quote is only ever a candidate here
+      // OR there, never both, since agree_quote_via_whatsapp() moves it out
+      // of 'submitted' the moment both sides are in.
+      //
+      // Re-applied 2 Sep 2026: found missing from the live deployed
+      // function after another session's own deploy overwrote this block
+      // with an on-disk copy that predated it. Read the file back from
+      // disk before trusting it is what got tested, not just what was
+      // written once.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: openQuotes } = await supabase.from("job_quotes")
+          .select("id, job_id, worker_email").eq("status", "submitted");
+        const quotes = (openQuotes ?? []) as { id: string; job_id: string; worker_email: string }[];
+
+        const tail = msg.from.replace(/\D/g, "").slice(-9);
+        const jobIds = [...new Set(quotes.map((q) => q.job_id))];
+        const { data: jobRows } = jobIds.length
+          ? await supabase.from("jobs").select("id, title, stage, client_phone").in("id", jobIds)
+          : { data: [] as { id: string; title: string; stage: number; client_phone: string | null }[] };
+        const jobsById = new Map((jobRows ?? []).map((j: any) => [j.id, j]));
+
+        const workerEmails = [...new Set(quotes.map((q) => q.worker_email))];
+        const { data: workerRows } = workerEmails.length
+          ? await supabase.from("worker_profiles").select("worker_email, phone").in("worker_email", workerEmails)
+          : { data: [] as { worker_email: string; phone: string | null }[] };
+        const phoneByWorker = new Map((workerRows ?? []).map((w: any) => [String(w.worker_email).toLowerCase(), w.phone]));
+
+        const quoteIds = quotes.map((q) => q.id);
+        const { data: agreementRows } = quoteIds.length
+          ? await supabase.from("quote_agreements").select("quote_id, side").in("quote_id", quoteIds)
+          : { data: [] as { quote_id: string; side: string }[] };
+        const confirmedSides = new Set((agreementRows ?? []).map((a: any) => `${a.quote_id}:${a.side}`));
+
+        const clientCandidates = quotes
+          .filter((q) => !confirmedSides.has(`${q.id}:client`))
+          .map((q) => jobsById.get(q.job_id))
+          .filter((j: any) => j && String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+
+        const workerCandidates: { id: string; title: string; stage: number }[] = [];
+        for (const q of quotes) {
+          if (confirmedSides.has(`${q.id}:worker`)) continue;
+          const workerTail = String(phoneByWorker.get(String(q.worker_email).toLowerCase()) ?? "").replace(/\D/g, "").slice(-9);
+          const j = jobsById.get(q.job_id);
+          if (j && workerTail && workerTail === tail) workerCandidates.push(j);
+        }
+
+        const quoteCandidates = [...clientCandidates, ...workerCandidates.filter((j) => !clientCandidates.some((c: any) => c.id === j.id))];
+        const quoteTarget = matchApprovingJob(msg.text, quoteCandidates as any);
+        if (quoteTarget) {
+          const { data: qResult, error: qErr } = await supabase.rpc("agree_quote_via_whatsapp", { p_job: quoteTarget.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_quote_confirm.job": quoteTarget.id, "yaadly.whatsapp_quote_confirm.outcome": qErr ? "refused" : "confirmed" });
+          if (qErr) return twiml(`That did not go through: ${qErr.message}`);
+          const row = Array.isArray(qResult) ? qResult[0] : qResult;
+          // Named the real, working alternative rather than a vague
+          // "ask Yaadly": the portal button next to this exact price is
+          // the only place that request can actually be made from here.
+          if (row?.both_confirmed) {
+            return twiml(row.agreed_side === "client"
+              ? `Confirmed. Both sides have agreed the price for ${quoteTarget.title}. Reply ${quoteTarget.id} again to book them, no Kickoff Pack needed. Want the fuller document first instead? Sign in to your Yaadly portal and tap "Get a Kickoff Pack first" next to this price.`
+              : `Confirmed. Both sides have agreed the price for ${quoteTarget.title}, ready for the client to book.`);
+          }
+          return twiml(`Confirmed on your side for ${quoteTarget.title}. Waiting on ${row?.agreed_side === "worker" ? "the client" : "the worker"} to reply the same code before this can move on.`);
+        }
+      }
+
       // Stage 6: confirming a Kickoff Pack by replying with the job's own
       // code. Founder's own correction, 1 Sep 2026, live: a worker's whole
       // surface is WhatsApp by design (CLAUDE.md §9 - "the worker web
@@ -1421,7 +1503,7 @@ Deno.serve(async (req: Request) => {
     const THREAD_HOURS = 12;
     const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
     const { data: prior } = await supabase.from("intake_threads")
-      .select("job_id,transcript,turns,last_at,stage")
+      .select("job_id,transcript,turns,last_at,stage,human_handling")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
     // A thread already at 'done' produced its job; nothing left to gather.
@@ -1446,6 +1528,49 @@ Deno.serve(async (req: Request) => {
       .filter(([k]) => k !== "audio")
       .map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(" and ");
     const thisTurn = [msg.text, attached ? `[they attached ${attached}]` : ""].filter(Boolean).join("\n");
+
+    // Monique has this thread. The assistant stands down: no model call, no
+    // fresh question, no read-back. What they say is still kept word for word
+    // and still lands on her phone, because a person waiting on a person
+    // should never find out later that their extra detail went nowhere.
+    // Deliberately checked before the 12 hour conversation window: a human
+    // conversation runs on the humans' clock, not the bot's, and the flag
+    // outliving the window is the point. Only the desk's "Hand back to the
+    // assistant" button clears it; nothing in this function ever does.
+    if (prior?.human_handling === true) {
+      const heldJobId = String(prior.job_id);
+      const before = String(prior.transcript ?? "");
+      const heldRepeat = before.trimEnd().endsWith(thisTurn.trim()) && thisTurn.trim().length > 0;
+      const heldTranscript = heldRepeat ? before.slice(-8000) : `${before}\n\n${thisTurn}`.slice(-8000);
+      if (msg.media.length) {
+        await keepMedia(supabase as unknown as MediaWriter, heldJobId, msg.media, Number(prior.turns) * 10, trace);
+      }
+      await supabase.from("intake_threads").upsert({
+        channel: threadKey.channel,
+        from_addr: threadKey.from_addr,
+        job_id: heldJobId,
+        transcript: heldTranscript,
+        turns: Number(prior.turns) + 1,
+        stage: String(prior.stage ?? "gathering"),
+        last_at: new Date().toISOString(),
+      }, { onConflict: "channel,from_addr" });
+      try {
+        const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+        if (st?.value) {
+          await fetch(`https://ntfy.sh/${st.value}`, {
+            method: "POST",
+            headers: { Title: `They wrote again: ${msg.channel}`, Priority: "high", Tags: "raising_hand" },
+            body: `${heldJobId}: waiting on you. The assistant is standing down until the desk hands the thread back.`,
+            signal: AbortSignal.timeout(4000),
+          });
+        }
+      } catch (_) { /* never let a notification break intake */ }
+      root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
+      if (isTwilio) {
+        return twiml("Monique has this and is coming back to you herself. I have added your message so she sees it.");
+      }
+      return json({ ok: true, jobId: heldJobId, heldForHuman: true });
+    }
 
     // A repeat of the immediately preceding turn, word for word, is not new
     // information: it is WhatsApp retrying, or someone impatient tapping
@@ -1584,6 +1709,15 @@ Deno.serve(async (req: Request) => {
     }
 
 
+    // Handing over now means standing down. From their next message on, the
+    // human_handling branch near the top of this handler keeps the record and
+    // pings Monique instead of running the model again, so "she will come
+    // back to you herself" is true rather than followed by more bot. Set only
+    // ever to true here: writing false would silently undo a desk reply's own
+    // claim on the thread, and clearing it is the desk's call alone.
+    const HANDOFF_TURNS = 3;
+    const handingOver = wantsHuman || (!enough && turns >= HANDOFF_TURNS);
+
     // Remember the conversation before replying. If the reply fails we would
     // rather have the thread than lose what they said.
     await supabase.from("intake_threads").upsert({
@@ -1594,14 +1728,13 @@ Deno.serve(async (req: Request) => {
       turns,
       stage,
       last_at: new Date().toISOString(),
+      ...(handingOver ? { human_handling: true } : {}),
     }, { onConflict: "channel,from_addr" });
 
     // Three pushes for one conversation is noise, and noise gets muted, and a
     // muted phone loses a real job later. So: once when somebody first writes
     // in, so a lead is never silently sitting there, and once when it becomes
     // a real job. Nothing for the turns in between.
-    const HANDOFF_TURNS = 3;
-    const handingOver = wantsHuman || (!enough && turns >= HANDOFF_TURNS);
     const worthTelling = stage === "done" || turns === 1 || handingOver;
 
     const summary = worthTelling ? notifyAdmin(supabase as unknown as SettingsReader, {
@@ -1703,8 +1836,9 @@ Deno.serve(async (req: Request) => {
       // person on the other end is usually the one who most needs a human:
       // older, upset, writing from a bad signal, or describing something the
       // model genuinely cannot categorise. Hand over and say so out loud.
-      const HANDOFF_AFTER = 3;
-      if (!enough && turns >= HANDOFF_AFTER) {
+      // Same handingOver already written to the thread above, so the next
+      // message from them is held for Monique rather than answered again.
+      if (!enough && turns >= HANDOFF_TURNS) {
         // Drop the questions out of whatever it wrote. Asking again in the
         // same breath as "I am giving this to a person" is the worst of both:
         // they do not know whether to answer or wait.

@@ -212,8 +212,9 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
   ${inv.covering_note ? `<div class="note"><h2>Note</h2><p>${esc(inv.covering_note).replace(/\n/g, "</p><p>")}</p></div>` : ""}
 
   <footer>
-    ${esc(settings.invoice_payment_terms)}<br>
-    ${esc(settings.invoice_pay_to)}<br>
+    ${inv.payable_to === "worker"
+      ? "This is a record of what you agreed to pay your tradesperson, not a bill from Yaadly. Pay them directly, the way you already agreed. Yaadly does not hold or move this money and is not the payee on this invoice.<br>"
+      : `${esc(settings.invoice_payment_terms)}<br>${esc(settings.invoice_pay_to)}<br>`}
     ${esc(settings.invoice_vat_status)}. ${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
     Services are project management, observation and documentation. They are not a survey, a valuation, a legal opinion or a quantity surveyor's estimate.
   </footer>

@@ -179,6 +179,61 @@ Deno.serve(async (req: Request) => {
       if (!errMsg) requested++; else { requestFailed++; requestErrors.push(errMsg); }
     }
 
+    // ── Phase 1b: every service booking gets a pack, made regardless
+    // (founder's instruction, 2 Sep 2026). Same shape as phase 1 but keyed
+    // by service_id: any booking that is not cancelled or complete, has no
+    // draft in flight and no pack yet, and has not failed three times, gets
+    // a draft requested. The intake is built only from fields the services
+    // row actually holds, the same no-invention rule as jobToIntake. ─────
+    const { data: svcRows } = await admin.from("services")
+      .select("id,type,parish,client_name,price,notes,due_at,status")
+      .in("status", ["held", "awaiting_payment", "live"]) as {
+        data: { id: string; type: string | null; parish: string | null; client_name: string | null; price: string | null; notes: string | null; due_at: string | null; status: string }[] | null;
+      };
+
+    const { data: svcDraftRows } = await admin.from("kickoff_drafts")
+      .select("service_id,status").not("service_id", "is", null);
+    const { data: svcPackRows } = await admin.from("kickoff_packs").select("service_id").not("service_id", "is", null);
+    const svcActiveDraft = new Set((svcDraftRows ?? []).filter((d) => d.status === "drafting" || d.status === "ready").map((d) => d.service_id));
+    const svcHasPack = new Set((svcPackRows ?? []).map((p) => p.service_id));
+    const svcFailedCounts = new Map<string, number>();
+    for (const d of svcDraftRows ?? []) {
+      if (d.status === "failed") svcFailedCounts.set(d.service_id, (svcFailedCounts.get(d.service_id) ?? 0) + 1);
+    }
+
+    let svcRequested = 0;
+    for (const svc of svcRows ?? []) {
+      if (svcActiveDraft.has(svc.id) || svcHasPack.has(svc.id)) continue;
+      if ((svcFailedCounts.get(svc.id) ?? 0) >= 3) { skippedTooManyFailures++; continue; }
+      const brief = [
+        `${svc.type ?? "A Yaadly service"} delivered by Yaadly itself for a client${svc.parish ? ` with property in ${svc.parish}` : ""}.`,
+        `This is a fixed-fee professional service (${svc.price ?? "price agreed on the booking"}), not a construction job: Yaadly is the provider, there is no tradesperson to manage and no materials budget.`,
+        svc.due_at ? `Delivery is promised for ${svc.due_at}.` : "",
+        svc.notes ? `Booking notes: ${svc.notes}` : "",
+      ].filter(Boolean).join("\n");
+      const intake: Record<string, string> = {
+        title: [svc.type, svc.parish].filter(Boolean).join(", ") || svc.id,
+        brief,
+      };
+      if (svc.client_name) intake.client_name = svc.client_name;
+      if (svc.parish) intake.parish = svc.parish;
+      if (svc.due_at) intake.timing = `deliver by ${svc.due_at}`;
+
+      const errMsg = await trace.span("yaad-kickoff request (service)", SpanKind.INTERNAL, { "yaadly.kickoff_check.service_id": svc.id }, async (s) => {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/yaad-kickoff`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ serviceId: svc.id, intake }),
+          signal: AbortSignal.timeout(15000),
+        });
+        s.setAttributes({ "http.response.status_code": r.status });
+        if (r.ok) return "";
+        const t = await r.text().catch(() => "");
+        return `${svc.id}: ${r.status} ${t.slice(0, 200)}`;
+      });
+      if (!errMsg) svcRequested++; else { requestFailed++; requestErrors.push(errMsg); }
+    }
+
     // ── Phase 2: a finished, guardrail-clean draft becomes that quote's own
     // pack, issued directly at 'approved'. A dirty one is left for a human.
     // Keyed by quote_id throughout, same reason as phase 1. ──────────────
@@ -229,15 +284,66 @@ Deno.serve(async (req: Request) => {
       else { linked++; hasPack.add(d.quote_id); }
     }
 
+    // ── Phase 2b: same auto-issue for a finished service draft. Clean →
+    // the booking's own pack straight at 'approved' (the pack-ready
+    // trigger is job-only, so nothing fires a worker message here); dirty
+    // → left in the desk's Kickoff Drafts view for a human, linkable with
+    // link_kickoff_draft_to_service once fixed. ──────────────────────────
+    const { data: readySvcDrafts } = await admin.from("kickoff_drafts")
+      .select("id,service_id,intake,docs,model,guardrail")
+      .not("service_id", "is", null).eq("status", "ready");
+
+    let svcLinked = 0;
+    for (const d of readySvcDrafts ?? []) {
+      if (svcHasPack.has(d.service_id)) continue;
+      const g = (d.guardrail ?? {}) as Record<string, unknown>;
+      const dirty = Boolean(g.price_language_detected) || Boolean(g.banned_language_detected) || Boolean(g.foreign_text_detected);
+      if (dirty) { heldForReview++; continue; }
+
+      const intake = (d.intake ?? {}) as Record<string, unknown>;
+      const packId = "KO-" + Math.floor(Date.now() * 1) + "-" + Math.floor(Math.random() * 1000);
+      const confirmCode = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+        .map((b) => b.toString(16).padStart(2, "0")).join("").toUpperCase().slice(0, 6);
+      // Two steps like the job path, for a different reason: the approval
+      // update can be refused by kickoff_guard_approval (payment stages
+      // must total exactly 100). Inserted at draft first, the pack then
+      // survives a refused approval and sits in the desk where the new
+      // Approve action reports the exact rule that refused it, instead of
+      // this cron failing the same insert every minute forever.
+      const { error: insErr } = await admin.from("kickoff_packs").insert({
+        id: packId,
+        service_id: d.service_id,
+        project_title: String(intake.title ?? "").trim() || "Service booking",
+        client_name: String(intake.client_name ?? "").trim() || null,
+        parish: String(intake.parish ?? "").trim() || null,
+        intake: d.intake,
+        docs: d.docs,
+        model: d.model,
+        confirm_code: confirmCode,
+      });
+      if (insErr) { console.error(`yaad-kickoff-check: service link failed for draft ${d.id}: ${insErr.message}`); linkFailed++; continue; }
+      svcHasPack.add(d.service_id);
+
+      const { error: updErr } = await admin.from("kickoff_packs").update({
+        status: "approved",
+        approved_by: "system: auto-issued, guardrail-clean",
+        approved_at: new Date().toISOString(),
+      }).eq("id", packId);
+      if (updErr) { console.error(`yaad-kickoff-check: service approve failed for pack ${packId}: ${updErr.message}`); heldForReview++; }
+      else svcLinked++;
+    }
+
     root.setAttributes({
       "yaadly.kickoff_check.requested": requested,
       "yaadly.kickoff_check.linked": linked,
       "yaadly.kickoff_check.held_for_review": heldForReview,
+      "yaadly.kickoff_check.service_requested": svcRequested,
+      "yaadly.kickoff_check.service_linked": svcLinked,
     });
     return json({
       ok: true,
       requested, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors,
-      linked, heldForReview, linkFailed,
+      linked, heldForReview, linkFailed, svcRequested, svcLinked,
     });
   } catch (e) {
     root.recordError(e);

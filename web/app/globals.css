@@ -1,32 +1,36 @@
 @import "tailwindcss";
 
-/* Yaadly brand tokens, lifted from the live site so the app and the marketing
-   site stay one visual system. Change them here, not in components. */
+/* Yaadly brand tokens — unified with the marketing site design system.
+   Purple/gold palette replacing green/teal, Sep 2026. Change here, not in components. */
 @theme {
-  --color-bg: #08110f;
-  --color-panel: #0f1b17;
-  --color-panel2: #14231e;
-  --color-line: #1f332c;
-  --color-line2: #284439;
-  --color-ink: #f2faf7;
-  --color-mute: #9db8ae;
-  --color-dim: #67807a;
-  --color-teal: #14b8a6;
-  --color-tealb: #2dd4bf;
-  --color-mango: #ffb020;
-  --color-coral: #ff6b4a;
-  --color-soft: #0f2b26;
-  --color-softline: #1e4a42;
-
+  --color-bg: #07071A;
+  --color-panel: rgba(255,255,255,0.028);
+  --color-panel2: rgba(255,255,255,0.05);
+  --color-line: rgba(155,115,245,0.11);
+  --color-line2: rgba(155,115,245,0.22);
+  --color-ink: #EEEEFF;
+  --color-mute: #7878A8;
+  --color-dim: #404068;
+  --color-purple: #9B73F5;
+  --color-purpleb: #C4AAFF;
+  --color-gold: #F59E0B;
+  --color-goldb: #FBBF24;
+  --color-green: #34D399;
+  --color-coral: #F87171;
+  --color-soft: rgba(155,115,245,0.07);
+  --color-softline: rgba(155,115,245,0.2);
+  /* legacy aliases so existing components don't lose colour during migration */
+  --color-teal: #9B73F5;
+  --color-tealb: #C4AAFF;
+  --color-mango: #F59E0B;
 }
 
-/* Font tokens must be inline: next/font defines --font-anton and
-   --font-space-grotesk on body, not :root, so a plain @theme token never
-   resolves and every heading silently fell back to system fonts. Found by
-   reading the computed style on the live page, 26 Aug. */
+/* Font tokens must be inline: next/font injects variables on body, not :root,
+   so a plain @theme token never resolves. Fraunces + IBM Plex, Sep 2026. */
 @theme inline {
-  --font-display: var(--font-anton), Impact, sans-serif;
-  --font-body: var(--font-space-grotesk), -apple-system, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-ibm-plex-sans), -apple-system, sans-serif;
+  --font-mono-app: var(--font-ibm-plex-mono), ui-monospace, monospace;
 }
 
 body {
@@ -50,14 +54,20 @@ body {
   --ink: var(--color-ink);
   --mute: var(--color-mute);
   --dim: var(--color-dim);
-  --teal: var(--color-teal);
-  --tealb: var(--color-tealb);
-  --mango: var(--color-mango);
+  --purple: var(--color-purple);
+  --purpleb: var(--color-purpleb);
+  --gold: var(--color-gold);
+  --goldb: var(--color-goldb);
+  --green: var(--color-green);
   --coral: var(--color-coral);
   --soft: var(--color-soft);
   --softline: var(--color-softline);
+  /* legacy aliases — existing components using teal/mango inherit purple/gold */
+  --teal: var(--color-purple);
+  --tealb: var(--color-purpleb);
+  --mango: var(--color-gold);
   --disp: var(--font-display);
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --mono: var(--font-mono-app);
   --r: 14px;
   --tr: .15s;
 }

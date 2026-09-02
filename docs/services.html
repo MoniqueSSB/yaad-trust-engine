@@ -996,6 +996,38 @@ footer {
 
     </div><!-- /svcs-grid -->
 
+    <!-- BOOK DIRECTLY. A booking is held, never charged, until Monique
+         confirms the scope and the exact price in writing. The card CTAs
+         above jump here with the service preselected. -->
+    <div class="payment-note rv" id="book" style="display:block">
+      <p style="margin:0 0 4px"><b>Book a service, nothing charged now.</b> The booking is held while Monique confirms the scope and the exact price with you in writing. The invoice comes by email after that, and you can cancel anytime before you pay.</p>
+      <div class="form-row" style="margin-top:14px">
+        <div class="fgroup"><label for="bk-svc">Which service</label>
+          <select id="bk-svc">
+            <option value="deposit">Deposit Protection Check</option>
+            <option value="visual">Visual Check</option>
+            <option value="condition">Condition Report</option>
+            <option value="signoff">Technical Sign-off</option>
+            <option value="retainer">Oversight Retainer</option>
+            <option value="care">Property Care</option>
+            <option value="setup">Project Setup Pack</option>
+            <option value="docs">Document Pack Check</option>
+          </select>
+        </div>
+        <div class="fgroup"><label for="bk-name">Your name</label><input id="bk-name" autocomplete="name"></div>
+      </div>
+      <div class="form-row">
+        <div class="fgroup"><label for="bk-email">Email</label><input id="bk-email" autocomplete="email" placeholder="you@email.com"></div>
+        <div class="fgroup"><label for="bk-phone">WhatsApp number</label><input id="bk-phone" placeholder="+44… or +1 876…"></div>
+      </div>
+      <div class="form-row">
+        <div class="fgroup"><label for="bk-parish">Where is the property? Parish or town</label><input id="bk-parish" placeholder="Portmore"></div>
+        <div class="fgroup"><label for="bk-msg">Anything we should know</label><input id="bk-msg" placeholder="Optional"></div>
+      </div>
+      <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
+      <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
+    </div>
+
     <!-- PAYMENT NOTE — replaces old split rule -->
     <div class="payment-note rv">
       <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
@@ -1109,6 +1141,60 @@ const ENQUIRY_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const $id = i => document.getElementById(i);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Direct booking (2 Sep 2026): a card's CTA jumps to the booking panel with
+   that service preselected instead of opening WhatsApp. The booking is held,
+   never charged, until Monique confirms scope and price in writing. A card
+   whose service has no bookable catalogue entry keeps its WhatsApp link. */
+const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-book-service";
+const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
+document.querySelectorAll(".svc-cta").forEach(el => {
+  const hit = CTA_KEYS.find(([frag]) => (el.getAttribute("href") || "").includes(frag));
+  if (!hit) return;
+  const card = el.closest(".svc-card");
+  const label = ((card?.querySelector(".svc-title")?.textContent || "") + ", " +
+                 (card?.querySelector(".price-main")?.textContent || "")).trim();
+  el.href = "#book"; el.removeAttribute("target"); el.removeAttribute("rel");
+  el.addEventListener("click", () => {
+    const sel = $id("bk-svc");
+    if (sel) { sel.value = hit[1]; sel.dataset.label = label; }
+  });
+});
+
+async function sendBooking(){
+  const g = i => ($id(i).value||"").trim();
+  const status = $id("bk-status"), btn = $id("bk-send");
+  const say = (tone, html) => { status.innerHTML = '<span style="color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</span>'; };
+  const fallback = ' Book it on <a href="https://wa.me/447878877567" target="_blank" rel="noopener">WhatsApp</a> instead, or email <a href="mailto:'+SVC_EMAIL+'">'+esc(SVC_EMAIL)+'</a>.';
+  const sel = $id("bk-svc");
+  const b = { service: sel.value, label: sel.dataset.label || sel.options[sel.selectedIndex].text,
+              name: g("bk-name"), email: g("bk-email"), phone: g("bk-phone"),
+              parish: g("bk-parish"), message: g("bk-msg") };
+  if(!b.name || (!b.email && !b.phone)){
+    say("bad", "<b>Nearly.</b> We need your name and an email or WhatsApp number, so the booking has somebody to belong to.");
+    return;
+  }
+  btn.disabled = true; btn.textContent = "Booking…";
+  let j = null;
+  try{
+    const r = await fetch(BOOKING_URL, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+SUPABASE_PUBLISHABLE_KEY, "apikey":SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify(b)
+    });
+    j = await r.json().catch(()=>null);
+    if(!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+  }catch(err){
+    btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+    const mine = (j && j.error) ? esc(j.error) : "That did not go through. Nothing is lost on your side.";
+    say("bad", "<b>" + mine + "</b>" + fallback);
+    return;
+  }
+  btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+  const channel = j.phoneGiven ? "WhatsApp" : "email";
+  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal. Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.");
+  ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
+}
 
 async function sendEnquiry(){
   const g = i => ($id(i).value||"").trim();

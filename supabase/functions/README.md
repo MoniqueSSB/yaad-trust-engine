@@ -14,6 +14,7 @@ that actually serves real users. That is why these files are here.
 | `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
 | `yaad-sketch` | true | Site Sketch Pack: video stills → rooms, condition schedule, schematic, admin session only |
+| `yaad-desk-reply` | true | Monique's typed reply to a Conversations thread, sent from the Yaadly Twilio number. No model call anywhere in it; `is_admin()` checked inside as well. A send marks the thread `human_handling`, so `yaad-inbound` stands down until the desk hands it back |
 
 `verify_jwt` matters. The three public endpoints must stay `false`, because
 Meta and an anonymous website visitor have no Supabase session, and they carry

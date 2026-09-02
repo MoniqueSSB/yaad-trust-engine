@@ -75,69 +75,124 @@ nav.site-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.88);backd
 /* ══════════════════════════════════════════════
    HERO — full-width, centered, cinematic
 ══════════════════════════════════════════════ */
-.hero{padding:88px 0 0;text-align:center}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
-.hero-left{display:flex;flex-direction:column}
-.hero-right{position:relative}
+.hero{padding:56px 0 8px;position:relative;overflow:hidden;z-index:1}
+.hero-grid{display:grid;grid-template-columns:11fr 9fr;gap:52px;align-items:center;position:relative;z-index:1}
+.hero-left{display:flex;flex-direction:column;align-items:flex-start;text-align:left}
+.hero-right{position:relative;perspective:1000px}
 .hero-right .vid-glow{position:absolute;inset:-40px;z-index:0;background:radial-gradient(ellipse at center,rgba(155,115,245,0.22) 0%,rgba(245,158,11,0.08) 50%,transparent 70%);filter:blur(30px);animation:vidglow 6s ease-in-out infinite alternate}
-.hero-right .vid-card{position:relative;z-index:1;background:rgba(10,10,32,0.8);border:1px solid rgba(155,115,245,0.3);border-radius:18px;padding:10px;box-shadow:0 40px 80px rgba(0,0,0,0.5)}
+.hero-right .vid-card{position:relative;z-index:1;background:rgba(10,10,32,0.8);border:1px solid rgba(155,115,245,0.3);border-radius:18px;padding:10px;box-shadow:0 40px 80px rgba(0,0,0,0.5);transition:transform .2s ease-out;will-change:transform}
 .hero-right .vid-card video{width:100%;border-radius:10px;display:block}
 @media(max-width:860px){.hero-grid{grid-template-columns:1fr;gap:36px}}
+
+.hero .orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(2px);will-change:transform;z-index:0}
+.hero .orb1{top:-160px;right:-200px;width:720px;height:720px;background:radial-gradient(ellipse at 60% 40%,rgba(155,115,245,0.14) 0%,transparent 65%)}
+.hero .orb2{bottom:-220px;left:-180px;width:600px;height:600px;background:radial-gradient(ellipse,rgba(245,158,11,0.07) 0%,transparent 65%)}
+.fleck{position:absolute;width:4px;height:4px;border-radius:50%;background:var(--purple);opacity:.35;animation:drift linear infinite;pointer-events:none}
+.fleck.g{background:var(--gold)}
+@keyframes drift{0%{transform:translateY(20px);opacity:0}15%{opacity:.4}85%{opacity:.4}100%{transform:translateY(-90vh);opacity:0}}
 
 .hero-eyebrow{
   display:inline-flex;align-items:center;gap:8px;
   font:600 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;
   color:var(--purpleb);padding:6px 16px;
   border:1px solid rgba(155,115,245,0.25);border-radius:100px;
-  background:rgba(155,115,245,0.07);margin-bottom:28px;
+  background:rgba(155,115,245,0.07);margin-bottom:24px;
 }
 .hero-eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--purple);animation:pulse 2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
 
 h1.display{
   font-family:var(--disp);font-weight:200;
-  font-size:clamp(38px,5.5vw,80px);
-  line-height:.97;letter-spacing:-0.035em;
-  margin-bottom:30px;
+  font-size:clamp(38px,5.4vw,74px);
+  line-height:1.03;letter-spacing:-0.025em;
+  margin-bottom:18px;
 }
+h1.display .w{display:inline-block;overflow:hidden;vertical-align:bottom}
+h1.display .w i{display:inline-block;font-style:inherit;transform:translateY(110%);animation:wordup .7s cubic-bezier(.2,.8,.2,1) forwards}
 h1.display em{
   font-style:italic;font-weight:300;
-  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+  background:var(--grad);background-size:220% 220%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:gradshift 5s ease-in-out infinite;
 }
-.hero-sub{font-size:17px;color:var(--mute);max-width:52ch;margin:0 0 28px;line-height:1.75}
+@keyframes wordup{to{transform:translateY(0)}}
+@keyframes gradshift{0%,100%{background-position:0% 40%}50%{background-position:95% 60%}}
+.hero-sub{font-size:16.5px;color:var(--mute);max-width:44ch;margin:0 0 24px;line-height:1.7;opacity:0;animation:fadeup .7s .8s ease forwards}
 .hero-sub b{color:var(--ink);font-weight:600}
+@keyframes fadeup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 
-/* steps row */
-.steps-row{
-  display:flex;justify-content:center;gap:0;
-  flex-wrap:wrap;margin-bottom:44px;
+/* PULSE STRIP: the three steps, animated */
+.pulse{
+  position:relative;margin-bottom:28px;max-width:530px;
+  border:1px solid var(--line);border-radius:14px;
+  background:rgba(13,13,40,0.6);
+  padding:16px 18px 14px;
+  opacity:0;animation:fadeup .7s 1.05s ease forwards;
 }
-.step{
-  display:flex;align-items:center;gap:10px;
-  padding:12px 20px;font-size:14px;color:var(--mute);
-  position:relative;
+.pulse-steps{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:center}
+.pstep{display:flex;align-items:flex-start;gap:10px;opacity:.38;transition:opacity .45s}
+.pstep.on{opacity:1}
+.pstep .pi{
+  width:32px;height:32px;border-radius:9px;flex-shrink:0;
+  background:rgba(155,115,245,0.1);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .45s,box-shadow .45s;
 }
-.step:not(:first-child)::before{
-  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:1px;height:24px;background:var(--line2);
+.pstep.on .pi{border-color:rgba(155,115,245,0.5);box-shadow:0 0 14px rgba(155,115,245,0.25)}
+.pstep .pi svg{width:15px;height:15px;stroke:var(--purpleb);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pstep .pt{font-size:11.5px;font-weight:600;color:var(--ink);line-height:1.35}
+.pstep .pn{font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.14em;color:var(--purple);display:block;margin-bottom:2px}
+.plock{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--bg2);border:1px solid var(--line2);
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .45s,box-shadow .45s;
 }
-.step-num{font:600 10px var(--mono);color:var(--dim);letter-spacing:.1em;flex-shrink:0}
-.step b{color:var(--ink);font-weight:600}
-@media(max-width:640px){.steps-row{flex-direction:column;align-items:center;gap:2px}.step::before{display:none}}
+.plock svg{width:16px;height:16px;stroke:var(--mute);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:stroke .3s}
+.plock.open{border-color:rgba(245,158,11,0.55);box-shadow:0 0 16px rgba(245,158,11,0.3)}
+.plock.open svg{stroke:var(--goldb)}
+.pulse-rail{position:relative;height:2px;border-radius:2px;background:rgba(155,115,245,0.12);margin-top:13px;overflow:hidden}
+.pulse-rail i{
+  position:absolute;top:0;bottom:0;left:0;width:0%;
+  background:var(--grad);border-radius:2px;
+  box-shadow:0 0 8px rgba(155,115,245,0.6);
+  transition:width .7s cubic-bezier(.4,0,.2,1);
+}
+.pulse-line{
+  margin-top:11px;font-family:var(--mono);font-size:10.5px;color:var(--mute);
+  display:flex;align-items:center;gap:8px;min-height:16px;
+}
+.pulse-line .led{width:6px;height:6px;border-radius:50%;background:var(--purple);box-shadow:0 0 7px rgba(155,115,245,0.7);flex-shrink:0;transition:background .3s,box-shadow .3s}
+.pulse-line.paid .led{background:var(--gold);box-shadow:0 0 7px rgba(245,158,11,0.8)}
+.pulse-line b{color:var(--goldb)}
+.pulse-line .g{color:var(--green)}
+
+@media(max-width:640px){.pulse-steps{grid-template-columns:1fr 1fr;gap:10px}.plock{display:none}}
+/* SCROLL CUE */
+.scroll-cue{
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:26px 0 22px;position:relative;z-index:2;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim);
+  opacity:0;animation:fadeup .8s 2s ease forwards;
+}
+.scroll-cue .mouse{width:20px;height:32px;border:1.5px solid var(--line2);border-radius:11px;position:relative}
+.scroll-cue .mouse::after{
+  content:'';position:absolute;left:50%;top:6px;width:3px;height:7px;margin-left:-1.5px;
+  border-radius:2px;background:var(--purpleb);
+  animation:wheel 1.6s ease-in-out infinite;
+}
+@keyframes wheel{0%{transform:translateY(0);opacity:1}70%{transform:translateY(10px);opacity:0}100%{transform:translateY(0);opacity:0}}
 
 /* hero CTAs */
-.hero-ctas{display:flex;gap:12px;justify-content:flex-start;flex-wrap:wrap}
+.hero-ctas{display:flex;gap:12px;justify-content:flex-start;flex-wrap:wrap;opacity:0;animation:fadeup .7s 1.3s ease forwards}
 
 /* ══════════════════════════════════════════════
-   VIDEO SECTION
+   VIDEO SHOWCASE
 ══════════════════════════════════════════════ */
-.vid-section{padding:0 0 88px;position:relative;z-index:1}
-.vid-section-inner{display:grid;grid-template-columns:1fr 2.2fr;gap:64px;align-items:center}
-@media(max-width:760px){.vid-section-inner{grid-template-columns:1fr;gap:28px}}
-.vid-section-label{text-align:left}
-.vid-tag{display:inline-flex;font:600 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--purpleb);padding:5px 12px;border:1px solid rgba(155,115,245,0.25);border-radius:100px;background:rgba(155,115,245,0.07);margin-bottom:16px}
-.vid-section-h{font:200 22px/1.4 var(--disp);color:var(--mute)}
-.vid-wrap-full{position:relative;z-index:1}
+.vid-wrap{
+  margin:56px auto 0;max-width:820px;
+  position:relative;z-index:1;
+}
 .vid-glow{
   position:absolute;inset:-40px;z-index:0;
   background:radial-gradient(ellipse at center, rgba(155,115,245,0.22) 0%, rgba(245,158,11,0.08) 50%, transparent 70%);
@@ -387,15 +442,39 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
 
 <!-- HERO -->
 <section class="hero" id="top">
+  <div class="orb orb1" data-px="30"></div>
+  <div class="orb orb2" data-px="18"></div>
   <div class="wrap hero-grid">
     <div class="hero-left">
       <div class="hero-eyebrow"><span class="dot"></span> Yaadly Ltd · UK registered · 17358077</div>
-      <h1 class="display">You cannot<br>be there.<br><em>Someone independent<br>can.</em></h1>
-      <p class="hero-sub">Property work in Jamaica, proven with evidence. <b>Photos arrive as the work is done.</b> You approve from your phone. Only then is anyone paid.</p>
-      <div class="steps-row">
-        <div class="step"><span class="step-num">01</span><span><b>Photos arrive</b> as the work is done</span></div>
-        <div class="step"><span class="step-num">02</span><span><b>You approve</b> from your phone, anywhere</span></div>
-        <div class="step"><span class="step-num">03</span><span><b>Only then</b> is anyone paid</span></div>
+      <h1 class="display">
+        <span class="w"><i style="animation-delay:.05s">You</i></span>
+        <span class="w"><i style="animation-delay:.13s">cannot</i></span>
+        <span class="w"><i style="animation-delay:.21s">be</i></span>
+        <span class="w"><i style="animation-delay:.29s">there.</i></span><br>
+        <span class="w"><i style="animation-delay:.45s"><em>Someone</em></i></span>
+        <span class="w"><i style="animation-delay:.53s"><em>independent</em></i></span>
+        <span class="w"><i style="animation-delay:.61s"><em>can.</em></i></span>
+      </h1>
+      <p class="hero-sub">Property work in Jamaica, <b>proven with evidence before anyone is paid.</b></p>
+      <div class="pulse" id="pulse">
+        <div class="pulse-steps">
+          <div class="pstep">
+            <span class="pi"><svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg></span>
+            <span class="pt"><span class="pn">01</span>Photos arrive as work is done</span>
+          </div>
+          <div class="pstep">
+            <span class="pi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg></span>
+            <span class="pt"><span class="pn">02</span>You approve from your phone</span>
+          </div>
+          <div class="pstep">
+            <span class="pi"><svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></span>
+            <span class="pt"><span class="pn">03</span>Only then is anyone paid</span>
+          </div>
+          <div class="plock" id="plock"><svg id="plock-svg" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+        </div>
+        <div class="pulse-rail"><i id="prail"></i></div>
+        <div class="pulse-line" id="pline"><span class="led"></span><span id="ptxt">evidence incoming…</span></div>
       </div>
       <div class="hero-ctas">
         <a class="btn btn-purple btn-lg" href="#marketplace">Post a job, free</a>
@@ -404,21 +483,18 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
     </div>
     <div class="hero-right">
       <div class="vid-glow"></div>
-      <div class="vid-card">
-        <div class="browser-bar"><span class="bdot r"></span><span class="bdot y"></span><span class="bdot g"></span></div>
+      <div class="vid-card" id="herovid">
         <video autoplay muted loop playsinline poster="demo-poster.jpg">
           <source src="demo.mp4" type="video/mp4">
         </video>
         <div class="vid-cap-bar">
-          <span class="vid-cap">This is the whole product, in eleven seconds.</span>
+          <span class="vid-cap">The whole product · eleven seconds.</span>
         </div>
       </div>
     </div>
   </div>
+  <div class="scroll-cue"><div class="mouse"></div>scroll</div>
 </section>
-
-<!-- VIDEO SECTION -->
-
 
 <!-- TRUST STRIP -->
 <div class="wrap rv d1">
@@ -571,11 +647,95 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
 
 <script>
 (function(){
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.05,rootMargin:'0px 0px 60px 0px'});
+  // Reveal elements already in view on load (above-fold / fast paint)
+  function revealInView(){
+    document.querySelectorAll('.rv:not(.in)').forEach(function(el){
+      var r=el.getBoundingClientRect();
+      if(r.top < window.innerHeight+80){el.classList.add('in')}
+    });
+  }
+  revealInView();
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.05,rootMargin:'0px 0px 80px 0px'});
   document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
-  setTimeout(function(){document.querySelectorAll('.rv:not(.in)').forEach(function(el){var r=el.getBoundingClientRect();if(r.top<window.innerHeight){el.classList.add('in')}})},50);
+  window.addEventListener('load',revealInView);
   var t=document.getElementById('nt'),v=document.getElementById('nvl');
   if(t)t.addEventListener('click',function(){v.classList.toggle('open')});
+})();
+</script>
+<script>
+(function(){
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var hero = document.getElementById('top');
+  if(!hero) return;
+
+  if(!reduce){
+    for(var i = 0; i < 6; i++){
+      var f = document.createElement('span');
+      f.className = 'fleck' + (i % 3 === 0 ? ' g' : '');
+      f.style.left = (6 + Math.floor(Math.abs(Math.sin(i * 37)) * 88)) + '%';
+      f.style.bottom = '-10px';
+      f.style.animationDuration = (10 + (i % 4) * 3) + 's';
+      f.style.animationDelay = (i * 1.4) + 's';
+      hero.appendChild(f);
+    }
+  }
+
+  var psteps = [].slice.call(document.querySelectorAll('.pstep'));
+  var prail = document.getElementById('prail');
+  var plock = document.getElementById('plock');
+  var plockSvg = document.getElementById('plock-svg');
+  var pline = document.getElementById('pline');
+  var ptxt = document.getElementById('ptxt');
+  if(!prail) return;
+  var LOCK_OPEN = '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0"/>';
+  var LOCK_CLOSED = '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
+  var RAIL = ['30%','62%','100%'];
+  var TXT = [
+    { t:'14:02 · 6 geotagged photos received · roof stage 2', paid:false },
+    { t:'14:09 · approved by you, from London', paid:false },
+    { t:'14:09 · <b>payment released</b> · <span class="g">worker paid</span>', paid:true }
+  ];
+  if(reduce){
+    psteps.forEach(function(s){ s.classList.add('on'); });
+    prail.style.width = '100%';
+    plock.classList.add('open'); plockSvg.innerHTML = LOCK_OPEN;
+    ptxt.innerHTML = TXT[2].t; pline.classList.add('paid');
+  } else {
+    var pi = -1;
+    var ptick = function(){
+      pi++;
+      if(pi >= 3){
+        setTimeout(function(){
+          psteps.forEach(function(s){ s.classList.remove('on'); });
+          prail.style.width = '0%';
+          plock.classList.remove('open'); plockSvg.innerHTML = LOCK_CLOSED;
+          pline.classList.remove('paid');
+          ptxt.textContent = 'evidence incoming…';
+          pi = -1;
+          setTimeout(ptick, 1400);
+        }, 3400);
+        return;
+      }
+      psteps[pi].classList.add('on');
+      prail.style.width = RAIL[pi];
+      ptxt.innerHTML = TXT[pi].t;
+      if(TXT[pi].paid){ pline.classList.add('paid'); plock.classList.add('open'); plockSvg.innerHTML = LOCK_OPEN; }
+      setTimeout(ptick, 1800);
+    };
+    setTimeout(ptick, 1700);
+  }
+
+  if(!reduce && matchMedia('(pointer:fine)').matches){
+    var orbs = [].slice.call(document.querySelectorAll('.hero .orb'));
+    var vid = document.getElementById('herovid');
+    addEventListener('mousemove', function(e){
+      var nx = (e.clientX / innerWidth - .5), ny = (e.clientY / innerHeight - .5);
+      orbs.forEach(function(o){
+        o.style.transform = 'translate(' + (nx * +o.dataset.px) + 'px,' + (ny * +o.dataset.px) + 'px)';
+      });
+      if(vid) vid.style.transform = 'rotateY(' + (nx * -5) + 'deg) rotateX(' + (ny * 4) + 'deg)';
+    });
+  }
 })();
 </script>
 </body>

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { JobList, WORKER_STATUS, type Job } from "@/components/portal/JobList";
 import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
+import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
@@ -102,6 +103,51 @@ export default async function WorkerPortal() {
     })
     .filter((x): x is MoneyJob => x !== null);
 
+  // The real document trail, not the computed estimate above: the actual
+  // invoices raised in this worker's own name (20260902n), job by job. No
+  // .eq() on worker_email for the same reason as the jobs query: RLS
+  // (invoices_worker_read) already scopes this to the signed-in worker.
+  const { data: myInvoices } = await supabase
+    .from("invoices")
+    .select("id,job_id,stage,period_label,total_pence,status,sent_at")
+    .eq("payable_to", "worker")
+    .neq("status", "void")
+    .order("stage", { ascending: true, nullsFirst: true });
+
+  // The page's own `jobs` list is scoped to this worker's live/won stake
+  // (jobs.worker_email, or a still-live quote); an invoice's own job_id can
+  // fall outside that on a seeded/older row, so its title is looked up
+  // directly rather than assumed present in that narrower list.
+  const invoiceJobIds = Array.from(new Set((myInvoices ?? []).map((i) => i.job_id).filter((x): x is string => !!x)));
+  const jobTitleById = new Map(jobs.map((j) => [j.id, j.title]));
+  const missingTitleIds = invoiceJobIds.filter((id) => !jobTitleById.has(id));
+  if (missingTitleIds.length) {
+    const { data: extraJobs } = await supabase.from("jobs").select("id,title").in("id", missingTitleIds);
+    for (const j of extraJobs ?? []) jobTitleById.set(j.id, j.title);
+  }
+  const payMethodByJob = new Map(jobs.map((j) => [j.id, Boolean((j as { pay_method: string | null }).pay_method)]));
+  const invoicesByJob = new Map<string, WorkerInvoiceJob["invoices"]>();
+  for (const inv of myInvoices ?? []) {
+    const list = invoicesByJob.get(inv.job_id!) ?? [];
+    list.push({
+      id: inv.id,
+      stage: inv.stage,
+      periodLabel: inv.period_label || (inv.stage ? "Stage " + inv.stage : "Work completed"),
+      totalPence: inv.total_pence,
+      status: inv.status,
+      sentAt: inv.sent_at,
+    });
+    invoicesByJob.set(inv.job_id!, list);
+  }
+  const invoiceJobs: WorkerInvoiceJob[] = Array.from(invoicesByJob.entries()).map(
+    ([jobId, invoices]) => ({
+      jobId,
+      jobTitle: jobTitleById.get(jobId) ?? null,
+      paid: payMethodByJob.get(jobId) ?? false,
+      invoices,
+    }),
+  );
+
   const held = moneyJobs.filter((j) => j.held).reduce((sum, j) => sum + j.takeHome, 0);
   const released = moneyJobs.filter((j) => !j.held).reduce((sum, j) => sum + j.takeHome, 0);
 
@@ -146,6 +192,8 @@ export default async function WorkerPortal() {
       <LinkWorkerPhone phone={profile?.phone ?? null} />
 
       <WorkerMoneyPanel jobs={moneyJobs} />
+
+      <WorkerInvoices jobs={invoiceJobs} />
 
       <JobList
         title="Live work"
