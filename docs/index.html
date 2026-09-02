@@ -76,6 +76,13 @@ nav.site-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.88);backd
    HERO — full-width, centered, cinematic
 ══════════════════════════════════════════════ */
 .hero{padding:88px 0 0;text-align:center}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.hero-left{display:flex;flex-direction:column}
+.hero-right{position:relative}
+.hero-right .vid-glow{position:absolute;inset:-40px;z-index:0;background:radial-gradient(ellipse at center,rgba(155,115,245,0.22) 0%,rgba(245,158,11,0.08) 50%,transparent 70%);filter:blur(30px);animation:vidglow 6s ease-in-out infinite alternate}
+.hero-right .vid-card{position:relative;z-index:1;background:rgba(10,10,32,0.8);border:1px solid rgba(155,115,245,0.3);border-radius:18px;padding:10px;box-shadow:0 40px 80px rgba(0,0,0,0.5)}
+.hero-right .vid-card video{width:100%;border-radius:10px;display:block}
+@media(max-width:860px){.hero-grid{grid-template-columns:1fr;gap:36px}}
 
 .hero-eyebrow{
   display:inline-flex;align-items:center;gap:8px;
@@ -89,7 +96,7 @@ nav.site-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.88);backd
 
 h1.display{
   font-family:var(--disp);font-weight:200;
-  font-size:clamp(52px,9vw,110px);
+  font-size:clamp(38px,5.5vw,80px);
   line-height:.97;letter-spacing:-0.035em;
   margin-bottom:30px;
 }
@@ -97,7 +104,7 @@ h1.display em{
   font-style:italic;font-weight:300;
   background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
 }
-.hero-sub{font-size:17px;color:var(--mute);max-width:52ch;margin:0 auto 36px;line-height:1.75}
+.hero-sub{font-size:17px;color:var(--mute);max-width:52ch;margin:0 0 28px;line-height:1.75}
 .hero-sub b{color:var(--ink);font-weight:600}
 
 /* steps row */
@@ -119,7 +126,7 @@ h1.display em{
 @media(max-width:640px){.steps-row{flex-direction:column;align-items:center;gap:2px}.step::before{display:none}}
 
 /* hero CTAs */
-.hero-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.hero-ctas{display:flex;gap:12px;justify-content:flex-start;flex-wrap:wrap}
 
 /* ══════════════════════════════════════════════
    VIDEO SECTION
@@ -380,43 +387,38 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
 
 <!-- HERO -->
 <section class="hero" id="top">
-  <div class="wrap-sm">
-    <div class="hero-eyebrow rv"><span class="dot"></span> Yaadly Ltd · UK registered · 17358077</div>
-    <h1 class="display rv d1">You cannot<br>be there.<br><em>Someone independent<br>can.</em></h1>
-    <p class="hero-sub rv d2">Property work in Jamaica, proven with evidence. <b>Photos arrive as the work is done.</b> You approve from your phone. Only then is anyone paid.</p>
-    <div class="steps-row rv d2">
-      <div class="step"><span class="step-num">01</span><span><b>Photos arrive</b> as the work is done</span></div>
-      <div class="step"><span class="step-num">02</span><span><b>You approve</b> from your phone, anywhere</span></div>
-      <div class="step"><span class="step-num">03</span><span><b>Only then</b> is anyone paid</span></div>
-    </div>
-    <div class="hero-ctas rv d3">
-      <a class="btn btn-purple btn-lg" href="#marketplace">Post a job, free</a>
-      <a class="btn btn-ghost btn-lg" href="#managed">Book a service</a>
-    </div>
-  </div>
-
-</section>
-
-<!-- VIDEO SECTION -->
-<section class="vid-section">
-  <div class="wrap">
-    <div class="vid-section-inner rv">
-      <div class="vid-section-label">
-        <span class="vid-tag">See how it works</span>
-        <p class="vid-section-h">This is the whole product, in eleven seconds.</p>
+  <div class="wrap hero-grid">
+    <div class="hero-left">
+      <div class="hero-eyebrow"><span class="dot"></span> Yaadly Ltd · UK registered · 17358077</div>
+      <h1 class="display">You cannot<br>be there.<br><em>Someone independent<br>can.</em></h1>
+      <p class="hero-sub">Property work in Jamaica, proven with evidence. <b>Photos arrive as the work is done.</b> You approve from your phone. Only then is anyone paid.</p>
+      <div class="steps-row">
+        <div class="step"><span class="step-num">01</span><span><b>Photos arrive</b> as the work is done</span></div>
+        <div class="step"><span class="step-num">02</span><span><b>You approve</b> from your phone, anywhere</span></div>
+        <div class="step"><span class="step-num">03</span><span><b>Only then</b> is anyone paid</span></div>
       </div>
-      <div class="vid-wrap-full">
-        <div class="vid-glow"></div>
-        <div class="vid-card">
-          <div class="browser-bar"><span class="bdot r"></span><span class="bdot y"></span><span class="bdot g"></span></div>
-          <video autoplay muted loop playsinline poster="demo-poster.jpg">
-            <source src="demo.mp4" type="video/mp4">
-          </video>
+      <div class="hero-ctas">
+        <a class="btn btn-purple btn-lg" href="#marketplace">Post a job, free</a>
+        <a class="btn btn-ghost btn-lg" href="#managed">Book a service</a>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="vid-glow"></div>
+      <div class="vid-card">
+        <div class="browser-bar"><span class="bdot r"></span><span class="bdot y"></span><span class="bdot g"></span></div>
+        <video autoplay muted loop playsinline poster="demo-poster.jpg">
+          <source src="demo.mp4" type="video/mp4">
+        </video>
+        <div class="vid-cap-bar">
+          <span class="vid-cap">This is the whole product, in eleven seconds.</span>
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<!-- VIDEO SECTION -->
+
 
 <!-- TRUST STRIP -->
 <div class="wrap rv d1">
