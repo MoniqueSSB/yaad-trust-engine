@@ -1658,10 +1658,16 @@ Deno.serve(async (req: Request) => {
     // brand new problem a week later is genuinely a new job.
     const THREAD_HOURS = 12;
     const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
-    const { data: prior } = await supabase.from("intake_threads")
+    const priorQ = await supabase.from("intake_threads")
       .select("job_id,transcript,turns,last_at,stage,human_handling")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
+    // let, not const: the website-chat adoption below swaps in the web
+    // conversation as this number's prior thread, so the ordinary pipeline
+    // continues it rather than starting over.
+    let prior = priorQ.data as {
+      job_id: string; transcript: string; turns: number; last_at: string; stage: string; human_handling: boolean;
+    } | null;
     // A thread already at 'done' produced its job; nothing left to gather.
     // A reply about THAT job (approving a stage, replying to a comment) is
     // already intercepted above, before this point, by its own lane. So a
@@ -1736,13 +1742,19 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, jobId: heldJobId, heldForHuman: true });
     }
 
-    // A visitor handed over from the website chat, arriving on WhatsApp with
-    // the reference the widget put in their first message. Adopt the web
-    // thread rather than start a fresh one: the transcript carries across,
-    // the job they were describing keeps its code, and the thread is held
-    // for Monique from this message on, because the only reason the widget
-    // sends anyone here is that the assistant had already handed over. This
-    // is what makes "you will not have to say it twice" true.
+    // A visitor arriving on WhatsApp from the website chat, with the
+    // reference the widget put in their first message. Adopt the web thread
+    // rather than start a fresh one: the transcript carries across and the
+    // job they were describing keeps its code. This is what makes "you will
+    // not have to say it twice" true.
+    //
+    // Who answers next is the founder's call, 2 Sep 2026, on watching it
+    // live: "AI should try help in the whatsapp chat before get passed to
+    // me". So the assistant carries on here, reading the whole web
+    // conversation, with a fresh three-turn allowance, and hands over by the
+    // same rules as any WhatsApp thread. The one exception is a web chat
+    // Monique had already personally replied in: that conversation is hers,
+    // and it stays hers on this number.
     if (msg.channel === "whatsapp" && msg.from) {
       const typedRef = webReferenceIn(msg.text);
       if (typedRef) {
@@ -1770,36 +1782,55 @@ Deno.serve(async (req: Request) => {
         }
         const ref = webThread?.job_id ?? typedRef;
         if (webThread) {
-          const carried = `${String(webThread.transcript ?? "")}\n\n[Continued on WhatsApp]\n${thisTurn}`.slice(-8000);
-          await supabase.from("intake_threads").upsert({
-            channel: threadKey.channel,
-            from_addr: threadKey.from_addr,
-            job_id: ref,
-            transcript: carried,
-            turns: Number(webThread.turns) + 1,
-            stage: String(webThread.stage ?? "gathering"),
-            last_at: new Date().toISOString(),
-            human_handling: true,
-          }, { onConflict: "channel,from_addr" });
-          // The number they wrote from is the first proven way to reach
-          // them; the web thread had none.
-          await supabase.from("jobs").update({ client_phone: msg.from }).eq("id", ref);
-          if (msg.media.length) {
-            await keepMedia(supabase as unknown as MediaWriter, ref, msg.media, Number(webThread.turns) * 10, trace);
-          }
-          try {
-            const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
-            if (st?.value) {
-              await fetch(`https://ntfy.sh/${st.value}`, {
-                method: "POST",
-                headers: { Title: "Needs you: web chat moved to WhatsApp", Priority: "high", Tags: "raising_hand" },
-                body: `${ref}: they carried on from the website chat. The whole conversation is on the thread. The assistant is standing down until the desk hands it back.`,
-                signal: AbortSignal.timeout(4000),
-              });
+          const { count: herReplies } = await supabase.from("web_chat_replies")
+            .select("id", { count: "exact", head: true }).eq("job_id", ref);
+          const hers = (herReplies ?? 0) > 0;
+          const webTranscript = String(webThread.transcript ?? "");
+          root.setAttributes({ "yaadly.inbound.outcome": "web_thread_adopted", "yaadly.job.id": ref, "yaadly.web_adopt.hers": hers });
+
+          if (hers) {
+            // She was already talking to them in the web chat. Keep it hers:
+            // record this message on the carried thread, hold it, tell her.
+            const carried = `${webTranscript}\n\n[Continued on WhatsApp]\n${thisTurn}`.slice(-8000);
+            await supabase.from("intake_threads").upsert({
+              channel: threadKey.channel, from_addr: threadKey.from_addr, job_id: ref,
+              transcript: carried, turns: Number(webThread.turns) + 1,
+              stage: String(webThread.stage ?? "gathering"), last_at: new Date().toISOString(),
+              human_handling: true,
+            }, { onConflict: "channel,from_addr" });
+            await supabase.from("jobs").update({ client_phone: msg.from }).eq("id", ref);
+            if (msg.media.length) {
+              await keepMedia(supabase as unknown as MediaWriter, ref, msg.media, Number(webThread.turns) * 10, trace);
             }
-          } catch (_) { /* never let a notification break intake */ }
-          root.setAttributes({ "yaadly.inbound.outcome": "web_thread_adopted", "yaadly.job.id": ref });
-          return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Monique will read it herself and come back to you on this number.`);
+            try {
+              const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+              if (st?.value) {
+                await fetch(`https://ntfy.sh/${st.value}`, {
+                  method: "POST",
+                  headers: { Title: "Your web chat moved to WhatsApp", Priority: "high", Tags: "raising_hand" },
+                  body: `${ref}: the person you were replying to on the website has carried on by WhatsApp. The whole conversation is on the thread, held for you.`,
+                  signal: AbortSignal.timeout(4000),
+                });
+              }
+            } catch (_) { /* never let a notification break intake */ }
+            return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Monique was already on this one and will come back to you on this number.`);
+          }
+
+          // Otherwise the assistant carries on. The web conversation becomes
+          // this number's prior thread, turns reset so the three-turn handoff
+          // counts afresh from here, and the pipeline below reads the whole
+          // thing and replies as it would to any continuing conversation.
+          // The job row is updated by that same pipeline, which on WhatsApp
+          // writes this number into client_phone, the first proven way to
+          // reach them.
+          prior = {
+            job_id: ref,
+            transcript: `${webTranscript}\n\n[Continued on WhatsApp]`,
+            turns: 0,
+            last_at: new Date().toISOString(),
+            stage: String(webThread.stage ?? "gathering") === "done" ? "confirming" : String(webThread.stage ?? "gathering"),
+            human_handling: false,
+          };
         }
       }
     }
@@ -2054,7 +2085,7 @@ Deno.serve(async (req: Request) => {
         if (isWeb) {
           return say(
             `Of course. Everything you have told me is saved as ${jobId}, so you will not have to say it twice. ` +
-            `Monique will answer here herself when she picks this up. If you are leaving this page, tap the WhatsApp button and carry on with her there instead.`,
+            `Monique will answer here herself when she picks this up. If you are leaving this page, tap the WhatsApp button and carry on there instead; everything you have said comes with you.`,
             true,
           );
         }
@@ -2114,7 +2145,7 @@ Deno.serve(async (req: Request) => {
         if (isWeb) {
           return say(
             (noQuestions ? noQuestions + " " : "") +
-            `I have not got quite enough to write this up properly, so this is one for Monique to read herself. Your reference is ${jobId}. She will answer here when she picks it up, or carry on with her on WhatsApp if you are leaving this page.`,
+            `I have not got quite enough to write this up properly, so this is one for Monique to read herself. Your reference is ${jobId}. She will answer here when she picks it up, or carry on on WhatsApp if you are leaving this page; everything you have said comes with you.`,
             true,
           );
         }
