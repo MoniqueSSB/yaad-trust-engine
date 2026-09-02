@@ -167,14 +167,47 @@ export function StageLedger({
             </div>
 
             <div className="flex flex-col gap-2.5 border-t border-line px-4.5 py-3.5">
-              {(s.releaseCondition || s.evidenceRequired.length > 0) && (
+              {s.releaseCondition && (
                 <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
                   {Ico.soon}
                   <span>
                     <b className="font-semibold text-ink">Acceptance criteria:</b>{" "}
-                    {s.releaseCondition ?? s.evidenceRequired.join(", ")}
+                    {s.releaseCondition}
                   </span>
                 </span>
+              )}
+
+              {/* The itemised list the pack asks for, which is the criteria in
+                  checkable form. It was being collapsed into a comma string
+                  behind the prose above, and only when there was no prose, so
+                  in practice it never appeared at all. */}
+              {s.evidenceRequired.length > 0 && (
+                <div className="rounded-xl border border-line bg-bg/35 px-4 py-3">
+                  <b className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.1em] text-dim">
+                    {side === "client"
+                      ? "What must be produced for this stage"
+                      : "What you must produce for this stage"}
+                  </b>
+                  <ul className="flex flex-col gap-1.5">
+                    {s.evidenceRequired.map((r, k) => (
+                      <li key={k} className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
+                        <span
+                          className={
+                            "mt-1 grid size-[14px] shrink-0 place-items-center rounded-[5px] border-[1.5px] " +
+                            (s.approved ? "border-green/45 bg-green/[0.15]" : "border-line2")
+                          }
+                        >
+                          {s.approved && (
+                            <svg viewBox="0 0 24 24" className="size-2 fill-none stroke-green stroke-[3.5]" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m5 13 4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
