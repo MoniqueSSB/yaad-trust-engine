@@ -1044,3 +1044,15 @@ Signed links here last 3600 seconds, not the 300 used for a one-shot WhatsApp or
 ## WhatsApp only ever means Twilio in this repository now
 
 `yaad-whatsapp-webhook`, a direct Meta Cloud API webhook, is gone (1 Sep 2026; see above and DECISIONS.md). It never received real traffic: `WHATSAPP_ACCESS_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` were never set, and the founder's own instruction on 31 Aug 2026 was to stop pursuing Meta entirely: "remove meta from this moving forward." **Real WhatsApp traffic flows through `yaad-inbound`**, via Twilio, `whatsapp:` prefixed sender addresses on the same webhook Twilio SMS uses, `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` the secrets that matter. If a real WhatsApp message is not reaching the system, look at `yaad-inbound`'s Twilio signature check and Twilio's own console configuration. If code or a doc anywhere still names `yaad-whatsapp-webhook`, that reference is stale; say so rather than trying to make it work.
+
+## A Quote Pack job never reaches `complete`, or its stage count looks wrong
+
+**Check which of the two documents `sync_job_status()` actually found.** Since 2 Sep 2026 (`20260902g`, see DECISIONS.md) the completion trigger checks an approved `kickoff_packs` row first, then an approved `quote_pack_drafts` row if that came back empty. A job stuck at the wrong stage count, or one that will not flip to `complete` no matter how much evidence gets approved, means neither lookup found an approved row:
+
+```sql
+select
+  (select status from kickoff_packs where job_id = '<job id>' order by updated_at desc limit 1) as kickoff_status,
+  (select status from quote_pack_drafts where job_id = '<job id>' order by created_at desc limit 1) as quotepack_status;
+```
+
+If the relevant one isn't `approved`, that's the actual problem, not the trigger. **The two documents store their stage count differently**: a Kickoff Pack keeps it nested at `docs->'payment_schedule'->'stages'`, a Quote Pack draft keeps a plain array at `docs->'payment_stages'`. A job can only ever have gone through one path (`20260902d`), so exactly one of the two should ever be populated for it; both being empty, or both being approved, is itself worth a second look. Recompute a job stuck on a now-fixed lookup by touching it: `update jobs set updated_at = now() where id = '<job id>'`, which re-fires `sync_job_status()` without changing anything else.

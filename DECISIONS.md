@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-02 · The completion trigger reads a Quote Pack's stage count too, not only a Kickoff Pack's
+
+**Found live while manually testing the worker journey end to end, join through paid, not caused by that test.** `sync_job_status()`'s completion check (`is_complete := stage > final_stage_count`) only ever looked up `final_stage_count` from an approved `kickoff_packs` row. `20260902c`/`d`, built the same day, added an entirely separate Quote Pack path (`quote_pack_drafts`) as an alternative to the Kickoff Pack, not a variant of it, so a job that goes through Quote Pack confirmation never gets a `kickoff_packs` row at all. The lookup came back null and silently fell back to the generic default of 4 remaining stages, whatever the Quote Pack itself had actually promised the client.
+
+**Confirmed live, on a real job.** `JOB-TEST-WAPAY-3`'s approved Quote Pack promised 2 payment stages (`docs->'payment_stages'`, 30%/70%); the portal's own progress bar, reading a third, independent count, was showing "Stage 3 of 3"; the trigger, by its own math, would not have completed the job until stage 5. All three disagreed with each other, and the client's own evidence approvals on stages 1 and 2 correctly released each stage's money regardless, since stage-level release never depended on the total count. Only the job's final `complete` flip, and with it the worker's own "how were you paid" screen, was stuck behind the wrong number.
+
+**Fix.** `sync_job_status()` now checks `kickoff_packs` first, exactly as before, and only if that comes back null, checks `quote_pack_drafts` for an approved row and reads its stage count from `docs->'payment_stages'` directly (a plain array, not nested under `payment_schedule` the way a Kickoff Pack stores it, the two documents were never the same shape). Since a job can only ever go through one of the two paths (`20260902d`'s own reasoning), the coalesce always lands on whichever document the job actually has, never a guess between them. A one-line `update jobs set updated_at = now()` for every job sitting on an already-approved Quote Pack draft was included in the same migration, so an already-stuck job like `JOB-TEST-WAPAY-3` didn't have to wait for an unrelated write to notice the fix.
+
+**Verified live.** Before the fix: `JOB-TEST-WAPAY-3` at `status = 'in_progress'`, `stage = 3`. Applied `20260902g_completion_trigger_reads_quote_pack_stage_count_too.sql` directly to `leffyisvfvjwzilydlwf`. After: the same job, no further action taken on it, read back as `status = 'complete'`. Continued the manual test through to the worker actually recording `pay_method = 'bank_transfer'` via the real portal form, the one screen this whole path exists to reach.
+
+---
+
 ## 2026-09-01 · A worker's text or voice reply, no photo attached, now produces a report the same way a photo does
 
 **The second half of the founder's own instruction on the report pipeline** (the daily prompt is the entry above this one): a worker's reply to it, most days a voice note or a couple of words with nothing to photograph, had nowhere to go. `yaad-inbound` had no lane that read a worker's own freeform update as anything at all: it either matched one of the existing narrow lanes (confirming a drafted report, answering a client's specific comment, a Kickoff Pack code) or fell all the way through into the client job-intake pipeline, read as a stranger describing a brand new problem.
