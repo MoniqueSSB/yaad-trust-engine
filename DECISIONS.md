@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-02 · The same fix, reapplied on top of a second session's newer work; the portal's own stage display gets it too
+
+**Two sessions on this branch at once, `sync_job_status()` changed under this one mid-task.** Minutes after `20260902g` (below) shipped, the live function had already moved on: a fee-paid-first gate (`if not fee_paid then new.status := 'awaiting_payment'; return new;`, ahead of what that migration's own file on disk shows) and `coalesce(final_stage_count, 1)` in place of `5 - 1`, neither of which this session wrote. The Quote Pack fallback `g` added had been silently dropped, reverted to reading `kickoff_packs` alone. Nobody's change was wrong on its own; they landed on top of each other. `20260902h` re-adds only the fallback, inside the structure actually live at the time (re-read via `pg_get_functiondef`, not assumed from the last file this session wrote), the fee-paid gate and its own default left exactly as found.
+
+**`JOB-TEST-WAPAY-3` correctly went back to `awaiting_payment` after this**, not a regression: its agency fee invoice was never actually marked paid, and the new gate is a real, separate rule that has nothing to do with either pack. Confirmed the two fixes are independent before concluding that.
+
+**The portal's own "Stage X of Y" never read either pack either**, a second, cosmetic instance of the same root cause: `stageCount` in `web/app/portal/(gated)/jobs/[id]/page.tsx` was `Math.max(job.stage, ...evidence stages seen, 1)`, "the highest stage number observed so far," coincidentally readable as a real total but never actually one. `web/lib/portal/journey.ts` gained `quotePackPaymentStages()`, the same shape as `packPaymentStages()` for the other document's `docs.payment_stages`. The page now tries an approved Kickoff Pack first, then an approved Quote Pack draft, same order and same reasoning as the trigger, so the portal's own number agrees with the one that actually decides completion. `currentPackStage`, the client's per-stage amount-due figure, was quietly reading kickoff-only too and is fixed the same way.
+
+**Not committed.** `page.tsx` and `journey.ts` both already carried substantial uncommitted work from the other session before this edit (163 and 21 lines respectively once combined). Committing either now would sweep that work in under this session's name. `web`'s own `tsc --noEmit` is clean and the fix is verified live in the dev server; the two files are left as working-tree changes for whoever owns that other work to fold in or commit themselves.
+
+---
+
 ## 2026-09-02 · The completion trigger reads a Quote Pack's stage count too, not only a Kickoff Pack's
 
 **Found live while manually testing the worker journey end to end, join through paid, not caused by that test.** `sync_job_status()`'s completion check (`is_complete := stage > final_stage_count`) only ever looked up `final_stage_count` from an approved `kickoff_packs` row. `20260902c`/`d`, built the same day, added an entirely separate Quote Pack path (`quote_pack_drafts`) as an alternative to the Kickoff Pack, not a variant of it, so a job that goes through Quote Pack confirmation never gets a `kickoff_packs` row at all. The lookup came back null and silently fell back to the generic default of 4 remaining stages, whatever the Quote Pack itself had actually promised the client.
