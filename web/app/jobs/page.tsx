@@ -159,15 +159,17 @@ export default async function Board({
         No addresses. No phone numbers. No budgets shown. Ever.
       </p>
 
-      {/* Live counts, read from what this page already loaded. */}
+      {/* The founder's call: keep the row, leave the figures blank until
+          there are real ones worth showing. The labels hold the shape so
+          nothing moves on the page when the numbers arrive. */}
       <div className="mt-5 flex flex-wrap gap-6">
         {[
-          [String(jobs.length), jobs.length === 1 ? "job open now" : "jobs open now", false],
-          [String(workers.length), workers.length === 1 ? "verified worker" : "verified workers", false],
-          ["100%", "paid on proof", true],
-        ].map(([n, label, gold]) => (
+          ["jobs open now", false],
+          ["verified workers", false],
+          ["paid on proof", true],
+        ].map(([label, gold]) => (
           <span key={label as string} className="flex items-baseline gap-2 font-mono-app text-[11px] font-medium uppercase tracking-[0.08em] text-dim">
-            <b className={"bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent " + (gold ? "bg-linear-to-br from-goldb to-gold" : "bg-linear-to-r from-purpleb via-purple to-gold")}>{n}</b>
+            <b className={"bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent " + (gold ? "bg-linear-to-br from-goldb to-gold" : "bg-linear-to-r from-purpleb via-purple to-gold")}>&mdash;</b>
             {label}
           </span>
         ))}

@@ -41,7 +41,7 @@ const looksLikePhone = (v: string) => v.replace(/\D/g, "").length >= 7;
 
 type Step = 0 | 1 | 2;
 
-export function PostJob({ initialTrade }: { initialTrade?: string }) {
+export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: string; requestedWorker?: string }) {
   const [step, setStep] = useState<Step>(0);
 
   const [trade, setTrade] = useState(initialTrade && (TRADES as readonly string[]).includes(initialTrade) ? initialTrade : "");
@@ -116,6 +116,7 @@ export function PostJob({ initialTrade }: { initialTrade?: string }) {
         message:
           `Job posted from the site, no account.\n\n` +
           `Reference: ${jobId || "draft not saved"}\n` +
+          (requestedWorker ? `Client asked for: ${requestedWorker}\n` : "") +
           `Trade: ${trade}\nParish: ${parish}\n\n${desc.trim()}` +
           (joinLink ? `\n\nSet up your portal: ${joinLink}\nJob code, if asked: ${portalCode}` : ""),
       });
