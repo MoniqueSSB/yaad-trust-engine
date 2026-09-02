@@ -6,23 +6,563 @@
 <title>Yaadly for business</title>
 <meta name="description" content="For agents, developers, insurers and partner firms who answer for Jamaican property they cannot stand in front of. Qualified, UK registered, independent of every contractor on the job.">
 <link rel="canonical" href="https://yaadly.co.uk/business.html">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%2314B8A6'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%2304211D'%3EY%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%237B4FE0'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%23ffffff'%3EY%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,500;1,9..144,200;1,9..144,300;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="yaadly.css?v=2">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,200;1,9..144,300;1,9..144,400;1,9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #07071A;
+  --bg2:    #0D0D28;
+  --panel:  rgba(155,115,245,0.05);
+  --panel2: rgba(155,115,245,0.09);
+  --line:   rgba(155,115,245,0.14);
+  --line2:  rgba(155,115,245,0.28);
+  --ink:    #EEEEFF;
+  --mute:   #7878A8;
+  --dim:    #44446A;
+  --purple: #9B73F5;
+  --purpleb:#C4AAFF;
+  --gold:   #F59E0B;
+  --goldb:  #FBBF24;
+  --grad:   linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
+  --disp:   'Fraunces',Georgia,serif;
+  --body:   'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:   'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:var(--body); background:var(--bg); color:var(--ink);
+  font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+a { color:var(--purple); text-decoration:none; }
+a:hover { color:var(--purpleb); }
+.wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
+
+/* NAV — identical to canonical */
+.site-nav {
+  position:sticky; top:0; z-index:100;
+  background:rgba(7,7,26,0.85); backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+.site-nav .nav-in {
+  max-width:1100px; margin:0 auto; padding:0 24px;
+  display:flex; align-items:center; height:56px;
+}
+.brand {
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--disp); font-weight:500; font-size:18px;
+  color:var(--ink); margin-right:auto; flex-shrink:0;
+}
+.brand .mark {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:30px; height:30px; border-radius:8px;
+  background:var(--grad); color:#fff; font-weight:700; font-size:16px;
+}
+.brand span { color:var(--mute); font-weight:300; }
+.views { display:flex; align-items:center; gap:2px; }
+.vbtn {
+  padding:6px 11px; border-radius:8px; font-size:13.5px; font-weight:500;
+  color:var(--mute); transition:color .15s,background .15s; white-space:nowrap;
+}
+.vbtn:hover { color:var(--ink); background:var(--panel2); }
+.vbtn.on { color:var(--purpleb); background:rgba(155,115,245,0.12); }
+.quiet-links {
+  display:flex; align-items:center; margin-left:12px;
+  padding-left:12px; border-left:1px solid var(--line);
+}
+.quiet-links a { padding:6px 10px; font-size:12.5px; color:var(--dim); white-space:nowrap; }
+.quiet-links a:hover { color:var(--purple); }
+
+/* HERO */
+.hero { padding:88px 0 72px; position:relative; overflow:hidden; }
+.hero::before {
+  content:''; position:absolute; top:-140px; left:-160px;
+  width:640px; height:640px; border-radius:50%;
+  background:radial-gradient(ellipse,rgba(245,158,11,0.08) 0%,transparent 65%);
+  pointer-events:none;
+}
+.hero::after {
+  content:''; position:absolute; bottom:-200px; right:-160px;
+  width:700px; height:700px; border-radius:50%;
+  background:radial-gradient(ellipse,rgba(155,115,245,0.1) 0%,transparent 65%);
+  pointer-events:none;
+}
+.hero-eyebrow {
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:var(--mono); font-size:11.5px; font-weight:600;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:22px;
+}
+.hero-eyebrow .dot { width:6px; height:6px; border-radius:50%; background:var(--gold); animation:pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+h1.display {
+  font-family:var(--disp); font-weight:300; line-height:1.06;
+  font-size:clamp(42px,6.5vw,88px); letter-spacing:-0.02em;
+  margin-bottom:26px; max-width:16ch;
+}
+h1.display em {
+  font-style:italic;
+  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.hero-sub { font-size:17.5px; color:var(--mute); max-width:58ch; line-height:1.7; margin-bottom:36px; }
+.hero-sub b { color:var(--ink); }
+.hero-ctas { display:flex; gap:12px; flex-wrap:wrap; }
+.btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:12px 22px; border-radius:10px; font-weight:600; font-size:14.5px;
+  cursor:pointer; transition:all .2s; white-space:nowrap;
+}
+.btn-primary { background:var(--grad); color:#fff; box-shadow:0 0 24px rgba(155,115,245,0.3); }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 32px rgba(155,115,245,0.4); color:#fff; }
+.btn-ghost { background:transparent; color:var(--purpleb); border:1.5px solid rgba(155,115,245,0.35); }
+.btn-ghost:hover { background:var(--panel2); border-color:var(--purple); color:var(--purpleb); }
+
+/* CREDENTIALS TICKER */
+.cred-strip {
+  margin-top:56px; display:grid; grid-template-columns:repeat(4,1fr);
+  border:1px solid var(--line); border-radius:16px; overflow:hidden;
+}
+.cred-cell {
+  padding:22px 24px; background:var(--panel);
+  border-right:1px solid var(--line);
+  transition:background .2s;
+}
+.cred-cell:last-child { border-right:none; }
+.cred-cell:hover { background:var(--panel2); }
+.cred-big {
+  font-family:var(--mono); font-size:20px; font-weight:600;
+  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  margin-bottom:4px;
+}
+.cred-small { font-size:12.5px; color:var(--mute); line-height:1.5; }
+
+/* SECTIONS */
+.sect { padding:76px 0; }
+.sect-alt { background:var(--bg2); }
+.kick {
+  font-family:var(--mono); font-size:11.5px; font-weight:600;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:14px;
+}
+.kick.p { color:var(--purple); }
+h2.heading {
+  font-family:var(--disp); font-weight:300;
+  font-size:clamp(28px,3.8vw,52px);
+  letter-spacing:-0.02em; line-height:1.1; margin-bottom:16px;
+}
+h2.heading em {
+  font-style:italic;
+  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.lead-text { font-size:16.5px; color:var(--mute); max-width:60ch; line-height:1.7; }
+.lead-text b { color:var(--ink); }
+
+/* WHO I WORK WITH: interactive dossier */
+.who-wrap { display:grid; grid-template-columns:5fr 6fr; gap:40px; margin-top:44px; align-items:stretch; }
+.who-tabs { display:flex; flex-direction:column; gap:6px; }
+.who-tab {
+  display:flex; align-items:center; gap:16px;
+  padding:18px 20px; border-radius:14px; cursor:pointer;
+  border:1px solid transparent;
+  transition:background .25s, border-color .25s;
+  position:relative;
+}
+.who-tab:hover { background:var(--panel); }
+.who-tab.active { background:var(--panel2); border-color:var(--line2); }
+.who-tab-num {
+  font-family:var(--mono); font-size:11px; font-weight:600;
+  letter-spacing:.12em; color:var(--dim); flex-shrink:0;
+  transition:color .25s;
+}
+.who-tab.active .who-tab-num { color:var(--gold); }
+.who-tab-title { font-size:15.5px; font-weight:600; color:var(--mute); transition:color .25s; }
+.who-tab.active .who-tab-title { color:var(--ink); }
+.who-tab-bar {
+  position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:3px;
+  background:var(--grad); opacity:0; transition:opacity .25s;
+}
+.who-tab.active .who-tab-bar { opacity:1; }
+.who-progress {
+  height:2px; background:rgba(155,115,245,0.12); border-radius:2px;
+  margin:14px 20px 0; overflow:hidden;
+}
+.who-progress i {
+  display:block; height:100%; width:0%; background:var(--grad); border-radius:2px;
+}
+.who-progress.run i { animation:whoprog 5s linear forwards; }
+@keyframes whoprog { to { width:100% } }
+/* dossier panel */
+.dossier {
+  background:rgba(13,13,40,0.92);
+  border:1px solid var(--line2);
+  border-radius:18px; padding:30px 32px;
+  position:relative; overflow:hidden;
+}
+.dossier::before {
+  content:''; position:absolute; top:-70px; right:-70px;
+  width:280px; height:280px; border-radius:50%;
+  background:radial-gradient(ellipse,rgba(155,115,245,0.13) 0%,transparent 70%);
+  pointer-events:none;
+}
+.dossier-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding-bottom:16px; margin-bottom:20px;
+  border-bottom:1px dashed rgba(155,115,245,0.25);
+}
+.dossier-ref {
+  font-family:var(--mono); font-size:10.5px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--dim);
+}
+.dossier-stamp {
+  font-family:var(--mono); font-size:10px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase;
+  color:var(--gold); border:1.5px solid rgba(245,158,11,0.45);
+  border-radius:6px; padding:5px 10px;
+  transform:rotate(-3deg);
+}
+.dossier-body { transition:opacity .3s ease, transform .3s ease; }
+.dossier-body.swap { opacity:0; transform:translateY(10px); }
+.dossier-title {
+  font-family:var(--disp); font-weight:400; font-style:italic;
+  font-size:24px; letter-spacing:-0.01em; color:var(--ink);
+  margin-bottom:22px;
+}
+.dossier-field { padding:13px 0; border-bottom:1px solid var(--line); }
+.dossier-field:last-child { border-bottom:none; }
+.dossier-label {
+  font-family:var(--mono); font-size:10px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--purple);
+  margin-bottom:5px;
+}
+.dossier-val { font-size:14px; color:var(--mute); line-height:1.6; }
+.dossier-val b { color:var(--ink); }
+.who-note { margin-top:20px; font-size:13.5px; color:var(--dim); }
+
+/* PAPER TRAIL (engagement) */
+.papers-flow { margin-top:52px; position:relative; }
+.flow-track {
+  height:2px; background:rgba(155,115,245,0.12); border-radius:2px;
+  margin:0 8% 26px; position:relative; overflow:visible;
+}
+.flow-fill {
+  position:absolute; left:0; top:0; height:100%; width:0%;
+  background:var(--grad); border-radius:2px;
+  box-shadow:0 0 10px rgba(155,115,245,0.5);
+  transition:width .8s cubic-bezier(.4,0,.2,1);
+}
+.flow-node {
+  position:absolute; top:50%; transform:translate(-50%,-50%) scale(.5);
+  width:9px; height:9px; border-radius:50%;
+  background:var(--bg); border:2px solid rgba(155,115,245,0.3);
+  transition:border-color .4s, transform .4s, box-shadow .4s;
+}
+.flow-node.lit {
+  border-color:var(--purple); transform:translate(-50%,-50%) scale(1);
+  box-shadow:0 0 10px rgba(155,115,245,0.6);
+}
+.flow-node:last-child.lit {
+  border-color:var(--gold);
+  box-shadow:0 0 10px rgba(245,158,11,0.6);
+}
+.papers {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:16px;
+}
+.paper {
+  background:rgba(16,16,42,0.85);
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:24px 22px 60px;
+  position:relative;
+  transition:transform .55s cubic-bezier(.2,.8,.3,1), border-color .25s ease, box-shadow .25s ease, opacity .55s ease;
+  overflow:hidden;
+  opacity:0; transform:translateY(26px);
+}
+.paper.up { opacity:1; transform:translateY(0); }
+.paper .scan {
+  position:absolute; left:0; right:0; top:-40%; height:34%;
+  background:linear-gradient(180deg,transparent,rgba(155,115,245,0.10),rgba(196,170,255,0.16),rgba(155,115,245,0.10),transparent);
+  opacity:0; pointer-events:none;
+}
+.paper.gold .scan {
+  background:linear-gradient(180deg,transparent,rgba(245,158,11,0.08),rgba(251,191,36,0.14),rgba(245,158,11,0.08),transparent);
+}
+.paper.scanning .scan { animation:scansweep 1s ease-in-out forwards; }
+@keyframes scansweep {
+  0% { top:-40%; opacity:0 }
+  15% { opacity:1 }
+  85% { opacity:1 }
+  100% { top:106%; opacity:0 }
+}
+.paper:hover {
+  transform:translateY(-3px);
+  border-color:var(--line2);
+  box-shadow:0 18px 44px rgba(0,0,0,0.45);
+}
+/* folded corner */
+.paper::before {
+  content:''; position:absolute; top:0; right:0;
+  width:0; height:0;
+  border-left:18px solid rgba(155,115,245,0.10);
+  border-top:18px solid var(--bg2);
+}
+.paper.gold::before { border-left-color:rgba(245,158,11,0.12); }
+/* faint ruled lines, like a document */
+.paper::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(180deg,transparent 0 27px,rgba(155,115,245,0.03) 27px 28px);
+}
+.paper-ref {
+  font-family:var(--mono); font-size:9.5px; font-weight:500;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--dim);
+  margin-bottom:16px; display:flex; justify-content:space-between;
+  padding-bottom:12px; border-bottom:1px solid var(--line);
+}
+.paper-title { font-family:var(--disp); font-weight:400; font-size:19px; letter-spacing:-0.01em; color:var(--ink); margin-bottom:10px; line-height:1.25; }
+.paper-body { font-size:13px; color:var(--mute); line-height:1.65; }
+.paper-body b { color:var(--ink); font-weight:600; }
+.paper-stamp {
+  position:absolute; right:20px; bottom:18px;
+  font-family:var(--mono); font-size:9px; font-weight:600;
+  letter-spacing:.2em; text-transform:uppercase;
+  padding:4px 10px; border-radius:3px;
+  border:1px solid rgba(155,115,245,0.45); color:var(--purpleb);
+  background:rgba(155,115,245,0.06);
+  transform:scale(1.15); opacity:0;
+  transition:transform .5s ease, opacity .5s ease;
+}
+.paper.stamped .paper-stamp { transform:scale(1); opacity:1; }
+.paper.gold .paper-stamp {
+  border-color:rgba(245,158,11,0.5); color:var(--goldb);
+  background:rgba(245,158,11,0.06);
+}
+.paper-foot { margin-top:22px; font-size:13px; color:var(--dim); line-height:1.6; max-width:70ch; }
+.paper-foot b { color:var(--mute); }
+
+/* AI CONSOLE BAND */
+.ai-console {
+  margin-top:52px;
+  background:linear-gradient(135deg,rgba(123,79,224,0.1),rgba(245,158,11,0.05));
+  border:1px solid var(--line2);
+  border-radius:18px; overflow:hidden;
+  display:grid; grid-template-columns:1fr 1fr;
+  position:relative;
+}
+.ai-console::before {
+  content:''; position:absolute; top:-60px; right:-60px;
+  width:280px; height:280px; border-radius:50%;
+  background:radial-gradient(ellipse,rgba(155,115,245,0.14) 0%,transparent 70%);
+  pointer-events:none;
+}
+.ai-console-left { padding:30px 32px; }
+.ai-console-title { font-family:var(--disp); font-style:italic; font-weight:400; font-size:clamp(20px,2.4vw,27px); color:var(--ink); margin-bottom:12px; line-height:1.25; }
+.ai-console-title em { background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-style:italic; }
+.ai-console-body { font-size:14px; color:var(--mute); line-height:1.65; }
+.ai-console-body b { color:var(--ink); }
+.ai-log {
+  background:rgba(5,5,18,0.75);
+  border-left:1px solid var(--line);
+  padding:24px 26px;
+  font-family:var(--mono); font-size:11.5px; line-height:2.1;
+  display:flex; flex-direction:column; justify-content:center;
+  min-height:200px;
+}
+.ai-log-head {
+  display:flex; align-items:center; gap:8px;
+  font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--dim); margin-bottom:10px;
+}
+.ai-log-head .dot { width:6px; height:6px; border-radius:50%; background:var(--gold); animation:pulse 2s infinite; }
+.log-line { color:var(--mute); opacity:0; transform:translateY(4px); transition:opacity .4s, transform .4s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.log-line.show { opacity:1; transform:translateY(0); }
+.log-line .t { color:var(--dim); }
+.log-line .a { color:var(--purpleb); }
+.log-line .h { color:var(--goldb); }
+
+/* AI BAND */
+.ai-band {
+  margin-top:56px;
+  display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:center;
+  background:linear-gradient(135deg,rgba(123,79,224,0.1),rgba(245,158,11,0.05));
+  border:1px solid var(--line2);
+  border-radius:18px; padding:26px 30px;
+  position:relative; overflow:hidden;
+}
+.ai-band::before {
+  content:''; position:absolute; top:-60px; right:-60px;
+  width:260px; height:260px; border-radius:50%;
+  background:radial-gradient(ellipse,rgba(155,115,245,0.15) 0%,transparent 70%);
+  pointer-events:none;
+}
+.ai-band-ico {
+  width:52px; height:52px; border-radius:14px;
+  background:rgba(155,115,245,0.12);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.ai-band-ico svg { width:26px; height:26px; stroke:var(--purpleb); fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.ai-band-title { font-size:16.5px; font-weight:600; color:var(--ink); margin-bottom:4px; }
+.ai-band-body { font-size:13.5px; color:var(--mute); line-height:1.6; }
+.ai-band-body b { color:var(--ink); }
+@media(max-width:700px){ .ai-band { grid-template-columns:1fr; } }
+
+/* Timeline draw-on-scroll */
+.timeline::before { transform:scaleY(0); transform-origin:top; transition:transform 1.4s cubic-bezier(.4,0,.2,1); }
+.timeline.drawn::before { transform:scaleY(1); }
+
+/* CONSULT CTA */
+.consult-card {
+  background:linear-gradient(135deg,rgba(123,79,224,0.12),rgba(245,158,11,0.06));
+  border:1px solid var(--line2);
+  border-radius:22px; padding:52px 44px;
+  text-align:center; position:relative; overflow:hidden;
+}
+.consult-card::before {
+  content:''; position:absolute; top:-80px; left:50%; transform:translateX(-50%);
+  width:500px; height:300px; border-radius:50%;
+  background:radial-gradient(ellipse,rgba(155,115,245,0.14) 0%,transparent 70%);
+  pointer-events:none;
+}
+.consult-pill {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
+  padding:6px 14px; border-radius:20px;
+  background:rgba(245,158,11,0.12); color:var(--gold);
+  border:1px solid rgba(245,158,11,0.25); margin-bottom:22px;
+}
+.consult-card h2 {
+  font-family:var(--disp); font-weight:300;
+  font-size:clamp(28px,4vw,48px); letter-spacing:-0.02em;
+  line-height:1.1; margin-bottom:16px;
+}
+.consult-card h2 em {
+  font-style:italic;
+  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.consult-sub { font-size:16px; color:var(--mute); max-width:50ch; margin:0 auto 8px; line-height:1.7; }
+.consult-promise { font-size:15px; font-weight:700; color:var(--gold); margin-bottom:28px; }
+.consult-note { font-size:13px; color:var(--dim); margin-top:18px; line-height:1.6; max-width:60ch; margin-left:auto; margin-right:auto; }
+.consult-note b { color:var(--mute); }
+.consult-note a { color:var(--purple); }
+
+/* TRIAGE SPINE (scope) */
+.triage { margin-top:52px; position:relative; }
+.triage-spine {
+  position:absolute; left:50%; top:0; bottom:0; width:2px;
+  transform:translateX(-50%);
+  background:linear-gradient(180deg,var(--purple),var(--gold));
+  opacity:.3;
+}
+.triage-cols {
+  display:grid; grid-template-columns:1fr 1fr; gap:0 64px;
+}
+.triage-colhead {
+  font-family:var(--mono); font-size:10.5px; font-weight:600;
+  letter-spacing:.16em; text-transform:uppercase;
+  padding-bottom:20px;
+}
+.triage-colhead.mine { color:var(--purpleb); text-align:right; }
+.triage-colhead.out { color:var(--goldb); }
+.triage-item {
+  background:var(--panel); border:1px solid var(--line);
+  border-radius:12px; padding:16px 18px;
+  margin-bottom:14px; position:relative;
+  opacity:0; transition:opacity .5s ease, transform .5s cubic-bezier(.2,1,.4,1);
+}
+.triage-item.mine {
+  grid-column:1; text-align:right;
+  transform:translateX(60px);
+  border-color:rgba(155,115,245,0.25);
+}
+.triage-item.out {
+  grid-column:2;
+  transform:translateX(-60px);
+  border-color:rgba(245,158,11,0.2);
+}
+.triage-item.land { opacity:1; transform:translateX(0); }
+.triage-item::after {
+  content:''; position:absolute; top:50%; width:32px; height:2px;
+  background:currentColor; opacity:.25;
+}
+.triage-item.mine::after { right:-48px; color:var(--purple); }
+.triage-item.out::after { left:-48px; color:var(--gold); }
+.triage-item .node {
+  position:absolute; top:50%; margin-top:-5px;
+  width:10px; height:10px; border-radius:50%; z-index:2;
+}
+.triage-item.mine .node { right:-69px; background:var(--purple); box-shadow:0 0 10px rgba(155,115,245,0.7); }
+.triage-item.out .node { left:-69px; background:var(--gold); box-shadow:0 0 10px rgba(245,158,11,0.7); }
+.triage-t { font-size:14.5px; font-weight:600; color:var(--ink); margin-bottom:3px; }
+.triage-b { font-size:12.5px; color:var(--mute); line-height:1.55; }
+.refer-tag {
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:9px; padding:3px 10px; border-radius:6px;
+  font-family:var(--mono); font-size:10px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase;
+  background:rgba(245,158,11,0.1); color:var(--goldb);
+  border:1px dashed rgba(245,158,11,0.4);
+}
+.keep-tag {
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:9px; padding:3px 10px; border-radius:6px;
+  font-family:var(--mono); font-size:10px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase;
+  background:rgba(155,115,245,0.1); color:var(--purpleb);
+  border:1px solid rgba(155,115,245,0.3);
+}
+
+/* FOOTER */
+footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
+.fgrid { display:flex; flex-direction:column; gap:16px; font-size:13px; color:var(--mute); }
+.flinks { display:flex; flex-wrap:wrap; gap:6px 18px; }
+.flinks a { color:var(--dim); font-size:13px; }
+.flinks a:hover { color:var(--purple); }
+
+/* SCROLL REVEAL */
+.rv { opacity:0; transform:translateY(28px); transition:opacity .6s ease, transform .6s ease; }
+.rv.in { opacity:1; transform:translateY(0); }
+.rv.d1 { transition-delay:.1s; }
+.rv.d2 { transition-delay:.2s; }
+.rv.d3 { transition-delay:.3s; }
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .cred-strip { grid-template-columns:1fr 1fr; }
+  .cred-cell:nth-child(2) { border-right:none; }
+  .cred-cell:nth-child(-n+2) { border-bottom:1px solid var(--line); }
+  .who-wrap { grid-template-columns:1fr; gap:24px; }
+  .papers { grid-template-columns:1fr 1fr; }
+  .flow-track { display:none; }
+  .ai-console { grid-template-columns:1fr; }
+  .ai-log { border-left:none; border-top:1px solid var(--line); }
+  .triage-spine { display:none; }
+  .triage-cols { grid-template-columns:1fr; gap:0; }
+  .triage-item.mine, .triage-item.out { grid-column:1; text-align:left; }
+  .triage-item::after, .triage-item .node { display:none; }
+  .triage-colhead.mine { text-align:left; }
+  .triage-colhead.out { padding-top:10px; }
+}
+@media(max-width:640px){
+  .views, .quiet-links { display:none; }
+  .cred-strip { grid-template-columns:1fr; }
+  .cred-cell { border-right:none; border-bottom:1px solid var(--line); }
+  .cred-cell:last-child { border-bottom:none; }
+  .consult-card { padding:40px 24px; }
+  .papers { grid-template-columns:1fr; }
+}
+</style>
 </head>
 <body>
 
-<nav class="top"><div class="nav-in">
+<nav class="site-nav"><div class="nav-in">
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
-    <a class="vbtn" href="marketplace.html">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
-    <a class="vbtn" href="services.html">Managed services</a>
-    <a class="vbtn on" href="business.html">For business</a>
-    <a class="vbtn" href="contact.html">Contact</a>
-    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
+    <a class="vbtn" href="/marketplace">Overview</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank">Job board</a>
+    <a class="vbtn" href="/services">Managed services</a>
+    <a class="vbtn on" href="/business">For business</a>
+    <a class="vbtn" href="/contact">Contact</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank">Book a call</a>
   </div>
   <div class="quiet-links">
     <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
@@ -31,73 +571,356 @@
   </div>
 </div></nav>
 
-<div class="sect first"><div class="wrap">
-  <div class="pills">
-    <span class="pill m">Yaadly for business</span>
-    <span class="pill n">Yaadly Ltd · UK 17358077</span>
-  </div>
-  <h1 class="hx" style="font-size:clamp(28px,4.5vw,44px)">Working with<br><span class="g2">your company.</span></h1>
-  <p class="lead">Most of this site is written for a family with a house back home. This page is not. If your business carries property in Jamaica, or clients who do, you need somebody qualified on the ground who is independent of every contractor on the job. <b>That is what I do.</b> Start with a consultation and we will work out whether there is anything here for you.</p>
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-eyebrow rv in"><span class="dot"></span>Yaadly for business · Yaadly Ltd, UK 17358077</div>
+    <h1 class="display">Your company answers for property <em>it cannot stand in front of.</em></h1>
+    <p class="hero-sub">If your business carries property in Jamaica, or clients who do, you need somebody qualified on the ground, <b>independent of every contractor on the job</b>. That is what I do.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="https://cal.com/yaadly" target="_blank" rel="noopener">Book a consultation</a>
+      <a class="btn btn-ghost" href="#who">Who this is for</a>
+    </div>
 
-  <div class="grid g2c" style="margin-top:26px">
-    <div class="card rv"><p class="kick" style="margin-bottom:4px">BEng</p><p style="color:var(--mute);font-size:14px">Aerospace Engineering</p></div>
-    <div class="card rv"><p class="kick" style="margin-bottom:4px">7+ years</p><p style="color:var(--mute);font-size:14px">UK construction and IoT project management</p></div>
-    <div class="card rv"><p class="kick" style="margin-bottom:4px">UK registered</p><p style="color:var(--mute);font-size:14px">Yaadly Ltd, England &amp; Wales, company 17358077</p></div>
-    <div class="card rv"><p class="kick" style="margin-bottom:4px">Independent</p><p style="color:var(--mute);font-size:14px">I never price, supply or manage the trade I assess</p></div>
-  </div>
-
-  <div class="sec">
-    <p class="kick m">Who I work with</p>
-    <h2 class="hx" style="font-size:clamp(22px,3.4vw,34px)">Four kinds of company</h2>
-    <div class="grid g2c" style="margin-top:22px">
-      <div class="card rv">
-        <h3 style="font-size:16.5px;margin-bottom:8px;display:flex;align-items:center;gap:9px"><svg class="gl" style="color:var(--tealb)" viewBox="0 0 24 24"><circle cx="7.5" cy="14.5" r="3.5"/><path d="M10.3 11.7 19 3"/><path d="m15.5 6.5 2.5 2.5M18 4l2.5 2.5"/></svg>Agents, managers and letting operators</h3>
-        <p style="color:var(--mute);font-size:14px">You hold keys, or a client's confidence, for property four thousand miles from your desk. I attend, document to a standing checklist, and send you a report you can forward without editing.</p>
+    <div class="cred-strip rv">
+      <div class="cred-cell">
+        <div class="cred-big">BEng</div>
+        <div class="cred-small">Aerospace Engineering</div>
       </div>
-      <div class="card rv">
-        <h3 style="font-size:16.5px;margin-bottom:8px;display:flex;align-items:center;gap:9px"><svg class="gl" style="color:var(--tealb)" viewBox="0 0 24 24"><path d="M5 21V10l5-3 5 3v11"/><path d="M15 10l4-2v9"/><path d="M3 21h18"/></svg>Developers and multi-unit owners</h3>
-        <p style="color:var(--mute);font-size:14px">Staged inspections against the programme, contractor oversight, and a progress report specific enough to hold a builder to.</p>
+      <div class="cred-cell">
+        <div class="cred-big">7+ years</div>
+        <div class="cred-small">UK construction and IoT project management</div>
       </div>
-      <div class="card rv">
-        <h3 style="font-size:16.5px;margin-bottom:8px;display:flex;align-items:center;gap:9px"><svg class="gl" style="color:var(--tealb)" viewBox="0 0 24 24"><path d="M4 21h16M5 21V10M9 21V10M15 21V10M19 21V10M3 10l9-6 9 6"/></svg>Insurers, lenders and diaspora schemes</h3>
-        <p style="color:var(--mute);font-size:14px">Condition and completion evidence to one standard, timestamped and geotagged, built to be audited rather than admired.</p>
+      <div class="cred-cell">
+        <div class="cred-big">UK Ltd</div>
+        <div class="cred-small">Yaadly Ltd, England &amp; Wales, company 17358077</div>
       </div>
-      <div class="card rv">
-        <h3 style="font-size:16.5px;margin-bottom:8px;display:flex;align-items:center;gap:9px"><svg class="gl" style="color:var(--tealb)" viewBox="0 0 24 24"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></svg>White label and partner work</h3>
-        <p style="color:var(--mute);font-size:14px">You keep the client and the relationship. I supply the eyes, the checklist and the report, under your name or mine.</p>
+      <div class="cred-cell">
+        <div class="cred-big">Independent</div>
+        <div class="cred-small">Never pricing, supplying or managing the trade being assessed</div>
       </div>
     </div>
-    <p class="tiny" style="margin-top:16px">Not on this list and think it still fits? Say so on the call. It is a thirty minute conversation, not a qualifying test.</p>
   </div>
+</section>
 
-  <div class="sec">
-    <div class="card" style="text-align:center;padding:34px 20px">
-      <div class="pills" style="justify-content:center"><span class="pill m">No fee, no obligation</span></div>
-      <h2 class="hx" style="font-size:clamp(24px,3.6vw,36px);margin-top:6px">Bring me one real property</h2>
-      <p class="lead" style="margin:12px auto 6px;max-width:52ch">Thirty minutes on the hardest one you have. By the end you will know whether I am any use to your business.</p>
-      <p style="color:var(--mango);font-weight:700;font-size:15px;margin-bottom:20px">If I am not, I will say so on the call.</p>
-      <a class="btn" href="https://cal.com/yaadly" target="_blank" rel="noopener">Book a consultation</a>
-      <p class="note">Or write to <a href="mailto:monique@yaadly.co.uk">monique@yaadly.co.uk</a>. Enquiries from companies are answered within one working day.</p>
-      <p class="note" style="margin-top:14px">Two things worth saying before you call. <b>Yaadly holds none of your money</b>, you pay your contractor directly and my fee is invoiced separately. And I do not do valuation, title or legal opinion: I record condition and I assess workmanship. Anything beyond that needs a surveyor or an attorney, and I will tell you which.</p>
+<!-- WHO I WORK WITH -->
+<section class="sect sect-alt" id="who">
+  <div class="wrap">
+    <div class="kick p">Who I work with</div>
+    <h2 class="heading">Four kinds <em>of company.</em></h2>
+    <p class="lead-text">Pick yours. Each case file shows what you carry, what I supply, and what you receive.</p>
+
+    <div class="who-wrap rv" id="who-widget">
+      <div class="who-tabs">
+        <div class="who-tab active" data-who="0">
+          <span class="who-tab-bar"></span>
+          <span class="who-tab-num">01</span>
+          <span class="who-tab-title">Agents &amp; letting operators</span>
+        </div>
+        <div class="who-tab" data-who="1">
+          <span class="who-tab-bar"></span>
+          <span class="who-tab-num">02</span>
+          <span class="who-tab-title">Developers &amp; multi-unit owners</span>
+        </div>
+        <div class="who-tab" data-who="2">
+          <span class="who-tab-bar"></span>
+          <span class="who-tab-num">03</span>
+          <span class="who-tab-title">Insurers, lenders &amp; schemes</span>
+        </div>
+        <div class="who-tab" data-who="3">
+          <span class="who-tab-bar"></span>
+          <span class="who-tab-num">04</span>
+          <span class="who-tab-title">White label &amp; partners</span>
+        </div>
+        <div class="who-progress" id="who-progress"><i></i></div>
+        <p class="who-note">Not on this list and think it still fits? Say so on the call.</p>
+      </div>
+      <div class="dossier">
+        <div class="dossier-head">
+          <span class="dossier-ref" id="dossier-ref">Case file · 01 / 04</span>
+          <span class="dossier-stamp">Independent</span>
+        </div>
+        <div class="dossier-body" id="dossier-body">
+          <div class="dossier-title" id="d-title">Agents &amp; letting operators</div>
+          <div class="dossier-field">
+            <div class="dossier-label">You carry</div>
+            <div class="dossier-val" id="d-carry">Keys, or a client's confidence, for property four thousand miles from your desk.</div>
+          </div>
+          <div class="dossier-field">
+            <div class="dossier-label">I supply</div>
+            <div class="dossier-val" id="d-supply">Attendance and documentation to a standing checklist, on the ground in Jamaica.</div>
+          </div>
+          <div class="dossier-field">
+            <div class="dossier-label">You receive</div>
+            <div class="dossier-val" id="d-receive"><b>A report you can forward without editing.</b></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</div></div>
+</section>
 
-<footer><div class="wrap"><div class="fgrid">
-  <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
-  <div class="flinks">
-    <a href="/">Home</a>
-    <a href="marketplace.html">Overview</a>
-    <a href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
-    <a href="services.html">Managed services</a>
-    <a href="payments.html">How you pay, and the legal detail</a>
-    <a href="faq.html">Questions and answers</a>
-    <a href="prices.html">What work costs</a>
-    <a href="contact.html">Contact</a>
-    <a href="https://app.yaadly.co.uk/portal">Client portal</a>
+<!-- HOW AN ENGAGEMENT RUNS -->
+<section class="sect">
+  <div class="wrap">
+    <div class="kick">The engagement</div>
+    <h2 class="heading">A paper trail, <em>from the first call.</em></h2>
+    <p class="lead-text">Four documents. Each one exists before the next stage starts.</p>
+
+    <div class="papers-flow" id="papers">
+      <div class="flow-track">
+        <div class="flow-fill" id="flow-fill"></div>
+        <span class="flow-node" style="left:12.5%"></span>
+        <span class="flow-node" style="left:37.5%"></span>
+        <span class="flow-node" style="left:62.5%"></span>
+        <span class="flow-node" style="left:87.5%"></span>
+      </div>
+      <div class="papers">
+      <div class="paper">
+        <span class="scan"></span>
+        <div class="paper-ref"><span>Doc 01</span><span>30 min</span></div>
+        <div class="paper-title">The consultation</div>
+        <div class="paper-body">Bring me the hardest property you have. <b>If I am no use to you, I say so on the call.</b></div>
+        <div class="paper-stamp">No fee</div>
+      </div>
+      <div class="paper">
+        <span class="scan"></span>
+        <div class="paper-ref"><span>Doc 02</span><span>Before booking</span></div>
+        <div class="paper-title">Scope in writing</div>
+        <div class="paper-body">What gets checked, to what checklist, at what fee. <b>Agreed before anything is booked.</b></div>
+        <div class="paper-stamp">Signed</div>
+      </div>
+      <div class="paper">
+        <span class="scan"></span>
+        <div class="paper-ref"><span>Doc 03</span><span>On site</span></div>
+        <div class="paper-title">Evidence file</div>
+        <div class="paper-body">Timestamped, geotagged photographs. <b>Never a contractor marking their own work.</b></div>
+        <div class="paper-stamp">Evidenced</div>
+      </div>
+      <div class="paper gold">
+        <span class="scan"></span>
+        <div class="paper-ref"><span>Doc 04</span><span>Job close</span></div>
+        <div class="paper-title">Independent review</div>
+        <div class="paper-body">An independent person reviews the finished work against the scope. <b>Then a report you can forward without editing.</b></div>
+        <div class="paper-stamp">Verified</div>
+      </div>
+      </div>
+    </div>
+    <p class="paper-foot rv"><b>Yaadly holds none of your money.</b> You pay your contractor directly. My fee is invoiced separately, bank transfer in GBP, USD or CAD.</p>
+
+    <div class="ai-console rv">
+      <div class="ai-console-left">
+        <div class="ai-console-title">AI agents run the admin. <em>A human signs the judgment.</em></div>
+        <div class="ai-console-body">Intake, tracking and updates run on AI agents over WhatsApp, day or night, so nothing waits for office hours. <b>Every step that moves money or changes a reputation is confirmed by a person.</b></div>
+      </div>
+      <div class="ai-log" id="ai-log">
+        <div class="ai-log-head"><span class="dot"></span>Agent activity · live</div>
+        <div class="log-line"><span class="t">02:14</span> <span class="a">agent</span> intake logged · Portmore roof</div>
+        <div class="log-line"><span class="t">02:14</span> <span class="a">agent</span> quote parsed · 1.2M JMD</div>
+        <div class="log-line"><span class="t">02:15</span> <span class="a">agent</span> evidence request sent</div>
+        <div class="log-line"><span class="t">02:15</span> <span class="a">agent</span> costs checked vs market rates</div>
+        <div class="log-line"><span class="t">08:03</span> <span class="h">human</span> Monique reviews · verdict drafted</div>
+        <div class="log-line"><span class="t">08:04</span> <span class="h">human</span> approval signed · report released</div>
+      </div>
+    </div>
   </div>
-</div></div></footer>
+</section>
 
-<script src="yaadly.js" defer></script>
+<!-- BOUNDARIES -->
+<section class="sect sect-alt">
+  <div class="wrap">
+    <div class="kick p">Scope, stated plainly</div>
+    <h2 class="heading">Every request lands on <em>one of two desks.</em></h2>
+    <p class="lead-text">Mine, or a named specialist's, in writing. Never a guess.</p>
+    <div class="triage" id="triage">
+      <div class="triage-spine"></div>
+      <div class="triage-cols">
+        <div class="triage-colhead mine">My desk</div>
+        <div class="triage-colhead out">Referred out · in writing</div>
+
+        <div class="triage-item mine"><span class="node"></span>
+          <div class="triage-t">Condition recording</div>
+          <div class="triage-b">What is there, in what state, with photographic evidence.</div>
+          <span class="keep-tag">✓ Mine</span>
+        </div>
+        <div class="triage-item out"><span class="node"></span>
+          <div class="triage-t">Valuation</div>
+          <div class="triage-b">I record condition. I do not price property.</div>
+          <span class="refer-tag">→ Licensed valuer</span>
+        </div>
+        <div class="triage-item mine"><span class="node"></span>
+          <div class="triage-t">Workmanship assessment</div>
+          <div class="triage-b">Whether completed work meets the standard for that trade.</div>
+          <span class="keep-tag">✓ Mine</span>
+        </div>
+        <div class="triage-item out"><span class="node"></span>
+          <div class="triage-t">Title &amp; legal opinion</div>
+          <div class="triage-b">I record. I do not opine on ownership.</div>
+          <span class="refer-tag">→ Attorney</span>
+        </div>
+        <div class="triage-item mine"><span class="node"></span>
+          <div class="triage-t">Contractor oversight</div>
+          <div class="triage-b">Progress against programme, on the ground, on your behalf.</div>
+          <span class="keep-tag">✓ Mine</span>
+        </div>
+        <div class="triage-item out"><span class="node"></span>
+          <div class="triage-t">Structural engineering</div>
+          <div class="triage-b">Structures are never guessed at.</div>
+          <span class="refer-tag">→ PERB registered engineer</span>
+        </div>
+        <div class="triage-item mine"><span class="node"></span>
+          <div class="triage-t">Procurement judgment</div>
+          <div class="triage-b">Whether a quote and a contractor stand up to scrutiny.</div>
+          <span class="keep-tag">✓ Mine</span>
+        </div>
+        <div class="triage-item out"><span class="node"></span>
+          <div class="triage-t">Boundary disputes</div>
+          <div class="triage-b">Lines on land are measured, not argued.</div>
+          <span class="refer-tag">→ Commissioned land surveyor</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONSULT CTA -->
+<section class="sect">
+  <div class="wrap">
+    <div class="consult-card rv">
+      <div class="consult-pill">No fee, no obligation</div>
+      <h2>Bring me one <em>real property.</em></h2>
+      <p class="consult-sub">Thirty minutes on the hardest one you have. By the end you will know whether I am any use to your business.</p>
+      <p class="consult-promise">If I am not, I will say so on the call.</p>
+      <a class="btn btn-primary" href="https://cal.com/yaadly" target="_blank" rel="noopener">Book a consultation</a>
+      <p class="consult-note">Or write to <a href="mailto:monique@yaadly.co.uk">monique@yaadly.co.uk</a>. Enquiries from companies are answered within one working day. <b>Yaadly holds none of your money</b>: you pay your contractor directly and my fee is invoiced separately, payable by bank transfer in GBP, USD or CAD.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
+      <div class="flinks">
+        <a href="/">Home</a>
+        <a href="/marketplace">Overview</a>
+        <a href="/services">Managed services</a>
+        <a href="/payments">How you pay</a>
+        <a href="/faq">Questions and answers</a>
+        <a href="/contact">Contact</a>
+        <a href="https://app.yaadly.co.uk/portal" target="_blank">Client portal</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); obs.unobserve(e.target); } });
+}, { threshold:0.08, rootMargin:'0px 0px 40px 0px' });
+document.querySelectorAll('.rv').forEach(el => obs.observe(el));
+
+/* Who-I-work-with dossier: click a tab, auto-advance every 5s */
+const WHO = [
+  { title:"Agents & letting operators",
+    carry:"Keys, or a client's confidence, for property four thousand miles from your desk.",
+    supply:"Attendance and documentation to a standing checklist, on the ground in Jamaica.",
+    receive:"<b>A report you can forward without editing.</b>" },
+  { title:"Developers & multi-unit owners",
+    carry:"A programme, a contractor, and money leaving in stages.",
+    supply:"Staged inspections against the programme and contractor oversight on site.",
+    receive:"<b>A progress report specific enough to hold a builder to.</b>" },
+  { title:"Insurers, lenders & diaspora schemes",
+    carry:"Risk on property you will never visit, priced on evidence you did not gather.",
+    supply:"Condition and completion evidence to one standard, timestamped and geotagged.",
+    receive:"<b>Files built to be audited rather than admired.</b>" },
+  { title:"White label & partners",
+    carry:"The client and the relationship. Both stay yours.",
+    supply:"The eyes, the checklist and the report, under your name or mine.",
+    receive:"<b>Ground capability in Jamaica without building it yourself.</b>" }
+];
+const whoTabs = [...document.querySelectorAll('.who-tab')];
+const dBody = document.getElementById('dossier-body');
+const dProg = document.getElementById('who-progress');
+const whoReduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let whoCur = 0, whoTimer = null;
+function setWho(i){
+  whoCur = i;
+  whoTabs.forEach((t,j) => t.classList.toggle('active', j === i));
+  dBody.classList.add('swap');
+  setTimeout(() => {
+    const w = WHO[i];
+    document.getElementById('dossier-ref').textContent = 'Case file · 0' + (i+1) + ' / 04';
+    document.getElementById('d-title').innerHTML = w.title;
+    document.getElementById('d-carry').innerHTML = w.carry;
+    document.getElementById('d-supply').innerHTML = w.supply;
+    document.getElementById('d-receive').innerHTML = w.receive;
+    dBody.classList.remove('swap');
+  }, 280);
+  if(!whoReduce){
+    dProg.classList.remove('run'); void dProg.offsetWidth; dProg.classList.add('run');
+  }
+}
+function whoPlay(){ if(whoReduce || whoTimer) return; dProg.classList.add('run'); whoTimer = setInterval(() => setWho((whoCur+1) % WHO.length), 5000); }
+function whoStop(){ clearInterval(whoTimer); whoTimer = null; dProg.classList.remove('run'); }
+whoTabs.forEach((t,i) => t.addEventListener('click', () => { whoStop(); setWho(i); whoPlay(); }));
+if(!whoReduce){
+  const wObs = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? whoPlay() : whoStop()), { threshold:0.3 });
+  wObs.observe(document.getElementById('who-widget'));
+}
+
+/* Paper trail choreography: line advances → doc rises → scan sweeps → stamp lands */
+const papers = [...document.querySelectorAll('.paper')];
+const flowFill = document.getElementById('flow-fill');
+const flowNodes = [...document.querySelectorAll('.flow-node')];
+const FLOWSTOPS = ['12.5%','37.5%','62.5%','87.5%'];
+if(whoReduce){
+  papers.forEach(p => p.classList.add('up','stamped'));
+  flowNodes.forEach(n => n.classList.add('lit'));
+  flowFill.style.width = '87.5%';
+} else {
+  const pObs = new IntersectionObserver(es => es.forEach(e => {
+    if(!e.isIntersecting) return;
+    pObs.unobserve(e.target);
+    papers.forEach((p,i) => {
+      const t = 300 + i * 1100;
+      setTimeout(() => { flowFill.style.width = FLOWSTOPS[i]; }, t);
+      setTimeout(() => { flowNodes[i].classList.add('lit'); p.classList.add('up'); }, t + 350);
+      setTimeout(() => p.classList.add('scanning'), t + 600);
+      setTimeout(() => p.classList.add('stamped'), t + 1450);
+    });
+  }), { threshold:0.25 });
+  pObs.observe(document.getElementById('papers'));
+}
+
+/* Triage: items fly in from the spine, alternating sides */
+const triItems = [...document.querySelectorAll('.triage-item')];
+if(whoReduce){ triItems.forEach(t => t.classList.add('land')); }
+else {
+  const trObs = new IntersectionObserver(es => es.forEach(e => {
+    if(!e.isIntersecting) return;
+    trObs.unobserve(e.target);
+    triItems.forEach((t,i) => setTimeout(() => t.classList.add('land'), 200 + i * 300));
+  }), { threshold:0.15 });
+  trObs.observe(document.getElementById('triage'));
+}
+
+/* AI console: log lines appear in sequence, then loop */
+const logLines = [...document.querySelectorAll('.log-line')];
+if(whoReduce){ logLines.forEach(l => l.classList.add('show')); }
+else {
+  const lObs = new IntersectionObserver(es => es.forEach(e => {
+    if(!e.isIntersecting) return;
+    lObs.unobserve(e.target);
+    function cycle(){
+      logLines.forEach(l => l.classList.remove('show'));
+      logLines.forEach((l,i) => setTimeout(() => l.classList.add('show'), 300 + i * 650));
+      setTimeout(cycle, 300 + logLines.length * 650 + 3500);
+    }
+    cycle();
+  }), { threshold:0.3 });
+  lObs.observe(document.getElementById('ai-log'));
+}
+</script>
 </body>
 </html>
