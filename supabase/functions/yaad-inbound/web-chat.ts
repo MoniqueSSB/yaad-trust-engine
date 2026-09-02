@@ -30,6 +30,11 @@ export function visitorTokenOk(v: unknown): boolean {
 export const WEB_CHAT_ORIGINS = new Set([
   "https://yaadly.co.uk",
   "https://www.yaadly.co.uk",
+  // The app carries the same widget (loaded from yaadly.co.uk/chat.js in
+  // web/app/layout.tsx) since 2 Sep 2026: "add this chat on the side of
+  // every page". localhost:3000 is the app's dev server.
+  "https://app.yaadly.co.uk",
+  "http://localhost:3000",
   "http://localhost:8932",
   "http://127.0.0.1:8932",
   "http://localhost:8933",

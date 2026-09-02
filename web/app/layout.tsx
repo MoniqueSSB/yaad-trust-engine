@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -33,6 +34,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${fraunces.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}>
         {children}
+        {/* The Ask Yaadly chat, the same file the marketing site serves, so
+            there is one widget and one place to change it. It talks to
+            yaad-inbound on the "web" channel; app.yaadly.co.uk is on that
+            door's origin allowlist (supabase/functions/yaad-inbound/web-chat.ts).
+            The file itself steps aside on the worker's portal. Founder,
+            2 Sep 2026: "add this chat on the side of every page". */}
+        <Script src="https://yaadly.co.uk/chat.js" strategy="afterInteractive" />
       </body>
     </html>
   );
