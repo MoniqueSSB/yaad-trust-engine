@@ -962,11 +962,39 @@ const VIEWS = [
     detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${kickDocsHtml(r.docs)}</div></div>`,
     cols:[
       {h:"Pack", f:r => id_(r.id) + sub_(r.model || "")},
-      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
+      {h:"For", f:r => r.job_id ? id_(r.job_id) : r.service_id ? id_(r.service_id) : mute_("none")},
       {h:"Project", f:r => esc(r.project_title || "") + sub_(r.client_name || "")},
       {h:"Rev", n:true, f:r => String(r.rev ?? 1)},
       {h:"State", f:r => tone_(r.status)},
       {h:"Built", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      // The first editing surface a pack has ever had. Only the readable
+      // prose of four sections; the structured lists stay the draft's until
+      // a redraft. Editing archives the old revision, bumps rev, and knocks
+      // an approved pack back to in_review, which hides it from the portal
+      // until you approve it again below. That is deliberate: nobody keeps
+      // reading an approved pack that no longer says what was approved.
+      { label:"Edit a section", cls:"g",
+        rpc:"edit_kickoff_doc_section",
+        ask:[
+          { k:"section", label:"Which section",
+            options:[
+              ["cover","Cover note"],
+              ["scope","Works scope, the summary paragraph"],
+              ["timeline","Timeline, the basis line"],
+              ["payment","Payment stages, the note"],
+            ] },
+          { k:"text", label:"The replacement text, in full", type:"long",
+            placeholder:"What you type replaces that section's prose word for word." },
+        ],
+        args:(r, v) => ({ p_pack:r.id, p_section:v.section, p_text:v.text }),
+        says:r => `Rewrites one section of ${r.id} in your own words. The pack becomes a new revision and drops out of the client's portal until you press Approve, so edit first, then approve once it reads right.` },
+      { label:"Approve", cls:"",
+        when:r => r.status !== "approved",
+        rpc:"approve_kickoff_pack",
+        args:(r) => ({ p_pack:r.id }),
+        says:r => `Approves ${r.id} in your name, which is what makes it readable in the client's portal. The database refuses this if the payment stages do not total exactly 100 percent; that refusal is the gate working.` },
     ]},
 
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
@@ -1022,6 +1050,15 @@ const VIEWS = [
         ],
         args:(r, v) => ({ p_draft_id:r.id, p_job_id:(v.job_id || "").trim() }),
         says:() => "Creates a Kickoff Pack for that job from this draft, listed under Kickoff Packs. It stays a draft, unread by the client, until they accept a quote on that job: that is the one moment anything ever approves it." },
+      { label:"Link to a service", cls:"g",
+        when:r => r.status === "ready",
+        rpc:"link_kickoff_draft_to_service",
+        ask:[
+          { k:"service_id", label:"Which service booking is this pack for?", type:"text",
+            placeholder:"SVC-A1B2C3", from:() => "" },
+        ],
+        args:(r, v) => ({ p_draft_id:r.id, p_service_id:(v.service_id || "").trim() }),
+        says:() => "Creates a Kickoff Pack for that service booking from this draft, listed under Kickoff Packs. It starts as a draft; press Approve there to make it readable in the client's portal. Refused while the guardrail still flags anything." },
     ]},
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
@@ -2353,6 +2390,10 @@ function drawAsk(k, a, row, btn){
         + f.options.map(([val, lab]) =>
             `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(lab)}</option>`).join("")
         + `</select>`
+      // "long" is a paragraph, not a line: editing a pack section is a few
+      // sentences of prose and a 160-character input would truncate it.
+      : f.type === "long"
+      ? `<textarea data-ask="${n}" rows="6" maxlength="4000" placeholder="${esc(f.placeholder || "")}">${esc(cur)}</textarea>`
       : `<input data-ask="${n}" maxlength="160" value="${esc(cur)}" placeholder="${esc(f.placeholder || "")}">`;
     return `<div data-askrow="${n}"><label>${esc(f.label)}</label>${control}</div>`;
   }).join("");

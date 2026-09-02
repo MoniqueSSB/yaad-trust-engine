@@ -67,6 +67,17 @@ export default async function ServiceRoom({
   }[];
   const gbp = (pence: number) => "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  // The booking's Kickoff Pack. RLS only returns an approved pack to the
+  // client, so its mere presence here means it is ready to read; while it
+  // is being drafted or edited this stays null and the section stays off.
+  const { data: pack } = await supabase
+    .from("kickoff_packs")
+    .select("id,rev,updated_at")
+    .eq("service_id", svc.id)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const stage = Math.max(0, Math.min(svc.stage ?? 0, TRACK.length - 1));
   const current = svcStage(svc.stage);
   const viewing = (() => {
@@ -164,6 +175,28 @@ export default async function ServiceRoom({
           })}
         </ol>
       </section>
+
+      {pack && (
+        <section className="mt-7">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Your Kickoff Pack
+          </h2>
+          <Link
+            href={"/portal/services/" + encodeURIComponent(svc.id) + "/pack"}
+            className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
+          >
+            <span className="text-[18px]">📄</span>
+            <span>
+              <b className="block text-[14px] text-ink">The plan for this booking</b>
+              <span className="block text-[12.5px] text-mute">
+                Scope, timeline, what you will see as proof, and what is needed
+                from you · rev {pack.rev ?? 1}
+              </span>
+            </span>
+            <span className="ml-auto text-tealb">&rarr;</span>
+          </Link>
+        </section>
+      )}
 
       <PortalCard
         reference={svc.id}

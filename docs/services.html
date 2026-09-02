@@ -161,6 +161,40 @@
   </div>
   <p class="tiny" style="margin-top:14px">Reports are staged, not paid all at once: under £200 in full, £200 and over half now and half on delivery, retainers monthly with 30 days notice. <a href="/payments">The full payment terms.</a></p>
 
+  <!-- BOOK DIRECTLY -->
+  <div class="card" id="book" style="margin-top:26px">
+    <div class="pills"><span class="pill">Nothing charged now</span><span class="pill n">Confirmed by a person first</span></div>
+    <h3 class="hx" style="font-size:clamp(20px,2.8vw,28px)">Book a service</h3>
+    <p class="lead" style="margin-top:10px">Your booking is held, not charged. Monique confirms the scope and the exact price with you in writing, then the invoice comes by email. Cancel anytime before you pay.</p>
+    <div class="grid g2c" style="margin-top:14px">
+      <div class="fgroup"><label class="fl" for="bk-svc">Which service</label>
+        <select class="f" id="bk-svc">
+          <option value="deposit">Deposit Protection Check</option>
+          <option value="visual">Visual Check</option>
+          <option value="condition">Condition Report</option>
+          <option value="retainer">Oversight Retainer</option>
+          <option value="care">Property Care</option>
+          <option value="setup">Project Setup Pack</option>
+          <option value="docs">Document Pack Check</option>
+        </select>
+      </div>
+      <div class="fgroup"><label class="fl" for="bk-name">Your name</label><input class="f" id="bk-name" autocomplete="name"></div>
+    </div>
+    <div class="grid g2c">
+      <div class="fgroup"><label class="fl" for="bk-email">Email</label><input class="f" id="bk-email" autocomplete="email" placeholder="you@email.com"></div>
+      <div class="fgroup"><label class="fl" for="bk-phone">WhatsApp number</label><input class="f" id="bk-phone" placeholder="+44… or +1 876…"></div>
+    </div>
+    <div class="grid g2c">
+      <div class="fgroup"><label class="fl" for="bk-parish">Where is the property? Parish or town</label><input class="f" id="bk-parish" placeholder="Portmore"></div>
+      <div class="fgroup"><label class="fl" for="bk-msg">Anything we should know</label><input class="f" id="bk-msg" placeholder="Optional"></div>
+    </div>
+    <div class="ctarow">
+      <button class="btn" id="bk-send" onclick="sendBooking()">Book it, nothing charged yet</button>
+      <span class="aside">Confirmed by WhatsApp or email</span>
+    </div>
+    <div id="bk-status"></div>
+  </div>
+
   <div class="rule" style="margin-top:22px"><span><svg class="gl" viewBox="0 0 24 24"><path d="m17.2 5.2 2.6 2.6-3 3-2.6-2.6 3-3Z"/><path d="m14.5 8-9.7 9.7 2.5 2.5L17 10.5"/></svg></span><div><b>Looking for a tradesperson instead?</b> That is the marketplace, and it is a different thing from the services above: you post the job, a vetted worker quotes it, and the work is proven with evidence before anyone is paid. <a href="/marketplace">See how the marketplace works.</a></div></div>
 </div></div>
 
@@ -246,28 +280,73 @@ const SVC_EMAIL = "monique@yaadly.co.uk";
 const ENQUIRY_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-enquiry";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 
-/* Paste the real Stripe Payment Link URL for each service here, between the
-   quotes. Until a link is pasted in, that service's "Pay now" button opens
-   WhatsApp instead, pre-filled with the service name, so nothing on the
-   page is ever a dead link. */
-const STRIPE_LINKS = {
-  deposit:   "",  // Deposit Protection Check, £149
-  visual:    "",  // Visual Check, £95
-  condition: "",  // Condition Report, £245
-  signoff:   "",  // Technical Sign-off, £245
-  retainer:  "",  // Oversight Retainer, £495 per month
-  care:      ""   // Property Care, £75 per visit
-};
+const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-book-service";
+
+/* A card's button books directly on this page now (2 Sep 2026): it jumps to
+   the booking form with that service preselected. Nothing is charged at
+   booking; the held-until-confirmed flow is the whole point. A service with
+   no bookable catalogue entry yet (Technical Sign-off) falls back to
+   WhatsApp, pre-filled, so nothing on the page is ever a dead link. */
+const BOOKABLE = ["deposit","visual","condition","retainer","care"];
 document.querySelectorAll(".pay").forEach(el => {
-  const url = STRIPE_LINKS[el.dataset.pay];
-  el.href = url
-    ? url
-    : "https://wa.me/447878877567?text=" + encodeURIComponent("Hello Yaadly, I would like to pay for: " + el.dataset.label);
-  el.target = "_blank"; el.rel = "noopener";
+  if (BOOKABLE.includes(el.dataset.pay)) {
+    el.textContent = "Book now, nothing charged yet";
+    el.href = "#book";
+    el.addEventListener("click", () => {
+      const sel = document.getElementById("bk-svc");
+      if (sel) { sel.value = el.dataset.pay; sel.dataset.label = el.dataset.label || ""; }
+    });
+  } else {
+    el.textContent = "Ask about this on WhatsApp";
+    el.href = "https://wa.me/447878877567?text=" + encodeURIComponent("Hello Yaadly, I would like to book: " + el.dataset.label);
+    el.target = "_blank"; el.rel = "noopener";
+  }
 });
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* Books a held service booking. The receipt with the reference and the
+   portal code arrives by WhatsApp or email from the booking itself, so the
+   page only confirms it landed and says what happens next. */
+async function sendBooking(){
+  const g = id => ($(id).value||"").trim();
+  const status = $("bk-status"), btn = $("bk-send");
+  const say = (tone, html) => { status.innerHTML = '<div class="'+(tone==="bad"?"status-bad":"status-ok")+'">'+html+'</div>'; };
+  const fallback = ' Book it on <a href="'+$("contact-wa").href+'" target="_blank" rel="noopener">WhatsApp</a> instead, or email <a href="mailto:'+SVC_EMAIL+'">'+esc(SVC_EMAIL)+'</a>.';
+
+  const sel = $("bk-svc");
+  const b = { service: sel.value, label: sel.dataset.label || sel.options[sel.selectedIndex].text,
+              name: g("bk-name"), email: g("bk-email"), phone: g("bk-phone"),
+              parish: g("bk-parish"), message: g("bk-msg") };
+  if(!b.name || (!b.email && !b.phone)){
+    say("bad", "<b>Nearly.</b> We need your name and an email or WhatsApp number, so the booking has somebody to belong to.");
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = "Booking…";
+  let j = null;
+  try{
+    const r = await fetch(BOOKING_URL, {
+      method: "POST",
+      headers: { "Content-Type":"application/json",
+                 "Authorization":"Bearer " + SUPABASE_PUBLISHABLE_KEY,
+                 "apikey": SUPABASE_PUBLISHABLE_KEY },
+      body: JSON.stringify(b)
+    });
+    j = await r.json().catch(()=>null);
+    if(!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+  }catch(err){
+    btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+    const mine = (j && j.error) ? esc(j.error) : "That did not go through. Nothing is lost on your side.";
+    say("bad", "<b>" + mine + "</b>" + fallback);
+    return;
+  }
+  btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
+  const channel = j.phoneGiven ? "WhatsApp" : "email";
+  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal. Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.");
+  ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$(i).value="");
+}
 
 /* Posts to yaad-enquiry rather than writing the row itself, because the
    function also emails a receipt, and only the server knows whether one
