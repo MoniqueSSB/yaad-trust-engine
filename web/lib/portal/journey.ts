@@ -52,6 +52,10 @@ const JOB_STATUS_STAGE: Record<string, number> = {
   awaiting_client_setup: 0,
   open_for_quotes: 0,
   quoted: 2,
+  // "Chosen & funded" is the rail's own name for this exact wait: a worker
+  // is chosen, the agency fee invoice is the one thing left before the job
+  // goes live. Added 2 Sep 2026 alongside the payment gate itself.
+  awaiting_payment: 4,
   in_progress: 6,
   disputed: 7,
   complete: 11,
@@ -89,7 +93,7 @@ export function packPaymentStages(docs: unknown): PackStage[] {
 const PRE_WORK_STAGES = STAGES.slice(0, 6); // "Job live" .. "Kickoff issued"
 const POST_WORK_TAIL = ["Closed & paid", "Reviews"];
 const NOT_YET_STARTED = new Set([
-  "draft", "awaiting_client_setup", "open_for_quotes", "quoted",
+  "draft", "awaiting_client_setup", "open_for_quotes", "quoted", "awaiting_payment",
 ]);
 
 /**

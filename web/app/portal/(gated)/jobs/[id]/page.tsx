@@ -89,6 +89,7 @@ const STATUS_LABEL: Record<string, string> = {
   draft: "Draft, not live yet",
   open: "Open for quotes",
   quoted: "Quotes in, waiting on you",
+  awaiting_payment: "Booked, waiting on the agency fee",
   confirmed: "Confirmed",
   in_progress: "Work under way",
   evidence: "Evidence waiting on you",
@@ -204,6 +205,19 @@ export default async function JobRoom({
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
   const chooseOpen = !job.worker_email && job.status !== "complete";
+  /* A client can confirm a still-'submitted' quote over WhatsApp before the
+     worker's side lands, and status only flips to 'quote_confirmed' once
+     BOTH sides are in. Found live, 2 Sep 2026: without this check, "Get a
+     Kickoff Pack for this price" kept showing (and being clicked) on a
+     quote the client had already started confirming the lighter way,
+     silently detouring it onto the Kickoff Pack path mid-confirmation. */
+  const submittedQuoteIds = qs.filter((q) => q.status === "submitted").map((q) => q.id);
+  const { data: partialAgreements } = submittedQuoteIds.length
+    ? await supabase.from("quote_agreements").select("quote_id, side").in("quote_id", submittedQuoteIds)
+    : { data: [] as { quote_id: string; side: string }[] };
+  const clientAlreadyConfirming = new Set(
+    (partialAgreements ?? []).filter((a) => a.side === "client").map((a) => a.quote_id),
+  );
   const chat = (msgRows ?? []).map((m) => ({
     id: m.id,
     mine: m.sender_email.toLowerCase() === email,
@@ -396,6 +410,12 @@ export default async function JobRoom({
     "q=" + encodeURIComponent(job.id) +
     "#" + encodeURIComponent(job.id);
   const approvedPack = pk.find((x) => x.status === "approved") ?? pk[0];
+  /* The quote both sides have confirmed over WhatsApp, if one exists yet:
+     the lighter document that precedes a Kickoff Pack and, on its own, is
+     enough to book. */
+  const confirmedQuote = qs.find((q) =>
+    ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""),
+  );
   /* Every document the job will ever have, each carrying the state it is
      actually in. "Not completed" is a fact about a document that is going to
      exist; a blank row is not, and the client had been reading blank rows as
@@ -409,6 +429,15 @@ export default async function JobRoom({
         : "Sign these and the job can go to workers",
       state: signed ? "ready" : "not_completed",
       href: "/portal/guidelines",
+    },
+    {
+      icon: confirmedQuote ? "\ud83d\udcc4" : "\u25cb",
+      title: "Quote Pack",
+      note: confirmedQuote
+        ? "Price, scope and payment stages, confirmed by both sides"
+        : "Written once a worker's price is confirmed by both sides",
+      state: confirmedQuote ? "ready" : "not_completed",
+      href: confirmedQuote ? jobBase + "/quote-pack?quote=" + confirmedQuote.id : undefined,
     },
     {
       icon: "\ud83d\udcc4",
@@ -608,12 +637,28 @@ export default async function JobRoom({
         <>
       <DocStrip docs={docs} />
 
-      {pk.length > 0 && (
+      {(pk.length > 0 || qs.some((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))) && (
         <section className="mt-8">
           <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
             Documents
           </h2>
           <ul className="grid gap-3">
+            {qs
+              .filter((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))
+              .map((q) => (
+                <li key={"qp-" + q.id}>
+                  <Link
+                    href={"/portal/jobs/" + encodeURIComponent(job.id) + "/quote-pack?quote=" + encodeURIComponent(q.id)}
+                    className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
+                  >
+                    <b className="text-[14px]">Quote Pack</b>
+                    <span className="text-[12.5px] text-dim">{q.worker_name}</span>
+                    <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
+                      {q.status}
+                    </span>
+                  </Link>
+                </li>
+              ))}
             {pk.map((p) => (
               <li key={p.id}>
               <Link
@@ -832,12 +877,46 @@ export default async function JobRoom({
                   </div>
                 )}
 
-                {role === "client" && chooseOpen && q.status === "submitted" && (
+                {role === "client" && chooseOpen && q.status === "submitted" && clientAlreadyConfirming.has(q.id) && (
+                  <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
+                    You&apos;ve already confirmed this price over WhatsApp. Waiting on {q.worker_name} to confirm their
+                    side, no Kickoff Pack needed unless you ask for one.
+                  </p>
+                )}
+
+                {role === "client" && chooseOpen && q.status === "submitted" && !clientAlreadyConfirming.has(q.id) && (
                   <form action={requestKickoff} className="mt-3">
                     <input type="hidden" name="jobId" value={job.id} />
                     <input type="hidden" name="quoteId" value={q.id} />
                     <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
                       Get a Kickoff Pack for this price
+                    </button>
+                  </form>
+                )}
+
+                {/* Both sides confirmed the price itself over WhatsApp (2 Sep
+                    2026), no Kickoff Pack involved: the lighter route to
+                    booking, same booking form as the Kickoff Pack path below
+                    since choose_worker() now accepts either a confirmed
+                    quote or a confirmed pack. */}
+                {role === "client" && chooseOpen && q.status === "quote_confirmed" && (
+                  <form action={chooseQuote} className="mt-3">
+                    <input type="hidden" name="jobId" value={job.id} />
+                    <input type="hidden" name="quoteId" value={q.id} />
+                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                      Skip the Kickoff Pack, book {q.worker_name} now
+                    </button>
+                    <p className="mt-1.5 max-w-[46ch] text-[11.5px] leading-snug text-dim">
+                      Both sides already confirmed this price over WhatsApp. This books the job on that alone.
+                    </p>
+                  </form>
+                )}
+                {role === "client" && chooseOpen && q.status === "quote_confirmed" && (
+                  <form action={requestKickoff} className="mt-2">
+                    <input type="hidden" name="jobId" value={job.id} />
+                    <input type="hidden" name="quoteId" value={q.id} />
+                    <button className="rounded-full border border-line2 px-3.5 py-1.5 text-[12px] font-bold text-mute transition hover:border-teal hover:text-tealb">
+                      Or get a Kickoff Pack first
                     </button>
                   </form>
                 )}
