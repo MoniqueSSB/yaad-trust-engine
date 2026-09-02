@@ -670,12 +670,14 @@ export default async function JobRoom({
       summary: setupDone ? "Done" : gates.filter((g) => g.done).length + " of " + gates.length + " done",
       state: phaseState(setupDone, !setupDone),
       steps: setupSteps,
+      href: jobBase + "?tab=job",
     },
     {
       title: "Quotes",
       summary: hasWon ? (won?.worker_name ?? "A worker") + " chosen" : hasQuotes ? qs.length + " in, waiting on a decision" : "Not started",
       state: phaseState(hasWon, setupDone && !hasWon),
       steps: quoteSteps,
+      href: jobBase + "?tab=quotes",
     },
     {
       title: "Work & evidence",
@@ -686,12 +688,14 @@ export default async function JobRoom({
           : "Not started",
       state: phaseState(closed, inWork),
       steps: workSteps,
+      href: jobBase + "?tab=evidence",
     },
     {
       title: "Closed & paid",
       summary: closed ? "Closed" : "Not started",
       state: phaseState(closed && !!myReview, closed && !myReview),
       steps: closeSteps,
+      href: jobBase + "?tab=documents",
     },
   ];
 
@@ -758,7 +762,7 @@ export default async function JobRoom({
      without opening each one. Zero is never shown: a badge reading 0 is worse
      than no badge, because it draws the eye to nothing. */
   const docsReady = docs.filter((x) => x.state === "ready").length + pk.length;
-  const tabCounts = { evidence: ev.length, documents: docsReady };
+  const tabCounts = { quotes: qs.length, evidence: ev.length, documents: docsReady };
 
   /* jobs.status = 'evidence' is the moment the money is waiting on a human
      rather than on the work. The ledger leads with it. */
@@ -871,177 +875,8 @@ export default async function JobRoom({
         <div className="min-w-0">
       <TabBar base={jobBase} active={tab} counts={tabCounts} />
 
-      {tab === "money" && (
+      {tab === "quotes" && (
         <>
-        <StageLedger
-          stages={ledgerStages}
-          side={role === "worker" ? "worker" : "client"}
-          jobBase={jobBase}
-          source={packSource}
-        />
-        <MoneyPanel
-          side={role === "worker" ? "worker" : "client"}
-          labour={labour}
-          materials={won?.materials_jmd ?? null}
-          fee={feeJmd}
-          allIn={allIn}
-          takeHome={takeHome}
-          invoices={invoices}
-          money={money}
-        />
-        </>
-      )}
-
-      {tab === "documents" && (
-        <>
-      <DocStrip docs={docs} />
-
-      {(pk.length > 0 || qs.some((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))) && (
-        <section className="mt-8">
-          <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-            Documents
-          </h2>
-          <ul className="grid gap-3">
-            {qs
-              .filter((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))
-              .map((q) => (
-                <li key={"qp-" + q.id}>
-                  <Link
-                    href={"/portal/jobs/" + encodeURIComponent(job.id) + "/quote-pack?quote=" + encodeURIComponent(q.id)}
-                    className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
-                  >
-                    <b className="text-[14px]">Quote Pack</b>
-                    <span className="text-[12.5px] text-dim">{q.worker_name}</span>
-                    <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
-                      {q.status}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            {pk.map((p) => (
-              <li key={p.id}>
-              <Link
-                href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
-                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
-              >
-                <b className="text-[14px]">
-                  Kickoff Pack{p.rev != null ? ` · rev ${p.rev}` : ""}
-                </b>
-                <span className="text-[12.5px] text-dim">
-                  {p.project_title}
-                </span>
-                <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
-                  {p.status}
-                </span>
-              </Link>
-              </li>
-            ))}
-            {job.status === "complete" && (
-              <li>
-                <Link href={"/portal/jobs/" + encodeURIComponent(job.id) + "/completion"}
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal">
-                  <b className="text-[14px]">Completion Report</b>
-                  <span className="text-[12.5px] text-dim">Yours to keep, with the evidence index and fingerprints</span>
-                </Link>
-              </li>
-            )}
-          </ul>
-        </section>
-      )}
-
-        </>
-      )}
-
-
-      {tab === "info" && (
-        <>
-      {role === "client" && (
-        <PortalCard
-          reference={job.id}
-          code={job.portal_code ?? null}
-          href={"app.yaadly.co.uk" + jobBase}
-          kind="job"
-        />
-      )}
-
-          <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
-            <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-              This job
-            </h2>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-[13px]">
-              <dt className="text-mute">Reference</dt>
-              <dd className="text-right font-mono text-tealb">{job.id}</dd>
-              {job.trade && (
-                <>
-                  <dt className="text-mute">Trade</dt>
-                  <dd className="text-right">{job.trade}</dd>
-                </>
-              )}
-              {job.parish && (
-                <>
-                  <dt className="text-mute">Parish</dt>
-                  <dd className="text-right">{job.parish}</dd>
-                </>
-              )}
-              <dt className="text-mute">You are the</dt>
-              <dd className="text-right">
-                {role === "client" ? "client" : "tradesperson"}
-              </dd>
-              <dt className="text-mute">On the marketplace</dt>
-              <dd className="text-right">
-                {onBoard ? (
-                  <Link href={marketplaceHref} className="text-tealb underline-offset-2 hover:underline">
-                    Live, see it &rarr;
-                  </Link>
-                ) : movedOn ? (
-                  <span className="text-dim">No, the job has moved on</span>
-                ) : (
-                  <span className="text-dim">Not yet</span>
-                )}
-              </dd>
-            </dl>
-          </section>
-        </>
-      )}
-
-      {tab === "job" && (
-        <>
-      {job.worker_email && job.status !== "complete" && (
-        <ArrivalCheckIn
-          jobId={job.id}
-          role={role === "worker" ? "worker" : "client"}
-          stage={Math.max(job.stage ?? 0, 1)}
-          checkedInToday={checkedInToday}
-          recent={recentArrivals}
-        />
-      )}
-      {/* Before the evidence ledger on purpose. Until this is answered no
-          materials money can move and no materials evidence can be filed, so
-          it belongs above the thing it is blocking rather than below it. */}
-      <MaterialsStore
-        jobId={job.id}
-        role={role}
-        storeType={job.materials_store_type ?? null}
-        store={job.materials_store ?? null}
-        setBy={job.materials_store_set_by ?? null}
-        setAt={job.materials_store_set_at ?? null}
-      />
-
-      {job.descr && (
-        <JobBrief
-          descr={job.descr}
-          trade={job.trade}
-          parish={job.parish}
-        />
-      )}
-
-      <IntakeThread
-        transcript={intakeRow?.transcript ?? null}
-        channel={intakeRow?.channel ?? null}
-        turns={intakeRow?.turns ?? null}
-        role={role === "worker" ? "worker" : "client"}
-      />
-
       {chooseOpen && qs.length > 0 && (
         <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
           <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -1225,6 +1060,193 @@ export default async function JobRoom({
           </ul>
         </section>
       )}
+
+          {qs.length === 0 && (
+            <div className="mt-4 rounded-2xl border border-dashed border-line2 bg-bg/30 px-5 py-8 text-center">
+              <b className="mb-1 block text-[14px] font-semibold text-ink">No quotes yet</b>
+              <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
+                {onBoard
+                  ? "Your job is on the board. Vetted workers can see it and quotes land here as they come in."
+                  : movedOn
+                    ? "This job moved on without quotes being recorded here."
+                    : "Quotes appear here once the job is on the marketplace."}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === "money" && (
+        <>
+        <StageLedger
+          stages={ledgerStages}
+          side={role === "worker" ? "worker" : "client"}
+          jobBase={jobBase}
+          source={packSource}
+        />
+        <MoneyPanel
+          side={role === "worker" ? "worker" : "client"}
+          labour={labour}
+          materials={won?.materials_jmd ?? null}
+          fee={feeJmd}
+          allIn={allIn}
+          takeHome={takeHome}
+          invoices={invoices}
+          money={money}
+        />
+        </>
+      )}
+
+      {tab === "documents" && (
+        <>
+      <DocStrip docs={docs} />
+
+      {(pk.length > 0 || qs.some((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))) && (
+        <section className="mt-8">
+          <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Documents
+          </h2>
+          <ul className="grid gap-3">
+            {qs
+              .filter((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))
+              .map((q) => (
+                <li key={"qp-" + q.id}>
+                  <Link
+                    href={"/portal/jobs/" + encodeURIComponent(job.id) + "/quote-pack?quote=" + encodeURIComponent(q.id)}
+                    className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
+                  >
+                    <b className="text-[14px]">Quote Pack</b>
+                    <span className="text-[12.5px] text-dim">{q.worker_name}</span>
+                    <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
+                      {q.status}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            {pk.map((p) => (
+              <li key={p.id}>
+              <Link
+                href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal"
+              >
+                <b className="text-[14px]">
+                  Kickoff Pack{p.rev != null ? ` · rev ${p.rev}` : ""}
+                </b>
+                <span className="text-[12.5px] text-dim">
+                  {p.project_title}
+                </span>
+                <span className="ml-auto rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
+                  {p.status}
+                </span>
+              </Link>
+              </li>
+            ))}
+            {job.status === "complete" && (
+              <li>
+                <Link href={"/portal/jobs/" + encodeURIComponent(job.id) + "/completion"}
+                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-teal">
+                  <b className="text-[14px]">Completion Report</b>
+                  <span className="text-[12.5px] text-dim">Yours to keep, with the evidence index and fingerprints</span>
+                </Link>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
+
+        </>
+      )}
+
+
+      {tab === "info" && (
+        <>
+      {role === "client" && (
+        <PortalCard
+          reference={job.id}
+          code={job.portal_code ?? null}
+          href={"app.yaadly.co.uk" + jobBase}
+          kind="job"
+        />
+      )}
+
+          <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+            <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+              This job
+            </h2>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-[13px]">
+              <dt className="text-mute">Reference</dt>
+              <dd className="text-right font-mono text-tealb">{job.id}</dd>
+              {job.trade && (
+                <>
+                  <dt className="text-mute">Trade</dt>
+                  <dd className="text-right">{job.trade}</dd>
+                </>
+              )}
+              {job.parish && (
+                <>
+                  <dt className="text-mute">Parish</dt>
+                  <dd className="text-right">{job.parish}</dd>
+                </>
+              )}
+              <dt className="text-mute">You are the</dt>
+              <dd className="text-right">
+                {role === "client" ? "client" : "tradesperson"}
+              </dd>
+              <dt className="text-mute">On the marketplace</dt>
+              <dd className="text-right">
+                {onBoard ? (
+                  <Link href={marketplaceHref} className="text-tealb underline-offset-2 hover:underline">
+                    Live, see it &rarr;
+                  </Link>
+                ) : movedOn ? (
+                  <span className="text-dim">No, the job has moved on</span>
+                ) : (
+                  <span className="text-dim">Not yet</span>
+                )}
+              </dd>
+            </dl>
+          </section>
+        </>
+      )}
+
+      {tab === "job" && (
+        <>
+      {job.worker_email && job.status !== "complete" && (
+        <ArrivalCheckIn
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          stage={Math.max(job.stage ?? 0, 1)}
+          checkedInToday={checkedInToday}
+          recent={recentArrivals}
+        />
+      )}
+      {/* Before the evidence ledger on purpose. Until this is answered no
+          materials money can move and no materials evidence can be filed, so
+          it belongs above the thing it is blocking rather than below it. */}
+      <MaterialsStore
+        jobId={job.id}
+        role={role}
+        storeType={job.materials_store_type ?? null}
+        store={job.materials_store ?? null}
+        setBy={job.materials_store_set_by ?? null}
+        setAt={job.materials_store_set_at ?? null}
+      />
+
+      {job.descr && (
+        <JobBrief
+          descr={job.descr}
+          trade={job.trade}
+          parish={job.parish}
+        />
+      )}
+
+      <IntakeThread
+        transcript={intakeRow?.transcript ?? null}
+        channel={intakeRow?.channel ?? null}
+        turns={intakeRow?.turns ?? null}
+        role={role === "worker" ? "worker" : "client"}
+      />
+
 
       {job.status === "complete" && !myReview && (
         <ReviewForm

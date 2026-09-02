@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 /**
  * Where this job is, in four phases, each opened up to show its own steps.
  *
@@ -25,6 +27,8 @@ export type Phase = {
   summary: string;
   state: "done" | "now" | "todo";
   steps: Step[];
+  /** where this phase lives, so the whole card is a way in */
+  href?: string;
 };
 
 const Tick = () => (
@@ -40,18 +44,17 @@ export function JobProgress({ phases }: { phases: Phase[] }) {
         Where this job is
       </h2>
       <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-        {phases.map((p, i) => (
-          <div
-            key={i}
-            className={
-              "rounded-2xl border px-4 pb-3.5 pt-4 " +
+        {phases.map((p, i) => {
+          const cls =
+              "block rounded-2xl border px-4 pb-3.5 pt-4 transition " +
+              (p.href ? "hover:border-purple/45 hover:bg-purple/[0.04] " : "") +
               (p.state === "done"
                 ? "border-green/25 bg-green/[0.04]"
                 : p.state === "now"
                   ? "border-gold/45 bg-gold/[0.06] shadow-[0_0_22px_rgba(245,158,11,0.07)]"
-                  : "border-line bg-bg/40")
-            }
-          >
+                  : "border-line bg-bg/40");
+          const body = (
+            <>
             <div className="mb-2 flex items-center gap-2">
               <span
                 className={
@@ -123,8 +126,14 @@ export function JobProgress({ phases }: { phases: Phase[] }) {
                 ))}
               </div>
             )}
-          </div>
-        ))}
+            </>
+          );
+          return p.href ? (
+            <Link key={i} href={p.href} className={cls}>{body}</Link>
+          ) : (
+            <div key={i} className={cls}>{body}</div>
+          );
+        })}
       </div>
     </>
   );
