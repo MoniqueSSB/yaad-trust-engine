@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-02 · The worker pay invoice raises itself, per stage, the moment the client approves; a founder-set default when there's no pack to read
+
+**Founder's correction to the same-session feature above: not one invoice at the end, one per stage, and not an admin's errand to remember.** "It should not be us deciding what goes in, it should be the worker and client payment terms that are being raised against," her own words. `raise_job_stage_worker_pay_invoice(job, stage)` reads a stage's own `proportion_percent` from whichever pack governs the job, same document and same priority order as the completion trigger (`20260902h`): an approved Kickoff Pack first, an approved Quote Pack draft second. `trg_raise_worker_pay_on_stage_approval`, `after insert on stage_approvals`, calls it the instant `_do_approve_stage()` inserts the client's own approval, whatever channel that approval came through, portal, WhatsApp, in person. A failure to raise (no pack yet found, some data problem) is logged and swallowed inside the trigger, never allowed to block the approval itself: the client's evidence sign-off is the consequential act this whole feature hangs off, the invoice is bookkeeping that follows it, not a precondition on it.
+
+**Materials are never split by proportion, and never assumed present.** "The material is dependent on the job as some have it, some don't," founder's own words, confirming a design already reached independently: whether a stage's invoice carries materials is read off whether a `kind = 'materials'` evidence row actually exists for that stage, a fact, not a guess.
+
+**A founder-set default for a job with no pack at all: 25% on the first stage, the rest on the second, nothing past that.** Not this session's invention: "if there is not payment term, it is a 25% and the rest split," stated with the same authority as every other split in this codebase. `invoices.notes` says plainly when a stage used the default rather than an agreed document, so nobody mistakes Yaadly's fallback for something the worker and client actually signed.
+
+**Reuses `invoices.stage`, already present and otherwise retired** since the old per-stage agency-fee invoice was dropped (`20260901y`): here it names which stage of the *worker's* pay this invoice is for, distinguished from the whole-job invoice (`20260902i`, `stage` null) by `payable_to` plus a populated `stage`.
+
+**A real gap closed in the same pass, not left for later.** A trigger-raised invoice lands as `draft`, and nothing in the desk's Job Invoices view could actually send a draft that hadn't come through its own "Raise & send" click, it would have sat there forever with no path to being emailed. Added a plain **Send** action for any `draft` invoice, same `fn({action:"send"...})` call the existing raise flow already makes.
+
+**A deliberate limit, stated rather than silently decided: raising is automatic, sending is not.** Every other invoice in this codebase needs a human's click to actually email a client, matching the governing rule. Auto-raising a correctly computed draft the moment the client approves satisfies "raised against the payment terms" without also making this the first thing in the system that emails real money figures to a real client with nobody having looked at it. Flagged to the founder rather than assumed either way.
+
+**Verified live**, all three paths, each via a real function or trigger call, none left standing: `raise_job_stage_worker_pay_invoice('JOB-TEST-WAPAY-3', 1)` and `(..., 2)` against its real Quote Pack (30%/70% of J$8,000 labour) came back J$2,400 and J$5,600, summing to the full labour price. The trigger itself, fired by a real `insert into stage_approvals`, in a rolled-back transaction, correctly raised against both an approved Kickoff Pack (`JOB-TEST-KICKOFF-1`, "Mobilization and assessment," J$1,300) and, separately, the no-pack default (`JOB-TEST-REALPHOTO`, a real job with no pack, J$2,500 then J$7,500 off J$10,000 labour, stage 3 correctly raising nothing). `pg_trigger` confirms it live and enabled on `stage_approvals`.
+
+---
+
 ## 2026-09-02 · A second, separate invoice: what the client owes the worker, raised as a record only
 
 **Founder's own instruction, direct: Yaadly raises two invoices per booked job, not one, paid separately, to different parties.** The agency fee invoice (20260901y) already existed: Yaadly's own 15%, billed to and paid by the client, to Yaadly. Nothing anywhere raised the second one, a record of what the client owes the worker, labour plus materials at cost. `20260901v`'s own comment already said the client pays the worker directly; this gives that arrangement paperwork instead of leaving it entirely informal.
