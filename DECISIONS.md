@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-02 · A place in the worker portal to see the actual invoices, not only the computed estimate
+
+**Founder's own instruction, direct continuation of the same session's work: "there should be a place in the portal where they can review the money of jobs and what is pending."** `WorkerMoneyPanel` (Stage 5.6, still in place, unchanged) has always shown one computed figure per job, 88% of labour plus materials, held or released off whether the whole job is `complete`. It was never the real document trail, and now that `invoices.worker_email` exists (this session, same day) there was finally something real to show instead of a client-side estimate.
+
+**`WorkerInvoices`, a new section beneath the existing money panel, not a replacement for it.** Lists the worker's own actual invoices, job by job, stage by stage: the real `period_label`, the real `total_pence`, a **Pending** badge on anything `sent` that the worker hasn't yet recorded receiving payment for (`jobs.pay_method`, the existing self-report). Deliberately worded in the panel's own copy that "pending" is not proof money moved, only the worker's own later note against the job says that, the same honesty `CLAUDE.md 9` already requires of the rest of this portal.
+
+**A real display gap found and fixed before it shipped, not after.** The first version looked up a job's title from the same `jobs` array the page already had, scoped to this worker's *live* stake (`jobs.worker_email` or an active quote). An invoice's own `job_id` isn't guaranteed to fall inside that narrower list, an older or differently-seeded row can name a job this worker no longer shows as "live" but was still genuinely invoiced against, and the first live test showed exactly that: "Untitled job" on a real, correctly-scoped invoice. Fixed by looking up any missing titles directly, by id, rather than assuming the page's existing job list was exhaustive.
+
+**A second parallel-session hazard, same class as before, caught before anything was lost this time.** Mid-edit, `git status` showed `On branch main` again, silently, with none of this session's other work in sight, meaning both new files had just been written against `main`'s own base rather than `the-approve-button`'s. Nothing was committed yet, so nothing was actually at risk, caught by checking the branch before committing rather than after, per the runbook entry the last time this happened. Resolved with `git stash`, a clean `checkout` back to `the-approve-button`, and `stash pop`, re-verified with a typecheck and a live reload before writing anything further.
+
+**Verified live**: the panel renders three real invoices across two jobs correctly, two still `draft` (raised before this session's auto-send fix existed, a real and accurate distinction, not a display bug), one `sent` and correctly marked Pending, all under their correct job titles after the lookup fix.
+
+---
+
 ## 2026-09-02 · A worker can read their own pay invoice; `invoices` had no column naming them at all
 
 **Founder's own instruction: "a worker needs to know which job they are being paid for."** Checked before building anything, not assumed: `invoices` had `client_email`/`client_user` and nothing naming the worker at all. The worker portal's own money panel already shows a job's title per row, but that figure was always computed client-side from `job_quotes`/`jobs.status`, never tied to the actual invoice document raised in the worker's name; there was no RLS path by which a worker could read that document even if they knew its id.
