@@ -66,6 +66,7 @@ export function MoneyPanel({
   takeHome,
   invoices,
   money,
+  materialsReleased,
 }: {
   side: "client" | "worker";
   labour: number | null;
@@ -75,6 +76,8 @@ export function MoneyPanel({
   takeHome: number | null;
   invoices: InvoiceRow[];
   money: (n: number | null | undefined) => string | null;
+  /** J$ of the materials line already paid out against a receipt; 0 if none */
+  materialsReleased: number;
 }) {
   const agreed = labour != null;
 
@@ -117,7 +120,12 @@ export function MoneyPanel({
                   label="Materials"
                   value={money(materials) ?? "—"}
                   width={30}
-                  caption="Quoted separately from labour. The Yaadly fee is not charged on materials."
+                  caption={
+                    materialsReleased > 0
+                      ? (money(materialsReleased) ?? "") +
+                        " released to the worker against a receipt. Never fee'd on either side."
+                      : "Paid to the worker against a receipt before labour starts, once the client has said where materials are kept. Not released yet. Never fee'd on either side."
+                  }
                 />
               )}
               <MoneyRow

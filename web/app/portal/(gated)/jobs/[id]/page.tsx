@@ -144,7 +144,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }, { data: quotePackRow }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }, { data: quotePackRow }, { data: materialsRows }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -201,6 +201,14 @@ export default async function JobRoom({
         .eq("status", "approved")
         .limit(1)
         .maybeSingle(),
+      /* Materials money moves BEFORE any labour stage, against a receipt
+         (20260828c), and until now the room never showed it moving. RLS
+         returns rows to the job's own client and worker only. */
+      supabase
+        .from("materials_releases")
+        .select("amount_jmd,released_at,stage,receipt_ref")
+        .eq("job_id", id)
+        .order("created_at", { ascending: true }),
     ]);
 
   const { data: myReview } = await supabase
@@ -471,6 +479,13 @@ export default async function JobRoom({
   const invoices = (invoiceRows ?? []) as InvoiceRow[];
   const feeInvoice = invoices.find((i) => i.payable_to !== "worker");
   const feeJmd = labour == null ? null : Math.round(labour * 0.15);
+  const matReleases = (materialsRows ?? []) as {
+    amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string;
+  }[];
+  const materialsReleasedJmd = matReleases
+    .filter((m) => m.released_at)
+    .reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
+  const materialsQuoted = won?.materials_jmd ?? 0;
   const isClient = role === "client";
   const otherSideLabel = isClient ? "The worker" : "The client";
 
@@ -562,6 +577,17 @@ export default async function JobRoom({
         cta: isClient ? undefined : "Upload",
       });
     }
+  }
+  if (won && materialsQuoted > 0 && materialsReleasedJmd === 0 && job.status !== "complete") {
+    outstanding.push({
+      who: "yaadly",
+      title: "Materials tranche not yet released",
+      detail:
+        (money(materialsQuoted) ?? "The materials line") +
+        " is paid to the worker against a receipt before labour starts. Yaadly releases it once the receipt and the storage evidence are in.",
+      href: jobBase + "?tab=money",
+      cta: "See it",
+    });
   }
   for (const inv of invoices) {
     if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
@@ -1093,6 +1119,7 @@ export default async function JobRoom({
           takeHome={takeHome}
           invoices={invoices}
           money={money}
+          materialsReleased={materialsReleasedJmd}
         />
         </>
       )}
