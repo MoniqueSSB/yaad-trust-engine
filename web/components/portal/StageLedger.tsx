@@ -171,7 +171,7 @@ export function StageLedger({
                 <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
                   {Ico.soon}
                   <span>
-                    <b className="font-semibold text-ink">What it covers:</b>{" "}
+                    <b className="font-semibold text-ink">Acceptance criteria:</b>{" "}
                     {s.releaseCondition ?? s.evidenceRequired.join(", ")}
                   </span>
                 </span>
@@ -215,12 +215,24 @@ export function StageLedger({
               </span>
 
               {s.current && s.evidenceFiled > 0 && !s.approved && side === "client" && (
-                <Link
-                  href={jobBase + "?tab=evidence"}
-                  className="mt-0.5 self-start rounded-full bg-linear-to-br from-goldb to-gold px-4.5 py-2.5 text-[12.5px] font-bold text-[#1A0F00] transition hover:brightness-105"
-                >
-                  Review and approve stage {s.n} &rarr;
-                </Link>
+                <div className="mt-0.5 flex flex-wrap items-center gap-3">
+                  <Link
+                    href={jobBase + "?tab=evidence"}
+                    className="rounded-full bg-linear-to-br from-goldb to-gold px-4.5 py-2.5 text-[12.5px] font-bold text-[#1A0F00] transition hover:brightness-105"
+                  >
+                    Review and approve stage {s.n} &rarr;
+                  </Link>
+                  {/* The other way to sign a stage off. It existed at the
+                      bottom of the evidence tab and nowhere else, so nobody
+                      found it; it belongs next to the decision it is an
+                      alternative to. */}
+                  <Link
+                    href={jobBase + "?tab=evidence#walkthrough"}
+                    className="text-[12.5px] font-semibold text-purpleb underline underline-offset-2 transition hover:opacity-80"
+                  >
+                    or book a live video walkthrough
+                  </Link>
+                </div>
               )}
               {s.current && s.evidenceFiled === 0 && side === "worker" && (
                 <Link

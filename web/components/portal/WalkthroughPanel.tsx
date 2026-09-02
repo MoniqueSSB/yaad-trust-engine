@@ -51,7 +51,7 @@ export function WalkthroughPanel({
   const notesConfirmed = !!walkNotesConfirmedAt;
 
   return (
-    <section className="mt-4 rounded-2xl border border-line bg-panel p-4">
+    <section id="walkthrough" className="mt-4 rounded-2xl border border-line bg-panel p-4">
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Video walkthrough</p>
       <p className="mt-1 text-[12px] leading-relaxed text-dim">
         {role === "client"
