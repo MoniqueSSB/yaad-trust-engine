@@ -161,7 +161,7 @@
     if (old) old.remove();
     var d = document.createElement('div');
     d.className = 'yc-wa';
-    d.innerHTML = '<p>Monique will answer here when she picks this up. Leaving the page? Carry on with her on WhatsApp instead; she sees everything you wrote here.</p>'
+    d.innerHTML = '<p>Monique will answer here when she picks this up. Leaving the page? Carry on on WhatsApp instead; everything you wrote here comes with you.</p>'
       + '<a href="' + waLink(ref) + '" target="_blank" rel="noopener">' + WA_ICON + 'Continue on WhatsApp</a>'
       + (ref ? '<small>Your reference is ' + esc(ref) + '. It is already in the message.</small>' : '');
     log.appendChild(d);
