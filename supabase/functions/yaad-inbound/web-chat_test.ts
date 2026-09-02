@@ -34,7 +34,8 @@ Deno.test("only the site and the local static server may post", () => {
   assert(originAllowed("https://www.yaadly.co.uk"));
   assert(originAllowed("HTTPS://YAADLY.CO.UK"));
   assert(originAllowed("http://localhost:8932"));
-  assert(!originAllowed("https://app.yaadly.co.uk"), "the app has its own doors");
+  assert(originAllowed("https://app.yaadly.co.uk"), "the app carries the widget too");
+  assert(originAllowed("http://localhost:3000"), "the app's dev server");
   assert(!originAllowed("https://yaadly.co.uk.evil.example"));
   assert(!originAllowed("http://yaadly.co.uk"), "plain http to the live site is not the live site");
   assert(!originAllowed(null));

@@ -22,6 +22,11 @@
  */
 (function () {
   if (document.getElementById('yc-launch')) return;
+  // The same file is loaded by the app (app.yaadly.co.uk, web/app/layout.tsx).
+  // Not on the worker's portal: that surface stays thin on purpose (CLAUDE.md
+  // §9), and a worker mid-job typing "photos coming" into a client intake
+  // assistant would open a draft job in the desk. Everywhere else, yes.
+  if (/^\/portal\/worker(\/|$)/.test(location.pathname)) return;
 
   var INBOUND_URL = 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-inbound';
   var PUBLISHABLE_KEY = 'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz';
@@ -61,18 +66,31 @@
 
   /* ---------- styles, self-contained so every page gets them ---------- */
   var css = ''
-    + '#yc-launch{position:fixed;right:18px;bottom:18px;z-index:80;display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border-radius:100px;border:1px solid rgba(196,170,255,.35);'
-    + 'background:linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);color:#fff;font:700 14px/1 "IBM Plex Sans",-apple-system,sans-serif;cursor:pointer;box-shadow:0 10px 30px rgba(20,10,60,.45)}'
-    + '#yc-launch:hover{filter:brightness(1.08)}'
-    + '#yc-launch svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
-    + '#yc-panel{position:fixed;right:18px;bottom:18px;z-index:81;width:min(380px,calc(100vw - 24px));height:min(600px,calc(100vh - 36px));display:flex;flex-direction:column;'
-    + 'background:#0d0d24;color:#EEEEFF;border:1px solid rgba(155,115,245,.28);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden;font:15px/1.5 "IBM Plex Sans",-apple-system,sans-serif}'
+    /* The launcher is a tab on the right edge of every page, mid height, and
+       the chat is a drawer down that side (founder, 2 Sep 2026: "add this
+       chat on the side of every page"). The right edge is the chat's; the
+       homepage's WhatsApp float moved to the left for it.
+
+       z-index 2400 is above everything the site uses (the highest today is
+       300, the homepage's own sticky nav, which painted straight over the
+       drawer's header at 81 until this was raised) with room left above it
+       for whatever a page adds next. */
+    + '#yc-launch{position:fixed;right:0;top:50%;transform:translateY(-50%);z-index:2400;display:inline-flex;flex-direction:column;align-items:center;gap:10px;padding:16px 11px 18px;border-radius:14px 0 0 14px;border:1px solid rgba(196,170,255,.35);border-right:0;'
+    + 'background:linear-gradient(180deg,#7B4FE0,#9B73F5 55%,#F59E0B);color:#fff;font:700 13px/1 "IBM Plex Sans",-apple-system,sans-serif;letter-spacing:.4px;cursor:pointer;box-shadow:-8px 0 28px rgba(20,10,60,.45)}'
+    + '#yc-launch[hidden]{display:none}'
+    + '#yc-launch span{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}'
+    + '#yc-launch:hover{filter:brightness(1.08);padding-right:14px}'
+    + '#yc-launch svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+    + '#yc-panel{position:fixed;right:0;top:0;z-index:2401;width:min(400px,100vw);height:100dvh;display:flex;flex-direction:column;'
+    + 'background:#0d0d24;color:#EEEEFF;border-left:1px solid rgba(155,115,245,.28);box-shadow:-24px 0 60px rgba(0,0,0,.55);overflow:hidden;font:15px/1.5 "IBM Plex Sans",-apple-system,sans-serif;animation:yc-in .22s ease-out}'
+    + '@keyframes yc-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}'
     + '#yc-panel[hidden]{display:none}'
-    + '@media(max-width:480px){#yc-panel{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}}'
+    + '@media(max-width:480px){#yc-launch{padding:12px 8px 14px;font-size:12px}#yc-launch svg{width:17px;height:17px}}'
+    + '@media(prefers-reduced-motion:reduce){#yc-panel{animation:none}}'
     + '.yc-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid rgba(155,115,245,.18);background:rgba(155,115,245,.07)}'
     + '.yc-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;color:#fff;font:600 17px Fraunces,Georgia,serif}'
     + '.yc-title{flex:1;min-width:0}.yc-title b{display:block;font-size:15px}.yc-title span{display:block;font-size:12px;color:#9a9ac4}'
-    + '.yc-close{background:none;border:0;color:#9a9ac4;font-size:22px;line-height:1;cursor:pointer;padding:4px 6px;border-radius:8px}.yc-close:hover{background:rgba(155,115,245,.14);color:#fff}'
+    + '.yc-close{background:none;border:0;color:#9a9ac4;font-size:22px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px}.yc-close:hover{background:rgba(155,115,245,.14);color:#fff}'
     + '.yc-log{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:9px;scroll-behavior:smooth}'
     + '.yc-m{max-width:86%;padding:10px 13px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word;font-size:14.5px}'
     + '.yc-m.bot{align-self:flex-start;background:rgba(155,115,245,.13);border:1px solid rgba(155,115,245,.2);border-bottom-left-radius:5px}'
@@ -117,7 +135,7 @@
   panel.innerHTML = ''
     + '<div class="yc-head"><div class="yc-mark">Y</div>'
     + '<div class="yc-title"><b>Yaadly</b><span>Assistant here. Monique on WhatsApp.</span></div>'
-    + '<button type="button" class="yc-close" aria-label="Close chat">&times;</button></div>'
+    + '<button type="button" class="yc-close" aria-label="Close chat" title="Close">&rsaquo;</button></div>'
     + '<div class="yc-log" id="yc-log" aria-live="polite"></div>'
     + '<form class="yc-form" id="yc-form"><textarea id="yc-in" rows="1" maxlength="1500" placeholder="Type here" aria-label="Your message"></textarea>'
     + '<button type="submit" id="yc-send">Send</button></form>'
