@@ -202,6 +202,22 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .reqdoc summary i{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--tealb);background:rgba(45,212,191,.16);color:var(--tealb);font-size:9px;font-style:normal;margin-right:6px}
 .reqdoc[open] summary{color:var(--tealb)}
 .docbody{white-space:pre-wrap;color:var(--mute);font-size:12.5px;line-height:1.65;padding:2px 4px 16px 21px;max-height:360px;overflow-y:auto;word-break:break-word}
+.docstruct{color:var(--mute);font-size:12.5px;line-height:1.6;padding:2px 4px 16px 21px;max-height:360px;overflow-y:auto;word-break:break-word}
+.docstruct p{margin:0 0 10px}
+.docstruct p:last-child{margin-bottom:0}
+.docstruct h4{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tealb);margin:14px 0 6px}
+.docstruct h4:first-child{margin-top:0}
+.docstruct ul{margin:0 0 10px 18px;padding:0}
+.docstruct ul:last-child{margin-bottom:0}
+.docstruct li{margin:0 0 8px;line-height:1.5}
+.docstruct li:last-child{margin-bottom:0}
+.docstruct b{color:var(--ink)}
+.docstruct .docsub{color:var(--dim);font-size:11.5px}
+.docstruct .docitem{padding:8px 0;border-top:1px solid var(--softline)}
+.docstruct .docitem:first-child{border-top:0}
+.docstruct table{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:12px}
+.docstruct th,.docstruct td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--softline);vertical-align:top}
+.docstruct th{color:var(--dim);font-weight:700;text-transform:uppercase;font-size:9.5px;letter-spacing:.06em}
 
 /* ---------- vetting ---------- */
 .vrec{margin-top:10px}
@@ -956,9 +972,10 @@ const VIEWS = [
   { k:"qpd", g:"Documents & money", label:"Quote Pack Drafts", icon:"doc",
     title:"Quote Pack Drafts", table:"quote_pack_drafts",
     sub:"Yaadly's own starting draft for a worker's quote, written for every open, unassigned job. A guardrail-clean draft is approved automatically and folds into whichever quote the worker actually submits; a dirty one is held here, exactly as it was written, until a named human clears it or a fresh draft replaces it. Nothing here is client-facing on its own.",
-    select:"id,job_id,status,model,guardrail,error,approved_by,approved_at,created_at,finished_at",
-    order:"created_at", search:["id","job_id"],
+    select:"id,job_id,status,model,docs,guardrail,error,approved_by,approved_at,created_at,finished_at",
+    order:"created_at", search:["id","job_id"], hide:["docs"],
     empty:["No drafts yet","A draft is written when yaad-quote-pack-check finds a live, unassigned job with none yet."],
+    detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${qpDocsHtml(r.docs)}</div></div>`,
     cols:[
       {h:"Draft", f:r => id_(r.id) + sub_(r.model || "not recorded")},
       {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
@@ -984,10 +1001,11 @@ const VIEWS = [
   { k:"kickd", g:"Documents & money", label:"Kickoff Drafts", icon:"doc",
     title:"Kickoff Drafts", table:"kickoff_drafts",
     sub:"Every kickoff draft yaad-kickoff has written, whether or not anybody has done anything with it. A draft is not a pack: nothing here is client-facing, and nothing ever becomes a pack on its own. Link a ready draft to a job below, and it starts as a draft pack there too, unread by the client until they accept a quote on that job.",
-    select:"id,status,model,intake,error,created_at,finished_at",
+    select:"id,status,model,intake,docs,error,created_at,finished_at",
     order:"created_at", search:["id","title","client_name"],
     empty:["No drafts yet","A draft is written when the kickoff wizard, or an admin request, asks yaad-kickoff for one."],
-    pre: preKickDrafts,
+    pre: preKickDrafts, hide:["docs"],
+    detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${kickDocsHtml(r.docs)}</div></div>`,
     cols:[
       {h:"Draft", f:r => id_(r.id) + sub_(r.model || "not recorded")},
       {h:"Project", f:r => esc(r.title || "untitled") + sub_(r.client_name || "")},
@@ -1036,17 +1054,35 @@ const VIEWS = [
 
   { k:"svc", g:"Services", label:"Services", icon:"tools",
     title:"Services", table:"services",
-    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee quoted on a call before anything starts. This is the lane the October Gate is counted from.",
+    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee from your own service list. A booking is born when you convert an enquiry, sits held until you confirm the work, and goes live on its own the moment its invoice is marked paid. This is the lane the October Gate is counted from.",
     select:"*",
     order:"updated_at", search:["id","type","client_name","parish"],
-    empty:["No service bookings","Deposit Protection Checks and Project Setup Packs land here."],
+    empty:["No service bookings","Convert an enquiry under Inbox and it lands here, held, waiting for your confirm."],
     panel: panelSvc,
     cols:[
-      {h:"Ref", f:r => id_(r.id)},
+      {h:"Ref", f:r => id_(r.id) + sub_(r.portal_code ? "portal " + r.portal_code : "")},
       {h:"Service", f:r => esc(r.type || "") + sub_(r.parish || "")},
-      {h:"Client", f:r => esc(r.client_name || "") + sub_(r.client_email || "")},
+      {h:"Client", f:r => esc(r.client_name || "") + sub_(r.client_phone || r.client_email || "")},
       {h:"Price", n:true, f:r => r.price ? esc(r.price) : mute_("not set")},
+      {h:"State", f:r => r.status ? tone_(r.status) : mute_("before the lifecycle")},
       {h:"Stage", f:r => tone_(r.stage)},
+      {h:"Promised", f:r => r.due_at ? esc(r.due_at) : mute_("no date")},
+    ],
+    actions:[
+      // The stop the founder asked for. Everything before this is unpriced
+      // conversation; everything after it is an invoice and a clock.
+      { label:"Confirm the work", cls:"", when:r => r.status === "held",
+        rpc:"confirm_service_booking",
+        ask:[
+          { k:"due", label:"Delivery date promised, as 2026-09-12", type:"text",
+            placeholder:"leave blank if not promised yet" },
+        ],
+        args:(r, v) => ({ p_service:r.id, p_due:v.due || null }),
+        says:() => "Says the scope is agreed and you are taking the work. It raises the invoice against your service list price and parks the booking at awaiting payment. The invoice is drafted, not sent: send it from the Invoices view. The booking goes live by itself the moment you mark that invoice paid." },
+      { label:"Cancel booking", cls:"d",
+        when:r => r.status && r.status !== "cancelled" && r.status !== "complete",
+        set:{ status:"cancelled" },
+        says:r => `Marks ${r.id} cancelled. The row stays on the record. Any invoice already raised is untouched: void it from the Invoices view if it should not be paid.` },
     ]},
 
   { k:"market", g:"Services", label:"Marketplace", icon:"board",
@@ -1121,7 +1157,26 @@ const VIEWS = [
       {h:"Asked", f:r => mute_(ago_(r.created_at))},
     ],
     actions:[
-      { label:"Mark replied", cls:"g", when:r => r.status !== "replied",
+      // The only way a service booking is ever born. The public form cannot
+      // create one, on purpose: bandwidth is the founder's, so the click is.
+      { label:"Convert to booking", cls:"", when:r => r.status !== "converted",
+        rpc:"convert_enquiry_to_service",
+        ask:[
+          { k:"svc", label:"Which service they are booking",
+            get options(){ return CATALOGUE.map(c => [c.id, c.name]); } },
+          { k:"name", label:"Client name", type:"text",
+            from:r => r.name || "" },
+          { k:"email", label:"Client email (the invoice and portal go here)", type:"text",
+            from:r => /@/.test(r.contact || "") ? r.contact : "" },
+          { k:"phone", label:"Client WhatsApp number", type:"text",
+            placeholder:"+44 or +1 876",
+            from:r => /@/.test(r.contact || "") ? "" : (r.contact || "") },
+          { k:"parish", label:"Parish or area", type:"text", placeholder:"Portmore" },
+        ],
+        args:(r, v) => ({ p_enquiry:r.id, p_catalogue_id:v.svc, p_client_name:v.name,
+                          p_client_email:v.email, p_phone:v.phone, p_parish:v.parish }),
+        says:() => "Creates a held booking under Services, priced from your own service list, and marks this enquiry converted. Nothing is sent to anybody: the booking waits for you to confirm the work, and only then does an invoice exist." },
+      { label:"Mark replied", cls:"g", when:r => r.status !== "replied" && r.status !== "converted",
         set:{ status:"replied" },
         says:() => "Says you have come back to them. It stops counting against you on the Overview. It does not send anything: replying happens on WhatsApp or by email, the same as it always did." },
     ]},
@@ -1809,10 +1864,10 @@ const KICK_DOCS = [
 ];
 
 // Flattens each draft's intake jsonb onto the row as plain fields (title,
-// client_name, parish, brief) and drops the raw intake and docs blobs
-// rather than hiding them: this view is for finding the right draft to
-// link, not for reading the ten documents inside it, which the Kickoff
-// Packs view already does once one exists.
+// client_name, parish, brief) and drops the raw intake blob rather than
+// hiding it: nobody reads raw intake jsonb in this desk. docs stays on the
+// row, hidden from the generic field dump, so a click on any draft opens
+// the actual pack it wrote, before it is ever linked to a job.
 async function preKickDrafts(rows){
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -1821,7 +1876,7 @@ async function preKickDrafts(rows){
       id: r.id, status: r.status, model: r.model,
       title: intake.title || "", client_name: intake.client_name || "",
       parish: intake.parish || "", brief: intake.brief || "",
-      error: r.error, created_at: r.created_at, finished_at: r.finished_at,
+      docs: r.docs, error: r.error, created_at: r.created_at, finished_at: r.finished_at,
       __i: r.__i,
     };
   }
@@ -1835,23 +1890,170 @@ async function preKick(rows){
   KICK_CTX = { pack: data || null, error: error ? error.message : null };
 }
 
+// Every string leaf inside a document, whatever shape it is: an object, a
+// list of objects, a list of strings, or plain prose. yaad-kickoff writes
+// nine of the twelve documents as structured data (see index.ts's own
+// schema comment), not text, so String(docs[key]) used to collapse each one
+// to the literal "[object Object]" and this panel reported them all as
+// missing even when the model had written them in full. Used both to
+// decide whether a document is actually present, and to scan the real
+// words for banned dashes or leaked foreign script.
+function docText(value){
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(docText).join(" ");
+  if (typeof value === "object") return Object.values(value).map(docText).join(" ");
+  return "";
+}
+
+const humanizeKey = k => String(k).replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase());
+
+// Fallback renderer for any value whose shape does not match a known
+// document below, or for a field inside one that a model added or dropped:
+// it should still read as something, not vanish or throw.
+function renderAny(value){
+  if (value == null) return "";
+  if (typeof value === "string") {
+    const t = value.trim();
+    return t ? t.split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g,"<br>")}</p>`).join("") : "";
+  }
+  if (typeof value === "number" || typeof value === "boolean") return `<p>${esc(String(value))}</p>`;
+  if (Array.isArray(value)) {
+    const items = value.filter(v => v !== null && v !== undefined && v !== "");
+    if (!items.length) return "";
+    if (items.every(v => typeof v === "string")) return `<ul>${items.map(v => `<li>${esc(v)}</li>`).join("")}</ul>`;
+    return items.map(v => `<div class="docitem">${renderAny(v)}</div>`).join("");
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value).filter(([,v]) => v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && !v.length));
+    if (!entries.length) return "";
+    return entries.map(([k,v]) => (typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+      ? `<p><b>${esc(humanizeKey(k))}:</b> ${esc(String(v))}</p>`
+      : `<h4>${esc(humanizeKey(k))}</h4>${renderAny(v)}`).join("");
+  }
+  return "";
+}
+
+// One renderer per key in KICK_DOCS, each written against the exact shape
+// yaad-kickoff/index.ts puts there. renderAny is the fallback whenever a
+// value does not match, so a schema tweak on the writing side degrades to
+// a plain rendering here rather than an empty panel.
+const DOC_RENDERERS = {
+  scope_of_works: v => (!v || typeof v !== "object") ? renderAny(v) : renderAny(v.summary || "")
+    + [["included","Included"], ["excluded","Excluded"], ["assumptions","Assumptions"],
+       ["acceptance_criteria","How this is known to be done"],
+       ["client_responsibilities","What the client must do or provide"]]
+      .map(([k,label]) => Array.isArray(v[k]) && v[k].length
+        ? `<h4>${esc(label)}</h4><ul>${v[k].map(x => `<li>${esc(String(x))}</li>`).join("")}</ul>` : "").join(""),
+
+  timeline: v => {
+    if (!v || typeof v !== "object") return renderAny(v);
+    const phases = Array.isArray(v.phases) ? v.phases : [];
+    return renderAny(v.basis || "") + (phases.length ? `<h4>Phases</h4><ul>${phases.map(p =>
+      `<li><b>${esc(p.name || "phase")}</b>${p.duration ? " &middot; " + esc(p.duration) : ""}`
+      + (p.depends_on ? `<br><span class="docsub">After: ${esc(p.depends_on)}</span>` : "")
+      + (p.milestone ? `<br><span class="docsub">Done when: ${esc(p.milestone)}</span>` : "") + `</li>`).join("")}</ul>` : "");
+  },
+
+  payment_schedule: v => {
+    if (!v || typeof v !== "object") return renderAny(v);
+    const stages = Array.isArray(v.stages) ? v.stages : [];
+    const tpl = v.cost_tracking_template;
+    return renderAny(v.note || "")
+      + (stages.length ? `<h4>Stages</h4><ul>${stages.map(s =>
+          `<li><b>${esc(s.stage || "stage")}</b>${s.proportion_percent != null ? " &middot; " + esc(String(s.proportion_percent)) + "%" : ""}`
+          + (s.release_condition ? `<br><span class="docsub">Releases on: ${esc(s.release_condition)}</span>` : "")
+          + (Array.isArray(s.evidence_required) && s.evidence_required.length ? `<br><span class="docsub">Evidence: ${esc(s.evidence_required.join(", "))}</span>` : "")
+          + `</li>`).join("")}</ul>` : "")
+      + (tpl && tpl.instruction ? `<h4>Cost tracking table</h4><p>${esc(tpl.instruction)}${Array.isArray(tpl.columns) && tpl.columns.length ? " Columns: " + esc(tpl.columns.join(", ")) + "." : ""}</p>` : "");
+  },
+
+  evidence_checklist: v => !Array.isArray(v) ? renderAny(v) : v.map(grp => {
+    const items = Array.isArray(grp.items) ? grp.items : [];
+    return `<h4>${esc(grp.stage || "stage")}</h4><ul>${items.map(it =>
+      `<li><b>${esc(it.item || "item")}</b>${it.type ? " &middot; " + esc(it.type) : ""}`
+      + (it.why ? `<br><span class="docsub">${esc(it.why)}</span>` : "") + `</li>`).join("")}</ul>`;
+  }).join(""),
+
+  document_pack: v => !Array.isArray(v) ? renderAny(v) : `<ul>${v.map(d =>
+    `<li><b>${esc(d.document || "document")}</b>${d.who_provides ? " &middot; " + esc(d.who_provides) : ""}`
+    + (d.why ? `<br><span class="docsub">${esc(d.why)}</span>` : "")
+    + (d.risk_if_missing ? `<br><span class="docsub">If missing: ${esc(d.risk_if_missing)}</span>` : "") + `</li>`).join("")}</ul>`,
+
+  risk_register: v => !Array.isArray(v) ? renderAny(v) : `<ul>${v.map(r =>
+    `<li><b>${esc(r.risk || "risk")}</b>${r.category ? " &middot; " + esc(r.category) : ""}`
+    + (r.likelihood || r.impact ? `<br><span class="docsub">Likelihood ${esc(r.likelihood || "?")}, impact ${esc(r.impact || "?")}</span>` : "")
+    + (r.mitigation ? `<br><span class="docsub">Mitigation: ${esc(r.mitigation)}</span>` : "")
+    + (r.owner ? `<br><span class="docsub">Owner: ${esc(r.owner)}</span>` : "") + `</li>`).join("")}</ul>`,
+
+  communications_list: v => !Array.isArray(v) ? renderAny(v) : `<ul>${v.map(c =>
+    `<li><b>${esc(c.role || "role")}</b>${c.who ? " &middot; " + esc(c.who) : ""}`
+    + (c.responsibility ? `<br><span class="docsub">${esc(c.responsibility)}</span>` : "")
+    + (c.contact_method || c.update_cadence ? `<br><span class="docsub">${[c.contact_method, c.update_cadence].filter(Boolean).map(esc).join(" &middot; ")}</span>` : "")
+    + `</li>`).join("")}</ul>`,
+
+  // Quote Kickoff Pack's own payment_stages: a plain array, no wrapping
+  // note or cost-tracking template the way the big pack's payment_schedule
+  // has one.
+  payment_stages: v => !Array.isArray(v) ? renderAny(v) : `<ul>${v.map(s =>
+    `<li><b>${esc(s.stage || "stage")}</b>${s.proportion_percent != null ? " &middot; " + esc(String(s.proportion_percent)) + "%" : ""}`
+    + (s.evidence_note ? `<br><span class="docsub">${esc(s.evidence_note)}</span>` : "") + `</li>`).join("")}</ul>`,
+
+  cost_breakdown: v => {
+    if (!v || typeof v !== "object") return renderAny(v);
+    const rows = Array.isArray(v.rows) ? v.rows : [];
+    return renderAny(v.note || "") + (rows.length
+      ? `<table><thead><tr><th>Item</th><th>Materials</th><th>Labour</th><th>Total</th></tr></thead><tbody>${rows.map(r =>
+          `<tr><td>${esc(r.item || "")}</td><td>${esc(r.materials || "")}</td><td>${esc(r.labour || "")}</td><td>${esc(r.total || "")}</td></tr>`).join("")}</tbody></table>` : "");
+  },
+
+  terms_placeholders: v => {
+    if (!v || typeof v !== "object") return renderAny(v);
+    const items = Array.isArray(v.items) ? v.items : [];
+    return renderAny(v.note || "") + (items.length
+      ? `<ul>${items.map(t => `<li><b>${esc(t.term || "term")}</b><br><span class="docsub">${esc(t.placeholder || "")}</span></li>`).join("")}</ul>` : "");
+  },
+};
+
+function renderDoc(key, value){
+  try {
+    const html = (DOC_RENDERERS[key] || renderAny)(value);
+    return html && html.trim() ? html : renderAny(value);
+  } catch (_) { return renderAny(value); }
+}
+
 // One row per drafted document, named exactly as KICK_DOCS names them. A
-// present document opens, on click, to the full text the model wrote, not a
-// paraphrase and not a preview cut short: this panel used to say "read it
+// present document opens, on click, to the full text the model wrote,
+// rendered the way it is actually shaped rather than a raw string dump, not
+// a paraphrase and not a preview cut short: this panel used to say "read it
 // end to end before approving" while giving no way to actually do that.
 // A missing document stays a flat row, there is nothing to open.
-function kickDocsHtml(docs){
+function docsListHtml(list, docs){
   docs = docs || {};
-  return KICK_DOCS.map(d => {
-    const text = String(docs[d[0]] || "").trim();
+  return list.map(d => {
+    const value = docs[d[0]];
+    const text = docText(value).trim();
     const n = text.length;
     const ok = n > 40;
     const head = `<i>${ok ? "&#10003;" : ""}</i>${esc(d[1])}`
       + (ok ? ` <span class="mono" style="color:var(--dim)">${n.toLocaleString("en-GB")} chars</span>` : " &mdash; <b>missing</b>");
     if (!ok) return `<div class="reqrow miss">${head}</div>`;
-    return `<details class="reqdoc"><summary>${head}</summary><div class="docbody">${esc(text)}</div></details>`;
+    return `<details class="reqdoc"><summary>${head}</summary><div class="docstruct">${renderDoc(d[0], value)}</div></details>`;
   }).join("");
 }
+const kickDocsHtml = docs => docsListHtml(KICK_DOCS, docs);
+
+// The Quote Kickoff Pack, yaad-quote-pack's own short worker-facing draft:
+// five keys, deliberately not the big pack's twelve (see quote_pack_drafts'
+// own migration comment). Same docText/renderDoc machinery, since it is the
+// same underlying problem, a structured value collapsing to "[object
+// Object]" under String().
+const QP_DOCS = [
+  ["scope_summary","Scope summary"], ["included","Included"], ["excluded","Excluded"],
+  ["rough_timeline","Rough timeline"], ["payment_stages","Payment stages"],
+];
+const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
 function panelKick(rows){
   if (!(rows || []).length || !KICK_CTX) return "";
@@ -1859,12 +2061,14 @@ function panelKick(rows){
   if (error) return softFail("The newest pack", error);
   if (!pack) return "";
   const docs = pack.docs || {};
-  const chars = Object.keys(docs).reduce((t, k) => t + String(docs[k] || "").length, 0);
-  const present = KICK_DOCS.filter(d => String(docs[d[0]] || "").trim().length > 40);
+  const chars = Object.keys(docs).reduce((t, k) => t + docText(docs[k]).length, 0);
+  const present = KICK_DOCS.filter(d => docText(docs[d[0]]).trim().length > 40);
 
   // Anything the writing rule forbids, and anything left over from a model
-  // that answers in another script. Counted, not assumed.
-  const all = Object.values(docs).map(v => String(v || "")).join("\n");
+  // that answers in another script. Counted from the real words inside each
+  // document, not from String(object), which used to hide anything sitting
+  // inside a structured field rather than in plain prose.
+  const all = Object.keys(docs).map(k => docText(docs[k])).join("\n");
   const dashes = (all.match(/[–—]/g) || []).length;
   const cjk = (all.match(/[\u3000-\u9fff\uff00-\uffef]/g) || []).length;
 
@@ -2462,7 +2666,7 @@ async function loadOverview(){
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
-    countOf("enquiries",   q => q.neq("status", "replied")),
+    countOf("enquiries",   q => q.not("status", "in", "(replied,converted)")),
   ]);
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";

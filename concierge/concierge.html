@@ -1054,17 +1054,35 @@ const VIEWS = [
 
   { k:"svc", g:"Services", label:"Services", icon:"tools",
     title:"Services", table:"services",
-    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee quoted on a call before anything starts. This is the lane the October Gate is counted from.",
+    sub:"The work you deliver yourself. Separate from the marketplace, separate money, no percentage: a fixed fee from your own service list. A booking is born when you convert an enquiry, sits held until you confirm the work, and goes live on its own the moment its invoice is marked paid. This is the lane the October Gate is counted from.",
     select:"*",
     order:"updated_at", search:["id","type","client_name","parish"],
-    empty:["No service bookings","Deposit Protection Checks and Project Setup Packs land here."],
+    empty:["No service bookings","Convert an enquiry under Inbox and it lands here, held, waiting for your confirm."],
     panel: panelSvc,
     cols:[
-      {h:"Ref", f:r => id_(r.id)},
+      {h:"Ref", f:r => id_(r.id) + sub_(r.portal_code ? "portal " + r.portal_code : "")},
       {h:"Service", f:r => esc(r.type || "") + sub_(r.parish || "")},
-      {h:"Client", f:r => esc(r.client_name || "") + sub_(r.client_email || "")},
+      {h:"Client", f:r => esc(r.client_name || "") + sub_(r.client_phone || r.client_email || "")},
       {h:"Price", n:true, f:r => r.price ? esc(r.price) : mute_("not set")},
+      {h:"State", f:r => r.status ? tone_(r.status) : mute_("before the lifecycle")},
       {h:"Stage", f:r => tone_(r.stage)},
+      {h:"Promised", f:r => r.due_at ? esc(r.due_at) : mute_("no date")},
+    ],
+    actions:[
+      // The stop the founder asked for. Everything before this is unpriced
+      // conversation; everything after it is an invoice and a clock.
+      { label:"Confirm the work", cls:"", when:r => r.status === "held",
+        rpc:"confirm_service_booking",
+        ask:[
+          { k:"due", label:"Delivery date promised, as 2026-09-12", type:"text",
+            placeholder:"leave blank if not promised yet" },
+        ],
+        args:(r, v) => ({ p_service:r.id, p_due:v.due || null }),
+        says:() => "Says the scope is agreed and you are taking the work. It raises the invoice against your service list price and parks the booking at awaiting payment. The invoice is drafted, not sent: send it from the Invoices view. The booking goes live by itself the moment you mark that invoice paid." },
+      { label:"Cancel booking", cls:"d",
+        when:r => r.status && r.status !== "cancelled" && r.status !== "complete",
+        set:{ status:"cancelled" },
+        says:r => `Marks ${r.id} cancelled. The row stays on the record. Any invoice already raised is untouched: void it from the Invoices view if it should not be paid.` },
     ]},
 
   { k:"market", g:"Services", label:"Marketplace", icon:"board",
@@ -1139,7 +1157,26 @@ const VIEWS = [
       {h:"Asked", f:r => mute_(ago_(r.created_at))},
     ],
     actions:[
-      { label:"Mark replied", cls:"g", when:r => r.status !== "replied",
+      // The only way a service booking is ever born. The public form cannot
+      // create one, on purpose: bandwidth is the founder's, so the click is.
+      { label:"Convert to booking", cls:"", when:r => r.status !== "converted",
+        rpc:"convert_enquiry_to_service",
+        ask:[
+          { k:"svc", label:"Which service they are booking",
+            get options(){ return CATALOGUE.map(c => [c.id, c.name]); } },
+          { k:"name", label:"Client name", type:"text",
+            from:r => r.name || "" },
+          { k:"email", label:"Client email (the invoice and portal go here)", type:"text",
+            from:r => /@/.test(r.contact || "") ? r.contact : "" },
+          { k:"phone", label:"Client WhatsApp number", type:"text",
+            placeholder:"+44 or +1 876",
+            from:r => /@/.test(r.contact || "") ? "" : (r.contact || "") },
+          { k:"parish", label:"Parish or area", type:"text", placeholder:"Portmore" },
+        ],
+        args:(r, v) => ({ p_enquiry:r.id, p_catalogue_id:v.svc, p_client_name:v.name,
+                          p_client_email:v.email, p_phone:v.phone, p_parish:v.parish }),
+        says:() => "Creates a held booking under Services, priced from your own service list, and marks this enquiry converted. Nothing is sent to anybody: the booking waits for you to confirm the work, and only then does an invoice exist." },
+      { label:"Mark replied", cls:"g", when:r => r.status !== "replied" && r.status !== "converted",
         set:{ status:"replied" },
         says:() => "Says you have come back to them. It stops counting against you on the Overview. It does not send anything: replying happens on WhatsApp or by email, the same as it always did." },
     ]},
@@ -2629,7 +2666,7 @@ async function loadOverview(){
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
-    countOf("enquiries",   q => q.neq("status", "replied")),
+    countOf("enquiries",   q => q.not("status", "in", "(replied,converted)")),
   ]);
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
