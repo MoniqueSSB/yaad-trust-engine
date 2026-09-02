@@ -628,6 +628,23 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
+const REPLY_FN = SUPABASE_URL + "/functions/v1/yaad-desk-reply";
+
+// The Conversations reply lane. Monique's words, typed here, sent from the
+// Yaadly number by yaad-desk-reply so they continue the chat the client
+// already has. No model anywhere in this path, and the function checks
+// is_admin() on its side too, so this button is convenience, not the control.
+async function deskReply(row, vals){
+  const text = (vals.text || "").trim();
+  if (!text) throw new Error("Nothing to send.");
+  const r = await fetch(REPLY_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify({ channel: row.channel, from_addr: row.from_addr, text })
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+}
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
@@ -1111,11 +1128,21 @@ const VIEWS = [
       { label:"Confirm the work", cls:"", when:r => r.status === "held",
         rpc:"confirm_service_booking",
         ask:[
+          { k:"tier", label:"What are you charging",
+            options:[
+              ["full","Full price, from your service list"],
+              ["founding","Founding rate, from your service list"],
+              ["custom","My own figure"],
+            ] },
+          { k:"amount", label:"Your figure, in pounds", type:"text",
+            placeholder:"149 or 149.50",
+            hideWhen:v => v.tier !== "custom" },
           { k:"due", label:"Delivery date promised, as 2026-09-12", type:"text",
             placeholder:"leave blank if not promised yet" },
         ],
-        args:(r, v) => ({ p_service:r.id, p_due:v.due || null }),
-        says:() => "Says the scope is agreed and you are taking the work. It raises the invoice against your service list price and parks the booking at awaiting payment. The invoice is drafted, not sent: send it from the Invoices view. The booking goes live by itself the moment you mark that invoice paid." },
+        args:(r, v) => ({ p_service:r.id, p_due:v.due || null,
+                          p_price:v.tier === "custom" ? (v.amount || "") : (v.tier || "full") }),
+        says:() => "Says the scope is agreed and you are taking the work. It raises the invoice at the price you choose here: full or founding come from your service list, or type your own figure and that is what the invoice says. It parks the booking at awaiting payment. The invoice is drafted, not sent: send it from the Invoices view. The booking goes live by itself the moment you mark that invoice paid." },
       { label:"Cancel booking", cls:"d",
         when:r => r.status && r.status !== "cancelled" && r.status !== "complete",
         set:{ status:"cancelled" },
@@ -1138,16 +1165,28 @@ const VIEWS = [
 
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
-    sub:"The full back and forth with anybody who wrote in by WhatsApp or email, kept word for word. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it.",
+    sub:"The full back and forth with anybody who wrote in by WhatsApp or email, kept word for word. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back.",
     select:"*",
     order:"last_at", search:["job_id","from_addr","transcript","channel"],
     empty:["No conversations yet","When somebody writes in by WhatsApp or email, the whole thread is kept here."],
     cols:[
       {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("no job yet")},
       {h:"From", f:r => esc(r.from_addr || "unknown") + sub_(r.channel || "")},
+      {h:"Who has it", f:r => r.human_handling ? chip_("warn","with you") : chip_("mute","assistant")},
       {h:"Turns", n:true, f:r => String(r.turns ?? 0)},
       {h:"The conversation", f:r => transcript_(r.transcript)},
       {h:"Last heard", f:r => mute_(ago_(r.last_at))},
+    ],
+    actions:[
+      { label:"Reply from the Yaadly number",
+        when:r => r.channel === "whatsapp" || r.channel === "sms",
+        says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only delivers a typed reply within 24 hours of their last message; outside that the send is refused and told to you honestly.",
+        ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
+        call: deskReply },
+      { label:"Hand back to the assistant", cls:"g",
+        when:r => r.human_handling === true,
+        says:() => "The assistant starts answering this number again from their next message. Nothing is sent to the client by pressing this.",
+        set:{ human_handling:false } },
     ]},
 
   { k:"wamid", g:"Inbox", label:"Mid-chat", icon:"clock",
@@ -2434,12 +2473,12 @@ function drawAsk(k, a, row, btn){
   $("askNo").addEventListener("click", () => { $("drwMsg").innerHTML = ""; btn.disabled = false; });
   $("askGo").addEventListener("click", async () => {
     const vals = collect();
-    $("askMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Writing.</div>';
+    $("askMsg").innerHTML = `<div class="msg ok"><span class="spin"></span>${a.call ? "Sending." : "Writing."}</div>`;
     const err = await writeAction(k, a, row, vals);
     if (err) {
-      // As Postgres said it. The function refusing this is the rule working,
+      // As Postgres, or the function, said it. A refusal is the rule working,
       // and rewording it would hide which rule fired.
-      $("askMsg").innerHTML = `<div class="msg err"><b>The database refused this.</b><br>${esc(err)}</div>`;
+      $("askMsg").innerHTML = `<div class="msg err"><b>${a.call ? "This did not go." : "The database refused this."}</b><br>${esc(err)}</div>`;
       return;
     }
     await loadTableView(k);
@@ -2453,6 +2492,13 @@ function drawAsk(k, a, row, btn){
 // wizard too and not only for whoever is looking at this page.
 async function writeAction(k, a, row, vals){
   const v = VIEW[k];
+  // a.call is for the one thing a column write cannot be: asking an edge
+  // function to do something in the world, like sending a WhatsApp message
+  // from the Yaadly number. The function's refusal comes back as it was said.
+  if (a.call) {
+    try { await a.call(row, vals); return null; }
+    catch (e) { return e && e.message ? e.message : String(e); }
+  }
   const { error } = a.rpc
     ? await sb.rpc(a.rpc, a.args(row, vals))
     : await sb.from(v.table).update(a.set).eq(pkOf(k), row[pkOf(k)]);
@@ -2974,9 +3020,12 @@ function renderInvoice(){
       <td style="width:110px">${draft ? `<select class="t">
           <option value="catalogue_founding"${l.price_source === "catalogue_founding" ? " selected" : ""}>founding</option>
           <option value="catalogue_full"${l.price_source === "catalogue_full" ? " selected" : ""}>full</option>
+          <option value="manual"${l.price_source === "manual" ? " selected" : ""}>my figure</option>
         </select>` : ""}</td>
       <td class="num" style="width:70px">${draft ? `<input class="q" type="number" min="0.5" step="0.5" value="${Number(l.qty)}">` : Number(l.qty)}</td>
-      <td class="num">${l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : money(l.unit_amount_pence)}</td>
+      <td class="num">${draft && l.price_source === "manual"
+        ? `<input class="u" type="number" min="0" step="0.01" style="width:90px" value="${(l.unit_amount_pence / 100).toFixed(2)}">`
+        : l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : money(l.unit_amount_pence)}</td>
       <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.line_total_pence)}</td>
       <td class="num">${draft ? `<button class="btn d rm">Remove</button>` : ""}</td>
     </tr>`).join("");
@@ -2992,6 +3041,7 @@ function renderInvoice(){
     ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
     ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
     <div class="brow" style="margin-top:16px">
+      ${draft && inv.drafted_by === "ai" ? `<button class="btn g" id="takeOver">Make it mine to price</button>` : ""}
       ${draft ? `<button class="btn g" id="addLine">Add a line</button>` : ""}
       ${draft ? `<button class="btn g" id="saveLines">Save changes</button>` : ""}
       <button class="btn g" id="previewBtn">Preview</button>
@@ -3015,9 +3065,12 @@ function renderInvoice(){
   // picking is the real number, not a preview of one. Previously this only
   // took effect once "Save changes" was clicked, which read as the dropdown
   // doing nothing.
+  // "my figure" works with or without a catalogue service on the line: the
+  // amount is yours either way. The catalogue tiers still need a service to
+  // read their price from, exactly as before.
   $("invBody").querySelectorAll(".t").forEach(sel => sel.addEventListener("change", async (e) => {
     const tr = e.target.closest("tr");
-    if (!tr.querySelector(".c").value) return;
+    if (sel.value !== "manual" && !tr.querySelector(".c").value) return;
     const { error } = await sb.from("invoice_lines").update({ price_source: sel.value }).eq("id", tr.dataset.id);
     if (error) return say("invMsg","err",error.message);
     await reload(inv.id);
@@ -3026,13 +3079,26 @@ function renderInvoice(){
   $("invBody").querySelectorAll(".c").forEach(sel => sel.addEventListener("change", async (e) => {
     const tr = e.target.closest("tr");
     const cid = sel.value;
+    const tier = tr.querySelector(".t").value;
     const { error } = await sb.from("invoice_lines").update({
       catalogue_id: cid || null,
-      price_source: cid ? tr.querySelector(".t").value : "needs_price"
+      price_source: cid ? tier : (tier === "manual" ? "manual" : "needs_price")
     }).eq("id", tr.dataset.id);
     if (error) return say("invMsg","err",error.message);
     await reload(inv.id);
   }));
+
+  // The price guard refuses a "my figure" line on an AI-drafted invoice by
+  // design: a human deciding to own the pricing is a decision on the
+  // record, and this button is that decision. drafted_by flips to human
+  // and stays that way; nothing about the lines changes until you do.
+  if ($("takeOver")) $("takeOver").addEventListener("click", async () => {
+    if (!confirm("Take over " + inv.id + "?\n\nIt stops being an AI draft: you become the one pricing it, and the my-figure tier unlocks on its lines.")) return;
+    const { error } = await sb.from("invoices").update({ drafted_by: "human" }).eq("id", inv.id);
+    if (error) return say("invMsg","err",error.message);
+    say("invMsg","ok","Yours now. Set any line to my figure and type the amount.");
+    await reload(inv.id);
+  });
 
   if ($("addLine")) $("addLine").addEventListener("click", async () => {
     // boot() empties CATALOGUE when the service list cannot be fetched, and
@@ -3053,15 +3119,22 @@ function renderInvoice(){
     say("invMsg","","");
     for (const tr of $("lineRows").querySelectorAll("tr")) {
       const cid = tr.querySelector(".c").value;
-      const { error } = await sb.from("invoice_lines").update({
+      const tier = tr.querySelector(".t").value;
+      const upd = {
         description: tr.querySelector(".d").value,
         qty: Number(tr.querySelector(".q").value) || 1,
         catalogue_id: cid || null,
-        price_source: cid ? tr.querySelector(".t").value : "needs_price"
-      }).eq("id", tr.dataset.id);
+        price_source: cid ? tier : (tier === "manual" ? "manual" : "needs_price")
+      };
+      // A "my figure" line saves the figure you typed, in pence. The
+      // catalogue tiers keep being overwritten by the price guard, so a
+      // number typed against those is still discarded, on purpose.
+      const u = tr.querySelector(".u");
+      if (u && tier === "manual") upd.unit_amount_pence = Math.round((Number(u.value) || 0) * 100);
+      const { error } = await sb.from("invoice_lines").update(upd).eq("id", tr.dataset.id);
       if (error) return say("invMsg","err",error.message);
     }
-    say("invMsg","ok","Saved. Prices were taken from your service list, not from what was typed.");
+    say("invMsg","ok","Saved. Service-list lines were priced from the list; my-figure lines say exactly what you typed.");
     await reload(inv.id);
   });
 

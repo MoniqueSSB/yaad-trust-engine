@@ -37,13 +37,13 @@ const CORS = {
 };
 
 // Page key -> catalogue id. An allowlist, not a passthrough: the page can
-// only name services the catalogue actually sells. Technical Sign-off and
-// Full Project Management have no catalogue row yet, so they are not
-// bookable here on purpose.
+// only name services the catalogue actually sells. Full Project Management
+// has no catalogue row yet, so it is not bookable here on purpose.
 const BOOKABLE: Record<string, string> = {
   deposit: "deposit-check",
   visual: "eyes-on-it",
   condition: "condition-report",
+  signoff: "technical-signoff",
   retainer: "retainer",
   "retainer-ground": "retainer-ground",
   care: "care-standard",

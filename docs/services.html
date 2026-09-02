@@ -172,6 +172,7 @@
           <option value="deposit">Deposit Protection Check</option>
           <option value="visual">Visual Check</option>
           <option value="condition">Condition Report</option>
+          <option value="signoff">Technical Sign-off</option>
           <option value="retainer">Oversight Retainer</option>
           <option value="care">Property Care</option>
           <option value="setup">Project Setup Pack</option>
@@ -285,9 +286,9 @@ const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-
 /* A card's button books directly on this page now (2 Sep 2026): it jumps to
    the booking form with that service preselected. Nothing is charged at
    booking; the held-until-confirmed flow is the whole point. A service with
-   no bookable catalogue entry yet (Technical Sign-off) falls back to
-   WhatsApp, pre-filled, so nothing on the page is ever a dead link. */
-const BOOKABLE = ["deposit","visual","condition","retainer","care"];
+   no bookable catalogue entry (only Full Project Management today) falls
+   back to WhatsApp, pre-filled, so nothing on the page is ever a dead link. */
+const BOOKABLE = ["deposit","visual","condition","signoff","retainer","care"];
 document.querySelectorAll(".pay").forEach(el => {
   if (BOOKABLE.includes(el.dataset.pay)) {
     el.textContent = "Book now, nothing charged yet";
