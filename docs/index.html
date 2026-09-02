@@ -558,8 +558,9 @@ footer{border-top:1px solid var(--line);padding:40px 0 60px}
 
 <script>
 (function(){
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.1});
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.05,rootMargin:'0px 0px 60px 0px'});
   document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+  setTimeout(function(){document.querySelectorAll('.rv:not(.in)').forEach(function(el){var r=el.getBoundingClientRect();if(r.top<window.innerHeight){el.classList.add('in')}})},50);
   var t=document.getElementById('nt'),v=document.getElementById('nvl');
   if(t)t.addEventListener('click',function(){v.classList.toggle('open')});
 })();
