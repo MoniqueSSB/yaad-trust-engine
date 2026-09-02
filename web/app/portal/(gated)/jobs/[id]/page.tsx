@@ -28,6 +28,7 @@ import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
 import { JobProgress, type Phase, type Step } from "@/components/portal/JobProgress";
 import { MoneyPanel, type InvoiceRow } from "@/components/portal/MoneyPanel";
+import { StageLedger, type LedgerStage } from "@/components/portal/StageLedger";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
@@ -627,6 +628,32 @@ export default async function JobRoom({
     { title: "Reviews exchanged", state: stepState(closed && !!myReview, closed && !myReview) },
   ];
 
+  /* One row per payment stage, joining the pack's own schedule to the
+     evidence filed against it, the approval that releases it, and the pay
+     invoice that approval raises. A stage invoice is a worker-payable one
+     carrying that stage number (20260902j); the whole-job agency fee has
+     no stage and is deliberately not matched here. */
+  const ledgerStages: LedgerStage[] = packStages.map((ps, k) => {
+    const n = k + 1;
+    const inv = invoices.find((i) => i.payable_to === "worker" && i.stage === n) ?? null;
+    return {
+      n,
+      name: ps.stage,
+      percent: ps.proportion_percent ?? null,
+      amount:
+        ps.proportion_percent != null && labour != null
+          ? money(Math.round((labour * ps.proportion_percent) / 100))
+          : null,
+      releaseCondition: ps.release_condition ?? null,
+      evidenceRequired: ps.evidence_required ?? [],
+      evidenceFiled: evidenceOnStage(n),
+      approved: approvedStages.has(n) || jobStage > n,
+      current: jobStage === n,
+      invoiceId: inv?.id ?? null,
+      invoicePaid: inv?.status === "paid",
+    };
+  });
+
   const phaseState = (done: boolean, now: boolean): Phase["state"] =>
     done ? "done" : now ? "now" : "todo";
   const inWork = hasWon && !closed;
@@ -897,6 +924,12 @@ export default async function JobRoom({
       <TabBar base={jobBase} active={tab} counts={tabCounts} />
 
       {tab === "money" && (
+        <>
+        <StageLedger
+          stages={ledgerStages}
+          side={role === "worker" ? "worker" : "client"}
+          jobBase={jobBase}
+        />
         <MoneyPanel
           side={role === "worker" ? "worker" : "client"}
           labour={labour}
@@ -907,6 +940,7 @@ export default async function JobRoom({
           invoices={invoices}
           money={money}
         />
+        </>
       )}
 
       {tab === "documents" && (

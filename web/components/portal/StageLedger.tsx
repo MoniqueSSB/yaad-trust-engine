@@ -1,0 +1,215 @@
+import Link from "next/link";
+
+/**
+ * Every payment stage on this job, one card each: what it covers, what
+ * evidence stands against it, what invoice it has produced, and what it
+ * releases.
+ *
+ * The phase view above says which stage is live. This says what each one
+ * actually is, which matters because on this product a stage is the unit
+ * money moves in: the client approves a stage, and that approval is what
+ * raises the worker's pay invoice for it (20260902j, 20260902l).
+ *
+ * Stage names, proportions and release conditions are read from the
+ * approved Kickoff Pack and never invented here. A job whose pack has no
+ * payment schedule renders nothing rather than a plausible-looking
+ * default, because a made-up stage list on a page about money would be
+ * worse than no list at all.
+ */
+
+export type LedgerStage = {
+  n: number;
+  name: string;
+  /** share of the labour price this stage releases, if the pack says */
+  percent: number | null;
+  amount: string | null;
+  /** the pack's own words for when this stage may be released */
+  releaseCondition: string | null;
+  evidenceRequired: string[];
+  evidenceFiled: number;
+  approved: boolean;
+  /** true for the stage the job is sitting on right now */
+  current: boolean;
+  /** the pay invoice raised for this stage, if one has been */
+  invoiceId: string | null;
+  invoicePaid: boolean;
+};
+
+const Ico = {
+  ok: (
+    <svg viewBox="0 0 24 24" className="mt-0.5 size-3.5 shrink-0 fill-none stroke-green stroke-2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  ),
+  wait: (
+    <svg viewBox="0 0 24 24" className="mt-0.5 size-3.5 shrink-0 fill-none stroke-goldb stroke-2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+    </svg>
+  ),
+  soon: (
+    <svg viewBox="0 0 24 24" className="mt-0.5 size-3.5 shrink-0 fill-none stroke-dim stroke-2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  ),
+};
+
+export function StageLedger({
+  stages,
+  side,
+  jobBase,
+}: {
+  stages: LedgerStage[];
+  side: "client" | "worker";
+  jobBase: string;
+}) {
+  if (stages.length === 0) return null;
+
+  return (
+    <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+      <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">The payment stages</h3>
+      <p className="mb-4 mt-1 text-[12.5px] text-dim">
+        From the approved Kickoff Pack. Each stage names its own evidence and releases its own share of the price.
+      </p>
+
+      {stages.map((s) => {
+        const state = s.approved ? "done" : s.current ? "now" : "todo";
+        return (
+          <div
+            key={s.n}
+            className={
+              "mb-2.5 overflow-hidden rounded-2xl border last:mb-0 " +
+              (state === "done"
+                ? "border-green/25"
+                : state === "now"
+                  ? "border-gold/45 shadow-[0_0_24px_rgba(245,158,11,0.06)]"
+                  : "border-line")
+            }
+          >
+            <div
+              className={
+                "flex items-center gap-3.5 px-4.5 py-3.5 " +
+                (state === "done" ? "bg-green/[0.05]" : state === "now" ? "bg-gold/[0.06]" : "bg-bg/40")
+              }
+            >
+              <span
+                className={
+                  "grid size-[26px] shrink-0 place-items-center rounded-[9px] border-[1.5px] font-mono-app text-[11px] font-semibold " +
+                  (state === "done"
+                    ? "border-green/45 bg-green/[0.15] text-green"
+                    : state === "now"
+                      ? "border-gold bg-gold/[0.16] text-goldb"
+                      : "border-line2 text-dim")
+                }
+              >
+                {state === "done" ? (
+                  <svg viewBox="0 0 24 24" className="size-3 fill-none stroke-green stroke-[3.2]" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m5 13 4 4L19 7" />
+                  </svg>
+                ) : (
+                  s.n
+                )}
+              </span>
+
+              <span className="min-w-0 flex-1">
+                <b className={"block text-[14.5px] font-semibold leading-tight " + (state === "todo" ? "text-mute" : "text-ink")}>
+                  Stage {s.n} · {s.name}
+                </b>
+                <span className="mt-0.5 block text-[11.5px] text-dim">
+                  {s.approved
+                    ? "Approved" +
+                      (s.invoicePaid ? " and paid" : s.invoiceId ? ", invoice raised" : "")
+                    : s.current
+                      ? side === "client"
+                        ? s.evidenceFiled > 0
+                          ? "Waiting on your approval"
+                          : "Under way, no evidence filed yet"
+                        : s.evidenceFiled > 0
+                          ? "Waiting on the client's approval"
+                          : "Under way, file your evidence"
+                      : "Not started yet"}
+                </span>
+              </span>
+
+              {s.amount && (
+                <span className="shrink-0 text-right">
+                  <span className={"block font-mono-app text-[14px] font-semibold " + (state === "todo" ? "text-mute" : "text-ink")}>
+                    {s.amount}
+                  </span>
+                  {s.percent != null && (
+                    <span className="block font-mono-app text-[10px] font-medium text-dim">{s.percent}% of labour</span>
+                  )}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2.5 border-t border-line px-4.5 py-3.5">
+              {(s.releaseCondition || s.evidenceRequired.length > 0) && (
+                <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
+                  {Ico.soon}
+                  <span>
+                    <b className="font-semibold text-ink">What it covers:</b>{" "}
+                    {s.releaseCondition ?? s.evidenceRequired.join(", ")}
+                  </span>
+                </span>
+              )}
+
+              <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
+                {s.approved ? Ico.ok : s.evidenceFiled > 0 ? Ico.wait : Ico.soon}
+                <span>
+                  <b className="font-semibold text-ink">Evidence:</b>{" "}
+                  {s.evidenceFiled === 0
+                    ? "nothing filed yet"
+                    : s.evidenceFiled +
+                      " item" +
+                      (s.evidenceFiled === 1 ? "" : "s") +
+                      " filed" +
+                      (s.approved ? " and approved" : ", not yet approved")}
+                </span>
+              </span>
+
+              <span className="flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
+                {s.invoicePaid ? Ico.ok : s.invoiceId ? Ico.wait : Ico.soon}
+                <span>
+                  <b className="font-semibold text-ink">{side === "client" ? "Invoice:" : "Your pay invoice:"}</b>{" "}
+                  {s.invoiceId ? (
+                    <>
+                      <span className="font-mono-app text-[11.5px]">{s.invoiceId}</span>
+                      {s.invoicePaid ? " · paid" : " · raised, not yet paid"}
+                    </>
+                  ) : s.approved ? (
+                    /* Approved but no invoice row against this stage. Older
+                       jobs were approved before pay invoices were raised per
+                       stage (20260902j), so say that rather than promise an
+                       invoice that is never coming. */
+                    "none recorded against this stage"
+                  ) : side === "client" ? (
+                    "not raised until this stage is approved"
+                  ) : (
+                    "raised the moment the client approves this stage"
+                  )}
+                </span>
+              </span>
+
+              {s.current && s.evidenceFiled > 0 && !s.approved && side === "client" && (
+                <Link
+                  href={jobBase + "?tab=evidence"}
+                  className="mt-0.5 self-start rounded-full bg-linear-to-br from-goldb to-gold px-4.5 py-2.5 text-[12.5px] font-bold text-[#1A0F00] transition hover:brightness-105"
+                >
+                  Review and approve stage {s.n} &rarr;
+                </Link>
+              )}
+              {s.current && s.evidenceFiled === 0 && side === "worker" && (
+                <Link
+                  href={jobBase + "?tab=evidence"}
+                  className="mt-0.5 self-start rounded-full bg-linear-to-br from-goldb to-gold px-4.5 py-2.5 text-[12.5px] font-bold text-[#1A0F00] transition hover:brightness-105"
+                >
+                  File stage {s.n} evidence &rarr;
+                </Link>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
