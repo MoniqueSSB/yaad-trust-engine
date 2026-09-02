@@ -55,7 +55,7 @@ export async function CalBand({
   const monthEnd = iso(cy, cm, daysIn);
 
   const supabase = await createClient();
-  const [{ data: avail }, { data: visits }] = await Promise.all([
+  const [{ data: avail }, { data: visits }, { data: worked }] = await Promise.all([
     supabase
       .from("worker_availability")
       .select("day,open")
@@ -68,7 +68,23 @@ export async function CalBand({
       .eq("owner_email", owner)
       .neq("state", "cancelled")
       .order("day", { ascending: true }),
+    /* The days work actually happened on this job. Founder's instruction,
+       2 Sep 2026: the calendar should track the day the work took place.
+       arrival_log is the geotagged on-site check-in (20260901za) and
+       arrived_on is already the Jamaica-local date it happened on, so no
+       timezone is re-derived here. A service has no arrival log, and the
+       query is skipped rather than guessed at. */
+    kind === "job"
+      ? supabase.from("arrival_log").select("arrived_on,stage").eq("job_id", jobId)
+      : Promise.resolve({ data: [] as { arrived_on: string; stage: number }[] }),
   ]);
+
+  /* Day -> the stage that was worked on it, so the calendar can say what
+     the visit was for rather than only that somebody attended. */
+  const workedDays = new Map<string, number>();
+  for (const w of (worked ?? []) as { arrived_on: string; stage: number }[]) {
+    if (w.arrived_on && !workedDays.has(w.arrived_on)) workedDays.set(w.arrived_on, w.stage);
+  }
 
   const openDays = new Set(
     (avail ?? []).filter((a) => a.open).map((a) => a.day as string),
@@ -118,17 +134,19 @@ export async function CalBand({
             const dayVisits = byDay.get(k) ?? [];
             const hasConfirmed = dayVisits.some((v) => v.state === "confirmed" || v.state === "done");
             const hasPending = dayVisits.some((v) => v.state === "pending");
-            const state = hasConfirmed ? "booked" : hasPending ? "pending" : openDays.has(k) ? "free" : "closed";
+            const didWork = workedDays.has(k);
+            const state = didWork ? "worked" : hasConfirmed ? "booked" : hasPending ? "pending" : openDays.has(k) ? "free" : "closed";
             const cls =
               "grid min-h-[32px] place-items-center rounded-[7px] border text-[11.5px] transition " +
-              (state === "booked" ? "border-mango/40 bg-mango/10 font-bold text-mango"
+              (state === "worked" ? "border-green/45 bg-green/[0.14] font-bold text-green"
+                : state === "booked" ? "border-mango/40 bg-mango/10 font-bold text-mango"
                 : state === "pending" ? "border-coral/35 bg-coral/10 text-coral"
                 : state === "free" ? "border-softline bg-soft text-tealb"
                 : "border-line bg-bg text-mute") +
               (k === todayIso ? " ring-1 ring-inset ring-mango" : "") +
               (k === sel ? " ring-2 ring-tealb/50" : "") +
-              (past && dayVisits.length === 0 ? " opacity-25" : " hover:border-line2");
-            return past && dayVisits.length === 0 ? (
+              (past && dayVisits.length === 0 && !didWork ? " opacity-25" : " hover:border-line2");
+            return past && dayVisits.length === 0 && !didWork ? (
               <span key={k} className={cls}>{d}</span>
             ) : (
               <Link key={k} href={`${base}?cal=${cy}-${cm + 1}&d=${k === sel ? "" : k}`} className={cls}>{d}</Link>
@@ -139,6 +157,9 @@ export async function CalBand({
           <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-soft ring-1 ring-inset ring-softline" />Open</span>
           <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-mango/35" />Booked</span>
           <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-coral/30" />Pending</span>
+          {workedDays.size > 0 && (
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-green/40" />Worked on site</span>
+          )}
         </div>
       </div>
 
@@ -179,6 +200,14 @@ export async function CalBand({
         {sel && (
           <div className="mt-3 border-t border-line pt-2.5">
             <b className="text-[12.5px]">{sel}</b>
+            {workedDays.has(sel) && (
+              <p className="mt-1.5 flex items-center gap-2 text-[11.5px] text-green">
+                <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-green stroke-2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" /><circle cx="12" cy="10" r="2.6" />
+                </svg>
+                Worked on site this day · stage {workedDays.get(sel)}
+              </p>
+            )}
             {side === "worker" ? (
               <form action={toggleDay} className="mt-1.5">
                 <input type="hidden" name="day" value={sel} />

@@ -74,12 +74,12 @@ export function StageLedger({
       <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
         <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">The payment stages</h3>
         <div className="mt-3.5 rounded-2xl border border-dashed border-line2 bg-bg/30 px-5 py-7 text-center">
-          <b className="mb-1 block text-[14px] font-semibold text-ink">Not set yet</b>
+          <b className="mb-1 block text-[14px] font-semibold text-ink">No stages on this job yet</b>
           <p className="mx-auto max-w-[52ch] text-[12.5px] leading-relaxed text-dim">
-            The stages are agreed with your tradesperson before work starts, in
-            either a Kickoff Pack or the Quote Pack you both sign. Each one names
-            the evidence it needs and the share of the price it releases, and they
-            will be listed here with their progress.
+            A job has payment stages once a Quote Pack or a Kickoff Pack has been
+            accepted and is on the job, and not before. Whichever of the two you
+            go through sets them, and each stage then names the evidence it needs
+            and the share of the price it releases.
           </p>
         </div>
       </section>
