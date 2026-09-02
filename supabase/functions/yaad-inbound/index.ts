@@ -1744,11 +1744,31 @@ Deno.serve(async (req: Request) => {
     // sends anyone here is that the assistant had already handed over. This
     // is what makes "you will not have to say it twice" true.
     if (msg.channel === "whatsapp" && msg.from) {
-      const ref = webReferenceIn(msg.text);
-      if (ref) {
-        const { data: webThread } = await supabase.from("intake_threads")
+      const typedRef = webReferenceIn(msg.text);
+      if (typedRef) {
+        // Exact first. Then tolerant: the founder's own first live test (2
+        // Sep 2026) typed the reference one digit short, and a 13 digit
+        // code that has to be perfect is a code that will be wrong. Among
+        // the web threads of the last week, one whose code starts with what
+        // was typed, or whose code the typed one starts with, is the
+        // conversation they mean, provided exactly one fits. Two fitting is
+        // ambiguous and falls through to a fresh chat rather than a guess.
+        let webThread: { job_id: string; transcript: string; turns: number; stage: string } | null = null;
+        const { data: exact } = await supabase.from("intake_threads")
           .select("job_id,transcript,turns,stage")
-          .eq("channel", "web").eq("job_id", ref).maybeSingle();
+          .eq("channel", "web").eq("job_id", typedRef).maybeSingle();
+        if (exact) webThread = exact;
+        else {
+          const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+          const { data: recent } = await supabase.from("intake_threads")
+            .select("job_id,transcript,turns,stage")
+            .eq("channel", "web").gt("last_at", weekAgo).limit(200);
+          const near = (recent ?? []).filter((t) =>
+            String(t.job_id).startsWith(typedRef) || typedRef.startsWith(String(t.job_id)));
+          if (near.length === 1) webThread = near[0];
+          root.setAttributes({ "yaadly.web_adopt.near_matches": near.length });
+        }
+        const ref = webThread?.job_id ?? typedRef;
         if (webThread) {
           const carried = `${String(webThread.transcript ?? "")}\n\n[Continued on WhatsApp]\n${thisTurn}`.slice(-8000);
           await supabase.from("intake_threads").upsert({
