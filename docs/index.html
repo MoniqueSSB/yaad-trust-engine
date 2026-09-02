@@ -3,156 +3,566 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yaadly · Property work in Jamaica, proven with evidence</title>
-<meta name="description" content="Two ways in: post a job free to vetted tradespeople, or book independent checks and oversight through Yaadly. Companies see Yaadly for business. Kingston and Portmore first.">
-<meta property="og:title" content="Yaadly · Property work in Jamaica, proven with evidence">
-<meta property="og:description" content="Post a job free to vetted tradespeople, or book independent checks and oversight through Yaadly. Companies see Yaadly for business. Kingston and Portmore first.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://yaadly.co.uk/">
-<meta property="og:site_name" content="Yaadly">
-<meta name="twitter:card" content="summary_large_image">
-<meta property="og:image" content="https://yaadly.co.uk/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Yaadly. Property work in Jamaica, proven with evidence.">
-<meta name="twitter:image" content="https://yaadly.co.uk/og.png">
-<link rel="canonical" href="https://yaadly.co.uk/">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%2314B8A6'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%2304211D'%3EY%3C/text%3E%3C/svg%3E">
+<title>Yaadly</title>
+<meta name="description" content="Property work in Jamaica, proven with evidence. Post a job free to vetted tradespeople, or book independent checks through Yaadly.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="yaadly.css">
-<script src="https://browser.sentry-cdn.com/10.70.0/bundle.min.js"
-        integrity="sha384-79FhSq4eaPA7rdWwXh1Jly3F3Wvgq7HChMpaIIx7feYEZicWt/LnwIfTFTXSJao5"
-        crossorigin="anonymous"></script>
-<script>
-(function(){
-  var SENTRY_DSN = "https://2a832116d343fe38a4d131754bd3746d@o4511948007931904.ingest.de.sentry.io/4511949660749904";
-  if (!SENTRY_DSN || !window.Sentry) return;
-  var RE_EMAIL=/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, RE_PHONE=/(\+?\d[\d\s().-]{7,}\d)/g;
-  function scrub(s){ return (typeof s==="string"&&s) ? s.replace(RE_EMAIL,"[email]").replace(RE_PHONE,"[phone]") : s; }
-  Sentry.init({ dsn:SENTRY_DSN, sendDefaultPii:false,
-    beforeSend:function(ev){ try{
-      if(ev.message) ev.message=scrub(ev.message);
-      if(ev.exception&&ev.exception.values) ev.exception.values.forEach(function(v){ v.value=scrub(v.value); });
-    }catch(e){} return ev; } });
-})();
-</script>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,500;1,9..144,200;1,9..144,300;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07071A;
+  --ink:#EEEEFF;--mute:#8686B0;--dim:#44446A;
+  --purple:#9B73F5;--purpleb:#C4AAFF;--purpledim:rgba(155,115,245,0.12);
+  --gold:#F59E0B;--goldb:#FBBF24;--golddim:rgba(245,158,11,0.10);
+  --green:#34D399;--greendim:rgba(52,211,153,0.10);
+  --line:rgba(155,115,245,0.12);--line2:rgba(155,115,245,0.22);
+  --grad:linear-gradient(135deg,#9B73F5 0%,#C4AAFF 50%,#F59E0B 100%);
+  --disp:'Fraunces',Georgia,serif;
+  --body:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --spring:cubic-bezier(0.16,1,0.3,1);
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font:15.5px/1.7 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--purpleb);text-decoration:none}
+
+/* ambient background */
+.canvas-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(110px);opacity:0.7}
+.o1{width:900px;height:900px;top:-20%;left:-20%;background:radial-gradient(circle,rgba(100,60,200,0.25) 0%,transparent 65%);animation:o1 20s ease-in-out infinite alternate}
+.o2{width:700px;height:700px;bottom:-15%;right:-15%;background:radial-gradient(circle,rgba(200,130,0,0.18) 0%,transparent 65%);animation:o2 16s ease-in-out infinite alternate}
+.o3{width:400px;height:400px;top:35%;left:55%;background:radial-gradient(circle,rgba(52,211,153,0.10) 0%,transparent 65%);animation:o3 24s ease-in-out infinite alternate}
+@keyframes o1{to{transform:translate(60px,50px) scale(1.12)}}
+@keyframes o2{to{transform:translate(-50px,-40px) scale(1.08)}}
+@keyframes o3{to{transform:translate(-80px,60px) scale(0.88)}}
+
+/* mesh grid overlay */
+.mesh{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(155,115,245,0.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(155,115,245,0.025) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+
+/* layout */
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+.wrap-sm{max-width:780px;margin:0 auto;padding:0 24px;position:relative;z-index:1}
+
+/* scroll reveal */
+.rv{opacity:0;transform:translateY(30px);transition:opacity .7s var(--spring),transform .8s var(--spring)}
+.rv.in{opacity:1;transform:none}
+.d1{transition-delay:.08s}.d2{transition-delay:.18s}.d3{transition-delay:.28s}.d4{transition-delay:.38s}
+
+/* nav */
+nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.75);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1100px;margin:0 auto;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;font-family:var(--disp);font-size:17px;font-weight:600;color:#fff;box-shadow:0 0 20px rgba(155,115,245,0.4),0 0 0 1px rgba(155,115,245,0.25)}
+.brand b{font-size:16px;font-weight:600;letter-spacing:-0.02em}
+.brand b span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.navlinks{display:flex;gap:2px}
+.nl{padding:7px 12px;border-radius:8px;font:500 13.5px var(--body);color:var(--mute);transition:.18s;cursor:pointer;background:none;border:0;text-decoration:none}
+.nl:hover{color:var(--ink);background:rgba(155,115,245,0.07)}
+.nav-cta{padding:8px 18px;border-radius:100px;font:600 13px var(--body);color:var(--purpleb);border:1px solid rgba(155,115,245,0.3);background:rgba(155,115,245,0.07);transition:.18s;cursor:pointer;text-decoration:none}
+.nav-cta:hover{background:rgba(155,115,245,0.15);border-color:rgba(155,115,245,0.5)}
+.nav-toggle{display:none;background:none;border:1px solid var(--line2);color:var(--ink);width:34px;height:34px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center}
+@media(max-width:760px){
+  .navlinks{display:none;position:absolute;top:60px;left:0;right:0;flex-direction:column;background:rgba(7,7,26,0.96);backdrop-filter:blur(24px);padding:12px 16px;border-bottom:1px solid var(--line)}
+  .navlinks.open{display:flex}
+  .nl{width:100%;padding:10px 12px}
+  .nav-toggle{display:flex}
+}
+
+/* ══════════════════════════════════════════════
+   HERO — full-width, centered, cinematic
+══════════════════════════════════════════════ */
+.hero{padding:88px 0 0;text-align:center}
+
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font:600 11px var(--mono);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--purpleb);padding:6px 16px;
+  border:1px solid rgba(155,115,245,0.25);border-radius:100px;
+  background:rgba(155,115,245,0.07);margin-bottom:28px;
+}
+.hero-eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--purple);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+h1.display{
+  font-family:var(--disp);font-weight:200;
+  font-size:clamp(52px,9vw,110px);
+  line-height:.97;letter-spacing:-0.035em;
+  margin-bottom:30px;
+}
+h1.display em{
+  font-style:italic;font-weight:300;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.hero-sub{font-size:17px;color:var(--mute);max-width:52ch;margin:0 auto 36px;line-height:1.75}
+.hero-sub b{color:var(--ink);font-weight:600}
+
+/* steps row */
+.steps-row{
+  display:flex;justify-content:center;gap:0;
+  flex-wrap:wrap;margin-bottom:44px;
+}
+.step{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 20px;font-size:14px;color:var(--mute);
+  position:relative;
+}
+.step:not(:first-child)::before{
+  content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:1px;height:24px;background:var(--line2);
+}
+.step-num{font:600 10px var(--mono);color:var(--dim);letter-spacing:.1em;flex-shrink:0}
+.step b{color:var(--ink);font-weight:600}
+@media(max-width:640px){.steps-row{flex-direction:column;align-items:center;gap:2px}.step::before{display:none}}
+
+/* hero CTAs */
+.hero-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+
+/* ══════════════════════════════════════════════
+   VIDEO SHOWCASE
+══════════════════════════════════════════════ */
+.vid-wrap{
+  margin:56px auto 0;max-width:820px;
+  position:relative;z-index:1;
+}
+.vid-glow{
+  position:absolute;inset:-40px;z-index:0;
+  background:radial-gradient(ellipse at center, rgba(155,115,245,0.22) 0%, rgba(245,158,11,0.08) 50%, transparent 70%);
+  filter:blur(30px);
+  animation:vidglow 6s ease-in-out infinite alternate;
+}
+@keyframes vidglow{to{opacity:0.7;transform:scale(1.05)}}
+.vid-card{
+  position:relative;z-index:1;
+  background:rgba(10,10,32,0.8);
+  border:1px solid rgba(155,115,245,0.3);
+  border-radius:20px;
+  padding:12px;
+  box-shadow:0 0 0 1px rgba(155,115,245,0.1), 0 40px 80px rgba(0,0,0,0.5);
+  transform:perspective(1800px) rotateX(3deg);
+  transition:transform .5s var(--spring);
+}
+.vid-card:hover{transform:perspective(1800px) rotateX(0deg)}
+.vid-card video{
+  width:100%;border-radius:12px;display:block;
+}
+.vid-cap-bar{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line);
+}
+.vid-cap{font:400 11.5px var(--mono);letter-spacing:.06em;color:var(--dim)}
+
+/* browser chrome dots */
+.browser-bar{
+  display:flex;align-items:center;gap:6px;padding:0 4px 10px;
+}
+.bdot{width:10px;height:10px;border-radius:50%}
+.bdot.r{background:#FF5F57}.bdot.y{background:#FEBC2E}.bdot.g{background:#28C840}
+
+/* ══════════════════════════════════════════════
+   TRUST STRIP
+══════════════════════════════════════════════ */
+.tstrip{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  margin:80px 0 0;
+}
+.titem{
+  flex:1;min-width:180px;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:28px 20px;
+  border-right:1px solid var(--line);text-align:center;
+}
+.titem:last-child{border-right:0}
+.titem .tval{font-family:var(--disp);font-size:clamp(28px,4vw,44px);font-weight:300;letter-spacing:-0.03em;color:var(--ink);line-height:1}
+.titem .tval em{font-style:italic;color:var(--purpleb)}
+.titem .tlbl{font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-top:4px}
+@media(max-width:600px){.titem{min-width:140px;border-right:0;border-bottom:1px solid var(--line)}.titem:last-child{border-bottom:0}}
+
+/* ══════════════════════════════════════════════
+   TWO DOORS — full-width stacked rows
+══════════════════════════════════════════════ */
+.doors{margin-top:80px}
+.door-section{position:relative;overflow:hidden;padding:72px 0}
+.door-section::before{content:'';position:absolute;inset:0;opacity:0;transition:.4s}
+
+/* purple door */
+.ds-purple{background:linear-gradient(180deg,rgba(155,115,245,0.04) 0%,transparent 100%);border-top:1px solid rgba(155,115,245,0.15)}
+.ds-purple::after{content:'';position:absolute;top:-200px;right:-150px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(100,60,200,0.16) 0%,transparent 60%);pointer-events:none}
+
+/* gold door */
+.ds-gold{background:linear-gradient(180deg,rgba(245,158,11,0.04) 0%,transparent 100%);border-top:1px solid rgba(245,158,11,0.15)}
+.ds-gold::after{content:'';position:absolute;bottom:-200px;left:-150px;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(180,100,0,0.14) 0%,transparent 60%);pointer-events:none}
+
+.door-inner{
+  display:grid;grid-template-columns:1fr 1fr;gap:60px;
+  align-items:center;position:relative;z-index:1;
+}
+@media(max-width:760px){.door-inner{grid-template-columns:1fr;gap:36px}.door-flip{order:-1}}
+
+.door-tag{
+  font:700 9.5px var(--body);letter-spacing:3px;text-transform:uppercase;
+  padding:5px 12px;border-radius:100px;margin-bottom:20px;display:inline-block;
+}
+.ds-purple .door-tag{color:var(--purpleb);background:rgba(155,115,245,0.1);border:1px solid rgba(155,115,245,0.25)}
+.ds-gold .door-tag{color:var(--gold);background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.22)}
+
+.door-h{font-family:var(--disp);font-weight:200;font-size:clamp(34px,5vw,58px);line-height:1.0;letter-spacing:-0.03em;margin-bottom:18px}
+.ds-purple .door-h em{font-style:italic;color:var(--purpleb);font-weight:300}
+.ds-gold .door-h em{font-style:italic;color:var(--goldb);font-weight:300}
+.door-p{color:var(--mute);font-size:15.5px;line-height:1.78;max-width:44ch;margin-bottom:28px}
+
+.door-features{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:32px}
+.door-features li{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--mute)}
+.door-features li::before{
+  content:'';flex-shrink:0;width:16px;height:16px;border-radius:50%;margin-top:3px;
+  background-image:url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='8' cy='8' r='7.5' stroke='%239B73F5' stroke-opacity='0.4'/%3E%3Cpath d='M4.5 8l2.5 2.5 4-4.5' stroke='%239B73F5' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.ds-gold .door-features li::before{
+  background-image:url("data:image/svg+xml,%3Csvg width='16' height='16' viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='8' cy='8' r='7.5' stroke='%23F59E0B' stroke-opacity='0.4'/%3E%3Cpath d='M4.5 8l2.5 2.5 4-4.5' stroke='%23F59E0B' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.door-features li b{color:var(--ink);font-weight:600}
+.door-price{font:500 13px var(--mono);color:var(--dim);margin-top:10px}
+.door-price span{color:var(--ink);font-weight:600}
+
+/* visual panel in each door */
+.door-visual{
+  border-radius:20px;overflow:hidden;
+  position:relative;aspect-ratio:4/3;
+}
+.dv-purple{
+  background:linear-gradient(135deg,rgba(14,10,40,0.9) 0%,rgba(30,15,70,0.7) 100%);
+  border:1px solid rgba(155,115,245,0.25);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 0 1px rgba(155,115,245,0.1);
+}
+.dv-gold{
+  background:linear-gradient(135deg,rgba(30,18,0,0.9) 0%,rgba(50,25,0,0.7) 100%);
+  border:1px solid rgba(245,158,11,0.22);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 0 1px rgba(245,158,11,0.08);
+}
+.dv-content{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:22px}
+
+/* job board mini */
+.mini-board{display:flex;flex-direction:column;gap:8px}
+.mini-job{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(155,115,245,0.06);
+  border:1px solid rgba(155,115,245,0.15);border-radius:10px;
+  padding:10px 12px;
+}
+.mj-icon{width:30px;height:30px;border-radius:8px;background:rgba(155,115,245,0.15);display:grid;place-items:center;flex-shrink:0}
+.mj-icon svg{width:14px;height:14px;stroke:var(--purpleb);fill:none;stroke-width:1.8;stroke-linecap:round}
+.mj-text{flex:1;min-width:0}
+.mj-name{font:600 12px var(--body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mj-loc{font:400 11px var(--mono);color:var(--dim)}
+.mj-badge{font:600 10px var(--body);letter-spacing:.05em;padding:3px 8px;border-radius:100px}
+.mj-badge.open{background:rgba(52,211,153,0.12);color:var(--green);border:1px solid rgba(52,211,153,0.25)}
+.mj-badge.q{background:rgba(155,115,245,0.1);color:var(--purpleb);border:1px solid rgba(155,115,245,0.2)}
+
+.mini-board-label{font:600 9.5px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+
+/* evidence/photo stack */
+.ev-stack{position:relative;height:100%}
+.ev-card{
+  position:absolute;border-radius:12px;overflow:hidden;
+  background:rgba(30,18,0,0.8);
+  border:1px solid rgba(245,158,11,0.18);
+}
+.ev-card.c1{width:68%;top:0;left:0;padding:12px}
+.ev-card.c2{width:65%;bottom:0;right:0;padding:12px}
+.ev-card.c3{width:50%;top:50%;left:50%;transform:translate(-50%,-50%);padding:10px;z-index:2}
+.ev-img{
+  width:100%;aspect-ratio:16/9;border-radius:8px;
+  background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(100,60,0,0.15));
+  display:flex;align-items:center;justify-content:center;margin-bottom:8px;
+}
+.ev-img svg{width:22px;height:22px;stroke:rgba(245,158,11,0.5);fill:none;stroke-width:1.5;stroke-linecap:round}
+.ev-meta{font:500 10px var(--mono);color:var(--dim)}
+.ev-meta b{color:var(--gold)}
+.ev-tick{
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);
+  display:grid;place-items:center;position:absolute;top:8px;right:8px;
+}
+.ev-tick svg{width:10px;height:10px;stroke:var(--green);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+
+/* ══════════════════════════════════════════════
+   BUSINESS STRIP
+══════════════════════════════════════════════ */
+.biz{
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+  border:1px solid var(--line);border-radius:16px;
+  padding:20px 28px;margin:60px 0 0;
+  text-decoration:none;color:inherit;
+  background:rgba(10,10,28,0.5);
+  transition:.22s var(--spring);
+}
+.biz:hover{border-color:rgba(155,115,245,0.35);transform:translateY(-2px);box-shadow:0 8px 32px rgba(155,115,245,0.08)}
+.biz-left .tag{font:700 9px var(--body);letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:4px}
+.biz-left b{font-size:15.5px;color:var(--ink)}
+.biz-left span{font-size:13.5px;color:var(--mute)}
+@media(max-width:600px){.biz{flex-direction:column;align-items:flex-start}}
+
+/* ══════════════════════════════════════════════
+   WHATSAPP
+══════════════════════════════════════════════ */
+.wa{
+  margin:16px 0 60px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  background:rgba(10,30,16,0.6);border:1px solid rgba(37,211,102,0.2);
+  border-radius:16px;padding:20px 24px;
+  text-decoration:none;color:inherit;transition:.22s var(--spring);
+}
+.wa:hover{background:rgba(14,40,22,0.7);border-color:rgba(37,211,102,0.38);transform:translateY(-2px)}
+.wa-ico{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:#25D366;display:grid;place-items:center;box-shadow:0 4px 18px rgba(37,211,102,0.3)}
+.wa-ico svg{width:22px;height:22px;fill:none;stroke:#04211D;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wa-txt{flex:1;min-width:180px}
+.wa-txt b{font-size:15px;font-weight:600;display:block}
+.wa-txt span{font-size:13px;color:var(--mute);display:block;margin-top:2px}
+.wa-cta{font:600 13.5px var(--body);color:var(--green);white-space:nowrap}
+
+/* buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;justify-content:center;
+  padding:13px 26px;border-radius:100px;border:0;cursor:pointer;
+  font:600 14.5px var(--body);text-decoration:none;
+  position:relative;overflow:hidden;transition:transform .22s var(--spring),box-shadow .22s;
+}
+.btn::after{
+  content:'';position:absolute;top:0;left:-100%;width:55%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.16),transparent);
+  animation:sh 3s ease-in-out infinite;
+}
+@keyframes sh{0%{left:-100%}60%,100%{left:160%}}
+.btn:hover{transform:translateY(-3px)}
+.btn-purple{background:linear-gradient(135deg,#7B4FE0,#9B73F5);color:#fff;box-shadow:0 0 28px rgba(155,115,245,0.35),0 2px 8px rgba(0,0,0,0.4)}
+.btn-purple:hover{box-shadow:0 8px 40px rgba(155,115,245,0.5),0 2px 8px rgba(0,0,0,0.4)}
+.btn-gold{background:linear-gradient(135deg,#D97706,#F59E0B);color:#fff;box-shadow:0 0 28px rgba(245,158,11,0.3),0 2px 8px rgba(0,0,0,0.4)}
+.btn-gold:hover{box-shadow:0 8px 40px rgba(245,158,11,0.45),0 2px 8px rgba(0,0,0,0.4)}
+.btn-ghost{background:none;border:1px solid var(--line2);color:var(--ink);box-shadow:none}
+.btn-ghost::after{display:none}
+.btn-ghost:hover{border-color:rgba(155,115,245,0.4);color:var(--purpleb)}
+.btn-sm{padding:9px 20px;font-size:13.5px}
+.btn-lg{padding:16px 36px;font-size:16px}
+
+/* footer */
+footer{border-top:1px solid var(--line);padding:40px 0 60px}
+.ft{max-width:1100px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--dim)}
+.ft-links{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px}
+.ft-links a{color:var(--mute);text-decoration:none;transition:.2s}.ft-links a:hover{color:var(--purpleb)}
+</style>
 </head>
 <body>
+<div class="canvas-bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+<div class="mesh"></div>
 
-<nav class="top"><div class="nav-in">
+<nav><div class="nav-in">
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
-  <div class="views">
-    <a class="vbtn" href="marketplace.html">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
-    <a class="vbtn" href="services.html">Managed services</a>
-    <a class="vbtn" href="business.html">For business</a>
-    <a class="vbtn" href="contact.html">Contact</a>
-    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
+  <button class="nav-toggle" id="nt" aria-label="Menu">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="1" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="15" y2="12"/></svg>
+  </button>
+  <div class="navlinks" id="nvl">
+    <a class="nl" href="marketplace.html">How it works</a>
+    <a class="nl" href="services.html">Managed services</a>
+    <a class="nl" href="business.html">For business</a>
+    <a class="nl" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
   </div>
-  <div class="quiet-links">
-    <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
-    <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
-    <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
-  </div>
+  <a class="nav-cta" href="https://wa.me/447878877567" target="_blank" rel="noopener">Talk to us</a>
 </div></nav>
 
-<div class="sect first"><div class="wrap">
-  <div class="pills rv">
-    <span class="pill">Yaadly Ltd · UK 17358077</span>
-    <span class="pill n">Jamaica · Kingston &amp; Portmore first</span>
-  </div>
-  <div class="herogrid">
-    <div class="herotext">
-      <h1 class="hx rv">You cannot be there.<br><span class="g2">Someone independent can.</span></h1>
-      <p class="lead rv d1">Property work in Jamaica, proven with evidence. Two ways in. Kingston and Portmore first.</p>
-      <ol class="how rv d1">
-        <li><b>Photos arrive</b> as the work is done.</li>
-        <li><b>You approve</b> from your phone, anywhere.</li>
-        <li><b>Only then</b> is anyone paid.</li>
-      </ol>
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="wrap-sm">
+    <div class="hero-eyebrow rv"><span class="dot"></span> Yaadly Ltd · UK registered · 17358077</div>
+    <h1 class="display rv d1">You cannot<br>be there.<br><em>Someone independent<br>can.</em></h1>
+    <p class="hero-sub rv d2">Property work in Jamaica, proven with evidence. <b>Photos arrive as the work is done.</b> You approve from your phone. Only then is anyone paid.</p>
+    <div class="steps-row rv d2">
+      <div class="step"><span class="step-num">01</span><span><b>Photos arrive</b> as the work is done</span></div>
+      <div class="step"><span class="step-num">02</span><span><b>You approve</b> from your phone, anywhere</span></div>
+      <div class="step"><span class="step-num">03</span><span><b>Only then</b> is anyone paid</span></div>
     </div>
-    <div class="herovid rv d2">
-      <video autoplay muted loop playsinline poster="demo-poster.jpg" aria-label="A client receives a photo of finished work on WhatsApp and taps approve, and the payment is released.">
+    <div class="hero-ctas rv d3">
+      <a class="btn btn-purple btn-lg" href="#marketplace">Post a job, free</a>
+      <a class="btn btn-ghost btn-lg" href="#managed">Book a service</a>
+    </div>
+  </div>
+
+  <!-- VIDEO SHOWCASE -->
+  <div class="vid-wrap rv d3">
+    <div class="vid-glow"></div>
+    <div class="vid-card">
+      <div class="browser-bar"><span class="bdot r"></span><span class="bdot y"></span><span class="bdot g"></span></div>
+      <video autoplay muted loop playsinline poster="demo-poster.jpg">
         <source src="demo.mp4" type="video/mp4">
       </video>
-      <span class="cap">This is the whole product, in eleven seconds.</span>
+      <div class="vid-cap-bar">
+        <span class="vid-cap">This is the whole product, in eleven seconds.</span>
+      </div>
     </div>
   </div>
+</section>
 
-  <div class="grid g2c" style="margin-top:26px">
-    <div class="dpanel rv d1">
-      <span class="eyebrow">Marketplace</span>
-      <h2 class="hx" style="font-size:clamp(24px,3.4vw,32px)">Book a tradesperson</h2>
-      <p>Post the job free. A vetted tradesperson quotes it and the work is proven with timestamped photos before anyone is paid.</p>
-      <a class="btn" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
-      <span class="tiny"><a href="marketplace.html#how">How the marketplace works</a></span>
+<!-- TRUST STRIP -->
+<div class="wrap rv d1">
+  <div class="tstrip">
+    <div class="titem">
+      <span class="tval"><em>Free</em></span>
+      <span class="tlbl">to post a job</span>
     </div>
-    <div class="dpanel sv rv d2">
-      <span class="eyebrow">Managed services</span>
-      <h2 class="hx" style="font-size:clamp(24px,3.4vw,32px)">Work with Yaadly</h2>
-      <p>Get your contractor and quote checked before you pay, an independent visit with photos, a condition report, or ongoing project oversight. From £95.</p>
-      <a class="btn" href="services.html#contact">Tell us about your property</a>
-      <span class="tiny"><a href="services.html#prices">See every price</a></span>
+    <div class="titem">
+      <span class="tval">1 day</span>
+      <span class="tlbl">human reply</span>
+    </div>
+    <div class="titem">
+      <span class="tval">25%</span>
+      <span class="tlbl">max deposit</span>
+    </div>
+    <div class="titem">
+      <span class="tval"><em>Zero</em></span>
+      <span class="tlbl">hidden fees</span>
     </div>
   </div>
+</div>
 
-  <a class="bizstrip rv d3" href="business.html">
-    <div><span class="eyebrow">For companies</span><b>Agents, developers, insurers.</b> Independent condition and completion evidence, one standard, built to be audited.</div>
-    <span class="btn ghost sm">Yaadly for business &rarr;</span>
+<!-- TWO DOORS -->
+<div class="doors">
+
+  <!-- DOOR 1: Marketplace -->
+  <section class="door-section ds-purple" id="marketplace">
+    <div class="wrap">
+      <div class="door-inner">
+        <div class="rv d1">
+          <span class="door-tag">Marketplace</span>
+          <h2 class="door-h">Book a<br><em>vetted</em><br>tradesperson</h2>
+          <p class="door-p">Post the job free. A vetted tradesperson quotes it. Timestamped photos prove the work is done before anyone is paid.</p>
+          <ul class="door-features">
+            <li><span>Post free, no card required</span></li>
+            <li><span><b>Vetted tradespeople</b> only, identity and references checked</span></li>
+            <li><span>Photos locked as evidence, approved by you</span></li>
+            <li><span>Money held until you approve each stage</span></li>
+          </ul>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <a class="btn btn-purple" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
+            <a class="btn btn-ghost btn-sm" href="marketplace.html">See how it works</a>
+          </div>
+        </div>
+        <div class="door-visual dv-purple rv d2">
+          <div class="dv-content">
+            <span class="mini-board-label">Live job board</span>
+            <div class="mini-board">
+              <div class="mini-job">
+                <div class="mj-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h4"/></svg></div>
+                <div class="mj-text"><div class="mj-name">Flat roof repair, Kingston</div><div class="mj-loc">Posted 2 hours ago</div></div>
+                <span class="mj-badge open">Open</span>
+              </div>
+              <div class="mini-job">
+                <div class="mj-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+                <div class="mj-text"><div class="mj-name">Fence installation, Portmore</div><div class="mj-loc">Posted yesterday</div></div>
+                <span class="mj-badge q">3 quotes</span>
+              </div>
+              <div class="mini-job">
+                <div class="mj-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+                <div class="mj-text"><div class="mj-name">Plumbing, Spanish Town</div><div class="mj-loc">Posted 3 days ago</div></div>
+                <span class="mj-badge open">Open</span>
+              </div>
+            </div>
+            <div style="font:400 11px var(--mono);color:var(--dim);margin-top:12px">Kingston and Portmore first. More parishes soon.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOOR 2: Managed Services -->
+  <section class="door-section ds-gold" id="managed">
+    <div class="wrap">
+      <div class="door-inner">
+        <div class="door-visual dv-gold rv d1 door-flip">
+          <div class="dv-content">
+            <div class="ev-stack">
+              <div class="ev-card c1">
+                <div class="ev-img"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+                <div class="ev-meta">Before · <b>Stage 1</b></div>
+              </div>
+              <div class="ev-card c2">
+                <div class="ev-img"><svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+                <div class="ev-meta">After · <b>Stage 1</b></div>
+                <div class="ev-tick"><svg viewBox="0 0 12 12"><path d="M2 6l3 3 5-5"/></svg></div>
+              </div>
+              <div class="ev-card c3" style="background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.3)">
+                <div style="font:600 10px var(--mono);color:var(--gold);margin-bottom:4px">You approved</div>
+                <div style="font:600 12px var(--body);color:var(--ink)">J$16,700 released</div>
+                <div style="font:400 10px var(--mono);color:var(--dim);margin-top:2px">From London, 11:43 pm</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="rv d2">
+          <span class="door-tag">Managed services</span>
+          <h2 class="door-h">Work with<br><em>Yaadly</em><br>directly</h2>
+          <p class="door-p">Get your contractor and quote checked before you pay, an independent visit with photos, a condition report, or full project oversight. From £95.</p>
+          <ul class="door-features">
+            <li><span><b>Contractor check</b> before you pay anyone</span></li>
+            <li><span>Independent site visit with timestamped photos</span></li>
+            <li><span>Condition and completion reports</span></li>
+            <li><span>Ongoing project oversight, you stay in control</span></li>
+          </ul>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <a class="btn btn-gold" href="services.html#contact">Tell us about your property</a>
+            <a class="btn btn-ghost btn-sm" href="services.html#prices">See prices</a>
+          </div>
+          <p class="door-price" style="margin-top:14px">From <span>£95</span> · No retainer, no subscription</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- BIZ + WHATSAPP -->
+<div class="wrap">
+  <a class="biz rv" href="business.html">
+    <div class="biz-left"><span class="tag">For companies</span><b>Agents, developers, insurers.</b><br><span>Independent condition and completion evidence, one standard, built to be audited.</span></div>
+    <span class="btn btn-ghost btn-sm">Yaadly for business &rarr;</span>
   </a>
 
-  <div class="trustrow rv">
-    <span><b>A person</b> replies within one working day</span><span class="dot">·</span>
-    <span><b>Every price on the page,</b> none in a DM</span><span class="dot">·</span>
-    <span><b>UK registered,</b> independent of every contractor</span><span class="dot">·</span>
-    <span><a href="prices.html">See what things actually cost</a></span>
-  </div>
-
-  <a class="wapanel rv" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener" style="text-decoration:none;color:inherit">
-    <span class="waico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></span>
-    <span class="watext">
+  <a class="wa rv d1" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener">
+    <span class="wa-ico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></span>
+    <span class="wa-txt">
       <b>Not sure which one? Just message us.</b>
-      <span>Text, photos or a voice note. Patois or English, both fine. A person, Monique, reads it and replies within one working day.</span>
+      <span>Text, photos or a voice note. Patois or English, both fine. A person replies within one working day.</span>
     </span>
-    <span class="wanum">Open WhatsApp &rarr;</span>
+    <span class="wa-cta">Open WhatsApp &rarr;</span>
   </a>
+</div>
 
-  <div class="jobsph rv"><b>Real jobs strip, hidden until December.</b> Three cards: photo, worker first name and face, one client sentence.</div>
-</div></div>
-
-<footer><div class="wrap"><div class="fgrid">
+<footer><div class="ft">
   <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
-  <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
-  <span>A human confirms every step that moves money or changes a reputation.</span>
-  <div class="flinks">
-    <a href="marketplace.html">Overview</a>
-    <a href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
+  <span>Launching in Kingston and Portmore. More parishes as we grow.</span>
+  <div class="ft-links">
+    <a href="marketplace.html">How it works</a>
     <a href="services.html">Managed services</a>
     <a href="business.html">Yaadly for business</a>
-    <a href="payments.html">How you pay, and the legal detail</a>
-    <a href="faq.html">Questions and answers</a>
+    <a href="payments.html">How you pay</a>
     <a href="prices.html">What work costs</a>
+    <a href="faq.html">FAQ</a>
     <a href="contact.html">Contact</a>
     <a href="https://app.yaadly.co.uk/portal">Client portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
-    <a href="https://wa.me/447878877567" target="_blank" rel="noopener">WhatsApp</a>
   </div>
-</div></div></footer>
+</div></footer>
 
 <script>
-/* Routes from the old one-page site, which addressed everything by hash. */
 (function(){
-  var h = (location.hash||"").replace("#","");
-  var GO = { market:"marketplace.html", post:"https://app.yaadly.co.uk/jobs/new",
-             client:"https://app.yaadly.co.uk/portal", worker:"https://app.yaadly.co.uk/portal",
-             site:"services.html", services:"services.html", prices:"services.html#prices",
-             how:"services.html#how", contact:"contact.html",
-             payments:"payments.html", partners:"business.html" };
-  if(GO[h]) location.replace(GO[h]);
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:0.1});
+  document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+  var t=document.getElementById('nt'),v=document.getElementById('nvl');
+  if(t)t.addEventListener('click',function(){v.classList.toggle('open')});
 })();
 </script>
-<script src="yaadly.js" defer></script>
 </body>
 </html>
