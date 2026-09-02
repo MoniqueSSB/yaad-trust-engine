@@ -234,30 +234,33 @@ export default async function Board({
                   >
                     {fresh && <span className="absolute inset-y-0 left-0 w-[3px] bg-linear-to-b from-gold to-transparent" />}
 
-                    {/* Photos lead the card. */}
+                    {/* The client's photos, at the top, each its own picture. */}
                     {ph.length > 0 && (
-                      <div className="relative -mx-6 -mt-5.5 mb-4.5">
-                        <div className={"grid h-32 gap-0.5 " + (banner.length === 1 ? "grid-cols-1" : banner.length === 2 ? "grid-cols-2" : "grid-cols-[1.6fr_1fr_1fr]")}>
+                      <div className="mb-4">
+                        <div className="flex flex-wrap gap-2.5">
                           {banner.map((p, i) => (
-                            <figure key={i} className="relative overflow-hidden border-b border-line bg-linear-to-br from-purple/28 to-gold/12 transition duration-200 group-hover:brightness-110">
+                            <figure key={i} className="relative h-[92px] w-[136px] shrink-0 overflow-hidden rounded-xl border border-line2 bg-linear-to-br from-purple/28 to-gold/12 transition duration-200 hover:border-purple/60">
                               {p.img && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={p.img} alt={p.caption} className="size-full object-cover" />
                               )}
-                              <figcaption className="absolute inset-x-0 bottom-0 bg-linear-to-t from-bg/80 to-transparent px-2.5 py-1 font-mono-app text-[8.5px] font-medium text-ink/80">
+                              <figcaption className="absolute inset-x-0 bottom-0 bg-linear-to-t from-bg/85 to-transparent px-2 py-1 font-mono-app text-[8.5px] font-medium leading-tight text-ink/80">
                                 {p.caption}
                               </figcaption>
-                              {i === 0 && ph.length > 3 && (
-                                <Link href={expanded ? keep("") : keep("pics=" + encodeURIComponent(j.id))} className="absolute right-2.5 top-2.5 rounded-full border border-gold/40 bg-bg/80 px-2.5 py-0.5 font-mono-app text-[9.5px] font-semibold text-goldb transition hover:border-gold">
-                                  {expanded ? "show less" : "+" + (ph.length - 3)}
-                                </Link>
-                              )}
                             </figure>
                           ))}
+                          {ph.length > 3 && (
+                            <Link
+                              href={expanded ? keep("") : keep("pics=" + encodeURIComponent(j.id))}
+                              className="grid h-[92px] w-[76px] shrink-0 place-items-center rounded-xl border border-gold/35 bg-gold/[0.06] font-mono-app text-[11px] font-semibold text-goldb transition hover:border-gold hover:bg-gold/10"
+                            >
+                              {expanded ? "less" : "+" + (ph.length - 3)}
+                            </Link>
+                          )}
                         </div>
-                        <span className="absolute -bottom-3.5 right-2.5 font-mono-app text-[9px] text-dim">
-                          {ph.length} photo{ph.length === 1 ? "" : "s"} · <b className="font-medium text-mute">yaad-vision read</b>
-                        </span>
+                        <p className="mt-2 font-mono-app text-[9.5px] text-dim">
+                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client · <b className="font-medium text-mute">yaad-vision has read them all</b>
+                        </p>
                       </div>
                     )}
 
@@ -397,20 +400,26 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
           const book = `/jobs/new?${[w.slug && `worker=${encodeURIComponent(w.slug)}`, w.trade && `trade=${encodeURIComponent(w.trade)}`].filter(Boolean).join("&")}`;
           return (
             <div key={i} className="group flex flex-col gap-3.5 overflow-hidden rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] p-5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40">
-              {/* Photo banner: the worker's own picture goes here once uploaded. */}
-              <div className="relative -mx-5 -mt-5 flex h-[110px] items-center justify-center bg-[radial-gradient(ellipse_at_30%_20%,rgba(155,115,245,0.3)_0%,transparent_60%),linear-gradient(150deg,rgba(123,79,224,0.35),rgba(245,158,11,0.14))]">
-                <span className="flex items-center gap-2 font-mono-app text-[9.5px] font-medium uppercase tracking-[0.14em] text-ink/45">
-                  <svg viewBox="0 0 24 24" className="size-3.5 fill-none stroke-current stroke-[1.7]" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" /><circle cx="12" cy="13" r="3.4" />
-                  </svg>
-                  Worker photo
-                </span>
-                <span className="absolute -bottom-5 left-4.5 grid size-13 place-items-center rounded-[15px] border-[3px] border-[#10102A] bg-linear-to-br from-purple to-gold font-display text-[19px] font-medium text-white">
-                  {initials}
-                </span>
+              {/* Pictures first, and each one its own: the worker's portrait,
+                  then their work. Placeholders until image storage exists. */}
+              <div className="flex gap-2.5">
+                <div className="relative grid size-[88px] shrink-0 place-items-center rounded-xl border border-line2 bg-[radial-gradient(ellipse_at_30%_20%,rgba(155,115,245,0.32)_0%,transparent_60%),linear-gradient(150deg,rgba(123,79,224,0.38),rgba(245,158,11,0.16))]">
+                  <span className="font-display text-[26px] font-medium text-white/90">{initials}</span>
+                  <span className="absolute inset-x-0 bottom-0 bg-linear-to-t from-bg/85 to-transparent py-0.5 text-center font-mono-app text-[7.5px] font-medium uppercase tracking-[0.12em] text-ink/55">
+                    photo
+                  </span>
+                </div>
+                <div className="grid flex-1 grid-cols-2 grid-rows-2 gap-2.5">
+                  {[0, 1, 2, 3].map((k) => (
+                    <span key={k} className="rounded-lg border border-line bg-linear-to-br from-purple/18 to-gold/[0.08] transition group-hover:border-line2" />
+                  ))}
+                </div>
               </div>
+              <span className="-mt-1.5 font-mono-app text-[9px] font-semibold uppercase tracking-[0.16em] text-dim">
+                Portrait &amp; recent work · verified photos
+              </span>
 
-              <div className="flex items-start gap-3 pt-3.5">
+              <div className="flex items-start gap-3">
                 <span className="min-w-0 flex-1">
                   <b className="block text-[15.5px] font-bold leading-tight">{w.name}</b>
                   <small className="block text-[12.5px] text-mute">{w.trade ?? "General trades"}</small>
@@ -434,15 +443,6 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
                 <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-semibold " + (w.lane === "cert" ? "border border-gold/35 bg-gold/[0.08] text-goldb" : "border border-purple/30 bg-purple/[0.08] text-purpleb")}>
                   {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
                 </span>
-              </div>
-
-              <div>
-                <span className="font-mono-app text-[9px] font-semibold uppercase tracking-[0.16em] text-dim">Recent work · verified photos</span>
-                <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-                  {[0, 1, 2, 3].map((k) => (
-                    <span key={k} className="aspect-square rounded-lg border border-line bg-linear-to-br from-purple/18 to-gold/[0.08] transition group-hover:border-line2" />
-                  ))}
-                </div>
               </div>
 
               <div className="mt-auto grid grid-cols-2 gap-2">
