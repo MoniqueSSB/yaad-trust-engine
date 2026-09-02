@@ -25,6 +25,7 @@ import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
 import { JobProgress, type Phase, type Step } from "@/components/portal/JobProgress";
 import { MoneyPanel, type InvoiceRow } from "@/components/portal/MoneyPanel";
 import { StageLedger, type LedgerStage } from "@/components/portal/StageLedger";
+import { JobRail } from "@/components/portal/JobRail";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
@@ -845,6 +846,10 @@ export default async function JobRoom({
         the person who turns up, and asking for one should not depend on
         whether this client happens to use WhatsApp.
       */}
+      <Outstanding items={outstanding} otherSideLabel={otherSideLabel} />
+
+      <JobProgress phases={phases} />
+
       {role === "client" && <JobPhotoUpload jobId={job.id} photos={bp} />}
 
       {/*
@@ -862,10 +867,8 @@ export default async function JobRoom({
         />
       )}
 
-      <Outstanding items={outstanding} otherSideLabel={otherSideLabel} />
-
-      <JobProgress phases={phases} />
-
+      <div className="mt-2 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0">
       <TabBar base={jobBase} active={tab} counts={tabCounts} />
 
       {tab === "money" && (
@@ -1307,7 +1310,31 @@ export default async function JobRoom({
       )}
         </>
       )}
+        </div>
 
+        <JobRail
+          side={role === "worker" ? "worker" : "client"}
+          money={money}
+          labour={labour}
+          allIn={allIn}
+          takeHome={takeHome}
+          fee={feeJmd}
+          heldNote={
+            labour == null
+              ? role === "worker"
+                ? "Agreed once a client accepts your quote."
+                : "You will see the full price, including Yaadly's 15% fee, before anything is agreed."
+              : job.status === "complete"
+                ? "Released. This job is closed and paid."
+                : role === "worker"
+                  ? "Each stage is paid to you once the client approves that stage's evidence."
+                  : "Held until you approve each stage's evidence."
+          }
+          workerName={won?.worker_name ?? job.worker_name ?? null}
+          jobBase={jobBase}
+          moneyHref={jobBase + "?tab=money"}
+        />
+      </div>
     </>
   );
 }
