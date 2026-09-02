@@ -7,6 +7,9 @@ import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
+import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
+import { FAQ_FACTS } from "./faq.ts";
+import { priceFigureGuard } from "./price-figures.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -98,6 +101,21 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
 
   let j: Record<string, unknown> = {};
   try { j = JSON.parse(raw); } catch (_) { /* fall through to empty */ }
+
+  // The chat in the corner of yaadly.co.uk (docs/chat.js). A visitor token
+  // stands where a phone number would: it is the thread key, so the second
+  // message reads against the first, and it names nobody. Text only, no
+  // media, by design: photographs of a job belong on the job form or on
+  // WhatsApp, where they are kept against the job.
+  if (s(j.channel) === "web") {
+    return {
+      channel: "web",
+      from: s(j.visitor).toLowerCase(),
+      name: "",
+      text: s(j.text).slice(0, WEB_CHAT_MAX_CHARS),
+      media: [],
+    };
+  }
 
   // Vonage
   if (j.msisdn || j.messageId) {
@@ -443,7 +461,17 @@ async function readTheJob(text: string, trace: Trace) {
           // codebase; every sibling call is 1200 or higher, some far higher,
           // and this is the one call that both classifies AND writes a full
           // conversational reply, never the lightest job of the set.
-          model: prov.model, temperature: 0.3, max_tokens: 3500,
+          //
+          // 3500 until 2 Sep 2026, when the FAQ facts joined the prompt and
+          // the model had more to think about: two of four first-turn calls
+          // that evening spent the whole budget inside <think> and never
+          // reached the JSON, and a third ran out midway through the reply
+          // field. Every one of those cost a client the generic opener in
+          // place of an answer. 6000 is the budget that fits the longer
+          // prompt; the parse below also strips the think block first, so a
+          // brace inside the reasoning can no longer be mistaken for the
+          // start of the answer.
+          model: prov.model, temperature: 0.3, max_tokens: 6000,
           messages: [
             { role: "system", content:
 `You are reading a WhatsApp conversation with somebody who needs property work
@@ -451,8 +479,11 @@ done in Jamaica. They are usually abroad, often writing in Jamaican Patois, and
 they will not write a neat brief. Read the WHOLE conversation, oldest first,
 and treat later lines as answers to earlier ones.
 
-Return JSON only. Never invent facts. Never state a price, a budget or a cost,
-and never estimate one even if asked directly. If something is not in the
+Return JSON only, even when the message is a question rather than a job: the
+answer to a question goes in "reply", inside the same JSON. Never invent
+facts. Never state a price, a budget or a cost for the work itself, and never estimate one even if asked directly. The only
+figures you may ever repeat are Yaadly's own published service prices and
+charges in the facts below, word for word. If something is not in the
 conversation, use "".
 
 Return exactly:
@@ -512,10 +543,13 @@ Not every message is a job. Handle whatever arrives, and always write a reply:
   greeting with a job reference or a promise.
 - A question about how it works. Answer it straight from the facts below, then
   bring it back to what they need done.
-- A question about price. Say plainly that Yaadly does not price work, the
-  vetted workers quote against the written scope, and that is deliberate so
-  nobody is marking up their own estimate. Never give a number, a range or a
-  guess, even if pushed twice.
+- A question about what a repair or a job will cost. Say plainly that Yaadly
+  does not price work, the vetted workers quote against the written scope, and
+  that is deliberate so nobody is marking up their own estimate. Never give a
+  number, a range or a guess, even if pushed twice.
+- A question about Yaadly's own services and what they cost. Answer from the
+  published prices in the facts below, exactly as written there, and point
+  them to yaadly.co.uk/prices for the full list.
 - Something not about property at all. Say briefly what this number is for and
   ask if they have work that needs doing. Do not be cold about it.
 - Somebody upset or worried about being ripped off. Take it seriously, do not
@@ -535,6 +569,8 @@ Facts you may state, and nothing beyond them:
 - Workers quote against a written scope. Yaadly does not price the work.
 - A person checks every job before any worker sees it.
 - Nothing is charged for describing a job or posting it.
+
+${FAQ_FACTS}
 
 If you do not know something, say you will have it checked rather than
 guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
@@ -558,9 +594,25 @@ guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
       try { j = JSON.parse(raw); } catch (e) {
         console.error("readTheJob: response body was not JSON:", String(e).slice(0, 200)); return null;
       }
-      const content = String((j as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "");
+      const content = String((j as { choices?: { message?: { content?: string } }[] })?.choices?.[0]?.message?.content ?? "")
+        .replace(/<think>[\s\S]*?<\/think>/g, "");
       const m = content.match(/\{[\s\S]*\}/);
       if (!m) {
+        // Asked how Yaadly works, the model sometimes answers in plain prose
+        // and skips the JSON envelope altogether (seen live 2 Sep 2026, the
+        // evening the FAQ facts joined the prompt: three good answers about
+        // vetting and Completion Reports, all thrown away for want of
+        // braces, and three clients handed the generic opener instead). The
+        // prose IS the answer. It goes out as the reply, through the same
+        // promise strip, figure guard and language screen as any other, with
+        // every classification field left empty, which is the honest reading
+        // of a message that was a question and not a job.
+        const prose = content.trim();
+        if (prose.length >= 20 && prose.length <= 2000 && !/[{}]/.test(prose)) {
+          console.error("readTheJob: model answered in prose, no JSON; using the prose as the reply:", prose.slice(0, 200));
+          return { title: "", scope: "", trade: "", urgency: "", parish: "", client_name: "", client_email: "",
+                   access_note: "", questions: [], enough: false, confirmed: false, wants_human: false, reply: prose };
+        }
         console.error("readTheJob: no JSON object in model content:", content.slice(0, 300)); return null;
       }
       try { return JSON.parse(m[0]); } catch (e) {
@@ -811,7 +863,7 @@ ${desk ? `<p style="margin:0 0 18px"><a href="${desk}" style="background:#14b8a6
  *  are a fixed closed set, and nothing the client or the model wrote. Same
  *  rule the other functions already follow for their notifications. The draft
  *  itself is in the function log. */
-async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace) {
+async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace, where = "WhatsApp") {
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const { data: st } = await supabase.from("app_settings")
@@ -820,7 +872,7 @@ async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace) 
     await fetch(`https://ntfy.sh/${st.value}`, {
       method: "POST",
       headers: { Title: "Reply held back", Priority: "high", Tags: "warning" },
-      body: "A WhatsApp reply failed the language screen and was not sent. The client got a "
+      body: `A ${where} reply failed the language screen and was not sent. The client got a `
         + "holding message and is waiting on a person. Reason: "
         + [...new Set(findings.map((f) => f.guidance))].join(" ")
         + " The draft is in the yaad-inbound function log.",
@@ -885,14 +937,48 @@ Deno.serve(async (req: Request) => {
     );
   };
 
+  // The web sibling of twiml(): same screen, same refusal, a JSON body the
+  // widget can render instead of TwiML. "handoff" tells the widget to show
+  // the WhatsApp button; a blocked reply always hands off, because the
+  // holding text it sends points at WhatsApp and the button is how they get
+  // there. "reference" is the job code the WhatsApp lane adopts.
+  const webSay = async (reply: string, meta: { reference?: string | null; handoff?: boolean } = {}) => {
+    const findings = guardrails.scan(reply);
+    let body = reply;
+    let handoff = meta.handoff === true;
+    if (findings.length) {
+      body = WEB_SAFE_FALLBACK;
+      handoff = true;
+      console.error(
+        "guardrail: outbound web reply blocked. Terms: "
+          + [...new Set(findings.map((f) => f.term))].join(", ")
+          + ". Draft was: " + reply.slice(0, 500),
+      );
+      await alertDeskBlocked(findings, trace, "website chat");
+    }
+    root.setAttributes({ ...guardrails.screenAttrs(findings), "yaadly.web_chat.handoff": handoff });
+    return json({ ok: true, reply: body, reference: meta.reference ?? null, handoff });
+  };
+
   try {
     if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
     if (!SUPABASE_URL || !SERVICE_KEY) return json({ error: "Not configured." }, 500);
 
     const raw = await req.text();
     const isTwilio = (req.headers.get("content-type") ?? "").includes("application/x-www-form-urlencoded");
+    // The website chat carries no signature: a visitor's browser has no
+    // secret to sign with. What stands in for one is the Origin check and
+    // the throttle further down, the same posture as yaad-enquiry. Detected
+    // here, before the signature check, because Resend's secret being set
+    // means every unsigned JSON body is otherwise refused.
+    let isWeb = false;
+    if (!isTwilio) {
+      try { isWeb = s((JSON.parse(raw) as Record<string, unknown>).channel) === "web"; } catch (_) { /* not JSON, not web */ }
+    }
 
-    const sig = isTwilio ? await twilioSigned(req, raw) : await resendSigned(req, raw);
+    const sig = isTwilio ? await twilioSigned(req, raw)
+      : isWeb ? { ok: true, checked: false }
+      : await resendSigned(req, raw);
     root.setAttributes({ "yaadly.inbound.signature_checked": sig.checked, "yaadly.inbound.signature_ok": sig.ok });
     if (sig.checked && !sig.ok) {
       root.setAttributes({ "yaadly.inbound.outcome": "bad_signature" });
@@ -919,6 +1005,76 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // ── the website chat door ────────────────────────────────────────────
+    // Three checks stand in for authentication, in the order cheapest first.
+    // The Origin header the browser sets, so a script on some other site
+    // cannot post through here from a visitor's browser. The token shape, so
+    // nothing but a widget-minted key ever becomes a thread key. And the
+    // throttle, which is the one that actually holds against a script
+    // outside a browser: every message through this door is a model call
+    // somebody pays for, so it is counted per caller, per visitor and in
+    // total, and refused with a plain sentence when a limit is hit.
+    if (isWeb) {
+      if (!originAllowed(req.headers.get("origin"))) {
+        root.setAttributes({ "yaadly.inbound.outcome": "web_bad_origin" });
+        return json({ error: "This chat only works on yaadly.co.uk." }, 403);
+      }
+      if (!visitorTokenOk(msg.from)) {
+        root.setAttributes({ "yaadly.inbound.outcome": "web_bad_token" });
+        return json({ error: "That did not send. Reload the page and try again." }, 400);
+      }
+      // A poll is the widget asking whether Monique has written back, not a
+      // message: no model, no throttle row, one indexed read for the one
+      // visitor whose token this is. The token is the proof; nothing else
+      // can read these rows.
+      let pollAfter: number | null = null;
+      try {
+        const j = JSON.parse(raw) as Record<string, unknown>;
+        if (j.poll === true) pollAfter = Math.max(0, Number(j.after ?? 0) || 0);
+      } catch (_) { /* not a poll */ }
+      if (pollAfter !== null) {
+        const [{ data: replies }, { data: th }] = await Promise.all([
+          supabase.from("web_chat_replies").select("id,body,created_at")
+            .eq("visitor_key", msg.from).gt("id", pollAfter).order("id", { ascending: true }).limit(20),
+          supabase.from("intake_threads").select("human_handling")
+            .eq("channel", "web").eq("from_addr", msg.from).maybeSingle(),
+        ]);
+        root.setAttributes({ "yaadly.inbound.outcome": "web_poll", "yaadly.web_chat.replies": (replies ?? []).length });
+        return json({
+          ok: true,
+          replies: (replies ?? []).map((r) => ({ id: r.id, text: r.body, at: r.created_at })),
+          human: th?.human_handling === true,
+        });
+      }
+
+      if (!msg.text.trim()) return json({ error: "Type something first." }, 400);
+
+      const WEB_PER_CALLER_PER_HOUR = 30;
+      const WEB_PER_VISITOR_PER_HOUR = 40;
+      const WEB_PER_HOUR = 600;
+      const ipRaw = req.headers.get("cf-connecting-ip")
+        ?? (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("yaadly-web-chat:" + ipRaw));
+      const callerKey = Array.from(new Uint8Array(digest)).slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+      const [{ count: mine }, { count: theirs }, { count: everyone }] = await Promise.all([
+        supabase.from("web_chat_attempts").select("id", { count: "exact", head: true }).eq("caller_key", callerKey).gt("created_at", hourAgo),
+        supabase.from("web_chat_attempts").select("id", { count: "exact", head: true }).eq("visitor_key", msg.from).gt("created_at", hourAgo),
+        supabase.from("web_chat_attempts").select("id", { count: "exact", head: true }).gt("created_at", hourAgo),
+      ]);
+      if ((mine ?? 0) >= WEB_PER_CALLER_PER_HOUR || (theirs ?? 0) >= WEB_PER_VISITOR_PER_HOUR) {
+        root.setAttributes({ "yaadly.inbound.outcome": "web_throttled_caller" });
+        return json({ error: "That is a lot of messages in one hour. Give it a little while, or carry on on WhatsApp." }, 429);
+      }
+      if ((everyone ?? 0) >= WEB_PER_HOUR) {
+        root.setAttributes({ "yaadly.inbound.outcome": "web_throttled_global" });
+        return json({ error: "The chat is busy right now. Carry on on WhatsApp and Monique will pick it up." }, 429);
+      }
+      await supabase.from("web_chat_attempts").insert({ caller_key: callerKey, visitor_key: msg.from });
+      // Housekeeping, one call in twenty, never on the request's critical path.
+      if (Math.random() < 0.05) { try { await supabase.rpc("web_chat_attempts_sweep"); } catch (_) { /* housekeeping only */ } }
+    }
 
     // A worker mid "which job" answer, or a fresh photo from a number
     // linked to a published worker (worker_profiles.phone). Only on the
@@ -1569,7 +1725,63 @@ Deno.serve(async (req: Request) => {
       if (isTwilio) {
         return twiml("Monique has this and is coming back to you herself. I have added your message so she sees it.");
       }
+      if (isWeb) {
+        // On the web there is no reply lane back to this widget, so the
+        // honest sentence is where she will actually answer: WhatsApp.
+        return webSay(
+          "Monique has this and is picking it up herself. I have added your message so she sees it. Her reply will show up here, or carry on with her on WhatsApp if you are leaving this page.",
+          { reference: heldJobId, handoff: true },
+        );
+      }
       return json({ ok: true, jobId: heldJobId, heldForHuman: true });
+    }
+
+    // A visitor handed over from the website chat, arriving on WhatsApp with
+    // the reference the widget put in their first message. Adopt the web
+    // thread rather than start a fresh one: the transcript carries across,
+    // the job they were describing keeps its code, and the thread is held
+    // for Monique from this message on, because the only reason the widget
+    // sends anyone here is that the assistant had already handed over. This
+    // is what makes "you will not have to say it twice" true.
+    if (msg.channel === "whatsapp" && msg.from) {
+      const ref = webReferenceIn(msg.text);
+      if (ref) {
+        const { data: webThread } = await supabase.from("intake_threads")
+          .select("job_id,transcript,turns,stage")
+          .eq("channel", "web").eq("job_id", ref).maybeSingle();
+        if (webThread) {
+          const carried = `${String(webThread.transcript ?? "")}\n\n[Continued on WhatsApp]\n${thisTurn}`.slice(-8000);
+          await supabase.from("intake_threads").upsert({
+            channel: threadKey.channel,
+            from_addr: threadKey.from_addr,
+            job_id: ref,
+            transcript: carried,
+            turns: Number(webThread.turns) + 1,
+            stage: String(webThread.stage ?? "gathering"),
+            last_at: new Date().toISOString(),
+            human_handling: true,
+          }, { onConflict: "channel,from_addr" });
+          // The number they wrote from is the first proven way to reach
+          // them; the web thread had none.
+          await supabase.from("jobs").update({ client_phone: msg.from }).eq("id", ref);
+          if (msg.media.length) {
+            await keepMedia(supabase as unknown as MediaWriter, ref, msg.media, Number(webThread.turns) * 10, trace);
+          }
+          try {
+            const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+            if (st?.value) {
+              await fetch(`https://ntfy.sh/${st.value}`, {
+                method: "POST",
+                headers: { Title: "Needs you: web chat moved to WhatsApp", Priority: "high", Tags: "raising_hand" },
+                body: `${ref}: they carried on from the website chat. The whole conversation is on the thread. The assistant is standing down until the desk hands it back.`,
+                signal: AbortSignal.timeout(4000),
+              });
+            }
+          } catch (_) { /* never let a notification break intake */ }
+          root.setAttributes({ "yaadly.inbound.outcome": "web_thread_adopted", "yaadly.job.id": ref });
+          return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Monique will read it herself and come back to you on this number.`);
+        }
+      }
     }
 
     // A repeat of the immediately preceding turn, word for word, is not new
@@ -1591,7 +1803,16 @@ Deno.serve(async (req: Request) => {
 
     const card = await readTheJob(transcript, trace);
     const enough = card?.enough === true;
-    const wantsHuman = card?.wants_human === true;
+    // wants_human is one model call's read of one message, and when the call
+    // fails outright (it did, live, 2 Sep 2026, on "Can I talk to a real
+    // person please" from the website chat) the card is null and the person
+    // who asked for a person gets the generic opener instead. Same backstop
+    // shape as saidConfirmed below: a plain word match on THIS turn's own
+    // text that can only ever add a true the model missed.
+    const saidHuman =
+      /\b(speak|talk|chat|deal)\s+(to|with)\s+(a\s+|an\s+)?(real\s+|actual\s+|live\s+)?(person|human|someone|somebody|monique|agent|operator)\b|\b(real|actual|live)\s+(person|human)\b|\b(are you|is this) a (bot|robot|machine)\b/i
+        .test(msg.text);
+    const wantsHuman = card?.wants_human === true || saidHuman;
 
     // Three stages, and the client owns the last one. The assistant may decide
     // it has enough; only they can say it is right and complete.
@@ -1617,7 +1838,7 @@ Deno.serve(async (req: Request) => {
       : "gathering";
 
     // JOB-WHAT-… helps nobody. Name the door it came through.
-    const CODE: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "EMAIL", generic: "WEB" };
+    const CODE: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "EMAIL", web: "WEB", generic: "WEB" };
     const jobId = continuing ? String(prior!.job_id) : `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
     const turns = continuing ? Number(prior!.turns) + 1 : 1;
 
@@ -1659,7 +1880,9 @@ Deno.serve(async (req: Request) => {
       "",
       `In their own words:\n${transcript}`,
       spoken ? "Source: voice note, transcribed automatically. The wording is theirs." : "",
-      `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}${turns > 1 ? `, over ${turns} messages` : ""}.`,
+      msg.channel === "web"
+        ? `Arrived by the chat on yaadly.co.uk${turns > 1 ? `, over ${turns} messages` : ""}. No contact details yet: the visitor is anonymous until they carry on by WhatsApp or finish setting up.`
+        : `Arrived by ${msg.channel} from ${msg.from || "an unknown sender"}${turns > 1 ? `, over ${turns} messages` : ""}.`,
       enough ? "" : "[Still gathering. The assistant has asked for what is missing and this stays a draft until it comes back.]",
       lostMedia ? `[${lostMedia} attachment${lostMedia > 1 ? "s" : ""} came through but could not be stored. Ask them to send again.]` : "",
       typedEmail
@@ -1671,7 +1894,9 @@ Deno.serve(async (req: Request) => {
       title: s(card?.title) || (enough ? `Job from ${msg.channel}` : `Someone writing in on ${msg.channel}`),
       parish: s(card?.parish),
       client_name: s(card?.client_name) || msg.name,
-      client_phone: msg.channel === "email" ? "" : msg.from,
+      // A web visitor token is not a phone number and must never be shown
+      // as one. The WhatsApp lane fills this in if they carry on there.
+      client_phone: msg.channel === "email" || msg.channel === "web" ? "" : msg.from,
       // jobs.access_contact is NOT NULL DEFAULT ''. s() already returns "" for
       // nothing given; the || null above this comment briefly sent NULL over
       // the wire instead and every continuing-conversation update on a job
@@ -1740,7 +1965,7 @@ Deno.serve(async (req: Request) => {
     const summary = worthTelling ? notifyAdmin(supabase as unknown as SettingsReader, {
       id: jobId,
       trade: s(card?.trade), parish: s(card?.parish), title: s(card?.title),
-      urgency: s(card?.urgency), from: msg.from, channel: msg.channel, spoken,
+      urgency: s(card?.urgency), from: msg.channel === "web" ? "the chat on yaadly.co.uk" : msg.from, channel: msg.channel, spoken,
       scope: s(card?.scope), access: s(card?.access_note),
       questions: Array.isArray(card?.questions) ? card.questions.filter(Boolean).map(s) : [],
     }, trace) : null;
@@ -1774,7 +1999,15 @@ Deno.serve(async (req: Request) => {
 
     root.setAttributes({ "yaadly.inbound.outcome": enough ? "job_created" : "gathering", "yaadly.job.id": jobId, "yaadly.inbound.spoken": spoken, "yaadly.inbound.turns": turns });
 
-    if (isTwilio) {
+    if (isTwilio || isWeb) {
+      // One voice, two doors. On WhatsApp the reply is TwiML; on the website
+      // chat it is JSON the widget renders, carrying the reference and
+      // whether to show the WhatsApp button. Where a sentence promises
+      // "on this number", the web version says where she will actually
+      // answer instead, because there is no reply lane back to the widget.
+      const say = (text: string, handoff = false) =>
+        isWeb ? webSay(text, { reference: jobId, handoff }) : twiml(text);
+
       // The assistant writes this, not a template. Somebody who says "I have a
       // problem at my house" and gets a job reference and a 24 hour promise has
       // been processed, not helped, and the card behind it is empty anyway.
@@ -1784,13 +2017,28 @@ Deno.serve(async (req: Request) => {
       // Still bounded by what the site promises: a person checks it, nothing
       // reaches a worker until it is signed, and no price is ever quoted here.
       const written = s(card?.reply);
-      const safe = stripPromises(written.replace(/[\u2010-\u2015]/g, ",")).slice(0, 900);
+      // The figure guard runs on the model's words only. The fixed strings
+      // below carry no prices, and the FAQ facts it may repeat are on the
+      // published list, so a cut here is always a number the model made up.
+      const figures = priceFigureGuard(stripPromises(written.replace(/[\u2010-\u2015]/g, ",")));
+      if (figures.cut.length) {
+        console.error("price guard: cut unpublished figure(s) from a reply: " + figures.cut.join(", ") + ". Draft was: " + written.slice(0, 500));
+        root.setAttributes({ "yaadly.price_guard.cut": figures.cut.length });
+      }
+      const safe = figures.text.slice(0, 900);
 
       // They asked for a person. That is not a failure of the assistant, it is
       // a reasonable thing to want when you are about to spend money on a
       // house you cannot see, and the answer is yes.
       if (wantsHuman) {
-        return twiml(
+        if (isWeb) {
+          return say(
+            `Of course. Everything you have told me is saved as ${jobId}, so you will not have to say it twice. ` +
+            `Monique will answer here herself when she picks this up. If you are leaving this page, tap the WhatsApp button and carry on with her there instead.`,
+            true,
+          );
+        }
+        return say(
           `Of course. I am passing this to Monique now and she will come back to you on this number herself. ` +
           `Everything you have told me is saved${stage === "done" ? ` as ${jobId}` : ""}, so you will not have to say it twice.`,
         );
@@ -1810,14 +2058,14 @@ Deno.serve(async (req: Request) => {
       // every time beats well phrased most of the time.
       if (stage === "confirming") {
         const readBack = safe || "Let me read that back. Have I got it right, and is there anything else before I write it up?";
-        return twiml(`${readBack} Reply yes if that is right, or just tell me what to change.`);
+        return say(`${readBack} Reply yes if that is right, or just tell me what to change.`);
       }
 
       // Confirmed. This is the only point a link goes out, because it is the
       // only point there is something finished to finish.
       if (confirmedNow || (stage === "done" && wasStage !== "done")) {
         const link = `https://app.yaadly.co.uk/portal/join?job=${encodeURIComponent(jobId)}${data?.portal_code ? `&code=${encodeURIComponent(String(data.portal_code))}` : ""}`;
-        return twiml(
+        return say(
           (safe ? safe + " " : "") +
           `Your job is ${jobId}. Last step, and it is short: ${link} ` +
           `That sets up your portal and the agreement. Nothing reaches a worker until you have signed it, and nothing is charged.`,
@@ -1827,7 +2075,7 @@ Deno.serve(async (req: Request) => {
       // Already finished and still talking. Take the extra detail, do not
       // re-send the link at them like a machine.
       if (stage === "done") {
-        return twiml(
+        return say(
           (safe ? safe + " " : "") + `Added to ${jobId}. If you still need the link to finish setting up, say "link".`,
         );
       }
@@ -1843,7 +2091,14 @@ Deno.serve(async (req: Request) => {
         // same breath as "I am giving this to a person" is the worst of both:
         // they do not know whether to answer or wait.
         const noQuestions = safe.split(/(?<=[.!?])\s+/).filter((x) => !x.trim().endsWith("?")).join(" ").trim();
-        return twiml(
+        if (isWeb) {
+          return say(
+            (noQuestions ? noQuestions + " " : "") +
+            `I have not got quite enough to write this up properly, so this is one for Monique to read herself. Your reference is ${jobId}. She will answer here when she picks it up, or carry on with her on WhatsApp if you are leaving this page.`,
+            true,
+          );
+        }
+        return say(
           (noQuestions ? noQuestions + " " : "") +
           `I have not got quite enough to write this up properly, so I am passing it to Monique to read herself. She will come back to you on this number. Your reference is ${jobId}.`,
         );
@@ -1852,7 +2107,7 @@ Deno.serve(async (req: Request) => {
       if (!enough) {
         // No reference number yet, on purpose. A reference for a greeting
         // teaches people the number means nothing.
-        return twiml(
+        return say(
           safe ||
           "Thanks for writing in. Yaadly gets property work done in Jamaica for people who are not there to watch it. Tell me what needs doing, which parish the property is in, and who can let a worker in.",
         );
@@ -1861,7 +2116,7 @@ Deno.serve(async (req: Request) => {
       // Should not be reached: every stage above returns. Kept as a floor so a
       // future branch can never fall through to silence, which on WhatsApp
       // looks exactly like being ignored.
-      return twiml(safe || "Thanks, I have that. What else can you tell me about the job?");
+      return say(safe || "Thanks, I have that. What else can you tell me about the job?");
     }
 
     return json({ ok: true, jobId, portalCode: data?.portal_code ?? null, channel: msg.channel, transcribed: spoken, enough, turns });

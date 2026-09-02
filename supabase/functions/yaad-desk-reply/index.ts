@@ -31,6 +31,14 @@
  * 24 hours of the client's last message. Outside that, Twilio refuses with
  * code 63016 and this function reports exactly that, honestly, rather than
  * pretending the message went. The desk shows the refusal as it came back.
+ *
+ * THE WEBSITE CHAT (2 Sep 2026). A thread on channel 'web' has no number to
+ * send to. Her words go into web_chat_replies instead, keyed by the visitor
+ * token, and the widget on yaadly.co.uk polls for them while it is open.
+ * Nothing is sent anywhere: if the visitor has closed the page they will not
+ * see it, and the note returned says so, because the widget also gave them a
+ * WhatsApp button for exactly that case. Same transcript append, same
+ * human_handling claim, same "no model in this path" rule.
  */
 
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
@@ -149,8 +157,8 @@ Deno.serve(async (req: Request) => {
     const fromAddr = String(b.from_addr ?? "").trim();
     const text = String(b.text ?? "").trim();
 
-    if (channel !== "whatsapp" && channel !== "sms") {
-      return json({ error: "This lane only sends WhatsApp and SMS. An email thread is answered from your own mailbox." }, 400);
+    if (channel !== "whatsapp" && channel !== "sms" && channel !== "web") {
+      return json({ error: "This lane only sends WhatsApp, SMS and the website chat. An email thread is answered from your own mailbox." }, 400);
     }
     if (!fromAddr) return json({ error: "No number to send to on this thread." }, 400);
     if (!text) return json({ error: "Nothing to send." }, 400);
@@ -166,8 +174,19 @@ Deno.serve(async (req: Request) => {
     if (!rows.length) return json({ error: "That conversation is not in intake_threads any more. Reload the desk." }, 404);
     const thread = rows[0];
 
-    const sent = await sendTwilio(fromAddr, text, channel, trace);
-    if (!sent.sent) return json({ error: sent.reason ?? "The send failed." }, 502);
+    if (channel === "web") {
+      // Written under her token: the admin policy on web_chat_replies is
+      // what lets this row in, and nothing else can.
+      const ins = await db(req, "web_chat_replies", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ visitor_key: fromAddr, job_id: thread.job_id, body: text }),
+      });
+      if (!ins.ok) return json({ error: `Could not save the reply: rest ${ins.status}.` }, 502);
+    } else {
+      const sent = await sendTwilio(fromAddr, text, channel, trace);
+      if (!sent.sent) return json({ error: sent.reason ?? "The send failed." }, 502);
+    }
 
     // Sent, so it is part of the record. Labelled as hers, and the thread is
     // hers now too: yaad-inbound stands down until the desk hands it back.
@@ -191,12 +210,16 @@ Deno.serve(async (req: Request) => {
       "yaadly.desk_reply.recorded": recorded,
       "yaadly.job.id": String(thread.job_id ?? ""),
     });
+    const where = channel === "web" ? "Placed in their chat window on yaadly.co.uk" : "Sent from the Yaadly number";
+    const webCaveat = channel === "web"
+      ? " They see it only while that page is open; if they have left, they were given the WhatsApp button and the same reference, so watch for them there."
+      : "";
     return json({
       ok: true,
       recorded,
       note: recorded
-        ? "Sent from the Yaadly number and added to the transcript. The assistant is standing down on this thread until you hand it back."
-        : "Sent from the Yaadly number, but writing it into the transcript failed. Say it again in the thread notes or retry, so the record stays complete.",
+        ? `${where} and added to the transcript. The assistant is standing down on this thread until you hand it back.${webCaveat}`
+        : `${where}, but writing it into the transcript failed. Say it again in the thread notes or retry, so the record stays complete.${webCaveat}`,
     });
   } catch (e) {
     root.recordError(e);

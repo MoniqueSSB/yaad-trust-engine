@@ -13,6 +13,11 @@ export const dynamic = "force-dynamic";
  * Reads only the open_jobs and client_summary views plus public
  * worker_profiles and job_photos. budget_band is never selected anywhere
  * on this page; the view makes that structural.
+ *
+ * Restyled Sep 2026 to the purple/gold system the marketing site now uses:
+ * photos lead every card, on jobs and on worker profiles alike, because the
+ * board is the thing people are asked to browse and evidence is what it
+ * sells. Nothing about the data or the gate changed in that pass.
  */
 
 type OpenJob = {
@@ -37,7 +42,10 @@ const STORE_LABEL: Record<string, string> = {
   none_available: "No secure store, buy in drops",
 };
 type Photo = { job_id: string; caption: string; img: string | null; position: number };
-type Worker = { name: string | null; trade: string | null; parish: string | null; lane: string | null; jobs_completed: number | null; slug: string | null };
+type Worker = {
+  name: string | null; trade: string | null; parish: string | null; lane: string | null;
+  jobs_completed: number | null; slug: string | null; about: string | null; years: number | null;
+};
 type QuotePackDraft = {
   job_id: string; status: string;
   docs: {
@@ -88,7 +96,7 @@ export default async function Board({
 
   const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] = await Promise.all([
     jq,
-    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed,slug").eq("active", true).order("jobs_completed", { ascending: false }),
+    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed,slug,about,years").eq("active", true).order("jobs_completed", { ascending: false }),
     supabase.from("open_jobs").select("trade"),
   ]);
 
@@ -127,29 +135,56 @@ export default async function Board({
     `/jobs?${[trade && `trade=${encodeURIComponent(trade)}`, showWorkers && "tab=workers", extra].filter(Boolean).join("&")}`;
   const newest = jobs[0]?.updated_at ? new Date(jobs[0].updated_at).getTime() : 0;
 
+  const pill = (on: boolean) =>
+    "rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition " +
+    (on ? "border-gold/45 bg-gold/10 text-goldb" : "border-line text-mute hover:border-line2 hover:text-purpleb");
+
   return (
-    <div className="mx-auto max-w-[1080px] px-5 py-10">
-      <h1 className="font-display text-[clamp(34px,6vw,64px)] uppercase leading-[0.97]">
-        The <span className="bg-linear-to-r from-tealb to-teal bg-clip-text text-transparent">marketplace.</span>
+    <div className="mx-auto max-w-[1040px] px-5 py-10">
+      {/* ── HEAD ─────────────────────────────────────────────── */}
+      <h1 className="font-display text-[clamp(38px,5.6vw,68px)] font-extralight leading-[1.02] tracking-[-0.025em]">
+        The{" "}
+        <em className="bg-linear-to-r from-purpleb via-purple to-gold bg-clip-text font-light not-italic text-transparent italic">
+          marketplace.
+        </em>
       </h1>
-      <p className="mt-4 max-w-[68ch] text-[15.5px] leading-relaxed text-mute">
-        The public board. This is the <code className="font-mono text-[13px] text-tealb">open_jobs</code> view,
-        safe columns only, anyone can read it, and a job only appears here once
-        its client has signed the Client Guidelines. No addresses, no phone
-        numbers, ever.
+      <p className="mt-3.5 max-w-[62ch] text-[15.5px] leading-relaxed text-mute">
+        Open property jobs across Jamaica and the verified workers who do them.{" "}
+        <b className="font-semibold text-ink">Money held until the work is proven.</b>
       </p>
-      <p className="mt-2 text-[13px]">
-        <Link href="/trades" className="text-tealb underline-offset-2 hover:underline">All 18 trades</Link>
-        <span className="text-dim"> · </span>
-        <Link href="/ask" className="text-tealb underline-offset-2 hover:underline">Ask a Yaad, free answers from tradespeople</Link>
+      <p className="mt-2.5 flex items-center gap-2 font-mono-app text-[11px] font-medium tracking-[0.06em] text-dim">
+        <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-gold stroke-2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        </svg>
+        No addresses. No phone numbers. No budgets shown. Ever.
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-[13px]">
-        <Link href={keep("")} className={!showWorkers ? "font-bold text-tealb" : "text-mute hover:text-tealb"}>Open jobs</Link>
-        <span className="text-dim">·</span>
-        <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={showWorkers ? "font-bold text-tealb" : "text-mute hover:text-tealb"}>The worker network</Link>
-        <span className="text-dim">·</span>
-        <Link href="/apply" className="text-mute hover:text-tealb">Join as a worker</Link>
+      {/* Live counts, read from what this page already loaded. */}
+      <div className="mt-5 flex flex-wrap gap-6">
+        {[
+          [String(jobs.length), jobs.length === 1 ? "job open now" : "jobs open now", false],
+          [String(workers.length), workers.length === 1 ? "verified worker" : "verified workers", false],
+          ["100%", "paid on proof", true],
+        ].map(([n, label, gold]) => (
+          <span key={label as string} className="flex items-baseline gap-2 font-mono-app text-[11px] font-medium uppercase tracking-[0.08em] text-dim">
+            <b className={"bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent " + (gold ? "bg-linear-to-br from-goldb to-gold" : "bg-linear-to-r from-purpleb via-purple to-gold")}>{n}</b>
+            {label}
+          </span>
+        ))}
+      </div>
+
+      {/* ── TABS ─────────────────────────────────────────────── */}
+      <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-line pb-4.5">
+        <Link href={keep("")} className={"inline-flex items-center gap-2 rounded-full border px-4.5 py-2.5 text-[13.5px] font-semibold transition " + (!showWorkers ? "border-purple/45 bg-purple/10 text-purpleb" : "border-line text-mute hover:border-line2 hover:text-ink")}>
+          Open jobs <span className={"rounded-full bg-panel2 px-2 py-px font-mono-app text-[10.5px] " + (!showWorkers ? "text-purpleb" : "text-dim")}>{jobs.length}</span>
+        </Link>
+        <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={"inline-flex items-center gap-2 rounded-full border px-4.5 py-2.5 text-[13.5px] font-semibold transition " + (showWorkers ? "border-purple/45 bg-purple/10 text-purpleb" : "border-line text-mute hover:border-line2 hover:text-ink")}>
+          The worker network <span className={"rounded-full bg-panel2 px-2 py-px font-mono-app text-[10.5px] " + (showWorkers ? "text-purpleb" : "text-dim")}>{workers.length}</span>
+        </Link>
+        <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
+          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All 18 trades</Link>
+          <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
+        </span>
       </div>
 
       {showWorkers ? (
@@ -157,18 +192,18 @@ export default async function Board({
       ) : (
         <>
           {trades.length > 1 && (
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link href={showWorkers ? "/jobs?tab=workers" : "/jobs"} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (!trade ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>All trades</Link>
+            <div className="mt-4.5 flex flex-wrap gap-2">
+              <Link href="/jobs" className={pill(!trade)}>All trades</Link>
               {trades.map((t) => (
-                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`} className={"rounded-full border px-3.5 py-1.5 text-[12.5px] font-bold transition " + (trade === t ? "border-teal bg-soft text-tealb" : "border-line text-mute hover:border-teal hover:text-tealb")}>{t}</Link>
+                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`} className={pill(trade === t)}>{t}</Link>
               ))}
             </div>
           )}
 
-          <p className="mt-3 text-[12.5px] text-dim">
+          <p className="mt-3 font-mono-app text-[11px] font-medium uppercase tracking-[0.06em] text-dim">
             {jobs.length} open job{jobs.length === 1 ? "" : "s"}
             {trade ? " in " + trade : ""} · drafts and unsigned jobs are not
-            counted because they are not here
+            counted, because they are not here
           </p>
 
           {jobs.length === 0 ? (
@@ -177,104 +212,122 @@ export default async function Board({
               moment Yaadly opens them, so pitch yours and it can be next.
             </p>
           ) : (
-            <div className="mt-4 grid gap-3.5">
+            <div className="mt-4 flex flex-col gap-3.5">
               {jobs.map((j) => {
                 const ph = photosByJob.get(j.id) ?? [];
                 const expanded = pics === j.id;
-                const showPh = expanded ? ph : ph.slice(0, 3);
+                const banner = expanded ? ph : ph.slice(0, 3);
                 const fresh = !!j.updated_at && newest - new Date(j.updated_at).getTime() < 1000 * 60 * 60 * 6;
                 const sp = [j.job_type, j.size_band, j.access_type, j.materials_by,
                   STORE_LABEL[j.materials_store_type ?? ""]].filter(Boolean) as string[];
                 const open = q === j.id;
                 return (
-                  <div key={j.id} id={j.id} className={"scroll-mt-6 rounded-2xl border bg-panel p-5 " + (fresh ? "border-mango/50 bg-mango/[.045]" : "border-line")}>
-                    <div className="flex flex-wrap items-start gap-3">
-                      <h2 className="min-w-[220px] flex-1 text-[16.5px] font-bold leading-snug">{j.title ?? "Job"}</h2>
-                      <span className="flex flex-wrap gap-2">
-                        {fresh && <span className="rounded-full border border-mango/40 bg-mango/10 px-2.5 py-1 text-[11px] font-bold text-mango">Just posted</span>}
-                        {j.trade && <span className="rounded-full border border-softline bg-soft px-2.5 py-1 text-[11px] font-bold text-tealb">{j.trade}</span>}
+                  <div
+                    key={j.id}
+                    id={j.id}
+                    className={
+                      "group relative scroll-mt-6 overflow-hidden rounded-[18px] border bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] px-6 pb-4.5 pt-5.5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40 hover:shadow-[0_12px_44px_rgba(0,0,0,0.4)] " +
+                      (fresh ? "border-gold/35" : "border-line")
+                    }
+                  >
+                    {fresh && <span className="absolute inset-y-0 left-0 w-[3px] bg-linear-to-b from-gold to-transparent" />}
+
+                    {/* Photos lead the card. */}
+                    {ph.length > 0 && (
+                      <div className="relative -mx-6 -mt-5.5 mb-4.5">
+                        <div className={"grid h-32 gap-0.5 " + (banner.length === 1 ? "grid-cols-1" : banner.length === 2 ? "grid-cols-2" : "grid-cols-[1.6fr_1fr_1fr]")}>
+                          {banner.map((p, i) => (
+                            <figure key={i} className="relative overflow-hidden border-b border-line bg-linear-to-br from-purple/28 to-gold/12 transition duration-200 group-hover:brightness-110">
+                              {p.img && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={p.img} alt={p.caption} className="size-full object-cover" />
+                              )}
+                              <figcaption className="absolute inset-x-0 bottom-0 bg-linear-to-t from-bg/80 to-transparent px-2.5 py-1 font-mono-app text-[8.5px] font-medium text-ink/80">
+                                {p.caption}
+                              </figcaption>
+                              {i === 0 && ph.length > 3 && (
+                                <Link href={expanded ? keep("") : keep("pics=" + encodeURIComponent(j.id))} className="absolute right-2.5 top-2.5 rounded-full border border-gold/40 bg-bg/80 px-2.5 py-0.5 font-mono-app text-[9.5px] font-semibold text-goldb transition hover:border-gold">
+                                  {expanded ? "show less" : "+" + (ph.length - 3)}
+                                </Link>
+                              )}
+                            </figure>
+                          ))}
+                        </div>
+                        <span className="absolute -bottom-3.5 right-2.5 font-mono-app text-[9px] text-dim">
+                          {ph.length} photo{ph.length === 1 ? "" : "s"} · <b className="font-medium text-mute">yaad-vision read</b>
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-start gap-3.5">
+                      <h2 className="min-w-[240px] flex-1 font-display text-[20px] font-normal leading-[1.25] tracking-[-0.01em]">{j.title ?? "Job"}</h2>
+                      <span className="flex flex-wrap gap-1.5">
+                        {fresh && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/35 bg-gold/10 px-2.5 py-1 text-[11px] font-semibold text-goldb">
+                            <i className="size-1.5 animate-pulse rounded-full bg-gold" />Just posted
+                          </span>
+                        )}
+                        {j.trade && <span className="rounded-full border border-purple/30 bg-purple/10 px-2.5 py-1 text-[11px] font-semibold text-purpleb">{j.trade}</span>}
                       </span>
                     </div>
 
                     {sp.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-dim">
-                        {sp.map((x) => <span key={x}>{x}</span>)}
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {sp.map((x) => (
+                          <span key={x} className="rounded-md border border-line bg-bg/50 px-2.5 py-1 font-mono-app text-[10.5px] font-medium tracking-[0.04em] text-mute">{x}</span>
+                        ))}
                       </div>
                     )}
 
                     {j.descr && (
-                      <p className="mt-2 whitespace-pre-wrap text-[13.5px] leading-relaxed text-mute">
+                      <p className="mt-3 max-w-[78ch] whitespace-pre-wrap text-[13.5px] leading-relaxed text-mute">
                         {j.descr.slice(0, 260)}{j.descr.length > 260 ? "..." : ""}
                       </p>
                     )}
 
-                    {ph.length > 0 && (
-                      <>
-                        <div className="mt-3 grid grid-cols-3 gap-2">
-                          {showPh.map((p, i) => (
-                            <figure key={i} className="relative h-16 overflow-hidden rounded-lg border border-softline bg-linear-to-br from-panel2 to-soft">
-                              {p.img && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={p.img} alt={p.caption} className="h-full w-full object-cover" />
-                              )}
-                              <figcaption className="absolute inset-x-0 bottom-0 bg-bg/70 px-1.5 py-0.5 text-[9.5px] leading-tight text-dim">{p.caption}</figcaption>
-                            </figure>
-                          ))}
-                          {ph.length > 3 && (
-                            <Link href={expanded ? keep("") : keep("pics=" + encodeURIComponent(j.id))} className="grid h-16 place-items-center rounded-lg border border-softline bg-soft text-[12px] font-bold text-tealb hover:border-teal">
-                              {expanded ? "Show less" : "+" + (ph.length - 3) + " more"}
-                            </Link>
-                          )}
-                        </div>
-                        <p className="mt-1.5 text-[11.5px] text-dim">
-                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client{expanded ? "" : ", first three shown"} · yaad-vision has read them all
-                        </p>
-                      </>
-                    )}
-
-                    <div className="mt-3 flex flex-wrap gap-3.5 border-t border-line pt-3 text-[12.5px] text-dim">
-                      {j.parish && <b className="font-medium text-mute">{j.parish}</b>}
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4.5 gap-y-1.5 border-t border-line pt-3.5 text-[12.5px] text-dim">
+                      {j.parish && <b className="font-semibold text-ink">{j.parish}</b>}
                       {j.urgency && <span>{j.urgency}</span>}
-                      {ph.length > 0 && <span>{ph.length} photos</span>}
                       <span>{ago(j.updated_at)}</span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3.5 pt-1 text-[12.5px] text-dim">
-                      <span>{j.client_signed ? "✓ Client guidelines signed" : "Awaiting client signature"}</span>
+                      {j.client_signed ? (
+                        <span className="inline-flex items-center gap-1.5 text-green">
+                          <svg viewBox="0 0 24 24" className="size-3 fill-none stroke-green stroke-[2.5]" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+                          Client guidelines signed
+                        </span>
+                      ) : (
+                        <span>Awaiting client signature</span>
+                      )}
                       <span>
                         {(j.client_jobs_completed ?? 0) > 0
                           ? `Client · ${j.client_jobs_completed} job${j.client_jobs_completed === 1 ? "" : "s"} completed`
-                          : "no client score yet, first job on Yaadly"}
+                          : "First job on Yaadly"}
                       </span>
-                      <span>{j.id}</span>
                     </div>
 
-                    <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                    <div className="mt-3.5 flex flex-wrap items-center gap-3">
                       <Link
                         href={open ? keep("") : keep("q=" + encodeURIComponent(j.id))}
                         className={vmode === "worker"
-                          ? "rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
-                          : "rounded-full border border-line2 px-4 py-2 text-[13px] font-bold text-ink transition hover:border-teal hover:text-tealb"}
+                          ? "rounded-full bg-linear-to-r from-purple to-gold px-5 py-2.5 text-[13.5px] font-bold text-white shadow-[0_0_20px_rgba(155,115,245,0.25)] transition hover:-translate-y-px hover:brightness-110"
+                          : "rounded-full border border-line2 px-5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-purple hover:text-purpleb"}
                       >
                         {open ? "Close" : "Quote this job"}
                       </Link>
-                      <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[11px] font-bold text-mute">
-                        Quote on the scope, no band shown
+                      <span className="font-mono-app text-[10.5px] font-medium tracking-[0.06em] text-dim">
+                        QUOTE ON THE SCOPE · NO BUDGET BAND SHOWN
                       </span>
                     </div>
 
                     {open && vmode !== "worker" && (
-                      <div className="mt-3.5 flex gap-2.5 rounded-xl border border-coral/25 bg-coral/[.07] p-3.5 text-[13px] leading-relaxed text-mute">
-                        <span>🔒</span>
-                        <span>
-                          <b className="text-coral">Quoting is for vetted workers.</b>{" "}
-                          The <code className="font-mono text-[11.5px] text-tealb">job_quotes</code> insert
-                          policy needs three things true at once: a published
-                          worker profile, a signed Worker Guidelines, and a job
-                          that is genuinely open. Browsing stays free for
-                          everyone.{" "}
-                          <Link href="/portal/sign-in" className="text-tealb underline">Worker sign in</Link>
-                        </span>
+                      <div className="mt-3.5 rounded-xl border border-gold/25 bg-gold/[0.05] p-4 text-[13px] leading-relaxed text-mute">
+                        <b className="font-semibold text-goldb">Quoting is for vetted workers.</b>{" "}
+                        A published worker profile, a signed Worker Guidelines, and
+                        a job that is genuinely open: all three are checked in the
+                        database before a quote can exist. Browsing stays free for
+                        everyone.{" "}
+                        <Link href="/portal/sign-in" className="font-semibold text-purpleb underline underline-offset-2">Worker sign in</Link>
+                        {" · "}
+                        <Link href="/apply" className="font-semibold text-purpleb underline underline-offset-2">Apply to join</Link>
                       </div>
                     )}
                     {open && vmode === "worker" && (
@@ -288,40 +341,30 @@ export default async function Board({
         </>
       )}
 
-      <div className="mt-8 rounded-2xl border border-line bg-panel p-5">
-        <h3 className="font-display text-[19px] uppercase">
-          Want to be <span className="text-mango">part of it?</span>
-        </h3>
-        <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-          Property owners: create your profile, sign the Client Guidelines, and
-          pitch your job, free, and your record starts building from the first
-          completed job. Tradespeople: apply free, pass verification, sign the
-          Worker Guidelines, and every job on this board is yours to quote.
-        </p>
-        {/* All three of these used to point at yaadly.co.uk/#worker and
-            /#client. Those panes came off the marketing site on 27 Aug, and
-            its hash router now answers both by replacing the location with
-            app.yaadly.co.uk/portal, which is inside the gated group and so
-            redirects again to sign-in. So every button on a PUBLIC board sent
-            the visitor to a login form: "Read the Client Guidelines" asked
-            them to sign in before reading the thing they were told they could
-            read, and "Join as a worker" sent an applicant, who by definition
-            has no account, to a sign-in wall.
-
-            They point at the real pages instead. Both are on this origin, so
-            they are Links, not cross-site hops through a redirect. The
-            guidelines page reads without an account on purpose (see the note
-            at the top of app/portal/guidelines/page.tsx), and ?read= opens
-            the document text itself rather than the index, so the labels
-            promise what the click delivers. The marketing site keeps its
-            #client and #worker rule: it was put there for old bookmarks
-            already loose in the world, and nothing here was ever what
-            justified it. */}
-        <div className="mt-3.5 flex flex-wrap gap-2.5">
-          <Link href="/portal/sign-in" className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110">Become a client &rarr;</Link>
-          <Link href="/apply" className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Join as a worker &rarr;</Link>
-          <Link href="/portal/guidelines?read=client_guidelines" className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Client Guidelines</Link>
-          <Link href="/portal/guidelines?read=worker_guidelines" className="rounded-full border border-line2 px-4.5 py-2.5 text-[13.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">Read the Worker Guidelines</Link>
+      {/* ── JOIN PANEL ───────────────────────────────────────── */}
+      <div className="relative mt-8 mb-4 overflow-hidden rounded-[18px] border border-line2 bg-linear-to-br from-purple/10 to-gold/[0.05] p-7">
+        <span className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-[radial-gradient(ellipse,rgba(155,115,245,0.14)_0%,transparent_70%)]" />
+        <div className="relative flex flex-wrap items-center gap-6">
+          <div className="min-w-[280px] flex-1">
+            <h3 className="font-display text-[clamp(20px,2.4vw,26px)] font-light tracking-[-0.01em]">
+              Want to be{" "}
+              <em className="bg-linear-to-r from-purpleb to-gold bg-clip-text text-transparent">part of it?</em>
+            </h3>
+            <p className="mt-1.5 max-w-[60ch] text-[13.5px] leading-relaxed text-mute">
+              Property owners: pitch your job free, and your record builds from
+              the first completed job. Tradespeople: pass verification and every
+              job on this board is yours to quote.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            <Link href="/jobs/new" className="rounded-full bg-linear-to-r from-purple to-gold px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_0_18px_rgba(155,115,245,0.25)] transition hover:-translate-y-px hover:brightness-110">Post a job, free &rarr;</Link>
+            <Link href="/apply" className="rounded-full border-[1.5px] border-purple/32 px-5 py-2.5 text-[13px] font-bold text-purpleb transition hover:border-purple hover:bg-panel2">Join as a worker &rarr;</Link>
+          </div>
+          <div className="flex w-full flex-wrap gap-4 font-mono-app text-[10.5px] text-dim">
+            <Link href="/portal/guidelines?read=client_guidelines" className="underline underline-offset-2 transition hover:text-purpleb">Read the Client Guidelines</Link>
+            <Link href="/portal/guidelines?read=worker_guidelines" className="underline underline-offset-2 transition hover:text-purpleb">Read the Worker Guidelines</Link>
+            <span>A human confirms every step that moves money or changes a reputation.</span>
+          </div>
         </div>
       </div>
     </div>
@@ -339,38 +382,81 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
     );
   }
   return (
-    <div className="mt-5 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-      {workers.map((w, i) => (
-        <div key={i} className="flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4">
-          <div className="flex flex-wrap items-start gap-3">
-            <span className="grid size-11 flex-none place-items-center rounded-xl bg-linear-to-br from-tealb to-teal font-display text-[18px] text-[#04211D]">
-              {(w.name ?? "W").split(" ").map((x) => x[0]).join("").slice(0, 2)}
-            </span>
-            <span className="min-w-0 flex-1">
-              <b className="block text-[15px] leading-tight">{w.name}</b>
-              <small className="block text-[12.5px] text-mute">{w.trade ?? "General trades"}</small>
-              <small className="block text-[12px] text-dim">{w.parish}</small>
-            </span>
-            <span className="text-right">
-              <span className="block text-[12px] text-dim">{w.jobs_completed ?? 0} jobs</span>
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-bold text-mute">ID verified</span>
-            <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-bold " + (w.lane === "cert" ? "border border-[#4A3A10] bg-[#2E2408] text-sand" : "border border-softline bg-soft text-tealb")}>
-              {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
-            </span>
-          </div>
-          <div className="grid grid-cols-4 gap-1.5">
-            {[0, 1, 2, 3].map((k) => <span key={k} className="h-9 rounded-md border border-line bg-linear-to-br from-panel2 to-soft" />)}
-          </div>
-          {w.slug && (
-            <Link href={"/workers/" + encodeURIComponent(w.slug)} className="rounded-full border border-line2 py-2 text-center text-[12.5px] font-bold text-ink transition hover:border-teal hover:text-tealb">
-              View profile
-            </Link>
-          )}
-        </div>
-      ))}
-    </div>
+    <>
+      <p className="mt-4 font-mono-app text-[11px] font-medium uppercase tracking-[0.06em] text-dim">
+        Every profile verified: government photo ID on a video call, references called
+      </p>
+      <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+        {workers.map((w, i) => {
+          const initials = (w.name ?? "W").split(" ").map((x) => x[0]).join("").slice(0, 2);
+          // Book routes into the post-a-job flow with this worker requested,
+          // per the founder's call: one flow, one place a job is created,
+          // and the enquiry says who the client asked for.
+          const book = `/jobs/new?${[w.slug && `worker=${encodeURIComponent(w.slug)}`, w.trade && `trade=${encodeURIComponent(w.trade)}`].filter(Boolean).join("&")}`;
+          return (
+            <div key={i} className="group flex flex-col gap-3.5 overflow-hidden rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] p-5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40">
+              {/* Photo banner: the worker's own picture goes here once uploaded. */}
+              <div className="relative -mx-5 -mt-5 flex h-[110px] items-center justify-center bg-[radial-gradient(ellipse_at_30%_20%,rgba(155,115,245,0.3)_0%,transparent_60%),linear-gradient(150deg,rgba(123,79,224,0.35),rgba(245,158,11,0.14))]">
+                <span className="flex items-center gap-2 font-mono-app text-[9.5px] font-medium uppercase tracking-[0.14em] text-ink/45">
+                  <svg viewBox="0 0 24 24" className="size-3.5 fill-none stroke-current stroke-[1.7]" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" /><circle cx="12" cy="13" r="3.4" />
+                  </svg>
+                  Worker photo
+                </span>
+                <span className="absolute -bottom-5 left-4.5 grid size-13 place-items-center rounded-[15px] border-[3px] border-[#10102A] bg-linear-to-br from-purple to-gold font-display text-[19px] font-medium text-white">
+                  {initials}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-3 pt-3.5">
+                <span className="min-w-0 flex-1">
+                  <b className="block text-[15.5px] font-bold leading-tight">{w.name}</b>
+                  <small className="block text-[12.5px] text-mute">{w.trade ?? "General trades"}</small>
+                  <small className="block font-mono-app text-[10.5px] font-medium uppercase text-dim">{w.parish}</small>
+                </span>
+                <span className="text-right font-mono-app text-[11px] font-semibold text-goldb">
+                  {w.jobs_completed ?? 0}
+                  <small className="block font-mono-app text-[9px] font-medium uppercase tracking-[0.08em] text-dim">jobs</small>
+                </span>
+              </div>
+
+              {(w.about || w.years) && (
+                <p className="text-[12.5px] leading-relaxed text-mute">
+                  {w.years ? <b className="font-semibold text-ink">{w.years} years in the trade. </b> : null}
+                  {w.about ? w.about.slice(0, 150) + (w.about.length > 150 ? "…" : "") : null}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-1.5">
+                <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-semibold text-mute">ID verified</span>
+                <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-semibold " + (w.lane === "cert" ? "border border-gold/35 bg-gold/[0.08] text-goldb" : "border border-purple/30 bg-purple/[0.08] text-purpleb")}>
+                  {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
+                </span>
+              </div>
+
+              <div>
+                <span className="font-mono-app text-[9px] font-semibold uppercase tracking-[0.16em] text-dim">Recent work · verified photos</span>
+                <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+                  {[0, 1, 2, 3].map((k) => (
+                    <span key={k} className="aspect-square rounded-lg border border-line bg-linear-to-br from-purple/18 to-gold/[0.08] transition group-hover:border-line2" />
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-auto grid grid-cols-2 gap-2">
+                {w.slug ? (
+                  <Link href={"/workers/" + encodeURIComponent(w.slug)} className="rounded-full border-[1.5px] border-purple/30 py-2.5 text-center text-[12.5px] font-semibold text-purpleb transition hover:border-purple hover:bg-panel2">
+                    View profile
+                  </Link>
+                ) : <span />}
+                <Link href={book} className="rounded-full bg-linear-to-br from-goldb to-gold py-2.5 text-center text-[12.5px] font-bold text-[#1A0F00] transition hover:-translate-y-px hover:brightness-105">
+                  Book for a job
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
