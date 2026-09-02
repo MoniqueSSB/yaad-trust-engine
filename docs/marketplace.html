@@ -45,25 +45,21 @@ a{color:var(--purpleb);text-decoration:none}
 .d1{transition-delay:.07s}.d2{transition-delay:.14s}.d3{transition-delay:.21s}.d4{transition-delay:.28s}
 
 /* nav */
-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.82);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--line)}
-.nav-in{max-width:1060px;margin:0 auto;padding:0 22px;height:54px;display:flex;align-items:center;justify-content:space-between;gap:14px}
-.brand{display:flex;align-items:center;gap:9px;color:var(--ink)}
-.mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;font-family:var(--disp);font-size:15px;font-weight:600;color:#fff;box-shadow:0 0 18px rgba(155,115,245,0.4)}
-.brand b{font-size:15px;font-weight:600;letter-spacing:-0.02em}
+nav.site-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:1060px;margin:0 auto;padding:0 22px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:center;gap:9px;color:var(--ink);text-decoration:none}
+.mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;font-family:var(--disp);font-size:16px;font-weight:600;color:#fff}
+.brand b{font-size:15.5px;font-weight:600;letter-spacing:-0.02em}
 .brand b span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.navlinks{display:flex;gap:1px}
-.nl{padding:6px 11px;border-radius:7px;font:500 13px var(--body);color:var(--mute);transition:.15s;cursor:pointer;background:none;border:0;text-decoration:none}
-.nl:hover{color:var(--ink);background:rgba(155,115,245,0.07)}
-.nl.on{color:var(--purpleb);font-weight:600}
-.nav-cta{padding:7px 16px;border-radius:100px;font:600 12.5px var(--body);color:var(--purpleb);border:1px solid rgba(155,115,245,0.28);background:rgba(155,115,245,0.07);transition:.15s;cursor:pointer;text-decoration:none}
-.nav-cta:hover{background:rgba(155,115,245,0.15)}
-.nav-toggle{display:none;background:none;border:1px solid var(--line2);color:var(--ink);width:30px;height:30px;border-radius:7px;cursor:pointer;align-items:center;justify-content:center}
-@media(max-width:700px){
-  .navlinks{display:none;position:absolute;top:54px;left:0;right:0;flex-direction:column;background:rgba(7,7,26,0.97);backdrop-filter:blur(20px);padding:10px 16px;border-bottom:1px solid var(--line);z-index:80}
-  .navlinks.open{display:flex}
-  .nl{width:100%;padding:9px 10px}
-  .nav-toggle{display:flex}
-}
+.views{display:flex;gap:2px;align-items:center}
+.vbtn{background:none;border:0;color:var(--mute);font:500 13.5px var(--body);padding:7px 11px;border-radius:8px;cursor:pointer;text-decoration:none;transition:.15s}
+.vbtn:hover{background:rgba(155,115,245,0.08);color:var(--ink)}
+.vbtn.on{color:var(--purpleb);font-weight:700}
+.quiet-links{display:flex;gap:12px;font-size:12.5px}
+.quiet-links a{color:var(--mute);text-decoration:none;transition:.15s}
+.quiet-links a:hover{color:var(--purpleb)}
+@media(max-width:1024px){.quiet-links{display:none}}
+@media(max-width:760px){.views{display:none}}
 
 /* buttons */
 .btn{display:inline-flex;align-items:center;gap:7px;justify-content:center;padding:11px 22px;border-radius:100px;border:0;cursor:pointer;font:600 13.5px var(--body);text-decoration:none;position:relative;overflow:hidden;transition:transform .2s var(--spring),box-shadow .2s}
@@ -428,19 +424,21 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 
 <a class="float-cta" id="fcta" href="https://app.yaadly.co.uk/jobs/new"><span class="fcdot"></span>Post a job, free</a>
 
-<nav><div class="nav-in">
+<nav class="site-nav"><div class="nav-in">
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
-  <button class="nav-toggle" id="nt" aria-label="Menu">
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="1" y1="3.5" x2="14" y2="3.5"/><line x1="1" y1="7.5" x2="14" y2="7.5"/><line x1="1" y1="11.5" x2="14" y2="11.5"/></svg>
-  </button>
-  <div class="navlinks" id="nvl">
-    <a class="nl on" href="marketplace.html">Overview</a>
-    <a class="nl" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
-    <a class="nl" href="services.html">Managed services</a>
-    <a class="nl" href="business.html">For business</a>
-    <a class="nl" href="contact.html">Contact</a>
+  <div class="views">
+    <a class="vbtn on" href="/marketplace">Overview</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
+    <a class="vbtn" href="/services">Managed services</a>
+    <a class="vbtn" href="/business">For business</a>
+    <a class="vbtn" href="/contact">Contact</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
-  <a class="nav-cta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
+  <div class="quiet-links">
+    <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
+    <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
+    <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
+  </div>
 </div></nav>
 
 <!-- HERO -->
