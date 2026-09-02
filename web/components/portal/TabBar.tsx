@@ -14,11 +14,12 @@ import Link from "next/link";
  * component with no hydration for what is ultimately navigation.
  */
 
-export type TabKey = "job" | "evidence" | "documents" | "info";
+export type TabKey = "job" | "evidence" | "money" | "documents" | "info";
 
 export const TABS: { key: TabKey; label: string }[] = [
   { key: "job", label: "The job" },
   { key: "evidence", label: "Evidence" },
+  { key: "money", label: "Money & invoices" },
   { key: "documents", label: "Documents" },
   { key: "info", label: "Link & settings" },
 ];

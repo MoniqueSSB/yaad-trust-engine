@@ -8,6 +8,7 @@ import { PackStageProgress } from "@/components/portal/PackStageProgress";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
+import { JobPhotoUpload } from "@/components/portal/JobPhotoUpload";
 import { VideoEvidenceUpload } from "@/components/portal/VideoEvidenceUpload";
 import { WalkthroughPanel } from "@/components/portal/WalkthroughPanel";
 import { ArrivalCheckIn } from "@/components/portal/ArrivalCheckIn";
@@ -24,6 +25,9 @@ import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
+import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
+import { JobProgress, type Phase, type Step } from "@/components/portal/JobProgress";
+import { MoneyPanel, type InvoiceRow } from "@/components/portal/MoneyPanel";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
@@ -40,6 +44,18 @@ export const dynamic = "force-dynamic";
  * the query returns nothing and the visitor gets a 404, not somebody
  * else's job.
  */
+
+/** A photograph the client sent with the job. board_ok is whether the public
+ *  marketplace board carries it; the file itself lives in the private intake
+ *  bucket and img is filled in below with a signed link, never stored. */
+type BoardPhoto = {
+  id: string;
+  caption: string;
+  img: string | null;
+  storage_path: string | null;
+  board_ok: boolean | null;
+  source: string | null;
+};
 
 type Evidence = {
   id: string;
@@ -130,7 +146,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -156,13 +172,25 @@ export default async function JobRoom({
          (20260829q), so a worker's copy of this query is empty and the
          component below never has worker-side data to mishandle. */
       supabase.from("intake_threads").select("transcript,channel,turns").eq("job_id", id).maybeSingle(),
-      /* The photos the public board shows, from the same table the board
-         reads, so the preview below cannot show a photo the board would
-         not. */
-      supabase.from("job_photos").select("caption,img").eq("job_id", id).order("position"),
+      /* The photos on this job, from the same table the board reads. Every
+         one of them, not only the published ones: this is the client's own
+         job and their own pictures, and the preview below marks which of
+         them the public board actually carries. RLS decides what comes back
+         ("job party reads their own job photos"), so a worker's copy of this
+         query is their own booked job and nothing else. */
+      supabase.from("job_photos").select("id,caption,img,storage_path,board_ok,source").eq("job_id", id).order("position"),
       /* The Arrival Log. Newest first, capped: this renders a short "on
          site" strip, not a full attendance record. */
       supabase.from("arrival_log").select("stage,arrived_at,arrived_on").eq("job_id", id).order("arrived_at", { ascending: false }).limit(10),
+      /* Invoices on this job. No email filter: RLS already returns a
+         client only their own non-draft invoices and a worker only the
+         ones payable to them, so filtering again here would be a second
+         place for that rule to drift out of step with Postgres. */
+      supabase
+        .from("invoices")
+        .select("id,status,total_pence,currency,stage,payable_to,issue_date,paid_at,period_label")
+        .eq("job_id", id)
+        .order("created_at", { ascending: true }),
     ]);
 
   const { data: myReview } = await supabase
@@ -201,6 +229,21 @@ export default async function JobRoom({
     const byPath = new Map((signed ?? []).map((r) => [r.path, r.signedUrl]));
     for (const e of inBucket) e.img = byPath.get(e.storage_path) ?? null;
   }
+  /* The client's own photographs, from the private 'intake' bucket WhatsApp
+     intake writes to. Same treatment as the evidence above and for the same
+     reason: nothing in that bucket is public, so the page mints a short-lived
+     signed URL per object as it renders and no link here outlives the page it
+     was drawn on. */
+  const bp = (boardPhotos ?? []) as BoardPhoto[];
+  const bpToSign = bp.filter((p) => p.storage_path && !p.img);
+  if (bpToSign.length) {
+    const { data: signedPhotos } = await supabase.storage
+      .from("intake")
+      .createSignedUrls(bpToSign.map((p) => p.storage_path as string), 300);
+    const byPath = new Map((signedPhotos ?? []).map((r) => [r.path, r.signedUrl]));
+    for (const p of bpToSign) p.img = byPath.get(p.storage_path as string) ?? null;
+  }
+
   const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
@@ -410,6 +453,214 @@ export default async function JobRoom({
     "q=" + encodeURIComponent(job.id) +
     "#" + encodeURIComponent(job.id);
   const approvedPack = pk.find((x) => x.status === "approved") ?? pk[0];
+
+  /* ── WHAT IS OUTSTANDING, AND WHERE THIS JOB IS ──────────────────────
+     Founder's instruction, 2 Sep 2026: make the stages and everything
+     outstanding clear, on both portals. Everything below is derived from
+     state this page already loaded; nothing here invents a task or a
+     number, and every branch is one a job can actually be in. */
+
+  const invoices = (invoiceRows ?? []) as InvoiceRow[];
+  const feeInvoice = invoices.find((i) => i.payable_to !== "worker");
+  const feeJmd = labour == null ? null : Math.round(labour * 0.15);
+  const isClient = role === "client";
+  const otherSideLabel = isClient ? "The worker" : "The client";
+
+  /* Approvals are what a stage waits on, and stage_approvals is the table
+     that records them, so "approved" here means the same thing it means to
+     the trigger that releases the money. */
+  const { data: approvalRows } = await supabase
+    .from("stage_approvals")
+    .select("stage")
+    .eq("job_id", id);
+  const approvedStages = new Set((approvalRows ?? []).map((r) => r.stage as number));
+
+  const jobStage = Math.max(job.stage ?? 0, 0);
+  const evidenceOnStage = (n: number) => ev.filter((e) => (e.stage ?? 1) === n).length;
+
+  const outstanding: OutItem[] = [];
+  if (isClient && !movedOn) {
+    for (const g of gates) {
+      if (g.done) continue;
+      outstanding.push({
+        who: "you",
+        title: g.title,
+        detail: g.why,
+        href: g.href,
+        cta: g.cta ?? "Open",
+      });
+    }
+  }
+  /* Gates all cleared but the job is still not on the board. The database
+     is no longer holding it; the client simply has not pressed the button
+     yet, and "all clear" would be a lie about a job nobody can quote. */
+  if (isClient && !movedOn && !onBoard && gates.every((g) => g.done)) {
+    outstanding.push({
+      who: "you",
+      title: "Put this job on the marketplace",
+      detail:
+        "Everything it needs is done. Until you publish it, no tradesperson can see it or quote it.",
+      href: jobBase,
+      cta: "Publish",
+    });
+  }
+  if (job.status === "quoted" && chooseOpen && qs.length > 0) {
+    outstanding.push({
+      who: isClient ? "you" : "them",
+      title: isClient ? "Choose a quote" : "The client is deciding between quotes",
+      detail: isClient
+        ? qs.length + " quote" + (qs.length === 1 ? " is" : "s are") + " in. Nothing is charged until you pick one."
+        : "Nothing is owed by either side until a quote is accepted.",
+      href: isClient ? jobBase : undefined,
+      cta: isClient ? "See quotes" : undefined,
+    });
+  }
+  if (job.status === "awaiting_payment") {
+    outstanding.push({
+      who: isClient ? "you" : "yaadly",
+      title: isClient ? "Pay the Guarantee & Support fee" : "Waiting on the client's agency fee",
+      detail: isClient
+        ? "15% of the labour price, invoiced once. The job cannot start until this is settled."
+        : "The job starts once Yaadly's fee invoice is paid. Nothing is needed from you.",
+      href: isClient ? jobBase + "?tab=money" : undefined,
+      cta: isClient ? "See the invoice" : undefined,
+    });
+  }
+  if (jobStage > 0 && job.status !== "complete") {
+    const filed = evidenceOnStage(jobStage);
+    const approved = approvedStages.has(jobStage);
+    if (!approved && filed > 0) {
+      outstanding.push({
+        who: isClient ? "you" : "them",
+        title: isClient
+          ? "Approve stage " + jobStage + " evidence, or raise a problem"
+          : "The client is reviewing your stage " + jobStage + " evidence",
+        detail: isClient
+          ? filed + " item" + (filed === 1 ? "" : "s") + " filed. Nothing is invoiced or paid until you decide."
+          : "Your pay invoice for this stage is raised the moment they approve it.",
+        href: isClient ? jobBase + "?tab=evidence" : undefined,
+        cta: isClient ? "Review" : undefined,
+      });
+    } else if (!approved && filed === 0) {
+      outstanding.push({
+        who: isClient ? "them" : "you",
+        title: isClient
+          ? "The worker is on stage " + jobStage
+          : "File stage " + jobStage + " evidence",
+        detail: isClient
+          ? "Nothing to approve yet. Evidence appears here as it is filed."
+          : "Photographs for this stage. Nothing is invoiced to you until the client approves them.",
+        href: isClient ? undefined : jobBase + "?tab=evidence",
+        cta: isClient ? undefined : "Upload",
+      });
+    }
+  }
+  for (const inv of invoices) {
+    if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
+      outstanding.push({
+        who: "you",
+        title: "Invoice " + inv.id + " is unpaid",
+        detail: "Sent" + (inv.issue_date ? " on " + inv.issue_date : "") + ". Paid by bank transfer.",
+        href: jobBase + "?tab=money",
+        cta: "See it",
+      });
+    }
+  }
+  if (job.status === "complete" && !myReview) {
+    outstanding.push({
+      who: "you",
+      title: "Leave a review",
+      detail: "The job is closed and paid. A review is what builds the record on both sides.",
+      href: jobBase + "?tab=job",
+      cta: "Write it",
+    });
+  }
+
+  /* Four phases, each opened up to show its own steps. A payment stage
+     carries the money it releases, because on this product a stage IS a
+     payment. */
+  const stepState = (done: boolean, now: boolean): Step["state"] =>
+    done ? "done" : now ? "now" : "todo";
+
+  const setupSteps: Step[] = gates.map((g) => ({
+    title: g.title,
+    state: g.done ? "done" : ("now" as const),
+  }));
+  const setupDone = gates.every((g) => g.done);
+
+  const hasQuotes = qs.length > 0;
+  const hasWon = !!won;
+  const quoteSteps: Step[] = [
+    { title: "Job visible on the board", state: stepState(onBoard || movedOn, false) },
+    { title: hasQuotes ? qs.length + " quote" + (qs.length === 1 ? "" : "s") + " received" : "Quotes received", state: stepState(hasQuotes, setupDone && !hasQuotes) },
+    { title: hasWon ? (won?.worker_name ?? "Quote") + " accepted" : "Quote accepted", state: stepState(hasWon, hasQuotes && !hasWon) },
+  ];
+
+  const workSteps: Step[] = [
+    { title: "Kickoff Pack agreed", state: stepState(!!trulyApprovedPack, hasWon && !trulyApprovedPack) },
+    {
+      title: "Yaadly fee " + (isClient ? "paid" : "settled"),
+      state: stepState(feeInvoice?.status === "paid", feeInvoice?.status === "sent"),
+      amount: money(feeJmd) ?? undefined,
+    },
+    ...(packStages.length
+      ? packStages.map((ps, k) => {
+          const n = k + 1;
+          const done = approvedStages.has(n) || jobStage > n;
+          const amt =
+            ps.proportion_percent != null && labour != null
+              ? money(Math.round((labour * ps.proportion_percent) / 100)) ?? undefined
+              : undefined;
+          return {
+            title: "Stage " + n + " · " + ps.stage,
+            state: stepState(done, jobStage === n),
+            amount: amt,
+          } as Step;
+        })
+      : []),
+  ];
+
+  const closed = job.status === "complete";
+  const closeSteps: Step[] = [
+    { title: "Final stage released", state: stepState(closed, false) },
+    { title: "Completion report issued", state: stepState(closed, false) },
+    { title: "Reviews exchanged", state: stepState(closed && !!myReview, closed && !myReview) },
+  ];
+
+  const phaseState = (done: boolean, now: boolean): Phase["state"] =>
+    done ? "done" : now ? "now" : "todo";
+  const inWork = hasWon && !closed;
+  const phases: Phase[] = [
+    {
+      title: "Set up",
+      summary: setupDone ? "Done" : gates.filter((g) => g.done).length + " of " + gates.length + " done",
+      state: phaseState(setupDone, !setupDone),
+      steps: setupSteps,
+    },
+    {
+      title: "Quotes",
+      summary: hasWon ? (won?.worker_name ?? "A worker") + " chosen" : hasQuotes ? qs.length + " in, waiting on a decision" : "Not started",
+      state: phaseState(hasWon, setupDone && !hasWon),
+      steps: quoteSteps,
+    },
+    {
+      title: "Work & evidence",
+      summary: closed
+        ? "Done"
+        : jobStage > 0
+          ? "Stage " + jobStage + (packStages.length ? " of " + packStages.length : "")
+          : "Not started",
+      state: phaseState(closed, inWork),
+      steps: workSteps,
+    },
+    {
+      title: "Closed & paid",
+      summary: closed ? "Closed" : "Not started",
+      state: phaseState(closed && !!myReview, closed && !myReview),
+      steps: closeSteps,
+    },
+  ];
+
   /* The quote both sides have confirmed over WhatsApp, if one exists yet:
      the lighter document that precedes a Kickoff Pack and, on its own, is
      enough to book. */
@@ -593,6 +844,14 @@ export default async function JobRoom({
       )}
 
       {/*
+        The client's own photographs, and the way to send more. Always here,
+        at every stage: a picture that would have helped a quote also helps
+        the person who turns up, and asking for one should not depend on
+        whether this client happens to use WhatsApp.
+      */}
+      {role === "client" && <JobPhotoUpload jobId={job.id} photos={bp} />}
+
+      {/*
         Shown only while the job is not yet on the board, which is the one
         moment the question "what exactly am I publishing?" is live. Once
         the job IS on the board the GoLive card links to the real thing,
@@ -603,9 +862,13 @@ export default async function JobRoom({
         <BoardPreview
           job={job}
           signed={signed}
-          photos={(boardPhotos ?? []) as { caption: string; img: string | null }[]}
+          photos={bp}
         />
       )}
+
+      <Outstanding items={outstanding} otherSideLabel={otherSideLabel} />
+
+      <JobProgress phases={phases} />
 
       <StageRail
         stages={railStages}
@@ -632,6 +895,19 @@ export default async function JobRoom({
       />
 
       <TabBar base={jobBase} active={tab} counts={tabCounts} />
+
+      {tab === "money" && (
+        <MoneyPanel
+          side={role === "worker" ? "worker" : "client"}
+          labour={labour}
+          materials={won?.materials_jmd ?? null}
+          fee={feeJmd}
+          allIn={allIn}
+          takeHome={takeHome}
+          invoices={invoices}
+          money={money}
+        />
+      )}
 
       {tab === "documents" && (
         <>
