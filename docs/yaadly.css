@@ -2,25 +2,21 @@
    business. Tokens carried over from the old single-file page so the site
    does not change its face, only its length. */
 :root{
-  --bg:#08110F; --panel:#0F1B17; --panel2:#14231E; --line:#1F332C; --line2:#284439;
-  --ink:#F2FAF7; --mute:#9DB8AE; --dim:#67807A;
-  --teal:#14B8A6; --tealb:#2DD4BF; --mango:#FFB020; --coral:#FF6B4A; --sand:#FDE68A;
-  --soft:#0F2B26; --softline:#1E4A42; --red:#E5484D; --redsoft:#2A1414;
-  --grad:linear-gradient(90deg,#14B8A6,#FFB020);
-  --disp:'Anton',Impact,sans-serif; --body:'Space Grotesk',-apple-system,sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --bg:#07071A; --panel:rgba(155,115,245,0.05); --panel2:rgba(155,115,245,0.09); --line:rgba(155,115,245,0.12); --line2:rgba(155,115,245,0.22);
+  --ink:#EEEEFF; --mute:#7878A8; --dim:#44446A;
+  /* Same variable names, purple/gold values — every rule in the file picks up the new palette automatically */
+  --teal:#9B73F5; --tealb:#C4AAFF; --mango:#F59E0B; --coral:#F87171; --sand:#FBBF24;
+  --soft:rgba(155,115,245,0.08); --softline:rgba(155,115,245,0.22); --red:#F87171; --redsoft:rgba(248,113,113,0.10);
+  --grad:linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
+  --disp:'Fraunces',Georgia,serif; --body:'IBM Plex Sans',-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --wrap:1080px; --gutter:20px; --r:14px; --r-lg:18px; --tr:.15s;
 
-  /* Light-section tokens, added 1 Sep 2026 for the visual review's "reading
-     sections move to a light ground" item. Plain white, not tinted: a warm
-     cream and then a warmer autumn gold were both tried and rejected on the
-     actual page before landing here. Every colour below is darkened by
-     measured contrast, not by eye, until it clears 7:1 against --l-bg, or is
-     called out where it deliberately sits a little under that. */
+  /* Light-section tokens */
   --l-bg:#FFFFFF; --l-panel2:#F3F2EE; --l-line:#E2E0D9; --l-line2:#CFCBBE;
   --l-ink:#221f1a; --l-mute:#423f3a; --l-dim:#4c4943;
   --l-amber:#6d3c0c; --l-coral:#8d1900;
-  --l-grad-teal:#09534b; --l-grad-amber:#633f00;
+  --l-grad-teal:#4B22C0; --l-grad-amber:#92600A;
 }
 
 /* Scroll reveal removed 1 Sep 2026: sections were reading as blank for two
@@ -39,7 +35,7 @@ img{max-width:100%}
 nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .nav-in{display:flex;justify-content:space-between;align-items:center;gap:14px;max-width:var(--wrap);margin:0 auto;padding:11px var(--gutter);flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
-.mark{width:34px;height:34px;border-radius:9px;background:var(--teal);display:grid;place-items:center;color:#04211D;font-family:var(--disp);font-size:18px}
+.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;color:#fff;font-family:var(--disp);font-size:18px;font-weight:600}
 .brand b{font-size:17px}.brand b span{color:var(--tealb)}
 .views{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .vbtn{background:none;border:0;color:var(--ink);font:600 13.5px var(--body);padding:8px 11px;border-radius:9px;cursor:pointer;text-decoration:none}
@@ -56,7 +52,7 @@ nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-f
 .quiet-links a.on{color:var(--tealb);font-weight:700}
 
 /* type */
-h1.hx,h2.hx,h3.hx{font-family:var(--disp);font-weight:400;letter-spacing:.5px;line-height:1.08;text-transform:uppercase}
+h1.hx,h2.hx,h3.hx{font-family:var(--disp);font-weight:200;letter-spacing:-0.02em;line-height:1.08}
 h1.hx{font-size:clamp(34px,6vw,60px)}
 h2.hx{font-size:clamp(26px,4vw,40px)}
 h3.hx{font-size:clamp(21px,3vw,28px)}
@@ -75,11 +71,11 @@ h3.hx{font-size:clamp(21px,3vw,28px)}
 .pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .pill{font:700 11px var(--body);letter-spacing:1px;text-transform:uppercase;padding:5px 11px;border-radius:100px;border:1px solid var(--softline);color:var(--tealb);background:var(--soft)}
 .pill.n{color:var(--mute);border-color:var(--line2);background:var(--panel)}
-.pill.m{color:var(--mango);border-color:#4a3a14;background:#1e1808}
+.pill.m{color:var(--mango);border-color:rgba(245,158,11,0.3);background:rgba(245,158,11,0.08)}
 
 /* buttons. The primary carries the teal to mango gradient, which is the one
    piece of brand colour on the page and the reason the CTA reads as a CTA. */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--grad);color:#04211D;font:700 15px var(--body);padding:13px 26px;border-radius:100px;border:1px solid transparent;cursor:pointer;text-decoration:none;text-align:center;transition:var(--tr)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--grad);color:#fff;font:700 15px var(--body);padding:13px 26px;border-radius:100px;border:1px solid transparent;cursor:pointer;text-decoration:none;text-align:center;transition:var(--tr)}
 .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .btn.ghost{background:none;border:1px solid var(--line2);color:var(--ink)}
 .btn.ghost:hover{border-color:var(--teal);color:var(--tealb);filter:none}
