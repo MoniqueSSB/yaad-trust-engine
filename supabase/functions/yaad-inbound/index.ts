@@ -1503,7 +1503,7 @@ Deno.serve(async (req: Request) => {
     const THREAD_HOURS = 12;
     const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
     const { data: prior } = await supabase.from("intake_threads")
-      .select("job_id,transcript,turns,last_at,stage")
+      .select("job_id,transcript,turns,last_at,stage,human_handling")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
     // A thread already at 'done' produced its job; nothing left to gather.
@@ -1528,6 +1528,49 @@ Deno.serve(async (req: Request) => {
       .filter(([k]) => k !== "audio")
       .map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(" and ");
     const thisTurn = [msg.text, attached ? `[they attached ${attached}]` : ""].filter(Boolean).join("\n");
+
+    // Monique has this thread. The assistant stands down: no model call, no
+    // fresh question, no read-back. What they say is still kept word for word
+    // and still lands on her phone, because a person waiting on a person
+    // should never find out later that their extra detail went nowhere.
+    // Deliberately checked before the 12 hour conversation window: a human
+    // conversation runs on the humans' clock, not the bot's, and the flag
+    // outliving the window is the point. Only the desk's "Hand back to the
+    // assistant" button clears it; nothing in this function ever does.
+    if (prior?.human_handling === true) {
+      const heldJobId = String(prior.job_id);
+      const before = String(prior.transcript ?? "");
+      const heldRepeat = before.trimEnd().endsWith(thisTurn.trim()) && thisTurn.trim().length > 0;
+      const heldTranscript = heldRepeat ? before.slice(-8000) : `${before}\n\n${thisTurn}`.slice(-8000);
+      if (msg.media.length) {
+        await keepMedia(supabase as unknown as MediaWriter, heldJobId, msg.media, Number(prior.turns) * 10, trace);
+      }
+      await supabase.from("intake_threads").upsert({
+        channel: threadKey.channel,
+        from_addr: threadKey.from_addr,
+        job_id: heldJobId,
+        transcript: heldTranscript,
+        turns: Number(prior.turns) + 1,
+        stage: String(prior.stage ?? "gathering"),
+        last_at: new Date().toISOString(),
+      }, { onConflict: "channel,from_addr" });
+      try {
+        const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+        if (st?.value) {
+          await fetch(`https://ntfy.sh/${st.value}`, {
+            method: "POST",
+            headers: { Title: `They wrote again: ${msg.channel}`, Priority: "high", Tags: "raising_hand" },
+            body: `${heldJobId}: waiting on you. The assistant is standing down until the desk hands the thread back.`,
+            signal: AbortSignal.timeout(4000),
+          });
+        }
+      } catch (_) { /* never let a notification break intake */ }
+      root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
+      if (isTwilio) {
+        return twiml("Monique has this and is coming back to you herself. I have added your message so she sees it.");
+      }
+      return json({ ok: true, jobId: heldJobId, heldForHuman: true });
+    }
 
     // A repeat of the immediately preceding turn, word for word, is not new
     // information: it is WhatsApp retrying, or someone impatient tapping
@@ -1666,6 +1709,15 @@ Deno.serve(async (req: Request) => {
     }
 
 
+    // Handing over now means standing down. From their next message on, the
+    // human_handling branch near the top of this handler keeps the record and
+    // pings Monique instead of running the model again, so "she will come
+    // back to you herself" is true rather than followed by more bot. Set only
+    // ever to true here: writing false would silently undo a desk reply's own
+    // claim on the thread, and clearing it is the desk's call alone.
+    const HANDOFF_TURNS = 3;
+    const handingOver = wantsHuman || (!enough && turns >= HANDOFF_TURNS);
+
     // Remember the conversation before replying. If the reply fails we would
     // rather have the thread than lose what they said.
     await supabase.from("intake_threads").upsert({
@@ -1676,14 +1728,13 @@ Deno.serve(async (req: Request) => {
       turns,
       stage,
       last_at: new Date().toISOString(),
+      ...(handingOver ? { human_handling: true } : {}),
     }, { onConflict: "channel,from_addr" });
 
     // Three pushes for one conversation is noise, and noise gets muted, and a
     // muted phone loses a real job later. So: once when somebody first writes
     // in, so a lead is never silently sitting there, and once when it becomes
     // a real job. Nothing for the turns in between.
-    const HANDOFF_TURNS = 3;
-    const handingOver = wantsHuman || (!enough && turns >= HANDOFF_TURNS);
     const worthTelling = stage === "done" || turns === 1 || handingOver;
 
     const summary = worthTelling ? notifyAdmin(supabase as unknown as SettingsReader, {
@@ -1785,8 +1836,9 @@ Deno.serve(async (req: Request) => {
       // person on the other end is usually the one who most needs a human:
       // older, upset, writing from a bad signal, or describing something the
       // model genuinely cannot categorise. Hand over and say so out loud.
-      const HANDOFF_AFTER = 3;
-      if (!enough && turns >= HANDOFF_AFTER) {
+      // Same handingOver already written to the thread above, so the next
+      // message from them is held for Monique rather than answered again.
+      if (!enough && turns >= HANDOFF_TURNS) {
         // Drop the questions out of whatever it wrote. Asking again in the
         // same breath as "I am giving this to a person" is the worst of both:
         // they do not know whether to answer or wait.
