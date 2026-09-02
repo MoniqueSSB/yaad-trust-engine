@@ -240,7 +240,13 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
 async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
   const { data } = await admin.from("jobs").select("id, title, stage, status").ilike("worker_email", email).order("updated_at", { ascending: false });
   return (data ?? [])
-    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled")
+    // 'awaiting_payment' excluded 2 Sep 2026, alongside the RLS gate on
+    // evidence itself: a job cannot progress until Yaadly's agency fee is
+    // marked paid, and a worker filing evidence over WhatsApp goes through
+    // the service role, which RLS alone cannot stop. Re-applied 2 Sep 2026
+    // after another session's deploy overwrote this file with a copy that
+    // predated it.
+    .filter((j: any) => j.status !== "complete" && j.status !== "cancelled" && j.status !== "awaiting_payment")
     .map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Math.max(j.stage ?? 0, 1) }));
 }
 
@@ -1131,6 +1137,82 @@ Deno.serve(async (req: Request) => {
               ? `Got it, passed on to the client on ${job.id}.`
               : `Got it, on record against ${job.id}. We could not reach the client directly just now, but it is saved.`);
           }
+        }
+      }
+
+      // Confirming a Quote Pack by replying with the job's own code. 2 Sep
+      // 2026, founder's own correction: a quote used to go straight from
+      // "submitted" to bookable the moment the client replied once, with
+      // nothing ever asking the worker to agree to anything. Client and
+      // worker each confirm the quote itself now, same shape as the
+      // Kickoff Pack block just below, before the job's booking block will
+      // recognise the price as open. MUST run before that block: a quote
+      // still sitting at 'submitted' is not a booking candidate any more
+      // (see choose_worker_via_whatsapp), so an unconfirmed reply has to be
+      // claimed here or it is lost, not fall through and refuse. Runs
+      // before the Kickoff Pack block too, though the two never actually
+      // compete for the same reply: a quote is only ever a candidate here
+      // OR there, never both, since agree_quote_via_whatsapp() moves it out
+      // of 'submitted' the moment both sides are in.
+      //
+      // Re-applied 2 Sep 2026: found missing from the live deployed
+      // function after another session's own deploy overwrote this block
+      // with an on-disk copy that predated it. Read the file back from
+      // disk before trusting it is what got tested, not just what was
+      // written once.
+      if (!msg.media.length && msg.text.trim()) {
+        const { data: openQuotes } = await supabase.from("job_quotes")
+          .select("id, job_id, worker_email").eq("status", "submitted");
+        const quotes = (openQuotes ?? []) as { id: string; job_id: string; worker_email: string }[];
+
+        const tail = msg.from.replace(/\D/g, "").slice(-9);
+        const jobIds = [...new Set(quotes.map((q) => q.job_id))];
+        const { data: jobRows } = jobIds.length
+          ? await supabase.from("jobs").select("id, title, stage, client_phone").in("id", jobIds)
+          : { data: [] as { id: string; title: string; stage: number; client_phone: string | null }[] };
+        const jobsById = new Map((jobRows ?? []).map((j: any) => [j.id, j]));
+
+        const workerEmails = [...new Set(quotes.map((q) => q.worker_email))];
+        const { data: workerRows } = workerEmails.length
+          ? await supabase.from("worker_profiles").select("worker_email, phone").in("worker_email", workerEmails)
+          : { data: [] as { worker_email: string; phone: string | null }[] };
+        const phoneByWorker = new Map((workerRows ?? []).map((w: any) => [String(w.worker_email).toLowerCase(), w.phone]));
+
+        const quoteIds = quotes.map((q) => q.id);
+        const { data: agreementRows } = quoteIds.length
+          ? await supabase.from("quote_agreements").select("quote_id, side").in("quote_id", quoteIds)
+          : { data: [] as { quote_id: string; side: string }[] };
+        const confirmedSides = new Set((agreementRows ?? []).map((a: any) => `${a.quote_id}:${a.side}`));
+
+        const clientCandidates = quotes
+          .filter((q) => !confirmedSides.has(`${q.id}:client`))
+          .map((q) => jobsById.get(q.job_id))
+          .filter((j: any) => j && String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === tail);
+
+        const workerCandidates: { id: string; title: string; stage: number }[] = [];
+        for (const q of quotes) {
+          if (confirmedSides.has(`${q.id}:worker`)) continue;
+          const workerTail = String(phoneByWorker.get(String(q.worker_email).toLowerCase()) ?? "").replace(/\D/g, "").slice(-9);
+          const j = jobsById.get(q.job_id);
+          if (j && workerTail && workerTail === tail) workerCandidates.push(j);
+        }
+
+        const quoteCandidates = [...clientCandidates, ...workerCandidates.filter((j) => !clientCandidates.some((c: any) => c.id === j.id))];
+        const quoteTarget = matchApprovingJob(msg.text, quoteCandidates as any);
+        if (quoteTarget) {
+          const { data: qResult, error: qErr } = await supabase.rpc("agree_quote_via_whatsapp", { p_job: quoteTarget.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_quote_confirm.job": quoteTarget.id, "yaadly.whatsapp_quote_confirm.outcome": qErr ? "refused" : "confirmed" });
+          if (qErr) return twiml(`That did not go through: ${qErr.message}`);
+          const row = Array.isArray(qResult) ? qResult[0] : qResult;
+          // Named the real, working alternative rather than a vague
+          // "ask Yaadly": the portal button next to this exact price is
+          // the only place that request can actually be made from here.
+          if (row?.both_confirmed) {
+            return twiml(row.agreed_side === "client"
+              ? `Confirmed. Both sides have agreed the price for ${quoteTarget.title}. Reply ${quoteTarget.id} again to book them, no Kickoff Pack needed. Want the fuller document first instead? Sign in to your Yaadly portal and tap "Get a Kickoff Pack first" next to this price.`
+              : `Confirmed. Both sides have agreed the price for ${quoteTarget.title}, ready for the client to book.`);
+          }
+          return twiml(`Confirmed on your side for ${quoteTarget.title}. Waiting on ${row?.agreed_side === "worker" ? "the client" : "the worker"} to reply the same code before this can move on.`);
         }
       }
 

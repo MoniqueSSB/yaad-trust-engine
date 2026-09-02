@@ -66,7 +66,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready"] as const;
+const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready"] as const;
 type Kind = (typeof KINDS)[number];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
@@ -661,7 +661,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -671,7 +671,21 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", kickoffWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready") {
+    // quote_awaiting_worker_confirm fires the moment a quote is submitted,
+    // long before any job.worker_email exists: the worker to tell is
+    // whoever wrote this specific quote, the same "read it off the quote,
+    // not the job" shape kickoff_pack_ready already needed above.
+    let quoteWorkerEmail = "";
+    if (kind === "quote_awaiting_worker_confirm" && quoteId) {
+      const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
+      quoteWorkerEmail = q?.worker_email ?? "";
+    }
+    if (kind === "quote_awaiting_worker_confirm" && quoteWorkerEmail) {
+      const { data: worker } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
+      workerPhone = String(worker?.phone ?? "").trim();
+    }
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -718,8 +732,17 @@ Deno.serve(async (req: Request) => {
       // system of record.
       const proposal = String(q?.note ?? "").trim();
       const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
+      // 2 Sep 2026, founder's own correction: this used to say "reply to
+      // confirm" with no word on what happens after, so confirming read as
+      // the whole action. Two replies actually do two different things
+      // here: first confirms the price, a second, later one books it, only
+      // once ${workerName} has confirmed too. Both steps named up front so
+      // neither reply is a guess. Replying used to try to book the worker
+      // directly on the first message; it now confirms the quote itself,
+      // the client's own half of a mutual agreement with the worker,
+      // nobody is booked until both sides have confirmed.
       const bookHint = clientPhone
-        ? `Reply with the code ${job.id} to confirm that and book ${q?.worker_name ?? "them"}, or `
+        ? `Reply ${job.id} to confirm you're happy with this price. Once ${workerName} confirms it too, reply ${job.id} once more to book them. Or `
         : "";
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
         `${workerName} quoted ${priceText}, labour and materials itemised separately.${scopeLine} ` +
@@ -744,11 +767,43 @@ Deno.serve(async (req: Request) => {
         .eq("job_id", jobId).eq("status", "accepted")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle();
       subject = `Booked: ${job.title}`;
+      // 2 Sep 2026, alongside the payment gate: booking no longer means
+      // work can start. It waits on Yaadly's own Guarantee & Support fee
+      // invoice, sent separately, marked paid by a person before anything
+      // moves. Saying "the worker is on site" here would be wrong now.
       line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
         `Labour ${money(q?.labour_jmd ?? 0)}, materials ${money(q?.materials_jmd ?? 0)} paid at cost against the receipt. ` +
         `Yaadly is not holding this payment: pay the worker directly, per stage as you approve it, ` +
         `within 3 working days, by bank transfer, Lynk wallet or remittance pick up, whichever you agree between you. ` +
-        `${roomLink}`;
+        `Before any of that starts, Yaadly's own Guarantee & Support fee invoice is on its way separately. ` +
+        `The job only goes live once that is paid. ${roomLink}`;
+    } else if (kind === "quote_awaiting_worker_confirm") {
+      // Fires once, the moment the worker's own quote lands (job_quotes
+      // AFTER INSERT WHEN status = 'submitted'). Writing the quote is not
+      // the same as confirming it: the client confirms too, and only once
+      // both sides have replied does it become bookable. Free text only,
+      // this kind has no approved template and job.id doubles as the code
+      // to reply with, the same shape every other WhatsApp-reply kind uses.
+      subject = `Confirm your price: ${job.title}`;
+      line = `Your price on ${job.id} (${job.title}) is in. ` +
+        `Reply with the code ${job.id} to confirm it. ` +
+        `The client is being asked to confirm the same price; once you have both replied, ` +
+        `they can book you straight away, or ask for a fuller Kickoff Pack first if they want one.`;
+    } else if (kind === "stage_released_worker") {
+      // Founder's own correction, 2 Sep 2026: stage_released only ever told
+      // the client. Nothing told the worker their own work had been
+      // approved, or that they were owed anything. This fires once, on the
+      // transition into 'complete' (not on every stage: RUNBOOK already
+      // documents no partial release, the whole figure moves at once at
+      // completion), the same moment raise_job_worker_pay_invoice() becomes
+      // raisable. Deliberately does not name a figure: the worker's own
+      // pay is labour_jmd * 0.88 plus materials, and stating it here risks
+      // drifting from whatever the money page actually shows if either
+      // changes independently.
+      subject = `${job.title} is signed off`;
+      line = `${job.title} (${job.id}) is signed off, every stage approved. ` +
+        `You're owed your labour and materials for it, paid directly by the client, off-platform, the way you already agreed with them. ` +
+        `Check your own figure any time in your Yaadly portal.`;
     } else if (kind === "evidence_landed") {
       // Founder's own requirement, 31 Aug 2026, and a real change from how
       // this kind worked that same morning: the AI's composed report does
