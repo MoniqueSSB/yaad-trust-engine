@@ -703,6 +703,28 @@ const TONE = {
 };
 const tone_ = (s) => chip_(TONE[String(s || "").toLowerCase()] || "mute", s || "none");
 
+// ---- Ask a Yaad: what to look at twice before publishing.
+//
+// A LOOSER COPY OF web/lib/ask.ts ON PURPOSE, and the looseness is the point.
+// The form refuses anything that can only be a phone number, and deliberately
+// lets a bare run of seven digits through, because in Jamaican dollars that
+// is a price and "is 1500000 fair for a bathroom" is the question the board
+// exists to answer. That ambiguity has to land somewhere, and it lands here,
+// with the person who can read the sentence around the number. A chip on a
+// queue can afford to be wrong. A message that blocks somebody's question
+// cannot.
+//
+// This duplicates a rule rather than importing it, the way the Deno and
+// Python guardrails do, because this file loads from disk with no build step.
+// If web/lib/ask.ts changes, change this too.
+function askFlag(r){
+  const t = String(r.body || "") + " " + String(r.area || "");
+  if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(t)) return chip_("crit", "an email address");
+  if (/(?<![\d,.])\d{7,}(?![\d,.])/.test(t) || /\+\d[\d\s().-]{6,}\d/.test(t) || /(?<![\d,.])\d{3}[\s.-]\d{4}(?![\d,.])/.test(t))
+    return chip_("warn", "a number, check it is not a phone");
+  return mute_("nothing obvious");
+}
+
 // The Supabase library loads from a CDN. Creating the client at the top of this
 // script would throw if it never arrived, and then NOTHING below would run,
 // including the click handlers. Lazy, and loud about its absence.
@@ -1320,6 +1342,28 @@ const VIEWS = [
       {h:"Why", f:r => esc(String(r.why || "").slice(0,90))},
       {h:"What would be better", f:r => esc(String(r.better || "").slice(0,90))},
       {h:"When", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"asks", g:"Inbox", label:"Questions", icon:"chat",
+    title:"Ask a Yaad", table:"questions",
+    sub:"Questions typed into app.yaadly.co.uk/ask by anybody at all. Nothing here is public until you publish it, and that gate is the only thing between an open text box on the internet and a page with the Yaadly name on it. Publishing puts the words on a public page exactly as they were typed. Read the whole thing before you do, and look at the marked ones twice: a question that carries something number-shaped may be somebody's phone number, which does not belong on a public board.",
+    select:"id,body,area,published,created_at",
+    order:"created_at", search:["body","area"],
+    empty:["No questions yet","Somebody asking on app.yaadly.co.uk/ask writes here. Until 3 September 2026 nothing could: the table had no insert policy, so every question was refused and the page said Received anyway."],
+    cols:[
+      {h:"The question", f:r => esc(String(r.body || "").slice(0,140))},
+      {h:"Area", f:r => r.area ? esc(r.area) : mute_("not given")},
+      {h:"Worth a second read", f:r => askFlag(r)},
+      {h:"On the board", f:r => r.published ? chip_("ok","published") : chip_("mute","waiting on you")},
+      {h:"Asked", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Publish it", cls:"", when:r => !r.published,
+        set:{ published:true },
+        says:() => "Puts this question on app.yaadly.co.uk/ask, word for word, where anybody on the internet can read it and any vetted worker can answer it. Check it carries no name, no phone number, no email and no address first. Nothing else publishes it: this button is the gate." },
+      { label:"Take it down", cls:"g", when:r => r.published === true,
+        set:{ published:false },
+        says:() => "Removes it from the public page straight away, along with any answers under it, because an answer is only public while its question is. The row stays for you." },
     ]},
 
   { k:"set", g:"System", label:"Settings", icon:"gear",
@@ -2806,7 +2850,7 @@ async function loadOverview(){
 
   const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
          invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
-         enqNew] = await Promise.all([
+         enqNew, asksNew] = await Promise.all([
     countOf("intakes",     q => q.in("status", ["new","triaged"])),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
     countOf("evidence",    q => q.eq("ok", false)),
@@ -2823,6 +2867,7 @@ async function loadOverview(){
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
     countOf("enquiries",   q => q.not("status", "in", "(replied,converted)")),
+    countOf("questions",   q => q.eq("published", false)),
   ]);
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
@@ -2835,6 +2880,7 @@ async function loadOverview(){
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to"),
+    tile(asksNew ? "warn" : "ok", "Questions to publish", String(asksNew), asksNew ? "Waiting on your read" : "Board is clear"),
     tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
     tile("", "Jobs on the board", String(jobsOpen), "Open to workers"),
     tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every job has a client"),
@@ -2849,6 +2895,8 @@ async function loadOverview(){
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
   if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
     "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
+  if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),
+    "Somebody asked on the public board and nothing publishes on its own. Read it, check it carries no phone number or address, then publish it or leave it.", "Read them", "asks"));
   if (intakeNew) needs.push(alertRow("warn","?", intakeNew + (intakeNew === 1 ? " intake is untriaged" : " intakes are untriaged"),
     "Somebody asked for help and nobody has read it yet. That is the clock people judge you on.", "Open intake", "intake"));
   if (appsWaiting) needs.push(alertRow("warn","?", appsWaiting + (appsWaiting === 1 ? " application is part way through vetting" : " applications are part way through vetting"),

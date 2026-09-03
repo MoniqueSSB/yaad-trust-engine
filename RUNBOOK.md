@@ -1300,3 +1300,23 @@ A 403 with `"Signature check failed."` is different and is the sender's problem:
 **If somebody cannot get in:** send them to `app.yaadly.co.uk/portal/sign-in`, have them type their email and leave the code box empty, and press the button. That sends a fresh code.
 
 **Outstanding, and it is the founder's call:** the Supabase Auth email templates may still contain a "reset your password" template pointing at `/portal/reset`. That link still works, because the route forwards and carries the session fragment across, so nobody is stranded. But the email says password and the product has none. Retiring or rewording that template changes what clients receive, so it has not been done for you. Dashboard, Authentication, Emails.
+
+---
+
+## Somebody asked a question on Ask a Yaad, or the page says it cannot save one
+
+**Where questions live.** `app.yaadly.co.uk/ask` writes one row into `questions`, unpublished. Nothing publishes it but you, in the concierge desk, **Inbox, Questions**. The Overview shows a tile, "Questions to publish", and an alert when any are waiting, so you do not have to remember to look.
+
+**To publish one.** Open the row, read the whole thing, then press **Publish it**. It goes onto the public page word for word, where anybody on the internet can read it and any vetted worker can answer it. Check it carries no name, phone number, email or address first. The column **Worth a second read** marks anything number-shaped: a run of seven digits is both a local phone number and a price in Jamaican dollars, and the form deliberately lets that through so pricing questions are not blocked, which makes it yours to judge. **Take it down** removes it again, along with any answers under it, because an answer is only public while its question is.
+
+**To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
+
+**If the page tells a visitor "We could not save that just now".** The insert is being refused by row level security. Check the policy is there:
+
+```bash
+curl -s "https://leffyisvfvjwzilydlwf.supabase.co/rest/v1/questions" -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" -H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" -H "Content-Type: application/json" -d '{"body":"runbook probe, delete this row afterwards","published":false}' -w "\nhttp %{http_code}\n"
+```
+
+`201` means a visitor can ask, and you should delete the row you just made. `401` with `42501` means the policy `anyone may ask` is missing from `questions`; apply `supabase/migrations/20260903d_a_visitor_can_actually_ask_a_question.sql` and run the probe again. That policy is the whole reason the page works: without it every question is refused, and before 3 September 2026 the page said "Received" anyway and threw them away.
+
+**Do not fix a refusal by loosening the policy.** It permits `published = false` only. Take that clause out and a stranger can publish straight onto a page with the Yaadly name on it, without anybody reading it first.

@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-03 · Ask a Yaad could not be asked, and the form said it could
+
+**The page had never saved a question, and it thanked every visitor for the one it threw away.** `questions` has had row level security since it was created on 26 August and exactly two policies: read published rows, and admin does anything. A visitor posts as `anon`, so every question anybody typed on `/ask` was refused by Postgres with 42501. The server action inserted, ignored what came back, and redirected to `?sent=1`, which drew "Received" regardless. The table held nil rows and that is the reason. This is worse than a form that visibly fails, because a visible failure gets reported and a false receipt does not: the visitor believes they have asked, and waits.
+
+**The missing policy is deliberately narrow, because this is the one place on the project where an unauthenticated stranger writes a row.** `anyone may ask` permits an insert only with `published = false`, a body between 10 and 500 characters, and an area of 60 or fewer. Without the `published` clause an anon insert could arrive already published and skip the moderation gate, which is the gate. There is no anon update policy, so nobody flips their own row afterwards either. **There is no rate limit and that is a stated gap, not an oversight.** Nothing in Postgres counts how often a key inserts. It is survivable because nothing publishes without a person, so a flood costs desk noise rather than a defaced public page, and the board carries no contact details worth harvesting. If it is ever abused, the answer is a throttle in front of the insert on the `yaad-enquiry` pattern, not a looser policy.
+
+**The action now reads the answer from the database instead of assuming one.** Same insert, same three columns, no new personal data: a public Q&A board does not need to know who is asking. What changed is that a refusal is shown to the person standing there, in words they can act on, with what they typed still in the box. The raw Postgres message is not shown, because "new row violates row-level security policy" tells a visitor nothing and an attacker something; it goes to the Worker log instead.
+
+**A phone number is refused, a price is not, and the two are genuinely hard to tell apart.** A bare run of seven digits is a Jamaican local number and it is also 1500000 in Jamaican dollars, which is the archetypal question this board exists to answer. The rule has to choose which way to be wrong. It refuses what cannot be a price, meaning runs long enough for an area code, anything after a plus, and digits grouped the way a phone number is grouped rather than the way money is, and it lets the ambiguous bare run through to the desk, which marks it for a second read. The reasoning is the founding one: blocking a pricing question fails the exact people the board is for, on every honest submission, with a message they cannot act on because their number **is** the question. Publishing a stray number requires both a visitor typing it and the person at the desk missing it.
+
+**No response time is promised, and that is a decision rather than a gap.** `/jobs/new` says one working day because the founder defined one. Nothing defines a timing for a public question that waits on a stranger to answer it, so the page says there is none and to check back. Inventing one here would have been the easiest sentence in the rewrite and the only untrue one.
+
+**The desk got a Questions view, because a moderation gate with nowhere to stand is not a gate.** Publishing was previously possible only by editing a row in the Supabase dashboard, which meant it would not happen. The view is ordinary registry work: read the rows, publish or take down, with the consequence spelled out on the button. The overview gained a tile and an alert, so a waiting question shows on the first screen rather than needing to be looked for.
+
+---
+
 ## 2026-09-03 · Four audit findings closed: the RPC grants, the Twilio door, the retired password routes, and the first tests on the trust logic
 
 **All four came out of a read-only audit of the whole application on the same day. None is a feature. Each one is something that was already true and should not have been.**

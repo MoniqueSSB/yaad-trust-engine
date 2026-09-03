@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SiteNav } from "@/components/SiteNav";
-import { askQuestion } from "@/app/ask/actions";
+import { AskForm } from "@/app/ask/AskForm";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +20,20 @@ export const dynamic = "force-dynamic";
  *
  * Reached from the job board's link row. It had no inbound link at all until
  * 3 Sep 2026.
+ *
+ * NO RESPONSE TIME IS PROMISED HERE, and that is deliberate rather than an
+ * omission. /jobs/new says one working day because the founder defined one.
+ * Nothing defines a timing for a public question that waits on a stranger to
+ * answer it, so this page says "there is no fixed timing, check back". If a
+ * timing is ever set, it goes in the "what happens next" list in AskForm.
+ *
+ * The form moved into AskForm.tsx on 3 Sep 2026, the same day the reason it
+ * had never saved a single row was found. See actions.ts and DECISIONS.md.
  */
 
 export const metadata = { title: "Ask a Yaad · Yaadly" };
 
-export default async function Ask({
-  searchParams,
-}: {
-  searchParams: Promise<{ sent?: string }>;
-}) {
-  const { sent } = await searchParams;
+export default async function Ask() {
   const supabase = await createClient();
   const { data: qs } = await supabase
     .from("questions")
@@ -52,43 +56,23 @@ export default async function Ask({
     <>
       <SiteNav active="market" />
       <div className="mx-auto max-w-[1080px] px-5 py-10">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask a Yaad &middot; public Q&amp;A</p>
-        <h1 className="mt-2 font-display text-[clamp(28px,4.5vw,42px)] uppercase leading-none">Ask before you post</h1>
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask a Yaad &middot; free public answers</p>
+        <h1 className="mt-2 font-display text-[clamp(28px,4.5vw,42px)] uppercase leading-none">Ask before you post a job</h1>
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
-          Not sure it&apos;s a job at all? Ask first, vetted workers answer publicly.
+          Not sure if it is a job, a quick fix, or nothing to worry about? Ask
+          here and vetted tradespeople answer in public, free.
         </p>
-        <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-relaxed text-dim">
-          This is the public board, so your question and its answers can be read
-          by anyone. If it is about your own property or your own money, use
-          Ask Yaadly, the chat tab on the right, and a person replies to you
-          privately.
+        <p className="mt-2.5 max-w-[62ch] rounded-xl border border-line bg-panel px-4 py-3 text-[13px] leading-relaxed text-mute">
+          <b className="text-ink">Everything on this board is public.</b> No
+          name, no email and no phone number is asked for, so leave those out
+          of your question too. If it is about your own property or your own
+          money, use Ask Yaadly, the chat tab on the right, and a person
+          replies to you privately.
         </p>
 
-        <form action={askQuestion} className="mt-6 rounded-2xl border border-line bg-panel p-5">
-          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">Your question</label>
-          <input name="body" required minLength={10} maxLength={500}
-            placeholder="e.g. How much should a water tank install cost in Portmore?"
-            className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal" />
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <input name="area" maxLength={60} placeholder="Your area (optional)"
-              className="w-44 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal" />
-            <button className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110">
-              Ask the community
-            </button>
-          </div>
-          {sent && (
-            <p className="mt-3 rounded-xl border border-softline bg-soft px-3.5 py-2.5 text-[13px] text-mute">
-              Received. Questions are read by a person before they publish, so
-              yours appears once it has been looked at.
-            </p>
-          )}
-          <p className="mt-3 text-[11.5px] text-dim">
-            Answered by vetted workers, publicly. Nothing you type here is a
-            job or a commitment.
-          </p>
-        </form>
+        <AskForm />
 
-        <div className="mt-6 grid gap-3.5 sm:grid-cols-2">
+        <div className="mt-8 grid gap-3.5 sm:grid-cols-2">
           {(qs ?? []).length === 0 ? (
             <p className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute sm:col-span-2">
               No questions published yet. Yours can be the first.
@@ -102,7 +86,7 @@ export default async function Ask({
                   <p key={i} className="mt-2.5 border-l-2 border-softline pl-3 text-[13px] leading-relaxed text-mute">{a.body}</p>
                 ))}
                 {(byQ.get(q.id) ?? []).length === 0 && (
-                  <p className="mt-2.5 text-[12px] text-dim">Waiting on a worker&apos;s answer.</p>
+                  <p className="mt-2.5 text-[12px] text-dim">No answer yet.</p>
                 )}
               </div>
             ))
