@@ -1,6 +1,7 @@
 import { getUser } from "@/lib/supabase/auth";
 import { signOut } from "./actions";
 import { SiteNav } from "@/components/SiteNav";
+import { SessionWatch } from "@/components/portal/SessionWatch";
 
 /**
  * The shell every /portal route wears, signed in or not.
@@ -32,6 +33,10 @@ export default async function PortalShell({
         signOut={user ? signOut : undefined}
       />
       <main className="mx-auto max-w-[1080px] px-5 py-8">{children}</main>
+      {/* Only for somebody who arrived signed in. Mounting it for a signed-out
+          visitor would arm a "your session has ended" banner for a person who
+          never had one. */}
+      {user ? <SessionWatch /> : null}
     </div>
   );
 }
