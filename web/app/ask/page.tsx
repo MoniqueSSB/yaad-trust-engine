@@ -5,18 +5,23 @@ import { AskForm } from "@/app/ask/AskForm";
 export const dynamic = "force-dynamic";
 
 /**
- * Ask a Yaad, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
+ * Ask Yaadly, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
  * asks, vetted workers answer publicly. Questions publish after a human
  * look, which is a deliberate moderation gate on an open text box on a
  * public website; the answering bar is the same one quoting uses.
  *
- * Two things on this site are called some version of "ask", and until now
- * neither said which it was. "Ask a Yaad" is this page: public, answered by
- * workers, visible to everyone, slow. "Ask Yaadly" is the chat tab pinned to
- * the right edge of every page: private, answered by a person at Yaadly,
- * quick. A visitor could not tell them apart from their names, so the page
- * now says the difference in a sentence rather than relying on the reader to
- * work it out. Renaming either one is the founder's call, not this file's.
+ * ONE NAME, TWO DOORS. Founder decision, 3 Sep 2026. This page was "Ask a
+ * Yaad" and the chat tab pinned to the right edge of every page was "Ask
+ * Yaadly": two products, near identical names, opposite privacy, and nothing
+ * anywhere saying which was which. The decision was not to invent a third
+ * name but to collapse to one, so there is a single thing a client asks and
+ * two ways to reach it.
+ *
+ * That puts the whole burden of the distinction on copy, which is why the
+ * paragraph under the heading is not decoration and should not be trimmed:
+ * this door is public, permanent and answered by workers; the chat is
+ * private, immediate and answered by a person. Somebody about to type their
+ * address into the wrong one has only that sentence to stop them.
  *
  * Reached from the job board's link row. It had no inbound link at all until
  * 3 Sep 2026.
@@ -27,11 +32,15 @@ export const dynamic = "force-dynamic";
  * answer it, so this page says "there is no fixed timing, check back". If a
  * timing is ever set, it goes in the "what happens next" list in AskForm.
  *
- * The form moved into AskForm.tsx on 3 Sep 2026, the same day the reason it
- * had never saved a single row was found. See actions.ts and DECISIONS.md.
+ * THE FORM LIVES IN AskForm.tsx AND THE OUTCOME IS NO LONGER A URL FLAG. It
+ * used to arrive as /ask?sent=1, ?sent=throttled and so on, which meant a
+ * refused question came back to an empty box and a refresh redrew a message
+ * for a question nobody had asked. Every one of those outcomes still exists,
+ * with the same words; they are returned by the action and rendered in place
+ * instead. See actions.ts and DECISIONS.md.
  */
 
-export const metadata = { title: "Ask a Yaad · Yaadly" };
+export const metadata = { title: "Ask Yaadly · public Q&A" };
 
 export default async function Ask() {
   const supabase = await createClient();
@@ -43,7 +52,14 @@ export default async function Ask() {
     .limit(30);
   const ids = (qs ?? []).map((q) => q.id);
   const { data: ans } = ids.length
-    ? await supabase.from("answers").select("question_id,worker_email,body,created_at").in("question_id", ids).order("created_at")
+    /* worker_email is NOT selected, and that is the point rather than tidiness.
+       This is a public page reading with the publishable key, so every column
+       named here is a column a stranger is asking the database for. It was
+       fetched and never rendered, which is the same shape of mistake
+       20260903f closed on worker_profiles: a private column sitting on a row
+       a visitor may read. The answering worker is deliberately anonymous on
+       this page anyway, so nothing here ever wanted it. */
+    ? await supabase.from("answers").select("question_id,body,created_at").in("question_id", ids).order("created_at")
     : { data: [] };
   const byQ = new Map<string, { body: string }[]>();
   for (const a of ans ?? []) {
@@ -56,18 +72,20 @@ export default async function Ask() {
     <>
       <SiteNav active="market" />
       <div className="mx-auto max-w-[1080px] px-5 py-10">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask a Yaad &middot; free public answers</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask Yaadly &middot; public Q&amp;A</p>
         <h1 className="mt-2 font-display text-[clamp(28px,4.5vw,42px)] uppercase leading-none">Ask before you post a job</h1>
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
           Not sure if it is a job, a quick fix, or nothing to worry about? Ask
           here and vetted tradespeople answer in public, free.
         </p>
         <p className="mt-2.5 max-w-[62ch] rounded-xl border border-line bg-panel px-4 py-3 text-[13px] leading-relaxed text-mute">
-          <b className="text-ink">Everything on this board is public.</b> No
-          name, no email and no phone number is asked for, so leave those out
-          of your question too. If it is about your own property or your own
-          money, use Ask Yaadly, the chat tab on the right, and a person
-          replies to you privately.
+          <b className="text-ink">Two ways to ask, and this is the public one.</b>{" "}
+          Your question and its answers stay on this page where anyone can read
+          them, and it is vetted workers who answer. No name, no email and no
+          phone number is asked for, so leave those out of your question too.
+          For anything about your own property, your own money or your own
+          address, use the chat tab on the right instead. That one is private
+          and a person replies to you.
         </p>
 
         <AskForm />

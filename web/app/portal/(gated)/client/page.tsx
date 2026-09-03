@@ -39,6 +39,14 @@ export default async function ClientPortal() {
   // No .eq() on email. Row level security already limits this to jobs where
   // the signed-in email is a party. If the filter lived in this file, a
   // mistake in this file would be a data leak. In Postgres it is a short list.
+  //
+  // This used to be said out loud in the page's opening line, as "everything
+  // here is scoped to you by the database, not by this page". True, reassuring
+  // to whoever wrote it, and meaningless to a client in London who does not
+  // know what a database filter is and had not until that moment wondered
+  // whether they might be shown somebody else's jobs. The reassurance a client
+  // actually wants is about their money, so that is what the line says now.
+  // The fact belongs here, where the person who needs it is reading.
   const { data, error } = await supabase
     .from("jobs")
     .select(
@@ -116,6 +124,13 @@ export default async function ClientPortal() {
 
   const todo = accountOutstanding.length + jobOutstanding.length;
 
+  /* Split rather than sorted, so the heading can say which is which. "complete"
+     is the only closed status in the live jobs_status_check vocabulary; anything
+     else, including disputed and cancelled, stays in the live list because it
+     still has something outstanding about it. */
+  const live = jobs.filter((j) => j.status !== "complete");
+  const closed = jobs.filter((j) => j.status === "complete");
+
   return (
     <>
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -125,8 +140,9 @@ export default async function ClientPortal() {
         Your jobs and your money
       </h1>
       <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-mute">
-        Everything here is scoped to you by the database, not by this page. Money
-        moves when you approve the evidence, and not before.
+        Every job you have with Yaadly, what each one is waiting for, and where
+        the money is. Nothing is paid out until you have seen the evidence and
+        approved it.
       </p>
 
       {error && (
@@ -235,12 +251,27 @@ export default async function ClientPortal() {
         </section>
       )}
 
+      {/*
+        Live jobs first, closed ones after, rather than one list ordered by
+        whatever moved last. A client with nine jobs was seeing four closed
+        ones above the one that needed them, because closing a job updates it
+        and updated_at is all the order knew about. The status tones make the
+        difference visible; they did not make it ORDERED, and a list you have
+        to scan in full is not answering "what is waiting on me".
+
+        Within each group the recency order is kept, because among live jobs
+        the most recently moved genuinely is the most interesting one.
+      */}
       <JobList
-        title="Your jobs"
-        jobs={jobs}
+        title={closed.length > 0 ? "Live jobs" : "Your jobs"}
+        jobs={live}
         labels={CLIENT_STATUS}
         empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
       />
+
+      {closed.length > 0 && (
+        <JobList title="Closed" jobs={closed} labels={CLIENT_STATUS} />
+      )}
 
       {services.length > 0 && (
         <section className="mt-8">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitQuote } from "@/app/jobs/actions";
+import { jmd } from "@/lib/money";
 
 /**
  * The quote form, MARKETPLACE-BUILD-SPEC 2.4. Helper copy is decided and
@@ -9,9 +10,7 @@ import { submitQuote } from "@/app/jobs/actions";
  * is typed: the client fee sits INSIDE the headline number, never added at
  * checkout, which is the DMCCA requirement made visible.
  */
-function jmd(n: number) {
-  return "J$" + n.toLocaleString("en-US");
-}
+
 
 type QuotePackDraft = {
   status: string;
@@ -234,7 +233,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
             className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
           />
           <span className="mt-1.5 block text-[11.5px] text-dim">
-            Percentages of your total, never amounts. This is what gets checked before you're paid, so be specific.
+            Percentages of your total, never amounts. This is what gets checked before you&rsquo;re paid, so be specific.
           </span>
         </label>
       </div>
@@ -247,8 +246,8 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           <div className="flex justify-between text-mute"><span>Client fee, 15% on labour</span><span>+{jmd(Math.round(labour * 0.15))}</span></div>
           <div className="flex justify-between font-bold text-ink"><span>Client sees one number</span><span>{jmd(Math.round(labour * 1.15) + materials)}</span></div>
           <div className="my-2 h-px bg-line" />
-          <div className="flex justify-between text-mute"><span>Your fee, 12% on labour</span><span>-{jmd(Math.round(labour * 0.12))}</span></div>
-          <div className="flex justify-between font-bold text-tealb"><span>You receive</span><span>{jmd(Math.round(labour * 0.88) + materials)}</span></div>
+          <div className="flex justify-between text-mute"><span>Yaadly&rsquo;s margin, 12% on labour</span><span>{jmd(Math.round(labour * 0.12))}</span></div>
+          <div className="flex justify-between font-bold text-tealb"><span>Yaadly pays you</span><span>{jmd(Math.round(labour * 0.88) + materials)}</span></div>
           <p className="mt-2.5 text-[11.5px] leading-relaxed text-dim">
             The client is shown the all-in total before they accept, never a
             base price with the fee added at the end.

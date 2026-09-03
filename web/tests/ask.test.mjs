@@ -1,5 +1,5 @@
 /**
- * Tests for lib/ask.ts, the rules Ask a Yaad applies before a stranger's
+ * Tests for lib/ask.ts, the rules Ask Yaadly applies before a stranger's
  * question is saved for publication on a public page.
  *
  * Why this file exists. Two things call these rules: the form as you type,

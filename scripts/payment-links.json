@@ -1,0 +1,17 @@
+{
+  "_README": "Amounts Stripe will actually charge. CONFIRM EVERY ROW BEFORE --live. 'hold' authorises the card and captures later when a named person approves the work. 'subscription' bills monthly. Anything at or above 50000 pence (£500) is invoiced, not linked, per the 3 Sep 2026 rule, so it does not belong in this file.",
+  "_SOURCE": "Aligned to public.service_catalogue on 3 Sep 2026 by founder instruction, using founding_pence. docs/services.html was moved to match in the same change, so the site, the catalogue and these links now agree. If you change a price, change all three.",
+  "_FOUNDING_RATE_WARNING": "These are founding rates, which the site limits to the first five clients per service. A payment link does not enforce that: it keeps taking the founding price from anyone who has the URL, for as long as it is active. When the five are gone, create standard-rate links (full_pence in the catalogue), swap the buttons, and deactivate the founding links in the Stripe Dashboard.",
+  "_NOT_INCLUDED": "Project Setup Pack (£399 founding) and Document Pack Check (£99 founding) are in the catalogue but have no card on docs/services.html, so there is no button to wire a link to. Oversight Retainer On The Ground (£600 founding) is the same. Add the service cards first if you want links for them. The Visual Check and Technical Sign-off express tiers and the £895 weekly retainer were removed from the site in this change because no catalogue row backs them.",
+  "currency": "gbp",
+  "links": [
+    { "id": "care-standard",     "name": "Property Care, standard home",   "amount_pence": 4500,  "mode": "hold",         "description": "Per-visit maintenance check on an empty or elder-occupied home." },
+    { "id": "care-large",        "name": "Property Care, large or rental", "amount_pence": 7000,  "mode": "hold",         "description": "Per-visit maintenance check on an empty or elder-occupied home." },
+    { "id": "care-villa",        "name": "Property Care, villa",           "amount_pence": 9500,  "mode": "hold",         "description": "Per-visit maintenance check on an empty or elder-occupied home." },
+    { "id": "eyes-on-it",        "name": "Visual Check",                   "amount_pence": 9500,  "mode": "hold",         "description": "A trained checker photographs everything against a checklist. They record. They do not rate or advise." },
+    { "id": "deposit-check",     "name": "Deposit Protection Check",       "amount_pence": 14900, "mode": "hold",         "description": "Your contractor and their quote, checked before you pay anybody. Written go or no-go, 72 hours." },
+    { "id": "technical-signoff", "name": "Technical Sign-off",             "amount_pence": 24500, "mode": "hold",         "description": "A qualified trade inspector judges one stage against the standard for that job. Pass, fail, or a written put-right list." },
+    { "id": "condition-report",  "name": "Condition Report",               "amount_pence": 24900, "mode": "hold",         "description": "System by system: roof, structure, water, electrics, drainage, termites, security. Every finding rated." },
+    { "id": "retainer",          "name": "Oversight Retainer",             "amount_pence": 39500, "mode": "subscription", "description": "Two documented site visits a month, a monthly cost-and-progress report, an accountability call, a WhatsApp line." }
+  ]
+}

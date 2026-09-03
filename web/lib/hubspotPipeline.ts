@@ -26,9 +26,11 @@
  * THE CALLER VERIFIES THE WEBHOOK, NOT THIS FILE. Nothing here can tell a real
  * payment confirmation from a forged one; it takes the deal ID on trust.
  * Whatever receives the inbound webhook checks the signature first and rejects
- * on failure, the way yaad-whatsapp-webhook checks Meta's X-Hub-Signature-256
- * before it does anything else. Without that, anyone who can guess a deal ID
- * can walk it to funds held.
+ * on failure. The live example to copy is app/api/hubspot/stage/route.ts,
+ * which verifies over the raw bytes before parsing and refuses outright when
+ * the secret is absent; yaad-inbound/twilio-signature.ts is the same idea for
+ * Twilio. (This used to point at yaad-whatsapp-webhook, deleted 1 Sep 2026.)
+ * Without that check, anyone who can guess a deal ID can walk it to funds held.
  *
  * FAILURE IS LOUD. Every function here throws rather than logging and
  * returning. A swallowed error means the client's payment is confirmed, the

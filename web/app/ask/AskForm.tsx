@@ -1,6 +1,6 @@
 "use client";
 
-/* ── Ask a Yaad, the form ──────────────────────────────────────────────────
+/* ── Ask Yaadly, the public question form ─────────────────────────────────
  *
  * A client component for four reasons, each of which was a real fault in the
  * server-only version it replaces:
@@ -111,9 +111,8 @@ function AskPanel({
           </button>
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-dim">
-          If you need a private answer about your own property, use Ask
-          Yaadly, the chat tab on the right, and a person replies to you
-          directly.
+          If you need a private answer about your own property, use the chat
+          tab on the right instead, and a person replies to you directly.
         </p>
       </div>
     );
@@ -190,7 +189,7 @@ function AskPanel({
           <p className="mt-4 rounded-xl border border-coral/40 bg-coral/10 px-3.5 py-2.5 text-[13px] leading-relaxed text-ink">
             {state.status === "error"
               ? state.message
-              : "That looks like a phone number or email address. This board is public, so leave those out. For a private reply use Ask Yaadly, the chat tab on the right."}
+              : "That looks like a phone number or email address. This board is public, so leave those out. For a private reply use the chat tab on the right."}
           </p>
         )}
       </div>

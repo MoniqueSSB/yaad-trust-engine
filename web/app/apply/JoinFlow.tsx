@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TRADES, PARISHES } from "@/lib/taxonomy";
+import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 
 /**
  * Join as a pro.
@@ -82,6 +82,35 @@ const WA_JOIN =
   "https://wa.me/447878877567?text=" +
   encodeURIComponent("Hello Yaadly, I am a tradesperson and I want to join.");
 
+/* Bump this whenever the wording of the AI review choice below changes. A
+   consent is only worth the sentence that earned it, and an old consent must
+   never be read as agreement to a newer or broader one.
+
+   v1 asked permission to send identity documents to NVIDIA's model, and that
+   is what happened until 30 Aug 2026.
+
+   v2 narrowed it: the ID, the selfie and the face video are withheld in
+   yaad-vetting-review whatever the applicant chose, so the question covered
+   the supporting paperwork only. Its sentence named "your police record,
+   proof of address, TRN, certificates and CV".
+
+   v3, 3 Sep 2026, on the founder's instruction to put the question back after
+   it was dropped from this page entirely. TWO REASONS FOR A NEW VERSION
+   rather than reusing v2, neither of them cosmetic. The police record step no
+   longer exists anywhere in this flow, so v2's sentence named a document
+   nobody is asked for. And a profile photograph is now collected, which is a
+   face: it is withheld like the selfie and named as withheld in the wording.
+   v3 is strictly narrower than v2, so every v2 consent already covers
+   everything done under v3, and the version still moves because the sentence
+   moved. That rule is CLAUDE.md §6 and it is not a formality: the whole point
+   of a version is that somebody can later ask what a given yes actually said.
+
+   The list in the copy is the real one. It is what survives IDENTITY_DOCS in
+   supabase/functions/yaad-vetting-review/index.ts, which is checked before the
+   download so a withheld file is never even fetched out of the bucket. If that
+   list changes, this sentence and this version change with it. */
+const AI_CONSENT_VERSION = "ai-review-v3";
+
 const PERSONA_TEMPLATE_ID = process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID ?? "";
 const PERSONA_ENVIRONMENT_ID = process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID ?? "";
 const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT_ID.length > 0;
@@ -100,7 +129,7 @@ const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT
 
 /* TRADES and PARISHES are shared with the client funnel. See web/lib/taxonomy.ts. */
 
-type Phase = 1 | 2 | 3;
+type Phase = 1 | 2;
 type Step = { n: string; h: string; p: string; body: BodyKind; note: string; phase: Phase };
 
 /* The three phases, founder's own design (30 Aug 2026). The order matters
@@ -116,9 +145,7 @@ const PHASES: Record<Phase, { name: string; sub: string }> = {
   1: { name: "Phase 1 · Your profile",
        sub: "About two minutes. This is the whole first sitting, and it goes to a person as soon as you send it." },
   2: { name: "Phase 2 · Trust and verification",
-       sub: "After a person has said yes. We chase these on WhatsApp, so you do not have to sit here for them. Verified within 48 hours of your documents arriving." },
-  3: { name: "Phase 3 · On the board",
-       sub: "What your account can and cannot do once it is live." },
+       sub: "After a person has said yes. We chase these on WhatsApp, so you do not have to sit here for them. You hear back within 24 hours of your documents arriving." },
 } as const;
 
 /* Phase 3 in words, shown once on the last screen rather than as steps to
@@ -136,6 +163,49 @@ const ON_THE_BOARD = {
 };
 type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "live";
 
+/* ── who should apply ─────────────────────────────────────────────────────
+   This panel is the first thing on the page, above even the WhatsApp door.
+   Before it existed the only way to find out whether you qualified was to
+   fill in eighteen trade chips and see what happened.
+
+   Every line is something that actually happens further down this flow or at
+   the desk. The parishes are the fourteen in the shared taxonomy, the TRN is
+   asked for on the identity screen, and the referees really are telephoned
+   before the jobs over £500. Nothing here is aspirational. */
+const WHO: { yes: string; why: string }[] = [
+  { yes: "You do the work in Jamaica, in at least one of the fourteen parishes",
+    why: "A job posted in a parish you have not ticked never reaches you." },
+  { yes: "You work for yourself, or you can invoice for the work",
+    why: "You are asked for a TRN later. It is how you are paid as your own business rather than as somebody's staff." },
+  { yes: "You take at least one of the eighteen trades, or you can name your own",
+    why: "Your trades come from the same list a client picks from. That is the only reason a client's roofing job and your roofing profile find each other." },
+  { yes: "You are willing to be identity checked, and to have three referees telephoned",
+    why: "The call happens before you can take work over £500. Nobody reaches a client's gate unverified." },
+];
+
+/* What it takes, split at the point a person says yes. Said before anybody
+   types, so nobody starts on a phone and stalls hunting for a document that
+   was never needed today. */
+const NEED_NOW = [
+  "Your name",
+  "A phone number or an email address, either one",
+  "The trades you take",
+  "The parishes you will travel to",
+];
+const NEED_LATER = [
+  "Government photo ID",
+  "Your TRN, the nine digit number",
+  "Proof of address dated within the last three months",
+  "Three people who will vouch for you",
+];
+
+/* Upload limits, in one place and stated on every row that takes a file.
+   50MB is the bucket's own cap in yaad-vetting-upload, and before this the
+   only way an applicant on Jamaican mobile data learned about it was by
+   failing at the end of a long upload. */
+const MAX_MB = 50;
+
+
 /* ── the two sittings ──────────────────────────────────────────────────────
    Phase 1 is the whole first visit and it is three screens: what you do,
    what you have done, send. That is about two minutes, and it is deliberate.
@@ -149,34 +219,34 @@ type BodyKind = "form" | "port" | "id" | "refs" | "sign" | "live";
    would rather do it in a browser. Nothing was deleted, it was moved to the
    point where it is earned. */
 const PHASE1_STEPS: Step[] = [
-{ phase: 1, n: "1 · Apply", body: "form",
+{ phase: 1, n: "Your trades", body: "form",
     h: "Your trades, and every parish you cover",
     p: "Take as many trades as you actually do, and name one yourself if it is not on our list. Pick every parish you will travel to, a job in a parish you have not ticked never reaches you.",
     note: "Your trades and job types come from the same list a client picks from. That is the only reason a client's roofing job and your roofing profile can find each other at all." },
-{ phase: 1, n: "2 · Your work", body: "port",
+{ phase: 1, n: "Your work", body: "port",
     h: "Show us the work, however you have it",
     p: "A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.",
     note: "We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it." },
-{ phase: 1, n: "Your profile", body: "live",
+{ phase: 1, n: "Check and send", body: "live",
     h: "This is how a client will see you",
     p: "Check it reads the way you would say it yourself. <b>Nothing here is fixed</b>, you can change any of it later, and the badge and the score fill in as you complete jobs.",
     note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
 ];
 
 const LATER_STEPS: Step[] = [
-{ phase: 2, n: "3 · Identity", body: "id",
+{ phase: 2, n: "Identity", body: "id",
     h: "A live photo and a live video, taken on this page",
     p: "Government photo ID, then a <b>photo this page takes through your camera</b>, and a <b>short video where you turn your face slowly left to right</b>. Both are captured here, in front of us, rather than picked from your files. Then your TRN and proof of address dated within three months.",
     note: "A file proves somebody holds a document. A turn taken in front of us proves somebody was sitting there when it was sent. If your browser will not hand over a camera we say so on the row, take an upload instead, and a person checks that one by hand." },
-{ phase: 2, n: "5 · References", body: "refs",
+{ phase: 2, n: "References", body: "refs",
     h: "Three people who will vouch for you",
     p: "Past clients, or trades you have worked alongside. Paste a WhatsApp message where they say what you did, or give a name and number. <b>Either is enough to get you on the board.</b> Before you can take the bigger jobs we telephone them, so tell them to expect a call.",
     note: "A forwarded message gets you moving today. The phone call happens before the jobs over £500, because a message can be written by anybody and a conversation cannot." },
-{ phase: 3, n: "7 · Sign", body: "sign",
+{ phase: 2, n: "Sign the guidelines", body: "sign",
     h: "The Worker Guidelines, signed once",
     p: "How quoting works, what evidence you owe on every job, how you get paid, and what loses you the platform. You sign the current version once, not once per job. If the wording is ever revised you are asked to sign the new version before your next job.",
     note: "Written with a timestamp and the exact consent sentence. No edit, no delete." },
-{ phase: 3, n: "Save it", body: "live",
+{ phase: 2, n: "Save it", body: "live",
     h: "Save what you have added",
     p: "Your application is already with the desk. This adds what you have just done to it: your ID check, your referees and your signature.",
     note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
@@ -207,6 +277,11 @@ const CHECKS: Check[] = [
 
 type DocType =
   | "cv" | "portfolio" | "certificate"
+  /* A photograph of the tradesperson themselves. Founder instruction,
+     3 Sep 2026. It is a face, so it is held to the same rule as the selfie
+     and the introduction video: it is on IDENTITY_DOCS in
+     yaad-vetting-review and is never sent to a model. */
+  | "profile_photo"
   | "photo_id" | "selfie_with_id" | "face_video" | "intro_video" | "trn" | "proof_of_address";
 
 type DocState = { state: "idle" | "busy" | "done" | "error"; file?: string; bytes?: number; error?: string };
@@ -261,6 +336,20 @@ async function call(body: Record<string, unknown>): Promise<Record<string, unkno
 
 export function JoinFlow() {
   const [step, setStep] = useState(0);
+  /* The step heading, so advancing can move focus to it. Without this a screen
+     reader user pressed Continue and heard nothing at all: focus stayed on a
+     button that had just been replaced, the page swapped underneath, and the
+     only signal that anything happened was visual. On the longest flow in the
+     product, where somebody is being asked for a passport. */
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    /* Not on arrival: stealing focus on first paint moves a keyboard user off
+       the top of a page they have not read yet. Only on a real step change. */
+    if (firstRender.current) { firstRender.current = false; return; }
+    headingRef.current?.focus();
+  }, [step]);
 
   // Step 1
   const [trades, setTrades] = useState<string[]>([]);
@@ -276,6 +365,14 @@ export function JoinFlow() {
      is one of the stronger signs somebody is a contractor rather than an
      employee, and a subcontractor raises an invoice against it. */
   const [trn, setTrn] = useState("");
+
+  /* The AI review choice. Deliberately starts EMPTY rather than defaulting to
+     either answer: a pre-ticked consent is not a consent, and the server reads
+     anything that is not the word "granted" as a no. What was sent is kept
+     separately so the sent screen reports the answer that actually went, not
+     whatever the box says afterwards. */
+  const [aiConsent, setAiConsent] = useState<"" | "granted" | "declined">("");
+  const [sentConsent, setSentConsent] = useState<"granted" | "declined">("declined");
 
   // Step 2
   const [work, setWork] = useState("");
@@ -307,6 +404,21 @@ export function JoinFlow() {
   const [signed, setSigned] = useState(false);
   const [signedName, setSignedName] = useState("");
 
+  /* A local preview of the photograph they just chose, so the profile preview
+     on the last screen shows the actual picture rather than initials.
+
+     It is an object URL and it lives for this page only. The file itself goes
+     to a private bucket no browser can read, so there is nothing to read back
+     after a reload, and the preview honestly falls back to initials with the
+     row still saying the photograph is on file. Better that than a preview
+     that shows something the page cannot actually fetch. */
+  const [photoPreview, setPhotoPreview] = useState("");
+  const photoUrlRef = useRef("");
+
+  // Let go of the object URL on the way out. A leaked blob holds the whole
+  // photograph in memory, on a phone.
+  useEffect(() => () => { if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current); }, []);
+
   // Documents, and the application they hang off
   const [docs, setDocs] = useState<Record<string, DocState>>({});
   const [claim, setClaim] = useState<Claim | null>(null);
@@ -316,15 +428,51 @@ export function JoinFlow() {
   /* Phase 1 is sent and they have chosen to carry straight on into the
      verification steps rather than wait to be chased. */
   const [continuing, setContinuing] = useState(false);
+  /* The second sitting had no ending. Pressing "Send my application" on the
+     last Phase 2 screen set sentRef, which the sent screen ignores while
+     `continuing` is true, so the button simply sat there having apparently
+     done nothing. This is that screen's own confirmation. */
+  const [savedLater, setSavedLater] = useState(false);
   const claimRef = useRef<Claim | null>(null);
+  /* Autosave must not run before the restore has finished, or the first
+     render writes an empty form over the one being recovered. */
+  const restored = useRef(false);
 
   /* Restore a half-finished application. Losing the tab on mobile data must
-     not mean re-sending a passport. */
+     not mean re-sending a passport, and it must not mean losing the paragraph
+     you just typed either.
+     
+     WHAT THIS USED TO DROP, all of it found by mapping the flow rather than by
+     anybody reporting it. It restored the claim, the documents and the profile
+     fields, and dropped `step`, `refs`, `signed`, `signedName`, `continuing`
+     and `sentRef`. So a worker halfway through the second sitting came back to
+     screen one of the first, and because sending cleared the whole store there
+     was no route back into the ID check at all: the only door to it is the
+     button on the sent screen, and that screen needs the reference. */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORE);
-      if (!raw) return;
+      if (!raw) { restored.current = true; return; }
       const v = JSON.parse(raw);
+
+      // The form comes back whether or not an application was ever opened.
+      // Autosave now writes on a debounce as they type, so there is something
+      // to recover from before the first Continue was ever pressed.
+      if (v.form) {
+        setTrades(v.form.trades ?? []); setParishes(v.form.parishes ?? []);
+        setTradeOther(v.form.tradeOther ?? ""); setName(v.form.name ?? "");
+        setPhone(v.form.phone ?? ""); setEmail(v.form.email ?? "");
+        setYears(v.form.years ?? "");
+        setTrn(v.form.trn ?? ""); setWork(v.form.work ?? "");
+        setLinks(v.form.links ?? []);
+        if (v.form.aiConsent === "granted" || v.form.aiConsent === "declined") {
+          setAiConsent(v.form.aiConsent);
+        }
+        if (Array.isArray(v.form.refs) && v.form.refs.length === 3) setRefs(v.form.refs);
+        setSigned(v.form.signed === true);
+        setSignedName(v.form.signedName ?? "");
+      }
+
       if (v?.claim?.applicationId && v?.claim?.uploadToken) {
         claimRef.current = v.claim;
         setClaim(v.claim);
@@ -333,17 +481,39 @@ export function JoinFlow() {
         // the tab died was nothing yet, and restoring "error" would show a
         // stale complaint about a connection that may be fine now.
         if (v.persona?.state === "done" && v.persona?.inquiryId) setPersona(v.persona);
-        if (v.form) {
-          setTrades(v.form.trades ?? []); setParishes(v.form.parishes ?? []);
-          setTradeOther(v.form.tradeOther ?? ""); setName(v.form.name ?? "");
-          setPhone(v.form.phone ?? ""); setEmail(v.form.email ?? "");
-          setYears(v.form.years ?? "");
-          setTrn(v.form.trn ?? ""); setWork(v.form.work ?? "");
-          setLinks(v.form.links ?? []);
+        // A sent application, and which sitting they were in. Both are only
+        // meaningful with a claim behind them: "continuing" with no
+        // application is a screen asking for a passport with nowhere to put it.
+        if (v.sentRef) setSentRef(String(v.sentRef));
+        if (v.sentConsent === "granted" || v.sentConsent === "declined") {
+          setSentConsent(v.sentConsent);
         }
+        if (v.continuing === true && v.sentRef) setContinuing(true);
       }
+
+      // Last, because the step is an index into whichever sitting the two
+      // lines above just chose.
+      const at = Number(v.step);
+      if (Number.isInteger(at) && at >= 0 && at < 8) setStep(at);
     } catch { /* a corrupt cache is not worth an error screen */ }
+    finally { restored.current = true; }
   }, []);
+
+  /* Everything worth keeping, in one shape, so the debounced autosave below
+     and the explicit writes on an upload cannot disagree about what a
+     half-finished application consists of. */
+  const snapshot = useCallback(() => ({
+    step,
+    continuing,
+    sentRef,
+    sentConsent,
+    form: {
+      trades, parishes, tradeOther, name, phone, email, years, work, links, trn,
+      refs, signed, signedName, aiConsent,
+    },
+  }), [step, continuing, sentRef, sentConsent, trades, parishes, tradeOther,
+       name, phone, email, years, work, links, trn, refs, signed, signedName,
+       aiConsent]);
 
   const remember = useCallback(
     (next: Partial<{
@@ -353,14 +523,44 @@ export function JoinFlow() {
     }>) => {
       try {
         const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
-        localStorage.setItem(STORE, JSON.stringify({
-          ...cur, ...next,
-          form: { trades, parishes, tradeOther, name, phone, email, years, work, links, trn },
-        }));
+        localStorage.setItem(STORE, JSON.stringify({ ...cur, ...snapshot(), ...next }));
       } catch { /* private browsing, carry on */ }
     },
-    [trades, parishes, tradeOther, name, phone, email, years, work, links, trn],
+    [snapshot],
   );
+
+  /* Autosave, on a debounce, as they type.
+  
+     Before this, `remember` ran on exactly three events: the application being
+     opened, a document landing, and a Persona check being recorded. So the
+     paragraph somebody wrote in "in your own words, what do you do" survived
+     only if they happened to upload a file afterwards, and the three referees
+     and the signature were never written down at all.
+  
+     Nothing is written for a visitor who has only read the page: an empty
+     store in somebody's browser is a thing to explain and nothing to recover. */
+  useEffect(() => {
+    if (!restored.current) return;
+    const worthKeeping =
+      claim !== null || name.trim() !== "" || trades.length > 0 || parishes.length > 0 ||
+      phone.trim() !== "" || email.trim() !== "" || work.trim() !== "";
+    if (!worthKeeping) return;
+    const t = window.setTimeout(() => {
+      try {
+        const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
+        localStorage.setItem(STORE, JSON.stringify({ ...cur, ...snapshot() }));
+      } catch { /* private browsing, carry on */ }
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [snapshot, claim, name, trades, parishes, phone, email, work]);
+
+  /* Throw the lot away, on purpose, and say what went. Offered next to the
+     "saved on this phone" line, because a saved application somebody cannot
+     clear is the same problem as one that will not save. */
+  const startAgain = useCallback(() => {
+    try { localStorage.removeItem(STORE); } catch { /* fine */ }
+    window.location.reload();
+  }, []);
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -440,6 +640,14 @@ export function JoinFlow() {
         remember({ docs: next });
         return next;
       });
+
+      // After the finish call, not before it. A photograph that failed to
+      // upload must never appear in the preview as though it had landed.
+      if (docType === "profile_photo") {
+        if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
+        photoUrlRef.current = URL.createObjectURL(file);
+        setPhotoPreview(photoUrlRef.current);
+      }
     } catch (e) {
       setDocs((d) => ({
         ...d,
@@ -587,9 +795,45 @@ export function JoinFlow() {
         // a gap somebody could later read either way.
         signedName: signed ? signedName.trim() : "",
         signedVersion: GUIDELINES_VERSION,
+        /* Unanswered goes over as the word "declined", not as a gap. The
+           server reads a missing field the same way, but sending it explicitly
+           means the row records a decision somebody made rather than a silence
+           a later reader could take either way.
+
+           THIS FIELD GOING MISSING IS WHY THE QUESTION WENT MISSING. When the
+           consent UI was dropped from this page the submit stopped sending it,
+           the server correctly read that as declined, and every application
+           since has recorded a refusal nobody made. Do not remove one without
+           removing the other. */
+        aiReviewConsent: aiConsent || "declined",
+        aiReviewConsentVersion: AI_CONSENT_VERSION,
       });
+      setSentConsent(aiConsent || "declined");
       setSentRef(c.reference);
-      try { localStorage.removeItem(STORE); } catch { /* fine */ }
+      if (continuing) {
+        // The second sitting is finished. There is nothing left to come back
+        // to, so the store goes.
+        setSavedLater(true);
+        try { localStorage.removeItem(STORE); } catch { /* fine */ }
+      } else {
+        /* KEPT ON PURPOSE, and this is the fix for the worst hole in the flow.
+           Clearing here destroyed the claim the instant the application was
+           sent. The only door into the ID check is the button on the sent
+           screen, and that button needs the application id and the upload
+           token. So losing the tab between the two sittings made the second
+           sitting unreachable: no reference, no token, nothing to attach a
+           passport to, and no way to get back other than applying twice.
+           `sentRef` is written explicitly because the state set a line above
+           has not landed in the snapshot yet. */
+        try {
+          const cur = JSON.parse(localStorage.getItem(STORE) ?? "{}");
+          localStorage.setItem(STORE, JSON.stringify({
+            ...cur, ...snapshot(),
+            sentRef: c.reference,
+            sentConsent: aiConsent || "declined",
+          }));
+        } catch { /* private browsing, carry on */ }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "That did not send. Try again.");
     } finally {
@@ -624,7 +868,8 @@ export function JoinFlow() {
 
   const outstanding = CHECKS.filter((c) => c.req && !done[c.k]).map((c) => c.b);
   const STEPS = continuing ? LATER_STEPS : PHASE1_STEPS;
-  const d = STEPS[step];
+  const at = Math.min(Math.max(step, 0), STEPS.length - 1);
+  const d = STEPS[at];
 
   /* Step 3's heading is chosen at render time because the check it describes
      is chosen at render time. The static STEPS copy describes the in-page
@@ -638,6 +883,55 @@ export function JoinFlow() {
         note: "Persona tells our server what it found, and a person at Yaadly still decides your application. If the check will not run on your connection, the page takes uploads and an in-page capture instead and says so on the row.",
       }
     : d;
+
+  /* ── the second sitting is saved ───────────────────────────────────── */
+
+  /* This screen did not exist. Pressing "Send my application" on the last
+     Phase 2 screen set sentRef, which the sent screen below ignores while
+     `continuing` is true, so the button appeared to do nothing at all after
+     somebody had just handed over their identity documents. */
+  if (savedLater) {
+    return (
+      <>
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Saved</p>
+        <h1 className="mt-2 font-display text-[clamp(28px,5vw,52px)] uppercase leading-[.95]">
+          That is added to
+          <br />
+          <span className="bg-gradient-to-r from-mango to-coral bg-clip-text text-transparent">
+            {sentRef}.
+          </span>
+        </h1>
+        <div className="mt-6 max-w-[62ch] rounded-2xl border border-softline bg-soft p-6 text-[14.5px] leading-relaxed text-mute">
+          <b className="text-ink">What you have just added</b>
+          <ul className="mt-3 grid gap-2">
+            {[
+              ["Your identity check", done.id],
+              ["Your TRN", done.id2],
+              ["Your referees", done.refs],
+              ["The Worker Guidelines, signed", done.sign],
+            ].map(([label, ok]) => (
+              <li key={String(label)} className="flex items-start gap-2">
+                <span className={ok ? "text-tealb" : "text-dim"} aria-hidden="true">{ok ? "✓" : "•"}</span>
+                <span className={ok ? "text-mute" : "text-dim"}>
+                  {label}{ok ? "" : ", not yet"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4">
+            A person at the desk works through it and comes back to you on
+            whichever way you gave us to reach you. Anything still marked not
+            yet, we chase on WhatsApp.
+          </p>
+        </div>
+        <p className="mt-4 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
+          Sending your documents is the last thing we need from you, and the
+          decision is a person&rsquo;s to make after reading them. Your profile
+          stays held back from clients until somebody at Yaadly publishes it.
+        </p>
+      </>
+    );
+  }
 
   /* ── the sent screen ───────────────────────────────────────────────── */
 
@@ -658,14 +952,91 @@ export function JoinFlow() {
             <b className="text-ink">A person at the Yaadly desk reads every page
             from cold</b>, then telephones your referees. That is the part
             nothing automates, and it is the reason a client believes the badge
-            on your profile. Nothing about your documents is sent outside
-            Yaadly. Allow <b className="text-ink">within 48 hours</b>.
+            on your profile.{" "}
+            {sentConsent === "granted"
+              ? "Your paperwork goes to the model you agreed to first, and your identity documents go nowhere near it."
+              : "Nothing about your documents is sent outside Yaadly."}{" "}
+            Allow <b className="text-ink">within 24 hours</b>.
           </p>
           <p className="mt-3">
-            You will hear back on whichever way you gave us to reach you. Quote{" "}
-            <span className="font-mono text-ink">{sentRef}</span> if you contact
-            us first.
+            You will hear back on whichever way you gave us to reach you. Quote
+            your reference if you contact us first.
           </p>
+          <CopyRef reference={sentRef} />
+        </div>
+
+        {/* WHAT THIS IS NOT. The page said "it is with a person now" and left
+            it there, which a tradesperson can reasonably read as being in.
+            Applying is not acceptance, and the honest version of that has to
+            be on the one screen everybody who applies reaches. */}
+        <div className="mt-4 max-w-[62ch] rounded-2xl border border-line2 bg-bg p-5 text-[13.5px] leading-relaxed text-mute">
+          <b className="text-ink">Where you stand, plainly.</b>
+          <p className="mt-2">
+            Your profile exists from the moment you sent this, and it is{" "}
+            <b className="text-ink">held back from clients</b> until the
+            verification steps clear and somebody at Yaadly publishes it. So a
+            person reading your application is the first step rather than the
+            decision, and it is not a promise of work on its own. Every worker
+            on the board came through the same gate, and that is exactly why a
+            client trusts the badge when you get there.
+          </p>
+        </div>
+
+        {/* Checks, drawn from `done`, which only ever ticks when the thing is
+            actually true. It is the standing rule for this file: no row here
+            may describe a check the code has not performed. */}
+        <div className="mt-4 max-w-[62ch] rounded-2xl border border-line bg-panel p-5">
+          <b className="text-[15px] text-ink">Where your application stands</b>
+          <ul className="mt-3 grid gap-2 text-[13px] leading-relaxed">
+            <li className="flex items-start gap-2">
+              <span className="text-tealb" aria-hidden="true">✓</span>
+              <span className="text-mute">
+                <b className="text-ink">Received and stored.</b> Every file you
+                sent was checked and fingerprinted by our server after it
+                arrived, not just accepted on your browser&rsquo;s word.
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className={done.id ? "text-tealb" : "text-dim"} aria-hidden="true">{done.id ? "✓" : "•"}</span>
+              <span className={done.id ? "text-mute" : "text-dim"}>
+                <b className={done.id ? "text-ink" : ""}>Identity check.</b>{" "}
+                {done.id
+                  ? (persona.state === "done"
+                      ? (persona.verified
+                          ? "Persona has confirmed it to our server. A person at the desk still decides your application."
+                          : `Persona has it as "${persona.status || "unchecked"}". A person at the desk resolves it.`)
+                      : "Your documents are on file and a person checks them by hand.")
+                  : "Not started. This is the next thing we ask for."}
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-dim" aria-hidden="true">•</span>
+              <span className="text-dim">
+                <b>Referees.</b>{" "}
+                {done.refs
+                  ? "Given, and not telephoned yet. The calls happen before the jobs over £500."
+                  : "Not given yet. We telephone them before the jobs over £500."}
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-dim" aria-hidden="true">•</span>
+              <span className="text-dim">
+                <b>A person reading it.</b> Not yet. That is what the 24 hours is.
+              </span>
+            </li>
+            {/* What they chose, read back. `sentConsent` and not `aiConsent`,
+                so this reports the answer that actually went to the server
+                rather than the state of a radio button afterwards. */}
+            <li className="flex items-start gap-2">
+              <span className="text-tealb" aria-hidden="true">✓</span>
+              <span className="text-mute">
+                <b className="text-ink">Who may read your paperwork.</b>{" "}
+                {sentConsent === "granted"
+                  ? "You agreed that software may read your proof of address, TRN, certificates, CV and portfolio first and write notes for the person deciding. Your ID, selfie, face video and photograph of yourself were not sent to it."
+                  : "You asked that no AI model reads your documents, so none of them left Yaadly. A person reads every page by hand."}
+              </span>
+            </li>
+          </ul>
         </div>
         {/* The way into the second sitting, for anybody who would rather do
             it now and in a browser than wait to be chased on WhatsApp. It is
@@ -725,10 +1096,95 @@ export function JoinFlow() {
       </p>
 
       {claim && (
-        <p className="mt-2 text-[12px] text-dim">
-          Saved as <span className="font-mono text-mute">{claim.reference}</span>.
-          You can close this and come back on the same phone.
+        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-dim">
+          <span>
+            <b className="font-normal text-mute">Saved on this phone.</b> Close
+            it and come back, your reference is{" "}
+            <span className="font-mono text-mute">{claim.reference}</span>.
+          </span>
+          {/* A saved application somebody cannot clear is the same problem as
+              one that will not save. This says what goes, then goes. */}
+          <button type="button" onClick={startAgain}
+            className="underline underline-offset-4 hover:text-coral">
+            Start again, and clear what is saved here
+          </button>
         </p>
+      )}
+
+      {/* ── WHO SHOULD APPLY, and what it takes ─────────────────────────────
+          Neither of these existed. The page opened on "For tradespeople" and
+          went straight into eighteen trade chips, so the only way to find out
+          whether you qualified, or what you would be asked for, was to fill
+          the thing in and see.
+
+          Only on the first screen of the first sitting. Somebody who has come
+          back to add their ID has already answered this. */}
+      {at === 0 && !continuing && (
+        <>
+          <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
+            <b className="text-[15.5px] text-ink">Who this is for</b>
+            <p className="mt-1.5 max-w-[62ch] text-[13px] leading-relaxed text-dim">
+              Four things. If all four are true, this is worth your two minutes.
+            </p>
+            <ul className="mt-3 grid gap-3">
+              {WHO.map((w) => (
+                <li key={w.yes} className="flex items-start gap-2.5">
+                  <span className="mt-0.5 text-tealb" aria-hidden="true">✓</span>
+                  <span className="text-[13.5px] leading-relaxed">
+                    <b className="text-ink">{w.yes}.</b>{" "}
+                    <span className="text-mute">{w.why}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {/* Said plainly, because nothing on this page said it. A page
+                headed "getting on the board" can be read as a sign-up. */}
+            <p className="mt-4 rounded-xl border border-line2 bg-bg px-4 py-3 text-[13px] leading-relaxed text-mute">
+              <b className="text-ink">What applying gets you is a real person
+              reading it,</b> within 24 hours, and a straight answer either way.
+              It is the start of the check rather than the end of it: the
+              verification steps come next, and the board opens to you once
+              they clear. Worth knowing before you spend the two minutes.
+            </p>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-softline bg-soft p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <b className="text-[14.5px] text-ink">What you need now</b>
+                <span className="src ok">Two minutes</span>
+              </div>
+              <ul className="mt-2.5 grid gap-1.5 text-[13px] leading-relaxed text-mute">
+                {NEED_NOW.map((x) => (
+                  <li key={x} className="flex items-start gap-2">
+                    <span className="text-tealb" aria-hidden="true">•</span><span>{x}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
+                That is the whole first sitting. Everything else on these three
+                screens is optional and can wait.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-bg p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <b className="text-[14.5px] text-ink">What you need later</b>
+                <span className="src opt">Not today</span>
+              </div>
+              <ul className="mt-2.5 grid gap-1.5 text-[13px] leading-relaxed text-mute">
+                {NEED_LATER.map((x) => (
+                  <li key={x} className="flex items-start gap-2">
+                    <span className="text-dim" aria-hidden="true">•</span><span>{x}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
+                Asked for after a person has read your application and said
+                yes. Do not go hunting for any of it now.
+              </p>
+            </div>
+          </div>
+        </>
       )}
 
       {/* The WhatsApp door. Most of the supply side is on a phone, on
@@ -776,7 +1232,17 @@ export function JoinFlow() {
             <p className="mt-2 max-w-[58ch] text-[12.5px] leading-relaxed text-dim">
               {PHASES[d.phase].sub}
             </p>
-            <h2 className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none">
+            {/* Scoped to this sitting, never across both. See Progress below
+                for why that boundary matters. */}
+            <Progress n={at} total={STEPS.length} name={d.n} />
+            {/* tabIndex -1 so it can be focused programmatically without
+                becoming a tab stop. The outline is left visible: somebody who
+                has just been moved here should be able to see where they are. */}
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none focus:outline-none"
+            >
               {shown.h}
             </h2>
             <p
@@ -789,21 +1255,29 @@ export function JoinFlow() {
             {d.body === "form" && (
               <>
                 <div className="fgroup">
-                  <label className="fl">
+                  {/* Named group, announced state, and an explicit button type.
+                      These were bare buttons in a plain div: a screen reader
+                      heard eighteen unrelated buttons with no way to tell which
+                      were ticked, on the page where a tradesperson decides
+                      whether this is worth the effort. Multi-select here, so
+                      aria-pressed is exactly right. */}
+                  <label className="fl" id="lbl-jf-trades">
                     Your trades, tick every one you take{" "}
                     <span className={"src " + (trades.length > 0 ? "ok" : "req")}>
                       {trades.length > 0 ? `${trades.length} selected` : "Required, pick at least one"}
                     </span>
                   </label>
-                  <div className="chips">
+                  <div className="chips" role="group" aria-labelledby="lbl-jf-trades">
                     {TRADES.map((t) => (
-                      <button key={t} className={trades.includes(t) ? "on" : ""}
+                      <button key={t} type="button" aria-pressed={trades.includes(t)}
+                        className={trades.includes(t) ? "on" : ""}
                         onClick={() => toggle(trades, setTrades, t)}>
-                        {trades.includes(t) ? "✓ " : "+ "}{t}
+                        <span aria-hidden="true">{trades.includes(t) ? "✓ " : "+ "}</span>{t}
                       </button>
                     ))}
                   </div>
                   <input className="jf mt-2.5" placeholder="Not on the list? Type what you do (optional)"
+                    aria-label="A trade that is not on the list, optional"
                     value={tradeOther} onChange={(e) => setTradeOther(e.target.value)} />
                   <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                     We would rather know what you actually do than squeeze you into
@@ -812,17 +1286,37 @@ export function JoinFlow() {
                 </div>
 
                 <div className="fgroup">
-                  <label className="fl">
+                  <label className="fl" id="lbl-jf-parishes">
                     Parishes you will travel to{" "}
                     <span className={"src " + (parishes.length > 0 ? "ok" : "req")}>
                       {parishes.length > 0 ? `${parishes.length} selected` : "Required, pick at least one"}
                     </span>
                   </label>
-                  <div className="chips">
+                  {/* The launch area, in one tap. The three parishes and the
+                      reasoning now live in lib/taxonomy as LAUNCH_PARISHES, so
+                      this button and the client funnel cannot disagree about
+                      where the business operates. It adds to what is already
+                      ticked rather than replacing it. */}
+                  <div className="jquick">
+                    <button type="button"
+                      onClick={() => setParishes(Array.from(new Set([...parishes, ...LAUNCH_PARISHES])))}>
+                      + Kingston and Portmore
+                    </button>
+                    <button type="button" onClick={() => setParishes([...PARISHES])}>
+                      + All fourteen
+                    </button>
+                    {parishes.length > 0 && (
+                      <button type="button" onClick={() => setParishes([])}>
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="chips" role="group" aria-labelledby="lbl-jf-parishes">
                     {PARISHES.map((p) => (
-                      <button key={p} className={parishes.includes(p) ? "on" : ""}
+                      <button key={p} type="button" aria-pressed={parishes.includes(p)}
+                        className={parishes.includes(p) ? "on" : ""}
                         onClick={() => toggle(parishes, setParishes, p)}>
-                        {parishes.includes(p) ? "✓ " : "+ "}{p}
+                        <span aria-hidden="true">{parishes.includes(p) ? "✓ " : "+ "}</span>{p}
                       </button>
                     ))}
                   </div>
@@ -843,12 +1337,16 @@ export function JoinFlow() {
                   </label>
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <input className="jf" placeholder="Your full name (required)" autoComplete="name"
+                      enterKeyHint="next" aria-label="Your full name, required"
                       value={name} onChange={(e) => setName(e.target.value)} />
                     <input className="jf" placeholder="Years at the trade (optional)" inputMode="numeric"
+                      enterKeyHint="next" aria-label="Years at the trade, optional"
                       value={years} onChange={(e) => setYears(e.target.value)} />
                     <input className="jf" placeholder="Phone number (or give an email)" inputMode="tel" autoComplete="tel"
+                      enterKeyHint="next" aria-label="Your phone number, or give an email address instead"
                       value={phone} onChange={(e) => setPhone(e.target.value)} />
                     <input className="jf" placeholder="Email address (or give a phone)" inputMode="email" autoComplete="email"
+                      enterKeyHint="done" aria-label="Your email address, or give a phone number instead"
                       value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                   <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
@@ -877,20 +1375,61 @@ export function JoinFlow() {
                     your phone, and you can add the rest later.
                   </p>
                 </div>
-                <Upload label="A CV or a written history" hint="PDF, Word, or a photo of it"
-                  accept={CVFILE} doc="cv" docs={docs} onFile={upload} />
+                {/* A photograph of the person. Founder instruction, 3 Sep 2026.
+                
+                    WHAT THIS COPY MAY AND MAY NOT SAY. The file goes into the
+                    same private vetting bucket as everything else here, which
+                    means two things that rule out the obvious wording. Nothing
+                    on this page can publish it: `worker_profiles` has no photo
+                    column, so no code path puts it on a public profile. And
+                    every file in that bucket is deleted ninety days after
+                    upload by yaad-vetting-purge, so it could not serve as a
+                    lasting profile picture even if something did read it.
+                
+                    So it says what is true: it reaches the person deciding.
+                    Calling it "your profile photo" would be the ornamental
+                    claim this file exists to refuse. */}
+                <div className="rounded-xl border border-line bg-bg px-4 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <b className="text-[13.5px]">A photograph of you</b>
+                    <span className="src opt">Optional</span>
+                  </div>
+                  <p className="mt-1 mb-3 text-[12.5px] leading-relaxed text-mute">
+                    A clear picture of your face, or you on a job in your work
+                    clothes. Either is fine and your phone camera is fine.{" "}
+                    <b className="text-ink">It goes to the person reading your
+                    application</b>, so they can put a face to the name instead
+                    of a form. For photographs of your finished work, use the
+                    portfolio row below, which takes several in one file.
+                  </p>
+                  <Upload label="Your photograph" hint="A clear picture of your face, or you on a job"
+                    accept={IMAGES} doc="profile_photo" docs={docs} onFile={upload} optional />
+                  <p className="mt-2 text-[12px] leading-relaxed text-dim">
+                    Held the same way as your ID: a private store no browser can
+                    reach, <b className="text-mute">never sent to an AI
+                    model</b>, and destroyed ninety days after you send it. This
+                    page does not publish it anywhere.
+                  </p>
+                </div>
+
+                <Upload label="A CV or a written history" hint="A photo of it is fine"
+                  accept={CVFILE} doc="cv" docs={docs} onFile={upload} optional />
                 <Upload label="A portfolio, or photos of finished jobs" hint="One file, or a PDF of several"
-                  accept={PAPERS} doc="portfolio" docs={docs} onFile={upload} />
+                  accept={PAPERS} doc="portfolio" docs={docs} onFile={upload} optional />
                 <Upload label="Trade certificates, if you hold any" hint="Verified with the body that issued them, not read off the picture"
-                  accept={PAPERS} doc="certificate" docs={docs} onFile={upload} />
+                  accept={PAPERS} doc="certificate" docs={docs} onFile={upload} optional />
 
                 <div className="rounded-xl border border-line bg-bg px-4 py-3">
-                  <b className="text-[13.5px]">A link to your site, Instagram or Facebook</b>
+                  <b className="text-[13.5px]">
+                    A link to your site, Instagram or Facebook{" "}
+                    <span className="src opt">Optional</span>
+                  </b>
                   <span className="mt-1 block text-[12px] text-dim">
                     Add as many as you have. Anywhere your work is already visible.
                   </span>
                   <div className="mt-3 flex gap-2">
-                    <input className="jf" placeholder="instagram.com/yourwork" value={linkDraft}
+                    <input className="jf" placeholder="instagram.com/yourwork"
+                      aria-label="A link to your work, then press Add link" value={linkDraft}
                       onChange={(e) => setLinkDraft(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key !== "Enter") return;
@@ -919,9 +1458,18 @@ export function JoinFlow() {
                   )}
                 </div>
 
+                {/* Here because this is the screen that collects the CV, the
+                    portfolio and the certificates, and because it is the last
+                    screen before the first send. See AiConsent for why the
+                    position is load bearing rather than tidy. */}
+                <AiConsent value={aiConsent} onChange={setAiConsent} />
+
                 <div>
-                  <label className="fl">In your own words, what do you do</label>
-                  <textarea className="jf min-h-[110px] resize-y" value={work}
+                  <label className="fl" htmlFor="jf-work">
+                    In your own words, what do you do{" "}
+                    <span className="src opt">Optional</span>
+                  </label>
+                  <textarea id="jf-work" className="jf min-h-[110px] resize-y" value={work}
                     onChange={(e) => setWork(e.target.value)}
                     placeholder="The kind of jobs you take, the biggest one you have done, anything a client should know." />
                 </div>
@@ -1040,13 +1588,22 @@ export function JoinFlow() {
                         it does not slow your application down.
                       </p>
                     )}
+                    {/* Needed to be published, not needed to send. Nothing on
+                        this screen blocks a button, and saying which is which
+                        beats leaving somebody to guess from silence. */}
+                    <p className="text-[12.5px] leading-relaxed text-dim">
+                      <b className="text-mute">All five are needed before your
+                      profile can go public.</b> None of them blocks this page:
+                      you can save what you have and send the rest later, and we
+                      will chase whatever is missing on WhatsApp.
+                    </p>
                     <Upload label="Government photo ID" hint="Voter card, driver's licence, national ID or passport"
                       accept={PAPERS} doc="photo_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="photo" label="A live photo, with your ID beside your face"
                       doc="selfie_with_id" docs={docs} onFile={upload} />
                     <LiveCapture kind="video" label="A short video, face left to right" seconds={10}
                       doc="face_video" docs={docs} onFile={upload} />
-                    <Upload label="Your TRN" hint="Matched to the name on the ID"
+                    <Upload label="Your TRN card" hint="Matched to the name on the ID"
                       accept={PAPERS} doc="trn" docs={docs} onFile={upload} />
                     <Upload label="Proof of address" hint="Dated within the last three months"
                       accept={PAPERS} doc="proof_of_address" docs={docs} onFile={upload} />
@@ -1101,6 +1658,13 @@ export function JoinFlow() {
                   </div>
                 )}
 
+                {/* The same question, the same single answer. It is repeated
+                    here rather than moved because this screen adds two more
+                    documents it covers, and somebody who said no in two
+                    minutes flat should be able to change that when they are
+                    actually handing the paperwork over. */}
+                <AiConsent value={aiConsent} onChange={setAiConsent} />
+
                 <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed text-mute">
                   {personaActive ? (
                     <>
@@ -1127,13 +1691,34 @@ export function JoinFlow() {
 
             {d.body === "refs" && (
               <div className="grid gap-3">
-                {refs.map((r, i) => (
+                <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed">
+                  <b className="text-ink">Three referees, and each one needs
+                  either a number or something they said</b>{" "}
+                  <span className={refsDone ? "src ok" : "src req"}>
+                    {refsDone ? "All three answered" : "Needed to be published"}
+                  </span>
+                  <p className="mt-2 text-mute">
+                    You can leave this screen part done and send what you have.
+                    It does not stop you here, and it does stop your profile
+                    going public, so it is worth finishing.
+                  </p>
+                </div>
+                {refs.map((r, i) => {
+                  const rDone = (r.name.trim() && r.phone.trim()) || r.quote.trim();
+                  return (
                   <div key={i} className="rounded-xl border border-line bg-bg p-4">
-                    <b className="text-[13.5px]">Reference {i + 1}</b>
+                    <b className="text-[13.5px]">
+                      Reference {i + 1}{" "}
+                      <span className={rDone ? "src ok" : "src opt"}>
+                        {rDone ? "Answered" : "Not answered yet"}
+                      </span>
+                    </b>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      <input className="jf" placeholder="Name" value={r.name}
+                      <input className="jf" placeholder="Their name" value={r.name}
+                        enterKeyHint="next" aria-label={`Reference ${i + 1}, their name`}
                         onChange={(e) => setRefs(refs.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-                      <input className="jf" placeholder="Phone number" inputMode="tel" value={r.phone}
+                      <input className="jf" placeholder="Their phone number" inputMode="tel" value={r.phone}
+                        enterKeyHint="next" aria-label={`Reference ${i + 1}, their phone number`}
                         onChange={(e) => setRefs(refs.map((x, j) => j === i ? { ...x, phone: e.target.value } : x))} />
                     </div>
                     {/* The founder's ruling, 30 Aug: a forwarded WhatsApp
@@ -1144,16 +1729,18 @@ export function JoinFlow() {
                       className="jf mt-2"
                       rows={2}
                       placeholder="Or paste what they said about your work, or a link to it"
+                      aria-label={`Reference ${i + 1}, what they said about your work, or a link to it`}
                       value={r.quote}
                       onChange={(e) => setRefs(refs.map((x, j) => j === i ? { ...x, quote: e.target.value } : x))}
                     />
                     <label className="mt-3 flex items-start gap-2.5 text-[12.5px] leading-relaxed text-mute">
-                      <input type="checkbox" checked={r.told} className="mt-0.5 size-4 accent-teal"
+                      <input type="checkbox" checked={r.told} className="mt-0.5 size-5 accent-teal"
                         onChange={() => setRefs(refs.map((x, j) => j === i ? { ...x, told: !x.told } : x))} />
                       I have told this person that Yaadly will call them before I take a job over £500.
                     </label>
                   </div>
-                ))}
+                  );
+                })}
                 <p className="text-[12.5px] leading-relaxed text-dim">
                   <b className="text-mute">A message or a number, whichever you
                   have.</b> A forwarded WhatsApp message is enough to get you on
@@ -1165,11 +1752,19 @@ export function JoinFlow() {
 
             {d.body === "sign" && (
               <div className="grid gap-3">
-                <div className={"sigbox" + (signed ? " done" : "")}>
-                  <b>{signed ? "✓ Worker Guidelines signed" : "Worker Guidelines, current version"}</b>
+                <div className={"sigbox" + (signed && signedName.trim().length > 1 ? " done" : "")}>
+                  <b>
+                    {signed && signedName.trim().length > 1
+                      ? "✓ Worker Guidelines signed"
+                      : "Worker Guidelines, current version"}{" "}
+                    <span className={signed && signedName.trim().length > 1 ? "src ok" : "src req"}>
+                      {signed && signedName.trim().length > 1 ? "Signed" : "Not signed yet"}
+                    </span>
+                  </b>
                   <span>
                     How quoting works, the evidence you owe on every job, how you are
-                    paid, and what loses you the platform.
+                    paid, and what loses you the platform. Read it first, then tick
+                    the box and type your name.
                   </span>
                 </div>
                 <a href="/portal/guidelines" target="_blank" rel="noreferrer"
@@ -1177,12 +1772,14 @@ export function JoinFlow() {
                   Read the Worker Guidelines →
                 </a>
                 <label className="flex items-start gap-2.5 text-[13px] leading-relaxed text-mute">
-                  <input type="checkbox" checked={signed} className="mt-0.5 size-4 accent-teal"
+                  <input type="checkbox" checked={signed} className="mt-0.5 size-5 accent-teal"
                     onChange={() => setSigned(!signed)} />
                   I have read the Worker Guidelines and I agree to work to them on
                   every Yaadly job.
                 </label>
-                <input className="jf" placeholder="Type your full name to sign" value={signedName}
+                <label className="fl" htmlFor="jf-sign">Type your full name to sign</label>
+                <input id="jf-sign" className="jf -mt-2" placeholder="Your full name" value={signedName}
+                  enterKeyHint="done"
                   onChange={(e) => setSignedName(e.target.value)} />
                 <p className="text-[12px] leading-relaxed text-dim">
                   Recorded with a timestamp and the exact consent sentence, when you
@@ -1227,9 +1824,20 @@ export function JoinFlow() {
                     </p>
 
                     <div className="flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-panel p-5">
-                      <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
-                        {(name.trim() || "W").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase()}
-                      </span>
+                      {/* The photograph if this page still has it in memory,
+                          initials otherwise. After a reload there is nothing to
+                          fetch, because the file sits in a bucket no browser
+                          can read, so the fallback says the picture is on file
+                          rather than pretending it was never sent. */}
+                      {photoPreview ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={photoPreview} alt="The photograph you uploaded of yourself"
+                          className="size-16 flex-none rounded-2xl object-cover" />
+                      ) : (
+                        <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
+                          {(name.trim() || "W").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
                       <span className="min-w-[220px] flex-1">
                         <h3 className="font-display text-[clamp(20px,3.4vw,28px)] uppercase leading-none">
                           {name.trim() || "Your name"}
@@ -1250,6 +1858,13 @@ export function JoinFlow() {
                         <p className="mt-1.5 text-[11.5px] text-dim">
                           The Yaad Score starts at the first signed-off job
                         </p>
+                        {!photoPreview && docs.profile_photo?.state === "done" && (
+                          <p className="mt-1.5 text-[11.5px] text-tealb">
+                            Your photograph is on file. It cannot be shown here
+                            after a reload, because the store it sits in is not
+                            readable by a browser.
+                          </p>
+                        )}
                       </span>
                     </div>
 
@@ -1277,8 +1892,20 @@ export function JoinFlow() {
                         win or lose</b>. You are never charged for a lead. Your
                         price is agreed with you per job, in writing, before you
                         start, and your materials are paid at cost on top of it.{" "}
-                        <b className="text-ink">Once the client approves the
-                        evidence you are paid within 24 hours.</b>
+                        <b className="text-ink">You are paid per stage, not one
+                        lump at the end: a stage signed off is a stage paid,
+                        within 3 working days of the client approving your
+                        evidence.</b>{" "}
+                        Bank transfer, Lynk wallet or remittance pick-up,
+                        whichever you choose.
+                      </p>
+                      <p className="mt-2.5 text-[12.5px] text-dim">
+                        <b className="text-mute">Yaadly is not holding money at
+                        present.</b> Your labour is paid by the client through
+                        the route agreed on your job. You are told this before
+                        you turn up rather than after, and it is set out in the
+                        Worker Guidelines you sign. When holding goes live that
+                        section changes and you are asked to sign it again.
                       </p>
                     </div>
 
@@ -1287,7 +1914,7 @@ export function JoinFlow() {
                       <p className="mt-2">
                         <b className="text-ink">Your profile is created the
                         moment you send this.</b> A person at the Yaadly desk
-                        reads it, not a queue, and you hear back within 48
+                        reads it, not a queue, and you hear back within 24
                         hours. The ID check and your referees come next, and we
                         chase those on WhatsApp so you do not have to sit here
                         for them. <b className="text-ink">Your profile goes
@@ -1310,15 +1937,25 @@ export function JoinFlow() {
                   </div>
                 )}
 
+                {/* A failed send left the server's sentence and nothing else.
+                    Everything typed is still here and still saved on the phone,
+                    and somebody who does not know that closes the tab. */}
                 {error && (
-                  <div className="rounded-xl border border-coral/50 bg-coral/5 px-4 py-3 text-[13px] text-coral">
-                    {error}
+                  <div className="rounded-xl border border-coral/50 bg-coral/5 px-4 py-3 text-[13px] leading-relaxed text-coral">
+                    <b>{error}</b>
+                    <p className="mt-2 text-mute">
+                      Nothing was lost. Everything you have typed is still on
+                      this page and saved on this phone, so you can press the
+                      button again, or close this and come back to it later.
+                    </p>
                   </div>
                 )}
 
                 <button onClick={send} disabled={busy || !step1Ready}
                   className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                  {busy ? "Sending…" : "Send my application"}
+                  {busy
+                    ? (continuing ? "Saving…" : "Sending…")
+                    : continuing ? "Save what I have added" : "Send my application"}
                 </button>
                 {!step1Ready && (
                   <p className="text-[12.5px] text-dim">
@@ -1358,9 +1995,20 @@ export function JoinFlow() {
             </div>
           )}
 
-          <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            {step > 0 && (
-              <button onClick={() => setStep(step - 1)}
+          {/* On a phone this bar sticks to the bottom of the viewport. Continue
+              sat below thirty-two chips at the end of a long scroll, which is
+              the one control on the screen a thumb has to be able to find.
+              `at`, not `step`, so a restored step past the end of this sitting
+              steps from where the screen actually is.
+
+              It stops being sticky on the send screens, where the primary
+              action is Send, inside the panel and directly under the error
+              line it needs to be read with. Pinning a bar that holds nothing
+              but Back would spend seventy pixels of a phone on the one control
+              nobody is reaching for. */}
+          <div className={"jnav" + (d.body === "live" ? " jnav-flow" : "")}>
+            {at > 0 && (
+              <button onClick={() => setStep(at - 1)}
                 className="rounded-full border border-line2 px-5 py-2.5 text-[13px] font-bold transition hover:border-teal hover:text-tealb">
                 Back
               </button>
@@ -1376,11 +2024,26 @@ export function JoinFlow() {
                     catch (e) { setError(e instanceof Error ? e.message : "Could not start your application."); setBusy(false); return; }
                     setBusy(false);
                   }
-                  setStep(step + 1);
+                  setStep(at + 1);
                 }}
                 className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                 {busy && d.body === "form" ? "Starting…" : "Continue"}
               </button>
+            )}
+            {/* Why Continue is grey, next to Continue. It used to be a line of
+                small print further up the page, above the chips, so on a phone
+                the button and the reason it will not move were never on screen
+                together. */}
+            {d.body === "form" && !step1Ready && !busy && (
+              <span className="jwhy">
+                Still needed:{" "}
+                {[
+                  !(trades.length > 0) && "a trade",
+                  !(parishes.length > 0) && "a parish",
+                  !(name.trim().length > 1) && "your name",
+                  !(hasPhone || hasEmail) && "a phone number or an email",
+                ].filter(Boolean).join(", ")}.
+              </span>
             )}
           </div>
 
@@ -1391,6 +2054,201 @@ export function JoinFlow() {
 
       </div>
     </>
+  );
+}
+
+/**
+ * Who may read the paperwork.
+ *
+ * WHY IT IS BACK, AND WHY HERE.
+ *
+ * This question existed, then the page it lived on was cut and it went with
+ * it. What did not go was the server's reading of a missing answer: absent
+ * counts as declined, correctly, so every application since has recorded a
+ * refusal no applicant ever gave and yaad-vetting-review has never run for
+ * anybody. Founder instruction, 3 Sep 2026: put it back.
+ *
+ * It renders on TWO screens, and that is not decoration. `submit` is what
+ * triggers the review, and Phase 1 submits, so a question living only in
+ * Phase 2 would be answered after the only moment it could matter and the
+ * page would be back where it started. So it sits with the CV, portfolio and
+ * certificates in Phase 1, before the first send, and again beside the TRN
+ * and proof of address in Phase 2, where somebody handing over more paperwork
+ * can change their mind about it. One piece of state, one answer, sent on
+ * whichever submit happens.
+ *
+ * EVERY CLAIM IN THE COPY BELOW IS CHECKED IN CODE, and the standing rule for
+ * this file is that nothing may describe a check that is not performed:
+ *
+ *   what is withheld   IDENTITY_DOCS in supabase/functions/yaad-vetting-review,
+ *                      tested BEFORE the download, so a withheld file is never
+ *                      fetched out of the bucket at all. Today that is the
+ *                      photo ID, the selfie, the face turn, the introduction
+ *                      video and the profile photograph.
+ *   what is sent       whatever is left, which is the proof of address, the
+ *                      TRN, trade certificates, the CV and the portfolio.
+ *   who receives it    NVIDIA's hosted vision model. Named, because "an AI
+ *                      model" tells somebody nothing about which country
+ *                      their proof of address ends up in.
+ *   what it decides    nothing. It writes flags for a person. The governing
+ *                      rule is that a named human confirms every consequential
+ *                      step, and this is the screen where that promise is
+ *                      either kept in writing or quietly broken.
+ *
+ * Neither option is pre-selected. A consent that arrived ticked is not a
+ * consent, and a passport is not the document to be casual with.
+ */
+function AiConsent({
+  value, onChange,
+}: {
+  value: "" | "granted" | "declined";
+  onChange: (v: "granted" | "declined") => void;
+}) {
+  return (
+    <div className="rounded-xl border border-line bg-bg px-4 py-4">
+      <label className="fl" id="lbl-ai-consent">
+        Who may read your paperwork{" "}
+        <span className={value ? "src ok" : "src opt"}>
+          {value ? "Answered" : "Your choice, either way"}
+        </span>
+      </label>
+
+      <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
+        A person at Yaadly reads your documents and decides. Before they do, we
+        can have software read the paperwork first, to check the name is the
+        same on every one, that the dates are current, and that nothing looks
+        altered. It writes notes for that person.{" "}
+        <b className="text-ink">It never decides anything.</b>
+      </p>
+
+      <p className="mt-2.5 text-[12.5px] leading-relaxed text-mute">
+        <b className="text-ink">Your photo ID, your selfie, your face video and
+        your photograph of yourself are never sent to any AI model, whichever
+        you choose here.</b> Not once. Those go to our identity checker and to a
+        person at Yaadly, and nowhere else.
+      </p>
+
+      <p className="mt-2.5 text-[12.5px] leading-relaxed text-mute">
+        This choice is about the rest of it: your proof of address, your TRN,
+        your trade certificates, your CV and your portfolio. To read those we
+        send them to a model run by <b className="text-ink">NVIDIA</b>, outside
+        Yaadly, and they are not used to train anything. Say no and only a
+        person at Yaadly ever opens them.{" "}
+        <b className="text-ink">Saying no counts against you in no way at
+        all.</b> It is a little slower. That is the whole difference.
+      </p>
+
+      <div className="mt-3 grid gap-2.5" role="radiogroup" aria-labelledby="lbl-ai-consent">
+        {([
+          ["granted",
+            "Software may read the paperwork first, then a person decides",
+            "Your proof of address, TRN, certificates, CV and portfolio go to NVIDIA's model to be read. Your ID, selfie, face video and photograph of yourself do not."],
+          ["declined",
+            "A person only. Do not send any of my documents to an AI model",
+            "Nothing at all leaves Yaadly. A person reads every page from cold, and you still hear back within 24 hours."],
+        ] as const).map(([v, title, sub]) => (
+          <label key={v}
+            className={"flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition "
+              + (value === v ? "border-teal bg-soft" : "border-line bg-panel hover:border-line2")}>
+            <input type="radio" name="aiconsent" className="mt-0.5 size-5 shrink-0 accent-teal"
+              checked={value === v} onChange={() => onChange(v)} />
+            <span>
+              <b className="block text-[13.5px] leading-snug">{title}</b>
+              <span className="mt-1 block text-[12px] leading-relaxed text-dim">{sub}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
+        Neither is ticked for you. If you send your application without
+        choosing, <b className="text-mute">we read that as no</b> and a person
+        reads everything by hand.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The reference, and a way to take it with you.
+ *
+ * It was printed in a monospace span. On a phone that means selecting six
+ * characters by hand, from the one screen somebody is most likely to close.
+ * Clipboard access can be refused, so the fallback is to select the text and
+ * say so rather than to claim a copy that did not happen.
+ */
+function CopyRef({ reference }: { reference: string }) {
+  const [said, setSaid] = useState("");
+  const box = useRef<HTMLSpanElement | null>(null);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(reference);
+      setSaid("Copied");
+    } catch {
+      // No clipboard permission, or an insecure context. Select it instead,
+      // which is a real thing the person can then act on.
+      const el = box.current;
+      if (el && typeof window.getSelection === "function") {
+        const r = document.createRange();
+        r.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+        setSaid("Selected, copy it yourself");
+      } else {
+        setSaid("Write it down");
+      }
+    }
+    window.setTimeout(() => setSaid(""), 2500);
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2.5">
+      <span ref={box} className="rounded-lg border border-line2 bg-bg px-3 py-2 font-mono text-[14px] text-ink">
+        {reference}
+      </span>
+      <button type="button" className="upbtn" onClick={() => void copy()}>
+        {said || "Copy the reference"}
+      </button>
+      <span aria-live="polite" className="sr-only">{said}</span>
+    </div>
+  );
+}
+
+/**
+ * Progress, scoped to the sitting you are standing in.
+ *
+ * A nine-item rail used to sit above this flow and was removed on the
+ * founder's instruction, 30 Aug 2026, for a good reason: a list of nine things
+ * still to do is the first thing anybody saw and it is a reason to close the
+ * tab.
+ *
+ * What is here instead is not that rail coming back. Phase 1 is three screens
+ * and about two minutes, and "screen 2 of 3" is reassuring in exactly the way
+ * "step 4 of 9" was not. The count comes from the sitting's own length, so it
+ * cannot drift from the screens that exist, and it must never be made to span
+ * both sittings: that would rebuild the thing that was deleted.
+ */
+function Progress({ n, total, name }: { n: number; total: number; name: string }) {
+  return (
+    <div className="jprog">
+      <span className="dots" role="presentation">
+        {Array.from({ length: total }, (_, i) => (
+          <i key={i} className={i < n ? "done" : i === n ? "now" : ""} />
+        ))}
+      </span>
+      {/* aria-hidden, because the sr-only sentence below says the same thing
+          in a shape a screen reader can use. Without this both are read out. */}
+      <span className="pnum" aria-hidden="true">
+        {n + 1} of {total} · {name}
+      </span>
+      {/* The dots are decoration. This is the sentence a screen reader gets,
+          and it is the only one, so it carries the screen name too. */}
+      <span className="sr-only" aria-current="step">
+        Screen {n + 1} of {total}: {name}
+      </span>
+    </div>
   );
 }
 
@@ -1721,8 +2579,32 @@ function LiveCapture({
  * that has to be taken live goes through LiveCapture above, which opens the
  * camera itself and admits it when it cannot.
  */
+/** What this row will take, in words, read off the accept string it is
+ *  already given so the two can never disagree. Before this, the formats and
+ *  the 50MB cap lived only in the edge function and the bucket policy, and an
+ *  applicant on Jamaican mobile data found out about them by uploading for a
+ *  minute and then failing. */
+function formatsOf(accept: string): string {
+  const has = (x: string) => accept.includes(x);
+  const parts: string[] = [];
+  if (has("image/")) parts.push("photo");
+  if (has("application/pdf")) parts.push("PDF");
+  if (has("wordprocessingml") || has("msword")) parts.push("Word");
+  if (has("video/")) parts.push("video");
+  if (!parts.length) return `Up to ${MAX_MB}MB`;
+  const last = parts.pop() as string;
+  const list = parts.length ? `${parts.join(", ")} or ${last}` : last;
+  return `${list} · up to ${MAX_MB}MB`;
+}
+
+/** What to try when a file will not go. An upload that fails with only the
+ *  server's sentence on the row leaves somebody with nothing to do about it,
+ *  and the two real causes on a phone are a photograph far bigger than the
+ *  paper needed and a connection that dropped halfway. */
+const RECOVER = `Photograph the paper rather than scanning it, or take the picture again a little further back. Anything over ${MAX_MB}MB is refused. Nothing was stored, so trying again costs you nothing.`;
+
 function Upload({
-  label, hint, accept, doc, docs, onFile, capture, cta = "Choose file",
+  label, hint, accept, doc, docs, onFile, capture, cta = "Choose file", optional,
 }: {
   label: string;
   hint: string;
@@ -1732,22 +2614,35 @@ function Upload({
   onFile: (d: DocType, f: File) => void;
   capture?: "user" | "environment";
   cta?: string;
+  /** Stated on the row rather than left to be inferred from silence. */
+  optional?: boolean;
 }) {
   const st = docs[doc]?.state ?? "idle";
   const cur = docs[doc];
   return (
     <div className={"upl" + (st === "done" ? " done" : st === "error" ? " bad" : "")}>
       <div className="uplb">
-        <b>{st === "done" ? `✓ ${label}` : label}</b>
-        <span>
+        <b>
+          {st === "done" ? `✓ ${label}` : label}
+          {optional && st !== "done" && <> <span className="src opt">Optional</span></>}
+        </b>
+        {/* aria-live, because the outcome of choosing a file is announced
+            nowhere else: the button label goes back to reading "Replace" and a
+            screen reader is told nothing at all about whether it worked. */}
+        <span aria-live="polite">
           {st === "busy" ? "Sending…"
             : st === "done" ? `${cur?.file} · ${kb(cur?.bytes)} · stored`
             : st === "error" ? cur?.error
             : hint}
         </span>
+        {st === "idle" && <span>{formatsOf(accept)}</span>}
+        {st === "error" && <span className="rec">{RECOVER}</span>}
       </div>
       <label className="upbtn">
-        {st === "busy" ? "Sending…" : st === "done" ? "Replace" : cta}
+        {st === "busy" ? "Sending…"
+          : st === "done" ? "Replace"
+          : st === "error" ? "Try again"
+          : cta}
         <input
           type="file"
           accept={accept}

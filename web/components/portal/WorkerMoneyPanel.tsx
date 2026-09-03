@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { recordPayInfo } from "@/app/portal/worker-actions";
+import { jmd } from "@/lib/money";
 
 /**
  * Stage 5.6. The worker portal's own header has promised "what you are
@@ -27,7 +28,7 @@ export type MoneyJob = {
   payRef: string | null;
 };
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 const METHOD_LABEL: Record<string, string> = {
   bank_transfer: "Bank transfer",

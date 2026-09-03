@@ -87,6 +87,25 @@ body {
   --mono: var(--font-mono-app);
   --r: 14px;
   --tr: .15s;
+
+  /* Spacing, radius and breakpoint scale, added 3 Sep 2026. Additive only:
+     nothing reads these names yet, existing spacing/radius/breakpoints are
+     untouched. Deliberately plain :root custom properties, not @theme —
+     Tailwind v4 auto-generates utilities from @theme's --spacing- and
+     --radius- namespaces, so putting a scale there would silently redefine Tailwind's
+     own rounded-sm/rounded-xl etc. across every existing component. These
+     are for hand-written CSS and arbitrary-value Tailwind (rounded-[var(--radius-md)])
+     until a deliberate, reviewed migration adopts them. Same values in
+     docs/yaadly.css; change both together or the two halves of the site
+     drift again. Breakpoints are listed for reference only — a CSS custom
+     property cannot appear inside an @media condition, so consolidating an
+     existing breakpoint onto this scale still means writing the literal
+     px value, just one of these three instead of one of the thirteen
+     currently in use. */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-14: 56px;
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 18px; --radius-pill: 100px;
+  --bp-sm: 640px; --bp-md: 820px; --bp-lg: 1080px;
 }
 
 /* ── Join as a pro, ported from the preview's #s-join ─────────────────── */
@@ -94,10 +113,57 @@ body {
 .jlane{margin-top:16px}
 .jhead{margin-top:18px}
 .jbadge{display:inline-flex;font-size:11px;padding:4px 10px;border-radius:100px;background:var(--panel2);border:1px solid var(--line);color:var(--mute);margin-bottom:10px}
-.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
-.chips button{font-size:12px;padding:7px 11px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--mute);transition:.13s;cursor:pointer}
+/* Chips are the widest thing on /apply: eighteen trades and fourteen parishes,
+   and the applicant is on a phone. 44px is the finger target, not a rounding
+   up of 30px, so min-height is set rather than left to the padding. */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chips button{display:inline-flex;align-items:center;min-height:44px;font-size:13px;padding:8px 14px;border-radius:11px;border:1px solid var(--line);background:var(--bg);color:var(--mute);transition:.13s;cursor:pointer}
 .chips button:hover{border-color:var(--teal)}
 .chips button.on{border-color:var(--teal);background:var(--soft);color:var(--tealb)}
+
+/* The quick-pick row above the parish chips. Most applicants tick two parishes
+   and currently hunt through fourteen to find them. */
+.jquick{display:flex;flex-wrap:wrap;gap:7px;margin:2px 0 8px}
+.jquick button{min-height:36px;font-size:12px;font-weight:700;padding:6px 12px;border-radius:100px;border:1px dashed var(--line2);background:transparent;color:var(--mute);cursor:pointer;transition:.13s}
+.jquick button:hover{border-style:solid;border-color:var(--teal);color:var(--tealb)}
+
+/* Progress, scoped to the sitting you are in and never to the whole check.
+   Three or four dots. A nine-item rail was removed on purpose, 30 Aug 2026,
+   and this must never grow back into one. */
+.jprog{display:flex;align-items:center;gap:9px;margin:0 0 10px}
+.jprog .dots{display:flex;gap:6px}
+.jprog i{display:block;width:9px;height:9px;border-radius:100px;background:var(--line2);transition:.15s}
+.jprog i.done{background:var(--tealb)}
+.jprog i.now{background:transparent;border:2px solid var(--tealb);width:11px;height:11px}
+.jprog .pnum{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--dim)}
+
+/* The Back and Continue bar. On a phone it pins to the bottom of the viewport,
+   because Continue currently sits below thirty-two chips and a thumb never
+   finds it. */
+.jnav{margin-top:20px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.jwhy{font-size:12px;line-height:1.55;color:var(--dim)}
+@media(max-width:640px){
+  /* Pinned, because Continue used to sit below thirty-two chips at the end of
+     a long scroll and a thumb never found it.
+
+     The right end is kept clear on purpose. The Ask Yaadly chat pill is fixed
+     bottom-right at z-index 2400 on every page in this app (app/layout.tsx,
+     founder instruction 2 Sep 2026), so a full-width Continue here would put
+     its right third underneath a floating button. The bar yields; the widget
+     stays where the founder put it. */
+  .jnav{position:sticky;bottom:0;z-index:20;margin:20px -20px 0;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+  .jnav>button{flex:0 1 auto;min-height:48px}
+  /* The space the pill needs is reserved on the last button rather than on the
+     bar, so the line explaining why Continue is grey still gets the full
+     width. Nothing floats over text. */
+  .jnav>button:last-of-type{margin-right:150px}
+  /* Above the buttons, on its own line. */
+  .jnav>.jwhy{order:-1;flex-basis:100%}
+  /* The send screens keep their bar in the flow. See the comment at the call
+     site in JoinFlow.tsx. */
+  .jnav-flow{position:static;margin:20px 0 0;padding:0;background:none;border-top:0}
+  .jnav-flow>button:last-of-type{margin-right:0}
+}
 .evpick{display:flex;flex-wrap:wrap;gap:7px;margin-top:3px}
 .evpick button{font-size:11.5px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--mute);cursor:pointer;transition:.13s}
 .evpick button:hover{border-color:var(--teal)}
@@ -105,6 +171,10 @@ body {
 .src{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:100px}
 .src.ok{background:rgba(20,184,166,.14);color:var(--tealb)}
 .src.req{background:rgba(255,107,74,.16);color:var(--coral)}
+/* Neutral third state. "Optional" is an answer, not a missing requirement, so
+   it must not borrow the coral that means "this will stop you". Before this,
+   a bare .src had no background at all and read as stray small print. */
+.src.opt{background:var(--panel2);color:var(--dim)}
 .fgroup{margin-bottom:16px}
 .fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .jf{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:11px 12px;color:var(--ink);font:inherit;font-size:14px}
@@ -121,6 +191,10 @@ body {
 .sigbox b{display:block;font-size:13px;margin-bottom:4px}
 .sigbox span{font-size:11.5px;color:var(--dim);line-height:1.5;display:block}
 .sigbox.done b{color:var(--tealb)}
+/* Same specificity trap as `.upl span`: `.sigbox span{display:block}` outranks
+   `.src{display:inline-flex}` and stretched the little state chip into a
+   full width bar. */
+.sigbox .src{display:inline-flex;width:auto;vertical-align:middle}
 
 /* Upload rows on the join flow. The pill is a <label> wrapping a hidden file
    input, so the whole thing is a real tap target on a phone and the browser's
@@ -134,10 +208,20 @@ body {
 .upl.done b{color:var(--tealb)}
 .upl span{display:block;font-size:12px;color:var(--dim);line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
 .upl.bad span{color:var(--coral)}
+/* `.upl span{display:block}` above outranks `.src{display:inline-flex}`, which
+   stretched the Optional chip into a full width bar. Two classes beat one
+   class plus an element, so this wins it back. */
+.upl .src{display:inline-flex;width:auto;margin-top:0;vertical-align:middle}
+/* The "what to try" line on a failed row. The row is coral because something
+   went wrong; the instructions for fixing it should not also shout. */
+.upl.bad span.rec{color:var(--mute)}
 .upbtn{flex:0 0 auto;cursor:pointer;font-size:12px;font-weight:700;padding:9px 15px;border-radius:100px;border:1px solid var(--line2);color:var(--ink);background:var(--panel);transition:.13s;white-space:nowrap}
 .upbtn:hover{border-color:var(--teal);color:var(--tealb)}
 .upbtn input{display:none}
-@media(max-width:520px){.upl{flex-wrap:wrap}.upbtn{width:100%;text-align:center}}
+/* Scoped to upload rows on purpose. Unscoped, this made every .upbtn on the
+   page full width on a phone, which squashed the "Add link" input beside its
+   own button down to about thirty pixels. */
+@media(max-width:520px){.upl{flex-wrap:wrap}.upl .upbtn{width:100%;text-align:center}}
 
 /* Links added on step 2. A chip you can remove, so it is obvious the link was
    taken rather than typed into a box that forgot it. */
@@ -167,3 +251,46 @@ body {
 /* An amendment note is the history of the clause above it, not a clause.
    It reads as a margin note because that is what it is. */
 .doc-body .amend{border-left:2px solid var(--line2);padding-left:11px;margin:10px 0 0;font-size:12px;color:var(--dim)}
+
+/* ── Print ───────────────────────────────────────────────────────────────
+   The Completion Report is the artefact a client keeps. It is assembled from
+   the job's own record, it carries the evidence index with its fingerprints,
+   and section 6 is legally load bearing. Until this existed it lived only as
+   a web page behind a login: nothing to file, nothing to hand to a lender or
+   an insurer, nothing to keep if the account ever lapses.
+
+   A print stylesheet is the whole fix. No PDF pipeline, no new dependency,
+   and every browser and phone can already turn it into a file.
+
+   The rules are the obvious ones and each earns its place:
+   dark backgrounds become white, because a client printing this on an inkjet
+   should not empty a cartridge on a page of near-black; the header, the chat
+   launcher and anything interactive come out, because a button on paper is
+   noise; links stop being underlined in a colour nobody can see in grey; and
+   a page break is kept out of the middle of an evidence row, because a
+   fingerprint split across two sheets is not much use as a record. */
+@media print {
+  :root {
+    --bg: #ffffff; --panel: #ffffff; --panel2: #f6f6f9;
+    --line: #d8d8e4; --line2: #b9b9cc;
+    --ink: #111122; --mute: #33334d; --dim: #55556b;
+    --teal: #4B22C0; --tealb: #3A1799; --purple: #4B22C0; --purpleb: #3A1799;
+    --gold: #7a4f06; --goldb: #7a4f06; --green: #0f6b4a; --coral: #8d1900;
+    --soft: #f4f1fd; --softline: #cdbdf5;
+  }
+  body { background: #fff !important; color: #111122 !important; }
+
+  /* Chrome and Safari drop background colours in print unless asked. The
+     evidence table's banding is structure, not decoration, so keep it. */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* The site header, the floating chat, and anything you would tap. */
+  nav, #yc-launch, #yc-panel, form button, a[href^="/portal/jobs"] button { display: none !important; }
+
+  main { max-width: none !important; padding: 0 !important; }
+  a { text-decoration: none !important; color: #111122 !important; }
+
+  /* Keep a record and its fingerprint on one sheet. */
+  li, tr, .doc-body .callout { break-inside: avoid; page-break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+}

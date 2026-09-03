@@ -155,12 +155,21 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # `npm run lint` is deliberately NOT run here yet. It currently reports a
-      # pre-existing error in app/portal/join/page.tsx (react-hooks
-      # set-state-in-effect) that predates this job. Adding lint today would
-      # mean either a permanently red build, or quietly changing portal
-      # behaviour to make an unrelated job go green. Fix that error, then add
-      # `npm run lint` here in the same commit.
+      # Lint runs, as of 3 Sep 2026.
+      #
+      # This block used to explain why it could not: a pre-existing
+      # react-hooks set-state-in-effect error in app/portal/join/page.tsx,
+      # which could only be cleared by changing portal behaviour to make an
+      # unrelated job go green. That is the right call and it is why lint
+      # waited.
+      #
+      # The description had gone stale. The hooks error is gone; what was
+      # actually left was one unescaped apostrophe in QuotePanel.tsx and an
+      # unused catch binding in sign-in. Neither changes behaviour, both were
+      # fixed in the same commit that added this line, which is exactly the
+      # sequence the old comment asked for.
+      - name: Lint
+        run: npm run lint
 
       # The tests that matter here are the negative ones: an unsigned, forged or
       # replayed request to /api/hubspot/stage must write NOTHING. That endpoint
@@ -170,10 +179,52 @@ jobs:
       - name: Run the web tests
         run: npm test
 
-      # `next build` is deliberately not run here. check-env.mjs stops a
-      # production build without the Supabase values, which are secrets this
-      # workflow has no reason to hold. Typecheck and lint already catch the
-      # class of breakage a build would.
+      # The build DOES run here, with placeholder Supabase values.
+      #
+      # This used to say a build could not run because check-env.mjs stops one
+      # without the Supabase values and this workflow has no reason to hold
+      # secrets. The first half is true; the conclusion was not. check-env only
+      # asks that the variables are PRESENT, the values are inlined into an
+      # artifact this job throws away, and no page queries Supabase at build
+      # time (every data route is dynamic, only /, /_not-found and /icon.svg
+      # prerender). So placeholders are enough, and they are visibly fake so
+      # nobody mistakes them for a leaked key.
+      #
+      # It earns its place because `tsc --noEmit` does NOT generate Next's route
+      # types, and `next build` does. A route-shape mistake, a deleted layout
+      # still referenced by a generated validator, a bad generateMetadata
+      # signature, all pass typecheck and fail the deploy. That is the gap this
+      # closes, and it is the gap that was open on 3 Sep 2026 when a deleted
+      # layout left a dangling type reference behind.
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_not_a_real_key
+        run: npx next build
+
+  taxonomy:
+    name: Job taxonomy has not drifted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # The taxonomy exists in four copies: the generated source, a byte copy
+      # the marketing site loads, an inlined copy in the prototype, and a
+      # TypeScript restatement the app imports (the app cannot import a file
+      # that declares `var`). They agreed when this job was written and nothing
+      # kept them agreeing.
+      #
+      # This matters more than tidiness. The ONLY reason a client's roofing job
+      # and a worker's roofing profile find each other is that both came from
+      # one list. The day the copies diverge, a client posts a job in a trade no
+      # worker profile can carry and the two never meet, with both halves
+      # individually valid so nothing else notices. Same idea as the _shared
+      # drift check above, for the list the marketplace is built on.
+      - name: Check the four copies agree
+        run: node scripts/check-taxonomy.mjs
 
   secrets:
     name: No secrets committed

@@ -6,11 +6,12 @@ import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
+import { jmd } from "@/lib/money";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
 export const dynamic = "force-dynamic";
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 /**
  * The worker portal.
@@ -153,20 +154,40 @@ export default async function WorkerPortal() {
     }),
   );
 
-  const held = moneyJobs.filter((j) => j.held).reduce((sum, j) => sum + j.takeHome, 0);
+  const heldJobs = moneyJobs.filter((j) => j.held);
+  const held = heldJobs.reduce((sum, j) => sum + j.takeHome, 0);
   const released = moneyJobs.filter((j) => !j.held).reduce((sum, j) => sum + j.takeHome, 0);
+
+  /* What the held figure is actually waiting on, named.
+     "Released once each client approves" is true and tells a worker nothing
+     they can act on: not which job, not how many, not whether the ball is with
+     them or with somebody else. A tradesperson looking at a number with their
+     name on it wants to know who is holding it up. Naming the single job when
+     there is one is the common case and the useful one. */
+  const heldNote =
+    heldJobs.length === 0
+      ? "Nothing held right now"
+      : heldJobs.length === 1
+        ? `Waiting on the client to approve ${heldJobs[0].title ?? "this job"}`
+        : `Waiting on ${heldJobs.length} clients to approve. See job by job below.`;
 
   const tiles: Tile[] = [
     {
       label: "Held right now",
       value: jmd(held),
       held: held > 0,
-      note: held > 0 ? "Released once each client approves" : "Nothing held right now",
+      note: heldNote,
     },
     {
       label: "Released",
+      /* "Paid off-platform" was honest and meant nothing to the person
+         reading it. A tradesperson does not know what a platform is, let
+         alone what being off one implies about when money arrives. Say the
+         thing itself: how it comes, and how long. The 3 working days figure
+         is unchanged, and nothing here claims the money has moved, which is
+         WorkerInvoices' job and is worded carefully there. */
       value: jmd(released),
-      note: "Paid off-platform within 3 working days of release",
+      note: "Paid straight to you by bank transfer, Lynk or cash, within 3 working days",
     },
   ];
 

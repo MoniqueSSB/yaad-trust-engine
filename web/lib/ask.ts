@@ -1,5 +1,5 @@
 /**
- * What Ask a Yaad will accept, and the exact words it says when it will not.
+ * What Ask Yaadly will accept, and the exact words it says when it will not.
  *
  * This is a pure module on purpose: no React, no Supabase, no request. The
  * server action calls it before the insert and the form calls it as you type,
@@ -13,7 +13,12 @@
  * failed by the form, not by themselves.
  */
 
-/** Matches the database CHECK in 20260903d and the maxLength on the input. */
+/**
+ * Matches ask_question() (20260903d), which is the only door into `questions`.
+ * The function truncates at 500 and 60; this module refuses instead, because
+ * silently cutting the end off somebody's question is a worse answer than
+ * telling them to trim it. The floor of ten is the function's own.
+ */
 export const BODY_MIN = 10;
 export const BODY_MAX = 500;
 export const AREA_MAX = 60;
@@ -102,7 +107,7 @@ export function checkQuestion(bodyRaw: string, areaRaw: string): AskProblem | nu
     return {
       field: "body",
       message:
-        "That looks like a phone number or email address. This board is public, so leave those out. For a private reply use Ask Yaadly, the chat tab on the right.",
+        "That looks like a phone number or email address. This board is public, so leave those out. For a private reply use the chat tab on the right.",
     };
   }
   if (area.length > AREA_MAX) {

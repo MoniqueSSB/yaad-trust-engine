@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TRADES } from "@/lib/taxonomy";
+import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { QuotePanel } from "@/components/QuotePanel";
@@ -43,10 +44,6 @@ const STORE_LABEL: Record<string, string> = {
   none_available: "No secure store, buy in drops",
 };
 type Photo = { job_id: string; caption: string; img: string | null; position: number; storage_path: string | null };
-type Worker = {
-  name: string | null; trade: string | null; parish: string | null; lane: string | null;
-  jobs_completed: number | null; slug: string | null; about: string | null; years: number | null;
-};
 type QuotePackDraft = {
   job_id: string; status: string;
   docs: {
@@ -58,7 +55,7 @@ type QuotePackDraft = {
 
 export const metadata = {
   title: "The marketplace · Yaadly",
-  description: "Open property jobs across Jamaica and the verified workers who do them. Money held until the work is proven.",
+  description: "Open property jobs across Jamaica and the verified workers who do them. Nobody is paid until you approve the evidence.",
 };
 
 function ago(iso: string | null): string {
@@ -97,7 +94,12 @@ export default async function Board({
 
   const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] = await Promise.all([
     jq,
-    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed,slug,about,years").eq("active", true).order("jobs_completed", { ascending: false }),
+    // public_worker_profiles, not the base table: it already excludes
+    // worker_email and phone, neither of which this board (or any visitor)
+    // has any business reading. See 20260903f in supabase/migrations.
+    // The name and the column list come from the component that renders them,
+    // so /jobs and /workers cannot read different things into the same card.
+    supabase.from(WORKER_VIEW).select(SELECT_WORKER).order("jobs_completed", { ascending: false }),
     supabase.from("open_jobs").select("trade"),
   ]);
 
@@ -176,7 +178,21 @@ export default async function Board({
       </h1>
       <p className="mt-3.5 max-w-[62ch] text-[15.5px] leading-relaxed text-mute">
         Open property jobs across Jamaica and the verified workers who do them.{" "}
-        <b className="font-semibold text-ink">Money held until the work is proven.</b>
+        Yaadly coordinates the work, we don&apos;t employ every worker on it.{" "}
+        {/* Founder decision, 3 Sep 2026. "Money held until the work is
+            proven" was true of a short job on manual capture, where a card
+            authorisation is a real hold, and NOT true of a long job that goes
+            out as an invoice, where nothing is held by anyone. One sentence
+            covering both stopped being honest the moment both existed, and
+            which path a job takes is decided per job by the founder rather
+            than by a rule the reader could infer.
+
+            This wording is true on both: on a card hold nothing is captured
+            until the client approves, on an invoice nothing is raised until
+            they approve. It is also not a new claim, it is the sentence
+            already live on yaadly.co.uk, so the two halves of the site now
+            say the same thing. */}
+        <b className="font-semibold text-ink">Nobody is paid until you approve the evidence.</b>
       </p>
       <p className="mt-2.5 flex items-center gap-2 font-mono-app text-[11px] font-medium tracking-[0.06em] text-dim">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-gold stroke-2" strokeLinecap="round" strokeLinejoin="round">
@@ -185,17 +201,32 @@ export default async function Board({
         No addresses. No phone numbers. No budgets shown. Ever.
       </p>
 
-      {/* The founder's call: keep the row, leave the figures blank until
-          there are real ones worth showing. The labels hold the shape so
-          nothing moves on the page when the numbers arrive. */}
+      {/* The numbers arrived, 3 Sep 2026.
+          
+          The row was built with the figures deliberately blank, the founder's
+          call: keep the shape, leave them until there are real ones worth
+          showing. What shipped rendered an em dash in each slot, and to a
+          first-time visitor three dashes under a trust claim read as a page
+          that failed to load rather than as a business being careful.
+
+          Two of the three were never waiting on anything. Both counts are
+          already computed above, off the same queries this page renders, so
+          they were honest and available the whole time.
+
+          The third is gone rather than filled. "Paid on proof" is not a count
+          of anything: there is no number behind it, and inventing one to fill
+          a slot is exactly what the blank was protecting against. The claim
+          itself is not lost, it is the headline three lines up, which is where
+          a claim belongs rather than dressed up as a statistic. */}
       <div className="mt-5 flex flex-wrap gap-6">
         {[
-          ["jobs open now", false],
-          ["verified workers", false],
-          ["paid on proof", true],
-        ].map(([label, gold]) => (
+          [jobs.length, "jobs open now"],
+          [workers.length, "verified workers"],
+        ].map(([value, label]) => (
           <span key={label as string} className="flex items-baseline gap-2 font-mono-app text-[11px] font-medium uppercase tracking-[0.08em] text-dim">
-            <b className={"bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent " + (gold ? "bg-linear-to-br from-goldb to-gold" : "bg-linear-to-r from-purpleb via-purple to-gold")}>&mdash;</b>
+            <b className="bg-linear-to-r from-purpleb via-purple to-gold bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent tabular-nums">
+              {value as number}
+            </b>
             {label}
           </span>
         ))}
@@ -209,17 +240,26 @@ export default async function Board({
         <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={"inline-flex items-center gap-2 rounded-full border px-4.5 py-2.5 text-[13.5px] font-semibold transition " + (showWorkers ? "border-purple/45 bg-purple/10 text-purpleb" : "border-line text-mute hover:border-line2 hover:text-ink")}>
           The worker network <span className={"rounded-full bg-panel2 px-2 py-px font-mono-app text-[10.5px] " + (showWorkers ? "text-purpleb" : "text-dim")}>{workers.length}</span>
         </Link>
-        {/* /ask had no inbound link from anywhere: not the header, not the
-            marketing site, not this board. It was built, shipped and
-            unreachable, which is the same as not existing for the one visitor
-            it was for, the person who is not sure they have a job yet. It
-            belongs here, next to the board, because that is exactly the
-            moment somebody hesitates. */}
-        <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
-          <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask a Yaad</Link>
-          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
-          <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
-        </span>
+      </div>
+
+      {/* /ask had no inbound link from anywhere: not the header, not the
+          marketing site, not this board. It was built, shipped and
+          unreachable, which is the same as not existing for the one visitor
+          it was for, the person who is not sure they have a job yet. It
+          belongs here, next to the board, because that is exactly the
+          moment somebody hesitates.
+          Moved out of the tab row and onto its own line, Sep 2026 board
+          optimisation pass: these two links were competing with the two
+          actual tabs for attention at the very top of the page. "Join as a
+          worker" dropped from here, it already lives in the join panel
+          below and did not need saying twice. */}
+      <div className="mt-3 flex flex-wrap gap-4 text-[13px]">
+        {/* "Ask Yaadly" is the founder's 3 Sep naming decision, one name for
+            the board and the chat. "/jobs/trades" is where the trade filter
+            moved when /trades was repurposed for tradespeople the same day.
+            Both sides of this were right; they landed in parallel. */}
+        <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask Yaadly</Link>
+        <Link href="/jobs/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
       </div>
 
       {showWorkers ? (
@@ -228,9 +268,15 @@ export default async function Board({
         <>
           {trades.length > 1 && (
             <div className="mt-4.5 flex flex-wrap gap-2">
-              <Link href="/jobs" className={pill(!trade)}>All trades</Link>
+              {/* aria-current, because these are links styled as a filter and
+                  the only signal of which one is active was colour. A screen
+                  reader heard a list of trade names with nothing to say which
+                  filter the board was showing. */}
+              <Link href="/jobs" aria-current={!trade ? "page" : undefined} className={pill(!trade)}>All trades</Link>
               {trades.map((t) => (
-                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`} className={pill(trade === t)}>{t}</Link>
+                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`}
+                  aria-current={trade === t ? "page" : undefined}
+                  className={pill(trade === t)}>{t}</Link>
               ))}
             </div>
           )}
@@ -242,12 +288,35 @@ export default async function Board({
           </p>
 
           {jobs.length === 0 ? (
-            <p className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-              No jobs are open for quotes right now. Pitched jobs land here the
-              moment Yaadly opens them, so pitch yours and it can be next.
-            </p>
+            <div className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
+              {/* Split by vmode, Sep 2026 board optimisation pass: one generic
+                  sentence told a worker looking for their trade the same
+                  thing it told a client with nothing posted yet, and neither
+                  got a next step suited to them. */}
+              {vmode === "worker" ? (
+                <p>
+                  {trade
+                    ? <>Nothing open in {trade} right now. New jobs land here the moment they&apos;re opened, or{" "}
+                        <Link href="/jobs" className="font-semibold text-purpleb underline underline-offset-2">clear the filter</Link>
+                        {" "}to see every trade.</>
+                    : "Nothing open right now. New jobs land here the moment they're opened."}
+                </p>
+              ) : (
+                <p>
+                  No jobs are open for quotes right now.{" "}
+                  <Link href="/jobs/new" className="font-semibold text-purpleb underline underline-offset-2">Post yours, free</Link>
+                  , and it can be the next one on this board.
+                </p>
+              )}
+            </div>
           ) : (
-            <div className="mt-4 flex flex-col gap-3.5">
+            // Two columns from tablet width up, matching the grid the worker
+            // tab already uses, so switching tabs doesn't change the shape of
+            // the page. CSS columns rather than a grid because job cards vary
+            // a lot in height (a photo banner, a long description, an open
+            // quote panel); a grid would leave a short card's row half empty,
+            // columns just let the next card sit right underneath it.
+            <div className="mt-4 columns-1 gap-3.5 md:columns-2">
               {jobs.map((j) => {
                 // Only pictures that actually resolved. A tile with nothing in
                 // it is not a photograph, and counting it would overstate what
@@ -264,7 +333,7 @@ export default async function Board({
                     key={j.id}
                     id={j.id}
                     className={
-                      "group relative scroll-mt-6 overflow-hidden rounded-[18px] border bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] px-6 pb-4.5 pt-5.5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40 hover:shadow-[0_12px_44px_rgba(0,0,0,0.4)] " +
+                      "group relative mb-3.5 block scroll-mt-6 overflow-hidden break-inside-avoid rounded-[18px] border bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] px-6 pb-4.5 pt-5.5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40 hover:shadow-[0_12px_44px_rgba(0,0,0,0.4)] " +
                       (fresh ? "border-gold/35" : "border-line")
                     }
                   >
@@ -295,7 +364,7 @@ export default async function Board({
                           )}
                         </div>
                         <p className="mt-2 font-mono-app text-[9.5px] text-dim">
-                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client · <b className="font-medium text-mute">yaad-vision has read them all</b>
+                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client · <b className="font-medium text-mute">All photos reviewed for this listing</b>
                         </p>
                       </div>
                     )}
@@ -341,7 +410,7 @@ export default async function Board({
                       <span>
                         {(j.client_jobs_completed ?? 0) > 0
                           ? `Client · ${j.client_jobs_completed} job${j.client_jobs_completed === 1 ? "" : "s"} completed`
-                          : "First job on Yaadly"}
+                          : "Client's first job on Yaadly"}
                       </span>
                     </div>
 
@@ -354,9 +423,16 @@ export default async function Board({
                       >
                         {open ? "Close" : "Quote this job"}
                       </Link>
-                      <span className="font-mono-app text-[10.5px] font-medium tracking-[0.06em] text-dim">
-                        QUOTE ON THE SCOPE · NO BUDGET BAND SHOWN
-                      </span>
+                      {/* Real trust copy for a worker, explaining a founder
+                          rule they need to know about. A visitor or client
+                          was never shown a price band and has no context for
+                          why one is absent, so this stayed worker-only in the
+                          Sep 2026 board optimisation pass. */}
+                      {vmode === "worker" && (
+                        <span className="font-mono-app text-[10.5px] font-medium tracking-[0.06em] text-dim">
+                          QUOTE ON THE SCOPE · NO BUDGET BAND SHOWN
+                        </span>
+                      )}
                     </div>
 
                     {open && vmode !== "worker" && (
@@ -412,89 +488,3 @@ export default async function Board({
   );
 }
 
-function WorkerDirectory({ workers }: { workers: Worker[] }) {
-  if (workers.length === 0) {
-    return (
-      <p className="mt-5 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-        The worker network is being built parish by parish, and nobody is
-        listed before verification is complete: government photo ID on a video
-        call, and references called. Profiles appear here as workers pass.
-      </p>
-    );
-  }
-  return (
-    <>
-      <p className="mt-4 font-mono-app text-[11px] font-medium uppercase tracking-[0.06em] text-dim">
-        Every profile verified: government photo ID on a video call, references called
-      </p>
-      <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-        {workers.map((w, i) => {
-          const initials = (w.name ?? "W").split(" ").map((x) => x[0]).join("").slice(0, 2);
-          // Book routes into the post-a-job flow with this worker requested,
-          // per the founder's call: one flow, one place a job is created,
-          // and the enquiry says who the client asked for.
-          const book = `/jobs/new?${[w.slug && `worker=${encodeURIComponent(w.slug)}`, w.trade && `trade=${encodeURIComponent(w.trade)}`].filter(Boolean).join("&")}`;
-          return (
-            <div key={i} className="group flex flex-col gap-3.5 overflow-hidden rounded-[18px] border border-line bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] p-5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40">
-              {/* Pictures first, and each one its own: the worker's portrait,
-                  then their work. Placeholders until image storage exists. */}
-              <div className="flex gap-2.5">
-                <div className="relative grid size-[88px] shrink-0 place-items-center rounded-xl border border-line2 bg-[radial-gradient(ellipse_at_30%_20%,rgba(155,115,245,0.32)_0%,transparent_60%),linear-gradient(150deg,rgba(123,79,224,0.38),rgba(245,158,11,0.16))]">
-                  <span className="font-display text-[26px] font-medium text-white/90">{initials}</span>
-                  <span className="absolute inset-x-0 bottom-0 bg-linear-to-t from-bg/85 to-transparent py-0.5 text-center font-mono-app text-[7.5px] font-medium uppercase tracking-[0.12em] text-ink/55">
-                    photo
-                  </span>
-                </div>
-                <div className="grid flex-1 grid-cols-2 grid-rows-2 gap-2.5">
-                  {[0, 1, 2, 3].map((k) => (
-                    <span key={k} className="rounded-lg border border-line bg-linear-to-br from-purple/18 to-gold/[0.08] transition group-hover:border-line2" />
-                  ))}
-                </div>
-              </div>
-              <span className="-mt-1.5 font-mono-app text-[9px] font-semibold uppercase tracking-[0.16em] text-dim">
-                Portrait &amp; recent work · verified photos
-              </span>
-
-              <div className="flex items-start gap-3">
-                <span className="min-w-0 flex-1">
-                  <b className="block text-[15.5px] font-bold leading-tight">{w.name}</b>
-                  <small className="block text-[12.5px] text-mute">{w.trade ?? "General trades"}</small>
-                  <small className="block font-mono-app text-[10.5px] font-medium uppercase text-dim">{w.parish}</small>
-                </span>
-                <span className="text-right font-mono-app text-[11px] font-semibold text-goldb">
-                  {w.jobs_completed ?? 0}
-                  <small className="block font-mono-app text-[9px] font-medium uppercase tracking-[0.08em] text-dim">jobs</small>
-                </span>
-              </div>
-
-              {(w.about || w.years) && (
-                <p className="text-[12.5px] leading-relaxed text-mute">
-                  {w.years ? <b className="font-semibold text-ink">{w.years} years in the trade. </b> : null}
-                  {w.about ? w.about.slice(0, 150) + (w.about.length > 150 ? "…" : "") : null}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-1.5">
-                <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-semibold text-mute">ID verified</span>
-                <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-semibold " + (w.lane === "cert" ? "border border-gold/35 bg-gold/[0.08] text-goldb" : "border border-purple/30 bg-purple/[0.08] text-purpleb")}>
-                  {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
-                </span>
-              </div>
-
-              <div className="mt-auto grid grid-cols-2 gap-2">
-                {w.slug ? (
-                  <Link href={"/workers/" + encodeURIComponent(w.slug)} className="rounded-full border-[1.5px] border-purple/30 py-2.5 text-center text-[12.5px] font-semibold text-purpleb transition hover:border-purple hover:bg-panel2">
-                    View profile
-                  </Link>
-                ) : <span />}
-                <Link href={book} className="rounded-full bg-linear-to-br from-goldb to-gold py-2.5 text-center text-[12.5px] font-bold text-[#1A0F00] transition hover:-translate-y-px hover:brightness-105">
-                  Book for a job
-                </Link>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}

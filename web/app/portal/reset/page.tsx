@@ -37,7 +37,7 @@ export default function Reset() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-[420px] py-16 text-center">
+    <div role="status" className="mx-auto max-w-[420px] py-16 text-center">
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
         Signing you in
       </p>

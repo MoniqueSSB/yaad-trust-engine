@@ -164,15 +164,19 @@ A view that needs its own logic sets `bespoke:true` and gets a loader in
 
 ## Colour means something
 
-Three tones, and they are claims about state, not decoration.
+Three tones, and they are claims about state, not decoration. Realigned onto
+the shared Yaadly brand palette 3 Sep 2026 (purple in place of teal, gold in
+place of mango), the meaning is unchanged, only the hue is. The `--teal` and
+`--mango` variable names in `concierge.html` are also unchanged, they now
+just point at different values.
 
 | Tone | Means |
 |---|---|
-| teal | Proven. Signed off, released, verified, passed |
-| mango | Held. Waiting on somebody, money not yet moved |
+| purple | Proven. Signed off, released, verified, passed |
+| gold | Held. Waiting on somebody, money not yet moved |
 | coral | Blocked. Risk, failed, needs attention |
 
-A rail with no colour means the day is clear. Do not use mango or coral for
+A rail with no colour means the day is clear. Do not use gold or coral for
 anything else. A guidelines chip is coral when somebody is behind the version
 in force, because the database refuses to let them quote: that is a block, not
 a wait.

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { STAGES_SVC, svcStage } from "@/lib/portal/journey";
+import { SERVICE_TRACK, STAGES_SVC, svcStage } from "@/lib/portal/journey";
 import { PortalCard } from "@/components/portal/PortalCard";
 import { ServiceNext } from "@/components/portal/ServiceNext";
 import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
+import { gbp } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -16,16 +17,12 @@ export const dynamic = "force-dynamic";
  * table scopes rows to the client's email, so this page carries no filter.
  */
 
-// The stages a professional service moves through. `stage` on the row is an
-// index into this list, matching how the old portal used it.
-const TRACK = [
-  ["Booked and paid", "Portal link and code sent the moment payment cleared"],
-  ["Intake", "What is needed from you before the clock starts"],
-  ["Documents received", "The 72 hour turnaround starts here, not at payment"],
-  ["Desk work", "Checked against real material costs and day rates"],
-  ["Draft with you", "You read it first. A wrong fact gets fixed before it is final"],
-  ["Delivered", "PDF, signed, yours to keep"],
-] as const;
+// The stages moved to lib/portal/journey.ts on 3 Sep 2026, as SERVICE_TRACK.
+// They were declared here AND in journey.ts, as six and as twelve, both
+// indexed by the same services.stage column and both rendered on this page:
+// the heading read the six, the rail read the twelve, and a booking at stage 5
+// said "Delivered" at the top and "M1 · evidence" halfway down. One list now.
+const TRACK = SERVICE_TRACK;
 
 /* Its own title, so two job tabs are two different words in the tab strip.
    The id rather than the job's name because it is already on the page, it is
@@ -77,7 +74,7 @@ export default async function ServiceRoom({
     total_pence: number; issue_date: string; due_date: string;
     sent_at: string | null; paid_at: string | null;
   }[];
-  const gbp = (pence: number) => "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
   // The booking's Kickoff Pack. RLS only returns an approved pack to the
   // client, so its mere presence here means it is ready to read; while it
@@ -90,8 +87,13 @@ export default async function ServiceRoom({
     .limit(1)
     .maybeSingle();
 
-  const stage = Math.max(0, Math.min(svc.stage ?? 0, TRACK.length - 1));
+  /* One clamp, one index. There used to be two: one against the six-stage
+     TRACK and svcStage() against the twelve-stage STAGES_SVC, both reading the
+     same services.stage column, both rendered on this page. `stage` is kept as
+     an alias of `current` only so the JSX below reads naturally; they are the
+     same number and there is no longer any way for them to disagree. */
   const current = svcStage(svc.stage);
+  const stage = current;
   const viewing = (() => {
     const n = Number(sParam);
     return Number.isInteger(n) && n >= 0 && n < STAGES_SVC.length ? n : current;
@@ -124,7 +126,7 @@ export default async function ServiceRoom({
           {svc.type ?? "Professional service"}
         </h1>
         <span className="rounded-full border border-softline bg-soft px-3 py-1.5 text-[11.5px] font-bold text-tealb">
-          {TRACK[stage][0]}
+          {TRACK[stage].name}
         </span>
       </div>
 
@@ -150,7 +152,7 @@ export default async function ServiceRoom({
           The clock is visible so neither of us has to guess.
         </p>
         <ol className="grid gap-2.5">
-          {TRACK.map(([name, detail], i) => {
+          {TRACK.map(({ name, detail }, i) => {
             const state = i < stage ? "done" : i === stage ? "now" : "todo";
             return (
               <li

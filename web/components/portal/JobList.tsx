@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { STATUS_TONE, type StatusLabel, type StatusTone } from "./statusTone";
+import { whenDate } from "@/lib/date";
 
 /**
  * One job row, shared by the client portal and the worker portal.
@@ -66,15 +67,6 @@ function statusOf(status: string, labels: Record<string, StatusLabel>): StatusLa
   return labels[status] ?? { label: status, tone: "idle" };
 }
 
-/** "3 Sep 2026". Short, unambiguous across UK, US and Jamaican readers, which
- *  a numeric date is not. */
-function when(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
 export function JobList({
   title,
   jobs,
@@ -99,7 +91,7 @@ export function JobList({
         <ul className="grid gap-3">
           {jobs.map((j) => {
             const s = statusOf(j.status, labels);
-            const updated = when(j.updated_at);
+            const updated = whenDate(j.updated_at);
             return (
               <li key={j.id}>
                 <Link

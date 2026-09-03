@@ -35,16 +35,50 @@ before(async () => {
 });
 
 describe("the rails themselves", () => {
-  test("a job rail has 13 stages and a service rail has 12, per PORTAL-SPEC v1.0", () => {
+  /* THESE TWO ASSERTIONS WERE CHANGED ON 3 SEP 2026, and it is worth being
+     loud about that because changing a test to make code pass is normally the
+     wrong move and this repo says so.
+   
+     They are not being weakened to accommodate a broken change. The FACT they
+     described stopped being true: the service rail was twelve stages per
+     PORTAL-SPEC v1.0, and the founder decided it is six, the six a client has
+     actually been reading. See DECISIONS.md, 3 Sep. The old numbers are kept
+     in this comment so the change is visible rather than silent:
+     STAGES_SVC.length was 12, it started at "Booked & paid" and ended at
+     "Review". */
+  test("a job rail has 13 stages and a service rail has 6", () => {
     assert.equal(j.STAGES.length, 13);
-    assert.equal(j.STAGES_SVC.length, 12);
+    assert.equal(j.STAGES_SVC.length, 6);
   });
 
   test("both rails start at something live and end at something finished", () => {
     assert.equal(j.STAGES[0], "Job live");
     assert.equal(j.STAGES[j.STAGES.length - 1], "Reviews");
-    assert.equal(j.STAGES_SVC[0], "Booked & paid");
-    assert.equal(j.STAGES_SVC[j.STAGES_SVC.length - 1], "Review");
+    assert.equal(j.STAGES_SVC[0], "Booked and paid");
+    assert.equal(j.STAGES_SVC[j.STAGES_SVC.length - 1], "Delivered");
+  });
+
+  /* The test that makes the bug this replaced impossible rather than merely
+     fixed. There were two service lists of different lengths, both indexed by
+     the same services.stage column, both rendered on the same page: a booking
+     at stage 5 said "Delivered" in the heading and "M1 · evidence" on the rail.
+     STAGES_SVC is now DERIVED from SERVICE_TRACK, so the two cannot disagree
+     about length or order. If somebody restates it as a literal again, this
+     fails. */
+  test("the service rail is derived from the track, so the two cannot drift", () => {
+    assert.deepEqual(j.STAGES_SVC, j.SERVICE_TRACK.map((s) => s.name));
+    assert.equal(j.STAGES_SVC.length, j.SERVICE_TRACK.length);
+  });
+
+  test("every service stage carries a sentence saying what it means", () => {
+    for (const s of j.SERVICE_TRACK) {
+      assert.ok(s.name?.trim(), "a stage with no name");
+      assert.ok(s.detail?.trim().length > 15, `stage "${s.name}" has no real detail`);
+    }
+  });
+
+  test("svcStage clamps to the service rail, not to some other length", () => {
+    assert.equal(j.svcStage(999), j.SERVICE_TRACK.length - 1);
   });
 
   test("no stage name is blank, so the rail never renders an unlabelled step", () => {

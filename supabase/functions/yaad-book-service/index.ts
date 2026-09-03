@@ -49,8 +49,6 @@ const BOOKABLE: Record<string, string> = {
   care: "care-standard",
   "care-large": "care-large",
   "care-villa": "care-villa",
-  docs: "document-check",
-  setup: "setup-pack",
 };
 
 const PER_CALLER_PER_DAY = 3;

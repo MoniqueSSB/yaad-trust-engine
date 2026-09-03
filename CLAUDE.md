@@ -2,7 +2,7 @@
 
 Read this before every task in this repository. It is not background reading. It is the set of rules that hold when nobody is checking the diff.
 
-Written 30 August 2026, following the Yaadly Technical Notes of 24 August. Refreshed 31 August 2026, with Monique's approval, to match what is actually in the repository, mainly §11. The rules in the rest of this file are unchanged. Monique owns this file. Do not rewrite it to suit a task. If a rule here blocks what you were asked to do, say so and stop.
+Written 30 August 2026, following the Yaadly Technical Notes of 24 August. Refreshed 31 August 2026, with Monique's approval, to match what is actually in the repository, mainly §11. Amended 3 September 2026, on her explicit instruction, to take payment integration off the §9 list; that section records what the change does and does not permit. The rules in the rest of this file are unchanged. Monique owns this file. Do not rewrite it to suit a task. If a rule here blocks what you were asked to do, say so and stop.
 
 ---
 
@@ -131,13 +131,16 @@ Say "held safely with a licensed payment provider". **Never say escrow.** Never 
 
 Going bare minimum to a December pilot in Kingston and Portmore. The following are out of scope right now. If asked for one, **say it is on this list first**, then do it if she still wants it.
 
-- Payment integration of any kind, before the legal review lands.
 - Yaad Score computation.
 - A market-rate comparison agent.
 - A full worker dashboard. The worker in Portmore is on a phone mid-job and will do everything over WhatsApp. The worker web surface stays thin on purpose: structured onboarding with credentials, and file upload. Nothing else.
 - Dispute ruling logic. The pack is assembled by machine, the ruling is a human decision on a published timeline.
 
 Scope creep with an agent is frictionless, which is exactly the danger.
+
+Payment came off this list on 3 September 2026, on Monique's instruction, once she confirmed legal sign-off and insurance were in hand. Yaadly is principal: the client buys the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson. `raise_job_client_invoice()` and `raise_job_worker_payable()` are the two documents, and `DECISIONS.md` carries the reasoning.
+
+**Read the next sentence before you touch anything in the payment path.** Payment being live changes what may be built. It changes nothing whatsoever in §2 or §3. A named human still approves every release, every time. Nothing auto-releases on a timer, a confidence score, or an evidence check passing, and "the payment provider supports automatic capture" is not a reason to use it. If a task arrives asking to release funds once the evidence passes, or to reduce the clicks between approval and payment, that is still the request §3 exists to refuse, and it is more tempting now that money actually moves, not less. §5 is also untouched: pricing is still a lookup, and a payment integration is not a reason to let a model near a price.
 
 Patois voice notes are now transcribed automatically (`supabase/functions/yaad-transcribe`, Cloudflare Workers AI Whisper first, OpenAI, Deepgram, Scribe and AssemblyAI as failover), so that item has come off this list. It does not change §4: the transcript still only ever reaches the Intake agent as text, and Intake still cannot quote a price or promise a timeline.
 
@@ -204,7 +207,9 @@ python3 -m http.server 8932 --directory docs
 python3 -m http.server 8934 --directory preview
 ```
 
-`npm run lint` exists but is not yet wired into CI: it currently reports one pre-existing error that predates the job. Do not add it to CI and silently change behaviour to make it pass; fix the error first, in its own change, then wire the job in the same commit. See the comment in `.github/workflows/ci.yml`.
+`npm run lint` runs in CI and passes clean, as of 3 September 2026. This paragraph used to say the opposite: that lint had one pre-existing error and must not be wired in until that error was fixed in its own change. That was the right rule and it was followed. The error is gone and the job is in `.github/workflows/ci.yml`, which keeps the history in a comment. Corrected 3 Sep 2026 by the post-optimisation regression audit, because a rule describing a state that no longer exists reads as permission to skip the check.
+
+Edge Function deployment note, also corrected by that audit: the list of endpoints running without platform auth below is longer than §12 used to say. Read it live before trusting either.
 
 Edge Functions are deployed by hand, from disk, never by pasting file contents (§12): `supabase functions deploy <name> --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`. If you touched anything in `_shared/`, run `supabase/functions/sync-shared.sh` first and redeploy every function that imports it, or the thing you tested is not the thing you deployed.
 
@@ -214,7 +219,7 @@ Edge Functions are deployed by hand, from disk, never by pasting file contents (
 
 - Supabase is on the **free plan**. Do not raise Pro-only items.
 - **Deploy Edge Functions from disk only**, with the CLI and `--project-ref`. Never paste file contents into a deploy tool. It has silently shipped a different intake flow before.
-- **`--no-verify-jwt` is per function, never a blanket.** Most functions run with `verify_jwt = true` and the platform checks the token before the code runs. Passing the flag turns that off, silently, and the deploy still succeeds. On 30 August 2026 the blanket form of this rule would have stripped platform auth from `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff`, `yaad-post-job` and `yaad-sketch`. Read the live setting first with `supabase functions list --project-ref <ref>` and preserve what is there. Only the endpoints that carry their own authentication get the flag: today that is `yaad-inbound`, `yaad-vetting-review`, `yaad-vetting-upload` and `yaad-enquiry`. (`yaad-whatsapp-webhook` was on this list; it spoke to Meta's Cloud API directly, never received real traffic, and was deleted 1 Sep 2026, see DECISIONS.md. Real WhatsApp intake runs through `yaad-inbound`, over Twilio.)
+- **`--no-verify-jwt` is per function, never a blanket.** Most functions run with `verify_jwt = true` and the platform checks the token before the code runs. Passing the flag turns that off, silently, and the deploy still succeeds. On 30 August 2026 the blanket form of this rule would have stripped platform auth from `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff`, `yaad-post-job` and `yaad-sketch`. Read the live setting first with `supabase functions list --project-ref <ref>` and preserve what is there. Only the endpoints that carry their own authentication get the flag. **Read it live, do not trust this sentence:** on 3 September 2026 the regression audit found ten functions running without platform auth where this line named four, which is the failure mode the line exists to prevent. As of that check: `yaad-inbound`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`, `yaad-website-intake`, `yaad-post-job`, `yaad-book-service`, `yaad-portal-code`, `yaad-quote-landed` and `yaad-notify-client`. The six that were added are public endpoints carrying their own throttle, signature or origin check, so the expansion is legitimate; the list going stale is not, because this list is the control. (`yaad-whatsapp-webhook` was on this list; it spoke to Meta's Cloud API directly, never received real traffic, and was deleted 1 Sep 2026, see DECISIONS.md. Real WhatsApp intake runs through `yaad-inbound`, over Twilio.)
 - **Parallel Claude sessions share this working tree.** The branch and the files can change under you mid-task. Check `git status` before assuming your edit is still the newest thing here.
 - Merges to `main` are Monique's click by default. Do them when she says so.
 - Nothing in this repository contains real client, worker, ID or payment data. Keep it that way.

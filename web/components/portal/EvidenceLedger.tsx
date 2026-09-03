@@ -12,10 +12,16 @@
  * are not deleted, because the whole product rests on them being checkable.
  * They move inside a details element, closed by default, one per stage. A
  * client who never opens it loses nothing; a client in a dispute has it all.
+ *
+ * The button that actually approves a stage moved to its own Approvals tab
+ * (3 Sep 2026), next to the money it releases and behind its own hold point,
+ * so this ledger only ever answers "what is the proof", never "shall I
+ * release the money" in the same breath.
  */
 
-import { ApproveButton } from "./ApproveButton";
+import Link from "next/link";
 import { EvidenceItemComment } from "./EvidenceItemComment";
+import { whenDateTime } from "@/lib/date";
 
 export type EvidenceItem = {
   id: string;
@@ -30,7 +36,7 @@ export type EvidenceItem = {
 type StageState = "done" | "now" | "todo";
 
 function stamp(iso: string | null) {
-  return iso ? new Date(iso).toISOString().slice(0, 16).replace("T", " ") : "";
+  return whenDateTime(iso) ?? "";
 }
 
 export function EvidenceLedger({
@@ -47,9 +53,9 @@ export function EvidenceLedger({
   currentStage: number;
   role: "client" | "worker";
   awaitingApproval: boolean;
-  /** Only used to build the Approve button and the link to the dispute form,
-      neither of which render for a worker. Optional so nothing else calling
-      this component needs to change. */
+  /** Only used to build the link to the Approvals tab and to gate the
+      per-photo comment box, neither of which render for a worker. Optional
+      so nothing else calling this component needs to change. */
   jobId?: string;
 }) {
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
@@ -110,13 +116,17 @@ export function EvidenceLedger({
           </span>
         </div>
 
-        {/* The button the product is named after. Client only: a worker
+        {/* The button the product is named after lives on the Approvals tab
+            now, next to the money it releases. Client only: a worker
             approving his own work is the thing this whole ledger exists to
-            rule out. jobId is optional on the type only so nothing else
-            calling EvidenceLedger has to change; the page that matters
-            always passes it. */}
+            rule out. */}
         {awaitingApproval && role === "client" && jobId && (
-          <ApproveButton jobId={jobId} queryHref="?tab=job#dispute" />
+          <Link
+            href="?tab=approvals"
+            className="mt-3.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110"
+          >
+            Go to Approvals to sign off &rarr;
+          </Link>
         )}
       </div>
 

@@ -175,7 +175,7 @@ describe("jobGates", () => {
 
   test("the materials gate anchors into the job it belongs to", () => {
     const materials = gatesFor(fresh(), { hasAcceptedMaterials: true }).find((x) => /materials/i.test(x.title));
-    assert.equal(materials.href, "/portal/jobs/JOB-TEST-1#materials");
+    assert.equal(materials.href, "/portal/jobs/JOB-TEST-1?tab=materials#materials");
   });
 
   test("account gates are identical across two different jobs, so they can be shown once", () => {
