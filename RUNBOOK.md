@@ -1158,7 +1158,29 @@ grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|re
 grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
 ```
 
-## Adding the Stripe payment links to the site
+## Creating the Stripe payment links
+
+There is a script: `scripts/create-payment-links.mjs`, with its prices in `scripts/payment-links.json`. Read the JSON before you run anything, because it is the list of amounts Stripe will actually charge.
+
+```bash
+export STRIPE_SECRET_KEY=sk_live_...          # your own terminal, never a chat session
+node scripts/create-payment-links.mjs          # dry run, creates nothing
+node scripts/create-payment-links.mjs --live   # actually creates them
+```
+
+The URLs land in `scripts/payment-links.out.json` (gitignored). Those are `https://buy.stripe.com/...` addresses: public, safe to paste anywhere, and the thing a session needs in order to wire them to buttons. The secret key is not in that file and must not leave your terminal.
+
+**Why a script and not the Dashboard.** The Dashboard link builder charges the card the moment the client pays and has no hold option. A hold needs `payment_intent_data[capture_method]=manual`, which is API only. Every one-off service on the menu is under £500, and at or under £500 is a hold under the 3 September rule, so the Dashboard is the wrong tool for the entire menu. The hold is what makes "your card is not charged until you approve the work" true, and that sentence is live on three pages.
+
+**Three guards, all tested.** The script refuses to run without a key, refuses a string that is not shaped like a Stripe secret key, and refuses any one-off priced at or above £500 because that is an invoice, not a link. It dry-runs by default even with a live key.
+
+**Re-running is safe.** Every object is created under an idempotency key derived from the service id and its price, so a second run returns the same link instead of a duplicate. Change a price and you get a new link, which is correct: a Payment Link's amount cannot be edited after creation, it has to be replaced and the old one deactivated in the Dashboard.
+
+**A hold is not money in the bank.** A card authorisation lasts seven days on every brand, with no request to Stripe and no special pricing. If nobody captures it in that window it expires and you have to ask the client again. Capturing is a named person's decision on the evidence, never a timer, so the seven days is an operational commitment: work delivered inside seven days can be a hold, anything slower cannot.
+
+**Before running it live, one thing is unresolved.** `docs/services.html` and `public.service_catalogue` disagree on prices. Property Care is the serious one: the site shows £75, £135 and £175, the catalogue holds £45, £70 and £95. Oversight Retainer and Condition Report differ too, and the express tiers and Project Setup Pack exist on only one side. The JSON follows the site, because that is what a client has been shown, and the `_UNRESOLVED` key in it records the conflict. Settling it is a pricing decision and therefore the founder's. Fix both sides in the same change, or the invoice and the payment link will take different amounts for the same job.
+
+## The older note on choosing between Dashboard and API links
 
 Not done, and it cannot be done from a chat session: creating a link needs the Stripe account, and a secret key must never be pasted into one. The founder creates each link in Stripe, hands over the URLs, and a session wires them to the buttons.
 
