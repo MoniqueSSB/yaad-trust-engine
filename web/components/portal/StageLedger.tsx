@@ -253,7 +253,7 @@ export function StageLedger({
                     href={jobBase + "?tab=evidence"}
                     className="rounded-full bg-linear-to-br from-goldb to-gold px-4.5 py-2.5 text-[12.5px] font-bold text-[#1A0F00] transition hover:brightness-105"
                   >
-                    Review and approve stage {s.n} &rarr;
+                    Review the evidence for stage {s.n} &rarr;
                   </Link>
                   {/* The other way to sign a stage off. It existed at the
                       bottom of the evidence tab and nowhere else, so nobody
