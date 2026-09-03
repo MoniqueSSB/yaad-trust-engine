@@ -178,6 +178,7 @@ export default async function Board({
       </h1>
       <p className="mt-3.5 max-w-[62ch] text-[15.5px] leading-relaxed text-mute">
         Open property jobs across Jamaica and the verified workers who do them.{" "}
+        Yaadly coordinates the work, we don&apos;t employ every worker on it.{" "}
         {/* Founder decision, 3 Sep 2026. "Money held until the work is
             proven" was true of a short job on manual capture, where a card
             authorisation is a real hold, and NOT true of a long job that goes
@@ -239,21 +240,26 @@ export default async function Board({
         <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={"inline-flex items-center gap-2 rounded-full border px-4.5 py-2.5 text-[13.5px] font-semibold transition " + (showWorkers ? "border-purple/45 bg-purple/10 text-purpleb" : "border-line text-mute hover:border-line2 hover:text-ink")}>
           The worker network <span className={"rounded-full bg-panel2 px-2 py-px font-mono-app text-[10.5px] " + (showWorkers ? "text-purpleb" : "text-dim")}>{workers.length}</span>
         </Link>
-        {/* /ask had no inbound link from anywhere: not the header, not the
-            marketing site, not this board. It was built, shipped and
-            unreachable, which is the same as not existing for the one visitor
-            it was for, the person who is not sure they have a job yet. It
-            belongs here, next to the board, because that is exactly the
-            moment somebody hesitates. */}
-        <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
-          {/* "Ask Yaadly" is the founder's 3 Sep naming decision, one name for
-              the board and the chat. "/jobs/trades" is where the trade filter
-              moved when /trades was repurposed for tradespeople the same day.
-              Both sides of this were right; they landed in parallel. */}
-          <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask Yaadly</Link>
-          <Link href="/jobs/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
-          <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
-        </span>
+      </div>
+
+      {/* /ask had no inbound link from anywhere: not the header, not the
+          marketing site, not this board. It was built, shipped and
+          unreachable, which is the same as not existing for the one visitor
+          it was for, the person who is not sure they have a job yet. It
+          belongs here, next to the board, because that is exactly the
+          moment somebody hesitates.
+          Moved out of the tab row and onto its own line, Sep 2026 board
+          optimisation pass: these two links were competing with the two
+          actual tabs for attention at the very top of the page. "Join as a
+          worker" dropped from here, it already lives in the join panel
+          below and did not need saying twice. */}
+      <div className="mt-3 flex flex-wrap gap-4 text-[13px]">
+        {/* "Ask Yaadly" is the founder's 3 Sep naming decision, one name for
+            the board and the chat. "/jobs/trades" is where the trade filter
+            moved when /trades was repurposed for tradespeople the same day.
+            Both sides of this were right; they landed in parallel. */}
+        <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask Yaadly</Link>
+        <Link href="/jobs/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
       </div>
 
       {showWorkers ? (
@@ -282,10 +288,27 @@ export default async function Board({
           </p>
 
           {jobs.length === 0 ? (
-            <p className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-              No jobs are open for quotes right now. Pitched jobs land here the
-              moment Yaadly opens them, so pitch yours and it can be next.
-            </p>
+            <div className="mt-4 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
+              {/* Split by vmode, Sep 2026 board optimisation pass: one generic
+                  sentence told a worker looking for their trade the same
+                  thing it told a client with nothing posted yet, and neither
+                  got a next step suited to them. */}
+              {vmode === "worker" ? (
+                <p>
+                  {trade
+                    ? <>Nothing open in {trade} right now. New jobs land here the moment they&apos;re opened, or{" "}
+                        <Link href="/jobs" className="font-semibold text-purpleb underline underline-offset-2">clear the filter</Link>
+                        {" "}to see every trade.</>
+                    : "Nothing open right now. New jobs land here the moment they're opened."}
+                </p>
+              ) : (
+                <p>
+                  No jobs are open for quotes right now.{" "}
+                  <Link href="/jobs/new" className="font-semibold text-purpleb underline underline-offset-2">Post yours, free</Link>
+                  , and it can be the next one on this board.
+                </p>
+              )}
+            </div>
           ) : (
             <div className="mt-4 flex flex-col gap-3.5">
               {jobs.map((j) => {
@@ -335,7 +358,7 @@ export default async function Board({
                           )}
                         </div>
                         <p className="mt-2 font-mono-app text-[9.5px] text-dim">
-                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client · <b className="font-medium text-mute">yaad-vision has read them all</b>
+                          {ph.length} photo{ph.length === 1 ? "" : "s"} from the client · <b className="font-medium text-mute">All photos reviewed for this listing</b>
                         </p>
                       </div>
                     )}
@@ -381,7 +404,7 @@ export default async function Board({
                       <span>
                         {(j.client_jobs_completed ?? 0) > 0
                           ? `Client · ${j.client_jobs_completed} job${j.client_jobs_completed === 1 ? "" : "s"} completed`
-                          : "First job on Yaadly"}
+                          : "Client's first job on Yaadly"}
                       </span>
                     </div>
 
@@ -394,9 +417,16 @@ export default async function Board({
                       >
                         {open ? "Close" : "Quote this job"}
                       </Link>
-                      <span className="font-mono-app text-[10.5px] font-medium tracking-[0.06em] text-dim">
-                        QUOTE ON THE SCOPE · NO BUDGET BAND SHOWN
-                      </span>
+                      {/* Real trust copy for a worker, explaining a founder
+                          rule they need to know about. A visitor or client
+                          was never shown a price band and has no context for
+                          why one is absent, so this stayed worker-only in the
+                          Sep 2026 board optimisation pass. */}
+                      {vmode === "worker" && (
+                        <span className="font-mono-app text-[10.5px] font-medium tracking-[0.06em] text-dim">
+                          QUOTE ON THE SCOPE · NO BUDGET BAND SHOWN
+                        </span>
+                      )}
                     </div>
 
                     {open && vmode !== "worker" && (
