@@ -1122,3 +1122,42 @@ select id, status, payable_to, total_pence from invoices where job_id = '<job id
 ## Pricing an invoice yourself, and the founding rate
 
 **Since `20260902s` the price on an invoice is yours in three places.** (1) "Confirm the work" on a service booking now asks what you are charging: full price or founding rate straight off `service_catalogue`, or "My own figure" with the amount typed in pounds; the invoice line and the booking's displayed price both follow your choice. (2) The invoice editor's price tier gained "my figure": pick it on any draft line and the Unit cell becomes a box you type the amount into; Save writes exactly what you typed. Service-list tiers are still overwritten from the catalogue on save, on purpose. (3) An AI-drafted invoice refuses my-figure lines until you press "Make it mine to price", which flips `drafted_by` to human on the record; that refusal is `invoice_line_price_guard` doing its job, not a bug. **Technical Sign-off** is now in the catalogue (`technical-signoff`, £245 both tiers) and bookable from the services page like the rest; Full Project Management remains the only card that falls back to WhatsApp.
+
+## The legal pages, and the placeholders that are still in them
+
+`docs/privacy.html`, `docs/cancellation.html` and `docs/terms.html` went up on 3 September 2026 with their open questions marked on the page rather than filled with guesses. Every gap is in a visible amber box or a square-bracketed `[TO BE INSERTED...]`, so to find all of them at once:
+
+```bash
+grep -rn "TO BE INSERTED\|gapcard" docs/privacy.html docs/cancellation.html docs/terms.html
+```
+
+What each one is waiting on:
+
+1. **Registered office address** (privacy, cancellation, and every page footer). Blocked on filing an AD01 to move the registered office off the founder's home address to a service address. Until then the address is on no page, which is a known and accepted breach of Regulation 25 disclosure, chosen over republishing a home address site-wide. When the AD01 is filed, put the address in the two page tables and in the footer of all eleven pages in `docs/`.
+2. **ICO registration number** (privacy). Register at ico.org.uk, around £52, then paste the number in.
+3. **Retention periods** (privacy). Legal decision, not a technical one. Identity document retention especially. Do not invent a number to close the box.
+4. **The model cancellation form and the statutory instructions** (cancellation). The text is substantially prescribed by Schedules 3 and 4 of the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. Take it from legislation.gov.uk verbatim and adapt only the company details. Note that legislation.gov.uk is blocked by the remote session's egress proxy, so this one has to be fetched from a normal browser and pasted in. Do not write it from memory.
+5. **Whether United States and Canada clients get the same cancellation rights, and whose law governs** (cancellation, terms). Genuinely open, with the adviser. In the meantime the site applies the 14 day right to every consumer client, wherever they are, as Yaadly's own commitment.
+6. **Liability, the workmanship guarantee and its length, governing law** (terms). With the adviser. The guarantee in particular is not to be promised before it is insured.
+
+Two rules that hold when editing these pages. The consent and provider facts on the privacy page mirror what the code actually does, so if `supabase/functions/_shared/textmodel.ts` moves off MiniMax, or a provider is added anywhere, the provider table and the "two things we will not soften" box change in the same commit or the page is lying. And the whole of `docs/` is subject to the language rules in CLAUDE.md §8: `guardrails.scan` does not read marketing copy, so nothing catches "escrow" or "held safely" on these pages except whoever is writing. Sweep before pushing:
+
+```bash
+grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|removes all fraud|fully covered" docs/*.html
+grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
+```
+
+## Adding the Stripe payment links to the site
+
+Not done, and it cannot be done from a chat session: creating a link needs the Stripe account, and a secret key must never be pasted into one. The founder creates each link in Stripe, hands over the URLs, and a session wires them to the buttons.
+
+Decide this per service before creating any of them, because it cannot be changed on a link afterwards:
+
+- **A Dashboard link** charges the card immediately. Five minutes, no code. It costs the line "your card is not charged until you approve the work", which is a real loss.
+- **An API-created link with `payment_intent_data.capture_method` set to `manual`** holds the card instead of charging it, keeping that line. One API call per link, created once and reused. The Dashboard link builder cannot do this; only the API can.
+
+The recommendation on file is manual capture via the API for the six fixed-price services, because the hold is the differentiator and the links are reusable. Dashboard links are the answer only if money needs to move this week.
+
+The rule underneath the table: work delivered inside seven days is a hold, because a card authorisation lasts seven days on every brand with no request to Stripe. Recurring is a subscription. Long or staged work is a deposit plus stages. Variable trade jobs get invoices, never links, because a link carries a fixed amount and a trade job prices differently every time.
+
+One thing left unresolved for the founder: short jobs paid by hold produce no invoice, and the invoice was the evidence of the principal structure, each one saying the client bought the job from Yaadly. Either raise one separately for the record, or decide the Quote Pack plus a written confirmation carries it. Something has to go out either way, because a written confirmation on a durable medium is required by the distance selling rules.

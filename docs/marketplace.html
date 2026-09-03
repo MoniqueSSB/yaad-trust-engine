@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yaadly · The Marketplace</title>
-<meta name="description" content="Post the job free. A vetted tradesperson quotes it, documented with timestamped evidence. Nobody is paid for a stage until you approve it.">
+<title>Yaadly · Managed jobs</title>
+<meta name="description" content="Post the job free. We price it and put a vetted tradesperson on it, documented with timestamped evidence. Nobody is paid for a stage until you approve it.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;1,9..144,200;1,9..144,300&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -369,10 +369,10 @@ h2.sh em{font-style:italic;font-weight:300;color:var(--purpleb)}
 }
 @keyframes gpulse{0%,100%{filter:drop-shadow(0 0 14px rgba(245,158,11,.3))}50%{filter:drop-shadow(0 0 30px rgba(245,158,11,.6))}}
 .money-label{font:500 12px var(--body);color:var(--mute);margin-top:5px;letter-spacing:.02em}
-.dep-bar{height:28px;background:rgba(7,7,26,0.7);border:1px solid var(--line2);border-radius:100px;overflow:hidden;margin-top:18px}
-.dep-fill{width:25%;min-width:90px;height:100%;background:linear-gradient(90deg,var(--gold),#F97316);border-radius:100px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;box-shadow:0 0 14px rgba(245,158,11,.28)}
-.dep-fill span{font:600 10px var(--mono);color:#1a0d00}
-.dep-leg{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:8px;flex-wrap:wrap;gap:4px}
+.stage-track{display:flex;align-items:center;margin-top:20px;padding:0 2px}
+.stage-track i{flex:none;width:9px;height:9px;border-radius:50%;background:var(--gold);opacity:.55;box-shadow:0 0 10px rgba(245,158,11,.35)}
+.stage-track s{flex:1;height:2px;text-decoration:none;background:linear-gradient(90deg,rgba(245,158,11,.4),rgba(245,158,11,.18))}
+.dep-leg{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:9px;flex-wrap:wrap;gap:4px}
 .money-rule{
   display:flex;align-items:flex-start;gap:12px;
   background:rgba(12,8,0,0.4);border:1px solid rgba(245,158,11,0.12);border-radius:12px;
@@ -446,7 +446,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   <div class="wrap">
     <div class="live-badge rv"><span class="dot"></span>Live in Kingston and Portmore, Jamaica</div>
     <h1 class="hero-h rv d1">Someone you can <em>trust,</em><br>on your property.</h1>
-    <p class="hero-sub rv d2">Post the job free. A vetted tradesperson quotes it, documented with timestamped evidence. <b>Nobody is paid for a stage until you approve it.</b></p>
+    <p class="hero-sub rv d2">Post the job free. We price it and put a vetted tradesperson on it, documented with timestamped evidence. <b>Nobody is paid for a stage until you approve it.</b></p>
     <div class="hero-ctas rv d2">
       <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
       <a class="btn btn-g" href="#how">How it works</a>
@@ -457,7 +457,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
     <div class="ticker-wrap rv d3">
       <div class="ticker">
         <div class="ticker-item"><span class="ti"></span><b>Free to post</b> · No card required</div>
-        <div class="ticker-item"><span class="ti"></span><b>25% max deposit</b> · ever</div>
+        <div class="ticker-item"><span class="ti"></span><b>A named person</b> · approves every release</div>
         <div class="ticker-item"><span class="ti"></span><b>Identity checked</b> · every worker</div>
         <div class="ticker-item"><span class="ti"></span><b>1 working day</b> · human reply</div>
         <div class="ticker-item"><span class="ti"></span><b>Zero hidden fees</b> · prices on the page</div>
@@ -466,7 +466,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
         <div class="ticker-item"><span class="ti"></span><b>Stage payments</b> · tied to photos</div>
         <!-- duplicate for seamless loop -->
         <div class="ticker-item"><span class="ti"></span><b>Free to post</b> · No card required</div>
-        <div class="ticker-item"><span class="ti"></span><b>25% max deposit</b> · ever</div>
+        <div class="ticker-item"><span class="ti"></span><b>A named person</b> · approves every release</div>
         <div class="ticker-item"><span class="ti"></span><b>Identity checked</b> · every worker</div>
         <div class="ticker-item"><span class="ti"></span><b>1 working day</b> · human reply</div>
         <div class="ticker-item"><span class="ti"></span><b>Zero hidden fees</b> · prices on the page</div>
@@ -508,15 +508,16 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   <div class="wrap">
     <div class="eyebrow rv sl">See it work, before you post anything</div>
     <h2 class="sh rv d1">Watch a real job cycle.<br><em>Evidence first. Payment last.</em></h2>
+    <p class="rv d1" style="font-size:13.5px;color:var(--mute);line-height:1.74;max-width:52ch;margin:0 0 18px">A named person approves every release. Never an automatic timer.</p>
     <div class="engine-card rv d2" id="engine">
       <div class="engine-tag">
         <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="currentColor" opacity=".6"><animate attributeName="opacity" values=".6;1;.6" dur="1.4s" repeatCount="indefinite"/></circle></svg>
         Live demo
       </div>
       <div class="eng-cols">
-        <div class="eng-box"><div class="eng-who">You</div><div class="eng-amt" id="eng-you">J$66,800</div><div class="eng-st" id="eng-you2">Funding stage one</div></div>
+        <div class="eng-box"><div class="eng-who">You</div><div class="eng-amt" id="eng-you">J$66,800</div><div class="eng-st" id="eng-you2">Stage one agreed</div></div>
         <div class="eng-lock"><div class="lockbox" id="eng-lock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div><small id="eng-lab">Not yet paid</small></div>
-        <div class="eng-box paid"><div class="eng-who">Delroy, the worker</div><div class="eng-amt" id="eng-w">J$0</div><div class="eng-st" id="eng-w2">Can see the money is real</div></div>
+        <div class="eng-box paid"><div class="eng-who">Delroy, the worker</div><div class="eng-amt" id="eng-w">J$0</div><div class="eng-st" id="eng-w2">Knows Yaadly has committed to pay him</div></div>
       </div>
       <div class="ev-grid">
         <div class="ev-tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Arrival</span></div>
@@ -526,7 +527,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
         <div class="ev-tile"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5 21 7v10l-6-3.5v-3Z"/></svg><span>Walk-round</span></div>
         <div class="ev-tile"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></div>
       </div>
-      <div class="eng-caption"><span class="edot"></span><span id="eng-cap"><b>Nothing has reached him yet.</b> He starts because he can see the job is funded, not because you sent him money.</span></div>
+      <div class="eng-caption"><span class="edot"></span><span id="eng-cap"><b>Nothing has reached him yet.</b> He starts because Yaadly has committed to pay him, not because you sent him money.</span></div>
     </div>
   </div>
 </section>
@@ -651,15 +652,19 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 <section class="money-section"><div class="wrap">
   <div class="money-grid">
     <div class="money-left rv">
-      <div class="money-pct">25%</div>
-      <div class="money-label">Maximum deposit. Ever.</div>
-      <div class="dep-bar"><div class="dep-fill"><span>25% cap</span></div></div>
-      <div class="dep-leg"><span>Deposit</span><span>Stage 1</span><span>Stage 2</span><span>Final inspect</span></div>
+      <div class="money-pct" style="font-size:clamp(40px,7vw,68px)">Stages</div>
+      <div class="money-label">Payment terms are agreed in writing for each job, before anything starts.</div>
+      <div class="stage-track"><i></i><s></s><i></i><s></s><i></i><s></s><i></i></div>
+      <div class="dep-leg"><span>Agreed</span><span>Stage 1</span><span>Stage 2</span><span>Final inspect</span></div>
     </div>
     <div class="rv d1">
       <div class="eyebrow gold">The money</div>
-      <h2 class="sh" style="margin-bottom:10px">Never more than a quarter,<br><em>before anything exists.</em></h2>
+      <h2 class="sh" style="margin-bottom:10px">Paid in stages,<br><em>against what you can see.</em></h2>
       <p style="font-size:13.5px;color:var(--mute);line-height:1.74;max-width:44ch;margin-bottom:16px">Stage payments tied to what you can photograph, never to a date. Materials pass through at cost, never marked up.</p>
+      <div class="money-rule">
+        <div class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg></div>
+        <div><b>A named person approves every release.</b> Never an automatic timer.</div>
+      </div>
       <div class="money-rule">
         <div class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.3 9.6c0-1.1 1.2-2 2.7-2s2.7.9 2.7 2-1.2 1.6-2.7 2.1-2.7 1-2.7 2.1 1.2 2 2.7 2 2.7-.9 2.7-2"/></svg></div>
         <div><b>Online payment is not yet live.</b> You pay the tradesperson directly, stage by stage, against a signed agreement. <a href="payments.html" style="color:var(--goldb)">Full breakdown here.</a></div>
@@ -704,6 +709,9 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
     <a href="faq.html">FAQ</a><a href="prices.html">What work costs</a>
     <a href="business.html">Yaadly for business</a><a href="contact.html">Contact</a>
     <a href="https://app.yaadly.co.uk/portal">Client portal</a><a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="cancellation.html">Cancelling</a>
+    <a href="terms.html">Terms</a>
   </div>
 </div></div></footer>
 
@@ -731,12 +739,12 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   var eY=document.getElementById('eng-you'),eY2=document.getElementById('eng-you2');
   var eW=document.getElementById('eng-w'),eW2=document.getElementById('eng-w2');
   var S=[
-    {y:'J$66,800',ys:'Funding stage one',w:'J$0',ws:'Can see the money is real',l:'Not yet paid',c:'<b>Nothing has reached him yet.</b> He starts because he can see the job is funded, not because you sent him money.',o:false,ev:[]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Waiting on first approval',l:'Not yet paid',c:'<b>Arrival photo logged.</b> Timestamped, GPS checked against the property.',o:false,ev:[0]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Work under way',l:'Not yet paid',c:'<b>Before photo checked.</b> Work scope locked before anything is touched.',o:false,ev:[0,1]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Materials receipt logged',l:'Not yet paid',c:'<b>Materials receipt verified.</b> Labour split from materials, no markup.',o:false,ev:[0,1,2]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'After photo checked',l:'Not yet paid',c:'<b>After photo checked against the scope.</b> Work done matched to work agreed.',o:false,ev:[0,1,2,3]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Walk-round video logged',l:'Not yet paid',c:'<b>Walk-round video complete.</b> Full record of the finished stage, timestamped.',o:false,ev:[0,1,2,3,4]},
+    {y:'J$66,800',ys:'Stage one agreed',w:'J$0',ws:'Knows Yaadly has committed to pay him',l:'Not yet paid',c:'<b>Nothing has reached him yet.</b> He starts because Yaadly has committed to pay him, not because you sent him money.',o:false,ev:[]},
+    {y:'J$66,800',ys:'Stage one agreed',w:'J$0',ws:'Waiting on first approval',l:'Not yet paid',c:'<b>Arrival photo logged.</b> Timestamped, GPS checked against the property.',o:false,ev:[0]},
+    {y:'J$66,800',ys:'Stage one agreed',w:'J$0',ws:'Work under way',l:'Not yet paid',c:'<b>Before photo checked.</b> Work scope locked before anything is touched.',o:false,ev:[0,1]},
+    {y:'J$66,800',ys:'Stage one agreed',w:'J$0',ws:'Materials receipt logged',l:'Not yet paid',c:'<b>Materials receipt verified.</b> Labour split from materials, no markup.',o:false,ev:[0,1,2]},
+    {y:'J$66,800',ys:'Stage one agreed',w:'J$0',ws:'After photo checked',l:'Not yet paid',c:'<b>After photo checked against the scope.</b> Work done matched to work agreed.',o:false,ev:[0,1,2,3]},
+    {y:'J$66,800',ys:'Stage one agreed',w:'J$0',ws:'Walk-round video logged',l:'Not yet paid',c:'<b>Walk-round video complete.</b> Full record of the finished stage, timestamped.',o:false,ev:[0,1,2,3,4]},
     {y:'J$50,100',ys:'Stage one released',w:'J$16,700',ws:'Stage one received',l:'Paid, stage one',c:'<b>You approved. Stage one paid.</b> Money moves only on your sign-off.',o:true,ev:[0,1,2,3,4,5]},
   ];
   var idx=0;
