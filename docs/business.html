@@ -557,9 +557,10 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   <div class="wrap">
     <div class="hero-eyebrow rv in"><span class="dot"></span>Yaadly for business · Kingston &amp; Portmore first · Yaadly Ltd, UK 17358077</div>
     <h1 class="display">Your company answers for property <em>it cannot stand in front of.</em></h1>
-    <p class="hero-sub">If your business carries property in Jamaica, or clients who do, you need somebody qualified on the ground, <b>independent of every contractor on the job</b>. That is what I do.</p>
+    <p class="hero-sub">If your business carries property in Jamaica, or clients who do, you need somebody qualified on the ground, <b>independent of every contractor on the job</b>. That is what I do. <b>Your contractors stay yours</b>, and you keep paying them directly. Yaadly supplies the eyes, the checklist and the report.</p>
     <div class="hero-ctas">
-      <a class="btn btn-primary" href="https://cal.com/yaadly" target="_blank" rel="noopener">Book a consultation</a>
+      <a class="btn btn-primary" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a consultation</a>
+      <a class="btn btn-ghost" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20am%20enquiring%20on%20behalf%20of%20a%20company%20with%20property%20in%20Jamaica." target="_blank" rel="noopener">Message us on WhatsApp</a>
       <a class="btn btn-ghost" href="#who">Who this is for</a>
     </div>
 
@@ -684,11 +685,11 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
         <div class="paper-ref"><span>Doc 04</span><span>Job close</span></div>
         <div class="paper-title">Independent review</div>
         <div class="paper-body">I review the finished work against the agreed scope, independent of every contractor on it. <b>Then a report you can forward without editing.</b></div>
-        <div class="paper-stamp">Verified</div>
+        <div class="paper-stamp">Recorded</div>
       </div>
       </div>
     </div>
-    <p class="paper-foot rv"><b>Yaadly holds none of your money.</b> You pay your contractor directly. My fee is invoiced separately, bank transfer in GBP, USD or CAD.</p>
+    <p class="paper-foot rv"><b>This is oversight only, so Yaadly holds none of the money for the building work.</b> Your contractor stays yours, you pay them directly on your own terms with them, and Yaadly never touches it. Yaadly&rsquo;s own fee for the eyes and the reports is invoiced separately, bank transfer in GBP, USD or CAD. <a href="/services">See the priced services</a>, or ask about a <a href="/marketplace">managed job</a>, where Yaadly buys and pays for the work itself.</p>
     <p class="paper-foot rv">On the ground in Kingston and Portmore first. Other parishes considered on request, subject to travel.</p>
 
     <div class="ai-console rv">
@@ -774,8 +775,8 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
       <h2>Bring me one <em>real property.</em></h2>
       <p class="consult-sub">Thirty minutes on the hardest one you have. By the end you will know whether I am any use to your business.</p>
       <p class="consult-promise">If I am not, I will say so on the call.</p>
-      <a class="btn btn-primary" href="https://cal.com/yaadly" target="_blank" rel="noopener">Book a consultation</a>
-      <p class="consult-note">Or write to <a href="mailto:monique@yaadly.co.uk">monique@yaadly.co.uk</a>. Enquiries from companies are answered within one working day. <b>Yaadly holds none of your money</b>: you pay your contractor directly and my fee is invoiced separately, payable by bank transfer in GBP, USD or CAD.</p>
+      <a class="btn btn-primary" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a consultation</a>
+      <p class="consult-note">Or write to <a href="mailto:monique@yaadly.co.uk">monique@yaadly.co.uk</a>. Enquiries from companies are answered within one working day. <b>On an oversight engagement Yaadly holds none of the money for the building work</b>: you pay your contractor directly, and Yaadly&rsquo;s own fee is invoiced separately, payable by bank transfer in GBP, USD or CAD.</p>
     </div>
   </div>
 </section>
@@ -788,6 +789,7 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
         <a href="/">Home</a>
         <a href="/marketplace">Overview</a>
         <a href="/services">Managed services</a>
+        <a href="/prices">What building work costs in Jamaica</a>
         <a href="/payments">How you pay</a>
         <a href="/faq">Questions and answers</a>
         <a href="/contact">Contact</a>
@@ -829,7 +831,7 @@ const whoTabs = [...document.querySelectorAll('.who-tab')];
 const dBody = document.getElementById('dossier-body');
 const dProg = document.getElementById('who-progress');
 const whoReduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-let whoCur = 0, whoTimer = null;
+let whoCur = 0, whoTimer = null, whoPicked = false;
 function setWho(i){
   whoCur = i;
   whoTabs.forEach((t,j) => t.classList.toggle('active', j === i));
@@ -847,9 +849,11 @@ function setWho(i){
     dProg.classList.remove('run'); void dProg.offsetWidth; dProg.classList.add('run');
   }
 }
-function whoPlay(){ if(whoReduce || whoTimer) return; dProg.classList.add('run'); whoTimer = setInterval(() => setWho((whoCur+1) % WHO.length), 5000); }
+function whoPlay(){ if(whoReduce || whoTimer || whoPicked) return; dProg.classList.add('run'); whoTimer = setInterval(() => setWho((whoCur+1) % WHO.length), 10000); }
 function whoStop(){ clearInterval(whoTimer); whoTimer = null; dProg.classList.remove('run'); }
-whoTabs.forEach((t,i) => t.addEventListener('click', () => { whoStop(); setWho(i); whoPlay(); }));
+/* Once a reader picks a case file themselves, stop rotating it out from
+   under them. Auto-advance is for people who have not chosen yet. */
+whoTabs.forEach((t,i) => t.addEventListener('click', () => { whoStop(); whoPicked = true; setWho(i); }));
 if(!whoReduce){
   const wObs = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? whoPlay() : whoStop()), { threshold:0.3 });
   wObs.observe(document.getElementById('who-widget'));

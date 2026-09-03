@@ -506,9 +506,11 @@ export default async function JobRoom({
   const isClient = role === "client";
   const otherSideLabel = isClient ? "The worker" : "The client";
 
-  /* Approvals are what a stage waits on, and stage_approvals is the table
+  /* Acceptances are what a stage waits on, and stage_approvals is the table
      that records them, so "approved" here means the same thing it means to
-     the trigger that releases the money. */
+     the trigger that raises Yaadly's payable for that stage. The table name
+     is the old vocabulary and is left alone; only what the client reads
+     changed. */
   const { data: approvalRows } = await supabase
     .from("stage_approvals")
     .select("stage")
@@ -589,7 +591,7 @@ export default async function JobRoom({
           : "File stage " + jobStage + " evidence",
         detail: isClient
           ? "Nothing to approve yet. Evidence appears here as it is filed."
-          : "Photographs for this stage. Nothing is invoiced to you until the client approves them.",
+          : "Photographs for this stage. Yaadly raises your pay invoice once the stage is accepted and checked.",
         href: isClient ? undefined : jobBase + "?tab=evidence",
         cta: isClient ? undefined : "Upload",
       });
@@ -1167,7 +1169,7 @@ export default async function JobRoom({
               <b className="mb-1 block text-[14px] font-semibold text-ink">No quotes yet</b>
               <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
                 {onBoard
-                  ? "Your job is on the board. Vetted workers can see it and quotes land here as they come in."
+                  ? "Your job is on the board. Identity checked workers can see it and quotes land here as they come in."
                   : movedOn
                     ? "This job moved on without quotes being recorded here."
                     : "Quotes appear here once the job is on the marketplace."}
@@ -1520,8 +1522,8 @@ export default async function JobRoom({
               : job.status === "complete"
                 ? "Released. This job is closed and paid."
                 : role === "worker"
-                  ? "Each stage is paid to you once the client approves that stage's evidence."
-                  : "Held until you approve each stage's evidence."
+                  ? "Yaadly pays you for each stage once that stage is signed off."
+                  : "Each stage is paid to the tradesperson by Yaadly once you have accepted it and we have checked it."
           }
           workerName={won?.worker_name ?? job.worker_name ?? null}
           jobBase={jobBase}

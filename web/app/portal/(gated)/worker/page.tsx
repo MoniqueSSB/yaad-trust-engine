@@ -163,13 +163,19 @@ export default async function WorkerPortal() {
      they can act on: not which job, not how many, not whether the ball is with
      them or with somebody else. A tradesperson looking at a number with their
      name on it wants to know who is holding it up. Naming the single job when
-     there is one is the common case and the useful one. */
+     there is one is the common case and the useful one.
+
+     Reworded 4 Sep 2026: it used to say "waiting on the client to approve",
+     which pointed a worker at the wrong party. The worker is Yaadly's
+     subcontractor, so Yaadly owes them and Yaadly pays them. The client
+     accepting the work is one input to that sign-off, not the thing that
+     pays. See docs/COPY-GUIDELINES.md section 3. */
   const heldNote =
     heldJobs.length === 0
       ? "Nothing held right now"
       : heldJobs.length === 1
-        ? `Waiting on the client to approve ${heldJobs[0].title ?? "this job"}`
-        : `Waiting on ${heldJobs.length} clients to approve. See job by job below.`;
+        ? `Waiting on sign-off for ${heldJobs[0].title ?? "this job"}`
+        : `Waiting on sign-off for ${heldJobs.length} jobs. See job by job below.`;
 
   const tiles: Tile[] = [
     {

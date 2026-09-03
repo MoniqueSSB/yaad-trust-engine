@@ -22,8 +22,8 @@ export const PUBLISHED_JMD = new Set([3500, 4500]);
 export const PUBLISHED_PERCENTS = new Set([2, 5, 12, 15]);
 
 export const NO_PRICE_SENTENCE =
-  "Yaadly does not price the work itself; a vetted worker quotes against the written scope. "
-  + "Yaadly's own services and their published prices are at yaadly.co.uk/prices.";
+  "Yaadly does not price the work itself; an identity checked worker quotes against the written scope. "
+  + "Yaadly's own services and their published prices are at yaadly.co.uk/services.";
 
 const POUNDS = /£\s?(\d[\d,]*)(?:\.\d+)?/g;
 const JMD = /J\$\s?(\d[\d,]*)(?:\.\d+)?/g;
