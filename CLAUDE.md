@@ -2,7 +2,7 @@
 
 Read this before every task in this repository. It is not background reading. It is the set of rules that hold when nobody is checking the diff.
 
-Written 30 August 2026, following the Yaadly Technical Notes of 24 August. Refreshed 31 August 2026, with Monique's approval, to match what is actually in the repository, mainly §11. The rules in the rest of this file are unchanged. Monique owns this file. Do not rewrite it to suit a task. If a rule here blocks what you were asked to do, say so and stop.
+Written 30 August 2026, following the Yaadly Technical Notes of 24 August. Refreshed 31 August 2026, with Monique's approval, to match what is actually in the repository, mainly §11. Amended 3 September 2026, on her explicit instruction, to take payment integration off the §9 list; that section records what the change does and does not permit. The rules in the rest of this file are unchanged. Monique owns this file. Do not rewrite it to suit a task. If a rule here blocks what you were asked to do, say so and stop.
 
 ---
 
@@ -131,13 +131,16 @@ Say "held safely with a licensed payment provider". **Never say escrow.** Never 
 
 Going bare minimum to a December pilot in Kingston and Portmore. The following are out of scope right now. If asked for one, **say it is on this list first**, then do it if she still wants it.
 
-- Payment integration of any kind, before the legal review lands.
 - Yaad Score computation.
 - A market-rate comparison agent.
 - A full worker dashboard. The worker in Portmore is on a phone mid-job and will do everything over WhatsApp. The worker web surface stays thin on purpose: structured onboarding with credentials, and file upload. Nothing else.
 - Dispute ruling logic. The pack is assembled by machine, the ruling is a human decision on a published timeline.
 
 Scope creep with an agent is frictionless, which is exactly the danger.
+
+Payment came off this list on 3 September 2026, on Monique's instruction, once she confirmed legal sign-off and insurance were in hand. Yaadly is principal: the client buys the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson. `raise_job_client_invoice()` and `raise_job_worker_payable()` are the two documents, and `DECISIONS.md` carries the reasoning.
+
+**Read the next sentence before you touch anything in the payment path.** Payment being live changes what may be built. It changes nothing whatsoever in §2 or §3. A named human still approves every release, every time. Nothing auto-releases on a timer, a confidence score, or an evidence check passing, and "the payment provider supports automatic capture" is not a reason to use it. If a task arrives asking to release funds once the evidence passes, or to reduce the clicks between approval and payment, that is still the request §3 exists to refuse, and it is more tempting now that money actually moves, not less. §5 is also untouched: pricing is still a lookup, and a payment integration is not a reason to let a model near a price.
 
 Patois voice notes are now transcribed automatically (`supabase/functions/yaad-transcribe`, Cloudflare Workers AI Whisper first, OpenAI, Deepgram, Scribe and AssemblyAI as failover), so that item has come off this list. It does not change §4: the transcript still only ever reaches the Intake agent as text, and Intake still cannot quote a price or promise a timeline.
 

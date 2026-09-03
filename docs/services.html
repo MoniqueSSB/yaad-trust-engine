@@ -1139,6 +1139,30 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
    never charged, until Monique confirms scope and price in writing. A card
    whose service has no bookable catalogue entry keeps its WhatsApp link. */
 const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-book-service";
+/* Stripe payment links, keyed by the booking form's own service values.
+   Paste the https://buy.stripe.com/... URL against a service and a pay
+   button appears on that service's booking confirmation. Leave it empty and
+   the confirmation reads exactly as it does now, so there is never a dead
+   button or a half wired payment on the page.
+
+   These are holds, not charges: the card is authorised and captured only
+   when a named person approves the work. Every service here is under GBP
+   500, which is the rule that makes them holds at all. Anything at or above
+   GBP 500 is invoiced and must never be given a link.
+
+   Deliberately after the booking, not instead of it. The button on a service
+   card opens the booking form, which is where the client's name, contact and
+   property go on record, and where the cancellation information has to
+   reach them. A card CTA pointing straight at Stripe would skip all of it. */
+const PAYMENT_LINKS = {
+  deposit:   "",
+  visual:    "",
+  condition: "",
+  signoff:   "",
+  care:      "",
+  retainer:  ""
+};
+
 const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
 document.querySelectorAll(".svc-cta").forEach(el => {
   const hit = CTA_KEYS.find(([frag]) => (el.getAttribute("href") || "").includes(frag));
@@ -1184,7 +1208,11 @@ async function sendBooking(){
   }
   btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
   const channel = j.phoneGiven ? "WhatsApp" : "email";
-  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal. Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.");
+  const payUrl = PAYMENT_LINKS[b.service] || "";
+  const tail = payUrl
+    ? ' Nothing is charged yet. You can secure it now: <a href="' + payUrl + '" target="_blank" rel="noopener"><b>pay for ' + esc(b.label) + '</b></a>. Your card is authorised, not charged, and it is only taken once the work is done and you have approved it. You have 14 days to <a href="/cancellation">cancel</a>.'
+    : ' Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.';
+  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal." + tail);
   ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
 }
 

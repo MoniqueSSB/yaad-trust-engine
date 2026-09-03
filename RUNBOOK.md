@@ -1285,3 +1285,26 @@ This bit us on 3 September 2026: the catalogue price alignment changed the publi
 The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. Whenever a price on `docs/services.html` changes, this list and `faq.ts` change in the same commit, and `service_catalogue` is the source of truth for all three.
 
 Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
+
+## Pasting the Stripe payment links in
+
+The site is wired and waiting. One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
+
+```js
+const PAYMENT_LINKS = {
+  deposit:   "https://buy.stripe.com/...",
+  visual:    "",
+  condition: "",
+  signoff:   "",
+  care:      "",
+  retainer:  ""
+};
+```
+
+Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads exactly as it does today, so there is never a dead button or a half wired payment. The keys are the booking form's own service values, not the catalogue ids.
+
+**Why the pay link is after the booking and not on the service card.** The card buttons are already claimed by the page's own script, which routes them into the booking form. That form is where the client's name, contact and property go on record, where the reference is minted, and where the cancellation information has to reach them. A card button pointing straight at Stripe would skip all of it, and a client would have paid before Yaadly knew who they were or had given them their 14 day cancellation notice. So the link appears on the confirmation, once the booking exists.
+
+Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
+
+**Still missing before a link should go live:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker.
