@@ -1003,6 +1003,14 @@ footer {
             <option value="docs">Document Pack Check</option>
           </select>
         </div>
+        <div class="fgroup" id="bk-care-tier-row" style="display:none">
+          <label for="bk-care-tier">Which home</label>
+          <select id="bk-care-tier">
+            <option value="standard">Standard, £45 a visit</option>
+            <option value="large">Large or rental, £70 a visit</option>
+            <option value="villa">Villa, £95 a visit</option>
+          </select>
+        </div>
         <div class="fgroup"><label for="bk-name">Your name</label><input id="bk-name" autocomplete="name"></div>
       </div>
       <div class="form-row">
@@ -1155,15 +1163,21 @@ const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-
    property go on record, and where the cancellation information has to
    reach them. A card CTA pointing straight at Stripe would skip all of it. */
 const PAYMENT_LINKS = {
-  deposit:   "",
-  visual:    "",
-  condition: "",
-  signoff:   "",
-  care:      "",
-  retainer:  ""
+  deposit:       "https://buy.stripe.com/cNicMYb3CgKVdSIdU19Zm09",
+  visual:        "https://buy.stripe.com/8x214ggnW7al8yo5nv9Zm08",
+  condition:     "https://buy.stripe.com/14A9AM9Zy3Y93e4bLT9Zm0b",
+  signoff:       "https://buy.stripe.com/fZu5kwdbK52dg0QaHP9Zm0a",
+  care_standard: "https://buy.stripe.com/eVqbIU1t20LX7uk6rz9Zm05",
+  care_large:    "https://buy.stripe.com/6oUbIUgnW8ep9Cs2bj9Zm06",
+  care_villa:    "https://buy.stripe.com/3cI6oA6Nm0LX7uk2bj9Zm07",
+  retainer:      "https://buy.stripe.com/28E6oAgnWeCN4i8cPX9Zm0c"
 };
 
 const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
+function updateCareTierRow(){
+  $id("bk-care-tier-row").style.display = $id("bk-svc").value === "care" ? "" : "none";
+}
+$id("bk-svc").addEventListener("change", updateCareTierRow);
 document.querySelectorAll(".svc-cta").forEach(el => {
   const hit = CTA_KEYS.find(([frag]) => (el.getAttribute("href") || "").includes(frag));
   if (!hit) return;
@@ -1173,7 +1187,7 @@ document.querySelectorAll(".svc-cta").forEach(el => {
   el.href = "#book"; el.removeAttribute("target"); el.removeAttribute("rel");
   el.addEventListener("click", () => {
     const sel = $id("bk-svc");
-    if (sel) { sel.value = hit[1]; sel.dataset.label = label; }
+    if (sel) { sel.value = hit[1]; sel.dataset.label = label; updateCareTierRow(); }
   });
 });
 
@@ -1208,7 +1222,8 @@ async function sendBooking(){
   }
   btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
   const channel = j.phoneGiven ? "WhatsApp" : "email";
-  const payUrl = PAYMENT_LINKS[b.service] || "";
+  const payKey = b.service === "care" ? "care_" + ($id("bk-care-tier").value || "standard") : b.service;
+  const payUrl = PAYMENT_LINKS[payKey] || "";
   const tail = payUrl
     ? ' Nothing is charged yet. You can secure it now: <a href="' + payUrl + '" target="_blank" rel="noopener"><b>pay for ' + esc(b.label) + '</b></a>. Your card is authorised, not charged, and it is only taken once the work is done and you have approved it. You have 14 days to <a href="/cancellation">cancel</a>.'
     : ' Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.';
