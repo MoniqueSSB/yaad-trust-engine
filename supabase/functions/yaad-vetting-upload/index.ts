@@ -48,6 +48,12 @@ const DOC_TYPES = [
   // in their own voice, which is worth more to a client deciding who to let
   // onto their mother's roof than another PDF.
   "intro_video",
+  // A photograph of the tradesperson themselves, so the person reading the
+  // application can put a face to the name (founder instruction, 3 Sep 2026).
+  // Same bucket, same ninety day clock, same server-side hash as every other
+  // document here. It is a face, so yaad-vetting-review withholds it from the
+  // model exactly as it withholds the selfie and the introduction video.
+  "profile_photo",
 ];
 
 // Video is here for one reason: the left-to-right face turn in step 3. A still
@@ -428,7 +434,7 @@ Deno.serve(async (req: Request) => {
             method: "POST",
             headers: { Title: "New Yaadly pro application", Priority: "default", Tags: "hammer" },
             body: `${s(b.trade) || "trade"}, ${s(b.parish) || "parish not given"}. ${count ?? 0} document(s) on file.`
-              + (aiConsent === "granted" ? "" : " No AI read, they refused. You promised an answer within 48 hours."),
+              + (aiConsent === "granted" ? "" : " No AI read, they refused. You promised an answer within 24 hours."),
             signal: AbortSignal.timeout(4000),
           });
         }
