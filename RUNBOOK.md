@@ -1231,3 +1231,72 @@ for f in docs/*.html; do printf '%-24s ' "$f"; grep -o "fill='%23[0-9A-Fa-f]\{6\
 ```
 
 All eight should read `%237B4FE0`. Four of them were still the old teal square until 3 Sep 2026.
+
+---
+
+## A database function is exposed to the open internet, or the desk stops being able to invoice
+
+**The rule.** PostgREST publishes EVERY function in the `public` schema that the caller's role may execute, at `/rest/v1/rpc/<name>`. Supabase's default privileges grant EXECUTE to `anon` and `authenticated` when a function is created. **A new `SECURITY DEFINER` function is therefore on the open internet the moment it exists, unless you take it off.** Do that in the same migration that creates it.
+
+**To see what is currently exposed:**
+
+```sql
+select p.proname, pg_get_function_identity_arguments(p.oid) as args,
+       has_function_privilege('anon', p.oid,'EXECUTE') as anon,
+       has_function_privilege('authenticated', p.oid,'EXECUTE') as auth,
+       exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_grant
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and p.prosecdef and has_function_privilege('anon', p.oid,'EXECUTE')
+order by p.proname;
+```
+
+Anything in that list that does not open with `if not public.is_admin()` or check `auth.uid()` is a hole. Anything called only by an Edge Function should not be in the list at all.
+
+**What is deliberately still on that list, as of 3 Sep 2026.** Seven, and none of them writes anything:
+
+| Function | Why it stays |
+|---|---|
+| `job_for_code`, `quotes_for_code` | The whole point of "no account to get quotes". The job code is the bearer token and the page at `/jobs/[id]/quotes` is public. |
+| `request_kickoff_as_me` | Reached from that same public page. It refuses anybody who is not the job's signed-in client, so an anonymous call just fails. |
+| `current_doc_version`, `job_open_for_quotes` | Read-only lookups with no personal data in them. |
+| `job_client_email_matches`, `may_use_agents` | **Do not revoke these without checking first.** They look like oracles, and they are: an anonymous caller can test whether an email matches a job. But they are almost certainly evaluated inside RLS policy expressions, and a function called in a policy runs as the querying user, so revoking EXECUTE would make those policies fail for everybody rather than merely closing an oracle. Closing them properly means moving the check inside a definer function first. Worth doing, not worth doing quickly. |
+
+**Always revoke from `public` as well as `anon`.** A grant to PUBLIC covers `anon` no matter what `anon` itself holds, so `revoke ... from anon` alone is a silent no-op on any function carrying one. The `public_grant` column above is how you spot it. `release_materials_tranche` was exactly that case on 3 Sep 2026.
+
+**Never revoke `authenticated` without checking the desk first.** `concierge/concierge.html` reads Postgres with the PUBLISHABLE key, so Monique signed in is `authenticated`, and `is_admin()` is what separates her. These are the functions the desk calls and they must keep `authenticated`:
+
+```bash
+grep -oE "rpc/[a-z_]+|rpc\(.[a-z_]+" concierge/concierge.html | sed -E "s|rpc/||; s|rpc\(.||" | sort -u
+```
+
+Today, ignoring the `args` line the pattern also picks up: `is_admin`, `raise_job_agency_fee_invoice`, `raise_service_invoice`, `release_materials_tranche`. The desk reaches these two ways, a fetch to `/rest/v1/rpc/<name>` and a `supabase.rpc("<name>")` call, which is why the pattern matches both shapes; a grep for only the first misses three of the four.
+
+**If the desk starts refusing with a permission error after a grant change,** re-grant it: `grant execute on function public.<name>(<exact arg types>) to authenticated, service_role;`. The argument list must match exactly or you will create a second entry rather than fixing the first.
+
+**Migration files here are a record, not the mechanism.** `supabase migration list` skips every file in `supabase/migrations/` because the names are `20260903c_...` rather than a 14-digit timestamp, so `supabase db push` will NOT apply them. They are applied through the dashboard or the API, which records its own timestamped entry. Write the file for the reasoning, apply it separately, then verify with the query above.
+
+---
+
+## WhatsApp intake is returning 503 and nothing is arriving
+
+Since 3 Sep 2026 `yaad-inbound` **refuses** a Twilio request it could not verify, rather than letting it through. A 503 with `"Inbound verification is not configured."` means exactly one thing: `TWILIO_AUTH_TOKEN` is missing or wrong on the function.
+
+```bash
+npx supabase secrets list --project-ref leffyisvfvjwzilydlwf | grep TWILIO
+```
+
+`TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` must both be present. Set the token from the Twilio console (Account Info, Auth Token) with `npx supabase secrets set TWILIO_AUTH_TOKEN=... --project-ref leffyisvfvjwzilydlwf`, then redeploy nothing: secrets are read at request time.
+
+**Do not "fix" this by removing the check.** Before it existed, a missing token meant every unsigned request was accepted, on an endpoint that runs with `--no-verify-jwt` and can agree quotes, agree Kickoff Packs, choose workers and approve stages. Approving a stage raises a worker pay invoice. The 503 is the system telling you the front door is unlocked; the answer is the key, not the alarm.
+
+A 403 with `"Signature check failed."` is different and is the sender's problem: the token is set and the signature did not match. Usually the URL Twilio posts to has changed. See `twilio-signature.ts` for why the URL is rebuilt candidate by candidate.
+
+---
+
+## Somebody asks about a password, or a password reset email arrives
+
+**There are no passwords.** Sign in is a code, sent to the email address on the account, good for about an hour. `/portal/forgot` and `/portal/reset` both now forward to `/portal/sign-in`; they used to run the retired password flow, and `/portal/reset` could still set a password that nothing accepted.
+
+**If somebody cannot get in:** send them to `app.yaadly.co.uk/portal/sign-in`, have them type their email and leave the code box empty, and press the button. That sends a fresh code.
+
+**Outstanding, and it is the founder's call:** the Supabase Auth email templates may still contain a "reset your password" template pointing at `/portal/reset`. That link still works, because the route forwards and carries the session fragment across, so nobody is stranded. But the email says password and the product has none. Retiring or rewording that template changes what clients receive, so it has not been done for you. Dashboard, Authentication, Emails.

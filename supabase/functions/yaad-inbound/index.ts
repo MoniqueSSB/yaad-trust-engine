@@ -980,6 +980,45 @@ Deno.serve(async (req: Request) => {
       : isWeb ? { ok: true, checked: false }
       : await resendSigned(req, raw);
     root.setAttributes({ "yaadly.inbound.signature_checked": sig.checked, "yaadly.inbound.signature_ok": sig.ok });
+
+    /* A Twilio request that was never checked is refused, 3 Sep 2026.
+     *
+     * checkTwilioSignature() reports {ok:true, checked:false} when no
+     * TWILIO_AUTH_TOKEN was passed in. That is a deliberate fail-open in the
+     * SIGNATURE MODULE and it stays there: it is a fact about what happened
+     * ("nothing was verified"), and it lets that module be tested against a
+     * throwaway secret. What was missing is anybody deciding what to DO about
+     * that fact. This function did nothing, so an unsigned request walked
+     * straight in.
+     *
+     * That was proportionate when the worst case was a junk enquiry row. It is
+     * not any more. This endpoint runs with --no-verify-jwt, so the signature
+     * is its ONLY door, and behind that door it can now call
+     * agree_quote_via_whatsapp, agree_kickoff_pack_via_whatsapp,
+     * choose_worker_via_whatsapp and approve_stage_via_whatsapp. The last of
+     * those fires raise_worker_pay_invoice_on_stage_approval. The worst case
+     * is a forged stage approval that raises a worker pay invoice.
+     *
+     * So it fails closed here, the same call the HubSpot webhook already
+     * makes: "an endpoint that guards money does not get a development mode."
+     * 503 rather than 403 because this is our misconfiguration, not the
+     * sender's bad signature, and the two should not look the same in a log.
+     * TWILIO_AUTH_TOKEN is set in production, so this changes nothing for real
+     * traffic; it changes what happens on the day it goes missing, which used
+     * to be silent.
+     *
+     * Scoped to isTwilio on purpose. The web chat sets checked:false too and
+     * must keep passing: its door is the origin allowlist in web-chat.ts, not
+     * a signature.
+     */
+    if (isTwilio && !sig.checked) {
+      root.setAttributes({ "yaadly.inbound.outcome": "unverifiable" });
+      console.error(
+        "yaad-inbound: TWILIO_AUTH_TOKEN is not set, so this request could not be verified. Refusing every Twilio request until it is.",
+      );
+      return json({ error: "Inbound verification is not configured." }, 503);
+    }
+
     if (sig.checked && !sig.ok) {
       root.setAttributes({ "yaadly.inbound.outcome": "bad_signature" });
       return json({ error: "Signature check failed." }, 403);
