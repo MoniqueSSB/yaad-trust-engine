@@ -54,7 +54,7 @@ export function LinkWorkerPhone({ phone }: { phone: string | null }) {
           />
           <button
             disabled={state === "busy"}
-            className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[12.5px] font-bold text-[#04211D] disabled:opacity-40"
+            className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[12.5px] font-bold text-onbrand disabled:opacity-40"
           >
             {state === "busy" ? "Saving…" : "Link this number"}
           </button>

@@ -5,13 +5,55 @@ import { askQuestion } from "@/app/ask/actions";
 export const dynamic = "force-dynamic";
 
 /**
- * Ask a Yaad, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
+ * Ask Yaadly, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
  * asks, vetted workers answer publicly. Questions publish after a human
  * look, which is a deliberate moderation gate on an open text box on a
  * public website; the answering bar is the same one quoting uses.
+ *
+ * ONE NAME, TWO DOORS. Founder decision, 3 Sep 2026. This page was "Ask a
+ * Yaad" and the chat tab pinned to the right edge of every page was "Ask
+ * Yaadly": two products, near identical names, opposite privacy, and nothing
+ * anywhere saying which was which. The decision was not to invent a third
+ * name but to collapse to one, so there is a single thing a client asks and
+ * two ways to reach it.
+ *
+ * That puts the whole burden of the distinction on copy, which is why the
+ * paragraph under the heading is not decoration and should not be trimmed:
+ * this door is public, permanent and answered by workers; the chat is
+ * private, immediate and answered by a person. Somebody about to type their
+ * address into the wrong one has only that sentence to stop them.
+ *
+ * Reached from the job board's link row. It had no inbound link at all until
+ * 3 Sep 2026.
  */
 
-export const metadata = { title: "Ask a Yaad · Yaadly" };
+export const metadata = { title: "Ask Yaadly · public Q&A" };
+
+/**
+ * What came back from ask_question(), said in the reader's terms.
+ *
+ * "throttled" is deliberately not an apology and not an error. Somebody who
+ * has asked ten questions in an hour is enthusiastic, not hostile, and the
+ * page should say what happened and when they can go again.
+ */
+const OUTCOME: Record<string, { tone: "ok" | "warn"; text: string }> = {
+  "1": {
+    tone: "ok",
+    text: "Received. Questions are read by a person before they publish, so yours appears once it has been looked at.",
+  },
+  throttled: {
+    tone: "warn",
+    text: "That is ten questions in an hour, which is where we stop and read. Nothing is lost, and you can ask again shortly.",
+  },
+  short: {
+    tone: "warn",
+    text: "That was too short to answer well. Ten characters or more, and say where the property is if you can.",
+  },
+  error: {
+    tone: "warn",
+    text: "That did not save, and it is our end rather than yours. Try again, or message us on WhatsApp and a person will pick it up.",
+  },
+};
 
 export default async function Ask({
   searchParams,
@@ -19,6 +61,7 @@ export default async function Ask({
   searchParams: Promise<{ sent?: string }>;
 }) {
   const { sent } = await searchParams;
+  const outcome = sent ? OUTCOME[sent] : undefined;
   const supabase = await createClient();
   const { data: qs } = await supabase
     .from("questions")
@@ -41,10 +84,17 @@ export default async function Ask({
     <>
       <SiteNav active="market" />
       <div className="mx-auto max-w-[1080px] px-5 py-10">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Ask a Yaad</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask Yaadly &middot; public Q&amp;A</p>
         <h1 className="mt-2 font-display text-[clamp(28px,4.5vw,42px)] uppercase leading-none">Ask before you post</h1>
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
           Not sure it&apos;s a job at all? Ask first, vetted workers answer publicly.
+        </p>
+        <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-relaxed text-dim">
+          Two ways to ask, and this is the public one: your question and its
+          answers stay on this page where anyone can read them, and it is
+          vetted workers who answer. For anything about your own property,
+          your own money or your own address, use the chat tab on the right
+          instead. That one is private and a person replies to you.
         </p>
 
         <form action={askQuestion} className="mt-6 rounded-2xl border border-line bg-panel p-5">
@@ -55,14 +105,26 @@ export default async function Ask({
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input name="area" maxLength={60} placeholder="Your area (optional)"
               className="w-44 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal" />
-            <button className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110">
+            <button className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110">
               Ask the community
             </button>
           </div>
-          {sent && (
-            <p className="mt-3 rounded-xl border border-softline bg-soft px-3.5 py-2.5 text-[13px] text-mute">
-              Received. Questions are read by a person before they publish, so
-              yours appears once it has been looked at.
+          {/* role="status" so a screen reader is told the outcome. Without it
+              the only feedback was a paragraph appearing silently in the
+              middle of the form, which is no feedback at all if you cannot
+              see it. Not role="alert": none of these is an emergency, and
+              alert interrupts whatever is being read. */}
+          {outcome && (
+            <p
+              role="status"
+              className={
+                "mt-3 rounded-xl border px-3.5 py-2.5 text-[13px] " +
+                (outcome.tone === "ok"
+                  ? "border-softline bg-soft text-mute"
+                  : "border-gold/40 bg-gold/10 text-goldb")
+              }
+            >
+              {outcome.text}
             </p>
           )}
           <p className="mt-3 text-[11.5px] text-dim">

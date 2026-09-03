@@ -99,7 +99,7 @@ export default function SignIn() {
           router.refresh();
           return;
         }
-      } catch (_) {
+      } catch {
         // Fall through to the form. A broken hand-off should still leave
         // somebody able to sign in the ordinary way.
       }
@@ -172,7 +172,7 @@ export default function SignIn() {
         <h1 className="font-display text-[32px] uppercase leading-none">
           Your portal
         </h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-mute">
+        <p role="status" className="mt-3 text-[14px] leading-relaxed text-mute">
           One moment, opening your portal.
         </p>
       </div>
@@ -186,19 +186,20 @@ export default function SignIn() {
       </h1>
       <p className="mt-3 text-[14px] leading-relaxed text-mute">
         Your jobs, your evidence, and the documents with your signature on
-        them. Same sign in whether you are a client or a tradesperson.
+        them. Sign in here if you already have a Yaadly account, as a client
+        or a tradesperson.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-7">
+      <form onSubmit={onSubmit} className="mt-7" aria-busy={busy}>
         {sent && (
-          <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+          <p role="status" className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
             Sent. Check your email, and your WhatsApp if we have your number.
             It lasts about an hour: type it in below.
           </p>
         )}
 
         <div className="mb-1.5 flex items-baseline justify-between">
-          <label className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+          <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
             Email
           </label>
           <span className="text-[10px] font-bold uppercase tracking-[.1em] text-coral">
@@ -206,16 +207,19 @@ export default function SignIn() {
           </span>
         </div>
         <input
+          id="email"
           type="email"
           autoComplete="username"
+          autoFocus
           required
+          disabled={busy}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal"
+          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal disabled:opacity-60"
         />
 
         <div className="mb-1.5 flex items-baseline justify-between">
-          <label className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+          <label htmlFor="otp" className="text-[11px] font-bold uppercase tracking-[.13em] text-dim">
             Your code
           </label>
           <span className="text-[10px] font-bold uppercase tracking-[.1em] text-dim">
@@ -223,14 +227,17 @@ export default function SignIn() {
           </span>
         </div>
         <input
+          id="otp"
           inputMode="numeric"
           autoComplete="one-time-code"
+          aria-describedby="otp-hint"
+          disabled={busy}
           value={otp}
           onChange={(e) => setOtp(e.target.value)}
           placeholder="Leave blank and we'll send you one"
-          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 font-mono text-[20px] tracking-[6px] text-ink outline-none focus:border-teal placeholder:font-sans placeholder:text-[13px] placeholder:tracking-normal placeholder:text-dim"
+          className="mb-4 w-full rounded-xl border border-line bg-bg px-3.5 py-3 font-mono text-[20px] tracking-[6px] text-ink outline-none focus:border-teal placeholder:font-sans placeholder:text-[13px] placeholder:tracking-normal placeholder:text-dim disabled:opacity-60"
         />
-        <p className="-mt-2 mb-4 text-[12px] leading-relaxed text-dim">
+        <p id="otp-hint" className="-mt-2 mb-4 text-[12px] leading-relaxed text-dim">
           <b className="text-mute">No password.</b> Already got a code from a
           message we sent? Type it above and press the button. Otherwise
           leave it blank: we send one to your email, and your WhatsApp if we
@@ -246,7 +253,7 @@ export default function SignIn() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+          className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40"
         >
           {signInButtonLabel(otp, busy)}
         </button>
@@ -259,6 +266,19 @@ export default function SignIn() {
           Finish setting up your job
         </Link>
         . Nothing here is public.
+      </p>
+
+      <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
+        Stuck, or a code never arrives?{" "}
+        <a
+          href="https://wa.me/447878877567"
+          target="_blank"
+          rel="noopener"
+          className="text-tealb underline"
+        >
+          Message us on WhatsApp
+        </a>
+        .
       </p>
     </div>
   );

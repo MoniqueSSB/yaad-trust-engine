@@ -31,8 +31,12 @@
   --line:   rgba(155,115,245,0.14);
   --line2:  rgba(155,115,245,0.28);
   --ink:    #EEEEFF;
-  --mute:   #7878A8;
-  --dim:    #44446A;
+  /* Text tiers retuned 3 Sep 2026, same values as docs/yaadly.css and
+     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1. The old
+     mute 4.8:1 and dim 2.2:1 put the supporting copy below AA. Change all
+     three files together or the site drifts against itself. */
+  --mute:   #9E9ECB;
+  --dim:    #7C7CA6;
   --purple: #9B73F5;
   --purpleb:#C4AAFF;
   --gold:   #F59E0B;
@@ -60,50 +64,6 @@ img { max-width:100%; display:block; }
 /* ─── LAYOUT ─────────────────────────────────────────────── */
 .wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
 .wrap-sm { max-width:780px; margin:0 auto; padding:0 24px; }
-
-/* ─── NAV ────────────────────────────────────────────────── */
-.site-nav {
-  position:sticky; top:0; z-index:100;
-  background:rgba(7,7,26,0.85);
-  backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--line);
-}
-.site-nav .nav-in {
-  max-width:1100px; margin:0 auto; padding:0 24px;
-  display:flex; align-items:center; gap:0; height:56px;
-}
-.brand {
-  display:flex; align-items:center; gap:8px;
-  font-family:var(--disp); font-weight:500; font-size:18px;
-  color:var(--ink); text-decoration:none; margin-right:auto;
-  flex-shrink:0;
-}
-.brand .mark {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:8px;
-  background:var(--grad); color:#fff;
-  font-weight:700; font-size:16px;
-}
-.brand span { color:var(--mute); font-weight:300; }
-.views {
-  display:flex; align-items:center; gap:2px;
-}
-.vbtn {
-  padding:6px 11px; border-radius:8px; font-size:13.5px; font-weight:500;
-  color:var(--mute); text-decoration:none; transition:color .15s,background .15s;
-  white-space:nowrap;
-}
-.vbtn:hover { color:var(--ink); background:var(--panel2); }
-.vbtn.on { color:var(--purpleb); background:rgba(155,115,245,0.12); }
-.quiet-links {
-  display:flex; align-items:center; gap:0; margin-left:12px;
-  padding-left:12px; border-left:1px solid var(--line);
-}
-.quiet-links a {
-  padding:6px 10px; font-size:12.5px; color:var(--dim);
-  text-decoration:none; transition:color .15s; white-space:nowrap;
-}
-.quiet-links a:hover { color:var(--purple); }
 
 /* ─── HERO ───────────────────────────────────────────────── */
 .hero {
@@ -495,6 +455,7 @@ h2.heading em {
 }
 .svc-card.featured .svc-cta:hover { background:rgba(245,158,11,0.22); }
 .svc-cta svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.bf-status { font-size:12.5px; line-height:1.5; }
 
 /* Wide card spans 2 cols */
 .svc-card.wide { grid-column:span 2; }
@@ -648,8 +609,6 @@ footer {
   .svc-card.wide { grid-column:span 1; }
   .steps-grid { grid-template-columns:1fr; }
   .form-row { grid-template-columns:1fr; }
-  .views { display:none; }
-  .quiet-links { display:none; }
   .stat-bar { flex-wrap:wrap; gap:16px; }
 }
 </style>
@@ -671,6 +630,7 @@ footer {
     }catch(e){} return ev; } });
 })();
 </script>
+<link rel="stylesheet" href="nav.css?v=1">
 </head>
 <body>
 
@@ -679,17 +639,18 @@ footer {
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
     <a class="vbtn" href="/marketplace">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank">Job board</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn on" href="/services">Managed services</a>
     <a class="vbtn" href="/business">For business</a>
     <a class="vbtn" href="/contact">Contact</a>
-    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank">Book a call</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
   <div class="quiet-links">
     <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
     <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
   </div>
+  <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
 <!-- HERO -->
@@ -699,7 +660,7 @@ footer {
       <div class="hero-left">
         <div class="hero-eyebrow"><span class="dot"></span>Managed services · Kingston &amp; Portmore first</div>
         <h1 class="display">You cannot<br>be there.<br><em>Someone independent<br>should be.</em></h1>
-        <p class="hero-sub">Timestamped proof of work on your property in Jamaica, checked against a written scope. <b>Independent of every contractor on the job.</b></p>
+        <p class="hero-sub">Timestamped proof of work on your property in Jamaica. <b>Independent of every contractor on the job.</b></p>
         <div class="hero-ctas">
           <a class="btn btn-primary" href="#contact">Tell us about your property</a>
           <a class="btn btn-ghost" href="#services">See the prices</a>
@@ -719,7 +680,6 @@ footer {
             <div>
               <div class="cred-label">Evidence standard</div>
               <div class="cred-val">Timestamped &amp; geotagged</div>
-              <div class="cred-note">Every photograph against a written checklist.</div>
             </div>
           </div>
           <div class="cred-row">
@@ -729,7 +689,6 @@ footer {
             <div>
               <div class="cred-label">You read it first</div>
               <div class="cred-val">Draft before final report</div>
-              <div class="cred-note">A fact wrong, you tell me and I fix it. Verdict is on page one.</div>
             </div>
           </div>
           <div class="cred-row">
@@ -739,7 +698,6 @@ footer {
             <div>
               <div class="cred-label">Fixed prices, in writing</div>
               <div class="cred-val">Nothing starts until you agree</div>
-              <div class="cred-note">Every price is on this page.</div>
             </div>
           </div>
         </div>
@@ -752,12 +710,10 @@ footer {
 
 
 
-
-
 <!-- HOW IT WORKS: EVIDENCE TRAIL -->
 <section class="sect sect-compact">
   <div class="wrap">
-    <div class="kick p">What happens after you book</div>
+    <div class="kick p">How it works</div>
     <h2 class="heading">Booked, attended, <em>written up.</em></h2>
     <div class="trail rv" id="trail">
       <div class="trail-track"><div class="trail-fill" id="trail-fill"></div></div>
@@ -768,7 +724,7 @@ footer {
           </div>
           <div class="trail-num">01</div>
           <div class="trail-title">You reach out</div>
-          <div class="trail-body">WhatsApp, form or voice note. Nothing charged.</div>
+          <div class="trail-body">Message us, nothing charged.</div>
         </div>
         <div class="trail-step" data-step="1">
           <div class="trail-orb">
@@ -776,23 +732,23 @@ footer {
           </div>
           <div class="trail-num">02</div>
           <div class="trail-title">Fixed price, invoiced</div>
-          <div class="trail-body">In writing. Nothing starts until you say yes.</div>
+          <div class="trail-body">Always in writing.</div>
         </div>
         <div class="trail-step" data-step="2">
           <div class="trail-orb">
             <svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg>
           </div>
           <div class="trail-num">03</div>
-          <div class="trail-title">We attend</div>
-          <div class="trail-body">Timestamped, geotagged, independent.</div>
+          <div class="trail-title">The work happens</div>
+          <div class="trail-body">On site or a desk review.</div>
         </div>
         <div class="trail-step" data-step="3">
           <div class="trail-orb">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg>
           </div>
           <div class="trail-num">04</div>
-          <div class="trail-title">Independent review</div>
-          <div class="trail-body">Reviewed independently of every contractor on the job. Report in 72h, verdict on page one.</div>
+          <div class="trail-title">Independent report</div>
+          <div class="trail-body">In 72 hours, verdict on page one.</div>
         </div>
       </div>
     </div>
@@ -804,17 +760,17 @@ footer {
   <div class="wrap">
     <div class="ai-strip rv">
       <div class="ai-strip-head">
-        <div class="kick" style="margin-bottom:8px">The part nobody else has</div>
-        <div class="ai-strip-title">Your whole project, <em>run from WhatsApp.</em></div>
+        <div class="kick" style="margin-bottom:8px">Two ways in</div>
+        <h2 class="ai-strip-title">Your whole project, <em>portal or WhatsApp.</em></h2>
       </div>
       <div class="ai-strip-points">
         <div class="ai-point">
           <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-          <span>One number, answered instantly, <b>day or night</b></span>
+          <span>Portal to book, WhatsApp to message, <b>day or night</b></span>
         </div>
         <div class="ai-point">
           <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4Z"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>
-          <span>AI agents track <b>every stage of your project</b></span>
+          <span>AI tracks <b>every stage</b></span>
         </div>
         <div class="ai-point">
           <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
@@ -830,29 +786,23 @@ footer {
   <div class="wrap">
     <div class="kick">Professional services</div>
     <h2 class="heading">Every price <em>on the page.</em></h2>
-    <p class="lead-text">Founding rates: first five clients per service.</p>
-
     <div class="svcs-grid">
 
       <!-- Deposit Protection Check — featured -->
       <div class="svc-card featured rv">
-        <div class="svc-badge">
-          <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
-          Founding rate
-        </div>
         <div class="svc-ico">
           <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
         </div>
         <div class="svc-title">Deposit Protection Check</div>
         <div class="svc-desc">Your contractor and their quote, checked before you pay anybody. <b style="color:var(--ink)">Written go or no-go, 72 hours.</b></div>
         <div class="svc-price">
-          <span class="price-main">£149</span>
+          <span class="price-main">£249</span>
           <span class="price-unit">fixed fee</span>
         </div>
         <div class="price-alt">Founding rate · first five clients · standard £249</div>
         <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Deposit%20Protection%20Check%20for%20%C2%A3149." target="_blank" rel="noopener">
           Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
       </div>
 
@@ -864,13 +814,13 @@ footer {
         <div class="svc-title">Visual Check</div>
         <div class="svc-desc">A trained checker photographs everything against a checklist. <b style="color:var(--ink)">They record. They do not rate or advise.</b></div>
         <div class="svc-price">
-          <span class="price-main">£95</span>
+          <span class="price-main">£125</span>
           <span class="price-unit">per visit</span>
         </div>
         <div class="price-alt">Founding rate · first five clients · standard £125</div>
         <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Visual%20Check." target="_blank" rel="noopener">
           Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
       </div>
 
@@ -888,7 +838,7 @@ footer {
         <div class="price-alt">Founding rate · first five clients · standard £349</div>
         <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Condition%20Report." target="_blank" rel="noopener">
           Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
       </div>
 
@@ -906,7 +856,7 @@ footer {
         <div class="price-alt">Fixed fee · the same rate for everyone</div>
         <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Technical%20Sign-off." target="_blank" rel="noopener">
           Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
       </div>
 
@@ -924,7 +874,7 @@ footer {
         <div class="price-alt">Large or rental: £70 · villa: £95</div>
         <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20Property%20Care." target="_blank" rel="noopener">
           Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
       </div>
 
@@ -938,7 +888,7 @@ footer {
           <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         </div>
         <div class="svc-title">Oversight Retainer</div>
-        <div class="svc-desc">Documented visits, a monthly cost-and-progress report, an accountability call, a WhatsApp line to me. <b style="color:var(--ink)">Pick your frequency.</b></div>
+        <div class="svc-desc">Documented visits, a monthly cost-and-progress report, an accountability call, a WhatsApp line to me. <b style="color:var(--ink)">Ongoing, not a one off.</b></div>
         <div class="svc-price">
           <span class="price-main">£395</span>
           <span class="price-unit">per month, fortnightly</span>
@@ -965,6 +915,10 @@ footer {
               <span class="price-unit">of build cost</span>
             </div>
             <div class="price-alt">Minimum fee £2,500</div>
+            <a class="svc-cta" style="margin-top:16px" href="#contact">
+              Enquire about this
+              <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
           </div>
           <div class="wide-right">
             <div class="wide-feature">
@@ -973,7 +927,7 @@ footer {
             </div>
             <div class="wide-feature">
               <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg>
-              <span><b>Stage-by-stage sign-off</b>. Payments only release once evidence is verified.</span>
+              <span><b>Stage-by-stage sign-off</b>. Payments only release once evidence is checked.</span>
             </div>
             <div class="wide-feature">
               <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg>
@@ -1033,7 +987,7 @@ footer {
 
     <!-- SCOPE NOTICE -->
     <div class="scope-notice rv">
-      <b>We know the edge of our scope.</b> Boundaries go to a land surveyor, structures to a PERB engineer, title to an attorney. In writing, never guessed. <a href="/payments">See the legal detail.</a>
+      <b>Independent inspection, not a guarantee.</b> Structural, survey and legal opinions come from a professional, in writing, never guessed.
     </div>
 
   </div>
@@ -1051,13 +1005,13 @@ footer {
     <div class="contact-card rv">
       <div class="contact-grid">
         <div class="contact-left">
-          <p class="lead-text" style="margin-bottom:28px">No account, no commitment, nothing charged. Say where the property is and what is worrying you about it. <b>Monique reads these herself.</b></p>
+          <p class="lead-text" style="margin-bottom:28px">No account, nothing charged. <b>Monique reads these herself.</b></p>
           <a class="channel" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica." target="_blank" rel="noopener">
             <div class="ch-ico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></div>
             <div>
               <div class="ch-label">WhatsApp</div>
               <div class="ch-val">Message us on WhatsApp</div>
-              <div class="ch-note">Fastest. Text, photos or a voice note. Patois or English.</div>
+              <div class="ch-note">Fastest, any time.</div>
             </div>
           </a>
           <a class="channel" href="mailto:monique@yaadly.co.uk">
@@ -1065,7 +1019,7 @@ footer {
             <div>
               <div class="ch-label">Email</div>
               <div class="ch-val">monique@yaadly.co.uk</div>
-              <div class="ch-note">Best when you have quotes, drawings or documents to attach.</div>
+              <div class="ch-note">For documents or quotes.</div>
             </div>
           </a>
           <a class="channel" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">
@@ -1073,7 +1027,7 @@ footer {
             <div>
               <div class="ch-label">Book a call</div>
               <div class="ch-val">Free 15 minute call</div>
-              <div class="ch-note">Talk it through. No obligation.</div>
+              <div class="ch-note">No obligation.</div>
             </div>
           </a>
         </div>
@@ -1085,22 +1039,22 @@ footer {
           <div class="fgroup">
             <label for="ct-topic">What is it about?</label>
             <select id="ct-topic">
-              <option>A question before I commit to anything</option>
-              <option>Property in Jamaica that needs work doing</option>
-              <option>I already have a contractor and want somebody watching</option>
-              <option>Property care while the house is empty</option>
-              <option>Something already booked or in progress</option>
+              <option>A question first</option>
+              <option>Property needing work</option>
+              <option>Already have a contractor</option>
+              <option>Property care</option>
+              <option>Already in progress</option>
               <option>Press, partnership or investment</option>
               <option>Something else</option>
             </select>
           </div>
           <div class="fgroup">
             <label for="ct-msg">Your message</label>
-            <textarea id="ct-msg" placeholder="Where the property is, what is happening, and what you want to know."></textarea>
+            <textarea id="ct-msg" placeholder="Where the property is and what's happening."></textarea>
           </div>
           <button class="btn btn-primary" id="ct-send" style="width:100%;justify-content:center" onclick="sendEnquiry()">Send enquiry</button>
           <div id="ct-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
-          <p class="f-note">What you write is used to answer you and nothing else. Replied within one working day. <a href="https://cal.com/yaadly/15min" target="_blank">Prefer a call?</a></p>
+          <p class="f-note">Used only to reply, one working day. <a href="https://cal.com/yaadly/15min" target="_blank">Or call.</a></p>
         </div>
       </div>
     </div>
@@ -1112,8 +1066,7 @@ footer {
   <div class="wrap">
     <div class="fgrid">
       <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
-      <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
-      <span>A human confirms every step that moves money or changes a reputation.</span>
+      <span>More parishes as we grow. A human confirms every step that moves money.</span>
       <div class="flinks">
         <a href="/">Home</a>
         <a href="/marketplace">Overview</a>

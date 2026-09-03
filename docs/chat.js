@@ -82,10 +82,28 @@
     + '#yc-launch:hover{filter:brightness(1.08);padding-right:14px}'
     + '#yc-launch svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
     + '#yc-panel{position:fixed;right:0;top:0;z-index:2401;width:min(400px,100vw);height:100dvh;display:flex;flex-direction:column;'
-    + 'background:#0d0d24;color:#EEEEFF;border-left:1px solid rgba(155,115,245,.28);box-shadow:-24px 0 60px rgba(0,0,0,.55);overflow:hidden;font:15px/1.5 "IBM Plex Sans",-apple-system,sans-serif;animation:yc-in .22s ease-out}'
+    + 'background:var(--panel2);color:var(--ink);border-left:1px solid rgba(155,115,245,.28);box-shadow:-24px 0 60px rgba(0,0,0,.55);overflow:hidden;font:15px/1.5 "IBM Plex Sans",-apple-system,sans-serif;animation:yc-in .22s ease-out}'
     + '@keyframes yc-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}'
     + '#yc-panel[hidden]{display:none}'
-    + '@media(max-width:480px){#yc-launch{padding:12px 8px 14px;font-size:12px}#yc-launch svg{width:17px;height:17px}}'
+    /* On a phone the mid-height right-edge tab sits ON the form. It is fixed,
+       nothing reserves room for it, and at 375px it covered the right edge of
+       every input card on /jobs/new and /apply: the two pages where a stranger
+       is being asked to type. A launcher that hides the thing it is offering
+       help with is worse than no launcher.
+
+       Under 700px it becomes an ordinary bottom-right pill instead, which is
+       where a phone user already looks for one, and which clears the middle of
+       the screen where the fields are. The homepage's WhatsApp float is on the
+       LEFT (it moved there for this chat), so the two do not collide. The
+       safe-area inset keeps it off the home indicator on an iPhone. */
+    + '@media(max-width:700px){'
+    +   '#yc-launch{top:auto;bottom:calc(16px + env(safe-area-inset-bottom));right:14px;transform:none;'
+    +     'flex-direction:row;gap:8px;padding:11px 16px;border-radius:100px;border-right:1px solid rgba(196,170,255,.35);'
+    +     'font-size:13px;box-shadow:0 8px 24px rgba(20,10,60,.5)}'
+    +   '#yc-launch span{writing-mode:horizontal-tb;transform:none}'
+    +   '#yc-launch:hover{padding-right:16px}'
+    + '}'
+    + '@media(max-width:480px){#yc-launch{padding:10px 14px;font-size:12px}#yc-launch svg{width:17px;height:17px}}'
     + '@media(prefers-reduced-motion:reduce){#yc-panel{animation:none}}'
     + '.yc-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid rgba(155,115,245,.18);background:rgba(155,115,245,.07)}'
     + '.yc-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;color:#fff;font:600 17px Fraunces,Georgia,serif}'
@@ -107,7 +125,7 @@
     + '.yc-wa a svg{width:18px;height:18px}'
     + '.yc-wa small{display:block;margin-top:8px;font-size:12px;color:#9a9ac4}'
     + '.yc-form{display:flex;gap:8px;padding:10px 12px;border-top:1px solid rgba(155,115,245,.18);background:rgba(155,115,245,.05)}'
-    + '.yc-form textarea{flex:1;resize:none;min-height:42px;max-height:120px;padding:10px 12px;border-radius:12px;border:1px solid rgba(155,115,245,.28);background:#07071A;color:#EEEEFF;font-family:inherit;font-size:14.5px;line-height:1.4;outline:none}'
+    + '.yc-form textarea{flex:1;resize:none;min-height:42px;max-height:120px;padding:10px 12px;border-radius:12px;border:1px solid rgba(155,115,245,.28);background:var(--bg);color:var(--ink);font-family:inherit;font-size:14.5px;line-height:1.4;outline:none}'
     + '.yc-form textarea:focus{border-color:#9B73F5}'
     + '.yc-form button{align-self:flex-end;height:42px;padding:0 16px;border-radius:12px;border:0;background:linear-gradient(135deg,#7B4FE0,#9B73F5);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}'
     + '.yc-form button:disabled{opacity:.55;cursor:default}'

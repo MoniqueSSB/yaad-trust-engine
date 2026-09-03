@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { recordPayInfo } from "@/app/portal/worker-actions";
+import { jmd } from "@/lib/money";
 
 /**
  * Stage 5.6. The worker portal's own header has promised "what you are
@@ -27,7 +28,7 @@ export type MoneyJob = {
   payRef: string | null;
 };
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 const METHOD_LABEL: Record<string, string> = {
   bank_transfer: "Bank transfer",
@@ -122,7 +123,7 @@ function MoneyRow({ job }: { job: MoneyJob }) {
                 maxLength={80}
                 className="rounded-xl border border-line bg-bg px-3 py-2 text-[13px] text-ink outline-none focus:border-teal"
               />
-              <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D]">
+              <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand">
                 Save
               </button>
             </form>

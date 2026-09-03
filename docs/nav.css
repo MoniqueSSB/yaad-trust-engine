@@ -1,0 +1,104 @@
+/* ── The site header, one file, every page ───────────────────────────────
+   Written 2 Sep 2026. Before this, the header was copy-pasted into all eight
+   pages and each page carried its own CSS for it. The four newest pages had
+   inline blocks that disagreed on the bar colour (0.85 vs 0.88 alpha), the
+   width (1080 vs 1060 vs 1100), the active-tab treatment (a purple pill, bold
+   text, or nothing) and the point at which the menu vanished (760, 860 or
+   1024px). The four older ones used nav.top in yaadly.css, which still had the
+   old green-black bar and bright white tab labels. Clicking between pages
+   therefore redrew the header, which read as a glitch rather than as a site.
+
+   Everything here is scoped under .site-nav, so this file can be linked from
+   a page that has its own design system inline without touching anything else
+   on it. The markup is identical on every page: only the .on class moves.
+
+   Change the header here, in one place. If you find yourself adding a nav rule
+   to a page, that is the bug coming back. */
+
+.site-nav{
+  position:sticky; top:0; z-index:100;
+  background:rgba(7,7,26,0.85);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);
+}
+/* The nowrap and justify-content here are not decoration. Four pages still
+   load yaadly.css, whose older .nav-in set flex-wrap:wrap, space-between and
+   a 14px gap. Left unstated, those leaked through and dropped "Post a job"
+   onto a second row on exactly those pages and nowhere else. Same for the
+   flex-wrap and gap resets on .views and .quiet-links below. */
+.site-nav .nav-in{
+  max-width:1100px; margin:0 auto; padding:0 24px;
+  display:flex; flex-wrap:nowrap; justify-content:flex-start;
+  align-items:center; gap:0; min-height:58px;
+}
+
+/* brand */
+.site-nav .brand{
+  display:flex; align-items:center; gap:8px; flex-shrink:0; margin-right:auto;
+  font-family:var(--disp); font-weight:500; font-size:18px;
+  color:var(--ink); text-decoration:none;
+}
+.site-nav .brand .mark{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:30px; height:30px; border-radius:8px;
+  background:var(--grad); color:#fff; font-weight:700; font-size:16px;
+}
+.site-nav .brand b{font-size:inherit; font-weight:500}
+.site-nav .brand b span{color:var(--mute); font-weight:300}
+
+/* main tabs */
+.site-nav .views{display:flex; flex-wrap:nowrap; align-items:center; gap:2px}
+.site-nav .vbtn{
+  padding:6px 8px; border-radius:8px; white-space:nowrap;
+  font:500 13px var(--body); color:var(--mute); text-decoration:none;
+  transition:color .15s, background .15s;
+}
+.site-nav .vbtn:hover{color:var(--ink); background:rgba(155,115,245,0.09)}
+.site-nav .vbtn.on{color:var(--purpleb, #C4AAFF); background:rgba(155,115,245,0.12); font-weight:600}
+
+/* portal links, quieter than the tabs on purpose */
+.site-nav .quiet-links{
+  display:flex; flex-wrap:nowrap; align-items:center; gap:0;
+  margin-left:10px; padding-left:10px; border-left:1px solid var(--line);
+}
+.site-nav .quiet-links a{
+  padding:6px; white-space:nowrap;
+  font-size:12px; color:var(--dim); text-decoration:none; transition:color .15s;
+}
+.site-nav .quiet-links a:hover{color:var(--purpleb, #C4AAFF)}
+.site-nav .quiet-links a.on{color:var(--purpleb, #C4AAFF); font-weight:600}
+
+/* The one filled button in the header, and it stays the only one.
+   Sizes through this file were measured, not guessed: with IBM Plex loaded,
+   brand + six tabs + three portal links + this button come to exactly the
+   1100px the page content uses. Grow any of them and the button pushes out
+   past the page grid on a wide screen. */
+.site-nav .navcta{
+  flex-shrink:0; margin-left:12px; white-space:nowrap;
+  display:inline-flex; align-items:center;
+  padding:8px 15px; border-radius:100px; border:1px solid transparent;
+  background:var(--grad); color:#fff; font:700 12.5px var(--body);
+  text-decoration:none; transition:filter .15s, transform .15s;
+}
+.site-nav .navcta:hover{filter:brightness(1.08); transform:translateY(-1px)}
+
+/* Narrow screens. The old pages hid the menu entirely below their own
+   breakpoint, which left a phone with a logo and nothing to navigate by. The
+   tabs scroll sideways instead, so every page stays reachable. */
+@media(max-width:1080px){
+  .site-nav .quiet-links{display:none}
+}
+@media(max-width:820px){
+  .site-nav .nav-in{flex-wrap:wrap; padding:8px 18px; gap:8px}
+  .site-nav .brand{margin-right:auto}
+  .site-nav .navcta{margin-left:0}
+  .site-nav .views{
+    order:3; width:100%;
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none; padding-bottom:2px;
+  }
+  .site-nav .views::-webkit-scrollbar{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .site-nav .navcta:hover{transform:none}
+}

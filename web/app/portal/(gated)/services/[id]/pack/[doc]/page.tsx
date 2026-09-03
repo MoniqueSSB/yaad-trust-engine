@@ -9,6 +9,18 @@ export const dynamic = "force-dynamic";
 /** One document of a service booking's Kickoff Pack, same renderers as the
  *  job version. A service booking carries at most one pack, so there is no
  *  quote disambiguation here. */
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string; doc: string }>;
+}) {
+  const { id, doc } = await params;
+  return { title: `${doc} · ${id} · Yaadly` };
+}
+
 export default async function ServicePackDoc({
   params,
 }: {

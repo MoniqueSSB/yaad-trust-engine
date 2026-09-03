@@ -90,6 +90,20 @@ Before touching DNS, check the Cloudflare record still exists and note what it w
 
 ---
 
+## 5a. The header looks different on one page
+
+The header is defined once, in `docs/nav.css`, and every page in `docs/` links it. The app's copy of the same header is `web/components/SiteNav.tsx`, which repeats the same tabs and the same measurements in Tailwind because the app does not load the marketing stylesheet.
+
+If one page's header does not match the rest:
+
+1. Check that page links the file: `grep -c nav.css docs/<page>.html` should return 1.
+2. Check nobody has put nav rules back into the page or into `yaadly.css`: `grep -n "\.vbtn\|\.views\|\.quiet-links\|site-nav" docs/*.html docs/yaadly.css` should return nothing but the markup lines. A nav rule anywhere other than `nav.css` is the fault.
+3. Check the markup matches. It is identical on all eight pages; only the `on` class moves to the current page's tab.
+
+If the whole row has wrapped onto two lines, something in it grew. With IBM Plex loaded, the header fills its 1100px exactly, so a longer label, more padding or an extra link pushes "Post a job" out. Shorten it, or take something out of the row: do not let it wrap on desktop, because a two-line header on one page and a one-line header on the next is the exact problem this file exists to prevent.
+
+---
+
 ## 6. A key has been exposed
 
 1. Rotate it at the provider now. Before anything else, before working out how it happened.
@@ -1123,6 +1137,380 @@ select id, status, payable_to, total_pence from invoices where job_id = '<job id
 
 **Since `20260902s` the price on an invoice is yours in three places.** (1) "Confirm the work" on a service booking now asks what you are charging: full price or founding rate straight off `service_catalogue`, or "My own figure" with the amount typed in pounds; the invoice line and the booking's displayed price both follow your choice. (2) The invoice editor's price tier gained "my figure": pick it on any draft line and the Unit cell becomes a box you type the amount into; Save writes exactly what you typed. Service-list tiers are still overwritten from the catalogue on save, on purpose. (3) An AI-drafted invoice refuses my-figure lines until you press "Make it mine to price", which flips `drafted_by` to human on the record; that refusal is `invoice_line_price_guard` doing its job, not a bug. **Technical Sign-off** is now in the catalogue (`technical-signoff`, £245 both tiers) and bookable from the services page like the rest; Full Project Management remains the only card that falls back to WhatsApp.
 
+## A client's photograph is not showing on the board, or you want to publish one
+
+**Since 2 Sep 2026 a photograph on a job is private until you publish it.** Client photographs arrive over WhatsApp, land in the private `intake` bucket, and get a `job_photos` row with `board_ok = false`. The client sees their own pictures in their portal and so does the booked worker; the public board at app.yaadly.co.uk/jobs shows only the ones you have put there.
+
+**To publish one:** desk → Services → Job photos. Every photograph anyone has ever sent is listed, with the picture itself, which job it came with, and whether it is on the board. Open the row and press "Show it on the board". "Take it off the board" reverses it straight away.
+
+**Before you press it:** a photograph sent into a WhatsApp conversation is not consent to put it on a public page. Ask the client, and remember what is usually in these pictures, the inside of a house that is often empty, next to a parish on the same card. If in doubt, leave it private; a worker can still be shown it by other means, and nothing about quoting depends on it being public.
+
+**A picture is missing where you expected one.** Work down these in order:
+
+- **Board shows no photos on a job that has them:** the rows are there but `board_ok` is false. That is the gate, not a fault. Publish from Job photos.
+- **"no file" in the Job photos view:** `job_photos.storage_path` is null on that row. It predates the bucket, or the upload in `yaad-inbound` failed and only the row landed (that path is best effort on purpose: a failed photo must never cost the job). Check the `yaad-inbound` function log for "store inbound media".
+- **"could not be signed":** the path is set but `createSignedUrls` came back empty for your admin session. Check `pg_policies` on `storage.objects` still has "admins read every bucket" covering `bucket_id = 'intake'`, and that your session's `is_admin()` is still true.
+- **Published, but the board tile is blank:** the board mints its own links as it renders, through "board photo files are readable". Check that policy exists and that the object path sits in a folder named after the job (`whatsapp/<job id>/<file>`), which the policy requires; a row whose `storage_path` names a different job's folder is refused on purpose.
+
+**Links here expire.** The board and the portal sign for 300 seconds, the desk for 3600. A picture that rendered an hour ago and is broken now is almost certainly just that; reload the page. Nothing you can copy out of this system is a lasting link to a client's photograph, which is the point.
+
+**Where a client sends photographs.** Their portal, on the job page: the "Add a photo" button inside "What a worker will see", or on the "Your listing" strip once the job is live. The link is the one they already have: `app.yaadly.co.uk/portal/join?job=<job id>&code=<portal code>` for a client who has not set the portal up yet (the wizard shows it on the "job received" screen, and `yaad-notify-client` messages it), then `app.yaadly.co.uk/portal/jobs/<job id>` once they are in. The portal code is on the job row in the desk. There is no separate upload link and there is deliberately no link that works without signing in: a page that accepts photographs of somebody's house on the strength of a URL alone is a page anybody can find.
+
+They can also still send them on WhatsApp, which is where most will come from. Both land in the same place.
+
+**Since 3 Sep 2026 a photo the client uploads themselves is theirs to publish.** The upload form has "Show it on the marketplace with the job", ticked by default, and every thumbnail they sent carries a "Show on marketplace" or "Take off marketplace" button, so a client-sent photo can be on the board with no desk step at all. They can also delete one they sent whether or not it is on the board. You still see every photo in Services → Job photos and can take any of them down. Photos that arrived on WhatsApp are unchanged: private until you publish them, and not the client's to publish or delete, because those were saved out of a conversation rather than sent for the board. If a client asks why a WhatsApp photo has no button, that is why, and the answer is to publish it for them from the desk.
+
+**The demonstration listing.** JOB-DEMO-PHOTOS is a display job carrying a Yaadly stock image from the app's own assets, not a client photograph, and it says so in its own title and first line. It is the only published photo today. Delete the job row and its photo row when you no longer want it on the board.
+
+---
+
+## 11. A card authorisation is about to expire, or already has
+
+Applies to short jobs taken on manual capture (authorise at booking, capture on approval). Decided 3 September 2026, see the ledger entry of that date. Long jobs go out as invoices and none of this applies to them.
+
+**The deadline.** Seven days from authorisation, on every card brand, for online customer-initiated payments. There is no grace period. If nobody captures in time, Stripe releases the funds and the payment status becomes `canceled`. The money is not taken wrongly; it is simply gone, and the client has to pay again.
+
+**Where to look.** Stripe Dashboard, Payments, filter status **Uncaptured**. Every row there is a live deadline. Check it daily while any short job is open. The API field carrying the exact expiry is `payment_method_details.card.capture_before` on the charge.
+
+**On approval, before day 7.** Open the payment and click **Capture**. That is the whole action. A named human clicks it after the client has approved the evidence, never before, and never automatically: capturing is taking the client's money, and `approve_job` is on `HUMAN_ONLY_DECISIONS`.
+
+**Day 6 and no approval yet.** Do not wait for day 7. Two options, both are decisions for a person:
+1. The work is done and the client is just slow to look: chase the client, and if the approval will not land in time, tell them the authorisation is expiring and that they will be asked to pay again. Then let it expire, or cancel it (below).
+2. The work is not done: cancel the authorisation and rebook the job as an invoice. A job that has already overrun seven days is not a manual capture job.
+
+**To cancel.** Open the payment in the Dashboard and cancel it. The hold is released and the client is charged nothing. Cancel rather than letting it lapse silently, because the client can see the pending amount on their statement and deserves to be told.
+
+**Never do.** Do not capture to beat the deadline while approval is outstanding. That takes money for work the client has not accepted, which is the thing this whole product exists not to do. Do not enable Stripe's `automatic_delayed` capture, which captures on a timer without a human, for the same reason.
+
+**A note on statements.** Some card issuers show an authorisation and a settled payment identically, so a client may believe they have already been charged when they have not. Expect that question and answer it plainly: the money is held by their bank, not taken by Yaadly, until they approve.
+
+---
+
+## A client wants to change the description of their job
+
+**Since 3 Sep 2026 they can do it themselves,** on the job page in their portal: the small "Edit the description" button inside "What a worker will see" (once the job is live and that preview is gone, the same button sits on the "Your listing" strip). Whatever they save is read back below it exactly as the board will show it, with the address, any access contact line and phone numbers stripped by `open_jobs` as before. The edit changes the stored text only; what is published is still decided by the view.
+
+**It stops the moment a worker is booked.** From then on the description is the scope both sides confirmed a Kickoff Pack against, and the button disappears. A client who asks for a change after that is asking for a variation: agree it with both sides and edit the job row in the desk yourself, and say so in the job's messages so the worker has it in writing.
+
+**Quotes already in were priced against the old wording.** The form tells the client that. If a change is big enough to move the price, message the workers who quoted; nothing does that automatically.
+
+**"Only the client of this job can change its description" / "A worker is booked on this job":** those are `edit_job_descr_as_me()` (20260903a) refusing, in words, and both are correct. The first means the signed-in email is not the job's `client_email`; the second is the rule above. There is no override in the portal on purpose.
+
+---
+
+## Changing a colour, or adding a text tier
+
+**Text colours live in six files and must move together.** `--mute` and `--dim` are defined in `web/app/globals.css`, `docs/yaadly.css`, and the inline `:root` blocks of `docs/index.html`, `docs/marketplace.html`, `docs/business.html` and `docs/services.html`. Editing the stylesheet alone reaches exactly half the marketing site, because those four pages carry their own copy. Check with:
+
+```bash
+grep -rnE -- '--(color-)?(mute|dim):? *#' docs/*.html docs/*.css web/app/globals.css
+```
+
+Every line that comes back should show the same two values. Today: `--mute:#9E9ECB`, `--dim:#7C7CA6`.
+Seven lines, six files. The app spells them `--color-mute` and `--color-dim`, because Tailwind v4
+derives `text-mute` and `text-dim` from that prefix; the plain names are aliased to them further down
+`globals.css` for the CSS ported from the preview. Same values, two spellings, one meaning.
+
+**Any colour used for text must clear 4.5:1 against `--bg` (`#07071A`).** That is not a preference, it is the WCAG AA floor for normal text, and `--dim` sat at 2.04:1 until 3 Sep 2026. To check a candidate, open any page and run this in the browser console:
+
+```js
+const lin=c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
+const L=h=>{const n=parseInt(h.slice(1),16);return 0.2126*lin((n>>16)&255)+0.7152*lin((n>>8)&255)+0.0722*lin(n&255)};
+const ratio=(a,b)=>{const x=L(a),y=L(b);return ((Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)).toFixed(2)};
+ratio('#7C7CA6','#07071A')   // must be 4.5 or above
+```
+
+**Status pill colours are `web/components/portal/statusTone.ts`, one file.** Four tones: `waiting` gold, `moving` purple, `done` green, `idle` grey. Add a tone there, never in the component asking for it, and check it against the panel background the same way. The wording of each status stays in `JobList.tsx`, per audience, because a client and a worker read the same status differently.
+
+**The ink on a brand gradient is `--color-onbrand`, one token.** It was hardcoded as `#04211D` in 53 places, a leftover green from the retired teal palette. If the gradient ever changes, this changes with it and nothing else needs to.
+
+**The favicon is the same purple mark on all eight marketing pages and the app** (`web/app/icon.svg`). Audit with:
+
+```bash
+for f in docs/*.html; do printf '%-24s ' "$f"; grep -o "fill='%23[0-9A-Fa-f]\{6\}'" "$f" | head -1; done
+```
+
+All eight should read `%237B4FE0`. Four of them were still the old teal square until 3 Sep 2026.
+
+---
+
+## A database function is exposed to the open internet, or the desk stops being able to invoice
+
+**The rule.** PostgREST publishes EVERY function in the `public` schema that the caller's role may execute, at `/rest/v1/rpc/<name>`. Supabase's default privileges grant EXECUTE to `anon` and `authenticated` when a function is created. **A new `SECURITY DEFINER` function is therefore on the open internet the moment it exists, unless you take it off.** Do that in the same migration that creates it.
+
+**To see what is currently exposed:**
+
+```sql
+select p.proname, pg_get_function_identity_arguments(p.oid) as args,
+       has_function_privilege('anon', p.oid,'EXECUTE') as anon,
+       has_function_privilege('authenticated', p.oid,'EXECUTE') as auth,
+       exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_grant
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and p.prosecdef and has_function_privilege('anon', p.oid,'EXECUTE')
+order by p.proname;
+```
+
+Anything in that list that does not open with `if not public.is_admin()` or check `auth.uid()` is a hole. Anything called only by an Edge Function should not be in the list at all.
+
+**What is deliberately still on that list, as of 3 Sep 2026.** Seven, and none of them writes anything:
+
+| Function | Why it stays |
+|---|---|
+| `job_for_code`, `quotes_for_code` | The whole point of "no account to get quotes". The job code is the bearer token and the page at `/jobs/[id]/quotes` is public. |
+| `request_kickoff_as_me` | Reached from that same public page. It refuses anybody who is not the job's signed-in client, so an anonymous call just fails. |
+| `current_doc_version`, `job_open_for_quotes` | Read-only lookups with no personal data in them. |
+| `job_client_email_matches`, `may_use_agents` | **Do not revoke these without checking first.** They look like oracles, and they are: an anonymous caller can test whether an email matches a job. But they are almost certainly evaluated inside RLS policy expressions, and a function called in a policy runs as the querying user, so revoking EXECUTE would make those policies fail for everybody rather than merely closing an oracle. Closing them properly means moving the check inside a definer function first. Worth doing, not worth doing quickly. |
+
+**Always revoke from `public` as well as `anon`.** A grant to PUBLIC covers `anon` no matter what `anon` itself holds, so `revoke ... from anon` alone is a silent no-op on any function carrying one. The `public_grant` column above is how you spot it. `release_materials_tranche` was exactly that case on 3 Sep 2026.
+
+**Never revoke `authenticated` without checking the desk first.** `concierge/concierge.html` reads Postgres with the PUBLISHABLE key, so Monique signed in is `authenticated`, and `is_admin()` is what separates her. These are the functions the desk calls and they must keep `authenticated`:
+
+```bash
+grep -oE "rpc/[a-z_]+|rpc\(.[a-z_]+" concierge/concierge.html | sed -E "s|rpc/||; s|rpc\(.||" | sort -u
+```
+
+Today, ignoring the `args` line the pattern also picks up: `is_admin`, `raise_job_agency_fee_invoice`, `raise_service_invoice`, `release_materials_tranche`. The desk reaches these two ways, a fetch to `/rest/v1/rpc/<name>` and a `supabase.rpc("<name>")` call, which is why the pattern matches both shapes; a grep for only the first misses three of the four.
+
+**If the desk starts refusing with a permission error after a grant change,** re-grant it: `grant execute on function public.<name>(<exact arg types>) to authenticated, service_role;`. The argument list must match exactly or you will create a second entry rather than fixing the first.
+
+**Migration files here are a record, not the mechanism.** `supabase migration list` skips every file in `supabase/migrations/` because the names are `20260903c_...` rather than a 14-digit timestamp, so `supabase db push` will NOT apply them. They are applied through the dashboard or the API, which records its own timestamped entry. Write the file for the reasoning, apply it separately, then verify with the query above.
+
+---
+
+## WhatsApp intake is returning 503 and nothing is arriving
+
+Since 3 Sep 2026 `yaad-inbound` **refuses** a Twilio request it could not verify, rather than letting it through. A 503 with `"Inbound verification is not configured."` means exactly one thing: `TWILIO_AUTH_TOKEN` is missing or wrong on the function.
+
+```bash
+npx supabase secrets list --project-ref leffyisvfvjwzilydlwf | grep TWILIO
+```
+
+`TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` must both be present. Set the token from the Twilio console (Account Info, Auth Token) with `npx supabase secrets set TWILIO_AUTH_TOKEN=... --project-ref leffyisvfvjwzilydlwf`, then redeploy nothing: secrets are read at request time.
+
+**Do not "fix" this by removing the check.** Before it existed, a missing token meant every unsigned request was accepted, on an endpoint that runs with `--no-verify-jwt` and can agree quotes, agree Kickoff Packs, choose workers and approve stages. Approving a stage raises a worker pay invoice. The 503 is the system telling you the front door is unlocked; the answer is the key, not the alarm.
+
+A 403 with `"Signature check failed."` is different and is the sender's problem: the token is set and the signature did not match. Usually the URL Twilio posts to has changed. See `twilio-signature.ts` for why the URL is rebuilt candidate by candidate.
+
+---
+
+## Somebody asks about a password, or a password reset email arrives
+
+**There are no passwords.** Sign in is a code, sent to the email address on the account, good for about an hour. `/portal/forgot` and `/portal/reset` both now forward to `/portal/sign-in`; they used to run the retired password flow, and `/portal/reset` could still set a password that nothing accepted.
+
+**If somebody cannot get in:** send them to `app.yaadly.co.uk/portal/sign-in`, have them type their email and leave the code box empty, and press the button. That sends a fresh code.
+
+**Outstanding, and it is the founder's call:** the Supabase Auth email templates may still contain a "reset your password" template pointing at `/portal/reset`. That link still works, because the route forwards and carries the session fragment across, so nobody is stranded. But the email says password and the product has none. Retiring or rewording that template changes what clients receive, so it has not been done for you. Dashboard, Authentication, Emails.
+
+---
+
+## Money is showing a different figure in two places on the same job
+
+**Every money string in the app comes from `web/lib/money.ts`.** If two panels disagree, one of them has grown its own formatter again. That is what this file exists to stop: there were ten, seven rounded and three did not, so a job could read J$1,234,567.89 in one panel and J$1,234,568 in another.
+
+```bash
+grep -rn 'toLocaleString("en-JM")\|toLocaleString("en-US")\|"J\$" +' web/app web/components
+```
+
+Anything that comes back other than `web/lib/money.ts` is the fault. Four exports, and they differ only in what they do with a missing figure:
+
+| Use | When |
+|---|---|
+| `jmd(n)` | you already know you have a number |
+| `jmdOrNull(n)` | the component renders nothing when there is no figure |
+| `jmdOrBlank(n)` | the caller concatenates the result regardless |
+| `amount(minorUnits, currency)` | an invoice total, in whatever currency it was raised |
+| `gbp(pence)` | a plain pence column, always two decimals |
+
+J$ is always rounded, because Jamaican pricing is quoted in whole dollars. Card currencies keep both decimals, because a statement has them. `amount(null, ...)` returns "not set", never a dash: a dash in a money column is ambiguous between nothing and zero.
+
+---
+
+## The question box on /ask is refusing people, or being flooded
+
+Since 3 Sep 2026 `/ask` writes through `ask_question()` in Postgres, not by direct insert, and `questions` has no INSERT policy for anon at all. Ten questions an hour per caller.
+
+**Somebody says they cannot ask.** The page tells them which of four things happened, so ask them what it said:
+
+| The page says | Means |
+|---|---|
+| "ten questions in an hour" | the throttle. Genuine, and it clears within the hour. |
+| "too short to answer well" | under 10 characters. |
+| "did not save, and it is our end" | the RPC errored. Check the function exists and `anon` can execute it. |
+| nothing appears after asking | working as intended: rows land unpublished and a person publishes them. |
+
+**To publish a question:** it is a row in `questions` with `published = false`. Set it true from the desk or the SQL editor. Answers come from vetted workers who have signed the Worker Guidelines; the policy enforces both.
+
+**To check the throttle is actually on:**
+
+```sql
+select has_function_privilege('anon','public.ask_question(text,text,text)','EXECUTE') as anon_can_ask,
+       exists (select 1 from pg_policies
+                where schemaname='public' and tablename='questions'
+                  and cmd='INSERT' and roles::text like '%anon%') as anon_can_insert_directly;
+```
+
+`anon_can_ask` must be true and `anon_can_insert_directly` must be **false**. If the second is true, the direct door is open again and the throttle is decorative.
+
+The caller key is a truncated SHA-256 of the address, computed in the server action, never the address itself. It is a throttle key, not a visitor log, and `question_attempts` sweeps itself within hours.
+
+---
+
+## Somebody cannot finish the "Post a job" form, or a job arrives with no urgency on it
+
+`/jobs/new` is six stages since 3 Sep 2026: the work, the property, urgency, photos, contact, review. It talks to two Edge Functions and nothing else. `yaad-post-job` in draft mode saves the job card, on the way out of stages one, two and three. `yaad-enquiry` sends the name and the contact detail, once, on Send.
+
+**Start by asking what the screen said.** The form shows the Edge Function's own words, so the message identifies the fault.
+
+| They saw | Means | Do |
+|---|---|---|
+| "That is a lot of job requests in one hour" | `yaad-post-job`'s per-caller throttle, eight creates an hour. A shared connection or an office can trip it. | Nothing is broken. Tell them to press **Carry on without saving**: the job still reaches you, without a reference number. Or finish it with them on WhatsApp. |
+| "Posting is not configured" | `SUPABASE_SERVICE_ROLE_KEY` is missing from the function's environment. | §9 of this runbook. Nothing saves until it is set. |
+| "That did not send. Nothing is lost on your side." | `yaad-enquiry` failed. The job card is already saved; only the contact detail did not go. | Ask them for the reference number on screen and their number. The job is in `jobs` and you can reply from the desk. |
+| "We need your name, a way to reach you, and what you want to ask" | `yaad-enquiry` got a blank field. Should be unreachable, the form checks first. | Report it, it is a bug. |
+| a stuck **Saving…** button | the invoke never came back. | Reload. The answers come back off the device, see below. |
+
+**A form that failed a save is never a locked door.** The error box offers **Try again** and **Carry on without saving**. Neither loses a word of what they typed.
+
+**Their answers survive a closed tab.** The trade, parish, description, urgency and access answer are kept in the browser under `yaadly.job.new.v1` for seven days, with the job reference, so a returning visitor lands on the stage they stopped at and keeps working on the SAME job rather than creating a second one. **The name, the contact detail and the portal code are deliberately never stored**, because this form gets filled in on shared family phones and the code is a credential. So somebody coming back re-types their name and number and nothing else. If they want a clean form, the banner has a **Start again** button.
+
+**A job arrives with no urgency or no access answer.** Both are required on the form, so it did not come from `/jobs/new`. It came in on WhatsApp through `yaad-inbound`, where the assistant fills what the conversation gave it. Set them from the desk.
+
+**Access answers matter more than they look.** The answer to "who can let a worker in" is written to `jobs.access_type`, and `enforce_vetted_worker_on_quote` reads it: a worker still in Probation is refused a job where they would hold keys or work inside an occupied home. Before 3 Sep 2026 this form never filled that column, so the gate was skipped on every job posted from the web. It is on now. If a worker says they cannot quote a web job, check their `vetting_state` and the job's `access_type` before assuming a bug: the refusal message names which of the two rules stopped them. The exact wording of the four options is asserted in `web/tests/new-job-form.test.mjs`; do not reword them in the page without reading that file.
+
+**Photographs are not uploaded on this form, on purpose.** Stage four says what to photograph and the confirmation screen hands over a link, `/portal/join?job=…&code=…&next=photos`, which sets up the account and lands directly on the photo panel. The file itself only ever travels the portal route: size capped, private storage, location stripped, deletable by the client. If somebody says the link did not open the photo screen, check that `next=photos` survived whatever copied the link, and that `?photos=1` is on the job URL afterwards.
+
+---
+
+## The worker directory or a worker profile is showing nobody, or `public_worker_profiles` errors
+
+Migration `20260903f_worker_profile_columns_stop_answering_the_open_internet.sql`. Same class of issue as "A database function is exposed to the open internet" above, but in RLS row policies instead of function grants: `worker_profiles.worker_email` and `.phone` sat on the same row as `name` and `trade`, and the old `wp_select_public` / `wp_select_signed_in` policies were row-only, so anybody holding the publishable key could `GET /rest/v1/worker_profiles?select=name,worker_email,phone` and read every active worker's contact details directly. Same shape of leak on `worker_checks` and `portfolio`, both of which carry `worker_email` purely as a join key.
+
+**The fix.** Three views, same pattern as `published_reviews`: `public_worker_profiles`, `public_worker_checks`, `public_portfolio`, none of which carry `worker_email` or `phone`; `worker_checks`/`portfolio` expose `subject_slug` instead of the email so the app can join on the public slug. The base tables are locked down behind them: `worker_profiles` now allows `select` only to the profile's own worker (`worker_user = auth.uid()` or their own `worker_email`) or `is_admin()`; `worker_checks`/`portfolio` keep only their existing admin-only policy.
+
+**web/app/jobs/page.tsx, web/app/jobs/new/page.tsx and web/app/workers/[slug]/page.tsx read the views, never the base tables.** If the worker directory or a profile page is rendering nobody, or a Supabase call against `worker_profiles`/`worker_checks`/`portfolio` from the web app is failing with a permission error, check first whether this migration has actually been applied:
+
+```sql
+select viewname from pg_views where schemaname = 'public' and viewname like 'public_%';
+```
+
+If the three views are missing, the migration file exists in the repo but was never run against `leffyisvfvjwzilydlwf`. **Migration files here are a record, not the mechanism** (see the entry above): apply it through the dashboard or the Supabase MCP, then verify:
+
+```sql
+select has_table_privilege('anon', 'worker_profiles', 'select') as anon_can_read_base_table; -- must be false
+select count(*) from public_worker_profiles; -- must return the active worker count
+```
+
+**What still needs `worker_email` on the base table, and stays working.** `web/app/portal/(gated)/worker/page.tsx` reads its own `phone` by `worker_user = auth.uid()`. `web/app/jobs/actions.ts` reads its own `name` by `worker_email`, matched against the signed-in user's own email. Both are covered by the new `wp_select_own_or_admin` policy; if either starts failing, check that policy exists and that its two OR-branches still match what those two call sites actually filter on.
+
+**The admin desk is unaffected.** `worker_checks`/`portfolio` keep their pre-existing `admin full ...` ALL-command policies, and `is_admin()` is part of the new `worker_profiles` SELECT policy, so `concierge.html` continues to see full worker rows including phone and email.
+
+---
+
+---
+
+## A tradesperson says they lost their place in the application, or cannot get back to the ID check
+
+`/apply` saves as they type, into `localStorage` under the key `yaadly.application.v1`, on the browser they were using. That is the whole mechanism: no account exists yet, so there is nowhere else to keep it.
+
+What is saved: the application id and upload token (the claim), every document already accepted, a recorded Persona check, the whole form including the three referees and the signature, which screen they were on, which of the two sittings they were in, and the reference once Phase 1 has been sent.
+
+1. **Same phone, same browser, not private mode:** send them back to `https://app.yaadly.co.uk/apply`. It reopens where they left off. If Phase 1 was already sent it reopens on the sent screen, which carries the "Carry on to the ID check" button.
+2. **Different phone, or they cleared their browser, or they were in private mode:** there is nothing to restore, and nothing is lost at the desk either. Their application is already in `applications` under its `APP-` reference and every document they sent is on file. Do **not** ask them to apply again, it makes a second row for the same person. Chase the remaining Phase 2 items on WhatsApp instead, which is the intended route anyway.
+3. **They want to wipe what is on the phone,** for instance it is a borrowed handset: the line under the heading carries "Start again, and clear what is saved here". It removes the key and reloads. It does not delete anything at the desk.
+
+**To read what a phone is holding,** in the browser's own console on that device:
+
+```js
+JSON.parse(localStorage.getItem("yaadly.application.v1"))
+```
+
+`sentRef` present means Phase 1 was submitted. `continuing: true` means they were in the second sitting. `step` is an index into that sitting, and an out-of-range value is clamped to the last screen rather than blanking the page.
+
+Note that the upload token stays on the phone until the second sitting is finished or "Start again" is pressed. Phase 2 uploads need it. If a handset is lost and the applicant is worried, the desk can invalidate it: change `upload_token` on their row in `applications` and their old browser copy stops working. They then finish over WhatsApp.
+
+---
+
+## The progress counter on /apply, and why it must never say "of 9"
+
+Phase 1 shows three dots, Phase 2 shows four, and the number comes from the length of the sitting being shown, not from a written constant.
+
+This is deliberate and it reverses nothing. The nine-item step rail was removed on 30 Aug 2026 because it was the first thing an applicant saw and a list of nine outstanding things is a reason to close the tab. A counter that spans both sittings is that rail again in smaller type. If a screen is added to a sitting the count follows on its own; if anybody proposes one counter across the whole check, the answer is no, and the reason is in `DECISIONS.md` under the 3 Sep 2026 entry.
+
+---
+
+## A photograph or an introduction video on /apply says "Could not record that document"
+
+The `doc_type` column on `vetting_documents` has a check constraint, and a value the constraint does not list fails at the insert **after** the file has already uploaded. The row shows that message, and the file sits orphaned in the bucket until the ninety day purge collects it.
+
+`intro_video` was in exactly this state from 31 Aug to 3 Sep 2026: accepted by the browser and by the edge function, refused by the database, every single time. `profile_photo` was added on 3 Sep. Both are in migration `20260903g`.
+
+**To see what the live constraint actually allows** (the migration history is not the schema, which is how the above went unnoticed):
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'public.vetting_documents'::regclass
+  and conname = 'vetting_documents_doc_type_check';
+```
+
+Adding a new document type takes **four** changes, and missing any one of them fails in a different place:
+
+1. The constraint above, by migration. Miss it and the insert fails after a successful upload.
+2. `DOC_TYPES` in `supabase/functions/yaad-vetting-upload`. Miss it and you get "Unknown document type" before anything uploads.
+3. `DocType` in `web/app/apply/JoinFlow.tsx`, and a row to upload it.
+4. **If it shows a person's face,** `IDENTITY_DOCS` in `supabase/functions/yaad-vetting-review`, in the same change. Miss it and the face is sent to a model. Today that list holds the photo ID, the selfie, the face turn, the introduction video and the profile photograph.
+
+---
+
+## What did an applicant actually agree to about AI reading their paperwork
+
+The question is on `/apply`, on the Phase 1 work screen and again on the Phase 2 identity screen. One answer, whichever screen they use.
+
+```sql
+select app_id, name, ai_review_consent, ai_review_consent_version, ai_review_consent_at
+from public.applications
+order by created_at desc
+limit 20;
+```
+
+- `granted` means the proof of address, TRN, certificates, CV and portfolio were sent to NVIDIA's vision model to be read, and flags were written for the desk. The photo ID, selfie, face video and profile photograph were **not**, whatever they chose: `IDENTITY_DOCS` withholds those before the download.
+- `declined`, or NULL, means nothing left Yaadly and a person reads every page by hand. The reviewer refuses to run, and so does the automatic hand-off from submit.
+- `ai_review_consent_version` is the sentence they agreed to. `ai-review-v3` is current, from 3 Sep 2026. Never read an older version as agreement to a newer or broader one; each is narrower than the last, so an old yes covers what is done today, but the version is the record of what was actually asked.
+
+**If a run of applications all say `declined` and nobody chose that:** the browser has stopped sending the field. That happened between 30 Aug and 3 Sep 2026, when the consent UI was removed from the page and the submit stopped sending `aiReviewConsent`; the server reads a missing field as declined, correctly, so every application in that window records a refusal nobody gave and no review ever ran for them. Check that `JoinFlow.tsx` still sends `aiReviewConsent` and `aiReviewConsentVersion` in the `submit` call. Those applications can be reviewed by hand at the desk, or re-asked; do not back-fill a consent nobody was asked for.
+
+**To change the wording of the question:** bump `AI_CONSENT_VERSION` in `JoinFlow.tsx` in the same commit. That is CLAUDE.md §6 and it is not a formality. The whole value of the column is that somebody can later ask what a given yes said.
+
+## 17. Turning the CSP from report-only to enforcing
+
+**Diary item, on or after 17 September 2026.** A Content-Security-Policy went out in report-only on 3 Sep with a two-week watch, founder's decision, no collector. If nobody does this, the policy sits there protecting nothing.
+
+**No collector means the reports go to the browser console and nowhere else**, so finding violations is a person walking the site with devtools open. That is the whole watch. Do it at least twice in the fortnight, and once more on the day.
+
+**Walk these, signed in, with the console open**, because each one loads something the others do not:
+
+1. `/jobs` — the board, client photographs on signed URLs, the chat widget from `yaadly.co.uk`
+2. `/jobs/new` — the post-a-job flow, photo upload
+3. `/apply` — **the important one.** The Persona identity step runs in an iframe from `inquiry.withpersona.com` and asks for the camera. If any single thing breaks under this policy it will be this.
+4. `/portal/jobs/<id>` — evidence images, video, the money panels
+5. `/portal/jobs/<id>/pack` — a Kickoff Pack document
+6. `/workers` and a worker profile
+
+Anything the console reports as a CSP violation is a source the policy is missing. Add it to the matching directive in `web/next.config.ts`, where every source already carries a comment saying where it came from. **A violation is not automatically something to allow**: if you cannot explain why the app is loading it, that is the policy doing its job.
+
+**To enforce**, in `web/next.config.ts`:
+
+1. Rename the header key `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
+2. Delete the separate `frame-ancestors 'none'` header above it. It is kept enforcing alongside the report-only policy on purpose, because that one clause is proven; the full policy already contains it, so leaving both would be duplication.
+3. Deploy, then walk the same six routes again. **This time a mistake breaks the page rather than logging.**
+
+**If something breaks after enforcing**, rename the key back to `Content-Security-Policy-Report-Only`, redeploy, and you are back to safe within one deploy. That is the whole rollback.
+
+**`'unsafe-inline'` on `script-src` is knowingly in there.** Next injects an inline bootstrap script, so removing it needs nonces threaded through the document. That is its own change and it is worth doing later; the policy is worth having in the meantime, because it still closes off every origin the app has no business talking to.
+
+**`service_catalogue` names and active flags can drift from what the marketing page and specs actually decided, since nothing keeps them in sync automatically.** On 3 Sep 2026, `eyes-on-it` still read "Eyes On It" and `condition-report` still read "Property Condition Report" in the live table, months after `specs/PRICING.md` and `CHANGELOG-2026-08-26.md` §4 renamed them to "Visual Check" and "Condition Report" on the day the invoicing migration was written; the seed data in `20260826_invoicing.sql` just never picked the rename up. Separately, `setup-pack` and `document-check` were still `active := true`, both listed under "Removed" in the same spec, which is why they were still raisable from the concierge desk's own catalogue dropdown (`loadCatalogueOptions` reads `active = true` straight off the table) and still selectable in the `<select id="bk-svc">` on `docs/services.html`, which never had its two leftover `<option>`s pulled when their product cards came off the page. Fixed in `20260903h`: renamed the two rows, set both retired ids `active = false`, dropped the two `<option>`s, and dropped `docs`/`setup` from the `BOOKABLE` allowlist in `yaad-book-service` so a crafted request can't book them even with the page unchanged; redeployed. **If a "removed" service becomes bookable again**, check three places: the row's `active` flag, whether its `<option>` is back in `docs/services.html`, and whether its key is back in `BOOKABLE`.
+
+**A bigger, separate gap found while fixing the above and not yet acted on:** several `service_catalogue` pence values still hold pre-26-Aug numbers, while `specs/PRICING.md` (dated the same day) records the founder's decided prices with sourced comparables. Live catalogue vs. spec, as of 3 Sep 2026: Visual Check full £125 vs. decided £149 · Condition Report £249/£349 vs. decided £245/£325 · Oversight Retainer £395/£495 vs. decided £595 fortnightly (and the catalogue has no weekly tier at all, spec wants one at £1,095) · Property Care standard/large/villa £45/£70/£95 flat vs. decided £95/£135/£175 · Technical Sign-off £245/£245 vs. decided £245/£300. The public page (`docs/services.html`) already shows the *decided* founding figures, so a client sees one number and, once an admin raises the invoice, `raise_service_invoice()` prices it off the *stale* catalogue figure. This is a money change, not a label fix, and the retainer needs an actual schema decision (one row or two), so it was left for the founder to confirm before anyone touches it.
 ## The legal pages, and the placeholders that are still in them
 
 `docs/privacy.html`, `docs/cancellation.html` and `docs/terms.html` went up on 3 September 2026 with their open questions marked on the page rather than filled with guesses. Every gap is in a visible amber box or a square-bracketed `[TO BE INSERTED...]`, so to find all of them at once:

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import legal from "@/lib/legal-copy.json";
+import { PrintReport } from "@/components/portal/PrintReport";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,18 @@ export const dynamic = "force-dynamic";
  * decided text, verbatim. Renders only once the job is complete: a report
  * for unfinished work would be fiction.
  */
+
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return { title: `Completion · ${id} · Yaadly` };
+}
 
 export default async function Completion({ params }: { params: Promise<{ id: string }> }) {
   const user = await getUser();
@@ -50,7 +63,10 @@ export default async function Completion({ params }: { params: Promise<{ id: str
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-6">
-      <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
+        <PrintReport />
+      </div>
       <div className="mt-3 border-b-2 border-teal pb-4">
         <h1 className="font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Completion Report</h1>
         <p className="mt-1 text-[12px] text-dim">{job.id} · {job.trade ?? ""} {job.parish ? "· " + job.parish : ""} · closed {String(job.updated_at).slice(0, 10)}</p>

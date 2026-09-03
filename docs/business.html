@@ -5,6 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Yaadly for business</title>
 <meta name="description" content="For agents, developers, insurers and partner firms who answer for Jamaican property they cannot stand in front of. Qualified, UK registered, independent of every contractor on the job.">
+<meta property="og:title" content="Yaadly for business · Independent oversight of property in Jamaica">
+<meta property="og:description" content="For agents, developers, insurers and partner firms who answer for Jamaican property they cannot stand in front of. Qualified, UK registered, independent of every contractor on the job.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yaadly.co.uk/business.html">
+<meta property="og:site_name" content="Yaadly">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="https://yaadly.co.uk/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Yaadly. Independent proof of work on your property in Jamaica.">
+<meta name="twitter:image" content="https://yaadly.co.uk/og.png">
 <link rel="canonical" href="https://yaadly.co.uk/business.html">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%237B4FE0'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%23ffffff'%3EY%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,8 +30,12 @@
   --line:   rgba(155,115,245,0.14);
   --line2:  rgba(155,115,245,0.28);
   --ink:    #EEEEFF;
-  --mute:   #7878A8;
-  --dim:    #44446A;
+  /* Text tiers retuned 3 Sep 2026, same values as docs/yaadly.css and
+     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1. The old
+     mute 4.8:1 and dim 2.2:1 put the supporting copy below AA. Change all
+     three files together or the site drifts against itself. */
+  --mute:   #9E9ECB;
+  --dim:    #7C7CA6;
   --purple: #9B73F5;
   --purpleb:#C4AAFF;
   --gold:   #F59E0B;
@@ -39,41 +54,6 @@ body {
 a { color:var(--purple); text-decoration:none; }
 a:hover { color:var(--purpleb); }
 .wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
-
-/* NAV — identical to canonical */
-.site-nav {
-  position:sticky; top:0; z-index:100;
-  background:rgba(7,7,26,0.85); backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--line);
-}
-.site-nav .nav-in {
-  max-width:1100px; margin:0 auto; padding:0 24px;
-  display:flex; align-items:center; height:56px;
-}
-.brand {
-  display:flex; align-items:center; gap:8px;
-  font-family:var(--disp); font-weight:500; font-size:18px;
-  color:var(--ink); margin-right:auto; flex-shrink:0;
-}
-.brand .mark {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:8px;
-  background:var(--grad); color:#fff; font-weight:700; font-size:16px;
-}
-.brand span { color:var(--mute); font-weight:300; }
-.views { display:flex; align-items:center; gap:2px; }
-.vbtn {
-  padding:6px 11px; border-radius:8px; font-size:13.5px; font-weight:500;
-  color:var(--mute); transition:color .15s,background .15s; white-space:nowrap;
-}
-.vbtn:hover { color:var(--ink); background:var(--panel2); }
-.vbtn.on { color:var(--purpleb); background:rgba(155,115,245,0.12); }
-.quiet-links {
-  display:flex; align-items:center; margin-left:12px;
-  padding-left:12px; border-left:1px solid var(--line);
-}
-.quiet-links a { padding:6px 10px; font-size:12.5px; color:var(--dim); white-space:nowrap; }
-.quiet-links a:hover { color:var(--purple); }
 
 /* HERO */
 .hero { padding:88px 0 72px; position:relative; overflow:hidden; }
@@ -543,7 +523,6 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   .triage-colhead.out { padding-top:10px; }
 }
 @media(max-width:640px){
-  .views, .quiet-links { display:none; }
   .cred-strip { grid-template-columns:1fr; }
   .cred-cell { border-right:none; border-bottom:1px solid var(--line); }
   .cred-cell:last-child { border-bottom:none; }
@@ -551,6 +530,7 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   .papers { grid-template-columns:1fr; }
 }
 </style>
+<link rel="stylesheet" href="nav.css?v=1">
 </head>
 <body>
 
@@ -558,23 +538,24 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
     <a class="vbtn" href="/marketplace">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank">Job board</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn" href="/services">Managed services</a>
     <a class="vbtn on" href="/business">For business</a>
     <a class="vbtn" href="/contact">Contact</a>
-    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank">Book a call</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
   <div class="quiet-links">
     <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
     <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
   </div>
+  <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
 <!-- HERO -->
 <section class="hero">
   <div class="wrap">
-    <div class="hero-eyebrow rv in"><span class="dot"></span>Yaadly for business · Yaadly Ltd, UK 17358077</div>
+    <div class="hero-eyebrow rv in"><span class="dot"></span>Yaadly for business · Kingston &amp; Portmore first · Yaadly Ltd, UK 17358077</div>
     <h1 class="display">Your company answers for property <em>it cannot stand in front of.</em></h1>
     <p class="hero-sub">If your business carries property in Jamaica, or clients who do, you need somebody qualified on the ground, <b>independent of every contractor on the job</b>. That is what I do.</p>
     <div class="hero-ctas">
@@ -634,6 +615,7 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
         </div>
         <div class="who-progress" id="who-progress"><i></i></div>
         <p class="who-note">Not on this list and think it still fits? Say so on the call.</p>
+        <p class="who-note">Need a single job checked rather than an ongoing arrangement? See <a href="/services">priced services</a>.</p>
       </div>
       <div class="dossier">
         <div class="dossier-head">
@@ -707,6 +689,7 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
       </div>
     </div>
     <p class="paper-foot rv"><b>Yaadly holds none of your money.</b> You pay your contractor directly. My fee is invoiced separately, bank transfer in GBP, USD or CAD.</p>
+    <p class="paper-foot rv">On the ground in Kingston and Portmore first. Other parishes considered on request, subject to travel.</p>
 
     <div class="ai-console rv">
       <div class="ai-console-left">
