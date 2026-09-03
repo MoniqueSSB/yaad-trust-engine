@@ -106,13 +106,13 @@ export function JobRail({
       <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
         <div className="mb-1 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.16em] text-dim">This job</div>
         <Link href={jobBase + "?tab=evidence"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Evidence <span className="text-dim">&rarr;</span>
+          Progress evidence <span className="text-dim">&rarr;</span>
         </Link>
-        <Link href={jobBase + "?tab=documents"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Documents <span className="text-dim">&rarr;</span>
+        <Link href={jobBase + "?tab=approvals"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
+          Approvals <span className="text-dim">&rarr;</span>
         </Link>
-        <Link href={jobBase + "?tab=info"} className="flex items-center justify-between py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Link &amp; settings <span className="text-dim">&rarr;</span>
+        <Link href={jobBase} className="flex items-center justify-between py-2.5 text-[13px] text-mute transition hover:text-purpleb">
+          Overview &amp; documents <span className="text-dim">&rarr;</span>
         </Link>
       </div>
 
