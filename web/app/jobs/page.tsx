@@ -310,7 +310,13 @@ export default async function Board({
               )}
             </div>
           ) : (
-            <div className="mt-4 flex flex-col gap-3.5">
+            // Two columns from tablet width up, matching the grid the worker
+            // tab already uses, so switching tabs doesn't change the shape of
+            // the page. CSS columns rather than a grid because job cards vary
+            // a lot in height (a photo banner, a long description, an open
+            // quote panel); a grid would leave a short card's row half empty,
+            // columns just let the next card sit right underneath it.
+            <div className="mt-4 columns-1 gap-3.5 md:columns-2">
               {jobs.map((j) => {
                 // Only pictures that actually resolved. A tile with nothing in
                 // it is not a photograph, and counting it would overstate what
@@ -327,7 +333,7 @@ export default async function Board({
                     key={j.id}
                     id={j.id}
                     className={
-                      "group relative scroll-mt-6 overflow-hidden rounded-[18px] border bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] px-6 pb-4.5 pt-5.5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40 hover:shadow-[0_12px_44px_rgba(0,0,0,0.4)] " +
+                      "group relative mb-3.5 block scroll-mt-6 overflow-hidden break-inside-avoid rounded-[18px] border bg-linear-to-b from-[rgba(19,19,50,0.9)] to-[rgba(12,12,38,0.75)] px-6 pb-4.5 pt-5.5 shadow-[inset_0_1px_0_rgba(238,238,255,0.04)] transition duration-200 hover:-translate-y-0.5 hover:border-purple/40 hover:shadow-[0_12px_44px_rgba(0,0,0,0.4)] " +
                       (fresh ? "border-gold/35" : "border-line")
                     }
                   >
