@@ -90,6 +90,20 @@ Before touching DNS, check the Cloudflare record still exists and note what it w
 
 ---
 
+## 5a. The header looks different on one page
+
+The header is defined once, in `docs/nav.css`, and every page in `docs/` links it. The app's copy of the same header is `web/components/SiteNav.tsx`, which repeats the same tabs and the same measurements in Tailwind because the app does not load the marketing stylesheet.
+
+If one page's header does not match the rest:
+
+1. Check that page links the file: `grep -c nav.css docs/<page>.html` should return 1.
+2. Check nobody has put nav rules back into the page or into `yaadly.css`: `grep -n "\.vbtn\|\.views\|\.quiet-links\|site-nav" docs/*.html docs/yaadly.css` should return nothing but the markup lines. A nav rule anywhere other than `nav.css` is the fault.
+3. Check the markup matches. It is identical on all eight pages; only the `on` class moves to the current page's tab.
+
+If the whole row has wrapped onto two lines, something in it grew. With IBM Plex loaded, the header fills its 1100px exactly, so a longer label, more padding or an extra link pushes "Post a job" out. Shorten it, or take something out of the row: do not let it wrap on desktop, because a two-line header on one page and a one-line header on the next is the exact problem this file exists to prevent.
+
+---
+
 ## 6. A key has been exposed
 
 1. Rotate it at the provider now. Before anything else, before working out how it happened.
@@ -1122,3 +1136,62 @@ select id, status, payable_to, total_pence from invoices where job_id = '<job id
 ## Pricing an invoice yourself, and the founding rate
 
 **Since `20260902s` the price on an invoice is yours in three places.** (1) "Confirm the work" on a service booking now asks what you are charging: full price or founding rate straight off `service_catalogue`, or "My own figure" with the amount typed in pounds; the invoice line and the booking's displayed price both follow your choice. (2) The invoice editor's price tier gained "my figure": pick it on any draft line and the Unit cell becomes a box you type the amount into; Save writes exactly what you typed. Service-list tiers are still overwritten from the catalogue on save, on purpose. (3) An AI-drafted invoice refuses my-figure lines until you press "Make it mine to price", which flips `drafted_by` to human on the record; that refusal is `invoice_line_price_guard` doing its job, not a bug. **Technical Sign-off** is now in the catalogue (`technical-signoff`, £245 both tiers) and bookable from the services page like the rest; Full Project Management remains the only card that falls back to WhatsApp.
+
+## A client's photograph is not showing on the board, or you want to publish one
+
+**Since 2 Sep 2026 a photograph on a job is private until you publish it.** Client photographs arrive over WhatsApp, land in the private `intake` bucket, and get a `job_photos` row with `board_ok = false`. The client sees their own pictures in their portal and so does the booked worker; the public board at app.yaadly.co.uk/jobs shows only the ones you have put there.
+
+**To publish one:** desk → Services → Job photos. Every photograph anyone has ever sent is listed, with the picture itself, which job it came with, and whether it is on the board. Open the row and press "Show it on the board". "Take it off the board" reverses it straight away.
+
+**Before you press it:** a photograph sent into a WhatsApp conversation is not consent to put it on a public page. Ask the client, and remember what is usually in these pictures, the inside of a house that is often empty, next to a parish on the same card. If in doubt, leave it private; a worker can still be shown it by other means, and nothing about quoting depends on it being public.
+
+**A picture is missing where you expected one.** Work down these in order:
+
+- **Board shows no photos on a job that has them:** the rows are there but `board_ok` is false. That is the gate, not a fault. Publish from Job photos.
+- **"no file" in the Job photos view:** `job_photos.storage_path` is null on that row. It predates the bucket, or the upload in `yaad-inbound` failed and only the row landed (that path is best effort on purpose: a failed photo must never cost the job). Check the `yaad-inbound` function log for "store inbound media".
+- **"could not be signed":** the path is set but `createSignedUrls` came back empty for your admin session. Check `pg_policies` on `storage.objects` still has "admins read every bucket" covering `bucket_id = 'intake'`, and that your session's `is_admin()` is still true.
+- **Published, but the board tile is blank:** the board mints its own links as it renders, through "board photo files are readable". Check that policy exists and that the object path sits in a folder named after the job (`whatsapp/<job id>/<file>`), which the policy requires; a row whose `storage_path` names a different job's folder is refused on purpose.
+
+**Links here expire.** The board and the portal sign for 300 seconds, the desk for 3600. A picture that rendered an hour ago and is broken now is almost certainly just that; reload the page. Nothing you can copy out of this system is a lasting link to a client's photograph, which is the point.
+
+**Where a client sends photographs.** Their portal, on the job page: the "Add a photo" button inside "What a worker will see", or on the "Your listing" strip once the job is live. The link is the one they already have: `app.yaadly.co.uk/portal/join?job=<job id>&code=<portal code>` for a client who has not set the portal up yet (the wizard shows it on the "job received" screen, and `yaad-notify-client` messages it), then `app.yaadly.co.uk/portal/jobs/<job id>` once they are in. The portal code is on the job row in the desk. There is no separate upload link and there is deliberately no link that works without signing in: a page that accepts photographs of somebody's house on the strength of a URL alone is a page anybody can find.
+
+They can also still send them on WhatsApp, which is where most will come from. Both land in the same place.
+
+**Since 3 Sep 2026 a photo the client uploads themselves is theirs to publish.** The upload form has "Show it on the marketplace with the job", ticked by default, and every thumbnail they sent carries a "Show on marketplace" or "Take off marketplace" button, so a client-sent photo can be on the board with no desk step at all. They can also delete one they sent whether or not it is on the board. You still see every photo in Services → Job photos and can take any of them down. Photos that arrived on WhatsApp are unchanged: private until you publish them, and not the client's to publish or delete, because those were saved out of a conversation rather than sent for the board. If a client asks why a WhatsApp photo has no button, that is why, and the answer is to publish it for them from the desk.
+
+**The demonstration listing.** JOB-DEMO-PHOTOS is a display job carrying a Yaadly stock image from the app's own assets, not a client photograph, and it says so in its own title and first line. It is the only published photo today. Delete the job row and its photo row when you no longer want it on the board.
+
+---
+
+## 11. A card authorisation is about to expire, or already has
+
+Applies to short jobs taken on manual capture (authorise at booking, capture on approval). Decided 3 September 2026, see the ledger entry of that date. Long jobs go out as invoices and none of this applies to them.
+
+**The deadline.** Seven days from authorisation, on every card brand, for online customer-initiated payments. There is no grace period. If nobody captures in time, Stripe releases the funds and the payment status becomes `canceled`. The money is not taken wrongly; it is simply gone, and the client has to pay again.
+
+**Where to look.** Stripe Dashboard, Payments, filter status **Uncaptured**. Every row there is a live deadline. Check it daily while any short job is open. The API field carrying the exact expiry is `payment_method_details.card.capture_before` on the charge.
+
+**On approval, before day 7.** Open the payment and click **Capture**. That is the whole action. A named human clicks it after the client has approved the evidence, never before, and never automatically: capturing is taking the client's money, and `approve_job` is on `HUMAN_ONLY_DECISIONS`.
+
+**Day 6 and no approval yet.** Do not wait for day 7. Two options, both are decisions for a person:
+1. The work is done and the client is just slow to look: chase the client, and if the approval will not land in time, tell them the authorisation is expiring and that they will be asked to pay again. Then let it expire, or cancel it (below).
+2. The work is not done: cancel the authorisation and rebook the job as an invoice. A job that has already overrun seven days is not a manual capture job.
+
+**To cancel.** Open the payment in the Dashboard and cancel it. The hold is released and the client is charged nothing. Cancel rather than letting it lapse silently, because the client can see the pending amount on their statement and deserves to be told.
+
+**Never do.** Do not capture to beat the deadline while approval is outstanding. That takes money for work the client has not accepted, which is the thing this whole product exists not to do. Do not enable Stripe's `automatic_delayed` capture, which captures on a timer without a human, for the same reason.
+
+**A note on statements.** Some card issuers show an authorisation and a settled payment identically, so a client may believe they have already been charged when they have not. Expect that question and answer it plainly: the money is held by their bank, not taken by Yaadly, until they approve.
+
+---
+
+## A client wants to change the description of their job
+
+**Since 3 Sep 2026 they can do it themselves,** on the job page in their portal: the small "Edit the description" button inside "What a worker will see" (once the job is live and that preview is gone, the same button sits on the "Your listing" strip). Whatever they save is read back below it exactly as the board will show it, with the address, any access contact line and phone numbers stripped by `open_jobs` as before. The edit changes the stored text only; what is published is still decided by the view.
+
+**It stops the moment a worker is booked.** From then on the description is the scope both sides confirmed a Kickoff Pack against, and the button disappears. A client who asks for a change after that is asking for a variation: agree it with both sides and edit the job row in the desk yourself, and say so in the job's messages so the worker has it in writing.
+
+**Quotes already in were priced against the old wording.** The form tells the client that. If a change is big enough to move the price, message the workers who quoted; nothing does that automatically.
+
+**"Only the client of this job can change its description" / "A worker is booked on this job":** those are `edit_job_descr_as_me()` (20260903a) refusing, in words, and both are correct. The first means the signed-in email is not the job's `client_email`; the second is the rule above. There is no override in the portal on purpose.

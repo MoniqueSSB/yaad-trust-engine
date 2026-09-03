@@ -45,21 +45,6 @@ a{color:var(--purpleb);text-decoration:none}
 .d1{transition-delay:.07s}.d2{transition-delay:.14s}.d3{transition-delay:.21s}.d4{transition-delay:.28s}
 
 /* nav */
-nav.site-nav{position:sticky;top:0;z-index:80;background:rgba(7,7,26,0.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--line)}
-.nav-in{max-width:1060px;margin:0 auto;padding:0 22px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{display:flex;align-items:center;gap:9px;color:var(--ink);text-decoration:none}
-.mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;font-family:var(--disp);font-size:16px;font-weight:600;color:#fff}
-.brand b{font-size:15.5px;font-weight:600;letter-spacing:-0.02em}
-.brand b span{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.views{display:flex;gap:2px;align-items:center}
-.vbtn{background:none;border:0;color:var(--mute);font:500 13.5px var(--body);padding:7px 11px;border-radius:8px;cursor:pointer;text-decoration:none;transition:.15s}
-.vbtn:hover{background:rgba(155,115,245,0.08);color:var(--ink)}
-.vbtn.on{color:var(--purpleb);font-weight:700}
-.quiet-links{display:flex;gap:12px;font-size:12.5px}
-.quiet-links a{color:var(--mute);text-decoration:none;transition:.15s}
-.quiet-links a:hover{color:var(--purpleb)}
-@media(max-width:1024px){.quiet-links{display:none}}
-@media(max-width:760px){.views{display:none}}
 
 /* buttons */
 .btn{display:inline-flex;align-items:center;gap:7px;justify-content:center;padding:11px 22px;border-radius:100px;border:0;cursor:pointer;font:600 13.5px var(--body);text-decoration:none;position:relative;overflow:hidden;transition:transform .2s var(--spring),box-shadow .2s}
@@ -416,6 +401,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 .float-cta:hover{box-shadow:0 6px 38px rgba(155,115,245,.62);transform:translateY(-2px)}
 .fcdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.7);animation:edotblink 1.4s ease-in-out infinite}
 </style>
+<link rel="stylesheet" href="nav.css?v=1">
 </head>
 <body>
 <div class="orb o1"></div>
@@ -428,7 +414,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
     <a class="vbtn on" href="/marketplace">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn" href="/services">Managed services</a>
     <a class="vbtn" href="/business">For business</a>
     <a class="vbtn" href="/contact">Contact</a>
@@ -439,6 +425,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
     <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
   </div>
+  <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
 <!-- HERO -->
@@ -457,7 +444,6 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
     <div class="ticker-wrap rv d3">
       <div class="ticker">
         <div class="ticker-item"><span class="ti"></span><b>Free to post</b> · No card required</div>
-        <div class="ticker-item"><span class="ti"></span><b>25% max deposit</b> · ever</div>
         <div class="ticker-item"><span class="ti"></span><b>Identity checked</b> · every worker</div>
         <div class="ticker-item"><span class="ti"></span><b>1 working day</b> · human reply</div>
         <div class="ticker-item"><span class="ti"></span><b>Zero hidden fees</b> · prices on the page</div>
@@ -466,7 +452,6 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
         <div class="ticker-item"><span class="ti"></span><b>Stage payments</b> · tied to photos</div>
         <!-- duplicate for seamless loop -->
         <div class="ticker-item"><span class="ti"></span><b>Free to post</b> · No card required</div>
-        <div class="ticker-item"><span class="ti"></span><b>25% max deposit</b> · ever</div>
         <div class="ticker-item"><span class="ti"></span><b>Identity checked</b> · every worker</div>
         <div class="ticker-item"><span class="ti"></span><b>1 working day</b> · human reply</div>
         <div class="ticker-item"><span class="ti"></span><b>Zero hidden fees</b> · prices on the page</div>
@@ -651,14 +636,12 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 <section class="money-section"><div class="wrap">
   <div class="money-grid">
     <div class="money-left rv">
-      <div class="money-pct">25%</div>
-      <div class="money-label">Maximum deposit. Ever.</div>
-      <div class="dep-bar"><div class="dep-fill"><span>25% cap</span></div></div>
+      <div class="money-label">Every job is paid in stages.</div>
       <div class="dep-leg"><span>Deposit</span><span>Stage 1</span><span>Stage 2</span><span>Final inspect</span></div>
     </div>
     <div class="rv d1">
       <div class="eyebrow gold">The money</div>
-      <h2 class="sh" style="margin-bottom:10px">Never more than a quarter,<br><em>before anything exists.</em></h2>
+      <h2 class="sh" style="margin-bottom:10px">Paid in stages,<br><em>against what you can see.</em></h2>
       <p style="font-size:13.5px;color:var(--mute);line-height:1.74;max-width:44ch;margin-bottom:16px">Stage payments tied to what you can photograph, never to a date. Materials pass through at cost, never marked up.</p>
       <div class="money-rule">
         <div class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.3 9.6c0-1.1 1.2-2 2.7-2s2.7.9 2.7 2-1.2 1.6-2.7 2.1-2.7 1-2.7 2.1 1.2 2 2.7 2 2.7-.9 2.7-2"/></svg></div>

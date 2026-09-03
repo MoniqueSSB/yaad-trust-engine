@@ -168,6 +168,15 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
             <p className="mt-3 text-[12.5px]">
               Your job code, if you are asked for it: <span className="font-mono text-ink">{portalCode}</span>
             </p>
+            {/* The photo route, named at the one moment it is useful. Before
+                2 Sep 2026 the only way a picture could reach us was WhatsApp,
+                and this screen said so, which made a client who does not use
+                WhatsApp a client we never got photographs from. */}
+            <p className="mt-3 text-[12.5px]">
+              It is also where you send photographs of the job, straight from
+              your phone. They are private to you, us and the worker booked on
+              the job.
+            </p>
           </div>
         )}
         {/* Not "your job is saved". That says nothing about what happens to
@@ -302,9 +311,10 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                 can send.</b>
                 <p className="mt-2">
                   They are what turns a guess into a quote. You do not need them
-                  to carry on, and the quickest way to send them is on WhatsApp
-                  once we reply, straight from your phone, or from whoever is at
-                  the property.
+                  to carry on. On the next screen you get a link to your portal,
+                  and that is where you send them, straight from your phone or
+                  from whoever is at the property. WhatsApp works too, once we
+                  reply.
                 </p>
               </div>
             </div>

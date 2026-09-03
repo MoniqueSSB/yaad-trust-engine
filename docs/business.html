@@ -40,41 +40,6 @@ a { color:var(--purple); text-decoration:none; }
 a:hover { color:var(--purpleb); }
 .wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
 
-/* NAV — identical to canonical */
-.site-nav {
-  position:sticky; top:0; z-index:100;
-  background:rgba(7,7,26,0.85); backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--line);
-}
-.site-nav .nav-in {
-  max-width:1100px; margin:0 auto; padding:0 24px;
-  display:flex; align-items:center; height:56px;
-}
-.brand {
-  display:flex; align-items:center; gap:8px;
-  font-family:var(--disp); font-weight:500; font-size:18px;
-  color:var(--ink); margin-right:auto; flex-shrink:0;
-}
-.brand .mark {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:8px;
-  background:var(--grad); color:#fff; font-weight:700; font-size:16px;
-}
-.brand span { color:var(--mute); font-weight:300; }
-.views { display:flex; align-items:center; gap:2px; }
-.vbtn {
-  padding:6px 11px; border-radius:8px; font-size:13.5px; font-weight:500;
-  color:var(--mute); transition:color .15s,background .15s; white-space:nowrap;
-}
-.vbtn:hover { color:var(--ink); background:var(--panel2); }
-.vbtn.on { color:var(--purpleb); background:rgba(155,115,245,0.12); }
-.quiet-links {
-  display:flex; align-items:center; margin-left:12px;
-  padding-left:12px; border-left:1px solid var(--line);
-}
-.quiet-links a { padding:6px 10px; font-size:12.5px; color:var(--dim); white-space:nowrap; }
-.quiet-links a:hover { color:var(--purple); }
-
 /* HERO */
 .hero { padding:88px 0 72px; position:relative; overflow:hidden; }
 .hero::before {
@@ -543,7 +508,6 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   .triage-colhead.out { padding-top:10px; }
 }
 @media(max-width:640px){
-  .views, .quiet-links { display:none; }
   .cred-strip { grid-template-columns:1fr; }
   .cred-cell { border-right:none; border-bottom:1px solid var(--line); }
   .cred-cell:last-child { border-bottom:none; }
@@ -551,6 +515,7 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   .papers { grid-template-columns:1fr; }
 }
 </style>
+<link rel="stylesheet" href="nav.css?v=1">
 </head>
 <body>
 
@@ -558,17 +523,18 @@ footer { border-top:1px solid var(--line); padding:36px 0; margin-top:60px; }
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
     <a class="vbtn" href="/marketplace">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank">Job board</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn" href="/services">Managed services</a>
     <a class="vbtn on" href="/business">For business</a>
     <a class="vbtn" href="/contact">Contact</a>
-    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank">Book a call</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
   <div class="quiet-links">
     <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
     <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
   </div>
+  <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
 <!-- HERO -->
