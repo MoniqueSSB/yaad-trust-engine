@@ -119,12 +119,40 @@ export default async function PortalDoor() {
         </Link>
       </div>
 
+      {/* This is where a new client with a stuck job lands, and it used to be
+          a dead end: a sentence about drafts and nothing to press. Somebody
+          standing here has one of exactly two problems, so it offers one route
+          for each rather than leaving them to find the header. */}
       {!isClient && !isWorker && (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-6">
           <b className="text-[15px]">Nothing here yet</b>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
-            When a job is set up for you it appears here. If you have posted one
-            and cannot see it, it is probably still a draft.
+          <p className="mt-2 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
+            When a job is set up for you it appears here. If you posted one and
+            cannot see it, it is almost certainly still a draft, which means it
+            never reached a tradesperson.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Link
+              href="/jobs/new"
+              className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
+            >
+              Post a job
+            </Link>
+            <a
+              href="https://wa.me/447878877567"
+              target="_blank"
+              rel="noopener"
+              className="rounded-full border border-line2 px-4.5 py-2.5 text-[13px] font-bold text-mute transition hover:border-purple hover:text-purpleb"
+            >
+              Message us on WhatsApp
+            </a>
+          </div>
+          <p className="mt-3 text-[12.5px] text-dim">
+            Already have a job code? Finish setting it up at{" "}
+            <Link href="/portal/join" className="font-semibold text-purpleb">
+              portal setup
+            </Link>
+            .
           </p>
         </div>
       )}

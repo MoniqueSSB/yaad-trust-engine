@@ -6,6 +6,42 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-03 · The rest of the audit: one money formatter, two CI gaps, a throttled question box, and the accessibility work
+
+**Working through the medium and low findings. Also, and more usefully, finding out how many of them were wrong.**
+
+**Ten money formatters became one.** Not nine, as the audit said: the services page had a tenth for GBP. Seven passed `en-JM` and three passed `en-US`, which sounds like the defect and is not, because for a J$ amount both locales group identically and the locale never showed. What did show is that seven rounded and three did not, so one job could read J$1,234,567.89 in one panel and J$1,234,568 in another, on the same screen, on the product whose premise is that the numbers can be trusted. `lib/money.ts` has four exports because the call sites genuinely need three null behaviours (`null` out, `""` out, and never-null) plus the multi-currency invoice case, and collapsing them would only push the null handling back into the components. Rounding won because Jamaican pricing is quoted in whole dollars. 15 tests.
+
+**`amount()` stopped printing a lone em dash for a missing total.** It now says "not set". A dash in a money column is ambiguous between nothing and zero, and those are very different answers to somebody asking what they owe. It also happened to be one of the few em dashes left in user-facing output.
+
+**CI grew two jobs, and one of them contradicts a comment I had to think about first.** The workflow said `next build` was deliberately skipped because `check-env.mjs` blocks a build without Supabase values and the workflow has no reason to hold secrets. The first half is true and the conclusion was not: `check-env` only asks that the variables are PRESENT, the artifact is discarded, and no page queries Supabase at build time (every data route is dynamic; only `/`, `/_not-found` and `/icon.svg` prerender). Verified by building locally with `env -i` and placeholders before touching CI. It earns its place because `tsc --noEmit` does not generate Next's route types and `next build` does, so a route-shape mistake passes typecheck and fails the deploy. That gap was open earlier the same day, when a deleted layout left a dangling reference in a generated validator.
+
+**The taxonomy drift check is the same idea as the `_shared` one, for the list the marketplace is built on.** Four copies: the generated source, a byte copy the marketing site loads, an inlined copy in the prototype, and a TypeScript restatement the app imports because it cannot import a file that declares `var`. They agreed and nothing kept them agreeing. The only reason a client's roofing job and a worker's roofing profile find each other is that both came from one list; the day they diverge, both halves stay individually valid and nothing notices. The check was proved by adding a nineteenth trade to the app copy and watching it fail with both lists printed, then reverting.
+
+**The question box is throttled in Postgres, not in the page.** `/ask` was the only unthrottled public write in the application, and `area` was capped by a `maxLength` attribute and nothing else, which is not a control. `ask_question()` now does the length floor, both caps, the throttle and `published = false`, and the caller cannot set `published` because the function never reads a value for it. Ten an hour per caller: generous for a human, useless for a script. Applied in two phases on purpose, the function first and the `anyone may ask` policy dropped only after the web deploy, because the deployed action still does a direct insert until the new build is live and dropping the policy first would break `/ask` for the length of a deploy. Caller key is a truncated SHA-256 of the address, the same shape and the same reasoning as `post_job_attempts`: a rate limit must not quietly become the one place this business keeps personal data nobody asked it to keep.
+
+**`search_path` is now pinned on every function in the schema, and the advisor's framing was worth checking.** All nine remaining were SECURITY INVOKER, so they run with the caller's own privileges and there is nothing to escalate to; somebody bending the path for one of those is attacking themselves. They are pinned anyway for a duller and more real reason: four are trigger functions, a trigger fires in whatever session context is writing, and `sync_job_status` in particular decides what stage a job is at. A trigger resolving `jobs` to something other than `public.jobs` would corrupt data quietly rather than fail loudly. Applied with `ALTER FUNCTION`, which sets one attribute and retypes no bodies, so the migration cannot change behaviour by transcription error.
+
+**The chip groups are the accessibility fix that mattered most.** Eighteen trades and fourteen parishes on `/jobs/new` and `/apply` were bare buttons in a plain div: a screen reader heard eighteen unrelated buttons, could not tell which was chosen, and never heard that the group was required. They are now named groups with `aria-pressed` on each control. `aria-pressed` rather than a radiogroup because these really are toggles, and tapping the chosen one clears it, which a radio cannot do. The JoinFlow buttons were also missing `type="button"`.
+
+**The approve button announces its outcome now, and the existing reasoning was right.** Its comment explains there is no visible success message because the ledger re-rendering IS the confirmation and a second visible claim could go stale. That holds for somebody who can see the ledger move. A screen reader user got nothing: the label went from "Approving…" back to "Approve this stage", indistinguishable from the tap doing nothing, on the one control in this product that moves money. So the confirmation is announced off-screen rather than shown. It is the non-visual counterpart to the ledger advancing, not a competing claim, and it cannot go stale because it is written once when the action returns.
+
+**A correction to the audit, which matters more than any single fix.** Five of its fine-grained per-route claims were wrong, all in the same direction, all found by opening the file before changing it:
+
+| The audit said | Actually |
+|---|---|
+| sign-in has no live region on its error | It has `role="alert"` |
+| sign-in has no route to `/portal/join` | It links there, in its own footer |
+| `/portal/join` has no live region | It has `role="alert"` |
+| the approve button announces nothing | It announces errors; only success was silent |
+| the guidelines page shows no version or date | It prints "Version 1.3 · date" above each document |
+
+The audit's structural findings held up, and every one of the four high-risk items was real and is closed. The per-route detail did not hold up as well, and the pattern is clear: those claims came from reading a page's rendered output and its main render path, not from grepping the file for the attribute in question. An audit that cries wolf is one nobody reads, which is the reasoning already written into this repo's own secrets scanner. The published audit has been corrected rather than quietly amended.
+
+**What was deliberately not done, and why.** The `/jobs` statistics render as em dashes by an explicit founder decision recorded in the code ("keep the row, leave the figures blank until there are real ones"), so it is not mine to change. The payment claim splitting by path is a founder decision about what the business says. The "Ask a Yaad" and "Ask Yaadly" naming is brand. A full CSP needs nonces threaded through the document and its own change, report-only first, exactly as `next.config.ts` already argues. `npm run lint` still waits on the one pre-existing error being fixed in its own commit, per `CLAUDE.md`. Splitting the 1,766 line JoinFlow and the 1,407 line job room by role are refactors that deserve their own change and their own testing. Reconciling the two service stage vocabularies touches what a client is told about how far along their money is, and is not a thing to do quickly at the end of a long session.
+
+---
+
 ## 2026-09-03 · Four audit findings closed: the RPC grants, the Twilio door, the retired password routes, and the first tests on the trust logic
 
 **All four came out of a read-only audit of the whole application on the same day. None is a feature. Each one is something that was already true and should not have been.**

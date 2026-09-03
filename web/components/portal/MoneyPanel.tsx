@@ -1,3 +1,5 @@
+import { amount } from "@/lib/money";
+
 /**
  * What this job costs, what has been invoiced, and the rules that govern
  * both. Founder's instruction, 2 Sep 2026: the agency fee has to be in
@@ -28,15 +30,10 @@ export type InvoiceRow = {
   period_label: string | null;
 };
 
-function amount(total: number | null, currency: string | null) {
-  if (total == null) return "—";
-  const n = total / 100;
-  const cur = (currency ?? "GBP").toUpperCase();
-  if (cur === "JMD") return "J$" + Math.round(n).toLocaleString("en-JM");
-  if (cur === "USD") return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
-  if (cur === "CAD") return "C$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
-  return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2 });
-}
+/* amount() moved to lib/money.ts, unchanged apart from the null case, which
+   said a lone em dash and now says "not set". A dash in a money column is
+   ambiguous between nothing and zero, and those are different answers to
+   somebody asking what they owe. */
 
 const TERMS: { title: string; body: string }[] = [
   {

@@ -24,12 +24,39 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Ask a Yaad · Yaadly" };
 
+/**
+ * What came back from ask_question(), said in the reader's terms.
+ *
+ * "throttled" is deliberately not an apology and not an error. Somebody who
+ * has asked ten questions in an hour is enthusiastic, not hostile, and the
+ * page should say what happened and when they can go again.
+ */
+const OUTCOME: Record<string, { tone: "ok" | "warn"; text: string }> = {
+  "1": {
+    tone: "ok",
+    text: "Received. Questions are read by a person before they publish, so yours appears once it has been looked at.",
+  },
+  throttled: {
+    tone: "warn",
+    text: "That is ten questions in an hour, which is where we stop and read. Nothing is lost, and you can ask again shortly.",
+  },
+  short: {
+    tone: "warn",
+    text: "That was too short to answer well. Ten characters or more, and say where the property is if you can.",
+  },
+  error: {
+    tone: "warn",
+    text: "That did not save, and it is our end rather than yours. Try again, or message us on WhatsApp and a person will pick it up.",
+  },
+};
+
 export default async function Ask({
   searchParams,
 }: {
   searchParams: Promise<{ sent?: string }>;
 }) {
   const { sent } = await searchParams;
+  const outcome = sent ? OUTCOME[sent] : undefined;
   const supabase = await createClient();
   const { data: qs } = await supabase
     .from("questions")
@@ -76,10 +103,22 @@ export default async function Ask({
               Ask the community
             </button>
           </div>
-          {sent && (
-            <p className="mt-3 rounded-xl border border-softline bg-soft px-3.5 py-2.5 text-[13px] text-mute">
-              Received. Questions are read by a person before they publish, so
-              yours appears once it has been looked at.
+          {/* role="status" so a screen reader is told the outcome. Without it
+              the only feedback was a paragraph appearing silently in the
+              middle of the form, which is no feedback at all if you cannot
+              see it. Not role="alert": none of these is an emergency, and
+              alert interrupts whatever is being read. */}
+          {outcome && (
+            <p
+              role="status"
+              className={
+                "mt-3 rounded-xl border px-3.5 py-2.5 text-[13px] " +
+                (outcome.tone === "ok"
+                  ? "border-softline bg-soft text-mute"
+                  : "border-gold/40 bg-gold/10 text-goldb")
+              }
+            >
+              {outcome.text}
             </p>
           )}
           <p className="mt-3 text-[11.5px] text-dim">
