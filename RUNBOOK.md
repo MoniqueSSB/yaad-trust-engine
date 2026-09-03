@@ -1352,3 +1352,32 @@ select has_function_privilege('anon','public.ask_question(text,text,text)','EXEC
 `anon_can_ask` must be true and `anon_can_insert_directly` must be **false**. If the second is true, the direct door is open again and the throttle is decorative.
 
 The caller key is a truncated SHA-256 of the address, computed in the server action, never the address itself. It is a throttle key, not a visitor log, and `question_attempts` sweeps itself within hours.
+
+---
+
+## 17. Turning the CSP from report-only to enforcing
+
+**Diary item, on or after 17 September 2026.** A Content-Security-Policy went out in report-only on 3 Sep with a two-week watch, founder's decision, no collector. If nobody does this, the policy sits there protecting nothing.
+
+**No collector means the reports go to the browser console and nowhere else**, so finding violations is a person walking the site with devtools open. That is the whole watch. Do it at least twice in the fortnight, and once more on the day.
+
+**Walk these, signed in, with the console open**, because each one loads something the others do not:
+
+1. `/jobs` — the board, client photographs on signed URLs, the chat widget from `yaadly.co.uk`
+2. `/jobs/new` — the post-a-job flow, photo upload
+3. `/apply` — **the important one.** The Persona identity step runs in an iframe from `inquiry.withpersona.com` and asks for the camera. If any single thing breaks under this policy it will be this.
+4. `/portal/jobs/<id>` — evidence images, video, the money panels
+5. `/portal/jobs/<id>/pack` — a Kickoff Pack document
+6. `/workers` and a worker profile
+
+Anything the console reports as a CSP violation is a source the policy is missing. Add it to the matching directive in `web/next.config.ts`, where every source already carries a comment saying where it came from. **A violation is not automatically something to allow**: if you cannot explain why the app is loading it, that is the policy doing its job.
+
+**To enforce**, in `web/next.config.ts`:
+
+1. Rename the header key `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
+2. Delete the separate `frame-ancestors 'none'` header above it. It is kept enforcing alongside the report-only policy on purpose, because that one clause is proven; the full policy already contains it, so leaving both would be duplication.
+3. Deploy, then walk the same six routes again. **This time a mistake breaks the page rather than logging.**
+
+**If something breaks after enforcing**, rename the key back to `Content-Security-Policy-Report-Only`, redeploy, and you are back to safe within one deploy. That is the whole rollback.
+
+**`'unsafe-inline'` on `script-src` is knowingly in there.** Next injects an inline bootstrap script, so removing it needs nonces threaded through the document. That is its own change and it is worth doing later; the policy is worth having in the meantime, because it still closes off every origin the app has no business talking to.
