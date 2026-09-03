@@ -126,6 +126,21 @@ The audit's structural findings held up, and every one of the four high-risk ite
 
 ---
 
+## 2026-09-03 · The question form keeps what you typed, and the desk got somewhere to publish from
+
+**Written after the fact, because the write path underneath this changed while it was being built.** The finding that started it: `/ask` had never saved a question and told every visitor "Received" anyway. `questions` had row level security and no insert policy for anon, so every question typed there was refused with 42501 while the action ignored the error and redirected to `?sent=1`. The table held nil rows and that was the reason. The interim fix was an insert policy, `anyone may ask`, and that policy is the `20260903d3` in the migrations folder: it is now dropped, because the throttled `ask_question()` is the only door and `20260903j` explains why that is the better answer. **The lesson worth keeping is not the policy, it is that a false receipt is worse than a visible failure.** A visible failure gets reported. This one left people believing they had asked, and waiting.
+
+**What is left here is the form, and it stopped using the URL to say what happened.** Outcomes arrived as `/ask?sent=1`, `?sent=throttled`, `?sent=short`, `?sent=error`. Every one of those still exists with the same words; they are returned by the action and rendered in place. A URL flag cannot survive a refusal without losing the box, so a refused question came back empty and somebody had to type it again, and a refresh or a shared link redrew a receipt for a question nobody had asked. The result now carries the text back, the button says "Sending your question" and is disabled for the round trip so a second tap cannot duplicate, errors land in a live region and mark the field, and the receipt dies with the page.
+
+**A phone number is refused, a price is not, and the two are genuinely hard to tell apart.** A bare run of seven digits is a Jamaican local number and it is also 1500000 in Jamaican dollars, which is the archetypal question this board exists to answer. The rule has to choose which way to be wrong, so it refuses what cannot be a price, meaning runs long enough for an area code, anything after a plus, and digits grouped the way a phone number is grouped rather than the way money is. The ambiguous bare run goes through and the desk marks it for a second read. Blocking a pricing question fails the exact people the board is for, on every honest submission, with a message they cannot act on because their number **is** the question. Publishing a stray number needs both a visitor typing it and the person at the desk missing it. The module also refuses at 500 characters rather than letting `ask_question()` truncate silently, because cutting the end off somebody's question without saying so is the worse of the two.
+
+**The desk got a Questions view, because a moderation gate with nowhere to stand is not a gate.** Publishing was previously a row edit in the Supabase dashboard, which meant it would not happen. Ordinary registry work: publish, take down, the consequence spelled out on the button, and a tile and alert on the Overview so a waiting question shows on the first screen rather than needing to be looked for.
+
+**No response time is promised, and that is a decision rather than a gap.** `/jobs/new` says one working day because the founder defined one. Nothing defines a timing for a public question that waits on a stranger to answer it, so the page says there is none and to check back. Inventing one would have been the easiest sentence in the rewrite and the only untrue one.
+
+
+---
+
 ## 2026-09-03 · Four audit findings closed: the RPC grants, the Twilio door, the retired password routes, and the first tests on the trust logic
 
 **All four came out of a read-only audit of the whole application on the same day. None is a feature. Each one is something that was already true and should not have been.**

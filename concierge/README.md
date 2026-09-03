@@ -38,15 +38,17 @@ curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/
 
 ## What is in it
 
-Twenty-two views, six groups, every one reading Postgres directly.
+Thirty-one views, six groups, every one reading Postgres directly. This table
+is written by hand and had drifted to twenty-two by 3 September 2026, so read
+the `VIEWS` registry in `concierge.html` if the count here matters to you.
 
 | Group | Views |
 |---|---|
-| Run the day | Overview, Intake, Jobs, Evidence, Quotes |
+| Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes |
 | People | Applications, Workers, Clients, Reviews |
-| Documents & money | Kickoff packs, Invoices, Sketch packs, Signatures, Money |
-| Services | Services, Marketplace |
-| Inbox | Conversations, Calls, Waiting list, Feedback |
+| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money |
+| Services | Services, Marketplace, Job photos |
+| Inbox | Conversations, Mid-chat, Calls, Enquiries, Waiting list, Feedback, Questions |
 | System | Settings, Health |
 
 Three views own their markup and their own logic: **Overview**, **Invoices**

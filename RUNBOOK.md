@@ -1757,3 +1757,17 @@ Paste a URL against a service and a pay button appears on that service's booking
 Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
 
 **Still missing before a link should go live:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker.
+
+---
+
+## Publishing a question somebody asked on /ask
+
+Read this with the section above, which covers a visitor who cannot ask at all. This one is the other half: a question arrived and nothing happens to it until you act.
+
+**Where they wait.** Every question lands in `questions` with `published = false`. The concierge desk shows them under **Inbox, Questions**, and the Overview carries a tile, "Questions to publish", plus an alert while any are waiting, so you do not have to remember to look.
+
+**To publish one.** Open the row, read the whole thing, then press **Publish it**. It goes onto the public page word for word, where anybody on the internet can read it and any vetted worker can answer it. Check it carries no name, phone number, email or address first. The column **Worth a second read** marks anything number-shaped: a run of seven digits is both a local phone number and a price in Jamaican dollars, and the form deliberately lets that through so pricing questions are not blocked, which makes it yours to judge.
+
+**Take it down** removes it from the public page again, along with any answers under it, because an answer is only public while its question is. The row stays for you.
+
+**To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
