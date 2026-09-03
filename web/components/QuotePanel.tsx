@@ -233,7 +233,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
             className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
           />
           <span className="mt-1.5 block text-[11.5px] text-dim">
-            Percentages of your total, never amounts. This is what gets checked before you're paid, so be specific.
+            Percentages of your total, never amounts. This is what gets checked before you&rsquo;re paid, so be specific.
           </span>
         </label>
       </div>

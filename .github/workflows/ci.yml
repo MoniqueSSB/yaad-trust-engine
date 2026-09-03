@@ -155,12 +155,21 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # `npm run lint` is deliberately NOT run here yet. It currently reports a
-      # pre-existing error in app/portal/join/page.tsx (react-hooks
-      # set-state-in-effect) that predates this job. Adding lint today would
-      # mean either a permanently red build, or quietly changing portal
-      # behaviour to make an unrelated job go green. Fix that error, then add
-      # `npm run lint` here in the same commit.
+      # Lint runs, as of 3 Sep 2026.
+      #
+      # This block used to explain why it could not: a pre-existing
+      # react-hooks set-state-in-effect error in app/portal/join/page.tsx,
+      # which could only be cleared by changing portal behaviour to make an
+      # unrelated job go green. That is the right call and it is why lint
+      # waited.
+      #
+      # The description had gone stale. The hooks error is gone; what was
+      # actually left was one unescaped apostrophe in QuotePanel.tsx and an
+      # unused catch binding in sign-in. Neither changes behaviour, both were
+      # fixed in the same commit that added this line, which is exactly the
+      # sequence the old comment asked for.
+      - name: Lint
+        run: npm run lint
 
       # The tests that matter here are the negative ones: an unsigned, forged or
       # replayed request to /api/hubspot/stage must write NOTHING. That endpoint

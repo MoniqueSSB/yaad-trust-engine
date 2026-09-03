@@ -93,6 +93,22 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
      Once, on mount. Anything unreadable or older than a week is ignored
      rather than repaired, and the person lands on the first stage that is
      still missing something rather than back at the beginning. */
+  /* Restoring a saved draft on mount, which cannot be done any other way in a
+     component that also renders on the server.
+
+     The rule is right in general: setState in an effect usually means state
+     that should have been derived during render. It is wrong here. The source
+     is window.localStorage, which does not exist during the server render, so
+     a lazy useState initialiser cannot read it without a hydration mismatch,
+     and there is nothing to derive from because the value arrives from outside
+     React entirely. One extra render on mount is the actual, intended cost.
+
+     Disabled with a reason rather than restructured, deliberately. CLAUDE.md
+     is explicit that a lint job must not be made green by quietly changing
+     behaviour, and what this effect protects is the thing /jobs/new exists to
+     protect: somebody who closed the tab halfway through gets their answers
+     back. Rewriting that to satisfy a heuristic would be the exact trade the
+     rule was added to prevent. */
   useEffect(() => {
     let raw: string | null = null;
     try { raw = window.localStorage.getItem(DRAFT_KEY); } catch { return; }
@@ -103,6 +119,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
     if (!next.trade && initialTrade && (TRADES as readonly string[]).includes(initialTrade)) {
       next.trade = initialTrade;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see the note above this effect
     setF(next);
     if (d.jobId) setJobId(d.jobId);
     setRestored(true);

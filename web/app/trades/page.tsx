@@ -83,7 +83,7 @@ export default function TradesInfo() {
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
           Yaadly connects vetted tradespeople with property owners, most of them overseas, who need
           real work proven with evidence before money moves. This page is where you find out if
-          that's for you. Applying is separate, and takes about two minutes.
+          that’s for you. Applying is separate, and takes about two minutes.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -116,7 +116,7 @@ export default function TradesInfo() {
 
         {/* ── expectations ─────────────────────────────────────────── */}
         <h2 className="mt-14 font-display text-[clamp(20px,3vw,26px)] uppercase leading-none">
-          What's expected of you
+          What’s expected of you
         </h2>
         <ul className="mt-5 space-y-3">
           {EXPECTATIONS.map((e) => (
@@ -127,9 +127,9 @@ export default function TradesInfo() {
           ))}
         </ul>
         <p className="mt-4 max-w-[62ch] text-[13px] leading-relaxed text-dim">
-          Jobs over £500, work inside an occupied home, and anything where you'd hold keys stay
-          closed to you until your three references have actually been telephoned. That's most of
-          the money on the board, so it's worth finishing that step early.
+          Jobs over £500, work inside an occupied home, and anything where you’d hold keys stay
+          closed to you until your three references have actually been telephoned. That’s most of
+          the money on the board, so it’s worth finishing that step early.
         </p>
 
         {/* ── fees & allocation ────────────────────────────────────── */}
@@ -139,16 +139,16 @@ export default function TradesInfo() {
         <div className="mt-5 grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <div className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
             <b className="text-ink">What Yaadly charges you:</b> 12% of your agreed labour price on a
-            completed job, taken at the point you're paid, so you keep 88%. Remote digital work
+            completed job, taken at the point you’re paid, so you keep 88%. Remote digital work
             carries 10% instead. Materials are never charged a fee.
             <p className="mt-2">
               <b className="text-ink">What you never pay:</b> joining, quoting, and leads, whether you
-              win the job or not. There's no subscription.
+              win the job or not. There’s no subscription.
             </p>
           </div>
           <div className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
             <b className="text-ink">How a job reaches you:</b> clients post jobs against the same
-            trades and parishes you pick on your profile. A job in a parish you haven't ticked never
+            trades and parishes you pick on your profile. A job in a parish you haven’t ticked never
             reaches you. You quote against the jobs you want; the client chooses who they engage.
           </div>
         </div>
@@ -160,7 +160,7 @@ export default function TradesInfo() {
         <p className="mt-4 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
           You work as an independent tradesperson, not a Yaadly employee. You set your own price for
           each job in writing before you start, and your relationship with us runs on your TRN, not a
-          payslip. Each job is its own agreement. There's no rota and no ongoing engagement beyond it.
+          payslip. Each job is its own agreement. There’s no rota and no ongoing engagement beyond it.
         </p>
 
         {/* ── is work guaranteed ───────────────────────────────────── */}
@@ -169,8 +169,8 @@ export default function TradesInfo() {
         </h2>
         <p className="mt-4 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
           No. Yaadly is a marketplace, not an employer. Clients post real jobs by trade and parish,
-          and you quote against the ones you want. You'll win some and lose others. Quoting is always
-          free, so there's no cost to trying, but nothing here promises a set amount of work.
+          and you quote against the ones you want. You’ll win some and lose others. Quoting is always
+          free, so there’s no cost to trying, but nothing here promises a set amount of work.
         </p>
 
         {/* ── what happens after ───────────────────────────────────── */}
