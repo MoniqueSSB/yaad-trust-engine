@@ -3,9 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yaadly · The Marketplace</title>
+<title>Yaadly · The marketplace for vetted property work in Jamaica</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%237B4FE0'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%23ffffff'%3EY%3C/text%3E%3C/svg%3E">
-<meta name="description" content="Post the job free. A vetted tradesperson quotes it, documented with timestamped evidence. Nobody is paid for a stage until you approve it.">
+<meta name="description" content="Post a repair, maintenance or inspection job in Jamaica. A vetted tradesperson quotes it, each stage is documented with evidence, and a named person reviews it before you sign off. Launching in Kingston and Portmore.">
+<meta property="og:title" content="Yaadly · The marketplace for vetted property work in Jamaica">
+<meta property="og:description" content="Post a repair, maintenance or inspection job in Jamaica. A vetted tradesperson quotes it, each stage is documented with evidence, and a named person reviews it before you sign off. Launching in Kingston and Portmore.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yaadly.co.uk/marketplace">
+<meta property="og:site_name" content="Yaadly">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image" content="https://yaadly.co.uk/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Yaadly. The marketplace for vetted property work in Jamaica.">
+<meta name="twitter:image" content="https://yaadly.co.uk/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;1,9..144,200;1,9..144,300&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -45,8 +56,6 @@ a{color:var(--purpleb);text-decoration:none}
 .rv.sl.in{transform:none}
 .d1{transition-delay:.07s}.d2{transition-delay:.14s}.d3{transition-delay:.21s}.d4{transition-delay:.28s}
 
-/* nav */
-
 /* buttons */
 .btn{display:inline-flex;align-items:center;gap:7px;justify-content:center;padding:11px 22px;border-radius:100px;border:0;cursor:pointer;font:600 13.5px var(--body);text-decoration:none;position:relative;overflow:hidden;transition:transform .2s var(--spring),box-shadow .2s}
 .btn::after{content:'';position:absolute;top:0;left:-100%;width:55%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:sh 3.5s ease-in-out infinite}
@@ -64,14 +73,13 @@ a{color:var(--purpleb);text-decoration:none}
 ═══════════════════════════════════════════ */
 .hero{padding:60px 0 0;text-align:center}
 
-.live-badge{
+.avail-badge{
   display:inline-flex;align-items:center;gap:7px;
-  background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.2);
+  background:rgba(155,115,245,0.06);border:1px solid rgba(155,115,245,0.2);
   border-radius:100px;padding:5px 14px;margin-bottom:20px;
-  font:500 12px var(--body);color:var(--green);
+  font:500 12px var(--body);color:var(--purpleb);
 }
-.live-badge .dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:lbdot 2s ease-in-out infinite}
-@keyframes lbdot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(52,211,153,.5)}50%{opacity:.4;box-shadow:0 0 0 4px rgba(52,211,153,0)}}
+.avail-badge .dot{width:5px;height:5px;border-radius:50%;background:var(--purple)}
 
 h1.hero-h{
   font-family:var(--disp);font-weight:200;
@@ -83,7 +91,6 @@ h1.hero-h em{
   background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
   position:relative;
 }
-/* animated underline on the italic word */
 h1.hero-h em::after{
   content:'';position:absolute;bottom:-3px;left:0;right:0;height:1px;
   background:var(--grad);transform:scaleX(0);transform-origin:left;
@@ -91,40 +98,25 @@ h1.hero-h em::after{
 }
 @keyframes uline{to{transform:scaleX(1)}}
 
-.hero-sub{font-size:15px;color:var(--mute);max-width:50ch;margin:0 auto 28px;line-height:1.74}
+.hero-sub{font-size:15px;color:var(--mute);max-width:46ch;margin:0 auto 28px;line-height:1.74}
 .hero-sub b{color:var(--ink)}
-.hero-ctas{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:32px}
+.hero-ctas{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
 
-/* animated ticker */
-.ticker-wrap{
-  overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  margin:36px 0;padding:12px 0;position:relative;
-}
-.ticker-wrap::before,.ticker-wrap::after{
-  content:'';position:absolute;top:0;bottom:0;width:80px;z-index:2;pointer-events:none;
-}
-.ticker-wrap::before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
-.ticker-wrap::after{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
-.ticker{display:flex;gap:0;width:max-content;animation:ticker 28s linear infinite}
-@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.ticker-item{
-  display:flex;align-items:center;gap:8px;
-  padding:0 28px;font:500 12px var(--mono);color:var(--dim);white-space:nowrap;
-  border-right:1px solid var(--line);
-}
-.ticker-item b{color:var(--mute)}
-.ticker-item .ti{width:5px;height:5px;border-radius:50%;background:var(--purple);opacity:.5}
+/* ═══════════════════════════════════════════
+   SECTION HEADERS (reused across sections)
+═══════════════════════════════════════════ */
+.eyebrow{font:700 9px var(--body);letter-spacing:2.8px;text-transform:uppercase;color:var(--purpleb);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.eyebrow::before{content:'';width:16px;height:1px;background:currentColor;opacity:.5}
+h2.sh{font-family:var(--disp);font-weight:200;font-size:clamp(24px,3.8vw,44px);line-height:1.04;letter-spacing:-0.025em}
+h2.sh em{font-style:italic;font-weight:300;color:var(--purpleb)}
+.section-sub{font-size:13.5px;color:var(--mute);line-height:1.74;max-width:58ch;margin-top:10px}
+.section-sub b{color:var(--ink)}
 
-/* stats */
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:28px}
-.stat{background:rgba(10,10,32,0.7);padding:14px 16px;text-align:center}
-.stat b{display:block;font-family:var(--disp);font-size:clamp(22px,3.5vw,34px);font-weight:200;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.1}
-.stat span{font:600 9.5px var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--dim);display:block;margin-top:4px}
-@media(max-width:580px){.stats{grid-template-columns:1fr 1fr}}
-
-/* trades */
-.trade-label{font:600 9.5px var(--mono);letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;text-align:left}
-.trades{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}
+/* ═══════════════════════════════════════════
+   WHAT YOU CAN POST, TRADES
+═══════════════════════════════════════════ */
+.what-section{margin-top:56px}
+.trades{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:20px}
 @media(max-width:740px){.trades{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:440px){.trades{grid-template-columns:1fr}}
 .trade{
@@ -140,234 +132,97 @@ h1.hero-h em::after{
 }
 .trade:hover{border-color:rgba(155,115,245,0.4);transform:translateY(-3px) scale(1.01);box-shadow:0 6px 22px rgba(155,115,245,0.14)}
 .trade:hover::before{opacity:1}
-.tic{width:36px;height:36px;border-radius:9px;background:rgba(155,115,245,0.07);border:1px solid rgba(155,115,245,0.15);display:grid;place-items:center;flex:0 0 auto;color:var(--purple);transition:.2s var(--spring)}
+.tic{width:34px;height:34px;border-radius:9px;background:rgba(155,115,245,0.07);border:1px solid rgba(155,115,245,0.15);display:grid;place-items:center;flex:0 0 auto;color:var(--purple);transition:.2s var(--spring)}
 .trade:hover .tic{background:rgba(155,115,245,0.18);color:var(--purpleb);transform:rotate(-8deg) scale(1.12)}
-.tic svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .trade b{display:block;font:600 13px var(--body);letter-spacing:-0.01em}
-.trade i{display:block;font-style:normal;font-size:11px;color:var(--dim);margin-top:1px}
-
-/* wa strip */
-.wa-strip{
-  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  background:rgba(8,22,12,0.55);border:1px solid rgba(37,211,102,0.16);border-radius:12px;
-  padding:13px 18px;text-decoration:none;color:inherit;transition:.2s var(--spring);
-}
-.wa-strip:hover{background:rgba(12,32,18,0.7);border-color:rgba(37,211,102,0.32);transform:translateY(-2px)}
-.wa-ico{flex-shrink:0;width:36px;height:36px;border-radius:9px;background:#25D366;display:grid;place-items:center;box-shadow:0 3px 12px rgba(37,211,102,0.26)}
-.wa-ico svg{width:18px;height:18px;fill:none;stroke:#04211D;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.wa-strip .wt{flex:1;min-width:140px}
-.wa-strip .wt b{font:600 13.5px var(--body)}
-.wa-strip .wt span{font-size:12.5px;color:var(--mute)}
-.wa-strip .wcta{font:600 13px var(--body);color:var(--green);white-space:nowrap}
 
 /* ═══════════════════════════════════════════
-   TRUST ENGINE — animated ring section
-═══════════════════════════════════════════ */
-.engine-section{
-  margin-top:56px;padding:52px 0;
-  background:linear-gradient(180deg,rgba(80,40,180,0.07) 0%,transparent 100%);
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  position:relative;overflow:hidden;
-}
-/* animated rotating ring behind the engine card */
-.engine-ring{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:600px;height:600px;border-radius:50%;
-  border:1px solid rgba(155,115,245,0.07);
-  animation:ring-spin 40s linear infinite;
-  pointer-events:none;
-}
-.engine-ring::before{
-  content:'';position:absolute;top:-3px;left:50%;width:6px;height:6px;
-  border-radius:50%;background:var(--purple);box-shadow:0 0 14px var(--purple);
-  margin-left:-3px;
-}
-@keyframes ring-spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
-.engine-ring-2{
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:440px;height:440px;border-radius:50%;
-  border:1px solid rgba(245,158,11,0.05);
-  animation:ring-spin 28s linear infinite reverse;
-  pointer-events:none;
-}
-.engine-ring-2::before{
-  content:'';position:absolute;bottom:-3px;left:50%;width:5px;height:5px;
-  border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);
-  margin-left:-2.5px;
-}
-
-.eyebrow{font:700 9px var(--body);letter-spacing:2.8px;text-transform:uppercase;color:var(--purpleb);margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.eyebrow::before{content:'';width:16px;height:1px;background:currentColor;opacity:.5}
-.eyebrow.gold{color:var(--gold)}
-.eyebrow.gold::before{background:var(--gold)}
-h2.sh{font-family:var(--disp);font-weight:200;font-size:clamp(24px,3.8vw,44px);line-height:1.04;letter-spacing:-0.025em}
-h2.sh em{font-style:italic;font-weight:300;color:var(--purpleb)}
-
-/* engine card */
-.engine-card{
-  margin-top:28px;
-  background:rgba(10,10,34,0.85);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
-  border-radius:18px;border:1px solid var(--line2);padding:24px;
-  box-shadow:0 0 60px rgba(155,115,245,0.08),inset 0 1px 0 rgba(255,255,255,0.04);
-  position:relative;overflow:hidden;
-}
-.engine-card::before{
-  content:'';position:absolute;inset:0;border-radius:18px;padding:1px;
-  background:linear-gradient(135deg,rgba(155,115,245,0.35),rgba(245,158,11,0.1) 60%,transparent);
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;
-}
-.engine-tag{display:inline-flex;align-items:center;gap:6px;font:600 9px var(--body);letter-spacing:1.5px;text-transform:uppercase;background:rgba(155,115,245,0.09);border:1px solid rgba(155,115,245,0.22);color:var(--purpleb);padding:3px 9px;border-radius:100px;margin-bottom:16px}
-.eng-cols{display:grid;grid-template-columns:1fr 90px 1fr;gap:12px;align-items:center}
-@media(max-width:520px){.eng-cols{grid-template-columns:1fr;gap:10px}}
-.eng-box{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;background:rgba(7,7,26,0.6)}
-.eng-who{font:600 8.5px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
-.eng-amt{font-family:var(--disp);font-size:clamp(22px,3.5vw,30px);font-weight:200;line-height:1;transition:color .5s}
-.eng-box.paid .eng-amt{color:var(--purpleb)}
-.eng-st{font-size:10.5px;color:var(--mute);margin-top:6px;min-height:14px}
-.eng-lock{display:flex;flex-direction:column;align-items:center;gap:6px}
-.lockbox{width:46px;height:46px;border-radius:12px;border:1px solid rgba(245,158,11,0.32);background:rgba(245,158,11,0.06);display:grid;place-items:center;color:var(--gold);transition:.6s var(--spring);box-shadow:0 0 18px rgba(245,158,11,0.08)}
-.engine-card.open .lockbox{border-color:rgba(155,115,245,0.5);background:rgba(155,115,245,0.09);color:var(--purpleb);box-shadow:0 0 22px rgba(155,115,245,0.2)}
-.lockbox svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.eng-lock small{font:600 8px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
-.ev-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:16px}
-@media(max-width:480px){.ev-grid{grid-template-columns:repeat(3,1fr)}}
-.ev-tile{
-  aspect-ratio:1;border-radius:10px;border:1px dashed var(--line);
-  background:rgba(7,7,26,0.5);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  font:500 8px var(--mono);color:var(--dim);text-align:center;padding:5px;
-  transition:.45s var(--spring);
-}
-.ev-tile svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;opacity:.28;transition:.45s}
-.ev-tile.on{border-style:solid;border-color:rgba(155,115,245,0.42);background:rgba(155,115,245,0.08);color:var(--purpleb);box-shadow:0 0 12px rgba(155,115,245,0.12);transform:translateY(-1px)}
-.ev-tile.on svg{opacity:1}
-.eng-caption{display:flex;align-items:flex-start;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(155,115,245,0.1);font-size:12px;color:var(--mute);min-height:36px}
-.eng-caption b{color:var(--ink)}
-.edot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px;background:var(--gold);box-shadow:0 0 6px rgba(245,158,11,.6);animation:edotblink 1.4s ease-in-out infinite}
-.engine-card.open .edot{background:var(--purple);box-shadow:0 0 6px rgba(155,115,245,.6);animation:none}
-@keyframes edotblink{0%,100%{opacity:1}50%{opacity:.2}}
-
-/* ═══════════════════════════════════════════
-   HOW IT WORKS — timeline with animated progress line
+   HOW IT WORKS, ANIMATED FLOW
 ═══════════════════════════════════════════ */
 .how-section{margin-top:56px;padding:0 0 56px}
-.how-steps{margin-top:32px;display:flex;flex-direction:column;gap:0;position:relative}
-/* the animated vertical progress line */
-.how-steps::before{
-  content:'';position:absolute;left:28px;top:0;bottom:0;width:1px;
-  background:linear-gradient(180deg,var(--purple),var(--gold));
-  opacity:.2;
+.flow{margin-top:44px}
+.flow-track{position:relative;display:flex;justify-content:space-between;gap:16px}
+.flow-track::before{
+  content:'';position:absolute;top:20px;left:20px;right:20px;height:2px;
+  background:var(--line2);
 }
-.how-step{display:flex;gap:0;padding:0 0 0 64px;position:relative;min-height:80px}
-.how-step:last-child{padding-bottom:0}
-/* the dot on the line */
-.how-step::before{
-  content:'';position:absolute;left:24px;top:20px;width:9px;height:9px;border-radius:50%;
+.flow-track::after{
+  content:'';position:absolute;top:20px;left:20px;right:20px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--purpleb) 15%,var(--goldb) 45%,var(--green) 75%,transparent);
+  background-size:220% 100%;
+  animation:flowshimmer 6s linear infinite;
+}
+@keyframes flowshimmer{0%{background-position:120% 0}100%{background-position:-100% 0}}
+.flow-step{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:flex-start;max-width:230px}
+.flow-dot{
+  width:40px;height:40px;border-radius:50%;flex-shrink:0;
   background:var(--bg);border:2px solid var(--purple);
-  transition:.3s var(--spring);z-index:1;
+  display:grid;place-items:center;
+  font-family:var(--disp);font-weight:300;font-size:15px;color:var(--purpleb);
+  margin-bottom:14px;transition:.3s var(--spring);
 }
-.how-step.in::before{background:var(--purple);box-shadow:0 0 12px rgba(155,115,245,0.5)}
-.how-step-inner{padding:16px 0 28px;border-bottom:1px solid var(--line);flex:1}
-.how-step:last-child .how-step-inner{border-bottom:0}
-.step-tag{font:700 8.5px var(--body);letter-spacing:2.5px;text-transform:uppercase;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px}
+.flow-step:hover .flow-dot{transform:scale(1.12);box-shadow:0 0 16px rgba(155,115,245,0.3)}
+.flow-step.gold .flow-dot{border-color:var(--gold);color:var(--goldb)}
+.flow-step.gold:hover .flow-dot{box-shadow:0 0 16px rgba(245,158,11,0.3)}
+.flow-step.green .flow-dot{border-color:var(--green);color:var(--green)}
+.flow-step.green:hover .flow-dot{box-shadow:0 0 16px rgba(52,211,153,0.3)}
+.step-tag{font:700 8.5px var(--body);letter-spacing:2.5px;text-transform:uppercase;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:10px}
 .st-purple{color:var(--purpleb);background:rgba(155,115,245,0.08);border:1px solid rgba(155,115,245,0.2)}
 .st-gold{color:var(--goldb);background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.18)}
 .st-green{color:var(--green);background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.18)}
-.how-step h3{font-family:var(--disp);font-size:clamp(18px,2.6vw,26px);font-weight:200;letter-spacing:-0.02em;line-height:1.05;margin-bottom:7px}
-.how-step p{font-size:13.5px;color:var(--mute);line-height:1.72;max-width:50ch}
-.how-step b{color:var(--ink)}
+.flow-step h3{font-family:var(--disp);font-size:clamp(16px,2vw,19px);font-weight:200;letter-spacing:-0.02em;line-height:1.15}
+.flow-step b{color:var(--ink)}
+@media(max-width:780px){
+  .flow-track{flex-direction:column;gap:26px}
+  .flow-track::before,.flow-track::after{top:20px;bottom:20px;left:20px;right:auto;width:2px;height:auto}
+  .flow-track::after{background:linear-gradient(180deg,transparent,var(--purpleb) 15%,var(--goldb) 45%,var(--green) 75%,transparent);background-size:100% 220%;animation:flowshimmerv 6s linear infinite}
+  .flow-step{flex-direction:row;align-items:center;gap:16px;max-width:none}
+  .flow-dot{margin-bottom:0}
+}
+@keyframes flowshimmerv{0%{background-position:0 120%}100%{background-position:0 -100%}}
 
 /* ═══════════════════════════════════════════
-   OPEN BOARD
+   TRUST AND PROTECTION
 ═══════════════════════════════════════════ */
-.board{
-  margin-top:52px;
-  border:1px solid var(--line2);border-radius:18px;
-  padding:44px 28px;text-align:center;
-  position:relative;overflow:hidden;
+.trust-section{
+  margin-top:56px;padding:52px 0;
+  background:linear-gradient(180deg,rgba(80,40,180,0.07) 0%,transparent 100%);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
 }
-.board::before{
-  content:'';position:absolute;top:-80px;left:50%;transform:translateX(-50%);
-  width:400px;height:220px;
-  background:radial-gradient(ellipse,rgba(155,115,245,0.15) 0%,transparent 65%);
-  pointer-events:none;
+.trust-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:28px}
+@media(max-width:680px){.trust-grid{grid-template-columns:1fr}}
+.trust-tile{
+  display:flex;gap:14px;align-items:flex-start;
+  background:rgba(10,10,32,0.55);border:1px solid var(--line);border-left:3px solid var(--purple);
+  border-radius:12px;padding:16px 18px;transition:.2s var(--spring);
 }
-/* rotating sparkle */
-.board::after{
-  content:'';position:absolute;top:20px;right:20px;
-  width:40px;height:40px;
-  background:conic-gradient(from 0deg,rgba(155,115,245,0),rgba(155,115,245,0.4),rgba(245,158,11,0.4),rgba(155,115,245,0));
-  border-radius:50%;filter:blur(4px);
-  animation:ring-spin 4s linear infinite;
-}
-.board p.sub{color:var(--mute);font-size:14.5px;max-width:44ch;margin:10px auto 22px;line-height:1.72}
-.cta-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+.trust-tile:hover{transform:translateY(-2px);border-color:rgba(155,115,245,0.32);box-shadow:0 6px 20px rgba(155,115,245,0.1)}
+.trust-tile.gold{border-left-color:var(--gold)}
+.trust-tile.green{border-left-color:var(--green)}
+.trust-ico{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:rgba(155,115,245,0.09);border:1px solid rgba(155,115,245,0.2);display:grid;place-items:center;color:var(--purpleb)}
+.trust-tile.gold .trust-ico{background:rgba(245,158,11,0.09);border-color:rgba(245,158,11,0.22);color:var(--goldb)}
+.trust-tile.green .trust-ico{background:rgba(52,211,153,0.09);border-color:rgba(52,211,153,0.22);color:var(--green)}
+.trust-ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.trust-tile h3{font:600 14px var(--body);letter-spacing:-0.01em;margin-bottom:4px}
+.trust-tile p{font-size:12.5px;color:var(--mute);line-height:1.6}
 
 /* ═══════════════════════════════════════════
-   WHO COMES — card flip on hover
+   GOOD TO KNOW, AVAILABILITY AND WORKERS
 ═══════════════════════════════════════════ */
-.who-section{margin-top:52px}
-.who-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:28px}
-@media(max-width:680px){.who-grid{grid-template-columns:1fr}}
-.who-card{
-  position:relative;height:200px;cursor:default;
-  perspective:1000px;
-}
-.who-inner{
-  position:absolute;inset:0;transition:transform .7s var(--spring);transform-style:preserve-3d;
-}
-.who-card:hover .who-inner{transform:rotateY(180deg)}
-.who-front,.who-back{
-  position:absolute;inset:0;border-radius:14px;padding:22px;
-  backface-visibility:hidden;-webkit-backface-visibility:hidden;
-  border:1px solid var(--line);
-}
-.who-front{background:rgba(10,10,32,0.7);display:flex;flex-direction:column;justify-content:space-between}
-.who-back{background:rgba(14,10,40,0.9);border-color:rgba(245,158,11,0.25);transform:rotateY(180deg);display:flex;flex-direction:column;justify-content:center;gap:8px}
-.who-front:hover{border-color:rgba(245,158,11,0.3)}
-.who-num{font:600 9px var(--mono);letter-spacing:.2em;color:var(--dim)}
-.who-icon{width:44px;height:44px;border-radius:12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.2);display:grid;place-items:center;color:var(--gold);margin-bottom:12px}
-.who-icon svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.who-front h3{font-family:var(--disp);font-size:clamp(16px,2.2vw,20px);font-weight:200;letter-spacing:-0.02em;line-height:1.1}
-.who-hint{font:400 10.5px var(--mono);color:var(--dim);text-align:right}
-.who-back .who-detail{font-size:13px;color:var(--mute);line-height:1.7}
-.who-back .who-detail b{color:var(--ink)}
-.who-back .gold-label{font:700 9px var(--body);letter-spacing:2px;text-transform:uppercase;color:var(--gold)}
-
-/* ═══════════════════════════════════════════
-   MONEY
-═══════════════════════════════════════════ */
-.money-section{
-  margin-top:52px;padding:48px 0;
-  background:linear-gradient(180deg,rgba(160,90,0,0.05) 0%,transparent 100%);
-  border-top:1px solid rgba(245,158,11,0.12);
-}
-.money-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:44px;align-items:center}
-@media(max-width:740px){.money-grid{grid-template-columns:1fr;gap:28px}}
-.money-left{text-align:center}
-.money-pct{
-  font-family:var(--disp);font-size:clamp(72px,12vw,120px);font-weight:200;
-  line-height:.95;letter-spacing:-0.05em;
-  background:linear-gradient(135deg,var(--gold) 0%,#F97316 100%);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
-  animation:gpulse 3s ease-in-out infinite;
-}
-@keyframes gpulse{0%,100%{filter:drop-shadow(0 0 14px rgba(245,158,11,.3))}50%{filter:drop-shadow(0 0 30px rgba(245,158,11,.6))}}
-.money-label{font:500 12px var(--body);color:var(--mute);margin-top:5px;letter-spacing:.02em}
-.dep-bar{height:28px;background:rgba(7,7,26,0.7);border:1px solid var(--line2);border-radius:100px;overflow:hidden;margin-top:18px}
-.dep-fill{width:25%;min-width:90px;height:100%;background:linear-gradient(90deg,var(--gold),#F97316);border-radius:100px;display:flex;align-items:center;justify-content:flex-end;padding:0 10px;box-shadow:0 0 14px rgba(245,158,11,.28)}
-.dep-fill span{font:600 10px var(--mono);color:#1a0d00}
-.dep-leg{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:8px;flex-wrap:wrap;gap:4px}
-.money-rule{
-  display:flex;align-items:flex-start;gap:12px;
-  background:rgba(12,8,0,0.4);border:1px solid rgba(245,158,11,0.12);border-radius:12px;
-  padding:13px 15px;margin-top:10px;font-size:13px;color:var(--mute);transition:.2s;
-}
-.money-rule:hover{border-color:rgba(245,158,11,0.26)}
-.money-rule b{color:var(--ink)}
-.money-rule .ri{flex:none;width:28px;height:28px;border-radius:7px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.16);display:grid;place-items:center;color:var(--gold)}
-.money-rule .ri svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.info-section{margin-top:52px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+@media(max-width:680px){.info-grid{grid-template-columns:1fr}}
+.info-card{position:relative;overflow:hidden;border:1px solid var(--line2);border-radius:16px;padding:22px;background:rgba(10,10,32,0.55);transition:.2s var(--spring)}
+.info-card:hover{transform:translateY(-2px);border-color:rgba(155,115,245,0.4)}
+.info-card::before{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(155,115,245,0.16) 0%,transparent 70%);pointer-events:none}
+.info-card.gold::before{background:radial-gradient(circle,rgba(245,158,11,0.16) 0%,transparent 70%)}
+.info-ico{width:38px;height:38px;border-radius:10px;background:rgba(155,115,245,0.09);border:1px solid rgba(155,115,245,0.2);display:grid;place-items:center;color:var(--purpleb);margin-bottom:14px;position:relative}
+.info-card.gold .info-ico{background:rgba(245,158,11,0.09);border-color:rgba(245,158,11,0.22);color:var(--goldb)}
+.info-ico svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.info-card h3{font-family:var(--disp);font-weight:200;font-size:clamp(17px,2.2vw,21px);letter-spacing:-0.02em;margin-bottom:5px;position:relative}
+.info-card p{font-size:12.5px;color:var(--mute);line-height:1.6;position:relative}
+.info-link{display:inline-flex;align-items:center;gap:4px;margin-top:12px;font:600 12px var(--body);color:var(--goldb);position:relative}
 
 /* ═══════════════════════════════════════════
    CONTACT
@@ -375,19 +230,8 @@ h2.sh em{font-style:italic;font-weight:300;color:var(--purpleb)}
 .contact-section{margin-top:52px;padding-bottom:60px}
 .contact-card{border-radius:18px;padding:32px;background:rgba(10,10,34,0.7);backdrop-filter:blur(18px);position:relative;text-align:center}
 .contact-card::before{content:'';position:absolute;inset:0;border-radius:18px;padding:1px;background:linear-gradient(135deg,rgba(155,115,245,0.45),rgba(245,158,11,0.24) 60%,rgba(52,211,153,0.16));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
-.contact-sub{font-size:14px;color:var(--mute);max-width:44ch;margin:10px auto 24px;line-height:1.72}
-.chans{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}
-@media(max-width:520px){.chans{grid-template-columns:1fr}}
-.chan{display:flex;gap:12px;align-items:center;background:rgba(7,7,26,0.5);border:1px solid var(--line2);border-radius:12px;padding:14px;text-decoration:none;color:inherit;transition:.2s var(--spring);text-align:left}
-.chan:hover{border-color:rgba(155,115,245,0.38);transform:translateY(-2px);box-shadow:0 6px 22px rgba(155,115,245,0.09)}
-.chan.wa:hover{border-color:rgba(37,211,102,0.34)}
-.chan-ico{flex:none;width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(155,115,245,0.09);border:1px solid rgba(155,115,245,0.18)}
-.chan-ico svg{width:18px;height:18px;fill:none;stroke:var(--purpleb);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.chan.wa .chan-ico{background:#25D366;border-color:#25D366;box-shadow:0 3px 12px rgba(37,211,102,.22)}
-.chan.wa .chan-ico svg{stroke:#04211D}
-.chan-label{font:700 8.5px var(--body);letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:2px}
-.chan-val{font:600 13.5px var(--body);display:block}
-.chan-why{font-size:11.5px;color:var(--mute);display:block;margin-top:1px}
+.contact-sub{font-size:14px;color:var(--mute);margin:10px auto 22px}
+.cta-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
 
 /* footer */
 footer{border-top:1px solid var(--line);padding:32px 0 50px}
@@ -401,6 +245,7 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 .float-cta.show{transform:none;opacity:1;pointer-events:auto}
 .float-cta:hover{box-shadow:0 6px 38px rgba(155,115,245,.62);transform:translateY(-2px)}
 .fcdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.7);animation:edotblink 1.4s ease-in-out infinite}
+@keyframes edotblink{0%,100%{opacity:1}50%{opacity:.2}}
 </style>
 <link rel="stylesheet" href="nav.css?v=1">
 </head>
@@ -432,226 +277,100 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 <!-- HERO -->
 <section class="hero" id="hero">
   <div class="wrap">
-    <div class="live-badge rv"><span class="dot"></span>Live in Kingston and Portmore, Jamaica</div>
+    <div class="avail-badge rv"><span class="dot"></span>Launching in Kingston and Portmore, Jamaica</div>
     <h1 class="hero-h rv d1">Someone you can <em>trust,</em><br>on your property.</h1>
-    <p class="hero-sub rv d2">Post the job free. A vetted tradesperson quotes it, documented with timestamped evidence. <b>Nobody is paid for a stage until you approve it.</b></p>
+    <p class="hero-sub rv d2">Post the job free. A vetted tradesperson quotes it, with evidence at every stage.</p>
     <div class="hero-ctas rv d2">
       <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
       <a class="btn btn-g" href="#how">How it works</a>
-      <a class="btn btn-g btn-sm" href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">See open jobs</a>
-    </div>
-
-    <!-- scrolling ticker -->
-    <div class="ticker-wrap rv d3">
-      <div class="ticker">
-        <div class="ticker-item"><span class="ti"></span><b>Free to post</b> · No card required</div>
-        <div class="ticker-item"><span class="ti"></span><b>Identity checked</b> · every worker</div>
-        <div class="ticker-item"><span class="ti"></span><b>1 working day</b> · human reply</div>
-        <div class="ticker-item"><span class="ti"></span><b>Zero hidden fees</b> · prices on the page</div>
-        <div class="ticker-item"><span class="ti"></span><b>UK registered</b> · no. 17358077</div>
-        <div class="ticker-item"><span class="ti"></span><b>References called</b> · not just listed</div>
-        <div class="ticker-item"><span class="ti"></span><b>Stage payments</b> · tied to photos</div>
-        <!-- duplicate for seamless loop -->
-        <div class="ticker-item"><span class="ti"></span><b>Free to post</b> · No card required</div>
-        <div class="ticker-item"><span class="ti"></span><b>Identity checked</b> · every worker</div>
-        <div class="ticker-item"><span class="ti"></span><b>1 working day</b> · human reply</div>
-        <div class="ticker-item"><span class="ti"></span><b>Zero hidden fees</b> · prices on the page</div>
-        <div class="ticker-item"><span class="ti"></span><b>UK registered</b> · no. 17358077</div>
-        <div class="ticker-item"><span class="ti"></span><b>References called</b> · not just listed</div>
-        <div class="ticker-item"><span class="ti"></span><b>Stage payments</b> · tied to photos</div>
-      </div>
-    </div>
-
-    <div class="stats rv d2">
-      <div class="stat"><b data-count="47">0</b><span>Jobs posted</span></div>
-      <div class="stat"><b data-count="23">0</b><span>Vetted workers</span></div>
-      <div class="stat"><b data-count="6">0</b><span>Trades covered</span></div>
-      <div class="stat"><b data-count="100" data-suffix="%">0%</b><span>Stage-gated payments</span></div>
-    </div>
-
-    <p class="trade-label rv">Start with the trade:</p>
-    <div class="trades">
-      <a class="trade rv" href="https://app.yaadly.co.uk/jobs/new?trade=Roofing"><span class="tic"><svg viewBox="0 0 24 24"><path d="M2.5 11.5 12 4l9.5 7.5"/><path d="M5 10.5V20h14v-9.5"/><path d="M9 20v-5h6v5"/></svg></span><span><b>Roof and zinc</b><i>Leaks, sheets, fixings</i></span></a>
-      <a class="trade rv d1" href="https://app.yaadly.co.uk/jobs/new?trade=Plumbing"><span class="tic"><svg viewBox="0 0 24 24"><path d="M7 4v6a4 4 0 0 0 4 4h2a4 4 0 0 1 4 4v2"/><rect x="4" y="2" width="6" height="4" rx="1"/><rect x="14" y="18" width="6" height="4" rx="1"/></svg></span><span><b>Plumbing</b><i>Pipes, tanks, pumps</i></span></a>
-      <a class="trade rv d2" href="https://app.yaadly.co.uk/jobs/new?trade=Electrical"><span class="tic"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></span><span><b>Electrical</b><i>Faults, lights, backup</i></span></a>
-      <a class="trade rv" href="https://app.yaadly.co.uk/jobs/new?trade=Painting"><span class="tic"><svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14 6.5 3.5 3.5"/></svg></span><span><b>Painting</b><i>Inside and out</i></span></a>
-      <a class="trade rv d1" href="https://app.yaadly.co.uk/jobs/new?trade=Drainage"><span class="tic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/></svg></span><span><b>Septic and drainage</b><i>Tanks, soakaways, gullies</i></span></a>
-      <a class="trade rv d2" href="https://app.yaadly.co.uk/jobs/new?trade=Grille"><span class="tic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16M3 12h18M7.5 4v16M16.5 4v16"/></svg></span><span><b>Grille and gate</b><i>Welding and security</i></span></a>
-    </div>
-
-    <a class="wa-strip rv d1" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener" style="margin-top:8px">
-      <span class="wa-ico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></span>
-      <span class="wt"><b>Or start on WhatsApp.</b> <span>Voice note, photos, Patois or English. A person writes the job up for you.</span></span>
-      <span class="wcta">Open WhatsApp &rarr;</span>
-    </a>
-  </div>
-</section>
-
-<!-- TRUST ENGINE -->
-<section class="engine-section">
-  <div class="engine-ring"></div>
-  <div class="engine-ring-2"></div>
-  <div class="wrap">
-    <div class="eyebrow rv sl">See it work, before you post anything</div>
-    <h2 class="sh rv d1">Watch a real job cycle.<br><em>Evidence first. Payment last.</em></h2>
-    <div class="engine-card rv d2" id="engine">
-      <div class="engine-tag">
-        <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" fill="currentColor" opacity=".6"><animate attributeName="opacity" values=".6;1;.6" dur="1.4s" repeatCount="indefinite"/></circle></svg>
-        Live demo
-      </div>
-      <div class="eng-cols">
-        <div class="eng-box"><div class="eng-who">You</div><div class="eng-amt" id="eng-you">J$66,800</div><div class="eng-st" id="eng-you2">Funding stage one</div></div>
-        <div class="eng-lock"><div class="lockbox" id="eng-lock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div><small id="eng-lab">Not yet paid</small></div>
-        <div class="eng-box paid"><div class="eng-who">Delroy, the worker</div><div class="eng-amt" id="eng-w">J$0</div><div class="eng-st" id="eng-w2">Can see the money is real</div></div>
-      </div>
-      <div class="ev-grid">
-        <div class="ev-tile"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/></svg><span>Arrival</span></div>
-        <div class="ev-tile"><svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>Before</span></div>
-        <div class="ev-tile"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg><span>Receipt</span></div>
-        <div class="ev-tile"><svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg><span>After</span></div>
-        <div class="ev-tile"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="12" height="12" rx="2.5"/><path d="M15 10.5 21 7v10l-6-3.5v-3Z"/></svg><span>Walk-round</span></div>
-        <div class="ev-tile"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg><span>You sign</span></div>
-      </div>
-      <div class="eng-caption"><span class="edot"></span><span id="eng-cap"><b>Nothing has reached him yet.</b> He starts because he can see the job is funded, not because you sent him money.</span></div>
+      <a class="btn btn-g btn-sm" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">Ask on WhatsApp</a>
     </div>
   </div>
 </section>
+
+<!-- WHAT YOU CAN POST -->
+<section class="what-section"><div class="wrap">
+  <div class="eyebrow rv sl">What you can post</div>
+  <h2 class="sh rv d1">Property repair<br>and <em>maintenance work.</em></h2>
+  <p class="section-sub rv d1">Scoped, quoted and documented, not just listed.</p>
+  <div class="trades rv d2">
+    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Roofing"><span class="tic"><svg viewBox="0 0 24 24"><path d="M2.5 11.5 12 4l9.5 7.5"/><path d="M5 10.5V20h14v-9.5"/><path d="M9 20v-5h6v5"/></svg></span><b>Roof and zinc</b></a>
+    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Plumbing"><span class="tic"><svg viewBox="0 0 24 24"><path d="M7 4v6a4 4 0 0 0 4 4h2a4 4 0 0 1 4 4v2"/><rect x="4" y="2" width="6" height="4" rx="1"/><rect x="14" y="18" width="6" height="4" rx="1"/></svg></span><b>Plumbing</b></a>
+    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Electrical"><span class="tic"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></span><b>Electrical</b></a>
+    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Painting"><span class="tic"><svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14 6.5 3.5 3.5"/></svg></span><b>Painting</b></a>
+    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Drainage"><span class="tic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/></svg></span><b>Septic and drainage</b></a>
+    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Grille"><span class="tic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16M3 12h18M7.5 4v16M16.5 4v16"/></svg></span><b>Grille and gate</b></a>
+  </div>
+</div></section>
 
 <!-- HOW IT WORKS -->
 <section class="how-section" id="how"><div class="wrap">
-  <div class="eyebrow rv sl">The verified job loop</div>
+  <div class="eyebrow rv sl">How it works</div>
   <h2 class="sh rv d1">Proven, <em>not promised.</em></h2>
-  <div class="how-steps">
-    <div class="how-step rv">
-      <div class="how-step-inner">
-        <span class="step-tag st-purple">Tell us what needs doing</span>
-        <h3>Form, WhatsApp, voice note. Patois or English.</h3>
-        <p>Saves as a draft before anything personal is asked. Send a photo and we will tell you straight whether it is even a job.</p>
+  <div class="flow rv d1">
+    <div class="flow-track">
+      <div class="flow-step">
+        <span class="flow-dot">1</span>
+        <span class="step-tag st-purple">Describe the job</span>
+        <h3>By web form, or on WhatsApp.</h3>
       </div>
-    </div>
-    <div class="how-step rv d1">
-      <div class="how-step-inner">
-        <span class="step-tag st-gold">An itemised quote</span>
-        <h3>Labour split from materials, benchmarked against real costs.</h3>
-        <p>Agreed before a tool is lifted. No "farrin price." A client in London pays what a client in Portmore pays.</p>
+      <div class="flow-step gold">
+        <span class="flow-dot">2</span>
+        <span class="step-tag st-gold">Get a quote</span>
+        <h3>Priced against real costs.</h3>
       </div>
-    </div>
-    <div class="how-step rv d2">
-      <div class="how-step-inner">
-        <span class="step-tag st-green">Every stage documented</span>
-        <h3>Arrival photo. Before. Receipt. After. Walk-round video.</h3>
-        <p>Timestamped and geotagged, checked against the agreed scope. Nothing passes that did not happen.</p>
+      <div class="flow-step">
+        <span class="flow-dot">3</span>
+        <span class="step-tag st-purple">Work is documented</span>
+        <h3>Photos and video, every stage.</h3>
       </div>
-    </div>
-    <div class="how-step rv d3">
-      <div class="how-step-inner">
-        <span class="step-tag st-purple">You approve, from anywhere</span>
-        <h3>From the evidence or live on video. <b>Nobody gets paid until you do.</b></h3>
-        <p>From your phone, in London, at midnight. Payment releases only on your sign-off. Every stage. Every time.</p>
+      <div class="flow-step green">
+        <span class="flow-dot">4</span>
+        <span class="step-tag st-green">You approve</span>
+        <h3><b>Nobody's paid until you sign off.</b></h3>
       </div>
     </div>
   </div>
 </div></section>
 
-<!-- OPEN BOARD -->
-<div class="wrap">
-  <div class="board rv">
-    <div class="eyebrow" style="justify-content:center">Already live</div>
-    <h2 class="sh" style="margin-top:8px">Jobs going up in <em>Kingston and Portmore.</em></h2>
-    <p class="sub">Real jobs, the vetted workers who quote them. No account needed to look.</p>
-    <div class="cta-row">
-      <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs">See the open jobs</a>
-      <a class="btn btn-g btn-sm" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
+<!-- TRUST AND PROTECTION -->
+<section class="trust-section"><div class="wrap">
+  <div class="eyebrow rv sl">Trust and protection</div>
+  <h2 class="sh rv d1">Real checks,<br><em>not promises.</em></h2>
+  <div class="trust-grid rv d1">
+    <div class="trust-tile">
+      <span class="trust-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M6 16.3c.5-1.6 1.8-2.3 2.5-2.3s2 .7 2.5 2.3M13 9.5h5M13 13h5"/></svg></span>
+      <div><h3>ID-checked workers</h3><p>References called, not just listed.</p></div>
     </div>
-  </div>
-</div>
-
-<!-- WHO COMES -->
-<section class="who-section"><div class="wrap">
-  <div class="eyebrow rv sl">Who comes to your property</div>
-  <h2 class="sh rv d1">Nobody attends <em>unverified.</em></h2>
-  <p class="rv d1" style="font-size:13px;color:var(--dim);margin:6px 0 0">Hover each card to see more.</p>
-  <div class="who-grid rv d2">
-
-    <div class="who-card">
-      <div class="who-inner">
-        <div class="who-front">
-          <div>
-            <div class="who-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M6 16.3c.5-1.6 1.8-2.3 2.5-2.3s2 .7 2.5 2.3M13 9.5h5M13 13h5"/></svg></div>
-            <h3>Checked properly,<br>not just uploaded.</h3>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end">
-            <span class="who-num">01 / Identity</span>
-            <span class="who-hint">hover &rarr;</span>
-          </div>
-        </div>
-        <div class="who-back">
-          <span class="gold-label">Identity check</span>
-          <p class="who-detail">Government ID, live selfie, liveness detection. Every worker on the platform has been through it <b>before they ever see a job.</b></p>
-        </div>
-      </div>
+    <div class="trust-tile gold">
+      <span class="trust-ico"><svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg></span>
+      <div><h3>Every job's evidence reviewed</h3><p>By a named person, disputes included.</p></div>
     </div>
-
-    <div class="who-card">
-      <div class="who-inner">
-        <div class="who-front">
-          <div>
-            <div class="who-icon"><svg viewBox="0 0 24 24"><path d="M6.5 4h3l1.3 3.8-2 1.5a11.5 11.5 0 0 0 5.4 5.4l1.5-2 3.8 1.3v3a2 2 0 0 1-2.2 2C10.6 18.6 5.4 13.4 4.5 6.7 4.4 5.6 5.3 4 6.5 4Z"/></svg></div>
-            <h3>Referees called.<br>Not just listed.</h3>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end">
-            <span class="who-num">02 / References</span>
-            <span class="who-hint">hover &rarr;</span>
-          </div>
-        </div>
-        <div class="who-back">
-          <span class="gold-label">Reference check</span>
-          <p class="who-detail">We speak to references directly, before the bigger work lands. <b>A name on a form means nothing</b> unless someone picks up the phone.</p>
-        </div>
-      </div>
+    <div class="trust-tile green">
+      <span class="trust-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg></span>
+      <div><h3>You pay Yaadly, not the tradesperson</h3><p>One price, agreed in writing.</p></div>
     </div>
-
-    <div class="who-card">
-      <div class="who-inner">
-        <div class="who-front">
-          <div>
-            <div class="who-icon"><svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 0 1 14.2-6.3L20 8M20 4.2V8h-3.8M20.5 12a8.5 8.5 0 0 1-14.2 6.3L4 16M4 19.8V16h3.8"/></svg></div>
-            <h3>Fall short once.<br>We stop sending work.</h3>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end">
-            <span class="who-num">03 / Accountability</span>
-            <span class="who-hint">hover &rarr;</span>
-          </div>
-        </div>
-        <div class="who-back">
-          <span class="gold-label">Ongoing accountability</span>
-          <p class="who-detail">The vetting holds after the job too. <b>You always know who is coming</b> to your property before they arrive, every time.</p>
-        </div>
-      </div>
+    <div class="trust-tile">
+      <span class="trust-ico"><svg viewBox="0 0 24 24"><path d="M4.5 5h15a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.2 3.2V17H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg></span>
+      <div><h3>Same price, wherever you call from</h3><p>No markup for being overseas.</p></div>
     </div>
-
   </div>
 </div></section>
 
-<!-- MONEY -->
-<section class="money-section"><div class="wrap">
-  <div class="money-grid">
-    <div class="money-left rv">
-      <div class="money-label">Every job is paid in stages.</div>
-      <div class="dep-leg"><span>Deposit</span><span>Stage 1</span><span>Stage 2</span><span>Final inspect</span></div>
+<!-- GOOD TO KNOW -->
+<section class="info-section"><div class="wrap">
+  <div class="eyebrow rv sl">Good to know</div>
+  <div class="info-grid rv d1">
+    <div class="info-card">
+      <span class="info-ico"><svg viewBox="0 0 24 24"><path d="M12 21s7-8 7-13a7 7 0 1 0-14 0c0 5 7 13 7 13Z"/><circle cx="12" cy="8" r="2.5"/></svg></span>
+      <h3>Kingston and Portmore first</h3>
+      <p>Not every trade or time slot is covered yet.</p>
     </div>
-    <div class="rv d1">
-      <div class="eyebrow gold">The money</div>
-      <h2 class="sh" style="margin-bottom:10px">Paid in stages,<br><em>against what you can see.</em></h2>
-      <p style="font-size:13.5px;color:var(--mute);line-height:1.74;max-width:44ch;margin-bottom:16px">Stage payments tied to what you can photograph, never to a date. Materials pass through at cost, never marked up.</p>
-      <div class="money-rule">
-        <div class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.3 9.6c0-1.1 1.2-2 2.7-2s2.7.9 2.7 2-1.2 1.6-2.7 2.1-2.7 1-2.7 2.1 1.2 2 2.7 2 2.7-.9 2.7-2"/></svg></div>
-        <div><b>Online payment is not yet live.</b> You pay the tradesperson directly, stage by stage, against a signed agreement. <a href="payments.html" style="color:var(--goldb)">Full breakdown here.</a></div>
-      </div>
-      <div class="money-rule">
-        <div class="ri"><svg viewBox="0 0 24 24"><path d="M4.5 5h15a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.2 3.2V17H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg></div>
-        <div><b>No "farrin price".</b> Every quote is benchmarked against real costs, so a client in London pays what a client in Portmore pays.</div>
-      </div>
+    <div class="info-card gold">
+      <span class="info-ico"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z"/><path d="m8.5 12 2.3 2.3L15.5 9.5"/></svg></span>
+      <h3>For vetted workers only</h3>
+      <p>Approved and ID-checked before any job.</p>
+      <a class="info-link" href="https://app.yaadly.co.uk/apply">Apply to join &rarr;</a>
     </div>
   </div>
 </div></section>
@@ -659,22 +378,11 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 <!-- CONTACT -->
 <section class="contact-section"><div class="wrap">
   <div class="contact-card rv">
-    <div class="eyebrow" style="justify-content:center;margin-bottom:8px">Answered by a person, within one working day</div>
-    <h2 class="sh" style="margin-bottom:0">Not sure it is even a job?</h2>
-    <p class="contact-sub">Ask first. No account, no commitment, nothing charged. Send a photo and we will tell you straight.</p>
-    <div class="chans">
-      <a class="chan wa" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">
-        <span class="chan-ico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></span>
-        <span><span class="chan-label">WhatsApp</span><span class="chan-val">Message us on WhatsApp</span><span class="chan-why">Fastest. Text, photos or a voice note.</span></span>
-      </a>
-      <a class="chan" href="mailto:monique@yaadly.co.uk">
-        <span class="chan-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></span>
-        <span><span class="chan-label">Email</span><span class="chan-val">monique@yaadly.co.uk</span><span class="chan-why">Best for quotes, drawings or documents.</span></span>
-      </a>
-    </div>
-    <div class="cta-row" style="justify-content:center">
+    <h2 class="sh">Ready to start a project?</h2>
+    <p class="contact-sub">No account, nothing charged.</p>
+    <div class="cta-row">
       <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
-      <span style="font-size:12px;color:var(--dim)">Free to post, free to get quotes</span>
+      <a class="btn btn-g btn-sm" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">Ask on WhatsApp</a>
     </div>
   </div>
 </div></section>
@@ -696,37 +404,6 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
 (function(){
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.1});
   document.querySelectorAll('.rv').forEach(function(e){io.observe(e)});
-  /* how-step dot animation */
-  var sio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');sio.unobserve(e.target)}})},{threshold:.3});
-  document.querySelectorAll('.how-step').forEach(function(e){sio.observe(e)});
-})();
-
-/* counters */
-(function(){
-  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(!e.isIntersecting)return;var el=e.target,tgt=parseInt(el.dataset.count),suf=el.dataset.suffix||'',start=null,dur=1200;requestAnimationFrame(function run(ts){if(!start)start=ts;var p=Math.min((ts-start)/dur,1),v=1-Math.pow(1-p,3);el.textContent=Math.round(v*tgt)+suf;if(p<1)requestAnimationFrame(run)});io.unobserve(el)})},{threshold:.5});
-  document.querySelectorAll('[data-count]').forEach(function(e){io.observe(e)});
-})();
-
-/* trust engine */
-(function(){
-  var card=document.getElementById('engine');if(!card)return;
-  var tiles=Array.from(card.querySelectorAll('.ev-tile'));
-  var elab=document.getElementById('eng-lab'),ecap=document.getElementById('eng-cap');
-  var eY=document.getElementById('eng-you'),eY2=document.getElementById('eng-you2');
-  var eW=document.getElementById('eng-w'),eW2=document.getElementById('eng-w2');
-  var S=[
-    {y:'J$66,800',ys:'Funding stage one',w:'J$0',ws:'Can see the money is real',l:'Not yet paid',c:'<b>Nothing has reached him yet.</b> He starts because he can see the job is funded, not because you sent him money.',o:false,ev:[]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Waiting on first approval',l:'Not yet paid',c:'<b>Arrival photo logged.</b> Timestamped, GPS checked against the property.',o:false,ev:[0]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Work under way',l:'Not yet paid',c:'<b>Before photo checked.</b> Work scope locked before anything is touched.',o:false,ev:[0,1]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Materials receipt logged',l:'Not yet paid',c:'<b>Materials receipt verified.</b> Labour split from materials, no markup.',o:false,ev:[0,1,2]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'After photo checked',l:'Not yet paid',c:'<b>After photo checked against the scope.</b> Work done matched to work agreed.',o:false,ev:[0,1,2,3]},
-    {y:'J$66,800',ys:'Stage one in escrow',w:'J$0',ws:'Walk-round video logged',l:'Not yet paid',c:'<b>Walk-round video complete.</b> Full record of the finished stage, timestamped.',o:false,ev:[0,1,2,3,4]},
-    {y:'J$50,100',ys:'Stage one released',w:'J$16,700',ws:'Stage one received',l:'Paid, stage one',c:'<b>You approved. Stage one paid.</b> Money moves only on your sign-off.',o:true,ev:[0,1,2,3,4,5]},
-  ];
-  var idx=0;
-  function apply(s){eY.textContent=s.y;eY2.textContent=s.ys;eW.textContent=s.w;eW2.textContent=s.ws;elab.textContent=s.l;ecap.innerHTML=s.c;card.classList.toggle('open',s.o);tiles.forEach(function(t,i){t.classList.toggle('on',s.ev.indexOf(i)>-1)})}
-  apply(S[0]);
-  setInterval(function(){idx=(idx+1)%S.length;apply(S[idx])},2400);
 })();
 
 /* float cta */
