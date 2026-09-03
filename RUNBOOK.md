@@ -1211,3 +1211,26 @@ grep -rn "not charged until\|authorised at booking" docs/*.html
 ```
 
 This also part-answers the open question about the invoice being the evidence of the principal structure. Above £500 there is always an invoice saying the client bought the job from Yaadly Ltd. At or under £500 there is not, so the written confirmation that goes out at booking has to carry it, and it has to go out anyway to satisfy the durable-medium requirement in the distance selling rules.
+
+## The worker's 12% is displayed but never collected, and the two sides contradict
+
+Found 3 September 2026 while answering "how do I take my fees from the worker". **Needs a founder ruling before any code moves.** Nothing has been changed except the description on `docs/payments.html`.
+
+**What the two sides are currently told, on the same job:**
+
+| Side | What it says | Where |
+|---|---|---|
+| The worker | Your labour price, less Yaadly's 12%, "You receive" 88% | `web/components/QuotePanel.tsx`, `web/components/portal/FeeBreakdown.tsx` |
+| The client | Pay the tradesperson their labour price plus materials, **"no fee added"** | `raise_job_worker_pay_invoice()` in `20260902i`, which totals `labour_jmd + materials_jmd` |
+
+So the client is invoiced to pay him 100% of labour, and he is shown 88%. **There is no mechanism anywhere that collects the 12%**: no invoice type, no `payable_to` value, no function. The number is decorative. Searching for it finds only the two display components above and a label in the desk.
+
+**Why it cannot be fixed by editing the labels.** Under today's live model the client pays the worker directly and Yaadly never touches that money, so "Yaadly pays you 88%" would be false. The display and the invoicing are one decision, not two.
+
+**The two ways out.**
+
+1. **Principal, which the founder chose on 3 September.** One all-in invoice from Yaadly to the client (labour plus the 15%). Yaadly pays the worker labour less 12%. The 12% is never collected because it is never paid out, and Yaadly's margin on a job becomes 27% of labour. This deletes `raise_job_worker_pay_invoice()` as a client-facing document and turns it into a record of what Yaadly owes the worker. It also means Yaadly receives the whole job payment, which is exactly what `docs/payments.html` promises will not happen until legal sign-off and insurance are in hand, so it is gated on that, not on the code.
+
+2. **Stay agent until that gate lifts.** The client keeps paying the worker directly at 100%, and Yaadly bills the worker separately for the 12%. That is legitimate (an invoice for a service rendered to him, not his money passing through Yaadly), but it means chasing a man in Portmore for 12% after he has already been paid in full, with no leverage left. It is the weakest collection position available and it is why option 1 is the recommendation.
+
+Whichever is chosen, the two display components and the desk label at `concierge/concierge.html` (the "Worker 12%, keeps 88%" row) must change in the same commit as the invoicing, or the contradiction just moves.
