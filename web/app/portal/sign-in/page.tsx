@@ -99,7 +99,7 @@ export default function SignIn() {
           router.refresh();
           return;
         }
-      } catch (_) {
+      } catch {
         // Fall through to the form. A broken hand-off should still leave
         // somebody able to sign in the ordinary way.
       }
