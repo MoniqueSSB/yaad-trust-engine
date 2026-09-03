@@ -94,7 +94,7 @@ export function ApproveButton({
       ) : (
         <div className="max-w-[56ch] rounded-xl border border-coral/40 bg-coral/[.07] p-4">
           <p className="text-[12px] font-bold uppercase tracking-[.14em] text-coral">
-            This releases money and cannot be undone
+            This commits Yaadly to pay for this stage and cannot be undone
           </p>
           <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink">{explain}</p>
 
@@ -143,8 +143,8 @@ export function ApproveButton({
                 {state === "busy"
                   ? "Approving…"
                   : inPerson
-                    ? "Yes, I inspected this myself: release payment"
-                    : "Yes, approve and release payment"}
+                    ? "Yes, I inspected this myself: accept this stage"
+                    : "Yes, accept this stage"}
               </button>
             </form>
             <button

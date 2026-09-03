@@ -24,7 +24,7 @@ export const PUBLISHED_PERCENTS = new Set([2, 5, 12, 15]);
 export const NO_PRICE_SENTENCE =
   "Yaadly does not estimate or quote the trade work itself; the tradesperson sets their own labour price "
   + "against the written scope, and the client agrees one Yaadly price built from it. "
-  + "Yaadly's own services and their published prices are at yaadly.co.uk/prices.";
+  + "Yaadly's own services and their published prices are at yaadly.co.uk/services.";
 
 const POUNDS = /£\s?(\d[\d,]*)(?:\.\d+)?/g;
 const JMD = /J\$\s?(\d[\d,]*)(?:\.\d+)?/g;

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 /**
  * The marketplace board, MARKETPLACE-BUILD-SPEC v1.0, built at
  * app.yaadly.co.uk/jobs per the founder's decision that the product lives
- * in the app. Two independent switches: vmode (visitor or vetted worker,
+ * in the app. Two independent switches: vmode (visitor or approved worker,
  * a REAL auth state here, derived server-side) and mtab (jobs/workers).
  * Reads only the open_jobs and client_summary views plus public
  * worker_profiles and job_photos. budget_band is never selected anywhere
@@ -55,7 +55,7 @@ type QuotePackDraft = {
 
 export const metadata = {
   title: "The marketplace · Yaadly",
-  description: "Open property jobs across Jamaica and the verified workers who do them. Nothing is signed off until you have seen the evidence.",
+  description: "Open property jobs across Jamaica and the identity checked workers who do them. You buy the job from Yaadly, and nothing is signed off until you have seen the evidence.",
 };
 
 function ago(iso: string | null): string {
@@ -177,15 +177,17 @@ export default async function Board({
         </em>
       </h1>
       <p className="mt-3.5 max-w-[62ch] text-[15.5px] leading-relaxed text-mute">
-        Open property jobs across Jamaica and the verified workers who do them.{" "}
+        Open property jobs across Jamaica and the identity checked workers who do them.{" "}
         Yaadly coordinates the work, we don&apos;t employ every worker on it.{" "}
-        {/* Founder decision, 3 Sep 2026. "Money held until the work is
-            proven" was true of a short job on manual capture, where a card
-            authorisation is a real hold, and NOT true of a long job that goes
-            out as an invoice, where nothing is held by anyone. One sentence
-            covering both stopped being honest the moment both existed, and
-            which path a job takes is decided per job by the founder rather
-            than by a rule the reader could infer.
+        {/* Founder decision, 3 Sep 2026, revised 4 Sep 2026. The first
+            version of this line was "Money held until the work is proven",
+            which was true of a short job on manual card capture and not true
+            of a long job invoiced, where nothing is held by anyone. It was
+            replaced with "Nobody is paid until you approve the evidence",
+            which fixed the holding claim and introduced a worse one: under
+            the principal contractor model the client does not contract with
+            the tradesperson, so they have no power to release that person's
+            pay, and telling them they do contradicts docs/terms.html.
 
             This wording is true on both: on a card hold nothing is captured
             until the client approves, on an invoice nothing is raised until
@@ -200,8 +202,15 @@ export default async function Board({
             whether or not a client in London has replied. The gate is not
             removed, it is pointed at the right party. The same sentence
             changed on yaadly.co.uk in the same commit, so the two halves of
-            the site still say the same thing. */}
-        <b className="font-semibold text-ink">Nothing is signed off until you have seen the evidence.</b>
+            the site still say the same thing.
+
+            Extended 4 Sep 2026, merging the copy audit branch. The 3 Sep
+            sentence was right about what the client's click does NOT do and
+            silent on who the client is buying from, which is the half a
+            visitor landing straight on the job board has no other way to
+            learn. Both halves now sit in one sentence. docs/COPY-GUIDELINES.md
+            section 3 is the source of truth for it across docs/ and web/. */}
+        <b className="font-semibold text-ink">You buy the job from Yaadly, and nothing is signed off until you have seen the evidence.</b>
       </p>
       <p className="mt-2.5 flex items-center gap-2 font-mono-app text-[11px] font-medium tracking-[0.06em] text-dim">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-gold stroke-2" strokeLinecap="round" strokeLinejoin="round">
@@ -230,7 +239,7 @@ export default async function Board({
       <div className="mt-5 flex flex-wrap gap-6">
         {[
           [jobs.length, "jobs open now"],
-          [workers.length, "verified workers"],
+          [workers.length, "identity checked workers"],
         ].map(([value, label]) => (
           <span key={label as string} className="flex items-baseline gap-2 font-mono-app text-[11px] font-medium uppercase tracking-[0.08em] text-dim">
             <b className="bg-linear-to-r from-purpleb via-purple to-gold bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent tabular-nums">
@@ -446,7 +455,7 @@ export default async function Board({
 
                     {open && vmode !== "worker" && (
                       <div className="mt-3.5 rounded-xl border border-gold/25 bg-gold/[0.05] p-4 text-[13px] leading-relaxed text-mute">
-                        <b className="font-semibold text-goldb">Quoting is for vetted workers.</b>{" "}
+                        <b className="font-semibold text-goldb">Quoting is for approved workers.</b>{" "}
                         A published worker profile, a signed Worker Guidelines, and
                         a job that is genuinely open: all three are checked in the
                         database before a quote can exist. Browsing stays free for

@@ -50,7 +50,7 @@ const BENEFITS: { h: string; p: string }[] = [
   },
   {
     h: "Paid per stage",
-    p: "Not one lump at the end. A stage signed off is a stage paid, once the client approves the evidence.",
+    p: "Not one lump at the end. A stage signed off is a stage paid. You are Yaadly's subcontractor, so Yaadly pays you, not the client.",
   },
   {
     h: "A record you own",

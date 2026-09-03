@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Ask Yaadly, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
- * asks, vetted workers answer publicly. Questions publish after a human
+ * asks, identity checked workers answer publicly. Questions publish after a human
  * look, which is a deliberate moderation gate on an open text box on a
  * public website; the answering bar is the same one quoting uses.
  *
@@ -81,7 +81,7 @@ export default async function Ask() {
         <p className="mt-2.5 max-w-[62ch] rounded-xl border border-line bg-panel px-4 py-3 text-[13px] leading-relaxed text-mute">
           <b className="text-ink">Two ways to ask, and this is the public one.</b>{" "}
           Your question and its answers stay on this page where anyone can read
-          them, and it is vetted workers who answer. No name, no email and no
+          them, and it is identity checked workers who answer. No name, no email and no
           phone number is asked for, so leave those out of your question too.
           For anything about your own property, your own money or your own
           address, use the chat tab on the right instead. That one is private

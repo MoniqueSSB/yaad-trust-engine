@@ -1796,3 +1796,31 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **Take it down** removes it from the public page again, along with any answers under it, because an answer is only public while its question is. The row stays for you.
 
 **To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
+
+---
+
+## Changing anything a customer reads about money, checks or prices
+
+`docs/COPY-GUIDELINES.md` is the source of truth for customer facing wording, across both the marketing site and the app. Read it before writing page copy, and change it first if the underlying fact has changed. See DECISIONS.md, "Two lanes, named" (4 Sep 2026), for why it exists.
+
+**Say which lane it is, before you say anything about money.** A **managed job**: the client buys the job from Yaadly, and Yaadly engages and pays the tradesperson as its subcontractor. **Oversight only**: the contractor stays the client's, the client pays them directly, Yaadly holds none of that money and invoices only its own fee. Almost every contradiction the September audit found came from a page reaching for the wrong one.
+
+**Never write that the client releases, approves or triggers a payment.** They accept the work. Yaadly then pays its own subcontractor, and a named person at Yaadly makes that call. Both halves, every time. The forbidden phrasings are listed in COPY-GUIDELINES section 3, and the reason is legal rather than stylistic: `docs/terms.html` says the client does not contract with the tradesperson, so a client cannot release that person's pay.
+
+**A price appears in more places than you think.** Changing one means changing all of these in the same commit, or the site starts contradicting itself and, where a founding rate is involved, breaks the Digital Markets, Competition and Consumers Act 2024:
+
+1. `docs/services.html`, the card price and the `price-alt` line under it
+2. the `wa.me` prefill message on that same card, which quotes the price in the text
+3. `docs/faq.html`, the "What does it cost?" answer
+4. `docs/index.html`, the owner door, for the two services listed there
+5. `docs/prices.html`, the "What Yaadly charges" table, for fees rather than service prices
+6. `web/lib/.../price-figures.ts`, the exact-figure allowlist that governs what the assistant may say
+7. `service_catalogue` in the database
+
+**A founding rate must be a real reduction.** Never publish one equal to the standard rate. Where there is no discount, write "Fixed fee, the same rate for everyone".
+
+**Never claim a check the database does not enforce.** `trg_profile_publish_checks` is the gate: a Persona identity check approved or completed, a TRN approved, and an email. That is what "nobody is listed before" may claim. The three-referees rule (any job over £500, any occupied home, any job holding keys) is real policy but is operational, not enforced by the trigger, so it is written as policy. If you find copy claiming a video call or that references are called for everyone, it is wrong: that exact wording was live until 4 September 2026.
+
+**One reply promise, site wide:** a person replies within one working day. Not "same day", not "any time", not "day or night", not "24 hours".
+
+**After changing copy on the app side**, run `npm --prefix web run typecheck`, `npm --prefix web test` and `npm --prefix web run lint`. Several tests assert on visible strings.
