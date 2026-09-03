@@ -1,4 +1,5 @@
 import { amount } from "@/lib/money";
+import { whenDate } from "@/lib/date";
 
 /**
  * What this job costs, what has been invoiced, and the rules that govern
@@ -205,7 +206,7 @@ export function MoneyPanel({
                     <div className="mt-1 text-[12px] leading-relaxed text-dim">
                       <span className="font-mono-app">{inv.id}</span>
                       {inv.issue_date ? " · issued " + inv.issue_date : ""}
-                      {inv.paid_at ? " · paid " + String(inv.paid_at).slice(0, 10) : ""}
+                      {inv.paid_at ? " · paid " + (whenDate(inv.paid_at) ?? inv.paid_at) : ""}
                       {inv.period_label ? " · " + inv.period_label : ""}
                     </div>
                   </div>

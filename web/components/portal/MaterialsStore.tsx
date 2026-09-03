@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { nominateMaterialsStore } from "@/app/portal/materials-actions";
+import { whenDate } from "@/lib/date";
 
 /**
  * The nominated materials store, PORTAL side of the 28 August 2026 rule.
@@ -73,7 +74,7 @@ export function MaterialsStore({
           )}
           <p className="mt-2 text-[12px] text-dim">
             {setBy ? "Named by " + setBy : "Named on this job"}
-            {setAt ? " on " + setAt.slice(0, 10) : ""}
+            {setAt ? " on " + (whenDate(setAt) ?? setAt) : ""}
           </p>
           <p className="mt-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
             {storeType === "none_available"

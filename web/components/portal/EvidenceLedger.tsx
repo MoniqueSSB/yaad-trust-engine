@@ -21,6 +21,7 @@
 
 import Link from "next/link";
 import { EvidenceItemComment } from "./EvidenceItemComment";
+import { whenDateTime } from "@/lib/date";
 
 export type EvidenceItem = {
   id: string;
@@ -35,7 +36,7 @@ export type EvidenceItem = {
 type StageState = "done" | "now" | "todo";
 
 function stamp(iso: string | null) {
-  return iso ? new Date(iso).toISOString().slice(0, 16).replace("T", " ") : "";
+  return whenDateTime(iso) ?? "";
 }
 
 export function EvidenceLedger({
