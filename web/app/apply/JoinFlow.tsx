@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TRADES, PARISHES } from "@/lib/taxonomy";
+import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 
 /**
  * Join as a pro.
@@ -336,6 +336,20 @@ async function call(body: Record<string, unknown>): Promise<Record<string, unkno
 
 export function JoinFlow() {
   const [step, setStep] = useState(0);
+  /* The step heading, so advancing can move focus to it. Without this a screen
+     reader user pressed Continue and heard nothing at all: focus stayed on a
+     button that had just been replaced, the page swapped underneath, and the
+     only signal that anything happened was visual. On the longest flow in the
+     product, where somebody is being asked for a passport. */
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const firstRender = useRef(true);
+
+  useEffect(() => {
+    /* Not on arrival: stealing focus on first paint moves a keyboard user off
+       the top of a page they have not read yet. Only on a real step change. */
+    if (firstRender.current) { firstRender.current = false; return; }
+    headingRef.current?.focus();
+  }, [step]);
 
   // Step 1
   const [trades, setTrades] = useState<string[]>([]);
@@ -1221,7 +1235,14 @@ export function JoinFlow() {
             {/* Scoped to this sitting, never across both. See Progress below
                 for why that boundary matters. */}
             <Progress n={at} total={STEPS.length} name={d.n} />
-            <h2 className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none">
+            {/* tabIndex -1 so it can be focused programmatically without
+                becoming a tab stop. The outline is left visible: somebody who
+                has just been moved here should be able to see where they are. */}
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none focus:outline-none"
+            >
               {shown.h}
             </h2>
             <p
@@ -1271,13 +1292,14 @@ export function JoinFlow() {
                       {parishes.length > 0 ? `${parishes.length} selected` : "Required, pick at least one"}
                     </span>
                   </label>
-                  {/* The launch area, in one tap. Kingston and Portmore is
-                      always written together, and Portmore is in St Catherine,
-                      so the pick is the two parishes that cover it. It adds to
-                      what is already ticked rather than replacing it. */}
+                  {/* The launch area, in one tap. The three parishes and the
+                      reasoning now live in lib/taxonomy as LAUNCH_PARISHES, so
+                      this button and the client funnel cannot disagree about
+                      where the business operates. It adds to what is already
+                      ticked rather than replacing it. */}
                   <div className="jquick">
                     <button type="button"
-                      onClick={() => setParishes(Array.from(new Set([...parishes, "Kingston", "St Andrew", "St Catherine"])))}>
+                      onClick={() => setParishes(Array.from(new Set([...parishes, ...LAUNCH_PARISHES])))}>
                       + Kingston and Portmore
                     </button>
                     <button type="button" onClick={() => setParishes([...PARISHES])}>
