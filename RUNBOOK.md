@@ -1234,3 +1234,24 @@ So the client is invoiced to pay him 100% of labour, and he is shown 88%. **Ther
 2. **Stay agent until that gate lifts.** The client keeps paying the worker directly at 100%, and Yaadly bills the worker separately for the 12%. That is legitimate (an invoice for a service rendered to him, not his money passing through Yaadly), but it means chasing a man in Portmore for 12% after he has already been paid in full, with no leverage left. It is the weakest collection position available and it is why option 1 is the recommendation.
 
 Whichever is chosen, the two display components and the desk label at `concierge/concierge.html` (the "Worker 12%, keeps 88%" row) must change in the same commit as the invoicing, or the contradiction just moves.
+
+## The stage worker-pay function is still on the old shape
+
+`raise_job_stage_worker_pay_invoice(p_job, p_stage)` was **not** converted when the whole-job pair moved to the principal structure on 3 September 2026 (`20260903a`). It still computes the old shape: the worker's full labour apportioned by stage, billed to the client, described as "pay them directly".
+
+Until it is converted, do not use it on a job that has been invoiced with `raise_job_client_invoice()`, or the client will be billed twice for the same labour: once inside their all-in invoice and again on the stage document.
+
+Converting it means the same two changes the whole-job version got, plus one more:
+
+1. The amount becomes the stage's share of labour **less 12%**, plus whatever materials rule the existing function applies.
+2. `client_email` becomes the `payable@yaadly.invalid` sentinel and `client_name` becomes Yaadly, so the client cannot read Yaadly's cost base through `invoices_client_read`.
+3. Its stage apportionment reads `kickoff_packs.docs -> payment_schedule -> stages` and falls back to `quote_pack_drafts.docs -> payment_stages`. Read both before touching it. That fallback is the part most likely to be got wrong in a hurry, which is why it was left rather than rewritten in passing.
+
+Check for the old function and its callers with:
+
+```bash
+grep -rn "raise_job_stage_worker_pay_invoice\|raise_job_agency_fee_invoice\|raise_job_worker_pay_invoice" \
+  --include=*.sql --include=*.html --include=*.ts --include=*.tsx . | grep -v node_modules
+```
+
+The first two names should appear only in migration files as history. Any live caller in `concierge/`, `web/` or `supabase/functions/` is a bug.
