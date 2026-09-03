@@ -1403,3 +1403,80 @@ select count(*) from public_worker_profiles; -- must return the active worker co
 **What still needs `worker_email` on the base table, and stays working.** `web/app/portal/(gated)/worker/page.tsx` reads its own `phone` by `worker_user = auth.uid()`. `web/app/jobs/actions.ts` reads its own `name` by `worker_email`, matched against the signed-in user's own email. Both are covered by the new `wp_select_own_or_admin` policy; if either starts failing, check that policy exists and that its two OR-branches still match what those two call sites actually filter on.
 
 **The admin desk is unaffected.** `worker_checks`/`portfolio` keep their pre-existing `admin full ...` ALL-command policies, and `is_admin()` is part of the new `worker_profiles` SELECT policy, so `concierge.html` continues to see full worker rows including phone and email.
+
+---
+
+---
+
+## A tradesperson says they lost their place in the application, or cannot get back to the ID check
+
+`/apply` saves as they type, into `localStorage` under the key `yaadly.application.v1`, on the browser they were using. That is the whole mechanism: no account exists yet, so there is nowhere else to keep it.
+
+What is saved: the application id and upload token (the claim), every document already accepted, a recorded Persona check, the whole form including the three referees and the signature, which screen they were on, which of the two sittings they were in, and the reference once Phase 1 has been sent.
+
+1. **Same phone, same browser, not private mode:** send them back to `https://app.yaadly.co.uk/apply`. It reopens where they left off. If Phase 1 was already sent it reopens on the sent screen, which carries the "Carry on to the ID check" button.
+2. **Different phone, or they cleared their browser, or they were in private mode:** there is nothing to restore, and nothing is lost at the desk either. Their application is already in `applications` under its `APP-` reference and every document they sent is on file. Do **not** ask them to apply again, it makes a second row for the same person. Chase the remaining Phase 2 items on WhatsApp instead, which is the intended route anyway.
+3. **They want to wipe what is on the phone,** for instance it is a borrowed handset: the line under the heading carries "Start again, and clear what is saved here". It removes the key and reloads. It does not delete anything at the desk.
+
+**To read what a phone is holding,** in the browser's own console on that device:
+
+```js
+JSON.parse(localStorage.getItem("yaadly.application.v1"))
+```
+
+`sentRef` present means Phase 1 was submitted. `continuing: true` means they were in the second sitting. `step` is an index into that sitting, and an out-of-range value is clamped to the last screen rather than blanking the page.
+
+Note that the upload token stays on the phone until the second sitting is finished or "Start again" is pressed. Phase 2 uploads need it. If a handset is lost and the applicant is worried, the desk can invalidate it: change `upload_token` on their row in `applications` and their old browser copy stops working. They then finish over WhatsApp.
+
+---
+
+## The progress counter on /apply, and why it must never say "of 9"
+
+Phase 1 shows three dots, Phase 2 shows four, and the number comes from the length of the sitting being shown, not from a written constant.
+
+This is deliberate and it reverses nothing. The nine-item step rail was removed on 30 Aug 2026 because it was the first thing an applicant saw and a list of nine outstanding things is a reason to close the tab. A counter that spans both sittings is that rail again in smaller type. If a screen is added to a sitting the count follows on its own; if anybody proposes one counter across the whole check, the answer is no, and the reason is in `DECISIONS.md` under the 3 Sep 2026 entry.
+
+---
+
+## A photograph or an introduction video on /apply says "Could not record that document"
+
+The `doc_type` column on `vetting_documents` has a check constraint, and a value the constraint does not list fails at the insert **after** the file has already uploaded. The row shows that message, and the file sits orphaned in the bucket until the ninety day purge collects it.
+
+`intro_video` was in exactly this state from 31 Aug to 3 Sep 2026: accepted by the browser and by the edge function, refused by the database, every single time. `profile_photo` was added on 3 Sep. Both are in migration `20260903g`.
+
+**To see what the live constraint actually allows** (the migration history is not the schema, which is how the above went unnoticed):
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'public.vetting_documents'::regclass
+  and conname = 'vetting_documents_doc_type_check';
+```
+
+Adding a new document type takes **four** changes, and missing any one of them fails in a different place:
+
+1. The constraint above, by migration. Miss it and the insert fails after a successful upload.
+2. `DOC_TYPES` in `supabase/functions/yaad-vetting-upload`. Miss it and you get "Unknown document type" before anything uploads.
+3. `DocType` in `web/app/apply/JoinFlow.tsx`, and a row to upload it.
+4. **If it shows a person's face,** `IDENTITY_DOCS` in `supabase/functions/yaad-vetting-review`, in the same change. Miss it and the face is sent to a model. Today that list holds the photo ID, the selfie, the face turn, the introduction video and the profile photograph.
+
+---
+
+## What did an applicant actually agree to about AI reading their paperwork
+
+The question is on `/apply`, on the Phase 1 work screen and again on the Phase 2 identity screen. One answer, whichever screen they use.
+
+```sql
+select app_id, name, ai_review_consent, ai_review_consent_version, ai_review_consent_at
+from public.applications
+order by created_at desc
+limit 20;
+```
+
+- `granted` means the proof of address, TRN, certificates, CV and portfolio were sent to NVIDIA's vision model to be read, and flags were written for the desk. The photo ID, selfie, face video and profile photograph were **not**, whatever they chose: `IDENTITY_DOCS` withholds those before the download.
+- `declined`, or NULL, means nothing left Yaadly and a person reads every page by hand. The reviewer refuses to run, and so does the automatic hand-off from submit.
+- `ai_review_consent_version` is the sentence they agreed to. `ai-review-v3` is current, from 3 Sep 2026. Never read an older version as agreement to a newer or broader one; each is narrower than the last, so an old yes covers what is done today, but the version is the record of what was actually asked.
+
+**If a run of applications all say `declined` and nobody chose that:** the browser has stopped sending the field. That happened between 30 Aug and 3 Sep 2026, when the consent UI was removed from the page and the submit stopped sending `aiReviewConsent`; the server reads a missing field as declined, correctly, so every application in that window records a refusal nobody gave and no review ever ran for them. Check that `JoinFlow.tsx` still sends `aiReviewConsent` and `aiReviewConsentVersion` in the `submit` call. Those applications can be reviewed by hand at the desk, or re-asked; do not back-fill a consent nobody was asked for.
+
+**To change the wording of the question:** bump `AI_CONSENT_VERSION` in `JoinFlow.tsx` in the same commit. That is CLAUDE.md §6 and it is not a formality. The whole value of the column is that somebody can later ask what a given yes said.
