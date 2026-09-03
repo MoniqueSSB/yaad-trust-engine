@@ -58,7 +58,7 @@ type QuotePackDraft = {
 
 export const metadata = {
   title: "The marketplace · Yaadly",
-  description: "Open property jobs across Jamaica and the verified workers who do them. Money held until the work is proven.",
+  description: "Open property jobs across Jamaica and the verified workers who do them. Nobody is paid until you approve the evidence.",
 };
 
 function ago(iso: string | null): string {
@@ -176,7 +176,20 @@ export default async function Board({
       </h1>
       <p className="mt-3.5 max-w-[62ch] text-[15.5px] leading-relaxed text-mute">
         Open property jobs across Jamaica and the verified workers who do them.{" "}
-        <b className="font-semibold text-ink">Money held until the work is proven.</b>
+        {/* Founder decision, 3 Sep 2026. "Money held until the work is
+            proven" was true of a short job on manual capture, where a card
+            authorisation is a real hold, and NOT true of a long job that goes
+            out as an invoice, where nothing is held by anyone. One sentence
+            covering both stopped being honest the moment both existed, and
+            which path a job takes is decided per job by the founder rather
+            than by a rule the reader could infer.
+
+            This wording is true on both: on a card hold nothing is captured
+            until the client approves, on an invoice nothing is raised until
+            they approve. It is also not a new claim, it is the sentence
+            already live on yaadly.co.uk, so the two halves of the site now
+            say the same thing. */}
+        <b className="font-semibold text-ink">Nobody is paid until you approve the evidence.</b>
       </p>
       <p className="mt-2.5 flex items-center gap-2 font-mono-app text-[11px] font-medium tracking-[0.06em] text-dim">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-gold stroke-2" strokeLinecap="round" strokeLinejoin="round">
@@ -185,17 +198,32 @@ export default async function Board({
         No addresses. No phone numbers. No budgets shown. Ever.
       </p>
 
-      {/* The founder's call: keep the row, leave the figures blank until
-          there are real ones worth showing. The labels hold the shape so
-          nothing moves on the page when the numbers arrive. */}
+      {/* The numbers arrived, 3 Sep 2026.
+          
+          The row was built with the figures deliberately blank, the founder's
+          call: keep the shape, leave them until there are real ones worth
+          showing. What shipped rendered an em dash in each slot, and to a
+          first-time visitor three dashes under a trust claim read as a page
+          that failed to load rather than as a business being careful.
+
+          Two of the three were never waiting on anything. Both counts are
+          already computed above, off the same queries this page renders, so
+          they were honest and available the whole time.
+
+          The third is gone rather than filled. "Paid on proof" is not a count
+          of anything: there is no number behind it, and inventing one to fill
+          a slot is exactly what the blank was protecting against. The claim
+          itself is not lost, it is the headline three lines up, which is where
+          a claim belongs rather than dressed up as a statistic. */}
       <div className="mt-5 flex flex-wrap gap-6">
         {[
-          ["jobs open now", false],
-          ["verified workers", false],
-          ["paid on proof", true],
-        ].map(([label, gold]) => (
+          [jobs.length, "jobs open now"],
+          [workers.length, "verified workers"],
+        ].map(([value, label]) => (
           <span key={label as string} className="flex items-baseline gap-2 font-mono-app text-[11px] font-medium uppercase tracking-[0.08em] text-dim">
-            <b className={"bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent " + (gold ? "bg-linear-to-br from-goldb to-gold" : "bg-linear-to-r from-purpleb via-purple to-gold")}>&mdash;</b>
+            <b className="bg-linear-to-r from-purpleb via-purple to-gold bg-clip-text font-mono-app text-[24px] font-semibold tracking-normal text-transparent tabular-nums">
+              {value as number}
+            </b>
             {label}
           </span>
         ))}
@@ -216,7 +244,7 @@ export default async function Board({
             belongs here, next to the board, because that is exactly the
             moment somebody hesitates. */}
         <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
-          <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask a Yaad</Link>
+          <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask Yaadly</Link>
           <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
           <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
         </span>

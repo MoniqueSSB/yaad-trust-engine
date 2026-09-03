@@ -21,20 +21,42 @@ export const STAGES = [
   "Reviews",
 ] as const;
 
-export const STAGES_SVC = [
-  "Booked & paid",
-  "Intake",
-  "Scope agreed",
-  "Kickoff issued",
-  "M1 · working",
-  "M1 · evidence",
-  "M1 · released",
-  "M2 · working",
-  "M2 · evidence",
-  "M3 · handover",
-  "Closed & paid",
-  "Review",
+/**
+ * A professional service, six stages. Founder decision, 3 Sep 2026.
+ *
+ * There were two lists and one column. PORTAL-SPEC v1.0 specified the twelve
+ * below, which lived here; the service page carried its own six-stage TRACK
+ * with a sentence against each. Both were indexed by the SAME services.stage
+ * integer, and both were rendered ON THE SAME SCREEN: the heading and the step
+ * list read from the six, the progress rail and the "nearly done" check read
+ * from the twelve. A booking at stage 5 therefore announced "Delivered" at the
+ * top of the page and "M1 · evidence" on the rail beneath it. Two contradictory
+ * statements about how far along somebody's money was, on one page.
+ *
+ * The six won because it is the one a client has actually been reading, it is
+ * the one whose wording was written for them rather than for the spec, and
+ * every stage carries a sentence saying what it means. The twelve was a
+ * milestone breakdown that describes a job, not a piece of desk work.
+ *
+ * Safe to change on 3 Sep because `select stage, count(*) from services` came
+ * back empty: there is no live booking whose progress could be misreported by
+ * the renumbering. It would not have been safe a month from now.
+ *
+ * The detail sentences live here with the names, rather than beside them in a
+ * page, because splitting them is how the two lists came apart in the first
+ * place.
+ */
+export const SERVICE_TRACK = [
+  { name: "Booked and paid", detail: "Portal link and code sent the moment payment cleared" },
+  { name: "Intake", detail: "What is needed from you before the clock starts" },
+  { name: "Documents received", detail: "The 72 hour turnaround starts here, not at payment" },
+  { name: "Desk work", detail: "Checked against real material costs and day rates" },
+  { name: "Draft with you", detail: "You read it first. A wrong fact gets fixed before it is final" },
+  { name: "Delivered", detail: "PDF, signed, yours to keep" },
 ] as const;
+
+/** The rail's names only. Derived, never restated, so it cannot drift again. */
+export const STAGES_SVC = SERVICE_TRACK.map((s) => s.name);
 
 export type Side = "client" | "worker" | "service";
 

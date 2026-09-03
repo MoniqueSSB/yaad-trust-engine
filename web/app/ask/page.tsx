@@ -5,24 +5,29 @@ import { askQuestion } from "@/app/ask/actions";
 export const dynamic = "force-dynamic";
 
 /**
- * Ask a Yaad, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
+ * Ask Yaadly, MARKETPLACE-BUILD-SPEC section 8. Free public Q&A: a visitor
  * asks, vetted workers answer publicly. Questions publish after a human
  * look, which is a deliberate moderation gate on an open text box on a
  * public website; the answering bar is the same one quoting uses.
  *
- * Two things on this site are called some version of "ask", and until now
- * neither said which it was. "Ask a Yaad" is this page: public, answered by
- * workers, visible to everyone, slow. "Ask Yaadly" is the chat tab pinned to
- * the right edge of every page: private, answered by a person at Yaadly,
- * quick. A visitor could not tell them apart from their names, so the page
- * now says the difference in a sentence rather than relying on the reader to
- * work it out. Renaming either one is the founder's call, not this file's.
+ * ONE NAME, TWO DOORS. Founder decision, 3 Sep 2026. This page was "Ask a
+ * Yaad" and the chat tab pinned to the right edge of every page was "Ask
+ * Yaadly": two products, near identical names, opposite privacy, and nothing
+ * anywhere saying which was which. The decision was not to invent a third
+ * name but to collapse to one, so there is a single thing a client asks and
+ * two ways to reach it.
+ *
+ * That puts the whole burden of the distinction on copy, which is why the
+ * paragraph under the heading is not decoration and should not be trimmed:
+ * this door is public, permanent and answered by workers; the chat is
+ * private, immediate and answered by a person. Somebody about to type their
+ * address into the wrong one has only that sentence to stop them.
  *
  * Reached from the job board's link row. It had no inbound link at all until
  * 3 Sep 2026.
  */
 
-export const metadata = { title: "Ask a Yaad · Yaadly" };
+export const metadata = { title: "Ask Yaadly · public Q&A" };
 
 /**
  * What came back from ask_question(), said in the reader's terms.
@@ -79,16 +84,17 @@ export default async function Ask({
     <>
       <SiteNav active="market" />
       <div className="mx-auto max-w-[1080px] px-5 py-10">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask a Yaad &middot; public Q&amp;A</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask Yaadly &middot; public Q&amp;A</p>
         <h1 className="mt-2 font-display text-[clamp(28px,4.5vw,42px)] uppercase leading-none">Ask before you post</h1>
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
           Not sure it&apos;s a job at all? Ask first, vetted workers answer publicly.
         </p>
         <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-relaxed text-dim">
-          This is the public board, so your question and its answers can be read
-          by anyone. If it is about your own property or your own money, use
-          Ask Yaadly, the chat tab on the right, and a person replies to you
-          privately.
+          Two ways to ask, and this is the public one: your question and its
+          answers stay on this page where anyone can read them, and it is
+          vetted workers who answer. For anything about your own property,
+          your own money or your own address, use the chat tab on the right
+          instead. That one is private and a person replies to you.
         </p>
 
         <form action={askQuestion} className="mt-6 rounded-2xl border border-line bg-panel p-5">
