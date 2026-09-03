@@ -380,3 +380,10 @@ table.ptable tbody tr:hover{background:var(--panel2)}
 .sect.light details.fq summary::after{color:var(--l-grad-teal)}
 .sect.light details.fq .ans{color:var(--l-mute)}
 .sect.light details.fq .ans b{color:var(--l-ink)}
+
+/* Legal pages (privacy, cancellation, terms). The global reset at the top of
+   this file zeroes list padding, so a plain <ul> loses its bullets entirely.
+   These pages are reading matter, not marketing, so the list gets its
+   indent and markers back explicitly rather than being restyled. */
+ul.lgl{list-style:disc;padding-left:20px;margin-top:10px;display:flex;flex-direction:column;gap:7px}
+ul.lgl li{padding-left:3px}

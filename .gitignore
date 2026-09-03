@@ -41,3 +41,7 @@ supabase/.temp/
 # one too, and a repo-wide rule means the next folder with a package.json is
 # covered before anybody runs install in it.
 node_modules/
+
+# Created payment link URLs. Public and safe to share, but they belong in
+# Stripe and on the site, not in git history.
+scripts/payment-links.out.json

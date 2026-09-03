@@ -1572,3 +1572,188 @@ curl -s -o /dev/null -w "%{http_code}\n" https://app.yaadly.co.uk/workers/does-n
 ```
 
 404 is right, 200 is the bug. To confirm the cause, move the route's `loading.tsx` aside and curl again: if it becomes 404, that is it. The fix is to resolve the record in `generateMetadata`, which runs before the shell is flushed, and call `notFound()` there; keep the one in the page as the backstop.
+## The legal pages, and the placeholders that are still in them
+
+`docs/privacy.html`, `docs/cancellation.html` and `docs/terms.html` went up on 3 September 2026 with their open questions marked on the page rather than filled with guesses. Every gap is in a visible amber box or a square-bracketed `[TO BE INSERTED...]`, so to find all of them at once:
+
+```bash
+grep -rn "TO BE INSERTED\|gapcard" docs/privacy.html docs/cancellation.html docs/terms.html
+```
+
+What each one is waiting on:
+
+1. **Registered office address** (privacy, cancellation, and every page footer). Blocked on a registered office service address, which the founder decided on 3 September 2026 to take rather than publish her home address. It must be an "appropriate address" under the rules in force since 4 March 2024, meaning post reaches someone acting for the company and delivery can be acknowledged, so a PO Box does not qualify. Roughly £30 to £50 a year. Then file an AD01 within 14 days, and change the director's correspondence address at the same time.
+
+   Until it is filed the site carries no address at all, which leaves the Regulation 25 disclosure (part of the UK, registered number, registered office address) unmet on the third element. That is a known and accepted gap, chosen over republishing a home address on all eleven pages of a site fed by a 9,000 follower TikTok. It was briefly published on 3 September and reverted the same evening when the founder chose the service address instead; nothing reached `main`, so it was never live.
+
+   When the address exists, it goes in three places: the footer of all eleven pages in `docs/`, the "who we are" table in `docs/privacy.html`, and the postal route in `docs/cancellation.html`. Find them all with:
+
+```bash
+grep -rn "TO BE INSERTED\|no. 17358077" docs/*.html
+```
+
+   Honest limit worth knowing before you spend the money: a home address used as a registered office cannot be removed from the Companies House register. Filing the change protects the record going forward and historic filings stay visible. Suppressing it from other documents is a separate application at £32 per document, and a serving director has to supply an alternative address to replace it.
+
+2. **ICO registration number** (privacy). Register at ico.org.uk, around £52, then paste the number in.
+3. **Retention periods** (privacy). Legal decision, not a technical one. Identity document retention especially. Do not invent a number to close the box.
+4. **The model cancellation form and the statutory instructions** (cancellation). The text is substantially prescribed by Schedules 3 and 4 of the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. Take it from legislation.gov.uk verbatim and adapt only the company details. Note that legislation.gov.uk is blocked by the remote session's egress proxy, so this one has to be fetched from a normal browser and pasted in. Do not write it from memory.
+5. **Whether United States and Canada clients get the same cancellation rights, and whose law governs** (cancellation, terms). Genuinely open, with the adviser. In the meantime the site applies the 14 day right to every consumer client, wherever they are, as Yaadly's own commitment.
+6. **Liability, the workmanship guarantee and its length, governing law** (terms). With the adviser. The guarantee in particular is not to be promised before it is insured.
+
+Two rules that hold when editing these pages. The consent and provider facts on the privacy page mirror what the code actually does, so if `supabase/functions/_shared/textmodel.ts` moves off MiniMax, or a provider is added anywhere, the provider table and the "two things we will not soften" box change in the same commit or the page is lying. And the whole of `docs/` is subject to the language rules in CLAUDE.md §8: `guardrails.scan` does not read marketing copy, so nothing catches "escrow" or "held safely" on these pages except whoever is writing. Sweep before pushing:
+
+```bash
+grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|removes all fraud|fully covered" docs/*.html
+grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
+```
+
+## Creating the Stripe payment links
+
+There is a script: `scripts/create-payment-links.mjs`, with its prices in `scripts/payment-links.json`. Read the JSON before you run anything, because it is the list of amounts Stripe will actually charge.
+
+```bash
+export STRIPE_SECRET_KEY=sk_live_...          # your own terminal, never a chat session
+node scripts/create-payment-links.mjs          # dry run, creates nothing
+node scripts/create-payment-links.mjs --live   # actually creates them
+```
+
+The URLs land in `scripts/payment-links.out.json` (gitignored). Those are `https://buy.stripe.com/...` addresses: public, safe to paste anywhere, and the thing a session needs in order to wire them to buttons. The secret key is not in that file and must not leave your terminal.
+
+**Why a script and not the Dashboard.** The Dashboard link builder charges the card the moment the client pays and has no hold option. A hold needs `payment_intent_data[capture_method]=manual`, which is API only. Every one-off service on the menu is under £500, and at or under £500 is a hold under the 3 September rule, so the Dashboard is the wrong tool for the entire menu. The hold is what makes "your card is not charged until you approve the work" true, and that sentence is live on three pages.
+
+**Three guards, all tested.** The script refuses to run without a key, refuses a string that is not shaped like a Stripe secret key, and refuses any one-off priced at or above £500 because that is an invoice, not a link. It dry-runs by default even with a live key.
+
+**Re-running is safe.** Every object is created under an idempotency key derived from the service id and its price, so a second run returns the same link instead of a duplicate. Change a price and you get a new link, which is correct: a Payment Link's amount cannot be edited after creation, it has to be replaced and the old one deactivated in the Dashboard.
+
+**A hold is not money in the bank.** A card authorisation lasts seven days on every brand, with no request to Stripe and no special pricing. If nobody captures it in that window it expires and you have to ask the client again. Capturing is a named person's decision on the evidence, never a timer, so the seven days is an operational commitment: work delivered inside seven days can be a hold, anything slower cannot.
+
+**Before running it live, one thing is unresolved.** `docs/services.html` and `public.service_catalogue` disagree on prices. Property Care is the serious one: the site shows £75, £135 and £175, the catalogue holds £45, £70 and £95. Oversight Retainer and Condition Report differ too, and the express tiers and Project Setup Pack exist on only one side. The JSON follows the site, because that is what a client has been shown, and the `_UNRESOLVED` key in it records the conflict. Settling it is a pricing decision and therefore the founder's. Fix both sides in the same change, or the invoice and the payment link will take different amounts for the same job.
+
+## The older note on choosing between Dashboard and API links
+
+Not done, and it cannot be done from a chat session: creating a link needs the Stripe account, and a secret key must never be pasted into one. The founder creates each link in Stripe, hands over the URLs, and a session wires them to the buttons.
+
+Decide this per service before creating any of them, because it cannot be changed on a link afterwards:
+
+- **A Dashboard link** charges the card immediately. Five minutes, no code. It costs the line "your card is not charged until you approve the work", which is a real loss.
+- **An API-created link with `payment_intent_data.capture_method` set to `manual`** holds the card instead of charging it, keeping that line. One API call per link, created once and reused. The Dashboard link builder cannot do this; only the API can.
+
+The recommendation on file is manual capture via the API for the six fixed-price services, because the hold is the differentiator and the links are reusable. Dashboard links are the answer only if money needs to move this week.
+
+The rule underneath the table: work delivered inside seven days is a hold, because a card authorisation lasts seven days on every brand with no request to Stripe. Recurring is a subscription. Long or staged work is a deposit plus stages. Variable trade jobs get invoices, never links, because a link carries a fixed amount and a trade job prices differently every time.
+
+One thing left unresolved for the founder: short jobs paid by hold produce no invoice, and the invoice was the evidence of the principal structure, each one saying the client bought the job from Yaadly. Either raise one separately for the record, or decide the Quote Pack plus a written confirmation carries it. Something has to go out either way, because a written confirmation on a durable medium is required by the distance selling rules.
+
+## Which jobs get an invoice and which get a card hold
+
+Founder's rule, 3 September 2026: **above £500 the job is invoiced. At or under £500 the card is authorised at booking and captured when the client approves the work.** The price of the job picks the instrument. Everything else about the terms, the stages and what each covers, is still agreed in writing per job.
+
+The rule is stated in three places and they must not drift apart: `docs/terms.html` (payment section), `docs/payments.html` (paying for a report or a retainer), and `docs/services.html` (the payment note under the service list). Change one, change all three.
+
+Two things to keep true while you edit them:
+
+1. **The card half is not switched on yet.** No Stripe links exist (see the payment links entry above), so today every job is invoiced whatever its size. All three pages say so. Delete that sentence only when the links are actually live, and not before.
+2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job. That is why the sentence is scoped to "at or under £500" everywhere it appears. Sweep it with:
+
+```bash
+grep -rn "not charged until\|authorised at booking" docs/*.html
+```
+
+This also part-answers the open question about the invoice being the evidence of the principal structure. Above £500 there is always an invoice saying the client bought the job from Yaadly Ltd. At or under £500 there is not, so the written confirmation that goes out at booking has to carry it, and it has to go out anyway to satisfy the durable-medium requirement in the distance selling rules.
+
+## The worker's 12% is displayed but never collected, and the two sides contradict
+
+Found 3 September 2026 while answering "how do I take my fees from the worker". **Needs a founder ruling before any code moves.** Nothing has been changed except the description on `docs/payments.html`.
+
+**What the two sides are currently told, on the same job:**
+
+| Side | What it says | Where |
+|---|---|---|
+| The worker | Your labour price, less Yaadly's 12%, "You receive" 88% | `web/components/QuotePanel.tsx`, `web/components/portal/FeeBreakdown.tsx` |
+| The client | Pay the tradesperson their labour price plus materials, **"no fee added"** | `raise_job_worker_pay_invoice()` in `20260902i`, which totals `labour_jmd + materials_jmd` |
+
+So the client is invoiced to pay him 100% of labour, and he is shown 88%. **There is no mechanism anywhere that collects the 12%**: no invoice type, no `payable_to` value, no function. The number is decorative. Searching for it finds only the two display components above and a label in the desk.
+
+**Why it cannot be fixed by editing the labels.** Under today's live model the client pays the worker directly and Yaadly never touches that money, so "Yaadly pays you 88%" would be false. The display and the invoicing are one decision, not two.
+
+**The two ways out.**
+
+1. **Principal, which the founder chose on 3 September.** One all-in invoice from Yaadly to the client (labour plus the 15%). Yaadly pays the worker labour less 12%. The 12% is never collected because it is never paid out, and Yaadly's margin on a job becomes 27% of labour. This deletes `raise_job_worker_pay_invoice()` as a client-facing document and turns it into a record of what Yaadly owes the worker. It also means Yaadly receives the whole job payment, which is exactly what `docs/payments.html` promises will not happen until legal sign-off and insurance are in hand, so it is gated on that, not on the code.
+
+2. **Stay agent until that gate lifts.** The client keeps paying the worker directly at 100%, and Yaadly bills the worker separately for the 12%. That is legitimate (an invoice for a service rendered to him, not his money passing through Yaadly), but it means chasing a man in Portmore for 12% after he has already been paid in full, with no leverage left. It is the weakest collection position available and it is why option 1 is the recommendation.
+
+Whichever is chosen, the two display components and the desk label at `concierge/concierge.html` (the "Worker 12%, keeps 88%" row) must change in the same commit as the invoicing, or the contradiction just moves.
+
+## The stage worker-pay function is still on the old shape
+
+`raise_job_stage_worker_pay_invoice(p_job, p_stage)` was **not** converted when the whole-job pair moved to the principal structure on 3 September 2026 (`20260903a`). It still computes the old shape: the worker's full labour apportioned by stage, billed to the client, described as "pay them directly".
+
+Until it is converted, do not use it on a job that has been invoiced with `raise_job_client_invoice()`, or the client will be billed twice for the same labour: once inside their all-in invoice and again on the stage document.
+
+Converting it means the same two changes the whole-job version got, plus one more:
+
+1. The amount becomes the stage's share of labour **less 12%**, plus whatever materials rule the existing function applies.
+2. `client_email` becomes the `payable@yaadly.invalid` sentinel and `client_name` becomes Yaadly, so the client cannot read Yaadly's cost base through `invoices_client_read`.
+3. Its stage apportionment reads `kickoff_packs.docs -> payment_schedule -> stages` and falls back to `quote_pack_drafts.docs -> payment_stages`. Read both before touching it. That fallback is the part most likely to be got wrong in a hurry, which is why it was left rather than rewritten in passing.
+
+Check for the old function and its callers with:
+
+```bash
+grep -rn "raise_job_stage_worker_pay_invoice\|raise_job_agency_fee_invoice\|raise_job_worker_pay_invoice" \
+  --include=*.sql --include=*.html --include=*.ts --include=*.tsx . | grep -v node_modules
+```
+
+The first two names should appear only in migration files as history. Any live caller in `concierge/`, `web/` or `supabase/functions/` is a bug.
+
+## Payment as principal is switched on, and what still is not
+
+Founder's instruction, 3 September 2026: legal sign-off and insurance are in hand, move forward with payment. The client now buys the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson. The "not switched on yet" and "pay your tradesperson directly" statements are gone from `docs/payments.html`, `docs/marketplace.html`, `docs/faq.html` (both the visible answer and the structured data), `supabase/functions/yaad-inbound/faq.ts` and `supabase/functions/yaad-notify-client/index.ts`.
+
+**The claim on the site is deliberately hers, and it is narrower than a guarantee.** It says Yaadly reviews the works and makes sure issues are handled. It does not say Yaadly guarantees the work, and it does not state a workmanship guarantee period, because no length has been set and none should be promised before it is insured for that length. The placeholder box on `docs/terms.html` stays until she sets one.
+
+**Two things this did not switch on.**
+
+1. **Card payment.** No Stripe links exist yet, so every job is still invoiced and paid by bank transfer. `docs/terms.html`, `docs/payments.html` and `docs/services.html` all still say so, correctly. That sentence comes out when the links are created, not before.
+2. **CLAUDE.md section 9** still lists "payment integration of any kind, before the legal review lands" as deliberately not being built. That is now stale. **Monique owns that file and a session must not rewrite it**, so it needs her edit, not ours.
+
+**Redeploy after any change to the assistant's facts.** `faq.ts` and `price-figures.ts` live in `yaad-inbound`, not `_shared`, so `sync-shared.sh` does not copy them. Deploy from disk:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf
+```
+
+Check the live `verify_jwt` setting with `supabase functions list` first and preserve it: `yaad-inbound` carries its own authentication and takes the flag, `yaad-notify-client` does not.
+
+## The figure guard and the published prices move together
+
+`supabase/functions/yaad-inbound/price-figures.ts` holds `PUBLISHED_POUNDS`, an exact list of every pound figure the assistant is allowed to say. Any figure not on it gets the whole sentence cut before the reply is sent.
+
+This bit us on 3 September 2026: the catalogue price alignment changed the published prices without touching the list, so the assistant would have had "Condition Report from £249" and "Property Care from £45" silently stripped, leaving clients with no price at all. The file's own comment says to update it in the same commit as `faq.ts`. Do that.
+
+The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. Whenever a price on `docs/services.html` changes, this list and `faq.ts` change in the same commit, and `service_catalogue` is the source of truth for all three.
+
+Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
+
+## Pasting the Stripe payment links in
+
+The site is wired and waiting. One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
+
+```js
+const PAYMENT_LINKS = {
+  deposit:   "https://buy.stripe.com/...",
+  visual:    "",
+  condition: "",
+  signoff:   "",
+  care:      "",
+  retainer:  ""
+};
+```
+
+Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads exactly as it does today, so there is never a dead button or a half wired payment. The keys are the booking form's own service values, not the catalogue ids.
+
+**Why the pay link is after the booking and not on the service card.** The card buttons are already claimed by the page's own script, which routes them into the booking form. That form is where the client's name, contact and property go on record, where the reference is minted, and where the cancellation information has to reach them. A card button pointing straight at Stripe would skip all of it, and a client would have paid before Yaadly knew who they were or had given them their 14 day cancellation notice. So the link appears on the confirmation, once the booking exists.
+
+Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
+
+**Still missing before a link should go live:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker.

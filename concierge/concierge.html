@@ -560,7 +560,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ JOB INVOICES -->
 <section class="view" data-view="jobinv">
   <h1 class="vh">Job Invoices</h1>
-  <p class="vsub">One row per booked job. Raises Yaadly's own 15% Guarantee &amp; Support fee as a single invoice, due at the start of the job, 15% of the whole accepted quote's labour price: never the worker's own pay, which the client still pays the worker direct, per the payment terms agreed between them.</p>
+  <p class="vsub">One row per booked job. Raises the client's single all-in invoice: the labour price, Yaadly's 15% Guarantee &amp; Support fee, and materials at cost. The client buys the whole job from Yaadly and is never billed for the worker. What Yaadly owes the tradesperson, their quoted labour less the agreed 12% plus materials, is a separate payable raised once the job is complete.</p>
   <div id="jiMsg"></div>
   <div id="jiBody"><div class="empty"><b>Reading your booked jobs&hellip;</b></div></div>
 
@@ -2943,7 +2943,7 @@ async function loadMoney(){
     <div class="card">
       <div class="kv">
         <span class="k2">Client, Guarantee and Support</span><span class="v2">15% on labour</span>
-        <span class="k2">Worker</span><span class="v2">12%, keeps 88%</span>
+        <span class="k2">Worker</span><span class="v2">engaged at quote less 12%</span>
         <span class="k2">Blended</span><span class="v2">27%</span>
         <span class="k2">Materials</span><span class="v2">never fee'd</span>
         <span class="k2">Yaadly Remote, digital</span><span class="v2">10%</span>
@@ -3364,7 +3364,7 @@ async function loadJobInvoices(){
       btn.disabled = true;
       say("jiMsg", "ok", `Raising the agency fee on ${job}…`);
       try {
-        const { data, error } = await sb.rpc("raise_job_agency_fee_invoice", { p_job: job });
+        const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
         if (error) throw error;
         const row = (data || [])[0];
         if (!row) throw new Error("Raised nothing to send.");
@@ -3595,7 +3595,7 @@ async function loadAgencyFees(){
         btn.disabled = true;
         say("feesMsg", "ok", `Raising the agency fee on ${job}…`);
         try {
-          const { data, error } = await sb.rpc("raise_job_agency_fee_invoice", { p_job: job });
+          const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
           if (error) throw error;
           const row = (data || [])[0];
           if (!row) throw new Error("Raised nothing to send.");

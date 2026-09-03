@@ -65,25 +65,27 @@ export function FeeBreakdown({
   return (
     <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
       <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
-        What you keep
+        Your rate on this job
       </h2>
       <dl className="grid grid-cols-[1fr_auto] gap-y-2 text-[14px] tabular-nums">
-        <dt className="text-mute">Your labour price</dt>
+        <dt className="text-mute">Your quoted labour price</dt>
         <dd className="text-right text-mute">{jmd(labour)}</dd>
-        <dt className="text-mute">Yaadly fee, 12%</dt>
-        <dd className="text-right text-mute">&minus;{jmd(fee)}</dd>
+        <dt className="text-mute">Yaadly&rsquo;s margin, 12%</dt>
+        <dd className="text-right text-mute">{jmd(fee)}</dd>
         <dt className="text-mute">
           Materials{materialsAtCost ? ", at cost" : ""}
         </dt>
         <dd className="text-right text-mute">{jmd(mat)}</dd>
         <dt className="col-span-2 mt-1 h-px bg-line" />
-        <dt className="font-bold text-ink">You receive</dt>
+        <dt className="font-bold text-ink">Yaadly pays you</dt>
         <dd className="text-right font-bold text-tealb">
           {jmd(labour - fee + mat)}
         </dd>
       </dl>
       <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
-        You keep 88%. Nothing to join, nothing per quote, nothing per lead.
+        Yaadly engages you at your quoted price less 12%, agreed before you
+        accept and never changed afterwards. Materials are paid at cost with
+        nothing deducted. Nothing to join, nothing per quote, nothing per lead.
       </p>
     </section>
   );
