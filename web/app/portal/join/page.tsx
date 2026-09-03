@@ -159,6 +159,21 @@ function JoinForm() {
         }
       }
 
+      /* next=photos comes off the confirmation screen of /jobs/new, which
+         has just told somebody that photographs are the single thing that
+         turns a guess into a quote. Landing them in the portal and making
+         them find the job, find the board preview and press "Add a photo"
+         is three steps of hunting for the thing they came here to do. Only
+         this one value is honoured, and only alongside a job: everything
+         else, WhatsApp arrivals included, still lands on /portal exactly as
+         before. */
+      const next = params.get("next");
+      if (next === "photos" && job) {
+        router.replace(`/portal/jobs/${encodeURIComponent(job)}?photos=1`);
+        router.refresh();
+        return;
+      }
+
       router.replace("/portal");
       router.refresh();
     } catch (err) {

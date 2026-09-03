@@ -130,13 +130,16 @@ export default async function JobRoom({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cal?: string; d?: string; tab?: string }>;
+  searchParams: Promise<{ cal?: string; d?: string; tab?: string; photos?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
-  const { cal, d, tab: tabParam } = await searchParams;
+  const { cal, d, tab: tabParam, photos: photosParam } = await searchParams;
+  /* ?photos=1 opens the photo panel on arrival. Set by /portal/join when
+     somebody comes through the job form's confirmation link. */
+  const openPhotos = photosParam === "1";
   const supabase = await createClient();
 
   const { data: job } = await supabase
@@ -906,6 +909,7 @@ export default async function JobRoom({
               photos={bp}
               quotesIn={qs.length}
               canEditDescr={!job.worker_email}
+              openPhotos={openPhotos}
             />
           }
         />
@@ -921,6 +925,7 @@ export default async function JobRoom({
             photos={bp}
             quotesIn={qs.length}
             canEditDescr={!job.worker_email}
+            openPhotos={openPhotos}
           />
         </section>
       )}

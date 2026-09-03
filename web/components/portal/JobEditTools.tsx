@@ -20,14 +20,21 @@ export function JobEditTools({
   photos,
   quotesIn,
   canEditDescr,
+  openPhotos = false,
 }: {
   jobId: string;
   descr: string;
   photos: JobPhoto[];
   quotesIn: number;
   canEditDescr: boolean;
+  /** Start with the photo panel already open. Set from ?photos=1, which is
+   *  where the job form's confirmation screen sends somebody who has just
+   *  been told that a photograph is what turns a guess into a quote. Folded
+   *  away is right for a job somebody is browsing; it is wrong for somebody
+   *  who arrived holding four pictures of a roof. */
+  openPhotos?: boolean;
 }) {
-  const [open, setOpen] = useState<"none" | "descr" | "photos">("none");
+  const [open, setOpen] = useState<"none" | "descr" | "photos">(openPhotos ? "photos" : "none");
   const btn =
     "rounded-full border px-3 py-1.5 text-[11.5px] font-bold transition ";
   const on = "border-teal bg-teal/10 text-tealb";
