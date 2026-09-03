@@ -829,10 +829,9 @@ Deno.serve(async (req: Request) => {
       // moves. Saying "the worker is on site" here would be wrong now.
       line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
         `Labour ${money(q?.labour_jmd ?? 0)}, materials ${money(q?.materials_jmd ?? 0)} paid at cost against the receipt. ` +
-        `Yaadly is not holding this payment: pay the worker directly, per stage as you approve it, ` +
-        `within 3 working days, by bank transfer, Lynk wallet or remittance pick up, whichever you agree between you. ` +
-        `Before any of that starts, Yaadly's own Guarantee & Support fee invoice is on its way separately. ` +
-        `The job only goes live once that is paid. ${roomLink}`;
+        `You pay Yaadly, not the worker: Yaadly engages and pays them. ` +
+        `Your invoice for the job is on its way separately, one price covering the work, materials at cost and Yaadly's Guarantee & Support fee. ` +
+        `The job goes live once that is paid, and each stage is released only when you approve the evidence. ${roomLink}`;
     } else if (kind === "quote_awaiting_worker_confirm") {
       // Fires once, the moment the worker's own quote lands (job_quotes
       // AFTER INSERT WHEN status = 'submitted'). Writing the quote is not

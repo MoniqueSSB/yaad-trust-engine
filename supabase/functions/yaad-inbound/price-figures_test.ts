@@ -10,7 +10,7 @@ import { FAQ_FACTS } from "./faq.ts";
 import { scan } from "./guardrails.ts";
 
 Deno.test("published service prices pass word for word", () => {
-  const r = priceFigureGuard("A Deposit Protection Check is from £149 and a Condition Report from £245. Full Project Management is 12 to 15% of build cost.");
+  const r = priceFigureGuard("A Deposit Protection Check is from £149 and a Condition Report from £249. Full Project Management is 12 to 15% of build cost.");
   assertEquals(r.cut, []);
   assert(r.text.includes("£149"));
 });

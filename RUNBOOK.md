@@ -1255,3 +1255,33 @@ grep -rn "raise_job_stage_worker_pay_invoice\|raise_job_agency_fee_invoice\|rais
 ```
 
 The first two names should appear only in migration files as history. Any live caller in `concierge/`, `web/` or `supabase/functions/` is a bug.
+
+## Payment as principal is switched on, and what still is not
+
+Founder's instruction, 3 September 2026: legal sign-off and insurance are in hand, move forward with payment. The client now buys the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson. The "not switched on yet" and "pay your tradesperson directly" statements are gone from `docs/payments.html`, `docs/marketplace.html`, `docs/faq.html` (both the visible answer and the structured data), `supabase/functions/yaad-inbound/faq.ts` and `supabase/functions/yaad-notify-client/index.ts`.
+
+**The claim on the site is deliberately hers, and it is narrower than a guarantee.** It says Yaadly reviews the works and makes sure issues are handled. It does not say Yaadly guarantees the work, and it does not state a workmanship guarantee period, because no length has been set and none should be promised before it is insured for that length. The placeholder box on `docs/terms.html` stays until she sets one.
+
+**Two things this did not switch on.**
+
+1. **Card payment.** No Stripe links exist yet, so every job is still invoiced and paid by bank transfer. `docs/terms.html`, `docs/payments.html` and `docs/services.html` all still say so, correctly. That sentence comes out when the links are created, not before.
+2. **CLAUDE.md section 9** still lists "payment integration of any kind, before the legal review lands" as deliberately not being built. That is now stale. **Monique owns that file and a session must not rewrite it**, so it needs her edit, not ours.
+
+**Redeploy after any change to the assistant's facts.** `faq.ts` and `price-figures.ts` live in `yaad-inbound`, not `_shared`, so `sync-shared.sh` does not copy them. Deploy from disk:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf
+```
+
+Check the live `verify_jwt` setting with `supabase functions list` first and preserve it: `yaad-inbound` carries its own authentication and takes the flag, `yaad-notify-client` does not.
+
+## The figure guard and the published prices move together
+
+`supabase/functions/yaad-inbound/price-figures.ts` holds `PUBLISHED_POUNDS`, an exact list of every pound figure the assistant is allowed to say. Any figure not on it gets the whole sentence cut before the reply is sent.
+
+This bit us on 3 September 2026: the catalogue price alignment changed the published prices without touching the list, so the assistant would have had "Condition Report from £249" and "Property Care from £45" silently stripped, leaving clients with no price at all. The file's own comment says to update it in the same commit as `faq.ts`. Do that.
+
+The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. Whenever a price on `docs/services.html` changes, this list and `faq.ts` change in the same commit, and `service_catalogue` is the source of truth for all three.
+
+Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
