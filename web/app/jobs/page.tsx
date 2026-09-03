@@ -55,7 +55,7 @@ type QuotePackDraft = {
 
 export const metadata = {
   title: "The marketplace · Yaadly",
-  description: "Open property jobs across Jamaica and the verified workers who do them. Nobody is paid until you approve the evidence.",
+  description: "Open property jobs across Jamaica and the verified workers who do them. Nothing is signed off until you have seen the evidence.",
 };
 
 function ago(iso: string | null): string {
@@ -191,8 +191,17 @@ export default async function Board({
             until the client approves, on an invoice nothing is raised until
             they approve. It is also not a new claim, it is the sentence
             already live on yaadly.co.uk, so the two halves of the site now
-            say the same thing. */}
-        <b className="font-semibold text-ink">Nobody is paid until you approve the evidence.</b>
+            say the same thing.
+
+            Reworded 3 Sep 2026. "Nobody is paid until you approve" tied the
+            worker's money to the client's click, which is the escrow shape
+            the principal structure exists to avoid, and it was also untrue
+            of the worker: he is Yaadly's subcontractor and Yaadly owes him
+            whether or not a client in London has replied. The gate is not
+            removed, it is pointed at the right party. The same sentence
+            changed on yaadly.co.uk in the same commit, so the two halves of
+            the site still say the same thing. */}
+        <b className="font-semibold text-ink">Nothing is signed off until you have seen the evidence.</b>
       </p>
       <p className="mt-2.5 flex items-center gap-2 font-mono-app text-[11px] font-medium tracking-[0.06em] text-dim">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-gold stroke-2" strokeLinecap="round" strokeLinejoin="round">
