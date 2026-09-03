@@ -6,7 +6,7 @@ import { packPaymentStages, quotePackPaymentStages } from "@/lib/portal/journey"
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
 import { EvidenceUpload } from "@/components/portal/EvidenceUpload";
-import { JobPhotoUpload } from "@/components/portal/JobPhotoUpload";
+import { JobEditTools } from "@/components/portal/JobEditTools";
 import { VideoEvidenceUpload } from "@/components/portal/VideoEvidenceUpload";
 import { WalkthroughPanel } from "@/components/portal/WalkthroughPanel";
 import { ArrivalCheckIn } from "@/components/portal/ArrivalCheckIn";
@@ -870,31 +870,49 @@ export default async function JobRoom({
         />
       )}
 
-      {/*
-        The client's own photographs, and the way to send more. Always here,
-        at every stage: a picture that would have helped a quote also helps
-        the person who turns up, and asking for one should not depend on
-        whether this client happens to use WhatsApp.
-      */}
       <Outstanding items={outstanding} otherSideLabel={otherSideLabel} />
 
       <JobProgress phases={phases} />
 
-      {role === "client" && <JobPhotoUpload jobId={job.id} photos={bp} />}
-
       {/*
-        Shown only while the job is not yet on the board, which is the one
-        moment the question "what exactly am I publishing?" is live. Once
-        the job IS on the board the GoLive card links to the real thing,
-        and a preview next to the original would just be the original,
-        twice.
+        The client's two controls on their own listing: edit the words, add a
+        picture. Two small buttons, folded until pressed. They live inside the
+        board preview while that is shown, because the preview is the thing
+        being edited; once the job is live and the preview is gone, the same
+        buttons sit on a strip of their own. Description editing stops when a
+        worker is booked (from then on it is the agreed scope); photos can be
+        added at every stage, because a picture that would have helped a
+        quote also helps the person who turns up.
       */}
       {role === "client" && !movedOn && !onBoard && (
         <BoardPreview
           job={job}
           signed={signed}
           photos={bp}
+          tools={
+            <JobEditTools
+              jobId={job.id}
+              descr={job.descr ?? ""}
+              photos={bp}
+              quotesIn={qs.length}
+              canEditDescr={!job.worker_email}
+            />
+          }
         />
+      )}
+      {role === "client" && (movedOn || onBoard) && (
+        <section className="mt-4 rounded-2xl border border-line bg-panel px-4 pb-4 pt-3">
+          <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Your listing
+          </p>
+          <JobEditTools
+            jobId={job.id}
+            descr={job.descr ?? ""}
+            photos={bp}
+            quotesIn={qs.length}
+            canEditDescr={!job.worker_email}
+          />
+        </section>
       )}
 
       <div className="mt-2 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">

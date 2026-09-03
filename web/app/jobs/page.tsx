@@ -41,7 +41,7 @@ const STORE_LABEL: Record<string, string> = {
   indoors: "Materials kept indoors",
   none_available: "No secure store, buy in drops",
 };
-type Photo = { job_id: string; caption: string; img: string | null; position: number };
+type Photo = { job_id: string; caption: string; img: string | null; position: number; storage_path: string | null };
 type Worker = {
   name: string | null; trade: string | null; parish: string | null; lane: string | null;
   jobs_completed: number | null; slug: string | null; about: string | null; years: number | null;
@@ -102,11 +102,36 @@ export default async function Board({
 
   const jobs = (jobsData ?? []) as OpenJob[];
   const jobIds = jobs.map((j) => j.id);
+  // board_ok is named here as well as enforced in Postgres, so that this page
+  // shows every viewer the same photographs. A signed-in client can read their
+  // own unpublished photos through "job party reads their own job photos", and
+  // without this filter their copy of the public board would quietly carry
+  // pictures nobody else can see, which is a misleading thing for a board to do.
   const { data: photoData } = jobIds.length
-    ? await supabase.from("job_photos").select("job_id,caption,img,position").in("job_id", jobIds).order("position")
+    ? await supabase.from("job_photos").select("job_id,caption,img,position,storage_path")
+        .in("job_id", jobIds).eq("board_ok", true).order("position")
     : { data: [] };
+  const photos = (photoData ?? []) as Photo[];
+
+  /* The photographs themselves live in the private 'intake' bucket, where
+     WhatsApp intake has been putting them since 27 Aug. Nothing in that bucket
+     is public and nothing here is a lasting link: a short-lived signed URL is
+     minted per object as the page renders, and it is dead in five minutes.
+     Postgres decides who may mint one ("board photo files are readable"), so a
+     photograph the board would not show cannot be signed for either. Rows that
+     already carry an img, the demonstration image in the app's own assets, are
+     left exactly as they are. */
+  const toSign = photos.filter((p) => p.storage_path && !p.img);
+  if (toSign.length) {
+    const { data: signed } = await supabase.storage
+      .from("intake")
+      .createSignedUrls(toSign.map((p) => p.storage_path as string), 300);
+    const byPath = new Map((signed ?? []).map((r) => [r.path, r.signedUrl]));
+    for (const p of toSign) p.img = byPath.get(p.storage_path as string) ?? null;
+  }
+
   const photosByJob = new Map<string, Photo[]>();
-  for (const p of (photoData ?? []) as Photo[]) {
+  for (const p of photos) {
     const l = photosByJob.get(p.job_id) ?? [];
     l.push(p);
     photosByJob.set(p.job_id, l);
@@ -216,7 +241,10 @@ export default async function Board({
           ) : (
             <div className="mt-4 flex flex-col gap-3.5">
               {jobs.map((j) => {
-                const ph = photosByJob.get(j.id) ?? [];
+                // Only pictures that actually resolved. A tile with nothing in
+                // it is not a photograph, and counting it would overstate what
+                // a worker has been given to quote from.
+                const ph = (photosByJob.get(j.id) ?? []).filter((p) => p.img);
                 const expanded = pics === j.id;
                 const banner = expanded ? ph : ph.slice(0, 3);
                 const fresh = !!j.updated_at && newest - new Date(j.updated_at).getTime() < 1000 * 60 * 60 * 6;

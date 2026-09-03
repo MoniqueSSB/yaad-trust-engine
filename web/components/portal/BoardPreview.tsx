@@ -1,3 +1,5 @@
+import type React from "react";
+
 /**
  * The job as the public board will show it, rendered for the client before
  * they put it there.
@@ -22,7 +24,10 @@
  * where a rule about who sees somebody's property belongs.
  */
 
-type PreviewPhoto = { caption: string; img: string | null };
+/** board_ok is whether this photograph is on the public board. A photograph
+ *  sent into a WhatsApp conversation is not published by default, so most of
+ *  these are false, and the card says so rather than implying otherwise. */
+type PreviewPhoto = { caption: string; img: string | null; board_ok?: boolean | null };
 
 // Same answer-to-label map the board uses (app/jobs/page.tsx). The place
 // itself never appears; a worker needs the answer to price the trips, not
@@ -48,6 +53,7 @@ export function BoardPreview({
   job,
   signed,
   photos,
+  tools,
 }: {
   job: {
     id: string;
@@ -64,6 +70,11 @@ export function BoardPreview({
   };
   signed: boolean;
   photos: PreviewPhoto[];
+  /** The client's own controls for this card (JobEditTools): edit the words,
+   *  add a picture. Rendered inside the card, folded until pressed, because
+   *  the card is the thing being edited. Absent for anyone who is not the
+   *  client. */
+  tools?: React.ReactNode;
 }) {
   const descr = boardDescr(job.descr);
   const scrubbed = descr !== job.descr;
@@ -98,6 +109,8 @@ export function BoardPreview({
           )}
         </div>
 
+        {tools}
+
         {sp.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-dim">
             {sp.map((x) => (
@@ -114,22 +127,39 @@ export function BoardPreview({
         )}
 
         {photos.length > 0 && (
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {photos.slice(0, 3).map((p, i) => (
-              <figure
-                key={i}
-                className="relative h-16 overflow-hidden rounded-lg border border-softline bg-linear-to-br from-panel2 to-soft"
-              >
-                {p.img && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.img} alt={p.caption} className="h-full w-full object-cover" />
-                )}
-                <figcaption className="absolute inset-x-0 bottom-0 bg-bg/70 px-1.5 py-0.5 text-[9.5px] leading-tight text-dim">
-                  {p.caption}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+          <>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {photos.slice(0, 3).map((p, i) => (
+                <figure
+                  key={i}
+                  className={
+                    "relative h-16 overflow-hidden rounded-lg border bg-linear-to-br from-panel2 to-soft " +
+                    (p.board_ok ? "border-softline" : "border-dashed border-line")
+                  }
+                >
+                  {p.img && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.img}
+                      alt={p.caption}
+                      className={"h-full w-full object-cover " + (p.board_ok ? "" : "opacity-40")}
+                    />
+                  )}
+                  <figcaption className="absolute inset-x-0 bottom-0 bg-bg/70 px-1.5 py-0.5 text-[9.5px] leading-tight text-dim">
+                    {p.board_ok ? p.caption : "Not on the board"}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+            {photos.some((p) => !p.board_ok) && (
+              <p className="mt-2 text-[11.5px] leading-relaxed text-dim">
+                The faded ones are private: only you, Yaadly and the booked
+                worker see them. Open Photos above and press &quot;Show on
+                marketplace&quot; on any you want workers to see. Ones you sent
+                on WhatsApp are published by us, when you ask.
+              </p>
+            )}
+          </>
         )}
 
         <div className="mt-3 flex flex-wrap gap-3.5 border-t border-line pt-3 text-[12.5px] text-dim">

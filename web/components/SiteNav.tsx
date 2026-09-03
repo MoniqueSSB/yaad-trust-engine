@@ -4,16 +4,16 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 
 /**
- * The same header the landing page wears, so app.yaadly.co.uk reads as a
- * tab of one Yaadly site rather than a separate place. Same tab order, same
- * labels, same one filled button, as docs/yaadly.css's nav.top. Fixed 1 Sep
- * 2026: this used to run its own order ("Website", "Services" pointing at a
- * marketing anchor that no longer exists) and its own filled active-tab pill
- * sitting next to the "Post a job" button, two solid CTAs fighting in one
- * header. Managed services, For business, Contact and Book a call only exist
- * on the marketing site, so those tabs link back across; Marketplace stays
- * pointed at the live board here, because that is where it actually lives
- * once you are in the app.
+ * The one Yaadly header. Same markup, same order, same labels as
+ * docs/nav.css on the marketing site, so app.yaadly.co.uk reads as another
+ * page of one site rather than somewhere else you were sent.
+ *
+ * Fixed 2 Sep 2026: this used to run a shorter menu than the marketing site,
+ * "Marketplace" where the site said "Overview" and no "Job board" tab at all,
+ * so the header changed shape the moment you crossed from yaadly.co.uk into
+ * the app. The tabs are now the same six on both sides. Overview is the story
+ * page and lives on the marketing site; Job board is the live board and lives
+ * here, which is why one crosses back and the other does not.
  *
  * The portal used to render its own cut-down header instead of this one:
  * logo, email, sign out, and no tabs at all. That is what made signing in
@@ -48,45 +48,59 @@ export function SiteNav({
       : path.startsWith("/jobs") ? "market"
       : path.startsWith("/portal") ? "client"
       : undefined);
+  /* Same values as docs/nav.css, kept in Tailwind here because this is the
+     only header in the app. The marketing gradient is written out in full
+     rather than reached for through a token, because --grad is a marketing
+     stylesheet variable and this bundle does not load that stylesheet. */
+  const GRAD = "bg-[linear-gradient(135deg,#7B4FE0,#9B73F5_45%,#F59E0B)]";
   const tab = (on: boolean) =>
-    "rounded-[9px] px-3 py-1.5 text-[13px] transition " +
+    "rounded-[8px] px-[8px] py-1.5 whitespace-nowrap text-[13px] transition " +
     (on
-      ? "font-bold text-tealb"
-      : "font-medium text-ink hover:bg-panel2");
-  const quiet = "text-[12.5px] text-ink hover:text-tealb transition";
+      ? "font-semibold text-purpleb bg-[rgba(155,115,245,0.12)]"
+      : "font-medium text-mute hover:text-ink hover:bg-[rgba(155,115,245,0.09)]");
+  const quiet =
+    "px-[6px] py-1.5 whitespace-nowrap text-[12px] text-dim transition hover:text-purpleb";
   return (
-    <nav className="sticky top-0 z-50 border-b border-line bg-bg/95 backdrop-blur">
-      <div className="mx-auto flex max-w-[1080px] flex-wrap items-center gap-3 px-5 py-3">
-        <a href={SITE} className="flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-[9px] bg-teal font-display text-[17px] text-[#04211D]">
+    <nav className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-[14px]">
+      <div className="mx-auto flex min-h-[58px] max-w-[1100px] flex-nowrap items-center px-6 max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2">
+        <a href={SITE} className="mr-auto flex shrink-0 items-center gap-2 font-display text-[18px] font-medium">
+          <span className={`grid size-[30px] place-items-center rounded-[8px] text-[16px] font-bold text-white ${GRAD}`}>
             Y
           </span>
-          <b className="text-[17px]">
-            Yaadly<span className="text-mango">Hub</span>
+          <b className="font-medium">
+            Yaadly<span className="font-light text-mute">Hub</span>
           </b>
         </a>
-        <div className="ml-auto flex flex-wrap items-center gap-1">
-          <Link href="/jobs" className={tab(here === "market")}>Marketplace</Link>
-          <a href={`${SITE}/services.html`} className={tab(false)}>Managed services</a>
-          <a href={`${SITE}/business.html`} className={tab(false)}>For business</a>
-          <a href={`${SITE}/contact.html`} className={tab(false)}>Contact</a>
+        <div className="flex items-center gap-0.5 max-[820px]:order-3 max-[820px]:w-full max-[820px]:overflow-x-auto">
+          <a href={`${SITE}/marketplace`} className={tab(false)}>Overview</a>
+          <Link href="/jobs" className={tab(here === "market")}>Job board</Link>
+          <a href={`${SITE}/services`} className={tab(false)}>Managed services</a>
+          <a href={`${SITE}/business`} className={tab(false)}>For business</a>
+          <a href={`${SITE}/contact`} className={tab(false)}>Contact</a>
           <a href="https://cal.com/yaadly/15min" target="_blank" rel="noopener" className={tab(false)}>Book a call</a>
         </div>
-        <div className="flex flex-wrap items-center gap-3.5">
-          <Link href="/portal/client" className={quiet + (here === "client" ? " font-bold text-tealb" : "")}>Client portal</Link>
-          <Link href="/portal/worker" className={quiet + (here === "worker" ? " font-bold text-tealb" : "")}>Worker portal</Link>
-          <Link href="/apply" className={quiet + (here === "join" ? " font-bold text-tealb" : "")}>Join as a pro</Link>
-        </div>
+        {/* Signed out, these are the three doors in, and they are the same
+            three the marketing site shows. Signed in, they come out: the
+            email and Sign out take that space, "Join as a pro" is not what
+            a signed-in person is there for, and keeping all of it would push
+            the row past the page edge. */}
+        {signOut ? null : (
+          <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1080px]:hidden">
+            <Link href="/portal/client" className={quiet + (here === "client" ? " font-semibold text-purpleb" : "")}>Client portal</Link>
+            <Link href="/portal/worker" className={quiet + (here === "worker" ? " font-semibold text-purpleb" : "")}>Worker portal</Link>
+            <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a pro</Link>
+          </div>
+        )}
 
         {email ? (
-          <span className="text-[12.5px] text-dim">{email}</span>
+          <span className="ml-auto max-w-[220px] truncate pl-3 text-[12.5px] text-dim">{email}</span>
         ) : null}
 
         {signOut ? (
           <form action={signOut}>
             <button
               type="submit"
-              className="rounded-[9px] border border-line px-3 py-1.5 text-[13px] text-mute transition hover:border-teal hover:text-tealb"
+              className="ml-3.5 rounded-[9px] border border-line px-3 py-1.5 text-[13px] text-mute transition hover:border-purple hover:text-purpleb"
             >
               Sign out
             </button>
@@ -99,7 +113,7 @@ export function SiteNav({
              one. The job is created here now, and only here. */
           <a
             href="/jobs/new"
-            className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+            className={`ml-3 shrink-0 whitespace-nowrap rounded-full px-[15px] py-2 text-[12.5px] font-bold text-white transition hover:brightness-110 ${GRAD}`}
           >
             Post a job
           </a>

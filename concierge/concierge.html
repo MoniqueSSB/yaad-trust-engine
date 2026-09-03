@@ -1172,6 +1172,30 @@ const VIEWS = [
       {h:"State", f:r => tone_(r.status || "open")},
     ]},
 
+  { k:"photos", g:"Services", label:"Job photos", icon:"photo",
+    title:"Job photos", table:"job_photos",
+    sub:"Every photograph a client has sent with a job. They arrive over WhatsApp and land in the private intake bucket, so nothing here is a public picture and none of these links last: each one is signed for an hour when you open this page. On the board is the only thing that publishes one. Leave it off unless the client has told you they want workers to see it: a photograph sent into a WhatsApp conversation is not consent to put it on a public page, and app.yaadly.co.uk/jobs is a public page.",
+    select:"id,job_id,caption,img,storage_path,mime,bytes,kind,source,position,board_ok,created_at",
+    order:"created_at", search:["job_id","caption","source"], hide:["img","storage_path"],
+    empty:["No photographs yet","One lands here the moment a client sends a picture on WhatsApp."],
+    pre: preJobPhotos,
+    cols:[
+      {h:"Picture", f:r => photoCell(r)},
+      {h:"Job", f:r => id_(r.job_id) + sub_(r.caption || "")},
+      {h:"Came from", f:r => esc(r.source || "unknown") + sub_(r.kind || r.mime || "")},
+      {h:"Size", n:true, f:r => r.bytes ? mute_(Math.round(r.bytes / 1024) + " KB") : mute_("not recorded")},
+      {h:"On the board", f:r => r.board_ok ? chip_("ok","published") : chip_("mute","private")},
+      {h:"Arrived", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Show it on the board", cls:"", when:r => !r.board_ok,
+        set:{ board_ok:true },
+        says:r => `Publishes this photograph on app.yaadly.co.uk/jobs, where anybody on the internet can see it while ${r.job_id} is open for quotes. Only do this if the client has said they want workers to see it.` },
+      { label:"Take it off the board", cls:"g", when:r => r.board_ok === true,
+        set:{ board_ok:false },
+        says:() => "Removes it from the public board straight away. The photograph stays on the job for you, the client and the booked worker. Anybody already holding a signed link keeps it until it expires, which is within the hour." },
+    ]},
+
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
     sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back.",
@@ -1734,6 +1758,37 @@ async function signEvidenceImgs(rows){
     const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
     for (const r of items) r.img = byPath.get(r.storage_path) || null;
   } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
+// ---- Job photos: the client's own pictures, from the private intake bucket.
+//
+// Same treatment as evidence above, different bucket. WhatsApp intake writes
+// these to 'intake' (private, storage.buckets.intake.public = false) and
+// records the path on the row; img stays null on every insert path, which is
+// what leaves somewhere to put the signed link. This desk's own session is
+// covered by "admins read every bucket", so it can sign every row here,
+// published or not: deciding what the public board carries is the job of
+// board_ok, and you cannot decide it without looking at the photograph.
+async function preJobPhotos(rows){
+  const items = (rows || []).filter(r => r.storage_path && !r.img);
+  if (!items.length) return;
+  try {
+    const { data, error } = await sb.storage.from("intake")
+      .createSignedUrls(items.map(r => r.storage_path), 3600);
+    if (error || !data) return;
+    const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
+    for (const r of items) r.img = byPath.get(r.storage_path) || null;
+  } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
+// A picture, or an honest word about why there is not one. A row with no
+// storage_path predates the bucket and never had a file behind it.
+function photoCell(r){
+  if (r.img) {
+    return `<a class="thumb" href="${esc(r.img)}" target="_blank" rel="noopener" title="${esc(r.caption || "photo")}">`
+         + `<img src="${esc(r.img)}" alt="${esc(r.caption || "photo")}" loading="lazy" style="width:88px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--softline);display:block"></a>`;
+  }
+  return mute_(r.storage_path ? "could not be signed" : "no file");
 }
 
 async function preEvidence(rows){

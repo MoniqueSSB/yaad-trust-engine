@@ -31,25 +31,11 @@ a{color:var(--tealb)}
 img{max-width:100%}
 .wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--gutter)}
 
-/* nav */
-nav.top{position:sticky;top:0;z-index:60;background:rgba(8,17,15,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.nav-in{display:flex;justify-content:space-between;align-items:center;gap:14px;max-width:var(--wrap);margin:0 auto;padding:11px var(--gutter);flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
-.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;color:#fff;font-family:var(--disp);font-size:18px;font-weight:600}
-.brand b{font-size:17px}.brand b span{color:var(--tealb)}
-.views{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.vbtn{background:none;border:0;color:var(--ink);font:600 13.5px var(--body);padding:8px 11px;border-radius:9px;cursor:pointer;text-decoration:none}
-.vbtn:hover{background:var(--panel2)}
-/* Current-page tab. No fill, so the header still shows only one filled
-   element sitewide, the app nav's "Post a job" button. Added 1 Sep 2026,
-   the .on class was already on the right link on every page but had no
-   rule to act on, so the current tab never actually lit up. */
-.vbtn.on{color:var(--tealb);font-weight:700}
-.vbtn.on:hover{background:none}
-.quiet-links{display:flex;gap:14px;font-size:12.5px}
-.quiet-links a{color:var(--ink);text-decoration:none}
-.quiet-links a:hover{color:var(--tealb)}
-.quiet-links a.on{color:var(--tealb);font-weight:700}
+/* nav: moved to nav.css, 2 Sep 2026. The header used to be defined four
+   different ways across eight pages, so it redrew itself as you clicked
+   between them. It now lives in one scoped file that every page links,
+   including the pages that carry their own design system inline. Do not
+   put nav rules back in here. */
 
 /* type */
 h1.hx,h2.hx,h3.hx{font-family:var(--disp);font-weight:200;letter-spacing:-0.02em;line-height:1.08}
