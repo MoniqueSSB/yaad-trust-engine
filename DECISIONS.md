@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-03 · /trades stopped being the job board and became the worker pitch, the board moved to /jobs/trades
+
+**The brief for "optimise the /trades page" described a page that explains the worker opportunity: who it's for, what it costs, how to apply.** What actually sat at that route was the client-facing "browse open jobs by trade" board, linked once, from `/jobs` as "All 18 trades." Two different audiences, one URL. Asked Monique directly rather than guess: repurpose `/trades` for workers, and move the client board somewhere else. It moved to `/jobs/trades`, under the job board's own layout rather than a new top-level route, because it already reads open job counts off `open_jobs` and belongs with the rest of the marketplace. The `/jobs` link was updated to match; nothing else referenced the old path.
+
+**Every figure on the new page is read from the current signed Worker Guidelines (`web/lib/legal-copy.json`, WG v1.4) or the Phase 1/2/3 copy in `web/app/apply/JoinFlow.tsx`, not written fresh for this page.** Doing that surfaced a real inconsistency: JoinFlow's own send screen still promises "paid within 24 hours," while the signed Worker Guidelines, corrected in v1.3, say 3 working days and say plainly that Yaadly is not holding client money yet, a worker is paid once the client pays, through the route agreed on the job. The new `/trades` page follows the signed, more recent document rather than the stale marketing line. JoinFlow's copy is out of this change's scope to fix, but it should not be left standing uncorrected: worth a follow-up.
+
+**No worker or job volumes are claimed anywhere on the page**, because there is no public figure for either in the repository, and the brief said not to invent one.
+
+---
+
 ## 2026-09-03 · The worker directory and profile page stop reading worker_email and phone off the base tables
 
 Found during a UX pass on `/jobs?tab=workers` and `/workers/[slug]`, not touching either yet: `worker_profiles.phone` and `.worker_email` sat on the same row as `name` and `trade`, and the two SELECT policies that made a profile publicly readable (`wp_select_public`, `wp_select_signed_in`) were row-level only, the way Postgres RLS always is. Row-level says which rows a role may see, never which columns, so anybody holding the publishable key could already `GET /rest/v1/worker_profiles?select=name,worker_email,phone` and read every active worker's contact details, no login and no app code involved. `worker_checks` and `portfolio` carried the identical shape of leak, `worker_email` present on every row purely as a join key nobody meant to publish. Confirmed live before writing the fix: 6 active profiles, 4 with a phone on file, 6 with an email, none of it ever rendered anywhere in the app.
