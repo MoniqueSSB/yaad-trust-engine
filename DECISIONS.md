@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-03 · /trades stopped being the job board and became the worker pitch, the board moved to /jobs/trades
+
+**The brief for "optimise the /trades page" described a page that explains the worker opportunity: who it's for, what it costs, how to apply.** What actually sat at that route was the client-facing "browse open jobs by trade" board, linked once, from `/jobs` as "All 18 trades." Two different audiences, one URL. Asked Monique directly rather than guess: repurpose `/trades` for workers, and move the client board somewhere else. It moved to `/jobs/trades`, under the job board's own layout rather than a new top-level route, because it already reads open job counts off `open_jobs` and belongs with the rest of the marketplace. The `/jobs` link was updated to match; nothing else referenced the old path.
+
+**Every figure on the new page is read from the current signed Worker Guidelines (`web/lib/legal-copy.json`, WG v1.4) or the Phase 1/2/3 copy in `web/app/apply/JoinFlow.tsx`, not written fresh for this page.** Doing that surfaced a real inconsistency: JoinFlow's own send screen still promises "paid within 24 hours," while the signed Worker Guidelines, corrected in v1.3, say 3 working days and say plainly that Yaadly is not holding client money yet, a worker is paid once the client pays, through the route agreed on the job. The new `/trades` page follows the signed, more recent document rather than the stale marketing line. JoinFlow's copy is out of this change's scope to fix, but it should not be left standing uncorrected: worth a follow-up.
+
+**No worker or job volumes are claimed anywhere on the page**, because there is no public figure for either in the repository, and the brief said not to invent one.
+
+---
+
 ## 2026-09-03 · The job form became six stages, and asking who holds the key switched on a gate that was never firing
 
 **The form was three screens and one of the three had nothing on it to fill in.** It said "Saved" and "photos help" and had no field, so a person was charged a step for reading a paragraph. It is now six, one question each, in the order somebody actually thinks about a problem with a building: what is wrong, where it is, how soon, what you can show us, how to reach you, then the whole thing on one screen before it goes. Nothing personal is asked before stage five, which was already true and is now visible, because the top of the form says up front exactly what it will ask for and that it will not ask for an address, an account or a card. The stage rules moved to `web/lib/jobs/new-form.ts` and are tested; they used to be three boolean expressions inline in the JSX.

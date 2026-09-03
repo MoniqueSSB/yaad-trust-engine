@@ -217,7 +217,7 @@ export default async function Board({
             moment somebody hesitates. */}
         <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
           <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask a Yaad</Link>
-          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
+          <Link href="/jobs/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
           <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
         </span>
       </div>
