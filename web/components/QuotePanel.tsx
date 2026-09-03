@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitQuote } from "@/app/jobs/actions";
+import { jmd } from "@/lib/money";
 
 /**
  * The quote form, MARKETPLACE-BUILD-SPEC 2.4. Helper copy is decided and
@@ -9,9 +10,7 @@ import { submitQuote } from "@/app/jobs/actions";
  * is typed: the client fee sits INSIDE the headline number, never added at
  * checkout, which is the DMCCA requirement made visible.
  */
-function jmd(n: number) {
-  return "J$" + n.toLocaleString("en-US");
-}
+
 
 type QuotePackDraft = {
   status: string;

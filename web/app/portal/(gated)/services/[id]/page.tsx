@@ -7,6 +7,7 @@ import { PortalCard } from "@/components/portal/PortalCard";
 import { ServiceNext } from "@/components/portal/ServiceNext";
 import { StageRail } from "@/components/portal/StageRail";
 import { CalBand } from "@/components/portal/CalBand";
+import { gbp } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,7 @@ export default async function ServiceRoom({
     total_pence: number; issue_date: string; due_date: string;
     sent_at: string | null; paid_at: string | null;
   }[];
-  const gbp = (pence: number) => "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 
   // The booking's Kickoff Pack. RLS only returns an approved pack to the
   // client, so its mere presence here means it is ready to read; while it

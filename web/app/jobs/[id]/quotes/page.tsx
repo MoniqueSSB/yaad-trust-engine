@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AcceptPanel } from "./AcceptPanel";
+import { jmdOrBlank as money } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,7 @@ export const metadata = {
   description: "The quotes on your job, with labour split from materials.",
 };
 
-const money = (n: number | null) =>
-  n == null ? "" : "J$" + Number(n).toLocaleString("en-JM");
+
 
 /* ── Your quotes, with no account ──────────────────────────────────────────
  *
@@ -35,6 +35,13 @@ export default async function Quotes({
 }) {
   const { id } = await params;
   const { code } = await searchParams;
+
+  /* A missing code is still notFound(): a bare /jobs/<id>/quotes with nothing
+     after it is somebody guessing, and confirming the job exists would be the
+     one thing worth telling them. A code that is PRESENT and wrong is a
+     different person with a different problem, and gets a different answer
+     below: almost always a client who copied the link out of WhatsApp and
+     lost a character off the end. */
   if (!code) notFound();
 
   const supabase = await createClient();
@@ -44,7 +51,31 @@ export default async function Quotes({
   ]);
 
   const job = (jobRows ?? [])[0];
-  if (!job) notFound();
+  if (!job) {
+    /* Deliberately says nothing about whether the job exists. It reads the
+       same for a mistyped code on a real job and for a job id invented out of
+       thin air, which is what stops this page confirming ids to somebody
+       working through them. What it does do is give the person a way out,
+       which a bare 404 did not. */
+    return (
+      <div className="mx-auto max-w-[620px] px-5 py-16">
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Your quotes</p>
+        <h1 className="mt-2 font-display text-[clamp(26px,4vw,38px)] uppercase leading-none">
+          That link did not open
+        </h1>
+        <p className="mt-3.5 text-[14.5px] leading-relaxed text-mute">
+          The code on the end of it is not one we recognise for this job. The
+          commonest cause is a character lost when the link was copied out of a
+          message, so it is worth opening the original again rather than
+          retyping it.
+        </p>
+        <p className="mt-3 text-[13.5px] leading-relaxed text-dim">
+          Still not working? Reply to the WhatsApp thread the link came from and
+          a person will send a fresh one. Nothing about your job is lost.
+        </p>
+      </div>
+    );
+  }
 
   const quotes = (quoteRows ?? []) as {
     id: string; worker_name: string; labour_jmd: number; materials_jmd: number;
@@ -58,7 +89,9 @@ export default async function Quotes({
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-10">
-      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Your quotes</p>
+      {/* Purple, like every other public page's eyebrow. This was the only
+          one in gold, with no rule behind the difference. */}
+      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Your quotes</p>
       <h1 className="mt-2 font-display text-[clamp(28px,5vw,52px)] uppercase leading-[.95]">
         {job.title}
       </h1>

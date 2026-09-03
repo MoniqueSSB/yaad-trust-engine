@@ -1,3 +1,5 @@
+import { jmd } from "@/lib/money";
+
 /**
  * The settled fee panel, from the preview's `feeClient()` and `feeWorker()`.
  *
@@ -10,9 +12,6 @@
  *   the client sees the all-in total, because a mandatory platform charge has
  *   to sit inside the displayed price rather than appear at the end
  */
-
-const jmd = (n: number) =>
-  "J$" + Math.round(n).toLocaleString("en-JM");
 
 export function FeeBreakdown({
   side,

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { jmdOrBlank as jmd } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
-const jmd = (n: number | null) => (n == null ? "" : "J$" + Math.round(n).toLocaleString("en-JM"));
+
 
 /**
  * The Quote Pack: the price and terms a worker actually submitted (labour,

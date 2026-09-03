@@ -217,7 +217,7 @@ export default async function Board({
             moment somebody hesitates. */}
         <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
           <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask a Yaad</Link>
-          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
+          <Link href="/jobs/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
           <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
         </span>
       </div>
@@ -228,9 +228,15 @@ export default async function Board({
         <>
           {trades.length > 1 && (
             <div className="mt-4.5 flex flex-wrap gap-2">
-              <Link href="/jobs" className={pill(!trade)}>All trades</Link>
+              {/* aria-current, because these are links styled as a filter and
+                  the only signal of which one is active was colour. A screen
+                  reader heard a list of trade names with nothing to say which
+                  filter the board was showing. */}
+              <Link href="/jobs" aria-current={!trade ? "page" : undefined} className={pill(!trade)}>All trades</Link>
               {trades.map((t) => (
-                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`} className={pill(trade === t)}>{t}</Link>
+                <Link key={t} href={`/jobs?trade=${encodeURIComponent(t)}`}
+                  aria-current={trade === t ? "page" : undefined}
+                  className={pill(trade === t)}>{t}</Link>
               ))}
             </div>
           )}

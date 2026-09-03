@@ -6,11 +6,12 @@ import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
+import { jmd } from "@/lib/money";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
 export const dynamic = "force-dynamic";
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 /**
  * The worker portal.
@@ -165,8 +166,14 @@ export default async function WorkerPortal() {
     },
     {
       label: "Released",
+      /* "Paid off-platform" was honest and meant nothing to the person
+         reading it. A tradesperson does not know what a platform is, let
+         alone what being off one implies about when money arrives. Say the
+         thing itself: how it comes, and how long. The 3 working days figure
+         is unchanged, and nothing here claims the money has moved, which is
+         WorkerInvoices' job and is worded carefully there. */
       value: jmd(released),
-      note: "Paid off-platform within 3 working days of release",
+      note: "Paid straight to you by bank transfer, Lynk or cash, within 3 working days",
     },
   ];
 

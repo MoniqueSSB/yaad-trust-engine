@@ -1300,3 +1300,81 @@ A 403 with `"Signature check failed."` is different and is the sender's problem:
 **If somebody cannot get in:** send them to `app.yaadly.co.uk/portal/sign-in`, have them type their email and leave the code box empty, and press the button. That sends a fresh code.
 
 **Outstanding, and it is the founder's call:** the Supabase Auth email templates may still contain a "reset your password" template pointing at `/portal/reset`. That link still works, because the route forwards and carries the session fragment across, so nobody is stranded. But the email says password and the product has none. Retiring or rewording that template changes what clients receive, so it has not been done for you. Dashboard, Authentication, Emails.
+
+---
+
+## Money is showing a different figure in two places on the same job
+
+**Every money string in the app comes from `web/lib/money.ts`.** If two panels disagree, one of them has grown its own formatter again. That is what this file exists to stop: there were ten, seven rounded and three did not, so a job could read J$1,234,567.89 in one panel and J$1,234,568 in another.
+
+```bash
+grep -rn 'toLocaleString("en-JM")\|toLocaleString("en-US")\|"J\$" +' web/app web/components
+```
+
+Anything that comes back other than `web/lib/money.ts` is the fault. Four exports, and they differ only in what they do with a missing figure:
+
+| Use | When |
+|---|---|
+| `jmd(n)` | you already know you have a number |
+| `jmdOrNull(n)` | the component renders nothing when there is no figure |
+| `jmdOrBlank(n)` | the caller concatenates the result regardless |
+| `amount(minorUnits, currency)` | an invoice total, in whatever currency it was raised |
+| `gbp(pence)` | a plain pence column, always two decimals |
+
+J$ is always rounded, because Jamaican pricing is quoted in whole dollars. Card currencies keep both decimals, because a statement has them. `amount(null, ...)` returns "not set", never a dash: a dash in a money column is ambiguous between nothing and zero.
+
+---
+
+## The question box on /ask is refusing people, or being flooded
+
+Since 3 Sep 2026 `/ask` writes through `ask_question()` in Postgres, not by direct insert, and `questions` has no INSERT policy for anon at all. Ten questions an hour per caller.
+
+**Somebody says they cannot ask.** The page tells them which of four things happened, so ask them what it said:
+
+| The page says | Means |
+|---|---|
+| "ten questions in an hour" | the throttle. Genuine, and it clears within the hour. |
+| "too short to answer well" | under 10 characters. |
+| "did not save, and it is our end" | the RPC errored. Check the function exists and `anon` can execute it. |
+| nothing appears after asking | working as intended: rows land unpublished and a person publishes them. |
+
+**To publish a question:** it is a row in `questions` with `published = false`. Set it true from the desk or the SQL editor. Answers come from vetted workers who have signed the Worker Guidelines; the policy enforces both.
+
+**To check the throttle is actually on:**
+
+```sql
+select has_function_privilege('anon','public.ask_question(text,text,text)','EXECUTE') as anon_can_ask,
+       exists (select 1 from pg_policies
+                where schemaname='public' and tablename='questions'
+                  and cmd='INSERT' and roles::text like '%anon%') as anon_can_insert_directly;
+```
+
+`anon_can_ask` must be true and `anon_can_insert_directly` must be **false**. If the second is true, the direct door is open again and the throttle is decorative.
+
+The caller key is a truncated SHA-256 of the address, computed in the server action, never the address itself. It is a throttle key, not a visitor log, and `question_attempts` sweeps itself within hours.
+
+---
+
+## Somebody cannot finish the "Post a job" form, or a job arrives with no urgency on it
+
+`/jobs/new` is six stages since 3 Sep 2026: the work, the property, urgency, photos, contact, review. It talks to two Edge Functions and nothing else. `yaad-post-job` in draft mode saves the job card, on the way out of stages one, two and three. `yaad-enquiry` sends the name and the contact detail, once, on Send.
+
+**Start by asking what the screen said.** The form shows the Edge Function's own words, so the message identifies the fault.
+
+| They saw | Means | Do |
+|---|---|---|
+| "That is a lot of job requests in one hour" | `yaad-post-job`'s per-caller throttle, eight creates an hour. A shared connection or an office can trip it. | Nothing is broken. Tell them to press **Carry on without saving**: the job still reaches you, without a reference number. Or finish it with them on WhatsApp. |
+| "Posting is not configured" | `SUPABASE_SERVICE_ROLE_KEY` is missing from the function's environment. | §9 of this runbook. Nothing saves until it is set. |
+| "That did not send. Nothing is lost on your side." | `yaad-enquiry` failed. The job card is already saved; only the contact detail did not go. | Ask them for the reference number on screen and their number. The job is in `jobs` and you can reply from the desk. |
+| "We need your name, a way to reach you, and what you want to ask" | `yaad-enquiry` got a blank field. Should be unreachable, the form checks first. | Report it, it is a bug. |
+| a stuck **Saving…** button | the invoke never came back. | Reload. The answers come back off the device, see below. |
+
+**A form that failed a save is never a locked door.** The error box offers **Try again** and **Carry on without saving**. Neither loses a word of what they typed.
+
+**Their answers survive a closed tab.** The trade, parish, description, urgency and access answer are kept in the browser under `yaadly.job.new.v1` for seven days, with the job reference, so a returning visitor lands on the stage they stopped at and keeps working on the SAME job rather than creating a second one. **The name, the contact detail and the portal code are deliberately never stored**, because this form gets filled in on shared family phones and the code is a credential. So somebody coming back re-types their name and number and nothing else. If they want a clean form, the banner has a **Start again** button.
+
+**A job arrives with no urgency or no access answer.** Both are required on the form, so it did not come from `/jobs/new`. It came in on WhatsApp through `yaad-inbound`, where the assistant fills what the conversation gave it. Set them from the desk.
+
+**Access answers matter more than they look.** The answer to "who can let a worker in" is written to `jobs.access_type`, and `enforce_vetted_worker_on_quote` reads it: a worker still in Probation is refused a job where they would hold keys or work inside an occupied home. Before 3 Sep 2026 this form never filled that column, so the gate was skipped on every job posted from the web. It is on now. If a worker says they cannot quote a web job, check their `vetting_state` and the job's `access_type` before assuming a bug: the refusal message names which of the two rules stopped them. The exact wording of the four options is asserted in `web/tests/new-job-form.test.mjs`; do not reword them in the page without reading that file.
+
+**Photographs are not uploaded on this form, on purpose.** Stage four says what to photograph and the confirmation screen hands over a link, `/portal/join?job=…&code=…&next=photos`, which sets up the account and lands directly on the photo panel. The file itself only ever travels the portal route: size capped, private storage, location stripped, deletable by the client. If somebody says the link did not open the photo screen, check that `next=photos` survived whatever copied the link, and that `?photos=1` is on the job URL afterwards.
