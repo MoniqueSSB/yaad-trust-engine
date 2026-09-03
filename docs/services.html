@@ -61,50 +61,6 @@ img { max-width:100%; display:block; }
 .wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
 .wrap-sm { max-width:780px; margin:0 auto; padding:0 24px; }
 
-/* ─── NAV ────────────────────────────────────────────────── */
-.site-nav {
-  position:sticky; top:0; z-index:100;
-  background:rgba(7,7,26,0.85);
-  backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--line);
-}
-.site-nav .nav-in {
-  max-width:1100px; margin:0 auto; padding:0 24px;
-  display:flex; align-items:center; gap:0; height:56px;
-}
-.brand {
-  display:flex; align-items:center; gap:8px;
-  font-family:var(--disp); font-weight:500; font-size:18px;
-  color:var(--ink); text-decoration:none; margin-right:auto;
-  flex-shrink:0;
-}
-.brand .mark {
-  display:inline-flex; align-items:center; justify-content:center;
-  width:30px; height:30px; border-radius:8px;
-  background:var(--grad); color:#fff;
-  font-weight:700; font-size:16px;
-}
-.brand span { color:var(--mute); font-weight:300; }
-.views {
-  display:flex; align-items:center; gap:2px;
-}
-.vbtn {
-  padding:6px 11px; border-radius:8px; font-size:13.5px; font-weight:500;
-  color:var(--mute); text-decoration:none; transition:color .15s,background .15s;
-  white-space:nowrap;
-}
-.vbtn:hover { color:var(--ink); background:var(--panel2); }
-.vbtn.on { color:var(--purpleb); background:rgba(155,115,245,0.12); }
-.quiet-links {
-  display:flex; align-items:center; gap:0; margin-left:12px;
-  padding-left:12px; border-left:1px solid var(--line);
-}
-.quiet-links a {
-  padding:6px 10px; font-size:12.5px; color:var(--dim);
-  text-decoration:none; transition:color .15s; white-space:nowrap;
-}
-.quiet-links a:hover { color:var(--purple); }
-
 /* ─── HERO ───────────────────────────────────────────────── */
 .hero {
   padding:64px 0 56px;
@@ -648,8 +604,6 @@ footer {
   .svc-card.wide { grid-column:span 1; }
   .steps-grid { grid-template-columns:1fr; }
   .form-row { grid-template-columns:1fr; }
-  .views { display:none; }
-  .quiet-links { display:none; }
   .stat-bar { flex-wrap:wrap; gap:16px; }
 }
 </style>
@@ -671,6 +625,7 @@ footer {
     }catch(e){} return ev; } });
 })();
 </script>
+<link rel="stylesheet" href="nav.css?v=1">
 </head>
 <body>
 
@@ -679,17 +634,18 @@ footer {
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
     <a class="vbtn" href="/marketplace">Overview</a>
-    <a class="vbtn" href="https://app.yaadly.co.uk/jobs" target="_blank">Job board</a>
+    <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn on" href="/services">Managed services</a>
     <a class="vbtn" href="/business">For business</a>
     <a class="vbtn" href="/contact">Contact</a>
-    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank">Book a call</a>
+    <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
   <div class="quiet-links">
     <a href="https://app.yaadly.co.uk/portal/client">Client portal</a>
     <a href="https://app.yaadly.co.uk/portal/worker">Worker portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
   </div>
+  <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
 <!-- HERO -->
@@ -708,21 +664,10 @@ footer {
           <div class="stat"><span class="stat-n">72h</span><span class="stat-l">Report turnaround</span></div>
           <div class="stat"><span class="stat-n">7+</span><span class="stat-l">Years UK construction PM</span></div>
           <div class="stat"><span class="stat-n">BEng</span><span class="stat-l">Aerospace Engineering</span></div>
-          <div class="stat"><span class="stat-n">0</span><span class="stat-l">Contractor ties</span></div>
         </div>
       </div>
       <div class="hero-right rv">
         <div class="cred-card">
-          <div class="cred-row">
-            <div class="cred-ico">
-              <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
-            </div>
-            <div>
-              <div class="cred-label">Independence guarantee</div>
-              <div class="cred-val">No contractor relationships</div>
-              <div class="cred-note">I never price, supply or manage the trade I assess.</div>
-            </div>
-          </div>
           <div class="cred-row">
             <div class="cred-ico">
               <svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg>
