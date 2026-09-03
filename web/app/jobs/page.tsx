@@ -46,6 +46,7 @@ type Photo = { job_id: string; caption: string; img: string | null; position: nu
 type Worker = {
   name: string | null; trade: string | null; parish: string | null; lane: string | null;
   jobs_completed: number | null; slug: string | null; about: string | null; years: number | null;
+  vetting_state: string | null;
 };
 type QuotePackDraft = {
   job_id: string; status: string;
@@ -97,7 +98,10 @@ export default async function Board({
 
   const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] = await Promise.all([
     jq,
-    supabase.from("worker_profiles").select("name,trade,parish,lane,jobs_completed,slug,about,years").eq("active", true).order("jobs_completed", { ascending: false }),
+    // public_worker_profiles, not the base table: it already excludes
+    // worker_email and phone, neither of which this board (or any visitor)
+    // has any business reading. See 20260903f in supabase/migrations.
+    supabase.from("public_worker_profiles").select("name,trade,parish,lane,jobs_completed,slug,about,years,vetting_state").order("jobs_completed", { ascending: false }),
     supabase.from("open_jobs").select("trade"),
   ]);
 
@@ -481,10 +485,22 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
               )}
 
               <div className="flex flex-wrap gap-1.5">
+                {/* "ID verified" is literal, not marketing: the publish gate
+                    (enforce_profile_publish_checks) refuses to make a profile
+                    active unless Persona reads back approved or completed, so
+                    every row this view can return has actually cleared it. */}
                 <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-semibold text-mute">ID verified</span>
                 <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-semibold " + (w.lane === "cert" ? "border border-gold/35 bg-gold/[0.08] text-goldb" : "border border-purple/30 bg-purple/[0.08] text-purpleb")}>
                   {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
                 </span>
+                {/* Probation is a real gate (20260831d): hidden from top-tier
+                    jobs until the police check and references clear. A card
+                    identical to a fully verified worker's said nothing of
+                    that, so a probation worker and a verified one read the
+                    same on this board. */}
+                {w.vetting_state === "probation" && (
+                  <span className="rounded-full border border-mango/40 bg-mango/10 px-2.5 py-1 text-[10.5px] font-semibold text-mango">Vetting in progress</span>
+                )}
               </div>
 
               <div className="mt-auto grid grid-cols-2 gap-2">
@@ -492,7 +508,13 @@ function WorkerDirectory({ workers }: { workers: Worker[] }) {
                   <Link href={"/workers/" + encodeURIComponent(w.slug)} className="rounded-full border-[1.5px] border-purple/30 py-2.5 text-center text-[12.5px] font-semibold text-purpleb transition hover:border-purple hover:bg-panel2">
                     View profile
                   </Link>
-                ) : <span />}
+                ) : (
+                  // A profile with no slug yet cannot be linked to. That is a
+                  // real, current state (some active profiles predate the
+                  // slug column), not a bug in this card, so it says so
+                  // rather than leaving a blank cell where a button should be.
+                  <span className="grid place-items-center rounded-full border border-dashed border-line py-2.5 text-center text-[12px] font-semibold text-dim">Profile page coming soon</span>
+                )}
                 <Link href={book} className="rounded-full bg-linear-to-br from-goldb to-gold py-2.5 text-center text-[12.5px] font-bold text-[#1A0F00] transition hover:-translate-y-px hover:brightness-105">
                   Book for a job
                 </Link>
