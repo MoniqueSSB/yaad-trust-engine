@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-03 · The three text tiers, and a status pill that means something
+
+**Two findings from a full read of every route, both measured rather than felt.**
+
+**The third text tier was not readable.** Against the page background `#07071A`, the palette measured: `--ink` 17.4:1, `--mute` 4.79:1, `--dim` 2.04:1 on the app and 2.16:1 on the marketing site. WCAG AA wants 4.5:1 for normal text, so `--dim` was not failing narrowly, it was at less than half the floor. It is used 269 times across 60 files in `web/` alone, and not for decoration: field labels, job references, "nothing held right now", "paid off-platform within 3 working days of release", "we are working in Kingston and Portmore first". That is the copy the product is trusted on, set at a contrast a tradesperson on a phone in daylight cannot read. Trust copy nobody can read builds no trust, so this was the highest-value change on the list and the cheapest.
+
+**The palette only had room for two readable tiers, so both moved.** `--mute` went `#7878A8` to `#9E9ECB` (4.79:1 to 7.78:1) and `--dim` went to `#7C7CA6` (5.02:1), which leaves a 1.55:1 step between them, enough to still read as two tiers. Lifting only `--dim` would have collapsed it into `--mute`; leaving `--mute` alone and finding room underneath it was arithmetically impossible. The values live in **six places** and must move together: `web/app/globals.css`, `docs/yaadly.css`, and the inline `:root` blocks in `docs/index.html`, `docs/marketplace.html`, `docs/business.html` and `docs/services.html`. The four inline blocks are the residue of the same copy-paste the 2 Sep header entry below describes; the stylesheet edit alone reached exactly half the site, which is how the split was found. The light-section tokens (`--l-*`) are a separate scale and were not touched.
+
+**Every job status looked the same, so none of them said anything.** "Closed", "Draft, not live yet", "Quotes in, waiting on you" and "Evidence waiting on you" all rendered in one neutral purple pill. A client with nine jobs had to read all nine to find the one holding them up. `components/portal/statusTone.ts` now holds four tones and their colours, shared by the job rows and the worker's invoice rows: **gold** waiting on the person reading it, **purple** moving and not on them, **green** finished and paid, **grey** not live yet. All four clear AA on the panel background. Tone is deliberately per audience and not per status, which is why the two portals still pass their own maps: "Open for quotes" is `moving` for a client who can only wait and `waiting` for a worker who can quote it right now. On the founder's own portal this turns nine identical pills into one gold one.
+
+**"Stage 0" came out of the job row.** It is the rail's internal counter, it means nothing to the person reading it, and on a job that has not started it prints "0", which reads as a failure rather than a beginning. The pill above it already says where the job is in words. The row now shows when the job last moved, which was fetched to sort by and never displayed.
+
+**Nothing about money, access or business logic moved.** No route added or removed, no query changed, no server action touched, no RLS policy touched. `--dim` had no non-text uses to break.
+
+---
+
 ## 2026-09-02 · One header, one file, instead of eight copies of it
 
 **Founder's own report, and she was right about the cause even without reading the code: "when I click on Marketplace or I click on Jobs it changes the menu to a different menu, it looks like a glitch."** The header was copy-pasted into all eight marketing pages, and each page then carried its own CSS for it. The four newest pages (index, marketplace, services, business) each had an inline block; they disagreed on the bar colour (0.85 against 0.88 alpha), the container width (1080, 1060, 1100), the active-tab treatment (a purple pill on two pages, plain bold on one, no rule at all on the fourth) and the width at which the menu vanished entirely (760, 860, 1024). The four older pages (contact, prices, faq, payments) used `nav.top` in `yaadly.css`, which still painted the pre-rebrand green-black bar and bright white tab labels. The app had a fifth header again, with a shorter menu: "Marketplace" where the site said "Overview", and no "Job board" tab at all. Nothing was broken in the sense of a bug report; it just redrew itself on every click, which is what a person reads as a glitch.

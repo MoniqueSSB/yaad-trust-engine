@@ -62,7 +62,7 @@ export function ChatThread({
           <input value={text} onChange={(e) => setText(e.target.value)} maxLength={1500}
             placeholder={"Message as " + self}
             className="flex-1 rounded-xl border border-line2 bg-bg px-3 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal" />
-          <button disabled={busy} className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] disabled:opacity-40">Send</button>
+          <button disabled={busy} className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand disabled:opacity-40">Send</button>
         </form>
         {warn.length > 0 && (
           <p role="status" className="mt-2.5 rounded-xl border border-coral/30 bg-coral/10 px-3 py-2.5 text-[12.5px] leading-relaxed text-mute">

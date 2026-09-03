@@ -18,6 +18,33 @@ type Review = {
   reply: string | null; created_at: string; author_first_name: string | null;
 };
 
+/* A public page that gets shared, so the tab and the link preview should say
+   whose profile it is. This is the one title worth a query of its own: every
+   other page can build its title from the URL, and a worker's name cannot be
+   read out of a slug without guessing at capitalisation and spelling. Falls
+   back to the generic title rather than throwing, because a missing profile is
+   notFound()'s job below, not this function's. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("worker_profiles")
+    .select("name,trade")
+    .eq("slug", slug)
+    .eq("active", true)
+    .maybeSingle();
+  if (!data?.name) return { title: "Worker profile · Yaadly" };
+  return {
+    title: data.trade
+      ? `${data.name}, ${data.trade} · Yaadly`
+      : `${data.name} · Yaadly`,
+  };
+}
+
 export default async function WorkerProfile({
   params,
 }: {
@@ -62,7 +89,7 @@ export default async function WorkerProfile({
       <Link href="/jobs?tab=workers" className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; The worker network</Link>
 
       <div className="mt-4 flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-panel p-5">
-        <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-[#04211D]">
+        <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
           {(wp.name ?? "W").split(" ").map((x: string) => x[0]).join("").slice(0, 2)}
         </span>
         <span className="min-w-[220px] flex-1">

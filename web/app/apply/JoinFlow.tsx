@@ -681,7 +681,7 @@ export function JoinFlow() {
           </p>
           <button
             onClick={() => { setContinuing(true); setStep(0); }}
-            className="mt-4 rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110">
+            className="mt-4 rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110">
             Carry on to the ID check
           </button>
         </div>
@@ -748,7 +748,7 @@ export function JoinFlow() {
           className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-softline bg-soft p-4 no-underline transition hover:border-teal sm:p-5"
         >
           <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[#25D366]">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="#04211D"
+            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="var(--onbrand)"
                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z" />
             </svg>
@@ -1227,7 +1227,7 @@ export function JoinFlow() {
                     </p>
 
                     <div className="flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-panel p-5">
-                      <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-[#04211D]">
+                      <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
                         {(name.trim() || "W").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase()}
                       </span>
                       <span className="min-w-[220px] flex-1">
@@ -1317,7 +1317,7 @@ export function JoinFlow() {
                 )}
 
                 <button onClick={send} disabled={busy || !step1Ready}
-                  className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                  className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                   {busy ? "Sending…" : "Send my application"}
                 </button>
                 {!step1Ready && (
@@ -1378,7 +1378,7 @@ export function JoinFlow() {
                   }
                   setStep(step + 1);
                 }}
-                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                 {busy && d.body === "form" ? "Starting…" : "Continue"}
               </button>
             )}

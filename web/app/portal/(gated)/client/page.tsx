@@ -25,6 +25,11 @@ export const dynamic = "force-dynamic";
  * Professional services live here too: somebody who bought a Deposit
  * Protection Check is a client, even though they never posted a job.
  */
+/* A title of its own, so a client with three tabs open can tell them apart.
+   Every portal screen used to fall back to the root layout's bare "Yaadly".
+   Three tabs, one word, three times. */
+export const metadata = { title: "Client portal · Yaadly" };
+
 export default async function ClientPortal() {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
@@ -177,7 +182,7 @@ export default async function ClientPortal() {
                 {g.href && (
                   <Link
                     href={g.href}
-                    className="mt-2.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D] transition hover:brightness-110"
+                    className="mt-2.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand transition hover:brightness-110"
                   >
                     {g.cta ?? "Do this"}
                   </Link>
@@ -208,7 +213,7 @@ export default async function ClientPortal() {
                     {g.href && (
                       <Link
                         href={g.href}
-                        className="mt-2.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D] transition hover:brightness-110"
+                        className="mt-2.5 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand transition hover:brightness-110"
                       >
                         {g.cta ?? "Do this"}
                       </Link>

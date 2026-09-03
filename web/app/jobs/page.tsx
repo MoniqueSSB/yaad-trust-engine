@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TRADES } from "@/lib/taxonomy";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { QuotePanel } from "@/components/QuotePanel";
@@ -208,8 +209,15 @@ export default async function Board({
         <Link href={`/jobs?tab=workers${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`} className={"inline-flex items-center gap-2 rounded-full border px-4.5 py-2.5 text-[13.5px] font-semibold transition " + (showWorkers ? "border-purple/45 bg-purple/10 text-purpleb" : "border-line text-mute hover:border-line2 hover:text-ink")}>
           The worker network <span className={"rounded-full bg-panel2 px-2 py-px font-mono-app text-[10.5px] " + (showWorkers ? "text-purpleb" : "text-dim")}>{workers.length}</span>
         </Link>
+        {/* /ask had no inbound link from anywhere: not the header, not the
+            marketing site, not this board. It was built, shipped and
+            unreachable, which is the same as not existing for the one visitor
+            it was for, the person who is not sure they have a job yet. It
+            belongs here, next to the board, because that is exactly the
+            moment somebody hesitates. */}
         <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
-          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All 18 trades</Link>
+          <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask a Yaad</Link>
+          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
           <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
         </span>
       </div>

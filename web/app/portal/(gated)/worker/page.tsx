@@ -30,6 +30,11 @@ const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
  * 88%-plus-materials arithmetic FeeBreakdown.tsx already shows per job,
  * summed across every job this worker has actually won.
  */
+/* A title of its own, so a client with three tabs open can tell them apart.
+   Every portal screen used to fall back to the root layout's bare "Yaadly".
+   Three tabs, one word, three times. */
+export const metadata = { title: "Worker portal · Yaadly" };
+
 export default async function WorkerPortal() {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
