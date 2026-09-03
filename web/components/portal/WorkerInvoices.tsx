@@ -12,6 +12,8 @@
  * money has moved: nothing in this codebase moves money (CLAUDE.md 9).
  */
 
+import { STATUS_TONE, type StatusLabel } from "./statusTone";
+
 export type WorkerInvoiceJob = {
   jobId: string;
   jobTitle: string | null;
@@ -27,6 +29,24 @@ export type WorkerInvoiceJob = {
 };
 
 const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
+/**
+ * The same four tones the job rows use, so "waiting on somebody" looks the
+ * same whether it is a job or an invoice. Before this, "Recorded paid" and
+ * "draft" shared one pill, which put the finished thing and the unsent thing
+ * in the same colour on the one screen a worker opens to ask whether they
+ * have been paid.
+ *
+ * "Pending" stays carefully worded. It means sent and waiting, and it is not
+ * a claim that money has moved: only the worker's own note against the job
+ * says that, and nothing in this codebase moves money (CLAUDE.md 9).
+ */
+function invoiceStatus(status: string, paid: boolean): StatusLabel {
+  if (status === "sent" && !paid) return { label: "Pending", tone: "waiting" };
+  if (status === "sent") return { label: "Recorded paid", tone: "done" };
+  if (status === "draft") return { label: "Draft, not sent", tone: "idle" };
+  return { label: status, tone: "idle" };
+}
 
 export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
   if (jobs.length === 0) return null;
@@ -55,12 +75,10 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                   <span
                     className={
                       "rounded-full border px-2 py-0.5 text-[10.5px] font-bold " +
-                      (inv.status === "sent" && !j.paid
-                        ? "border-mango/40 text-mango"
-                        : "border-softline bg-soft text-tealb")
+                      STATUS_TONE[invoiceStatus(inv.status, j.paid).tone]
                     }
                   >
-                    {inv.status === "sent" && !j.paid ? "Pending" : inv.status === "sent" ? "Recorded paid" : inv.status}
+                    {invoiceStatus(inv.status, j.paid).label}
                   </span>
                   <span className="font-mono text-[10px] text-dim">{inv.id}</span>
                 </li>

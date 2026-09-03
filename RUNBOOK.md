@@ -1195,3 +1195,39 @@ Applies to short jobs taken on manual capture (authorise at booking, capture on 
 **Quotes already in were priced against the old wording.** The form tells the client that. If a change is big enough to move the price, message the workers who quoted; nothing does that automatically.
 
 **"Only the client of this job can change its description" / "A worker is booked on this job":** those are `edit_job_descr_as_me()` (20260903a) refusing, in words, and both are correct. The first means the signed-in email is not the job's `client_email`; the second is the rule above. There is no override in the portal on purpose.
+
+---
+
+## Changing a colour, or adding a text tier
+
+**Text colours live in six files and must move together.** `--mute` and `--dim` are defined in `web/app/globals.css`, `docs/yaadly.css`, and the inline `:root` blocks of `docs/index.html`, `docs/marketplace.html`, `docs/business.html` and `docs/services.html`. Editing the stylesheet alone reaches exactly half the marketing site, because those four pages carry their own copy. Check with:
+
+```bash
+grep -rnE -- '--(color-)?(mute|dim):? *#' docs/*.html docs/*.css web/app/globals.css
+```
+
+Every line that comes back should show the same two values. Today: `--mute:#9E9ECB`, `--dim:#7C7CA6`.
+Seven lines, six files. The app spells them `--color-mute` and `--color-dim`, because Tailwind v4
+derives `text-mute` and `text-dim` from that prefix; the plain names are aliased to them further down
+`globals.css` for the CSS ported from the preview. Same values, two spellings, one meaning.
+
+**Any colour used for text must clear 4.5:1 against `--bg` (`#07071A`).** That is not a preference, it is the WCAG AA floor for normal text, and `--dim` sat at 2.04:1 until 3 Sep 2026. To check a candidate, open any page and run this in the browser console:
+
+```js
+const lin=c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
+const L=h=>{const n=parseInt(h.slice(1),16);return 0.2126*lin((n>>16)&255)+0.7152*lin((n>>8)&255)+0.0722*lin(n&255)};
+const ratio=(a,b)=>{const x=L(a),y=L(b);return ((Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)).toFixed(2)};
+ratio('#7C7CA6','#07071A')   // must be 4.5 or above
+```
+
+**Status pill colours are `web/components/portal/statusTone.ts`, one file.** Four tones: `waiting` gold, `moving` purple, `done` green, `idle` grey. Add a tone there, never in the component asking for it, and check it against the panel background the same way. The wording of each status stays in `JobList.tsx`, per audience, because a client and a worker read the same status differently.
+
+**The ink on a brand gradient is `--color-onbrand`, one token.** It was hardcoded as `#04211D` in 53 places, a leftover green from the retired teal palette. If the gradient ever changes, this changes with it and nothing else needs to.
+
+**The favicon is the same purple mark on all eight marketing pages and the app** (`web/app/icon.svg`). Audit with:
+
+```bash
+for f in docs/*.html; do printf '%-24s ' "$f"; grep -o "fill='%23[0-9A-Fa-f]\{6\}'" "$f" | head -1; done
+```
+
+All eight should read `%237B4FE0`. Four of them were still the old teal square until 3 Sep 2026.

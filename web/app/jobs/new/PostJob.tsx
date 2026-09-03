@@ -161,7 +161,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
             </p>
             <Link
               href={`/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}`}
-              className="mt-4 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+              className="mt-4 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
             >
               Finish setting up your portal
             </Link>
@@ -369,19 +369,19 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
             )}
             {step === 0 && (
               <button type="button" disabled={busy || !workReady} onClick={saveDraft}
-                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                 {busy ? "Saving…" : "Save and carry on"}
               </button>
             )}
             {step === 1 && (
               <button type="button" onClick={() => setStep(2)}
-                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110">
+                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110">
                 Continue
               </button>
             )}
             {step === 2 && (
               <button type="button" disabled={busy || !reachReady} onClick={send}
-                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
                 {busy ? "Sending…" : "Send my job"}
               </button>
             )}

@@ -29,6 +29,11 @@ export const dynamic = "force-dynamic";
 
 type Sec = { n: number; title: string; html: string };
 
+/* A title of its own, so a client with three tabs open can tell them apart.
+   Every portal screen used to fall back to the root layout's bare "Yaadly".
+   Three tabs, one word, three times. */
+export const metadata = { title: "Guidelines · Yaadly" };
+
 export default async function Guidelines({
   searchParams,
 }: {
@@ -92,7 +97,7 @@ export default async function Guidelines({
                   ✓ Signed {String(sig.signed_at).slice(0, 10)}
                 </span>
               ) : (
-                <a href={`/portal/guidelines?read=${d.key}`} className="ml-auto rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                <a href={`/portal/guidelines?read=${d.key}`} className="ml-auto rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
                   {user ? "Read and sign" : "Read it"}
                 </a>
               )}
@@ -120,7 +125,7 @@ export default async function Guidelines({
                     <input name="name" required minLength={3}
                       className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[15px] text-ink outline-none focus:border-teal" />
                   </label>
-                  <button className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-[#04211D]">
+                  <button className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-onbrand">
                     Sign {d.label} v{d.version}
                   </button>
                   <p className="w-full text-[11.5px] leading-relaxed text-dim">

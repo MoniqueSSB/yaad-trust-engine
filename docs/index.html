@@ -26,7 +26,11 @@
   --bg:#07071A; --bg2:#0D0D28;
   --panel:rgba(155,115,245,0.05); --panel2:rgba(155,115,245,0.09);
   --line:rgba(155,115,245,0.14); --line2:rgba(155,115,245,0.28);
-  --ink:#EEEEFF; --mute:#7878A8; --dim:#44446A;
+  /* Text tiers retuned 3 Sep 2026, same values as docs/yaadly.css and
+     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1. The old
+     mute 4.8:1 and dim 2.2:1 put the supporting copy below AA. Change all
+     three files together or the site drifts against itself. */
+  --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
   --purple:#9B73F5; --purpleb:#C4AAFF; --gold:#F59E0B; --goldb:#FBBF24;
   --grad:linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
   --disp:'Fraunces',Georgia,serif;

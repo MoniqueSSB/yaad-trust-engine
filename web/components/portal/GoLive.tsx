@@ -56,7 +56,7 @@ export function GoLive({
         </p>
         <Link
           href={marketplaceHref}
-          className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+          className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
         >
           See it live on the marketplace &rarr;
         </Link>
@@ -137,7 +137,7 @@ export function GoLive({
       {ready ? (
         <form action={goLive} className="mt-4">
           <input type="hidden" name="jobId" value={jobId} />
-          <button className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110">
+          <button className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110">
             Put this job on the marketplace
           </button>
         </form>
@@ -146,7 +146,7 @@ export function GoLive({
         next.cta && (
           <Link
             href={next.href}
-            className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+            className="mt-4 inline-flex rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
           >
             {next.cta}
           </Link>

@@ -85,7 +85,25 @@
     + 'background:#0d0d24;color:#EEEEFF;border-left:1px solid rgba(155,115,245,.28);box-shadow:-24px 0 60px rgba(0,0,0,.55);overflow:hidden;font:15px/1.5 "IBM Plex Sans",-apple-system,sans-serif;animation:yc-in .22s ease-out}'
     + '@keyframes yc-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}'
     + '#yc-panel[hidden]{display:none}'
-    + '@media(max-width:480px){#yc-launch{padding:12px 8px 14px;font-size:12px}#yc-launch svg{width:17px;height:17px}}'
+    /* On a phone the mid-height right-edge tab sits ON the form. It is fixed,
+       nothing reserves room for it, and at 375px it covered the right edge of
+       every input card on /jobs/new and /apply: the two pages where a stranger
+       is being asked to type. A launcher that hides the thing it is offering
+       help with is worse than no launcher.
+
+       Under 700px it becomes an ordinary bottom-right pill instead, which is
+       where a phone user already looks for one, and which clears the middle of
+       the screen where the fields are. The homepage's WhatsApp float is on the
+       LEFT (it moved there for this chat), so the two do not collide. The
+       safe-area inset keeps it off the home indicator on an iPhone. */
+    + '@media(max-width:700px){'
+    +   '#yc-launch{top:auto;bottom:calc(16px + env(safe-area-inset-bottom));right:14px;transform:none;'
+    +     'flex-direction:row;gap:8px;padding:11px 16px;border-radius:100px;border-right:1px solid rgba(196,170,255,.35);'
+    +     'font-size:13px;box-shadow:0 8px 24px rgba(20,10,60,.5)}'
+    +   '#yc-launch span{writing-mode:horizontal-tb;transform:none}'
+    +   '#yc-launch:hover{padding-right:16px}'
+    + '}'
+    + '@media(max-width:480px){#yc-launch{padding:10px 14px;font-size:12px}#yc-launch svg{width:17px;height:17px}}'
     + '@media(prefers-reduced-motion:reduce){#yc-panel{animation:none}}'
     + '.yc-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid rgba(155,115,245,.18);background:rgba(155,115,245,.07)}'
     + '.yc-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#7B4FE0,#5A28B8);display:grid;place-items:center;color:#fff;font:600 17px Fraunces,Georgia,serif}'

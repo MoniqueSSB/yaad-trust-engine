@@ -252,7 +252,7 @@ function JoinForm() {
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+        className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40"
       >
         {signInButtonLabel(otp, busy)}
       </button>

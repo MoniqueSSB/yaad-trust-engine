@@ -114,6 +114,18 @@ function jmd(n: number | null) {
   return n == null ? null : "J$" + n.toLocaleString("en-US");
 }
 
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return { title: `${id} · Yaadly` };
+}
+
 export default async function JobRoom({
   params,
   searchParams,
@@ -370,7 +382,7 @@ export default async function JobRoom({
                 </p>
                 <Link
                   href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
-                  className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]"
+                  className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand"
                 >
                   Read the Kickoff Pack &rarr;
                 </Link>
@@ -1026,7 +1038,7 @@ export default async function JobRoom({
                   <form action={requestKickoff} className="mt-3">
                     <input type="hidden" name="jobId" value={job.id} />
                     <input type="hidden" name="quoteId" value={q.id} />
-                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
                       Get a Kickoff Pack for this price
                     </button>
                   </form>
@@ -1041,7 +1053,7 @@ export default async function JobRoom({
                   <form action={chooseQuote} className="mt-3">
                     <input type="hidden" name="jobId" value={job.id} />
                     <input type="hidden" name="quoteId" value={q.id} />
-                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
                       Skip the Kickoff Pack, book {q.worker_name} now
                     </button>
                     <p className="mt-1.5 max-w-[46ch] text-[11.5px] leading-snug text-dim">
@@ -1088,7 +1100,7 @@ export default async function JobRoom({
                       <form action={chooseQuote}>
                         <input type="hidden" name="jobId" value={job.id} />
                         <input type="hidden" name="quoteId" value={q.id} />
-                        <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                        <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
                           Choose {q.worker_name} for the job
                         </button>
                         <p className="mt-1.5 max-w-[46ch] text-[11.5px] leading-snug text-dim">

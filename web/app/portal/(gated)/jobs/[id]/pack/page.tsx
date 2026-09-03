@@ -19,6 +19,18 @@ export const dynamic = "force-dynamic";
  * CURRENT revision's. A code baked into an older link fails closed in
  * agree_kickoff_pack() rather than silently confirming stale content.
  */
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return { title: `Kickoff pack · ${id} · Yaadly` };
+}
+
 export default async function PackIndex({
   params,
   searchParams,
@@ -118,7 +130,7 @@ export default async function PackIndex({
                 <input type="hidden" name="jobId" value={id} />
                 <input type="hidden" name="packId" value={pack.id} />
                 <input type="hidden" name="code" value={linkCode || pack.confirm_code || ""} />
-                <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D]">
+                <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
                   Confirm as the client
                 </button>
               </form>

@@ -14,6 +14,18 @@ export const dynamic = "force-dynamic";
  * for unfinished work would be fiction.
  */
 
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return { title: `Completion · ${id} · Yaadly` };
+}
+
 export default async function Completion({ params }: { params: Promise<{ id: string }> }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");

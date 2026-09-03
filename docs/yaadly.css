@@ -3,7 +3,14 @@
    does not change its face, only its length. */
 :root{
   --bg:#07071A; --panel:rgba(155,115,245,0.05); --panel2:rgba(155,115,245,0.09); --line:rgba(155,115,245,0.12); --line2:rgba(155,115,245,0.22);
-  --ink:#EEEEFF; --mute:#7878A8; --dim:#44446A;
+  /* The three text tiers, retuned 3 Sep 2026 so all three are readable.
+     Measured against --bg #07071A: ink 17.4:1, mute 7.8:1, dim 5.0:1.
+     The old values were mute 4.8:1 and dim 2.2:1, and --dim carried the
+     supporting copy on every page: what is held, what is released, what
+     a field wants. Copy nobody can read builds no trust, so the tier that
+     carries it has to clear AA like the rest. Keep any new tier above
+     4.5:1 on --bg or it is decoration, not text. */
+  --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
   /* Same variable names, purple/gold values — every rule in the file picks up the new palette automatically */
   --teal:#9B73F5; --tealb:#C4AAFF; --mango:#F59E0B; --coral:#F87171; --sand:#FBBF24;
   --soft:rgba(155,115,245,0.08); --softline:rgba(155,115,245,0.22); --red:#F87171; --redsoft:rgba(248,113,113,0.10);

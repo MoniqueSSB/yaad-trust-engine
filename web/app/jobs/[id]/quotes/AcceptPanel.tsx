@@ -66,7 +66,7 @@ export function AcceptPanel({
         type="button"
         onClick={accept}
         disabled={busy}
-        className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? "Requesting…" : `Get a Kickoff Pack from ${workerName}`}
       </button>

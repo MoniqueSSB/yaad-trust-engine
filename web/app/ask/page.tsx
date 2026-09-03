@@ -9,6 +9,17 @@ export const dynamic = "force-dynamic";
  * asks, vetted workers answer publicly. Questions publish after a human
  * look, which is a deliberate moderation gate on an open text box on a
  * public website; the answering bar is the same one quoting uses.
+ *
+ * Two things on this site are called some version of "ask", and until now
+ * neither said which it was. "Ask a Yaad" is this page: public, answered by
+ * workers, visible to everyone, slow. "Ask Yaadly" is the chat tab pinned to
+ * the right edge of every page: private, answered by a person at Yaadly,
+ * quick. A visitor could not tell them apart from their names, so the page
+ * now says the difference in a sentence rather than relying on the reader to
+ * work it out. Renaming either one is the founder's call, not this file's.
+ *
+ * Reached from the job board's link row. It had no inbound link at all until
+ * 3 Sep 2026.
  */
 
 export const metadata = { title: "Ask a Yaad · Yaadly" };
@@ -41,10 +52,16 @@ export default async function Ask({
     <>
       <SiteNav active="market" />
       <div className="mx-auto max-w-[1080px] px-5 py-10">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Ask a Yaad</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Ask a Yaad &middot; public Q&amp;A</p>
         <h1 className="mt-2 font-display text-[clamp(28px,4.5vw,42px)] uppercase leading-none">Ask before you post</h1>
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
           Not sure it&apos;s a job at all? Ask first, vetted workers answer publicly.
+        </p>
+        <p className="mt-2.5 max-w-[62ch] text-[13.5px] leading-relaxed text-dim">
+          This is the public board, so your question and its answers can be read
+          by anyone. If it is about your own property or your own money, use
+          Ask Yaadly, the chat tab on the right, and a person replies to you
+          privately.
         </p>
 
         <form action={askQuestion} className="mt-6 rounded-2xl border border-line bg-panel p-5">
@@ -55,7 +72,7 @@ export default async function Ask({
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <input name="area" maxLength={60} placeholder="Your area (optional)"
               className="w-44 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal" />
-            <button className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110">
+            <button className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110">
               Ask the community
             </button>
           </div>

@@ -121,7 +121,7 @@ export function JobDescrEditor({
           <div className="mt-3 flex flex-wrap gap-2.5">
             <button
               disabled={state === "busy"}
-              className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+              className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40"
             >
               {state === "busy" ? "Saving..." : "Save the description"}
             </button>

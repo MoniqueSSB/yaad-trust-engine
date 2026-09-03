@@ -188,7 +188,7 @@ export async function CalBand({
                   <form action={setVisitState} className="mt-1.5 flex gap-1.5">
                     <input type="hidden" name="id" value={v.id} />
                     <input type="hidden" name="path" value={base} />
-                    <button name="state" value="confirmed" className="rounded-full bg-linear-to-r from-teal to-mango px-3 py-1 text-[11px] font-bold text-[#04211D]">Confirm</button>
+                    <button name="state" value="confirmed" className="rounded-full bg-linear-to-r from-teal to-mango px-3 py-1 text-[11px] font-bold text-onbrand">Confirm</button>
                     <button name="state" value="cancelled" className="rounded-full border border-line px-3 py-1 text-[11px] text-mute hover:border-coral hover:text-coral">Decline</button>
                   </form>
                 )}
@@ -212,7 +212,7 @@ export async function CalBand({
               <form action={toggleDay} className="mt-1.5">
                 <input type="hidden" name="day" value={sel} />
                 <input type="hidden" name="path" value={base} />
-                <button className={"rounded-full px-4 py-1.5 text-[12px] font-bold " + (openDays.has(sel) ? "border border-line2 text-ink hover:border-coral hover:text-coral" : "bg-linear-to-r from-teal to-mango text-[#04211D]")}>
+                <button className={"rounded-full px-4 py-1.5 text-[12px] font-bold " + (openDays.has(sel) ? "border border-line2 text-ink hover:border-coral hover:text-coral" : "bg-linear-to-r from-teal to-mango text-onbrand")}>
                   {openDays.has(sel) ? "Close this day" : "Open this day"}
                 </button>
                 <p className="mt-1.5 text-[11px] leading-relaxed text-dim">

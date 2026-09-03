@@ -267,7 +267,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
         is signed.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button disabled={busy} className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40">
+        <button disabled={busy} className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40">
           {busy ? "Sending..." : "Send quote"}
         </button>
         <span className="text-[11.5px] text-dim">

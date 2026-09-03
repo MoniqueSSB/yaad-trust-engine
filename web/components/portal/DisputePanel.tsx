@@ -132,7 +132,7 @@ export function DisputePanel({
               className="min-w-[240px] flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-[13px] text-ink outline-none focus:border-teal" />
             <button disabled={busy || reply.trim().length < 2}
               onClick={async () => { setBusy(true); try { await moveDispute(dispute.id, jobId, "reply", reply); router.refresh(); } catch {} setBusy(false); }}
-              className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] disabled:opacity-40">
+              className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand disabled:opacity-40">
               Reply
             </button>
           </>
@@ -141,7 +141,7 @@ export function DisputePanel({
           <>
             <button disabled={busy}
               onClick={async () => { setBusy(true); try { await moveDispute(dispute.id, jobId, "resolved"); router.refresh(); } catch {} setBusy(false); }}
-              className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] disabled:opacity-40">
+              className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand disabled:opacity-40">
               That sorts it
             </button>
             <button disabled={busy}

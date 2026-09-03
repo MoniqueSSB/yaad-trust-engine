@@ -200,7 +200,7 @@ export function JobPhotoUpload({
         )}
         <button
           disabled={state === "busy"}
-          className="mt-3 rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+          className="mt-3 rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40"
         >
           {state === "busy" ? "Sending..." : "Send a photo"}
         </button>

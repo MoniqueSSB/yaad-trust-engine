@@ -8,15 +8,31 @@
   --color-panel2: rgba(255,255,255,0.05);
   --color-line: rgba(155,115,245,0.11);
   --color-line2: rgba(155,115,245,0.22);
+  /* The three text tiers, retuned 3 Sep 2026 so all three are readable.
+     Measured against --color-bg #07071A: ink 17.4:1, mute 7.8:1, dim 5.0:1,
+     which clears WCAG AA (4.5:1) on all three with a visible step between
+     them. The old values were mute 4.8:1 and dim 2.0:1, and text-dim is used
+     269 times across 60 files: field labels, job references, "nothing held
+     right now", "paid off-platform within 3 working days of release". That is
+     the copy the product is trusted on, set at a contrast a worker on a phone
+     outdoors cannot read. Same values as docs/yaadly.css; change both or the
+     two halves of the site drift. Any new tier stays above 4.5:1 on the
+     background or it is decoration, not text. */
   --color-ink: #EEEEFF;
-  --color-mute: #7878A8;
-  --color-dim: #404068;
+  --color-mute: #9E9ECB;
+  --color-dim: #7C7CA6;
   --color-purple: #9B73F5;
   --color-purpleb: #C4AAFF;
   --color-gold: #F59E0B;
   --color-goldb: #FBBF24;
   --color-green: #34D399;
   --color-coral: #F87171;
+  /* The ink that sits ON the brand gradient, rather than on the page.
+     It was #04211D in 53 places, the near-black GREEN left over from the
+     retired teal palette, sitting on a purple and gold button. A token
+     because the next palette change should be one line, not 53. 5.5:1 on
+     the purple end, 8.7:1 on the gold end. */
+  --color-onbrand: #160B2E;
   --color-soft: rgba(155,115,245,0.07);
   --color-softline: rgba(155,115,245,0.2);
   /* legacy aliases so existing components don't lose colour during migration */
@@ -60,6 +76,7 @@ body {
   --goldb: var(--color-goldb);
   --green: var(--color-green);
   --coral: var(--color-coral);
+  --onbrand: var(--color-onbrand);
   --soft: var(--color-soft);
   --softline: var(--color-softline);
   /* legacy aliases — existing components using teal/mango inherit purple/gold */
