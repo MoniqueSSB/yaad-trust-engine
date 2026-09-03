@@ -77,13 +77,34 @@ export default async function PackIndex({
     if (quote && quote.worker_user === user.id) role = "worker";
   }
 
+  /* Every revision's agreements, not just this one's.
+     clientAgreed/workerAgreed below still count ONLY the current revision,
+     which is the part that gates anything. The older rows are read for a
+     different purpose: telling somebody they already confirmed an earlier
+     revision and that this one replaced it. */
   const { data: agreements } = await supabase
     .from("kickoff_pack_agreements")
-    .select("side")
-    .eq("pack_id", pack.id)
-    .eq("rev", pack.rev ?? 1);
-  const clientAgreed = (agreements ?? []).some((a) => a.side === "client");
-  const workerAgreed = (agreements ?? []).some((a) => a.side === "worker");
+    .select("side,rev,agreed_at")
+    .eq("pack_id", pack.id);
+  const thisRev = pack.rev ?? 1;
+  const atThisRev = (agreements ?? []).filter((a) => (a.rev ?? 1) === thisRev);
+  const clientAgreed = atThisRev.some((a) => a.side === "client");
+  const workerAgreed = atThisRev.some((a) => a.side === "worker");
+
+  /* The reader's own most recent confirmation of an EARLIER revision.
+     There is deliberately no diff here and there cannot be one: kickoff_packs
+     holds a single `docs` per pack with a rev counter, so the previous
+     revision's content is overwritten and gone. Inventing a "what changed"
+     summary from nothing would be worse than saying nothing, on a document
+     somebody is being asked to agree to.
+     What the database DOES know is which revision this person confirmed and
+     when, and that is the fact worth telling them: their earlier confirmation
+     does not carry over, and this is a different document. */
+  const myPrior = role
+    ? (agreements ?? [])
+        .filter((a) => a.side === role && (a.rev ?? 1) < thisRev)
+        .sort((a, b) => String(b.agreed_at).localeCompare(String(a.agreed_at)))[0] ?? null
+    : null;
   const iAgreed = role === "client" ? clientAgreed : role === "worker" ? workerAgreed : false;
 
   const d = (pack.docs ?? {}) as Dict;
@@ -115,9 +136,31 @@ export default async function PackIndex({
           <p className="mb-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
             Both sides confirm this exact revision before it is treated as final.
             {pack.both_confirmed_at
-              ? " Both sides have confirmed rev " + (pack.rev ?? 1) + "."
+              ? " Both sides have confirmed rev " + thisRev + "."
               : " If the pack changes after this, a new revision is issued and both sides confirm again."}
           </p>
+
+          {/* Asking somebody to sign the same thing twice, without telling them
+              it is not the same thing, is how a re-confirmation becomes a
+              rubber stamp. This says plainly what the database knows. It does
+              not claim to say what changed, because the previous revision's
+              text is not kept and a summary of it would be invented. */}
+          {myPrior && !iAgreed && (
+            <p
+              role="status"
+              className="mb-3 max-w-[62ch] rounded-xl border border-gold/40 bg-gold/10 px-3.5 py-3 text-[13px] leading-relaxed text-goldb"
+            >
+              <b className="font-semibold">This is not the pack you confirmed before.</b>{" "}
+              You confirmed revision {myPrior.rev ?? 1} on{" "}
+              {new Date(String(myPrior.agreed_at)).toLocaleDateString("en-GB", {
+                day: "numeric", month: "short", year: "numeric",
+              })}
+              . It was replaced by revision {thisRev}, so that confirmation no
+              longer stands and this one has to be read again. Yaadly does not
+              keep the old wording side by side, so if you want to know exactly
+              what moved, ask on the job and a person will tell you.
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-2.5">
             <span className={"rounded-full border px-3 py-1.5 text-[12px] font-bold " + (clientAgreed ? "border-softline bg-soft text-tealb" : "border-line text-dim")}>
               {clientAgreed ? "✓ Client confirmed" : "Client not yet confirmed"}

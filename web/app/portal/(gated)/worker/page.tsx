@@ -154,15 +154,29 @@ export default async function WorkerPortal() {
     }),
   );
 
-  const held = moneyJobs.filter((j) => j.held).reduce((sum, j) => sum + j.takeHome, 0);
+  const heldJobs = moneyJobs.filter((j) => j.held);
+  const held = heldJobs.reduce((sum, j) => sum + j.takeHome, 0);
   const released = moneyJobs.filter((j) => !j.held).reduce((sum, j) => sum + j.takeHome, 0);
+
+  /* What the held figure is actually waiting on, named.
+     "Released once each client approves" is true and tells a worker nothing
+     they can act on: not which job, not how many, not whether the ball is with
+     them or with somebody else. A tradesperson looking at a number with their
+     name on it wants to know who is holding it up. Naming the single job when
+     there is one is the common case and the useful one. */
+  const heldNote =
+    heldJobs.length === 0
+      ? "Nothing held right now"
+      : heldJobs.length === 1
+        ? `Waiting on the client to approve ${heldJobs[0].title ?? "this job"}`
+        : `Waiting on ${heldJobs.length} clients to approve. See job by job below.`;
 
   const tiles: Tile[] = [
     {
       label: "Held right now",
       value: jmd(held),
       held: held > 0,
-      note: held > 0 ? "Released once each client approves" : "Nothing held right now",
+      note: heldNote,
     },
     {
       label: "Released",

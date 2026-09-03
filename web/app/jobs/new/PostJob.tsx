@@ -59,7 +59,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { TRADES, PARISHES } from "@/lib/taxonomy";
+import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
   ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY,
   draftFields, firstIncomplete, looksLikeEmail, looksLikePhone,
@@ -84,6 +84,13 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
   const [saveFailed, setSaveFailed] = useState(false);
   const [sent, setSent] = useState(false);
   const [restored, setRestored] = useState(false);
+  /* Narrows the trade chips as you type. Eighteen chips then fourteen more is
+     two full phone screens before the first question is answered, on the page
+     with the highest intent in the funnel. A filter is the fix that invents
+     nothing: the taxonomy carries no grouping, so any categories would be made
+     up here and would then disagree with every other list of trades in the
+     product. An empty box shows all eighteen, exactly as before. */
+  const [tradeFilter, setTradeFilter] = useState("");
 
   const set = <K extends keyof Fields>(k: K, v: Fields[K]) => setF((p) => ({ ...p, [k]: v }));
   const key = STAGES[stage].key;
@@ -458,8 +465,18 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                     {f.trade ? "Chosen" : "Required"}
                   </span>
                 </label>
+                <input
+                  type="search"
+                  value={tradeFilter}
+                  onChange={(e) => setTradeFilter(e.target.value)}
+                  placeholder="Start typing to narrow the list, e.g. roof"
+                  aria-label="Filter the trades"
+                  className="jf mb-2.5"
+                />
                 <div className="chips" role="group" aria-labelledby="lbl-trade">
-                  {TRADES.map((t) => (
+                  {TRADES.filter((t) =>
+                    t.toLowerCase().includes(tradeFilter.trim().toLowerCase()),
+                  ).map((t) => (
                     <button key={t} type="button" aria-pressed={f.trade === t}
                       className={f.trade === t ? "on" : ""}
                       onClick={() => set("trade", f.trade === t ? "" : t)}>
@@ -467,6 +484,15 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                     </button>
                   ))}
                 </div>
+                {/* Nothing matching is not an error and not a dead end: the
+                    next question is a free text box a person reads. */}
+                {tradeFilter.trim() !== "" &&
+                  !TRADES.some((t) => t.toLowerCase().includes(tradeFilter.trim().toLowerCase())) && (
+                    <p role="status" className="mt-2 text-[12.5px] leading-relaxed text-goldb">
+                      Nothing matches &ldquo;{tradeFilter.trim()}&rdquo;. Pick the closest
+                      trade, or clear the box and describe it in your own words below.
+                    </p>
+                  )}
                 <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                   Not sure which? Pick the closest. A person reads this and will
                   put it right if it needs changing.
@@ -501,8 +527,31 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                     {f.parish ? "Chosen" : "Required"}
                   </span>
                 </label>
+                {/* The three we actually work in, first, and labelled. The note
+                    underneath already said Kingston and Portmore come first,
+                    and the list under it was alphabetical, so a client read the
+                    sentence and then scanned fourteen parishes in an order that
+                    contradicted it. Same fourteen, all still pickable: posting
+                    from anywhere is deliberate and the note says what happens
+                    next. LAUNCH_PARISHES is shared with /apply so the two
+                    funnels cannot disagree about where the business operates. */}
+                <p className="mb-1.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.14em] text-dim">
+                  Where we work now
+                </p>
                 <div className="chips" role="group" aria-labelledby="lbl-parish">
-                  {PARISHES.map((p) => (
+                  {LAUNCH_PARISHES.map((p) => (
+                    <button key={p} type="button" aria-pressed={f.parish === p}
+                      className={f.parish === p ? "on" : ""}
+                      onClick={() => set("parish", f.parish === p ? "" : p)}>
+                      <span aria-hidden="true">{f.parish === p ? "✓ " : "+ "}</span>{p}
+                    </button>
+                  ))}
+                </div>
+                <p className="mb-1.5 mt-3 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.14em] text-dim">
+                  Everywhere else
+                </p>
+                <div className="chips" role="group" aria-label="Other parishes">
+                  {PARISHES.filter((p) => !(LAUNCH_PARISHES as readonly string[]).includes(p)).map((p) => (
                     <button key={p} type="button" aria-pressed={f.parish === p}
                       className={f.parish === p ? "on" : ""}
                       onClick={() => set("parish", f.parish === p ? "" : p)}>
