@@ -28,9 +28,13 @@ type Review = {
 /* A public page that gets shared, so the tab and the link preview should say
    whose profile it is. This is the one title worth a query of its own: every
    other page can build its title from the URL, and a worker's name cannot be
-   read out of a slug without guessing at capitalisation and spelling. Falls
-   back to the generic title rather than throwing, because a missing profile is
-   notFound()'s job below, not this function's. */
+   read out of a slug without guessing at capitalisation and spelling.
+
+   Falls back to the generic title rather than throwing, because a missing
+   profile is notFound()'s job. Note that BOTH the notFound() below and a
+   notFound() here are too late to set the status code: see layout.tsx in this
+   folder, which is the one place on this route that runs before the shell is
+   flushed. This function is left as it was on purpose. */
 export async function generateMetadata({
   params,
 }: {
