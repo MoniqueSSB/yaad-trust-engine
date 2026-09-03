@@ -13,6 +13,7 @@
  */
 
 import { STATUS_TONE, type StatusLabel } from "./statusTone";
+import { jmd } from "@/lib/money";
 
 export type WorkerInvoiceJob = {
   jobId: string;
@@ -28,7 +29,7 @@ export type WorkerInvoiceJob = {
   }[];
 };
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 /**
  * The same four tones the job rows use, so "waiting on somebody" looks the
@@ -66,11 +67,20 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
             <b className="text-[14.5px]">{j.jobTitle ?? j.jobId}</b>
             <ul className="mt-2 grid gap-1.5">
               {j.invoices.map((inv) => (
+                /* Two explicit columns rather than a four item wrap. On a
+                   narrow screen the flex row broke wherever it ran out of
+                   width, which regularly put the amount on one line and the
+                   status that qualifies it on the next: J$9,500 reading as
+                   settled when the word underneath said Pending. The label
+                   spans the top on a phone; the money and its status stay
+                   together on the row below, which is the pairing that has
+                   to survive. */
                 <li
                   key={inv.id}
-                  className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-bg px-3 py-2 text-[12.5px]"
+                  className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-bg px-3 py-2 text-[12.5px] max-[560px]:grid-cols-1"
                 >
-                  <span className="min-w-[140px] flex-1 text-mute">{inv.periodLabel}</span>
+                  <span className="text-mute max-[560px]:col-span-full">{inv.periodLabel}</span>
+                  <span className="flex flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">
                   <span className="font-bold text-tealb">{jmd(inv.totalPence)}</span>
                   <span
                     className={
@@ -81,6 +91,7 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                     {invoiceStatus(inv.status, j.paid).label}
                   </span>
                   <span className="font-mono text-[10px] text-dim">{inv.id}</span>
+                  </span>
                 </li>
               ))}
             </ul>

@@ -30,6 +30,7 @@ import { BoardPreview } from "@/components/portal/BoardPreview";
 import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
+import { jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -110,9 +111,7 @@ const STATUS_LABEL: Record<string, string> = {
   complete: "Closed",
 };
 
-function jmd(n: number | null) {
-  return n == null ? null : "J$" + n.toLocaleString("en-US");
-}
+/* Was a second, unrounded formatter in this same file. See lib/money.ts. */
 
 /* Its own title, so two job tabs are two different words in the tab strip.
    The id rather than the job's name because it is already on the page, it is
@@ -416,8 +415,7 @@ export default async function JobRoom({
         )
       : undefined);
 
-  const money = (n: number | null | undefined) =>
-    n == null ? null : "J$" + Math.round(n).toLocaleString("en-JM");
+  const money = jmdOrNull;
 
   const labour = won?.labour_jmd ?? null;
   const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);

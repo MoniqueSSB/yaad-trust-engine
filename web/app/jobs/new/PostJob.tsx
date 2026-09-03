@@ -235,17 +235,26 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
           {step === 0 && (
             <div className="grid gap-4">
               <div className="fgroup">
-                <label className="fl">
+                {/* A group with a name, and buttons that say whether they are
+                    on. These were bare <button>s inside a plain <div>, so a
+                    screen reader heard eighteen unrelated buttons, could not
+                    tell which one was chosen, and never heard that the group
+                    was required. aria-pressed rather than a radiogroup because
+                    these really are toggles: tapping the chosen one clears it,
+                    which a radio cannot do. The tick and plus are decoration
+                    once the state is announced, so they are hidden. */}
+                <label className="fl" id="lbl-trade">
                   What kind of work is it{" "}
                   <span className={"src " + (trade ? "ok" : "req")}>
                     {trade ? "Chosen" : "Required"}
                   </span>
                 </label>
-                <div className="chips">
+                <div className="chips" role="group" aria-labelledby="lbl-trade">
                   {TRADES.map((t) => (
-                    <button key={t} type="button" className={trade === t ? "on" : ""}
+                    <button key={t} type="button" aria-pressed={trade === t}
+                      className={trade === t ? "on" : ""}
                       onClick={() => setTrade(trade === t ? "" : t)}>
-                      {trade === t ? "✓ " : "+ "}{t}
+                      <span aria-hidden="true">{trade === t ? "✓ " : "+ "}</span>{t}
                     </button>
                   ))}
                 </div>
@@ -256,17 +265,18 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
               </div>
 
               <div className="fgroup">
-                <label className="fl">
+                <label className="fl" id="lbl-parish">
                   Which parish is the property in{" "}
                   <span className={"src " + (parish ? "ok" : "req")}>
                     {parish ? "Chosen" : "Required"}
                   </span>
                 </label>
-                <div className="chips">
+                <div className="chips" role="group" aria-labelledby="lbl-parish">
                   {PARISHES.map((p) => (
-                    <button key={p} type="button" className={parish === p ? "on" : ""}
+                    <button key={p} type="button" aria-pressed={parish === p}
+                      className={parish === p ? "on" : ""}
                       onClick={() => setParish(parish === p ? "" : p)}>
-                      {parish === p ? "✓ " : "+ "}{p}
+                      <span aria-hidden="true">{parish === p ? "✓ " : "+ "}</span>{p}
                     </button>
                   ))}
                 </div>

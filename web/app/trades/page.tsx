@@ -46,7 +46,17 @@ export default async function Trades() {
         <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {TRADES.map((t) => {
             const n = counts.get(t.toLowerCase()) ?? 0;
-            return (
+            /* A trade with nothing open used to link into an empty board: a
+               dead end with no next action, on the page whose whole promise is
+               "never start from a blank page". It now offers the thing that IS
+               available, which is posting the first one. */
+            return n === 0 ? (
+              <Link key={t} href={`/jobs/new?trade=${encodeURIComponent(t.toLowerCase())}`}
+                className="rounded-xl border border-line bg-bg px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-line2">
+                <b className="block text-[14px] text-mute">{t}</b>
+                <span className="text-[11.5px] text-dim">Nothing open. Post the first one</span>
+              </Link>
+            ) : (
               <Link key={t} href={`/jobs?trade=${encodeURIComponent(t.toLowerCase())}`}
                 className="rounded-xl border border-line bg-panel px-4 py-3.5 transition hover:-translate-y-0.5 hover:border-teal hover:bg-panel2">
                 <b className="block text-[14px]">{t}</b>

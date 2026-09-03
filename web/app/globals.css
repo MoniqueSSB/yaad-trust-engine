@@ -167,3 +167,46 @@ body {
 /* An amendment note is the history of the clause above it, not a clause.
    It reads as a margin note because that is what it is. */
 .doc-body .amend{border-left:2px solid var(--line2);padding-left:11px;margin:10px 0 0;font-size:12px;color:var(--dim)}
+
+/* ── Print ───────────────────────────────────────────────────────────────
+   The Completion Report is the artefact a client keeps. It is assembled from
+   the job's own record, it carries the evidence index with its fingerprints,
+   and section 6 is legally load bearing. Until this existed it lived only as
+   a web page behind a login: nothing to file, nothing to hand to a lender or
+   an insurer, nothing to keep if the account ever lapses.
+
+   A print stylesheet is the whole fix. No PDF pipeline, no new dependency,
+   and every browser and phone can already turn it into a file.
+
+   The rules are the obvious ones and each earns its place:
+   dark backgrounds become white, because a client printing this on an inkjet
+   should not empty a cartridge on a page of near-black; the header, the chat
+   launcher and anything interactive come out, because a button on paper is
+   noise; links stop being underlined in a colour nobody can see in grey; and
+   a page break is kept out of the middle of an evidence row, because a
+   fingerprint split across two sheets is not much use as a record. */
+@media print {
+  :root {
+    --bg: #ffffff; --panel: #ffffff; --panel2: #f6f6f9;
+    --line: #d8d8e4; --line2: #b9b9cc;
+    --ink: #111122; --mute: #33334d; --dim: #55556b;
+    --teal: #4B22C0; --tealb: #3A1799; --purple: #4B22C0; --purpleb: #3A1799;
+    --gold: #7a4f06; --goldb: #7a4f06; --green: #0f6b4a; --coral: #8d1900;
+    --soft: #f4f1fd; --softline: #cdbdf5;
+  }
+  body { background: #fff !important; color: #111122 !important; }
+
+  /* Chrome and Safari drop background colours in print unless asked. The
+     evidence table's banding is structure, not decoration, so keep it. */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* The site header, the floating chat, and anything you would tap. */
+  nav, #yc-launch, #yc-panel, form button, a[href^="/portal/jobs"] button { display: none !important; }
+
+  main { max-width: none !important; padding: 0 !important; }
+  a { text-decoration: none !important; color: #111122 !important; }
+
+  /* Keep a record and its fingerprint on one sheet. */
+  li, tr, .doc-body .callout { break-inside: avoid; page-break-inside: avoid; }
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+}

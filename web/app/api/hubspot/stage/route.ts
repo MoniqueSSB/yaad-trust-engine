@@ -12,13 +12,24 @@
  * a second implementation of money-adjacent stage logic, free to drift from
  * the first. One implementation, imported, beats two that agree today.
  *
- * FAIL CLOSED, UNLIKE yaad-whatsapp-webhook. That function treats a missing
- * WHATSAPP_APP_SECRET as "skip the check", which is a deliberate and
- * documented convenience: it lets the intake flow be built before the Meta app
- * exists, and the worst case is a junk enquiry row. The worst case here is a
- * deal that claims a client's money is held when it is not. So a missing
- * secret is 503 and nothing moves. An endpoint that guards money does not get
- * a development mode.
+ * FAIL CLOSED. A missing secret is 503 and nothing moves. An endpoint that
+ * guards money does not get a development mode.
+ *
+ * This paragraph used to draw the contrast with yaad-whatsapp-webhook, which
+ * treated a missing secret as "skip the check" on the grounds that the worst
+ * case was a junk enquiry row. Both halves of that have since stopped being
+ * true and the comment is corrected rather than deleted, because the reasoning
+ * is the useful part:
+ *
+ *   yaad-whatsapp-webhook was deleted on 1 September 2026 (see DECISIONS.md).
+ *   It spoke to Meta's Cloud API directly and never received real traffic.
+ *   Real WhatsApp intake runs through yaad-inbound, over Twilio.
+ *
+ *   yaad-inbound had the same fail-open and no longer does, as of 3 September
+ *   2026. The "junk enquiry row" reasoning had expired: that function can now
+ *   agree quotes, agree Kickoff Packs, choose workers and approve stages, and
+ *   approving a stage raises a worker pay invoice. It now refuses a Twilio
+ *   request it could not verify, the same call this file made first.
  *
  * THE SENDER PICKS AN EVENT, NEVER A STAGE. The payload names something that
  * happened; this file decides which stage that implies. Accepting a stage ID

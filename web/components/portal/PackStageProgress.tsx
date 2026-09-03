@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { jmd } from "@/lib/money";
 
 /**
  * The current stage, read straight from the approved Kickoff Pack rather
@@ -8,7 +9,7 @@ import Link from "next/link";
  * exactly the state every job was in before the pack could be approved.
  */
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 type Phase = { name?: string; duration?: string; milestone?: string };
 

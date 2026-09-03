@@ -789,17 +789,24 @@ export function JoinFlow() {
             {d.body === "form" && (
               <>
                 <div className="fgroup">
-                  <label className="fl">
+                  {/* Named group, announced state, and an explicit button type.
+                      These were bare buttons in a plain div: a screen reader
+                      heard eighteen unrelated buttons with no way to tell which
+                      were ticked, on the page where a tradesperson decides
+                      whether this is worth the effort. Multi-select here, so
+                      aria-pressed is exactly right. */}
+                  <label className="fl" id="lbl-jf-trades">
                     Your trades, tick every one you take{" "}
                     <span className={"src " + (trades.length > 0 ? "ok" : "req")}>
                       {trades.length > 0 ? `${trades.length} selected` : "Required, pick at least one"}
                     </span>
                   </label>
-                  <div className="chips">
+                  <div className="chips" role="group" aria-labelledby="lbl-jf-trades">
                     {TRADES.map((t) => (
-                      <button key={t} className={trades.includes(t) ? "on" : ""}
+                      <button key={t} type="button" aria-pressed={trades.includes(t)}
+                        className={trades.includes(t) ? "on" : ""}
                         onClick={() => toggle(trades, setTrades, t)}>
-                        {trades.includes(t) ? "✓ " : "+ "}{t}
+                        <span aria-hidden="true">{trades.includes(t) ? "✓ " : "+ "}</span>{t}
                       </button>
                     ))}
                   </div>
@@ -812,17 +819,18 @@ export function JoinFlow() {
                 </div>
 
                 <div className="fgroup">
-                  <label className="fl">
+                  <label className="fl" id="lbl-jf-parishes">
                     Parishes you will travel to{" "}
                     <span className={"src " + (parishes.length > 0 ? "ok" : "req")}>
                       {parishes.length > 0 ? `${parishes.length} selected` : "Required, pick at least one"}
                     </span>
                   </label>
-                  <div className="chips">
+                  <div className="chips" role="group" aria-labelledby="lbl-jf-parishes">
                     {PARISHES.map((p) => (
-                      <button key={p} className={parishes.includes(p) ? "on" : ""}
+                      <button key={p} type="button" aria-pressed={parishes.includes(p)}
+                        className={parishes.includes(p) ? "on" : ""}
                         onClick={() => toggle(parishes, setParishes, p)}>
-                        {parishes.includes(p) ? "✓ " : "+ "}{p}
+                        <span aria-hidden="true">{parishes.includes(p) ? "✓ " : "+ "}</span>{p}
                       </button>
                     ))}
                   </div>

@@ -26,20 +26,35 @@ import { approveStage } from "@/app/portal/approve-actions";
 export function ApproveButton({ jobId, queryHref }: { jobId: string; queryHref: string }) {
   const [state, setState] = useState<"idle" | "busy" | "error">("idle");
   const [msg, setMsg] = useState("");
+  /* Announced, not shown. See the live region at the bottom of this file. */
+  const [announce, setAnnounce] = useState("");
   const [inPerson, setInPerson] = useState(false);
 
   return (
-    <div className="mt-3.5 flex flex-wrap items-center gap-3">
+    <div className="relative mt-3.5 flex flex-wrap items-center gap-3">
       <form
         action={async (fd) => {
           setState("busy");
           setMsg("");
           try {
             await approveStage(fd);
-            // No local "done" state: approveStage revalidates the page, and
-            // the ledger re-rendering with the stage advanced IS the
-            // confirmation. A separate success message would be a second,
-            // possibly stale, thing claiming the same fact.
+            // No local "done" state, and no visible success banner:
+            // approveStage revalidates the page, and the ledger re-rendering
+            // with the stage advanced IS the confirmation. A second visible
+            // message would be another, possibly stale, thing claiming the
+            // same fact.
+            //
+            // That reasoning holds for somebody who can SEE the ledger move.
+            // A screen reader user got nothing at all: the button label went
+            // from "Approving…" back to "Approve this stage", which is
+            // indistinguishable from the tap having done nothing, on the one
+            // control in this product that moves money. So the confirmation is
+            // announced rather than shown. It is the non-visual counterpart to
+            // the ledger advancing, not a competing claim, and it cannot go
+            // stale because it is written once, at the moment the action
+            // returned.
+            setState("idle");
+            setAnnounce("Stage approved. The ledger below has moved on.");
           } catch (e) {
             setState("error");
             setMsg(e instanceof Error ? e.message : "That did not go through.");
@@ -76,6 +91,17 @@ export function ApproveButton({ jobId, queryHref }: { jobId: string; queryHref: 
           {msg}
         </p>
       )}
+
+      {/* Off screen rather than hidden: display:none and visibility:hidden are
+          both skipped by screen readers, so a live region has to stay in the
+          accessibility tree to be read. */}
+      <p
+        role="status"
+        aria-live="polite"
+        className="absolute -m-px size-px overflow-hidden whitespace-nowrap border-0 p-0 [clip:rect(0,0,0,0)]"
+      >
+        {announce}
+      </p>
     </div>
   );
 }
