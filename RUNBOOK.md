@@ -1607,6 +1607,31 @@ grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|re
 grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
 ```
 
+**A third sweep, added 3 September 2026: the tradesperson's money must never be described as waiting on the client's click.** Under the principal structure the client owes Yaadly and Yaadly owes the tradesperson, and those two obligations are independent. Copy saying "nobody is paid until you approve" glues them back together, which is the escrow picture the structure exists to avoid, and it is also untrue of the worker, who is Yaadly's subcontractor and gets paid whether or not a client abroad has replied. The client's gate is not removed by this, it is pointed at the right party: their sign-off closes the job with Yaadly and releases the balance they owe Yaadly. Eleven places said the old thing on 3 September and all eleven were changed in one commit. Note the contraction, which is why the sweep is two patterns and not one: `docs/marketplace.html` said "Nobody's paid", not "Nobody is paid", and the first sweep missed it.
+
+```bash
+grep -rniE "(nobody|no one|nothing)('s| is| are)? (paid|charged) until|paid until you|until you release" docs/*.html preview/*.html web/app supabase/functions
+```
+
+Hits on the client's own card ("nothing is charged until you pick one", "authorised at booking") are correct and stay: that is the client's money and the gate genuinely is theirs. Hits describing the *worker* being paid are the bug.
+
+**And the sweep must cover the signed terms, not only the marketing pages.** `web/lib/legal-copy.json` is what a client and a worker put their name to, and on 3 September 2026 it still said the client pays the worker directly while the website said the opposite. A contradiction between a marketing page and a signed document resolves in favour of the document, so the terms are the more important half, and they are the half nobody thinks to grep. The same wording was also duplicated inline in `web/app/apply/JoinFlow.tsx` (what an applicant reads before signing anything) and in `supabase/functions/yaad-inbound/faq.ts` (the facts the reply model may state to a real client), so fixing the canonical JSON is never the whole job.
+
+**Changing either guidelines document is a three-part change, and doing two parts is worse than doing none.**
+
+1. Edit the section in `web/lib/legal-copy.json`, and add a `<p class="amend">` saying what changed and whether earlier signatures carry over. The convention set in v1.1 is that they do not.
+2. Bump `WG_VERSION` / `CG_VERSION` and the matching date in the same file.
+3. Add a migration setting `worker_guidelines_version` / `client_guidelines_version` in `app_settings` to the new number, in the same commit.
+
+Skip step 3 and everyone who signs the new text fails the gate on the old number while everyone holding a withdrawn signature keeps passing it, because `match_workers_for_job` and `client_go_live` both compare the signature's `doc_version` to `current_doc_version()` with `=`. That has now happened twice, `20260828e` and `20260901i`. Read the live values before assuming the folder is the truth:
+
+```sql
+select key, value from public.app_settings where key like '%guidelines_version%';
+select doc_type, doc_version, count(*) from public.doc_signatures group by 1,2 order by 1,2;
+```
+
+Anyone whose signed version is not the current one must re-sign before they can be matched to a job or go live. Tell the founder how many people that is before applying the migration, not after. The two live client message templates, `yaad-inbound` (the facts the reply model may state) and `yaad-notify-client` (the booking confirmation), are inside this sweep on purpose, because they are the only copy a real client reads without visiting the site, and a fix that stops at `docs/` leaves the worst offender live.
+
 ## Creating the Stripe payment links
 
 There is a script: `scripts/create-payment-links.mjs`, with its prices in `scripts/payment-links.json`. Read the JSON before you run anything, because it is the list of amounts Stripe will actually charge.
