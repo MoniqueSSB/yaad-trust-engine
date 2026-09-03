@@ -1133,7 +1133,18 @@ grep -rn "TO BE INSERTED\|gapcard" docs/privacy.html docs/cancellation.html docs
 
 What each one is waiting on:
 
-1. **Registered office address** (privacy, cancellation, and every page footer). Blocked on filing an AD01 to move the registered office off the founder's home address to a service address. Until then the address is on no page, which is a known and accepted breach of Regulation 25 disclosure, chosen over republishing a home address site-wide. When the AD01 is filed, put the address in the two page tables and in the footer of all eleven pages in `docs/`.
+1. **Registered office address** (privacy, cancellation, and every page footer). Blocked on a registered office service address, which the founder decided on 3 September 2026 to take rather than publish her home address. It must be an "appropriate address" under the rules in force since 4 March 2024, meaning post reaches someone acting for the company and delivery can be acknowledged, so a PO Box does not qualify. Roughly £30 to £50 a year. Then file an AD01 within 14 days, and change the director's correspondence address at the same time.
+
+   Until it is filed the site carries no address at all, which leaves the Regulation 25 disclosure (part of the UK, registered number, registered office address) unmet on the third element. That is a known and accepted gap, chosen over republishing a home address on all eleven pages of a site fed by a 9,000 follower TikTok. It was briefly published on 3 September and reverted the same evening when the founder chose the service address instead; nothing reached `main`, so it was never live.
+
+   When the address exists, it goes in three places: the footer of all eleven pages in `docs/`, the "who we are" table in `docs/privacy.html`, and the postal route in `docs/cancellation.html`. Find them all with:
+
+```bash
+grep -rn "TO BE INSERTED\|no. 17358077" docs/*.html
+```
+
+   Honest limit worth knowing before you spend the money: a home address used as a registered office cannot be removed from the Companies House register. Filing the change protects the record going forward and historic filings stay visible. Suppressing it from other documents is a separate application at £32 per document, and a serving director has to supply an alternative address to replace it.
+
 2. **ICO registration number** (privacy). Register at ico.org.uk, around £52, then paste the number in.
 3. **Retention periods** (privacy). Legal decision, not a technical one. Identity document retention especially. Do not invent a number to close the box.
 4. **The model cancellation form and the statutory instructions** (cancellation). The text is substantially prescribed by Schedules 3 and 4 of the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. Take it from legislation.gov.uk verbatim and adapt only the company details. Note that legislation.gov.uk is blocked by the remote session's egress proxy, so this one has to be fetched from a normal browser and pasted in. Do not write it from memory.
@@ -1161,3 +1172,20 @@ The recommendation on file is manual capture via the API for the six fixed-price
 The rule underneath the table: work delivered inside seven days is a hold, because a card authorisation lasts seven days on every brand with no request to Stripe. Recurring is a subscription. Long or staged work is a deposit plus stages. Variable trade jobs get invoices, never links, because a link carries a fixed amount and a trade job prices differently every time.
 
 One thing left unresolved for the founder: short jobs paid by hold produce no invoice, and the invoice was the evidence of the principal structure, each one saying the client bought the job from Yaadly. Either raise one separately for the record, or decide the Quote Pack plus a written confirmation carries it. Something has to go out either way, because a written confirmation on a durable medium is required by the distance selling rules.
+
+## Which jobs get an invoice and which get a card hold
+
+Founder's rule, 3 September 2026: **above £500 the job is invoiced. At or under £500 the card is authorised at booking and captured when the client approves the work.** The price of the job picks the instrument. Everything else about the terms, the stages and what each covers, is still agreed in writing per job.
+
+The rule is stated in three places and they must not drift apart: `docs/terms.html` (payment section), `docs/payments.html` (paying for a report or a retainer), and `docs/services.html` (the payment note under the service list). Change one, change all three.
+
+Two things to keep true while you edit them:
+
+1. **The card half is not switched on yet.** No Stripe links exist (see the payment links entry above), so today every job is invoiced whatever its size. All three pages say so. Delete that sentence only when the links are actually live, and not before.
+2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job. That is why the sentence is scoped to "at or under £500" everywhere it appears. Sweep it with:
+
+```bash
+grep -rn "not charged until\|authorised at booking" docs/*.html
+```
+
+This also part-answers the open question about the invoice being the evidence of the principal structure. Above £500 there is always an invoice saying the client bought the job from Yaadly Ltd. At or under £500 there is not, so the written confirmation that goes out at booking has to carry it, and it has to go out anyway to satisfy the durable-medium requirement in the distance selling rules.
