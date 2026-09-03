@@ -71,7 +71,14 @@ export default async function Ask({
     .limit(30);
   const ids = (qs ?? []).map((q) => q.id);
   const { data: ans } = ids.length
-    ? await supabase.from("answers").select("question_id,worker_email,body,created_at").in("question_id", ids).order("created_at")
+    /* worker_email is NOT selected, and that is the point rather than tidiness.
+       This is a public page reading with the publishable key, so every column
+       named here is a column a stranger is asking the database for. It was
+       fetched and never rendered, which is the same shape of mistake
+       20260903f closed on worker_profiles: a private column sitting on a row
+       a visitor may read. The answering worker is deliberately anonymous on
+       this page anyway, so nothing here ever wanted it. */
+    ? await supabase.from("answers").select("question_id,body,created_at").in("question_id", ids).order("created_at")
     : { data: [] };
   const byQ = new Map<string, { body: string }[]>();
   for (const a of ans ?? []) {

@@ -1511,3 +1511,64 @@ Anything the console reports as a CSP violation is a source the policy is missin
 **`service_catalogue` names and active flags can drift from what the marketing page and specs actually decided, since nothing keeps them in sync automatically.** On 3 Sep 2026, `eyes-on-it` still read "Eyes On It" and `condition-report` still read "Property Condition Report" in the live table, months after `specs/PRICING.md` and `CHANGELOG-2026-08-26.md` §4 renamed them to "Visual Check" and "Condition Report" on the day the invoicing migration was written; the seed data in `20260826_invoicing.sql` just never picked the rename up. Separately, `setup-pack` and `document-check` were still `active := true`, both listed under "Removed" in the same spec, which is why they were still raisable from the concierge desk's own catalogue dropdown (`loadCatalogueOptions` reads `active = true` straight off the table) and still selectable in the `<select id="bk-svc">` on `docs/services.html`, which never had its two leftover `<option>`s pulled when their product cards came off the page. Fixed in `20260903h`: renamed the two rows, set both retired ids `active = false`, dropped the two `<option>`s, and dropped `docs`/`setup` from the `BOOKABLE` allowlist in `yaad-book-service` so a crafted request can't book them even with the page unchanged; redeployed. **If a "removed" service becomes bookable again**, check three places: the row's `active` flag, whether its `<option>` is back in `docs/services.html`, and whether its key is back in `BOOKABLE`.
 
 **A bigger, separate gap found while fixing the above and not yet acted on:** several `service_catalogue` pence values still hold pre-26-Aug numbers, while `specs/PRICING.md` (dated the same day) records the founder's decided prices with sourced comparables. Live catalogue vs. spec, as of 3 Sep 2026: Visual Check full £125 vs. decided £149 · Condition Report £249/£349 vs. decided £245/£325 · Oversight Retainer £395/£495 vs. decided £595 fortnightly (and the catalogue has no weekly tier at all, spec wants one at £1,095) · Property Care standard/large/villa £45/£70/£95 flat vs. decided £95/£135/£175 · Technical Sign-off £245/£245 vs. decided £245/£300. The public page (`docs/services.html`) already shows the *decided* founding figures, so a client sees one number and, once an admin raises the invoice, `raise_service_invoice()` prices it off the *stale* catalogue figure. This is a money change, not a label fix, and the retainer needs an actual schema decision (one row or two), so it was left for the founder to confirm before anyone touches it.
+
+---
+
+## 18. A migration is in the repository but not in the database
+
+Found this way on 3 September 2026: `/apply` said "Could not record that document" for every profile photograph and introduction video, and had been doing so silently since the feature shipped. The file was committed. It had never been applied.
+
+**The folder is the intent. `supabase_migrations.schema_migrations` is the fact.** Do not trust one for the other. Symptoms look like a bad connection, a flaky upload, or nothing at all, because the code path in front of the missing change usually succeeds first.
+
+### Check for drift, both directions
+
+```bash
+ls supabase/migrations | sed 's/\.sql$//' | sort > /tmp/repo-migrations.txt
+```
+
+Then read the applied list and compare by name, remembering that the live `name` often drops the `20260903x_` prefix the filename carries, and that one file may have been applied as several named parts:
+
+```sql
+select version, name from supabase_migrations.schema_migrations order by version desc limit 40;
+```
+
+Two different problems come out of this and they need different answers:
+
+- **In the repository, not in the database.** A change nobody is getting. Read the file, check it is still what you want, then apply just that one. Do NOT reach for `supabase db push`: on 3 Sep it would have applied four migrations, of which two were already live under different names and one was a decision nobody had taken yet.
+- **In the database, not in the repository.** Worse, because the folder can no longer rebuild the database. Write the migration back as a file, copying the statements out of `schema_migrations` rather than from memory, and keep the reverts as their own files instead of tidying them away. The ordering mistake is usually the useful part.
+
+### Apply one migration, not all of them
+
+Use the Supabase MCP `apply_migration` with the single file's contents, or run the statements directly. Then prove it took, against the live schema rather than against the file you just ran:
+
+```sql
+select pg_get_constraintdef(oid) from pg_constraint
+where conrelid = 'public.vetting_documents'::regclass
+  and conname = 'vetting_documents_doc_type_check';
+```
+
+### Before applying anything that re-adds a CHECK constraint
+
+`drop constraint` then `add constraint` validates every existing row. Count what is in the column first, or the add fails and, outside a transaction, leaves the table with no constraint at all:
+
+```sql
+select doc_type, count(*) from public.vetting_documents group by doc_type;
+```
+
+### Still open, and it is a founder decision
+
+`20260901i_worker_guidelines_v14_drops_police_check_and_trial_job.sql` is unapplied. The app ships Worker Guidelines v1.4; `app_settings.worker_guidelines_version` still says 1.3. `match_workers_for_job` compares a worker's signed `doc_version` to that setting exactly, so a worker signing the text now on screen matches no jobs, and the two workers who signed the withdrawn v1.3 text still do. Applying it swaps which half is broken until those two re-sign. See DECISIONS.md, 3 Sep 2026.
+
+---
+
+## 19. A page 404s correctly but answers 200
+
+A `loading.tsx` on a dynamic route puts a Suspense boundary in front of the page, so Next flushes the shell with a 200 before the page's `notFound()` runs. The visitor sees the right page. Search engines are told every URL exists.
+
+Check any public route that can 404:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://app.yaadly.co.uk/workers/does-not-exist
+```
+
+404 is right, 200 is the bug. To confirm the cause, move the route's `loading.tsx` aside and curl again: if it becomes 404, that is it. The fix is to resolve the record in `generateMetadata`, which runs before the shell is flushed, and call `notFound()` there; keep the one in the page as the backstop.
