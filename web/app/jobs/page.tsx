@@ -55,7 +55,7 @@ type QuotePackDraft = {
 
 export const metadata = {
   title: "The marketplace · Yaadly",
-  description: "Open property jobs across Jamaica and the identity checked workers who do them. You buy the job from Yaadly, and Yaadly pays the tradesperson on completion.",
+  description: "Open property jobs across Jamaica and the identity checked workers who do them. You buy the job from Yaadly, and nothing is signed off until you have seen the evidence.",
 };
 
 function ago(iso: string | null): string {
@@ -189,12 +189,28 @@ export default async function Board({
             the tradesperson, so they have no power to release that person's
             pay, and telling them they do contradicts docs/terms.html.
 
-            What the client actually does is ACCEPT THE WORK. Yaadly then pays
-            its own subcontractor, and a named person at Yaadly makes that
-            call. Two acts, not one. The wording below says both, and matches
-            docs/COPY-GUIDELINES.md section 3, which is now the source of
-            truth for this sentence across docs/ and web/. */}
-        <b className="font-semibold text-ink">You buy the job from Yaadly, and Yaadly pays the tradesperson on completion.</b>
+            This wording is true on both: on a card hold nothing is captured
+            until the client approves, on an invoice nothing is raised until
+            they approve. It is also not a new claim, it is the sentence
+            already live on yaadly.co.uk, so the two halves of the site now
+            say the same thing.
+
+            Reworded 3 Sep 2026. "Nobody is paid until you approve" tied the
+            worker's money to the client's click, which is the escrow shape
+            the principal structure exists to avoid, and it was also untrue
+            of the worker: he is Yaadly's subcontractor and Yaadly owes him
+            whether or not a client in London has replied. The gate is not
+            removed, it is pointed at the right party. The same sentence
+            changed on yaadly.co.uk in the same commit, so the two halves of
+            the site still say the same thing.
+
+            Extended 4 Sep 2026, merging the copy audit branch. The 3 Sep
+            sentence was right about what the client's click does NOT do and
+            silent on who the client is buying from, which is the half a
+            visitor landing straight on the job board has no other way to
+            learn. Both halves now sit in one sentence. docs/COPY-GUIDELINES.md
+            section 3 is the source of truth for it across docs/ and web/. */}
+        <b className="font-semibold text-ink">You buy the job from Yaadly, and nothing is signed off until you have seen the evidence.</b>
       </p>
       <p className="mt-2.5 flex items-center gap-2 font-mono-app text-[11px] font-medium tracking-[0.06em] text-dim">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 fill-none stroke-gold stroke-2" strokeLinecap="round" strokeLinejoin="round">

@@ -1,0 +1,33 @@
+-- Founder instruction, 3 Sep 2026: the customer and worker terms still
+-- described the pre-3-September arrangement, where the client paid the
+-- tradesperson directly and Yaadly held nothing. Under the principal
+-- structure the client buys the job from Yaadly and Yaadly engages and pays
+-- the tradesperson, which is what yaadly.co.uk has said since that morning.
+-- The two documents contradicted each other, and the terms were the half
+-- somebody actually signs.
+--
+-- web/lib/legal-copy.json moved to Worker Guidelines v1.5 and Client
+-- Guidelines v1.4. This is the matching half in the database. Same shape as
+-- 20260828e and 20260901i: current_doc_version() reads app_settings, and both
+-- gates (match_workers_for_job for workers, client_go_live for clients)
+-- require a signature's doc_version to equal it exactly. Bump the JSON
+-- without this and everybody who signs the new text fails the gate on the old
+-- number, while everybody holding a signature against the withdrawn text
+-- keeps passing it.
+--
+-- This supersedes 20260901i, which set worker_guidelines_version to '1.4' and
+-- was never applied. Applying that one first is harmless but pointless; this
+-- statement sets the value outright either way.
+--
+-- KNOWN AND INTENDED CONSEQUENCE. At the time of writing app_settings holds
+-- '1.3' for both keys, and doc_signatures holds two worker signatures and two
+-- client signatures, all against '1.3'. All four stop matching the moment
+-- this is applied, and those people must re-sign before they can be matched
+-- to a job or go live. That is correct rather than unfortunate: what they
+-- signed says the client pays the worker directly and that Yaadly can release
+-- nothing, and neither sentence is true any more. Worker Guidelines section 7
+-- told them in advance that this section would change and that they would be
+-- asked to re-sign it.
+
+update public.app_settings set value = '1.5' where key = 'worker_guidelines_version';
+update public.app_settings set value = '1.4' where key = 'client_guidelines_version';

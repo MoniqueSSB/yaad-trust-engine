@@ -1894,18 +1894,19 @@ export function JoinFlow() {
                         start, and your materials are paid at cost on top of it.{" "}
                         <b className="text-ink">You are paid per stage, not one
                         lump at the end: a stage signed off is a stage paid,
-                        within 3 working days of the client approving your
-                        evidence.</b>{" "}
+                        within 3 working days of Yaadly signing the stage
+                        off.</b>{" "}
                         Bank transfer, Lynk wallet or remittance pick-up,
                         whichever you choose.
                       </p>
                       <p className="mt-2.5 text-[12.5px] text-dim">
-                        <b className="text-mute">Yaadly is not holding money at
-                        present.</b> Your labour is paid by the client through
-                        the route agreed on your job. You are told this before
-                        you turn up rather than after, and it is set out in the
-                        Worker Guidelines you sign. When holding goes live that
-                        section changes and you are asked to sign it again.
+                        <b className="text-mute">Yaadly pays you, the client
+                        does not.</b> You are Yaadly&rsquo;s subcontractor: the
+                        client buys the job from Yaadly, and Yaadly engages and
+                        pays you. Your money does not wait on the client
+                        approving anything. You are told this before you turn up
+                        rather than after, and it is set out in the Worker
+                        Guidelines you sign.
                       </p>
                     </div>
 
