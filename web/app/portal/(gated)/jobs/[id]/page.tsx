@@ -34,6 +34,7 @@ import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 import { jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
+import { whenDate, whenDateTime } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 
@@ -300,7 +301,7 @@ export default async function JobRoom({
     id: m.id,
     mine: m.sender_email.toLowerCase() === email,
     body: scrub(m.body).clean,
-    at: String(m.created_at).slice(0, 16).replace("T", " "),
+    at: whenDateTime(m.created_at) ?? "",
   }));
   const dispute = disputeRow
     ? { id: disputeRow.id, state: disputeRow.state, body: disputeRow.body, reply: disputeRow.reply, kinds: (disputeRow.kinds ?? []) as string[] }
@@ -829,7 +830,7 @@ export default async function JobRoom({
   const checkedInToday = arrivalRows.some((a) => a.arrived_on === jamaicaToday);
   const recentArrivals = arrivalRows.map((a) => ({
     stage: a.stage as number,
-    arrivedAt: String(a.arrived_at).slice(0, 16).replace("T", " "),
+    arrivedAt: whenDateTime(a.arrived_at) ?? "",
   }));
 
   /* The top summary card's "next action" and "responsible" read off the
@@ -838,9 +839,7 @@ export default async function JobRoom({
   const topAction = outstanding[0] ?? null;
   const responsibleLabel = (who: OutItem["who"]) =>
     who === "you" ? "You" : who === "them" ? otherSideLabel : "Yaadly";
-  const lastUpdated = job.updated_at
-    ? String(job.updated_at).slice(0, 16).replace("T", " ")
-    : null;
+  const lastUpdated = whenDateTime(job.updated_at);
 
   return (
     <>
@@ -1394,7 +1393,7 @@ export default async function JobRoom({
                   {m.stage != null && <span className="text-dim">Stage {m.stage}</span>}
                   <span className="text-dim">{m.receipt_ref}</span>
                   <span className="ml-auto text-dim">
-                    {m.released_at ? m.released_at.slice(0, 10) : "not yet released"}
+                    {m.released_at ? whenDate(m.released_at) : "not yet released"}
                   </span>
                 </li>
               ))}
