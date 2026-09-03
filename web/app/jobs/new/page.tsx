@@ -24,10 +24,9 @@ export default async function NewJob({
   if (worker) {
     const supabase = await createClient();
     const { data } = await supabase
-      .from("worker_profiles")
+      .from("public_worker_profiles")
       .select("name,trade")
       .eq("slug", worker)
-      .eq("active", true)
       .maybeSingle();
     if (data?.name) requestedWorker = data.name;
   }

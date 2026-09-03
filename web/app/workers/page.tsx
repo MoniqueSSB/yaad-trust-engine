@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TRADES, PARISHES } from "@/lib/taxonomy";
-import { WorkerDirectory, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
+import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
 
 export const dynamic = "force-dynamic";
 
@@ -65,10 +65,16 @@ export default async function Workers({
   const { trade, parish } = await searchParams;
   const supabase = await createClient();
 
+  /* The VIEW, never worker_profiles. The base table carries phone and
+     worker_email on the same row as name and trade, and the public read policy
+     is row level, which means every column. A directory reading the base table
+     would hand every visitor a list of tradespeople's phone numbers. The view
+     cannot carry those columns and already filters to active, which is why
+     there is no .eq("active", true) here. Found and fixed in parallel by
+     another session, 8578312; this page must not undo it. */
   let q = supabase
-    .from("worker_profiles")
+    .from(WORKER_VIEW)
     .select(SELECT_WORKER)
-    .eq("active", true)
     .order("jobs_completed", { ascending: false });
 
   if (trade) q = q.ilike("trade", trade);
@@ -78,9 +84,8 @@ export default async function Workers({
   const workers = (data ?? []) as Worker[];
 
   const { data: allRows } = await supabase
-    .from("worker_profiles")
-    .select("trade,parish,areas")
-    .eq("active", true);
+    .from(WORKER_VIEW)
+    .select("trade,parish,areas");
   const total = (allRows ?? []).length;
 
   /* Only offer a filter that would find somebody. A directory that lets you

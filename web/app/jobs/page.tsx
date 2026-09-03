@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TRADES } from "@/lib/taxonomy";
-import { WorkerDirectory, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
+import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { QuotePanel } from "@/components/QuotePanel";
@@ -94,7 +94,12 @@ export default async function Board({
 
   const [{ data: jobsData }, { data: workersData }, { data: tradeRows }] = await Promise.all([
     jq,
-    supabase.from("worker_profiles").select(SELECT_WORKER).eq("active", true).order("jobs_completed", { ascending: false }),
+    // public_worker_profiles, not the base table: it already excludes
+    // worker_email and phone, neither of which this board (or any visitor)
+    // has any business reading. See 20260903f in supabase/migrations.
+    // The name and the column list come from the component that renders them,
+    // so /jobs and /workers cannot read different things into the same card.
+    supabase.from(WORKER_VIEW).select(SELECT_WORKER).order("jobs_completed", { ascending: false }),
     supabase.from("open_jobs").select("trade"),
   ]);
 
@@ -241,8 +246,12 @@ export default async function Board({
             belongs here, next to the board, because that is exactly the
             moment somebody hesitates. */}
         <span className="ml-auto flex flex-wrap gap-4 text-[13px]">
+          {/* "Ask Yaadly" is the founder's 3 Sep naming decision, one name for
+              the board and the chat. "/jobs/trades" is where the trade filter
+              moved when /trades was repurposed for tradespeople the same day.
+              Both sides of this were right; they landed in parallel. */}
           <Link href="/ask" className="font-semibold text-mute transition hover:text-purpleb">Ask Yaadly</Link>
-          <Link href="/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
+          <Link href="/jobs/trades" className="font-semibold text-mute transition hover:text-purpleb">All {TRADES.length} trades</Link>
           <Link href="/apply" className="font-semibold text-goldb transition hover:opacity-80">Join as a worker &rarr;</Link>
         </span>
       </div>

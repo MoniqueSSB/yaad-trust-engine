@@ -116,7 +116,15 @@ const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address"];
 // tradesperson's face and voice, which is the same category of thing as the
 // selfie and the liveness turn, whatever it is called and whatever it is for.
 // The file says "adding a doc_type here is safe", and this is that case.
-const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video", "intro_video"];
+//
+// profile_photo joined it the day IT was created (3 Sep 2026), for the same
+// reason and by the same reading. It is asked for so a person at the desk can
+// put a face to the name, which is a purpose no model serves, and a
+// photograph of somebody's face is a photograph of somebody's face whatever
+// the row is called. It is added here in the same commit that creates the
+// document type, deliberately: a face that reaches this function before it
+// reaches this list is a face that has already been sent.
+const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video", "intro_video", "profile_photo"];
 
 // When Persona has confirmed the government ID and selfie, those two are not
 // missing, they are somewhere better: checked by a vendor with real document

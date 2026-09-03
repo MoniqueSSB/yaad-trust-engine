@@ -4,30 +4,54 @@ import Link from "next/link";
  * The worker network, one component, two entry points.
  *
  * It was declared inside app/jobs/page.tsx and rendered only on the board's
- * second tab. /workers, meanwhile, was a 404: only /workers/[slug] existed, so
- * a worker's profile could be reached from a card and by no other route, and a
- * tradesperson had no link they could send anybody. The founder asked for a
- * directory on 3 Sep 2026.
+ * second tab. /workers was a 404, so a profile could be reached from a card
+ * and by no other route, and a tradesperson had no link to send anybody. The
+ * founder asked for a directory on 3 Sep 2026 and this is the card it renders.
  *
- * Extracted rather than copied. A second implementation of the card would have
- * been free to drift from the first, and the two surfaces have to agree about
- * what "verified" looks like above everything else on the page.
+ * Extracted rather than copied. A second implementation would have been free
+ * to drift, and the two surfaces have to agree about what "verified" looks
+ * like above everything else on the page.
  *
- * SELECT_WORKER is exported with it, because the columns are part of the
- * contract: the card reads `about`, `years` and `jobs_completed`, and a caller
- * that forgets one gets an undefined rather than an error. There is
- * deliberately no email in that list and no email in the type. Discovery is by
- * trade and parish, the URL carries a slug, and a worker's address is not
- * something a public page needs in order to draw a card.
+ * THE BODY BELOW IS THE VERSION FROM 8578312, not the one that existed when
+ * this file was first split out. That commit landed in parallel and carried
+ * three things worth keeping, which an extraction done from the older copy
+ * would have silently reverted:
+ *
+ *   the probation badge, so a worker still being vetted no longer reads
+ *   identically to a fully cleared one
+ *
+ *   "Profile page coming soon" instead of a blank cell, for the active
+ *   profiles that predate the slug column
+ *
+ *   and the reason SELECT_WORKER reads a VIEW: worker_profiles.phone and
+ *   .worker_email sit on the same row as name and trade, the public read
+ *   policy is row level, and row level means every column. Anyone with the
+ *   publishable key could read every active worker's phone number. The fix is
+ *   public_worker_profiles, which cannot carry those columns at all.
+ *
+ * So: never point this at worker_profiles again, however convenient. The view
+ * is the boundary.
  */
 
 export type Worker = {
   name: string | null; trade: string | null; parish: string | null; lane: string | null;
   jobs_completed: number | null; slug: string | null; about: string | null; years: number | null;
+  vetting_state: string | null;
 };
 
-/** The exact columns the card reads. Kept beside it so they cannot drift. */
-export const SELECT_WORKER = "name,trade,parish,lane,jobs_completed,slug,about,years";
+/**
+ * The columns the card reads, and the view it reads them from.
+ *
+ * Both halves matter. The column list is a contract: the card reads `about`,
+ * `years`, `jobs_completed` and `vetting_state`, and a caller that forgets one
+ * gets undefined rather than an error. The TABLE name is a security boundary:
+ * public_worker_profiles exists precisely so a public page cannot select a
+ * worker's phone or email, and it has no filter on `active` because the view
+ * already applies one.
+ */
+export const WORKER_VIEW = "public_worker_profiles";
+export const SELECT_WORKER =
+  "name,trade,parish,lane,jobs_completed,slug,about,years,vetting_state";
 
 export function WorkerDirectory({ workers }: { workers: Worker[] }) {
   if (workers.length === 0) {
@@ -92,10 +116,22 @@ export function WorkerDirectory({ workers }: { workers: Worker[] }) {
               )}
 
               <div className="flex flex-wrap gap-1.5">
+                {/* "ID verified" is literal, not marketing: the publish gate
+                    (enforce_profile_publish_checks) refuses to make a profile
+                    active unless Persona reads back approved or completed, so
+                    every row this view can return has actually cleared it. */}
                 <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-semibold text-mute">ID verified</span>
                 <span className={"rounded-full px-2.5 py-1 text-[10.5px] font-semibold " + (w.lane === "cert" ? "border border-gold/35 bg-gold/[0.08] text-goldb" : "border border-purple/30 bg-purple/[0.08] text-purpleb")}>
                   {w.lane === "cert" ? "Certified professional" : "Evidence vetted"}
                 </span>
+                {/* Probation is a real gate (20260831d): hidden from top-tier
+                    jobs until the police check and references clear. A card
+                    identical to a fully verified worker's said nothing of
+                    that, so a probation worker and a verified one read the
+                    same on this board. */}
+                {w.vetting_state === "probation" && (
+                  <span className="rounded-full border border-mango/40 bg-mango/10 px-2.5 py-1 text-[10.5px] font-semibold text-mango">Vetting in progress</span>
+                )}
               </div>
 
               <div className="mt-auto grid grid-cols-2 gap-2">
@@ -103,7 +139,13 @@ export function WorkerDirectory({ workers }: { workers: Worker[] }) {
                   <Link href={"/workers/" + encodeURIComponent(w.slug)} className="rounded-full border-[1.5px] border-purple/30 py-2.5 text-center text-[12.5px] font-semibold text-purpleb transition hover:border-purple hover:bg-panel2">
                     View profile
                   </Link>
-                ) : <span />}
+                ) : (
+                  // A profile with no slug yet cannot be linked to. That is a
+                  // real, current state (some active profiles predate the
+                  // slug column), not a bug in this card, so it says so
+                  // rather than leaving a blank cell where a button should be.
+                  <span className="grid place-items-center rounded-full border border-dashed border-line py-2.5 text-center text-[12px] font-semibold text-dim">Profile page coming soon</span>
+                )}
                 <Link href={book} className="rounded-full bg-linear-to-br from-goldb to-gold py-2.5 text-center text-[12.5px] font-bold text-[#1A0F00] transition hover:-translate-y-px hover:brightness-105">
                   Book for a job
                 </Link>
