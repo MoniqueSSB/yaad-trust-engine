@@ -1870,8 +1870,20 @@ export function JoinFlow() {
                         win or lose</b>. You are never charged for a lead. Your
                         price is agreed with you per job, in writing, before you
                         start, and your materials are paid at cost on top of it.{" "}
-                        <b className="text-ink">Once the client approves the
-                        evidence you are paid within 24 hours.</b>
+                        <b className="text-ink">You are paid per stage, not one
+                        lump at the end: a stage signed off is a stage paid,
+                        within 3 working days of the client approving your
+                        evidence.</b>{" "}
+                        Bank transfer, Lynk wallet or remittance pick-up,
+                        whichever you choose.
+                      </p>
+                      <p className="mt-2.5 text-[12.5px] text-dim">
+                        <b className="text-mute">Yaadly is not holding money at
+                        present.</b> Your labour is paid by the client through
+                        the route agreed on your job. You are told this before
+                        you turn up rather than after, and it is set out in the
+                        Worker Guidelines you sign. When holding goes live that
+                        section changes and you are asked to sign it again.
                       </p>
                     </div>
 
