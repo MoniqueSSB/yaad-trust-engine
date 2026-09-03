@@ -89,4 +89,15 @@ const inboundSource = await Deno.readTextFile(new URL("./index.ts", import.meta.
 Deno.test("yaad-inbound uses this signature check rather than its own copy", () => {
   assert(inboundSource.includes('from "./twilio-signature.ts"'), "yaad-inbound no longer imports twilio-signature.ts");
   assert(!/const candidates = \[/.test(inboundSource), "yaad-inbound has grown its own copy of the candidate-URL logic again");
+
+  /* The module above may report "nothing was verified"; index.ts is what
+     decides that a Twilio request in that state does not get in. Added 3 Sep
+     2026. The assertion lives here rather than in the module's own tests
+     because the module's contract is deliberately unchanged: it reports a
+     fact, the caller sets the policy. If this fails, the fail-open has come
+     back at the only place it ever mattered. */
+  assert(
+    /isTwilio && !sig\.checked/.test(inboundSource),
+    "yaad-inbound no longer refuses a Twilio request it could not verify",
+  );
 });
