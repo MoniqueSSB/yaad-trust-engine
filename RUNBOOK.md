@@ -1378,3 +1378,28 @@ The caller key is a truncated SHA-256 of the address, computed in the server act
 **Access answers matter more than they look.** The answer to "who can let a worker in" is written to `jobs.access_type`, and `enforce_vetted_worker_on_quote` reads it: a worker still in Probation is refused a job where they would hold keys or work inside an occupied home. Before 3 Sep 2026 this form never filled that column, so the gate was skipped on every job posted from the web. It is on now. If a worker says they cannot quote a web job, check their `vetting_state` and the job's `access_type` before assuming a bug: the refusal message names which of the two rules stopped them. The exact wording of the four options is asserted in `web/tests/new-job-form.test.mjs`; do not reword them in the page without reading that file.
 
 **Photographs are not uploaded on this form, on purpose.** Stage four says what to photograph and the confirmation screen hands over a link, `/portal/join?job=…&code=…&next=photos`, which sets up the account and lands directly on the photo panel. The file itself only ever travels the portal route: size capped, private storage, location stripped, deletable by the client. If somebody says the link did not open the photo screen, check that `next=photos` survived whatever copied the link, and that `?photos=1` is on the job URL afterwards.
+
+---
+
+## The worker directory or a worker profile is showing nobody, or `public_worker_profiles` errors
+
+Migration `20260903f_worker_profile_columns_stop_answering_the_open_internet.sql`. Same class of issue as "A database function is exposed to the open internet" above, but in RLS row policies instead of function grants: `worker_profiles.worker_email` and `.phone` sat on the same row as `name` and `trade`, and the old `wp_select_public` / `wp_select_signed_in` policies were row-only, so anybody holding the publishable key could `GET /rest/v1/worker_profiles?select=name,worker_email,phone` and read every active worker's contact details directly. Same shape of leak on `worker_checks` and `portfolio`, both of which carry `worker_email` purely as a join key.
+
+**The fix.** Three views, same pattern as `published_reviews`: `public_worker_profiles`, `public_worker_checks`, `public_portfolio`, none of which carry `worker_email` or `phone`; `worker_checks`/`portfolio` expose `subject_slug` instead of the email so the app can join on the public slug. The base tables are locked down behind them: `worker_profiles` now allows `select` only to the profile's own worker (`worker_user = auth.uid()` or their own `worker_email`) or `is_admin()`; `worker_checks`/`portfolio` keep only their existing admin-only policy.
+
+**web/app/jobs/page.tsx, web/app/jobs/new/page.tsx and web/app/workers/[slug]/page.tsx read the views, never the base tables.** If the worker directory or a profile page is rendering nobody, or a Supabase call against `worker_profiles`/`worker_checks`/`portfolio` from the web app is failing with a permission error, check first whether this migration has actually been applied:
+
+```sql
+select viewname from pg_views where schemaname = 'public' and viewname like 'public_%';
+```
+
+If the three views are missing, the migration file exists in the repo but was never run against `leffyisvfvjwzilydlwf`. **Migration files here are a record, not the mechanism** (see the entry above): apply it through the dashboard or the Supabase MCP, then verify:
+
+```sql
+select has_table_privilege('anon', 'worker_profiles', 'select') as anon_can_read_base_table; -- must be false
+select count(*) from public_worker_profiles; -- must return the active worker count
+```
+
+**What still needs `worker_email` on the base table, and stays working.** `web/app/portal/(gated)/worker/page.tsx` reads its own `phone` by `worker_user = auth.uid()`. `web/app/jobs/actions.ts` reads its own `name` by `worker_email`, matched against the signed-in user's own email. Both are covered by the new `wp_select_own_or_admin` policy; if either starts failing, check that policy exists and that its two OR-branches still match what those two call sites actually filter on.
+
+**The admin desk is unaffected.** `worker_checks`/`portfolio` keep their pre-existing `admin full ...` ALL-command policies, and `is_admin()` is part of the new `worker_profiles` SELECT policy, so `concierge.html` continues to see full worker rows including phone and email.
