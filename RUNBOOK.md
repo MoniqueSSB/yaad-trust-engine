@@ -2618,3 +2618,26 @@ supabase functions list --project-ref leffyisvfvjwzilydlwf
 - `yaad-inbound` answers 403 with a signature error. Correct: the request reached the code and its own check refused it.
 - `yaad-desk-reply` and `yaad-report` answer 401, missing authorization header. Correct: platform auth stopped it before the code ran.
 - A 503 or a timeout means the bundle did not boot.
+
+---
+
+## Answering the people who are waiting
+
+**Waiting on you**, first item in the Inbox on the desk. One list: WhatsApp, SMS, website chat and contact form enquiries together, oldest first, everybody who has written in and not had a person answer.
+
+It exists because until 4 September the desk knew who was waiting and would not show it. The Overview counted them; acting on the count meant opening Conversations, opening Enquiries and working out which rows were which. A measurement nobody can act on is decoration.
+
+**Red means the promise on every page of the site has already been missed.** A person replies within one working day. Clear red rows before evidence, before drafts, before anything.
+
+**What each row can do:**
+
+- **WhatsApp or SMS.** Reply from here. It goes from the Yaadly number so it continues the chat they already have, marks the thread as yours, and stamps the reply clock, which is what clears the row.
+- **Website chat.** Reply from here. They see it only while that page is open; if they have left, they were given a WhatsApp button carrying the same reference, so watch for them there. The clock is stamped either way.
+- **Contact form enquiry.** There is **no reply lane yet**. Answer it on WhatsApp or by email, then press "I have answered this", which is what clears the row and stamps the clock. It sends nothing.
+
+**Read the "Heard from us" column before you choose who to answer first.**
+
+- `nothing at all` means the automatic receipt never even reached them. It happens when somebody leaves a phone number rather than an email, so there is no address to send a receipt to. They have had complete silence since they wrote, and they should be first.
+- `receipt failed` means we tried and it bounced.
+
+**The known gap.** An enquiry from somebody who left only a phone number cannot be answered from the desk at all, and cannot be acknowledged automatically either. Both halves of that are the same missing piece: `yaad-desk-reply` sends to an existing conversation, and an enquiry is not one. Until it is built, those people need a WhatsApp message from you by hand.
