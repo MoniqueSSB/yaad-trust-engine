@@ -4,7 +4,7 @@
  * Stage IDs, lifecycle membership and the funds-held rule all come from
  * ./hubspotConfig. Nothing in this file hardcodes a stage ID or a label.
  *
- * NAMING: the stage this advances to is FUNDS_HELD. Guardrail 1 in
+ * NAMING: the stage this advances to is CLIENT_PAID. Guardrail 1 in
  * yaad/guardrails.py bans the e-word, and that scanner only screens text on
  * its way out of an agent. A HubSpot stage name never passes through it, so a
  * banned word in a stage constant would slip the net and then surface on the
@@ -62,7 +62,7 @@ const API_BASE = "https://api.hubapi.com";
 export const LIFECYCLE_ORDER: readonly DealStageId[] = [
   DEAL_STAGES.INQUIRY_SCOPING,
   DEAL_STAGES.QUOTE_SENT,
-  DEAL_STAGES.FUNDS_HELD,
+  DEAL_STAGES.CLIENT_PAID,
   DEAL_STAGES.EVIDENCE_SUBMITTED,
   DEAL_STAGES.CLIENT_APPROVED,
   DEAL_STAGES.COMPLETED_PAID,
@@ -188,7 +188,7 @@ export type StageMove = {
  *
  * Webhooks get redelivered. Without the read before the write, a duplicate
  * "payment confirmed" arriving after the client had already approved the
- * evidence would haul the deal back to Funds Held, and the board would then be
+ * evidence would haul the deal back to Client Paid, and the board would then be
  * lying about where somebody's money is.
  *
  * `changed: false` is a success, not an error. A redelivered webhook should
@@ -240,9 +240,9 @@ export async function setDealStage(
   return { changed: true, from: current, to: targetStageId };
 }
 
-/** A verified webhook has confirmed the client's payment is held. */
-export function advanceDealToFundsHeld(dealId: string): Promise<StageMove> {
-  return setDealStage(dealId, DEAL_STAGES.FUNDS_HELD);
+/** A verified webhook has confirmed the client has paid Yaadly for the job. */
+export function advanceDealToClientPaid(dealId: string): Promise<StageMove> {
+  return setDealStage(dealId, DEAL_STAGES.CLIENT_PAID);
 }
 
 /** The worker's before and after evidence has landed. */

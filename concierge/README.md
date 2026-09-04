@@ -98,21 +98,37 @@ this desk makes to a model goes through the one guard behind it, in `fn()` and
 `skFn()`. Paused means invoice drafting and sketch description refuse to send
 anything.
 
-**It does not reach everything, and it names what it misses.** `yaad-inbound`
-calls a model without this desk starting it: woken by an incoming message, it
-has replied to somebody before the desk knows the message exists, and it does
-not read `agents_paused`. Settings says so, Health says so, and the Overview
-says so while the pause is on. (`yaad-whatsapp-webhook` shared this gap until
-1 Sep 2026; it spoke to Meta's Cloud API directly, never received real
-traffic, and was deleted, see DECISIONS.md. `yaad-inbound`, over Twilio, is
-the one live WhatsApp path now.)
+**It reaches `yaad-inbound` too, since 4 September 2026.** That one is woken by
+an incoming message rather than by this desk, so it had replied to somebody
+before the desk knew the message existed, and it did not read `agents_paused`.
+It was the only agent talking to clients unsupervised at night, which made it
+the one a kill switch is actually for. It now reads the row itself, in
+`agentsPaused()`, before the text provider is chosen, so no path through that
+function can produce a model call while the switch is on.
 
-Reading that row at the top of that one is the whole remaining job. There is
-already a per-person gate, `may_use_agents(email)`, which `yaad-agent` and
-`yaad-vision` both call, so a global pause folded into it would reach further
-still. Until that is done, the desk is precise about its reach rather than
-quiet about it, because **a switch that claims more than it does is worse than
-no switch.**
+What paused looks like from the client's side: their message is recorded, their
+photographs and voice notes are kept, they are told a person is reading it, and
+the thread is handed to Monique on their **first** message rather than after
+three turns of a generic opener. Nobody is left in silence.
+
+**The scope is narrower than "everything stops", and that is deliberate.**
+Transcription and media storage keep running while paused, because they build
+the record a person then reads. Settings, Health and the Overview all say this
+in those words. The rule that produced the old honesty still holds: **a switch
+that claims more than it does is worse than no switch**, and that cuts both
+ways now, so do not widen this copy without widening the code.
+
+The read **fails closed**. If `app_settings` cannot be read at all, inbound
+treats itself as paused and hands the conversation over. Handing a client to a
+person is the product. A switch that silently stops working is not.
+
+A per-person gate, `may_use_agents(email)`, also exists and is called by
+`yaad-agent` and `yaad-vision`. It is not the mechanism here and cannot be:
+it authorises a signed-in person, and an inbound webhook has no signed-in
+person to authorise. (`yaad-whatsapp-webhook` shared the old gap until 1 Sep
+2026; it spoke to Meta's Cloud API directly, never received real traffic, and
+was deleted, see DECISIONS.md. `yaad-inbound`, over Twilio, is the one live
+WhatsApp path now.)
 
 ## Settings read empty for a while, and the table was full
 

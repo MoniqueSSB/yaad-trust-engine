@@ -29,7 +29,7 @@ export const PIPELINE_ID = "default";
 export const DEAL_STAGES = {
   INQUIRY_SCOPING: "appointmentscheduled",
   QUOTE_SENT: "qualifiedtobuy",
-  FUNDS_HELD: "presentationscheduled",
+  CLIENT_PAID: "presentationscheduled",
   EVIDENCE_SUBMITTED: "decisionmakerboughtin",
   CLIENT_APPROVED: "contractsent",
   COMPLETED_PAID: "closedwon",
@@ -46,7 +46,7 @@ export type DealStageId = (typeof DEAL_STAGES)[DealStageKey];
 export const STAGE_LABELS: Record<DealStageId, string> = {
   appointmentscheduled: "Inquiry and Scoping",
   qualifiedtobuy: "Quote Sent",
-  presentationscheduled: "Funds Held",
+  presentationscheduled: "Client Paid, Work In Progress",
   decisionmakerboughtin: "Evidence Submitted",
   contractsent: "Client Approved",
   closedwon: "Completed and Paid",
@@ -63,18 +63,31 @@ export function stageKeyById(stageId: string): DealStageKey | null {
 }
 
 /**
- * Stages where the client has paid but the worker has not been released.
- * Anything that releases or refunds money should ask this rather than compare
- * stage IDs by hand, so the rule lives in one place.
+ * Stages where the client has paid Yaadly and the tradesperson has not yet
+ * been paid for the work. Anything that releases or refunds money should ask
+ * this rather than compare stage IDs by hand, so the rule lives in one place.
+ *
+ * RENAMED 4 Sep 2026, and the rename is the point. This was FUNDS_HELD, and
+ * its label in HubSpot was "Funds Held", while terms.html, services.html,
+ * business.html and the desk all say plainly that Yaadly does not hold money
+ * on a client's behalf. Under the principal structure settled on 3 Sep,
+ * a client pays Yaadly for the job and Yaadly pays its subcontractor out of
+ * that: nothing is held on anybody's behalf at any point. The old label
+ * described a business Yaadly deliberately is not.
+ *
+ * The comment at the top of this file predicted exactly this class of failure
+ * and it happened anyway, because a stage label is not agent output and
+ * guardrails.scan never sees one. Stage labels reach clients through deal
+ * notifications, workflow emails, exports and screenshots.
  */
-export const FUNDS_HELD_STAGES: readonly DealStageId[] = [
-  DEAL_STAGES.FUNDS_HELD,
+export const CLIENT_PAID_STAGES: readonly DealStageId[] = [
+  DEAL_STAGES.CLIENT_PAID,
   DEAL_STAGES.EVIDENCE_SUBMITTED,
   DEAL_STAGES.CLIENT_APPROVED,
 ];
 
-export function isHoldingFunds(stageId: string): boolean {
-  return FUNDS_HELD_STAGES.includes(stageId as DealStageId);
+export function isClientPaidAndUnreleased(stageId: string): boolean {
+  return CLIENT_PAID_STAGES.includes(stageId as DealStageId);
 }
 
 export type PropertyDef = {

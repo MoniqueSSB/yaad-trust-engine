@@ -1844,3 +1844,58 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **One reply promise, site wide:** a person replies within one working day. Not "same day", not "any time", not "day or night", not "24 hours".
 
 **After changing copy on the app side**, run `npm --prefix web run typecheck`, `npm --prefix web test` and `npm --prefix web run lint`. Several tests assert on visible strings.
+
+---
+
+## The reply clock, and what to do when the Overview goes coral
+
+The Overview's first tile is **Oldest thing waiting**. It reads `v_reply_clock`, which lists everything nobody has answered yet, oldest first, across `intake_threads` (WhatsApp, SMS, email, website chat) and `enquiries` (the contact form).
+
+- **Amber** means somebody is waiting and is still inside one working day.
+- **Coral, with an alert row above the tiles**, means the published promise has been missed. Every public page says a person replies within one working day. Clear these first, before evidence and before drafts, because it is the one promise a client can check without your help.
+
+**A thread leaves the clock when you reply from the desk**, not when you read it. `yaad-desk-reply` stamps `first_human_reply_at` once and never clears it, so the number is about the first answer rather than the most recent. An enquiry leaves the clock when its status becomes `replied` or `converted`, stamped by `trg_enquiry_reply_clock`.
+
+**If the tile says "nothing" and you know somebody is waiting**, the row has been answered in a way that did not go through the desk (a reply sent from your own phone, for instance). That is not a bug in the clock, it is the clock telling the truth about what it can see. Reply from the desk, or mark the enquiry, and it will correct itself.
+
+**One working day is 24 hours here**, not a business-hours calculation, because clients are in the UK, the United States and Canada and workers are in Jamaica. The interval lives in `v_reply_clock` and nowhere else.
+
+---
+
+## Pausing the agents, including the one that answers WhatsApp at 2am
+
+The switch is in the top bar of the desk and writes `app_settings.agents_paused`.
+
+**Since 4 September 2026 it reaches `yaad-inbound`**, which is the function that answers WhatsApp, SMS, email and the website chat. Before that it did not, and the desk said so in three places.
+
+What paused actually does:
+
+- No model call happens anywhere, on any path through `yaad-inbound`.
+- The message is still recorded. Photographs and voice notes are still kept and still transcribed, because those build the record you then read.
+- The client is told a person is reading it and given their reference. Nobody is left in silence.
+- The thread is handed to you on their **first** message, not after three turns.
+
+**If you pause and somebody still gets an assistant reply**, check in this order:
+
+1. `select value from app_settings where key = 'agents_paused'` actually says `true`.
+2. The deployed `yaad-inbound` is the current one. `agentsPaused()` should be in it. Redeploy from disk if not.
+3. Whether the reply was really from the assistant, or from the desk, or a Twilio template such as the daily check-in, which this switch does not touch.
+
+**The read fails closed.** If `app_settings` cannot be read at all, inbound treats itself as paused and hands every conversation to you. So a flood of handoffs with no obvious cause is a symptom of the settings read failing, not of the switch being stuck on.
+
+**Do not widen the Settings or Health copy without widening the code.** A switch that claims more than it does is worse than no switch, and that now cuts in both directions.
+
+---
+
+## Renaming a HubSpot deal stage
+
+Stage labels reach clients through deal notifications, workflow emails, exports and any screenshot. **`guardrails.scan` never sees them**, so the banned-language rules are yours to enforce here by hand. A stage called "Funds Held" was live until 4 September 2026 while every page on the site said Yaadly does not hold money on a client's behalf.
+
+To rename one:
+
+1. **Relabel in the HubSpot UI. Never delete and recreate.** Settings, Data Management, Objects, Deals, Pipelines. Relabelling keeps the internal stage ID; recreating mints a new one and every ID in `web/lib/hubspotConfig.ts` goes stale at once.
+2. Update `STAGE_LABELS` in `hubspotConfig.ts` so the file and the portal agree.
+3. If the meaning changed rather than only the wording, rename the key in `DEAL_STAGES` and every use of it, and say why in `DECISIONS.md`.
+4. `npm --prefix web run typecheck && npm --prefix web test`.
+
+**Outstanding manual step from 4 September 2026:** the code now says `Client Paid, Work In Progress` for stage `presentationscheduled`. The label in the HubSpot portal still says `Funds Held` until somebody relabels it there. The code change does not perform it.

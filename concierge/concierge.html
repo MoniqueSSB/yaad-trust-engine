@@ -1721,8 +1721,8 @@ function paintKill(){
   b.classList.toggle("off", AGENTS_PAUSED);
   b.textContent = AGENTS_PAUSED ? "Agents: paused" : "Agents: live";
   b.title = AGENTS_PAUSED
-    ? "Paused. Nothing this desk starts will call a model. yaad-inbound and yaad-whatsapp-webhook are not covered and still reply to incoming messages."
-    : "Live. Drafting an invoice or describing stills calls a model. yaad-inbound and yaad-whatsapp-webhook run whatever this says.";
+    ? "Paused. Nothing calls a model, including yaad-inbound: an incoming message is recorded and handed to you instead of answered."
+    : "Live. Drafting an invoice or describing stills calls a model, and yaad-inbound answers people who write in.";
 }
 
 async function setAgentsPaused(next){
@@ -2319,7 +2319,7 @@ function panelSvc(rows){
 // Every row says what reads it. A row nothing reads is said to be a row
 // nothing reads, because that is the difference between a switch and a label.
 const SETTING_META = {
-  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. It does not reach everything. <b>yaad-inbound and yaad-whatsapp-webhook answer people on their own and never read this row</b>, so an incoming message is still replied to while this is on.", true],
+  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model, and since 4 Sep 2026 stops <b>yaad-inbound</b> too: an incoming WhatsApp, SMS, email or website message is recorded, its photographs and voice notes are kept, and the client is told a person is reading it, with no model call anywhere. The thread is handed to you on the first message rather than the third. If the switch cannot be read at all, inbound treats that as paused.", true],
   worker_guidelines_version: ["Worker Guidelines in force", "current_doc_version() reads this, and the quote policy refuses an insert from anybody signed on an older version. Bumping it stops quoting until they re-sign.", false],
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
@@ -2666,7 +2666,7 @@ document.addEventListener("click", (e) => {
   if (kill) {
     const next = !AGENTS_PAUSED;
     if (!confirm(next
-      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. yaad-inbound and yaad-whatsapp-webhook are not covered and keep replying to incoming messages."
+      ? "Pause every agent?\n\nInvoice drafting and sketch description stop calling a model, and so does yaad-inbound: anyone who writes in is recorded and told a person is reading it, and the thread lands in your queue on their first message. Photographs and voice notes are still kept."
       : "Let this desk call agents again?")) return;
     setAgentsPaused(next);
     return;
@@ -2857,6 +2857,17 @@ async function loadOverview(){
   VISITS = vis.data || [];
   renderCal();
 
+  // The reply clock. One view, oldest first, so the Overview can finally say
+  // how long rather than only how many. "A person replies within one working
+  // day" is on four public pages and until 4 Sep 2026 nothing measured it.
+  // See 20260904a_the_one_working_day_promise_gets_a_clock.sql.
+  const clockQ = await sb.from("v_reply_clock")
+    .select("kind,ref,channel,hours_waiting,breached")
+    .order("hours_waiting", { ascending: false }).limit(200);
+  const CLOCK = clockQ.data || [];
+  const oldest = CLOCK[0] || null;
+  const breached = CLOCK.filter(r => r.breached).length;
+
   const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
          invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
          enqNew, asksNew] = await Promise.all([
@@ -2881,7 +2892,13 @@ async function loadOverview(){
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
 
+  const hrs = (h) => h == null ? "nothing" : h < 1 ? "under an hour" : h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + " days";
+
   $("ovTiles").innerHTML = [
+    tile(breached ? "crit" : oldest ? "warn" : "ok", "Oldest thing waiting", hrs(oldest?.hours_waiting),
+      breached
+        ? breached + (breached === 1 ? " item is" : " items are") + " past one working day"
+        : oldest ? "Inside one working day" : "Everyone has had an answer"),
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute"),
     tile(evidWaiting ? "warn" : "ok", "Evidence to check", String(evidWaiting), evidWaiting ? "Waiting on your eyes" : "Nothing waiting"),
     tile(intakeNew ? "warn" : "ok", "Intake to triage", String(intakeNew), intakeNew ? "Read it and decide" : "Queue is clear"),
@@ -2898,6 +2915,8 @@ async function loadOverview(){
   ].join("");
 
   const needs = [];
+  if (breached) needs.push(alertRow("crit","!", breached + (breached === 1 ? " person has" : " people have") + " waited more than one working day",
+    "Every page on the site says a person replies within one working day. The oldest has been waiting " + hrs(oldest?.hours_waiting) + ". This is the promise clients judge you on, and the only one they can check themselves.", "Open intake", "intake"));
   if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
@@ -2946,7 +2965,7 @@ async function loadOverview(){
   setCount("kick", kickDraft, false);
   if (AGENTS_PAUSED) {
     $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
-      "Invoice drafting and sketch description are off. yaad-inbound and yaad-whatsapp-webhook are not covered by this switch and are still replying to people who write in.",
+      "Invoice drafting and sketch description are off, and so is yaad-inbound: people who write in are recorded and handed straight to you. Nothing is answered by a model.",
       "Open settings","set"));
   }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
@@ -3049,7 +3068,7 @@ async function loadHealth(){
     "The whole promise of this desk is that an approval binds to the exact files. A row with no sha256 cannot be bound to anything, so signing it off is a signature on air.");
 
   if (AGENTS_PAUSED) add("warn","Agents are paused, and the pause does not reach everything",
-    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. Two functions are not covered, because nothing here starts them: yaad-inbound and yaad-whatsapp-webhook are woken by an incoming message and call a model before this desk knows the message exists. Reading app_settings.agents_paused at the top of those two is what would make the switch mean everything it looks like it means.");
+    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. yaad-inbound reads the same row directly since 4 Sep 2026, so the message that wakes it at two in the morning is recorded and handed to you instead of answered by a model. Transcription and media storage deliberately keep running while paused, because they produce the record you then read.");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
     "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view.");

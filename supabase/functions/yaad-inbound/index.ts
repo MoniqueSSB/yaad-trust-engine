@@ -436,7 +436,43 @@ async function keepMedia(
 }
 
 /** The intake agent, same prompt discipline as the job wizard: never money. */
-async function readTheJob(text: string, trace: Trace) {
+/** Is the desk's agents switch on?
+ *
+ *  Until 4 Sep 2026 this function did not read it, and said so honestly in
+ *  three places: the Settings row, the Health view and concierge/README.md all
+ *  told Monique that pausing every agent did not reach the one agent that
+ *  actually talks to clients. That was the worst possible shape for the hole
+ *  to be in. yaad-inbound is woken by an incoming message and answers a real
+ *  person at two in the morning with nobody watching, so it is precisely the
+ *  one a kill switch exists for, and a switch that stops the quiet functions
+ *  and not the loud one is theatre.
+ *
+ *  FAILS CLOSED. If app_settings cannot be read, this returns true and the
+ *  conversation is handed to Monique. Handing a client to a person is the
+ *  product; a switch that silently stops working is not. The client is never
+ *  left in silence either way: the paused path below still replies.
+ *
+ *  SCOPE, stated so this comment cannot outgrow the truth: pausing stops the
+ *  intake assistant reasoning about the message and writing the reply. It does
+ *  not stop the message being recorded, media being stored, or a voice note
+ *  being transcribed, because those produce the record a person then reads.
+ */
+async function agentsPaused(supabase: any): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.from("app_settings")
+      .select("value").eq("key", "agents_paused").maybeSingle();
+    if (error) throw error;
+    return String(data?.value ?? "false").toLowerCase() === "true";
+  } catch (e) {
+    console.error("agentsPaused: could not read app_settings, failing closed (paused):", String(e).slice(0, 200));
+    return true;
+  }
+}
+
+async function readTheJob(text: string, trace: Trace, paused = false) {
+  // Before the provider is even chosen, so a paused desk cannot produce a
+  // model call by any path through this function.
+  if (paused) return null;
   const prov = pickTextProvider();
   // No length gate. "Hi" is the most common first message a real person sends
   // and it is exactly the one that needs a human sounding answer, not a
@@ -1898,7 +1934,9 @@ Deno.serve(async (req: Request) => {
         ? priorTranscript.slice(-8000)
         : `${priorTranscript}\n\n${thisTurn}`.slice(-8000);
 
-    const card = await readTheJob(transcript, trace);
+    const paused = await agentsPaused(supabase);
+    if (paused) root.setAttributes({ "yaadly.inbound.agents_paused": true });
+    const card = await readTheJob(transcript, trace, paused);
     const enough = card?.enough === true;
     // wants_human is one model call's read of one message, and when the call
     // fails outright (it did, live, 2 Sep 2026, on "Can I talk to a real
@@ -2038,7 +2076,9 @@ Deno.serve(async (req: Request) => {
     // ever to true here: writing false would silently undo a desk reply's own
     // claim on the thread, and clearing it is the desk's call alone.
     const HANDOFF_TURNS = 3;
-    const handingOver = wantsHuman || (!enough && turns >= HANDOFF_TURNS);
+    // paused first: a paused desk hands over on turn one rather than letting
+    // the client work through three turns of the generic opener to get there.
+    const handingOver = paused || wantsHuman || (!enough && turns >= HANDOFF_TURNS);
 
     // Remember the conversation before replying. If the reply fails we would
     // rather have the thread than lose what they said.
@@ -2127,6 +2167,31 @@ Deno.serve(async (req: Request) => {
       // They asked for a person. That is not a failure of the assistant, it is
       // a reasonable thing to want when you are about to spend money on a
       // house you cannot see, and the answer is yes.
+      // The desk has paused the agents. Say something true and hand over.
+      //
+      // Deliberately not silence, and deliberately not "we are experiencing
+      // technical difficulties". Somebody messaging about their mother's roof
+      // at two in the morning gets told a person is reading it, because a
+      // person is: handingOver above has already marked this thread for
+      // Monique and worthTelling has already pinged her.
+      //
+      // No model wrote any of this. `card` is null on this path by
+      // construction, so nothing below that reads it can leak a draft.
+      if (paused) {
+        if (isWeb) {
+          return say(
+            `Thanks for this, I have got it all down and saved it as ${jobId}. ` +
+            `Monique is reading messages herself at the moment rather than the assistant, so she will answer you here when she picks this up. ` +
+            `If you are leaving this page, tap the WhatsApp button and carry on there instead; everything you have said comes with you.`,
+            true,
+          );
+        }
+        return say(
+          `Thanks for this, I have got it all down and saved it as ${jobId}. ` +
+          `Monique is reading messages herself at the moment rather than the assistant, so she will come back to you on this number.`,
+        );
+      }
+
       if (wantsHuman) {
         if (isWeb) {
           return say(

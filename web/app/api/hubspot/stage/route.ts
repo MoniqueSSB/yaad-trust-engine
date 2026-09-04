@@ -42,7 +42,7 @@ import { NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/webhookSignature";
 import {
   HubSpotError,
-  advanceDealToFundsHeld,
+  advanceDealToClientPaid,
   advanceDealToEvidenceSubmitted,
   advanceDealToClientApproved,
   advanceDealToCompletedPaid,
@@ -62,7 +62,12 @@ import {
  * releasing funds is its own human decision, and is not this endpoint.
  */
 const EVENTS: Record<string, (dealId: string) => Promise<StageMove>> = {
-  payment_held: advanceDealToFundsHeld,
+  // client_paid is the name. payment_held is kept as an accepted alias so a
+  // sender configured against the old name does not start failing silently on
+  // the day the stage was relabelled (4 Sep 2026). Both reach the same stage.
+  // Drop the alias once nothing is sending it.
+  client_paid: advanceDealToClientPaid,
+  payment_held: advanceDealToClientPaid,
   evidence_submitted: advanceDealToEvidenceSubmitted,
   client_approved: advanceDealToClientApproved,
   worker_paid: advanceDealToCompletedPaid,

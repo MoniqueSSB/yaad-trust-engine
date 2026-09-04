@@ -168,9 +168,9 @@ Deno.serve(async (req: Request) => {
 
     // The thread first, under the caller's token: if RLS will not show it,
     // nothing gets sent to anybody.
-    const q = `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}&select=job_id,transcript,turns`;
+    const q = `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}&select=job_id,transcript,turns,first_human_reply_at`;
     const tr = await db(req, q);
-    const rows = tr.ok ? await tr.json() as { job_id: string; transcript: string; turns: number }[] : [];
+    const rows = tr.ok ? await tr.json() as { job_id: string; transcript: string; turns: number; first_human_reply_at: string | null }[] : [];
     if (!rows.length) return json({ error: "That conversation is not in intake_threads any more. Reload the desk." }, 404);
     const thread = rows[0];
 
@@ -196,7 +196,17 @@ Deno.serve(async (req: Request) => {
       `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}`,
       {
         method: "PATCH",
-        body: JSON.stringify({ transcript, human_handling: true, last_at: new Date().toISOString() }),
+        // first_human_reply_at is set once and never cleared, so it records
+        // the answer the "within one working day" promise is actually about
+        // rather than the most recent one. `thread` was read above, so the
+        // null check costs nothing extra. See
+        // 20260904a_the_one_working_day_promise_gets_a_clock.sql.
+        body: JSON.stringify({
+          transcript,
+          human_handling: true,
+          last_at: new Date().toISOString(),
+          ...(thread.first_human_reply_at ? {} : { first_human_reply_at: new Date().toISOString() }),
+        }),
       },
     );
     // The message is already with the client either way; a failed record
