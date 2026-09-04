@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "The worker network · Yaadly",
   description:
-    "Every verified tradesperson on Yaadly, by trade and by parish. Government photo ID on a video call, references called.",
+    "Every tradesperson on Yaadly, by trade and by parish. Identity checked with an independent provider, with the Jamaican TRN checked against the name on the ID.",
 };
 
 /**
@@ -123,8 +123,11 @@ export default async function Workers({
         Who does the work
       </h1>
       <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
-        Every profile here has passed the same check: government photo ID on a
-        video call, and references called. Nobody is listed before that is done.
+        Every profile here has passed the same two checks: an identity check
+        run by an independent verification provider, and a Jamaican TRN
+        checked against the name on that ID. Nobody is listed before both are
+        done. Before any job over £500, any work inside an occupied home, or
+        any job where keys are held, three referees are spoken to as well.
       </p>
 
       <section className="mt-7" aria-labelledby="filter-trade">

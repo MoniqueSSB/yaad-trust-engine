@@ -423,7 +423,7 @@ select id, created, status_code, content::text
 
 **None of this fires twice for the same event.** `evidence_landed`'s trigger condition is a transition (`old.status IS DISTINCT FROM 'evidence' AND new.status = 'evidence'`), not a state, so a second evidence item filed against a stage that already flipped the status does not notify again. If a client reports being told the same thing twice, that is two genuinely separate events, most likely two different stages, not a repeat.
 
-**The shared secret lives only as a hash.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. The plaintext is baked into the three trigger function bodies (`notify_client_quote_arrived`, `notify_client_on_job_change`, `notify_client_dispute_raised`) at the point they were created. If it ever needs rotating, regenerate it the way `20260831i` did and rewrite all three function bodies together; a mismatch between what a trigger sends and what the hash expects fails closed; `yaad-notify-client` returns 401 rather than notifying on a bad secret.
+**The shared secret lives in Supabase Vault, and only as a hash in the database.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. Since 3 September 2026 the plaintext is held in Vault under the name `notify_trigger_secret` and fetched at call time by `public.notify_trigger_secret()`; no trigger function body contains it any more, so reading a definition back with `pg_get_functiondef` reveals nothing. EXECUTE on that function is granted to `service_role` only, never to `anon` or `authenticated`, because it returns the plaintext. Ten callers use it: the eight `notify_*` trigger functions, `notify_client_service_change`, and `relay_confirmed_report`. A mismatch between what a caller sends and what the hash expects fails closed; `yaad-notify-client` returns 403 rather than notifying on a bad secret. This paragraph previously described the plaintext as baked into three function bodies, which was the design until 3 September and named three of what were by then nine callers. Corrected 4 September 2026.
 
 **`yaad-quote-landed` is retired.** It answers 410 and names where the work went. If something still calls it, `console.warn` inside the stub logs the referer, visible in that function's logs.
 
@@ -1349,6 +1349,26 @@ Every `fn_hash` should equal `stored_hash`. If one does not, that function was r
 
 **Fixed, 1 Sep 2026.** The secret had already been exposed and rotated; the new value sat in a Supabase Vault entry (`notify_trigger_secret_plaintext_20260831x`) with its own note to copy it into `YAAD_CRON_SECRET` via the dashboard or CLI, then delete the entry. Two attempts at the copy landed a value that still did not hash-match before a third attempt, copied by hand in the Edge Functions Secrets page, finally did: confirmed live by checking `supabase secrets list`'s displayed hash for `YAAD_CRON_SECRET` against `notify_trigger_secret_sha256` directly, not assumed from "I copied it." The Vault entry has been deleted, its job done.
 
+**Superseded 3 September 2026: the plaintext is out of the function bodies entirely.** Everything above is history and is kept because it explains why the design changed. The secret now lives in Supabase Vault under the name `notify_trigger_secret`, and every caller fetches it at call time with `public.notify_trigger_secret()`. There is no plaintext in any function body to extract, to re-bake, or to drift, so the "extract it from a function that still agrees" pattern above no longer applies and must not be revived. Adding a new trigger that calls `yaad-notify-client` now means calling `public.notify_trigger_secret()` in the body, nothing more.
+
+**The check, in its current shape:**
+
+```sql
+select p.proname,
+       p.prosrc like '%notify_trigger_secret()%' as uses_vault_lookup,
+       p.prosrc ~ '[0-9a-f]{64}'                 as carries_a_plaintext
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and (p.prosrc like '%yaad-notify-client%' or p.proname = 'notify_trigger_secret')
+ order by p.proname;
+```
+
+Every row should read `uses_vault_lookup = true` and `carries_a_plaintext = false`, except `notify_trigger_secret` itself, which is the lookup rather than a caller. Confirmed live 4 September 2026: ten rows, all correct. Note this query never prints the secret, which the older queries in this section did.
+
+**Rotating it, now that it is in Vault.** Update the Vault secret, set `app_settings.notify_trigger_secret_sha256` to the SHA-256 of the new value, and set `YAAD_CRON_SECRET` to the same new value with `supabase secrets set`. No function body has to change, which is the whole point of the move. `YAAD_CRON_SECRET` is still a separate copy held outside Postgres by `yaad-job-health`, `yaad-followup-check` and `yaad-evidence-landed-check`, so it is still the piece a rotation forgets; it fails silently with a `403` visible only in the calling function's own logs.
+
+**The repository and the database had drifted on exactly this, found 4 September 2026.** The migration that made the Vault move was applied to production on 3 September as version `20260903083651`, but its file was never committed. That is the reverse of section 18's usual direction and it was the more dangerous way round: a rebuild from migrations would have recreated the old plaintext function bodies carrying a value that no longer works, and every client notification would have failed a `403` silently. The file has been recovered by reading the live definitions back and committing them as `supabase/migrations/20260903a_the_notify_secret_lives_in_the_vault_not_the_trigger_body.sql`. If you ever find production and the repository disagreeing about a function body, read the live one back with `pg_get_functiondef` and commit that; do not reconstruct it from memory.
+
 ## The AI photo review comes back empty
 
 **Check the function's own console output, not just the trace.** `reviewEvidencePhotos()` in `yaad-notify-client` logs a specific reason with `console.error` on every failure path as of 31 Aug 2026: `NVIDIA_API_KEY` unset, no image URLs to review, an HTTP error from NVIDIA, or the model's response not containing a JSON array at all. Query `function_logs` for the function around the time of the send:
@@ -2230,6 +2250,31 @@ grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|re
 grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
 ```
 
+**A third sweep, added 3 September 2026: the tradesperson's money must never be described as waiting on the client's click.** Under the principal structure the client owes Yaadly and Yaadly owes the tradesperson, and those two obligations are independent. Copy saying "nobody is paid until you approve" glues them back together, which is the escrow picture the structure exists to avoid, and it is also untrue of the worker, who is Yaadly's subcontractor and gets paid whether or not a client abroad has replied. The client's gate is not removed by this, it is pointed at the right party: their sign-off closes the job with Yaadly and releases the balance they owe Yaadly. Eleven places said the old thing on 3 September and all eleven were changed in one commit. Note the contraction, which is why the sweep is two patterns and not one: `docs/marketplace.html` said "Nobody's paid", not "Nobody is paid", and the first sweep missed it.
+
+```bash
+grep -rniE "(nobody|no one|nothing)('s| is| are)? (paid|charged) until|paid until you|until you release" docs/*.html preview/*.html web/app supabase/functions
+```
+
+Hits on the client's own card ("nothing is charged until you pick one", "authorised at booking") are correct and stay: that is the client's money and the gate genuinely is theirs. Hits describing the *worker* being paid are the bug.
+
+**And the sweep must cover the signed terms, not only the marketing pages.** `web/lib/legal-copy.json` is what a client and a worker put their name to, and on 3 September 2026 it still said the client pays the worker directly while the website said the opposite. A contradiction between a marketing page and a signed document resolves in favour of the document, so the terms are the more important half, and they are the half nobody thinks to grep. The same wording was also duplicated inline in `web/app/apply/JoinFlow.tsx` (what an applicant reads before signing anything) and in `supabase/functions/yaad-inbound/faq.ts` (the facts the reply model may state to a real client), so fixing the canonical JSON is never the whole job.
+
+**Changing either guidelines document is a three-part change, and doing two parts is worse than doing none.**
+
+1. Edit the section in `web/lib/legal-copy.json`, and add a `<p class="amend">` saying what changed and whether earlier signatures carry over. The convention set in v1.1 is that they do not.
+2. Bump `WG_VERSION` / `CG_VERSION` and the matching date in the same file.
+3. Add a migration setting `worker_guidelines_version` / `client_guidelines_version` in `app_settings` to the new number, in the same commit.
+
+Skip step 3 and everyone who signs the new text fails the gate on the old number while everyone holding a withdrawn signature keeps passing it, because `match_workers_for_job` and `client_go_live` both compare the signature's `doc_version` to `current_doc_version()` with `=`. That has now happened twice, `20260828e` and `20260901i`. Read the live values before assuming the folder is the truth:
+
+```sql
+select key, value from public.app_settings where key like '%guidelines_version%';
+select doc_type, doc_version, count(*) from public.doc_signatures group by 1,2 order by 1,2;
+```
+
+Anyone whose signed version is not the current one must re-sign before they can be matched to a job or go live. Tell the founder how many people that is before applying the migration, not after. The two live client message templates, `yaad-inbound` (the facts the reply model may state) and `yaad-notify-client` (the booking confirmation), are inside this sweep on purpose, because they are the only copy a real client reads without visiting the site, and a fix that stops at `docs/` leaves the worst offender live.
+
 ## Creating the Stripe payment links
 
 There is a script: `scripts/create-payment-links.mjs`, with its prices in `scripts/payment-links.json`. Read the JSON before you run anything, because it is the list of amounts Stripe will actually charge.
@@ -2394,3 +2439,31 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **Take it down** removes it from the public page again, along with any answers under it, because an answer is only public while its question is. The row stays for you.
 
 **To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
+
+---
+
+## Changing anything a customer reads about money, checks or prices
+
+`docs/COPY-GUIDELINES.md` is the source of truth for customer facing wording, across both the marketing site and the app. Read it before writing page copy, and change it first if the underlying fact has changed. See DECISIONS.md, "Two lanes, named" (4 Sep 2026), for why it exists.
+
+**Say which lane it is, before you say anything about money.** A **managed job**: the client buys the job from Yaadly, and Yaadly engages and pays the tradesperson as its subcontractor. **Oversight only**: the contractor stays the client's, the client pays them directly, Yaadly holds none of that money and invoices only its own fee. Almost every contradiction the September audit found came from a page reaching for the wrong one.
+
+**Never write that the client releases, approves or triggers a payment.** They accept the work. Yaadly then pays its own subcontractor, and a named person at Yaadly makes that call. Both halves, every time. The forbidden phrasings are listed in COPY-GUIDELINES section 3, and the reason is legal rather than stylistic: `docs/terms.html` says the client does not contract with the tradesperson, so a client cannot release that person's pay.
+
+**A price appears in more places than you think.** Changing one means changing all of these in the same commit, or the site starts contradicting itself and, where a founding rate is involved, breaks the Digital Markets, Competition and Consumers Act 2024:
+
+1. `docs/services.html`, the card price and the `price-alt` line under it
+2. the `wa.me` prefill message on that same card, which quotes the price in the text
+3. `docs/faq.html`, the "What does it cost?" answer
+4. `docs/index.html`, the owner door, for the two services listed there
+5. `docs/prices.html`, the "What Yaadly charges" table, for fees rather than service prices
+6. `web/lib/.../price-figures.ts`, the exact-figure allowlist that governs what the assistant may say
+7. `service_catalogue` in the database
+
+**A founding rate must be a real reduction.** Never publish one equal to the standard rate. Where there is no discount, write "Fixed fee, the same rate for everyone".
+
+**Never claim a check the database does not enforce.** `trg_profile_publish_checks` is the gate: a Persona identity check approved or completed, a TRN approved, and an email. That is what "nobody is listed before" may claim. The three-referees rule (any job over £500, any occupied home, any job holding keys) is real policy but is operational, not enforced by the trigger, so it is written as policy. If you find copy claiming a video call or that references are called for everyone, it is wrong: that exact wording was live until 4 September 2026.
+
+**One reply promise, site wide:** a person replies within one working day. Not "same day", not "any time", not "day or night", not "24 hours".
+
+**After changing copy on the app side**, run `npm --prefix web run typecheck`, `npm --prefix web test` and `npm --prefix web run lint`. Several tests assert on visible strings.

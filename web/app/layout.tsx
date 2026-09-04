@@ -24,7 +24,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Yaadly",
   description:
-    "Trust-first property work in Jamaica. Nobody is paid until you approve the evidence.",
+    "Trust-first property work in Jamaica. You buy the job from Yaadly, nothing is signed off until you have seen the evidence, and Yaadly pays the tradesperson on completion.",
 };
 
 export default function RootLayout({

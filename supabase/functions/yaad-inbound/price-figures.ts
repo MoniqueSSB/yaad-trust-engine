@@ -30,9 +30,9 @@ export const PUBLISHED_PERCENTS = new Set([2, 5, 12, 15]);
 // is to say when a client has just asked about money, so it is the worst place
 // in the system for a retired claim to be sitting.
 export const NO_PRICE_SENTENCE =
-  "I cannot give you a figure myself. A person at Yaadly prices the job against real "
-  + "material costs and real day rates, and you get that price in writing before anything "
-  + "starts. Yaadly's own services and their published prices are at yaadly.co.uk/prices.";
+  "Yaadly does not estimate or quote the trade work itself; the tradesperson sets their own labour price "
+  + "against the written scope, and the client agrees one Yaadly price built from it. "
+  + "Yaadly's own services and their published prices are at yaadly.co.uk/services.";
 
 const POUNDS = /£\s?(\d[\d,]*)(?:\.\d+)?/g;
 const JMD = /J\$\s?(\d[\d,]*)(?:\.\d+)?/g;

@@ -72,7 +72,7 @@ function MoneyRow({ job }: { job: MoneyJob }) {
 
       {job.held ? (
         <p className="mt-2 text-[12px] leading-relaxed text-dim">
-          Held until the client approves the evidence on this job.
+          Due once this job is signed off. Yaadly pays you, not the client.
         </p>
       ) : (
         <div className="mt-3 border-t border-line pt-3">

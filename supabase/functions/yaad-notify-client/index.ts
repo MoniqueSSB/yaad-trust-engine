@@ -822,10 +822,13 @@ Deno.serve(async (req: Request) => {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
       // the two doors set it: a portal tap or a WhatsApp reply. Payment is
-      // relayed here, not collected: Yaadly is not holding money yet
-      // (CLAUDE.md 9), so this states the same off-platform terms already
-      // published in the worker FAQ, word for word, rather than inventing
-      // new payment language.
+      // relayed here, not collected. Comment corrected 3 Sep 2026: it used to
+      // say "Yaadly is not holding money yet (CLAUDE.md 9)", which stopped
+      // being true when payment came off that section's not-built list the
+      // same day. The client buys the job from Yaadly and Yaadly engages and
+      // pays the worker, so the wording below states the principal structure
+      // and matches the worker FAQ rather than inventing new payment
+      // language.
       const { data: q } = await admin.from("job_quotes")
         .select("worker_name, labour_jmd, materials_jmd")
         .eq("job_id", jobId).eq("status", "accepted")
@@ -839,7 +842,7 @@ Deno.serve(async (req: Request) => {
         `Labour ${money(q?.labour_jmd ?? 0)}, materials ${money(q?.materials_jmd ?? 0)} paid at cost against the receipt. ` +
         `You pay Yaadly, not the worker: Yaadly engages and pays them. ` +
         `Your invoice for the job is on its way separately, one price covering the work, materials at cost and Yaadly's Guarantee & Support fee. ` +
-        `The job goes live once that is paid, and each stage is released only when you approve the evidence. ${roomLink}`;
+        `The job goes live once that is paid. Yaadly pays the worker under our own agreement with him, so he never waits on you. Your approval is what closes each stage with us, once you have seen the evidence. ${roomLink}`;
     } else if (kind === "quote_awaiting_worker_confirm") {
       // Fires once, the moment the worker's own quote lands (job_quotes
       // AFTER INSERT WHEN status = 'submitted'). Writing the quote is not
