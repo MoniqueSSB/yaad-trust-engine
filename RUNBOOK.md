@@ -146,7 +146,7 @@ This is the Python engine only. The live Edge Functions are step 9.
 
 The nine live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`, `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack` and `yaad-sketch`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set. (`yaad-kickoff` also has a provider picker of its own, which checks OpenRouter and NVIDIA first and otherwise falls through to the shared one.)
 
-**Done on 4 September 2026.** Steps one and two below were carried out and the switch is live. Step three, removing the MiniMax branch, is still outstanding.
+**Done on 4 September 2026, all three steps.** The switch is live, the MiniMax branch is gone, and there is no fallback provider any more. This section is kept as the record of how it was done and as the procedure for the next provider change, not as outstanding work.
 
 **MiniMax is the current choice, deliberately.** Founder decision, 30 August 2026: the data flowing through these functions today is synthetic, and a China transfer of invented job cards is not what the DPIA is about. **The trigger for this step is real client and worker data, which arrives with the December pilot.** Do it before then, not after.
 
@@ -186,9 +186,9 @@ supabase functions logs yaad-post-job --project-ref leffyisvfvjwzilydlwf
 
 Turning on a real OTLP endpoint is still worth doing and would make this a one-query answer across all nine functions instead of one function at a time. It is not a prerequisite for the switch.
 
-**Step three, remove the MiniMax branch.** Still outstanding as of 4 September 2026. Delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the nine functions using the two loops below. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again. `MINIMAX_API_KEY` is still set as a secret and should come out at the same time.
+**Step three, remove the MiniMax branch. Done, 4 September 2026.** The branch is out of `_shared/textmodel.ts`, `sync-shared.sh` has pushed the change into all nine copies, all nine are redeployed, and the `MINIMAX_API_KEY` secret has been unset. `docs/privacy.html` now names Mistral in the European Union, and the table row and both dates on that page moved with it.
 
-Two other things belong to the same piece of work: `docs/privacy.html` still tells the public that text drafting happens in China, which stopped being true on 4 September 2026, and that page says plainly that the sentence stays until the switch is made. It has been made.
+There is deliberately no fallback provider now. With no Mistral key configured, `pickTextProvider()` returns null and every caller gets `NO_PROVIDER_MESSAGE`, which is a loud failure rather than a quiet reroute to China. Do not add a fallback back in. If a provider ever needs changing again, use the four `TEXT_MODEL_*` secrets, which take priority over everything and need no deploy.
 
 **If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. See step one, which is where that goes wrong.
 

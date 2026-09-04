@@ -10,32 +10,43 @@
 // UK adequacy decision, and Jamaica's Data Protection Act 2020 restricts
 // transfers where the destination lacks adequate protection.
 //
-// Founder decision, 30 August 2026, in two parts and both of them deliberate.
+// Founder decision, 30 August 2026: move to Mistral, hosted in the EU, which
+// speaks the OpenAI chat completions shape so the call sites barely change and
+// which offers a signed data processing agreement. The timing was deliberately
+// left open, because the data flowing through these functions in August was
+// synthetic and a China transfer of invented job cards is not the risk the
+// DPIA is about. The line was REAL CLIENT AND WORKER DATA, arriving with the
+// December pilot.
 //
-// The endpoint to move TO is Mistral: hosted in the EU, speaks the OpenAI chat
-// completions shape so the eight call sites barely change, and offers a signed
-// data processing agreement.
+// ── The move happened on 4 September 2026 ──
 //
-// WHEN to move is not yet. MiniMax stays for now. The data flowing through
-// these functions today is synthetic and buildathon shaped, and a China
-// transfer of invented job cards is not the risk the DPIA is about. The line
-// is REAL CLIENT AND WORKER DATA, which arrives with the December pilot in
-// Kingston and Portmore.
+// MISTRAL_API_KEY and MISTRAL_MODEL were set as Edge Function secrets and every
+// function picked them up on its next invocation. No deploy, no code change,
+// no nine-file edit. That was the whole point of moving the decision into this
+// file ahead of the decision itself, and it worked exactly as designed.
 //
-// ── How the move happens when it happens ──
+// The MiniMax branch that used to sit below has been REMOVED, which is step
+// three of RUNBOOK §9. It was correct while it was the current choice. It
+// stops being correct the moment Mistral is the choice, because then it is no
+// longer a provider, it is a silent fallback to China waiting for one missing
+// secret. There is deliberately nothing to fall back to now: with no provider
+// configured every caller gets NO_PROVIDER_MESSAGE and fails loudly, which is
+// the right failure. Do not reintroduce it.
 //
-// Set MISTRAL_API_KEY as an Edge Function secret. That is the whole switch.
-// The order below prefers it, so the moment the secret exists every function
-// is on the EU endpoint. No deploy, no code change, no eight-file edit. That
-// was the point of moving the decision into this file ahead of the decision
-// itself. RUNBOOK step 9 has the three steps.
+// Every model span still carries yaadly.model.region, so "where did this
+// client's message actually go" is answerable from telemetry rather than from
+// memory. Note that as of 4 September 2026 no OTLP endpoint is configured on
+// this project, so nothing is actually reading those spans yet. That is why
+// RUNBOOK §9 step two proves the switch with a live call rather than a trace.
 //
-// The MiniMax branch below is therefore the CURRENT CHOICE, not a failure
-// state, and it does not shout on every call: an alarm somebody has been told
-// to ignore has stopped being an alarm. What it does instead is leave a trace.
-// Every model span carries yaadly.model.region, so "where did this client's
-// message actually go" is answered from telemetry rather than from memory, and
-// the day the answer needs to be "eu" it is checkable in one query.
+// ── The model id, which is where this goes wrong ──
+//
+// Set MISTRAL_MODEL. Do not rely on the default below. Model ids move: the
+// previous default here was mistral-large-latest, which Mistral stopped
+// serving, and the first replacement tried was mistral-medium-3-5-26-04, which
+// is a model NAME from Mistral's overview table and not an API id at all. Both
+// failed. The id form is mistral-small-latest, mistral-medium-latest, or a
+// dated snapshot such as mistral-medium-2604.
 //
 // ── Adding a provider ──
 //
@@ -70,39 +81,27 @@ export function pickTextProvider(): TextProvider | null {
     };
   }
 
-  // 2. Mistral, the EU endpoint. The intended home.
+  // 2. Mistral, the EU endpoint. The home, live since 4 September 2026.
   //
-  // Model ids move. Confirm the current one on Mistral's model page before
-  // relying on this default, and set MISTRAL_MODEL rather than editing here.
+  // The default below is a last resort, not a recommendation. Set
+  // MISTRAL_MODEL rather than editing here, and read the model id note at
+  // the top of this file before assuming a default still resolves.
   const mistral = Deno.env.get("MISTRAL_API_KEY");
   if (mistral) {
     return {
       name: "mistral",
       api: "https://api.mistral.ai/v1/chat/completions",
       key: mistral,
-      model: Deno.env.get("MISTRAL_MODEL") || "mistral-large-latest",
+      model: Deno.env.get("MISTRAL_MODEL") || "mistral-small-latest",
       region: "eu",
     };
   }
 
-  // 3. MiniMax, in China. The current choice while the data is synthetic, by
-  //    founder decision of 30 Aug 2026. Not a fallback and not an error, so it
-  //    does not log. The region rides on every span instead, which is the
-  //    honest signal: silent when nobody is asking, conclusive when they are.
-  //
-  //    This branch comes out when Mistral goes in, before the December pilot
-  //    carries real client and worker data.
-  const minimax = Deno.env.get("MINIMAX_API_KEY");
-  if (minimax) {
-    return {
-      name: "minimax",
-      api: "https://api.minimax.io/v1/chat/completions",
-      key: minimax,
-      model: Deno.env.get("MINIMAX_MODEL") || "MiniMax-M2.7",
-      region: "cn",
-    };
-  }
-
+  // There is no third branch, on purpose. MiniMax (China) was here until
+  // 4 September 2026 and was removed the day Mistral went live, because a
+  // provider that is no longer the choice is not a fallback, it is a silent
+  // route to a country the privacy page says we do not use. Failing loudly
+  // is the correct behaviour: see NO_PROVIDER_MESSAGE below.
   return null;
 }
 

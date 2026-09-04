@@ -34,7 +34,7 @@ import * as guardrails from "./guardrails.ts";
 // same brief can be drafted by MiniMax M2.7, GLM 5.2, Kimi K3 and DeepSeek
 // V4 Pro and the packs read side by side. Requires the OPENROUTER_API_KEY
 // secret; without it the override is refused with a plain message. The
-// default remains MiniMax direct, per the standing decision.
+// default was MiniMax direct then, and is Mistral in the EU from 4 Sep 2026.
 //
 // v11, 24 Aug 2026: the v10 budgets made part A too slow for one worker; a
 // rich-brief draft was culled at the background worker's 400 second lifetime
@@ -61,13 +61,22 @@ import * as guardrails from "./guardrails.ts";
 // checklist, which share stage names and so must come from one mind; (C)
 // document pack, risk register, communications - merged into one document
 // set. Wall time drops to the slowest third. Same table, same polling desk;
-// MiniMax stays the model, per the standing decision.
+// The model came from the shared picker then and still does.
 
-// Provider selection, checked at request time. MiniMax is the DEFAULT by
-// Monique's standing decision (23 Aug: "leave NVIDIA, make it better on
-// MiniMax") - the mere presence of an NVIDIA key must never hijack the
-// draft (v5 did exactly that and a test failed on an NVIDIA 503).
+// Provider selection, checked at request time. The shared picker in
+// _shared/textmodel.ts is the DEFAULT, and since 4 September 2026 that means
+// Mistral in the EU. It used to mean MiniMax in China, by Monique's standing
+// decision of 23 Aug ("leave NVIDIA, make it better on MiniMax"); the part of
+// that decision which still holds is the shape, not the provider. The mere
+// presence of an NVIDIA key must never hijack the draft (v5 did exactly that
+// and a test failed on an NVIDIA 503).
 // NVIDIA runs only when explicitly chosen: set the secret PROVIDER=nvidia.
+//
+// Note the two escape hatches below both leave the EU. An OpenRouter override
+// carries region "unstated" and NVIDIA is in the US, so either one sends a
+// client's intake somewhere docs/privacy.html does not currently name. Neither
+// key is set on this project as of 4 September 2026, so neither path can run;
+// setting one is a data protection decision before it is a config change.
 function pickProvider(override?: string): TextProvider | null {
   if (override) {
     const ork = Deno.env.get("OPENROUTER_API_KEY");
@@ -381,8 +390,10 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
       ...(blob.match(/\b\d[\d,]{2,}(?:\.\d{2})?\s?(?:dollars|pounds|JMD|USD|GBP)\b/gi) ?? []),
     ];
     const priced = priceHits.length > 0;
-    // MiniMax is a Chinese model and can leak CJK fragments into English
-    // prose (it did, once). Flag them; the desk shows the samples.
+    // MiniMax, the model until 4 September 2026, could leak CJK fragments
+    // into English prose (it did, once). The check stays now the provider is
+    // Mistral: it costs nothing, the OpenRouter override can still reach a
+    // Chinese model, and a guard is cheaper to keep than to reinstate.
     const cjkHits = blob.match(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]+/g) ?? [];
 
     // Banned language, same list as the Python engine. Flags rather than
