@@ -15,6 +15,7 @@ that actually serves real users. That is why these files are here.
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
 | `yaad-sketch` | true | Site Sketch Pack: video stills → rooms, condition schedule, schematic, admin session only |
 | `yaad-inbound` | false | Every inbound message: Twilio WhatsApp and SMS, Resend email, and since 2 Sep 2026 the chat widget on yaadly.co.uk (`channel: "web"`, see `web-chat.ts`). One intake assistant, one handoff rule, one banned-language screen, three doors. The web door has no signature; the Origin check plus the `web_chat_attempts` throttle stand in for one, the same posture as `yaad-enquiry` |
+| `yaad-report` | true | The report drafting agent: an inspector's notes and photograph captions become the findings of a draft report, admin session only. **No severity field and no verdict field in its schema**, the same shape as `yaad-invoice` having no amount field. See below |
 | `yaad-message-status` | **false** | Twilio's delivery callbacks: queued, sent, delivered, read, failed, undelivered, keyed on Twilio's own MessageSid into `message_deliveries`. Carries its own authentication (the same HMAC check `yaad-inbound` uses, from `_shared/twilio-signature.ts`) and refuses outright when the token is missing. Records what it is told and acts on nothing, so a forged callback can only ever make a status wrong, never move anything |
 | `yaad-phone-check` | true | Twilio Lookup on a number a worker typed: is it real, is it a mobile, and what is it in E.164. Called from the portal's link-your-number form before the number is saved. Holds no service-role key and touches no table; it reports and the caller decides. `verify_jwt` stays true because Lookup costs money per call |
 | `yaad-desk-reply` | true | Monique's typed reply to a Conversations thread, sent from the Yaadly Twilio number, or into `web_chat_replies` for a website chat thread. No model call anywhere in it; `is_admin()` checked inside as well. A send marks the thread `human_handling`, so `yaad-inbound` stands down until the desk hands it back |
@@ -204,3 +205,44 @@ stills are pulled from the video in the browser with a `<video>` element and a
 canvas. The walkthrough of somebody's home never leaves the machine it was
 loaded on. Only the stills she keeps are uploaded, six per call, which is also
 what keeps each request inside the function's timeout.
+
+
+## yaad-report, and the two fields it does not have
+
+Three of the seven priced services are a document: the Deposit Protection
+Check, the Condition Report and the Technical Sign-off. `services.html`
+promises a verdict on page one, normally within 72 hours of the visit. Typed by
+hand, a £249 report costs an evening, which caps the whole business at roughly
+four reports a week.
+
+So the agent drafts the findings. It does not write the two things the client
+is actually paying for.
+
+**A client paying for a Condition Report is not buying prose.** They are buying
+somebody with seven years of UK construction project management saying "this
+one is Severe, and here is what I would do about it". Draft the prose and you
+save an evening. Draft the rating and you have sold a judgment nobody made.
+
+| Move | Who makes it | What stops the function |
+|---|---|---|
+| Rating a finding Severe, Moderate or Low | Monique | no field in the schema; `report_guard_issue` refuses to issue with any finding unrated; `report_stamp_rater` requires `is_admin()` and records who rated it |
+| Writing the page one verdict | Monique | no field in the schema; the same trigger refuses to issue without one |
+| Stating a measurement | nobody, ever | the prompt forbids it, `MEASUREMENT_RE` scrubs and reports what arrives anyway, and `has_measurement()` refuses the issue |
+| Pricing a remedy | Monique | no field in the schema, same as `yaad-invoice` |
+| Answering valuation, title, structure or boundaries | four named professionals | the prompt routes them to `questions` instead of writing a finding |
+
+`MEASUREMENT_RE` here and `has_measurement()` in `20260904c` are the same rule
+the sketch packs already use, deliberately reused rather than reimplemented: a
+second copy of that regex would drift, and the sketch one is already tested
+against eighteen sentences.
+
+There is a second scrub, `RATING_WORDS`, which is belt and braces on rule 1.
+A model told not to rate will occasionally rate in prose anyway, and "this is a
+severe problem" inside a body reads to a client exactly like the rating they
+paid a person for.
+
+The function holds no service-role key. Every database call goes out under the
+caller's own token, so RLS is doing the access control.
+
+Proof: `supabase/tests/report_guards.sql`, eleven assertions.
+Schema: `supabase/migrations/20260904n_the_report_drafter.sql`.
