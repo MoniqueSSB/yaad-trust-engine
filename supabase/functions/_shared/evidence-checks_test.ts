@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { checkAttrs, deskPack, runEvidenceChecks, workerGaps } from "./evidence-checks.ts";
+import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 
 const CHECKLIST = [
   { stage: "Strip and make safe", items: [{ item: "Wide shot of the room" }, { item: "Close-up of the join" }] },
@@ -179,4 +179,63 @@ Deno.test("telemetry carries counts, never the detail text", () => {
   for (const c of checks) {
     assert(!blob.includes(c.detail), "a check's sentence must not reach telemetry");
   }
+});
+
+// ── the location pin ─────────────────────────────────────────────────────
+//
+// Replaces the Python engine's "live pin on work log", which could not be
+// ported: evidence rows carry no lat/lon, WhatsApp discards EXIF on send, and
+// the portal upload path strips location deliberately. A WhatsApp location
+// share is the live equivalent and a stronger one.
+
+Deno.test("a shared pin is recorded as a note, never a gap", () => {
+  const checks = runEvidenceChecks({
+    stage: 1, evidence: [photo(), clip()], arrivals: [arrival()], checklist: CHECKLIST,
+    pins: [{ shared_at: "2026-09-04T14:30:00Z", far_from_site: false, address: "Barbican, Kingston 8" }],
+  });
+  const pin = byName(checks, "Location pin");
+  assertEquals(pin.passed, true);
+  assertEquals(pin.severity, "note");
+  assert(pin.detail.includes("Barbican"), "it shows the address a human would rather read");
+});
+
+Deno.test("NO pin is never a gap and never blocks: it is an offer", () => {
+  const checks = runEvidenceChecks({
+    stage: 1, evidence: [photo(), clip()], arrivals: [arrival()], checklist: CHECKLIST, pins: [],
+  });
+  const pin = byName(checks, "Location pin");
+  assertEquals(pin.passed, false);
+  assertEquals(pin.severity, "note", "a missing pin must never be a gap");
+  // The rule arrival_log's own migration sets: it strengthens the record, it
+  // never gates it. If this ever becomes a gap, a voluntary thing has quietly
+  // turned into an obligation and a worker is being judged for declining.
+  assertEquals(workerGaps(checks), [], "a missing pin must never reach the gap list");
+  assert(workerNotes(checks).some((n) => /up to you/i.test(n)), "the ask must say it is optional");
+});
+
+Deno.test("the pin ask explains what it is FOR, and tells nobody off", () => {
+  const notes = workerNotes(runEvidenceChecks({
+    stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: CHECKLIST, pins: [],
+  }));
+  const ask = notes.find((n) => /location/i.test(n))!;
+  assert(/you were there|harder to argue/i.test(ask), "says what it buys him: " + ask);
+  assert(!/must|required|need to|failed|missing/i.test(ask), "must not read as a demand: " + ask);
+});
+
+Deno.test("a far pin is desk only, like the arrival flag", () => {
+  const checks = runEvidenceChecks({
+    stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: CHECKLIST, parish: "Portmore",
+    pins: [{ shared_at: "2026-09-04T14:30:00Z", far_from_site: true }],
+  });
+  const far = byName(checks, "Pin distance");
+  assertEquals(far.audience, "desk");
+  assertEquals(far.severity, "note");
+  assert(!workerGaps(checks).concat(workerNotes(checks)).some((t) => /30km/.test(t)),
+    "the worker is never shown the distance flag");
+});
+
+Deno.test("pins are optional input: omitting them entirely still runs", () => {
+  const checks = runEvidenceChecks({ stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: CHECKLIST });
+  assertEquals(byName(checks, "Location pin").passed, false);
+  assertEquals(workerGaps(checks).length > 0, true, "the other checks still work");
 });

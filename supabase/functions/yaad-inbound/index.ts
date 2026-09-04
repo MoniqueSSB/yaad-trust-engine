@@ -48,7 +48,13 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 type Media = { url: string; mime: string };
-type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string };
+/** A WhatsApp location share. Twilio delivers Latitude, Longitude, Address and
+ *  Label as ordinary inbound parameters; there is nothing to install for this.
+ *  Address and Label are whatever the sender's own app filled in and are never
+ *  trusted for anything, only shown to a human who would rather read
+ *  "Barbican, Kingston 8" than two decimals. */
+type Place = { lat: number; lon: number; address: string; label: string };
+type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; place?: Place; resendId?: string; subject?: string };
 
 /** photo, video, audio or file, from whatever Twilio says it is. */
 function mediaKind(mime: string): string {
@@ -90,12 +96,23 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
     // client actually is.
     const rawFrom = s(f.get("From"));
     const isWa = rawFrom.startsWith("whatsapp:");
+    // A WhatsApp location share. Only Current Location exists here: the
+    // Business API does not carry Live Location, so a pin is a point in time
+    // and never a track, which is the right shape for evidence and the only
+    // shape worth storing about somebody who works for you.
+    const latRaw = Number(f.get("Latitude"));
+    const lonRaw = Number(f.get("Longitude"));
+    const place: Place | undefined = Number.isFinite(latRaw) && Number.isFinite(lonRaw)
+      && (latRaw !== 0 || lonRaw !== 0)
+      ? { lat: latRaw, lon: lonRaw, address: s(f.get("Address")), label: s(f.get("Label")) }
+      : undefined;
     return {
       channel: isWa ? "whatsapp" : "sms",
       from: isWa ? rawFrom.slice("whatsapp:".length) : rawFrom,
       name: s(f.get("ProfileName")),
       text: s(f.get("Body")),
       media,
+      place,
     };
   }
 
@@ -1133,6 +1150,7 @@ Deno.serve(async (req: Request) => {
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
+      const pinSession = sess && String((sess.answers as any)?._lane ?? "") === "pin" ? sess : null;
 
       // A worker answering the "send this draft, or write your own"
       // prompt. "1" means send exactly what was drafted; anything else
@@ -1263,6 +1281,60 @@ Deno.serve(async (req: Request) => {
         // job description to write down, only an orphaned photo nobody
         // answered for. Falls through and this message is read fresh.
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+      }
+
+      // A worker sharing where they are. Founder's instruction, 4 Sep 2026:
+      // do the geotag check through Twilio, because a photograph cannot carry
+      // one. WhatsApp discards EXIF on send and the portal upload path strips
+      // location deliberately, so there was never a photo geotag to read. A
+      // location share is a stronger signal anyway: it is an act performed
+      // now, where a photograph's metadata can come from a picture taken last
+      // week at a different house.
+      //
+      // Same rule as the arrival tap, and it is not negotiable: this
+      // STRENGTHENS the record and never gates it. Nobody is asked twice,
+      // nothing is blocked by its absence, and a worker who never sends one
+      // is never penalised for that.
+      if (msg.place) {
+        const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+        if (!found) {
+          return twiml("Thanks. I could not match that to a job of yours, so I have not saved it anywhere.");
+        }
+        // Never filed on the strength of a single option alone, exactly as
+        // the evidence lane below does it. The code is always asked for and
+        // always checked; nothing lands on a job until the worker names it.
+        await supabase.from("wa_intake_sessions").upsert({
+          wa_id: msg.from,
+          answers: { _lane: "pin", worker_email: found.email, place: msg.place, job_choices: found.jobs },
+          photo_count: 0,
+          updated_at: new Date().toISOString(),
+        });
+        root.setAttributes({ "yaadly.pin.received": true });
+        return twiml(`Got your location. ${codePrompt(found.jobs)}`);
+      }
+
+      if (pinSession) {
+        const answers = pinSession.answers as any;
+        const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
+        const place: Place | null = answers.place ?? null;
+        const pick = pickJobChoice(msg.text, choices);
+        if (!pick) return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
+        if (!place) {
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          return twiml("Something went wrong holding that location. Send it again when you get a moment.");
+        }
+        const { error: pinErr } = await supabase.rpc("record_work_log_pin", {
+          p_job: pick.id, p_phone: msg.from,
+          p_lat: place.lat, p_lon: place.lon,
+          p_accuracy_m: null, p_address: place.address || null, p_label: place.label || null,
+        });
+        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        root.setAttributes({ "yaadly.pin.filed": !pinErr, "yaadly.job.id": pick.id });
+        if (pinErr) {
+          console.error("record_work_log_pin failed:", pinErr.message);
+          return twiml("That did not save. It is not holding anything up, so carry on and send it again later if you like.");
+        }
+        return twiml(`Saved against ${pick.id}. That is on the record as where you were, and it helps the pack stand up. Nothing is waiting on it.`);
       }
 
       const evidenceMedia = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));

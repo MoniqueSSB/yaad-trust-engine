@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · The geotag check comes back as a WhatsApp location share, which is a better thing than the one it replaces
+
+**Founder's instruction, on being told the check could not be ported: do it through Twilio, "as this might be better".** It is better, and the reasoning is worth keeping because the obvious alternative is a dead end that looks alive.
+
+**There was never a photo geotag to read.** The Python engine's "live pin on work log" reads a geotag off a photograph. WhatsApp re-encodes images on send and discards the EXIF block, GPS included, and this repository's own portal upload path strips location on purpose. So the check could not have been ported by trying harder at the photo; the data has never existed on either route in. Anybody proposing to recover it later is proposing something that does not work, which is now written into RUNBOOK §20 so the next person does not spend a day on it.
+
+**A location share is a different signal and a stronger one.** Twilio delivers `Latitude`, `Longitude`, `Address` and `Label` as ordinary inbound webhook parameters, with nothing to buy or install, so the founder's "they have a plugin for this" was right about the capability and generously wrong about the cost. Two properties make it better than EXIF rather than merely equivalent. It cannot be back-dated: a photograph's metadata can come from a picture taken last week at a different house, while a share is an act performed now. And it is consent rather than covert extraction, which matters a great deal when the person being located is a tradesperson working for you rather than a suspect.
+
+**The rule it inherits, and the test that keeps it.** `arrival_log`'s migration says GPS "strengthens the record, it never gates it", and that declining, having no fix, or having no geolocation at all never blocks a check-in. That holds here without exception: a missing pin is a NOTE and never a gap, it never reaches the gap list, and a test asserts both. The wording of the ask is tested too, that it says what a pin buys the worker and contains none of "must", "required", "need to", "failed" or "missing". The reason for testing copy, which is unusual: the moment a missing pin reads as a failing, a voluntary thing has become an obligation and a worker is being judged for declining, and that drift would happen one careless word at a time.
+
+**Which job it belongs to is always asked.** The evidence lane's own rule, quoted from its comment: never filed on the strength of a single option alone, even when there is only one job it could possibly be. Pins follow it exactly, through the same session shape and the same `pickJobChoice` matcher.
+
+**`work_log_pins` is a new table rather than a column on `arrival_log`.** An arrival and a work-log pin are different events: one says somebody turned up, the other says somebody was standing there when the work was recorded. Merging them would have made both harder to reason about and would have let an arrival stand in for a work log. RLS mirrors `arrival_log` exactly, party read plus admin, and writes go only through a SECURITY DEFINER function that no browser can call, because the pin arrives over a Twilio webhook rather than from a signed-in session and the worker is identified by the number the signature check already authenticated.
+
+**The privacy page now says all of this**, on the founder's own instruction and before the feature was finished rather than after. It names both moments a location can be read, says both are optional every time, says plainly that declining blocks nothing, and states that Yaadly does not track anyone: no continuous location, no live location, nothing read at any moment other than the tap or the share. The WhatsApp Business API does not carry Live Location at all, so that last sentence is true by construction as well as by policy.
+
+---
+
 ## 2026-09-04 · The evidence checks are live, and three of the audit's own seven were wrong
 
 **The gap this closes.** `yaad/agents/verification.py` has checked an evidence chain since the engine was written, and CLAUDE.md §10 calls those gates the moat: they come out of seven years of construction project management and they are the one part an agent cannot supply. The agent audit found they were imported by exactly two files, `run_demo.py` and `tests/`, and ran on no live job at all. What ran instead was a vision model describing photographs, which by construction cannot notice what is ABSENT. That is the whole point of a completeness check and it was the thing not running.

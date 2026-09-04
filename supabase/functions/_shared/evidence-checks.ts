@@ -74,12 +74,16 @@ export type Check = {
   audience: "worker" | "desk";
 };
 
+/** A deliberate WhatsApp location share by the worker, from work_log_pins. */
+export type PinRow = { shared_at?: string | null; far_from_site?: boolean | null; address?: string | null };
+
 export type ChecksInput = {
   stage: number;
   evidence: EvidenceRow[];
   arrivals: ArrivalRow[];
   /** docs.evidence_checklist from the job's approved Kickoff Pack, if it has one. */
   checklist: ChecklistGroup[] | null;
+  pins?: PinRow[];
   parish?: string | null;
 };
 
@@ -203,7 +207,47 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
     });
   }
 
-  // ── 6. SITE ──────────────────────────────────────────────────────────
+  // ── 6. PIN ───────────────────────────────────────────────────────────
+  // The Python engine's "live pin on work log", finally answerable. It could
+  // not be ported on 4 Sep because evidence rows carry no lat/lon, and reading
+  // a photograph's EXIF was never an option: WhatsApp discards it on send and
+  // this project's portal path strips it deliberately.
+  //
+  // A WhatsApp location share replaces it and is stronger. It is an act
+  // performed now, where a photograph's metadata can come from a picture taken
+  // last week at a different house.
+  //
+  // It is a NOTE and never a gap, and that is the whole point. `arrival_log`'s
+  // own migration says GPS "strengthens the record, it never gates it"; the
+  // same holds here without exception. A worker who shares nothing is not
+  // penalised, delayed or blocked, and the wording below says what a pin is
+  // FOR rather than telling anyone off for the absence of one.
+  const pins = input.pins ?? [];
+  out.push({
+    name: "Location pin",
+    passed: pins.length > 0,
+    detail: pins.length > 0
+      ? `A location was shared with this stage${pins[0]?.address ? ` (${pins[0].address})` : ""}, which strengthens the pack.`
+      : "No location shared on this stage. Sending your location on WhatsApp puts on record that you were there, which makes the pack harder to argue with. Entirely up to you and nothing waits on it.",
+    severity: "note",
+    audience: "worker",
+  });
+
+  // A pin far from the parish is the desk's business, on exactly the same
+  // terms as the arrival tap's own flag: a glance, never a finding.
+  const farPin = pins.find((p) => p.far_from_site === true);
+  if (farPin) {
+    out.push({
+      name: "Pin distance",
+      passed: false,
+      detail: `A shared location on this stage sits over 30km from ${input.parish || "the job parish"}. `
+        + "A materials run, a parish border or a bad fix all look identical to this, so it is worth a glance and nothing more on its own.",
+      severity: "note",
+      audience: "desk",
+    });
+  }
+
+  // ── 7. SITE ──────────────────────────────────────────────────────────
   // DESK ONLY. See the header. Reports what raised it and what else raises
   // the same flag, so it reads as the coarse sanity signal it actually is
   // rather than as an accusation the data cannot support.
@@ -238,6 +282,17 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
 export function workerGaps(checks: Check[]): string[] {
   return checks
     .filter((c) => c.audience === "worker" && !c.passed && c.severity === "gap")
+    .map((c) => c.detail);
+}
+
+/** Worker-facing NOTES, which are offers rather than demands and are kept
+ *  apart from gaps for exactly that reason. The location pin lives here: it
+ *  strengthens a pack and is never required, so putting it in the same list
+ *  as a missing clip would misdescribe it and would quietly turn a voluntary
+ *  thing into an obligation. */
+export function workerNotes(checks: Check[]): string[] {
+  return checks
+    .filter((c) => c.audience === "worker" && !c.passed && c.severity === "note")
     .map((c) => c.detail);
 }
 

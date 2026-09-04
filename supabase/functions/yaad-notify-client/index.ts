@@ -50,7 +50,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
-import { checkAttrs, deskPack, runEvidenceChecks, workerGaps } from "./evidence-checks.ts";
+import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -672,11 +672,15 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
       admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+    const { data: pins } = await admin.from("work_log_pins")
+      .select("shared_at, far_from_site, address")
+      .eq("job_id", jobId).eq("stage", stage).order("shared_at", { ascending: false });
     return runEvidenceChecks({
       stage,
       evidence: ev ?? [],
       arrivals: arr ?? [],
       checklist: pack?.docs?.evidence_checklist ?? null,
+      pins: pins ?? [],
       parish: job?.parish ?? null,
     });
   } catch (e) {
@@ -993,6 +997,9 @@ Deno.serve(async (req: Request) => {
       // have finished in two minutes.
       const evChecks = await assembleEvidenceChecks(admin, jobId, job.stage ?? 1);
       const gaps = workerGaps(evChecks);
+      // Notes are offers, not demands, and are carried separately so the
+      // location-pin ask can never read as one more thing he has to do.
+      const notes = workerNotes(evChecks);
       if (gaps.length) {
         await ntfyPush(admin, `Evidence gaps: ${job.title}`,
           `${jobId} stage ${job.stage ?? 1}: ${gaps.length} thing${gaps.length === 1 ? "" : "s"} missing. `
@@ -1037,6 +1044,7 @@ Deno.serve(async (req: Request) => {
         // then what to do. Nothing here stops him replying 1: the choice is
         // still his, and a stage is never blocked by this.
         gaps.length ? `Still missing on this stage:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
+        notes.length ? notes.join("\n\n") : null,
         itemsLine,
         `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
       ].filter(Boolean).join("\n\n");
