@@ -70,32 +70,36 @@ import * as guardrails from "./guardrails.ts";
 // that decision which still holds is the shape, not the provider. The mere
 // presence of an NVIDIA key must never hijack the draft (v5 did exactly that
 // and a test failed on an NVIDIA 503).
-// NVIDIA runs only when explicitly chosen: set the secret PROVIDER=nvidia.
 //
-// Note the two escape hatches below both leave the EU. An OpenRouter override
-// carries region "unstated" and NVIDIA is in the US, so either one sends a
-// client's intake somewhere docs/privacy.html does not currently name. Neither
-// key is set on this project as of 4 September 2026, so neither path can run;
-// setting one is a data protection decision before it is a config change.
-function pickProvider(override?: string): TextProvider | null {
-  if (override) {
-    const ork = Deno.env.get("OPENROUTER_API_KEY");
-    if (!ork) return null;
-    return { name: "openrouter", api: "https://openrouter.ai/api/v1/chat/completions", key: ork, model: override, region: "unstated" };
-  }
-  const want = (Deno.env.get("PROVIDER") || "").toLowerCase();
-  const nk = Deno.env.get("NVIDIA_API_KEY");
-  const nvidia = (): TextProvider | null => nk
-    ? { name: "nvidia", api: "https://integrate.api.nvidia.com/v1/chat/completions", key: nk,
-        model: Deno.env.get("NVIDIA_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b", region: "us" }
-    : null;
-
-  if (want === "nvidia") { const n = nvidia(); if (n) return n; }
-
-  // The ordinary path. Shared with the other seven functions so the EU move
-  // is one secret, not eight edits.
-  return pickTextProvider() ?? nvidia();
-}
+// ── This function had three ways out of the EU, and they are gone ──
+//
+// Removed 4 September 2026, the same day the MiniMax branch came out of
+// _shared/textmodel.ts, and for the same reason. This function used to have a
+// picker of its own with three extra routes:
+//
+//   1. `return pickTextProvider() ?? nvidia()` - a SILENT fallback to NVIDIA
+//      in the United States whenever the shared picker came back empty. This
+//      is the exact pattern removed from textmodel.ts an hour earlier, and it
+//      was the live one: NVIDIA_API_KEY IS set on this project, so this route
+//      was armed the whole time. It never fired only because Mistral resolved
+//      first, which is a coincidence of ordering and not a control.
+//   2. `PROVIDER=nvidia` - an explicit switch to the same US endpoint.
+//   3. A per-draft OpenRouter model slug, for reading one brief drafted by
+//      several models side by side (v12 below). It carried region "unstated",
+//      which is the honest label and also the reason it cannot stay: a
+//      Kickoff Pack is drafted from a real client's intake.
+//
+// docs/privacy.html names NVIDIA for IMAGE ANALYSIS only. Drafting a client's
+// pack there was a use that page did not disclose. NVIDIA_API_KEY stays set
+// because yaad-sketch and yaad-notify-client genuinely use it, for photographs,
+// which is what the page says.
+//
+// So this function now uses the shared picker and nothing else, like the other
+// eight. One provider, named on the privacy page, in the EU. If it is missing,
+// the draft fails loudly rather than quietly drafting somewhere else.
+//
+// The model comparison in v12 was a good idea and is recoverable from git. If
+// it comes back it belongs on synthetic briefs, not on a real client's intake.
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -321,7 +325,7 @@ async function draftPart(
 // model calls. Every exit path updates the row: a draft is never left
 // 'drafting' by this code (short of the platform culling the worker, which
 // the desk's own 8 minute cutoff reports).
-async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace, overrideModel?: string): Promise<void> {
+async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace): Promise<void> {
   const fail = async (msg: string) => {
     console.error("kickoff draft", draftId, "failed:", msg);
     await draftsWrite("PATCH", `?id=eq.${draftId}`, {
@@ -329,10 +333,8 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     }).catch(() => {});
   };
   try {
-    const prov = pickProvider(overrideModel);
-    if (!prov) { await fail(overrideModel
-      ? "A model override needs the OPENROUTER_API_KEY secret, which is not set."
-      : NO_PROVIDER_MESSAGE); return; }
+    const prov = pickTextProvider();
+    if (!prov) { await fail(NO_PROVIDER_MESSAGE); return; }
 
     const userPrompt = intakeToPrompt(intake);
     const partDocs = await Promise.all(PARTS.map((p) => draftPart(prov, userPrompt, p, trace)));
@@ -501,16 +503,15 @@ Deno.serve(async (req: Request) => {
     // can have. Same trust boundary again: only this repository's own
     // automation may stamp it.
     const serviceId = isServiceRole && typeof body.serviceId === "string" && body.serviceId.trim() ? body.serviceId.trim() : undefined;
-    // Optional per-draft model override, for reading the same brief drafted by
-    // different models side by side. Admin session only; OpenRouter slugs only.
-    const overrideModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
-    if (overrideModel) {
-      if (!/^[\w-]+\/[\w.:-]+$/.test(overrideModel)) {
-        return json({ error: "Model override must be an OpenRouter slug like z-ai/glm-5.2." }, 400);
-      }
-      if (!Deno.env.get("OPENROUTER_API_KEY")) {
-        return json({ error: "Model overrides go through OpenRouter. Add the OPENROUTER_API_KEY secret to this function first (Supabase dashboard, Edge Functions, Secrets)." }, 400);
-      }
+    // The per-draft model override is gone (4 Sep 2026, see the note at the
+    // top of this file). It routed a real client's intake through OpenRouter
+    // to an unstated region. Refused rather than ignored, so a caller still
+    // sending one is told, instead of quietly getting a pack drafted by a
+    // different model than it asked for.
+    if (typeof body.model === "string" && body.model.trim()) {
+      return json({
+        error: "Per-draft model overrides have been removed. Kickoff Packs are drafted by the provider in _shared/textmodel.ts, in the EU, because the brief is a real client's intake.",
+      }, 400);
     }
 
     // Register the draft, hand back its id, and do the slow work after the
@@ -539,7 +540,7 @@ Deno.serve(async (req: Request) => {
       "yaadly.kickoff.outcome": "queued",
     });
 
-    const bg = runDraft(row.id, intake, trace, overrideModel);
+    const bg = runDraft(row.id, intake, trace);
     const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
     if (rt?.waitUntil) rt.waitUntil(bg);
 
