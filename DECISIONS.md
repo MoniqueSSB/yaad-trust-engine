@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · Capacity counts only decisions a person made, and a worker vetting decision is not recorded at all
+
+**The capacity metric was one query away from being nonsense in the direction that flatters.** `kickoff_packs` and `quote_pack_drafts` both carry an `approved_by`, which reads as a human approval and is not one: every row of both reads `system: auto-issued, guardrail-clean`, 314 of them against 11 real decisions. A capacity view over "things with an approver" would have reported a desk getting through three hundred items and nobody would have had a reason to doubt it. `desk_decisions` therefore excludes anything whose approver matches `system:%`, as a pattern rather than a table list, so a future auto-issuer cannot quietly join the count.
+
+**A working session rolls over at 05:00 Jamaica time.** The person doing this work is a night owl. Grouping on the plain local date splits a real evening at midnight, reports two thin sessions where there was one, and halves the capacity figure while looking entirely reasonable. The rig pins the boundary at 23:10, 00:40, 04:50 and 05:10.
+
+**Built before the pilot on purpose.** December is the run that produces the first real capacity data, and a view added in January measures none of it. This is the same mistake the stall history had to be gone back and fixed for on the same day, which is why it was not repeated here.
+
+**The open gap, and it is a governance one rather than a metrics one.** Passing or failing a worker's application is a consequential decision under section 2, and nothing in the schema records who made it or when. `applications.status` moves and leaves no attributed row; `vetting_reviews` holds the AI's read, not the person's ruling. So the rule "a named human confirms every consequential step" is true in practice for vetting and cannot be evidenced after the fact. Capacity undercounts by however long vetting takes, which is the smaller half of the problem. Left as a flagged gap rather than fixed in passing, because adding attribution means changing what the desk writes when an application is decided, and that is worth doing deliberately.
+
+---
+
 ## 2026-09-04 · Evidence completeness is measured from the snapshot, not from the evidence table
 
 **The obvious implementation is wrong in a way that flatters the business.** Counting rows in `evidence` per approved job gives a completeness figure that goes up when a worker files a photograph the day after sign-off. The measure is supposed to say what the named human had in front of them at the moment they decided, and that version says something closer to what eventually turned up. `stage_approvals.evidence` already holds the right thing: a snapshot written at approval time, each item carrying the sha256 of the exact bytes. Reading the snapshot makes the number structurally incapable of improving retrospectively, which is the property that matters, and a rig proves it by filing evidence and an arrival after an approval and confirming neither moves the row.

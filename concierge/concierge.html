@@ -3056,6 +3056,15 @@ async function loadOverview(){
   // takes at approval time, not from the evidence table, so a photograph filed
   // the day after does not quietly improve the number. All time, because
   // approvals are the rarest thing in the system.
+  // Capacity: how many consequential decisions fit in one working session.
+  // A session rolls over at 05:00 Jamaica time rather than midnight, so a
+  // sign-off at half past midnight belongs to the evening that just happened.
+  const capRow = await sb.from("desk_capacity").select("*").maybeSingle();
+  const cap = capRow.data || {};
+  const capSessions = Number(cap.sessions || 0);
+  const capAvg = cap.avg_per_session === null || cap.avg_per_session === undefined
+    ? null : Number(cap.avg_per_session);
+
   const evCompRow = await sb.from("evidence_completeness").select("*").maybeSingle();
   const ec = evCompRow.data || {};
   const signoffs = Number(ec.signoffs || 0);
@@ -3149,6 +3158,13 @@ async function loadOverview(){
     tile(withArr === null ? "" : withArr >= 80 ? "ok" : "warn",
       "Arrival logged first", withArr === null ? "n/a" : withArr + "%",
       signoffs ? `${ec.with_arrival} of ${signoffs} had the worker on site on record` : "Nothing signed off yet"),
+    // Never coloured. This is a capacity reading, not a target: a low evening
+    // is a quiet week, not a bad one, and a green tick on it would invite
+    // treating throughput as the thing to maximise.
+    tile("", "Decisions in an evening", capAvg === null ? "n/a" : String(capAvg),
+      capSessions
+        ? `Average over ${capSessions} ${capSessions === 1 ? "session" : "sessions"}, busiest was ${cap.busiest_session}`
+        : "No sessions recorded yet"),
   ].join("");
 
   const needs = [];

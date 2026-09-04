@@ -603,6 +603,48 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## Desk capacity, how much gets through in an evening
+
+**The question behind it.** The product is that a named human confirms every
+consequential step, so "can this scale" is really "how many of those
+confirmations fit in an evening". Built before the December pilot rather than
+after, because the pilot is the run that produces the first real numbers and a
+view added in January measures nothing that already happened.
+
+```sql
+select * from public.desk_capacity;
+select * from public.desk_sessions order by session_date desc;
+select * from public.desk_decisions order by at desc limit 30;
+```
+
+**A session runs 05:00 to 05:00 Jamaica time, not midnight to midnight.**
+Grouping on the plain date splits a normal evening in half and reports two thin
+sessions where there was one, which halves the figure while looking perfectly
+reasonable. `supabase/tests/desk_capacity_guards.sql` pins the boundary at
+23:10, 00:40, 04:50 and 05:10.
+
+**Only rows naming a real person count.** `kickoff_packs` and
+`quote_pack_drafts` carry an `approved_by` that reads `system: auto-issued,
+guardrail-clean`, and on 4 September 2026 there were 314 of those against 11
+real decisions. They are documents issued automatically after a human accepted
+a quote, not decisions anybody sat down and made. The exclusion is a `system:%`
+pattern rather than a table list, so a new auto-issuer cannot quietly join the
+count. Tests 4 and 5 in the rig are the guard.
+
+**The tile is never coloured, and that is deliberate.** A quiet evening is a
+quiet week, not a bad one. Colouring throughput invites treating it as the
+thing to maximise, and the thing to maximise here is not how many sign-offs
+happen per hour.
+
+**It undercounts, and by a known amount.** Passing or failing a worker's
+application is a human decision and nothing records who made it or when:
+`applications.status` moves and leaves no attributed row, and `vetting_reviews`
+is the AI's read rather than the person's ruling. So the evening is longer than
+this says by however much vetting took. Logged in `DECISIONS.md` as an open
+governance gap.
+
+---
+
 ## Evidence completeness at sign-off
 
 **The question is what you had in front of you when you decided, not what is
