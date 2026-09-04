@@ -46,9 +46,17 @@ def test_banned_language_is_caught(text: str) -> None:
 
 
 def test_approved_language_passes() -> None:
+    # The fixture describes the business Yaadly actually runs. It used to read
+    # "Payment is held safely with a licensed payment provider and released to
+    # the worker within 24 hours of your approval", which passes the screen
+    # (none of those words are banned) but describes escrow, the arrangement
+    # the principal-contractor structure exists to avoid. Nothing was failing.
+    # It was worse than that: this test is the worked example of GOOD copy, so
+    # the wrong sentence sat here as the thing to imitate. Replaced 4 Sep 2026.
     assert_clean(
-        "Payment is held safely with a licensed payment provider and released to the worker "
-        "within 24 hours of your approval. Work is protected up to the guarantee limit."
+        "You buy the job from Yaadly, and a stage closes once you have seen the evidence "
+        "and agreed the work is right. The tradesperson is engaged and paid by Yaadly under "
+        "its own separate agreement. Work is protected up to the guarantee limit."
     )
 
 
@@ -213,7 +221,17 @@ def test_banned_language_violation_emits_a_bounded_event(monkeypatch: pytest.Mon
     assert attrs["where"] == "Client Update"
     # The event carries the fixed, closed-set guidance string from
     # BANNED_TERMS, never the sentence that was actually being screened.
-    assert attrs["terms"] == "Use 'held safely with a licensed payment provider', never 'escrow'."
+    #
+    # Read out of BANNED_TERMS rather than written out again here. Until
+    # 4 September 2026 this line hardcoded the guidance copy, so correcting
+    # that copy (it still described the pre-principal-contractor arrangement)
+    # failed a guardrail test for a reason that had nothing to do with the
+    # guardrail. Asserting against the source is strictly stronger: it proves
+    # the telemetry value IS the closed-set entry, rather than proving it
+    # matches a second copy of the sentence that has to be kept in step. The
+    # Deno port already tested the property rather than the copy, which is
+    # why it never broke. Same idea, done properly.
+    assert attrs["terms"] == yaad_guardrails.BANNED_TERMS[r"\bescrow(ed|s)?\b"]
     assert "sits in escrow until the job is done" not in attrs["terms"]
 
 

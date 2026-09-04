@@ -14,14 +14,29 @@ from dataclasses import dataclass
 from .telemetry import record_guardrail_event
 
 # 1. Never market payment holding as escrow.
+#
+# The PATTERNS are unchanged and must stay that way. The GUIDANCE strings for
+# the two money patterns were rewritten on 4 September 2026, because they still
+# told a reader to describe the pre-3-September arrangement: "held safely with a
+# licensed payment provider" and "Yaadly orchestrates the flow". Under the
+# principal-contractor structure Yaadly is not holding or orchestrating anybody
+# else's money, it is being paid for a job it sells. Guidance is what the next
+# person reads when they hit the screen, so stale guidance propagates the old
+# model into the next fix. Keep this list identical to the Deno port.
 BANNED_TERMS: dict[str, str] = {
-    r"\bescrow(ed|s)?\b": "Use 'held safely with a licensed payment provider', never 'escrow'.",
+    r"\bescrow(ed|s)?\b": (
+        "Never 'escrow'. Yaadly is the principal contractor: the client buys the job from "
+        "Yaadly, and Yaadly engages and pays the tradesperson under a separate agreement."
+    ),
     r"\b100\s?%": "No absolute claims. Give the real figure or drop the claim.",
     r"\bzero (fraud|risk|conflicts?)\b": "No absolute claims.",
     r"\bremoves? all fraud\b": "No absolute claims.",
     r"\bguarantee[sd]? (?:no|zero) \w+": "No absolute claims.",
     r"\bfully covered\b": "Say 'protected up to the guarantee limit', not 'fully covered'.",
-    r"\bwe hold (?:your |the )?(?:money|funds)\b": "Yaadly orchestrates the flow, it does not hold funds itself.",
+    r"\bwe hold (?:your |the )?(?:money|funds)\b": (
+        "Yaadly holds nobody's money. A stage closes when the client approves that stage's "
+        "evidence, and the balance falls due to Yaadly. Nothing is released to a third party."
+    ),
 }
 
 # 3. AI assists and drafts. Humans decide anything involving money or trust.

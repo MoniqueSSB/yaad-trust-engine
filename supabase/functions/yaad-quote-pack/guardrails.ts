@@ -21,14 +21,22 @@
 
 export type Finding = { term: string; guidance: string };
 
+// The PATTERNS are unchanged and must stay that way. The GUIDANCE strings for
+// the two money patterns were rewritten on 4 September 2026, in the same commit
+// as the Python side, because they still described the pre-3-September
+// arrangement: "held safely with a licensed payment provider" and "Yaadly
+// orchestrates the flow". Under the principal-contractor structure Yaadly is
+// not holding or orchestrating anybody else's money, it is being paid for a job
+// it sells. Guidance is what the next person reads when they hit the screen, so
+// stale guidance propagates the old model into the next fix.
 const BANNED: [RegExp, string][] = [
-  [/\bescrow(ed|s)?\b/gi, "Use 'held safely with a licensed payment provider', never 'escrow'."],
+  [/\bescrow(ed|s)?\b/gi, "Never 'escrow'. Yaadly is the principal contractor: the client buys the job from Yaadly, and Yaadly engages and pays the tradesperson under a separate agreement."],
   [/\b100\s?%/gi, "No absolute claims. Give the real figure or drop the claim."],
   [/\bzero (fraud|risk|conflicts?)\b/gi, "No absolute claims."],
   [/\bremoves? all fraud\b/gi, "No absolute claims."],
   [/\bguarantee[sd]? (?:no|zero) \w+/gi, "No absolute claims."],
   [/\bfully covered\b/gi, "Say 'protected up to the guarantee limit', not 'fully covered'."],
-  [/\bwe hold (?:your |the )?(?:money|funds)\b/gi, "Yaadly orchestrates the flow, it does not hold funds itself."],
+  [/\bwe hold (?:your |the )?(?:money|funds)\b/gi, "Yaadly holds nobody's money. A stage closes when the client approves that stage's evidence, and the balance falls due to Yaadly. Nothing is released to a third party."],
 ];
 
 /** Every banned-language hit in a block of outbound text. */
