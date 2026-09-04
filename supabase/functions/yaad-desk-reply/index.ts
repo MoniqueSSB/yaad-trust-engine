@@ -196,15 +196,30 @@ Deno.serve(async (req: Request) => {
       `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}`,
       {
         method: "PATCH",
-        // first_human_reply_at is set once and never cleared, so it records
-        // the answer the "within one working day" promise is actually about
-        // rather than the most recent one. `thread` was read above, so the
-        // null check costs nothing extra. See
-        // 20260904a_the_one_working_day_promise_gets_a_clock.sql.
+        // THE REPLY CLOCK. This is the only place a real person answering is
+        // recorded, which is what makes the "a person replies within one
+        // working day" promise on every public page checkable at all.
+        //
+        // Three columns, from 20260904105323, and all three matter:
+        //
+        //   first_human_reply_at  set ONCE and never overwritten, because the
+        //                         promise is about the first answer, not the
+        //                         most recent one. `thread` was read above, so
+        //                         the check costs nothing.
+        //   awaiting_human_since  cleared here. It is what the desk sorts its
+        //                         queue by, so a thread that has been answered
+        //                         must stop counting against her.
+        //
+        // first_client_at is set on the way in, by yaad-inbound, not here.
+        //
+        // Written 4 Sep 2026. The migration that added these columns shipped
+        // before anything populated them, so until this deploys the clock has
+        // the schema and none of the readings.
         body: JSON.stringify({
           transcript,
           human_handling: true,
           last_at: new Date().toISOString(),
+          awaiting_human_since: null,
           ...(thread.first_human_reply_at ? {} : { first_human_reply_at: new Date().toISOString() }),
         }),
       },

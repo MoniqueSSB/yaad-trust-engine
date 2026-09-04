@@ -1741,7 +1741,7 @@ Deno.serve(async (req: Request) => {
     const THREAD_HOURS = 12;
     const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
     const priorQ = await supabase.from("intake_threads")
-      .select("job_id,transcript,turns,last_at,stage,human_handling")
+      .select("job_id,transcript,turns,last_at,stage,human_handling,first_client_at,awaiting_human_since")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
     // let, not const: the website-chat adoption below swaps in the web
@@ -1749,6 +1749,7 @@ Deno.serve(async (req: Request) => {
     // continues it rather than starting over.
     let prior = priorQ.data as {
       job_id: string; transcript: string; turns: number; last_at: string; stage: string; human_handling: boolean;
+      first_client_at: string | null; awaiting_human_since: string | null;
     } | null;
     // A thread already at 'done' produced its job; nothing left to gather.
     // A reply about THAT job (approving a stage, replying to a comment) is
@@ -1847,7 +1848,7 @@ Deno.serve(async (req: Request) => {
         // was typed, or whose code the typed one starts with, is the
         // conversation they mean, provided exactly one fits. Two fitting is
         // ambiguous and falls through to a fresh chat rather than a guess.
-        let webThread: { job_id: string; transcript: string; turns: number; stage: string } | null = null;
+        let webThread: { job_id: string; transcript: string; turns: number; stage: string; first_client_at?: string | null; awaiting_human_since?: string | null } | null = null;
         const { data: exact } = await supabase.from("intake_threads")
           .select("job_id,transcript,turns,stage")
           .eq("channel", "web").eq("job_id", typedRef).maybeSingle();
@@ -1912,6 +1913,12 @@ Deno.serve(async (req: Request) => {
             last_at: new Date().toISOString(),
             stage: String(webThread.stage ?? "gathering") === "done" ? "confirming" : String(webThread.stage ?? "gathering"),
             human_handling: false,
+            // Carried across, not restarted. They are the same person and this
+            // is the same request; they have only changed window. Measuring
+            // their wait from the moment they switched to WhatsApp would hide
+            // however long they had already been waiting on the website.
+            first_client_at: webThread.first_client_at ?? null,
+            awaiting_human_since: webThread.awaiting_human_since ?? null,
           };
         }
       }
@@ -2091,6 +2098,21 @@ Deno.serve(async (req: Request) => {
       stage,
       last_at: new Date().toISOString(),
       ...(handingOver ? { human_handling: true } : {}),
+      // THE REPLY CLOCK, the inbound half. Columns from 20260904105323, which
+      // shipped with a backfill and nothing to keep them true afterwards.
+      //
+      // first_client_at is when this person FIRST wrote, so it is written on
+      // the opening turn and never again. An upsert that set it every turn
+      // would restart the clock with each message and report that Yaadly
+      // answers instantly, which is the exact failure a measurement is
+      // supposed to prevent.
+      //
+      // awaiting_human_since is when the thread became a person's problem. It
+      // is not overwritten either: if they were handed over on Tuesday and are
+      // still writing on Thursday, the wait started Tuesday. yaad-desk-reply
+      // clears it when somebody actually answers.
+      ...(continuing && prior?.first_client_at ? {} : { first_client_at: new Date().toISOString() }),
+      ...(handingOver && !prior?.awaiting_human_since ? { awaiting_human_since: new Date().toISOString() } : {}),
     }, { onConflict: "channel,from_addr" });
 
     // Three pushes for one conversation is noise, and noise gets muted, and a

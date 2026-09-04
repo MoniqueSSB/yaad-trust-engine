@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · A parallel session had already built the reply clock, and theirs was better
+
+**Before applying anything I read the live database, and it was ahead of every branch.** `20260904105323_the_one_working_day_promise_becomes_measurable` was already applied, from a session running in parallel on the same repository. It had added `first_client_at`, `first_human_reply_at` and `awaiting_human_since` to `intake_threads`, a `within_one_working_day()` function and an `sla_first_reply` view. My own migration, written hours earlier, added a `first_human_reply_at` column by the same name and a `v_reply_clock` view measuring the same published promise by a different rule.
+
+**Theirs is better and this one gave way.** `within_one_working_day()` counts actual working days in Jamaica time and skips weekends. Mine used a flat 24 hour interval and carried a paragraph justifying it, which was a reasonable call in isolation and the wrong one once a real working day calculation existed. Two clocks measuring one published promise by two rules is worse than either alone, so `20260904a` was rewritten to define no rule of its own: it now adds only the half theirs did not cover, the contact form, and rebuilds `v_reply_clock` on top of `sla_first_reply` and their function. If the definition of the promise changes it changes in one place.
+
+**The important find was that their clock had no hands.** The migration shipped with a backfill and nothing to keep the columns true afterwards. The deployed `yaad-desk-reply`, version 11, still patched only `transcript`, `human_handling` and `last_at`, so `first_human_reply_at` would have stayed null forever and `awaiting_human_since` would never have been cleared. Live: five threads, zero with a recorded human reply. The schema existed and the readings did not. This branch supplies both halves, `yaad-desk-reply` stamping the reply and clearing the wait, and `yaad-inbound` setting `first_client_at` on the opening turn and `awaiting_human_since` on handover, neither ever overwritten, because a clock that restarts on every message reports that Yaadly answers instantly.
+
+**A web conversation that moves to WhatsApp carries its clock across rather than restarting it.** Same person, same request, different window. Measuring from the moment they switched would hide however long they had already waited on the website.
+
+**Nothing was applied or deployed.** Two sessions editing `yaad-inbound` and `yaad-desk-reply` on the same day is exactly the situation `CLAUDE.md` §12 warns about, and deploying from this branch could drop work the other session has in flight but not yet shipped. The reconciliation is in the branch; the order of applying is the founder's call, not something to resolve by being first to push.
+
+**The clock immediately found a live breach, before it was even deployed.** One website chat thread, handed to a person on 2 September, five turns in, no answer 1.9 days later. That is the promise on every public page being missed right now, and nothing in the system had ever been able to say so.
+
+---
+
 ## 2026-09-04 · The report drafter, the action ledger, and the page that explains the rule
 
 **The capacity ceiling was never demand or supply. It was an evening.** Three of the seven priced services are a document: the Deposit Protection Check, the Condition Report and the Technical Sign-off. Typed by hand, a £249 report costs an evening, which caps the business at roughly four reports a week, which is roughly the October Gate. `yaad-report` drafts the findings so the evening is spent judging rather than typing.
