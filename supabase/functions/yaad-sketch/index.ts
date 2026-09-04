@@ -397,7 +397,10 @@ Deno.serve(async (req) => {
           "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
           "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
         });
-        if (!r.ok) s.recordError(`nvidia http ${r.status}: ${body.slice(0, 200)}`);
+        if (!r.ok) {
+          const msg = `yaad-sketch frame: nvidia http ${r.status}: ${body.slice(0, 200)}`;
+          s.recordError(msg); console.error(msg);
+        }
         // A failed model call must never come back looking like "the model saw
         // nothing". That reads as a clean result and it is not one.
         return { ok: r.ok, status: r.status, body, content: j?.choices?.[0]?.message?.content ?? "" };
@@ -481,7 +484,10 @@ Deno.serve(async (req) => {
           "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
           "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
         });
-        if (!r.ok) s.recordError(`${prov.name} http ${r.status}: ${rawText.slice(0, 200)}`);
+        if (!r.ok) {
+          const msg = `yaad-sketch assemble: ${prov.name} http ${r.status}: ${rawText.slice(0, 200)}`;
+          s.recordError(msg); console.error(msg);
+        }
         return { ok: r.ok, status: r.status, body: rawText, content: j?.choices?.[0]?.message?.content ?? "" };
       });
 

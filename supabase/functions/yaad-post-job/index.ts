@@ -206,7 +206,8 @@ type Read = {
 
 async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Read | null> {
   const prov = pickTextProvider();
-  if (!prov || text.length < 12) return null;
+  if (!prov) { console.error("readTheJob: no text provider configured"); return null; }
+  if (text.length < 12) return null;
   try {
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov),
@@ -226,14 +227,30 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
       });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { sp.recordError(`${prov.name} http ${r.status}`); return null; }
+      // Every return null below used to be silent: recorded on the span only,
+      // which does not surface in function_logs. With no OTLP endpoint set,
+      // that means a failed read leaves NOTHING anywhere, and the client just
+      // gets a form the agent did not fill in. Found live 4 Sep 2026 during
+      // the Mistral switch: a wrong model id failed here in total silence and
+      // there was no way to tell it from the hourly model cap. Same treatment
+      // yaad-inbound's own readTheJob got on 1 Sep, for the same reason.
+      if (!r.ok) {
+        const msg = `readTheJob: ${prov.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        sp.recordError(msg); console.error(msg); return null;
+      }
       let j: any = {};
-      try { j = JSON.parse(raw); } catch (_) { return null; }
+      try { j = JSON.parse(raw); } catch (e) {
+        console.error("readTheJob: response body was not JSON:", String(e).slice(0, 200)); return null;
+      }
       const content = j?.choices?.[0]?.message?.content ?? "";
       const m = String(content).match(/\{[\s\S]*\}/);
-      if (!m) return null;
+      if (!m) {
+        console.error("readTheJob: no JSON object in model content:", String(content).slice(0, 300)); return null;
+      }
       let out: any;
-      try { out = JSON.parse(m[0]); } catch (_) { return null; }
+      try { out = JSON.parse(m[0]); } catch (e) {
+        console.error("readTheJob: matched text was not valid JSON:", String(e).slice(0, 200), m[0].slice(0, 300)); return null;
+      }
       return {
         title: s(out.title).slice(0, 120),
         scope: s(out.scope).slice(0, 2000),
@@ -251,7 +268,9 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
           : [],
       };
     });
-  } catch (_) { return null; }
+  } catch (e) {
+    console.error("readTheJob: threw:", String(e).slice(0, 300)); return null;
+  }
 }
 
 // ───────────────────────── throttle ─────────────────────────

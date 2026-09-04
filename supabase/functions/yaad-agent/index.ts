@@ -155,7 +155,15 @@ Deno.serve(async (req) => {
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
+      // recordError alone lands on the span and nowhere in function_logs, so
+      // with no OTLP endpoint configured a failed model call left no trace at
+      // all. Found 4 Sep 2026 during the Mistral switch: a wrong model id
+      // produced a silent failure across four functions and there was nothing
+      // to read. console.error alongside the span, same as yaad-inbound.
+      if (!r.ok) {
+        const msg = `yaad-agent: ${prov.name} http ${r.status}: ${JSON.stringify(j).slice(0, 200)}`;
+        s.recordError(msg); console.error(msg);
+      }
       return j?.choices?.[0]?.message?.content ?? JSON.stringify(j);
     });
 

@@ -144,33 +144,79 @@ This is the Python engine only. The live Edge Functions are step 9.
 
 ## 9. Switching the text model to the EU
 
-The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set.
+The nine live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`, `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack` and `yaad-sketch`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set. (`yaad-kickoff` also has a provider picker of its own, which checks OpenRouter and NVIDIA first and otherwise falls through to the shared one.)
+
+**Done on 4 September 2026.** Steps one and two below were carried out and the switch is live. Step three, removing the MiniMax branch, is still outstanding.
 
 **MiniMax is the current choice, deliberately.** Founder decision, 30 August 2026: the data flowing through these functions today is synthetic, and a China transfer of invented job cards is not what the DPIA is about. **The trigger for this step is real client and worker data, which arrives with the December pilot.** Do it before then, not after.
 
-**Step one, set the secret.** One command, and every function picks it up on its next invocation. No redeploy needed, because it is read at call time.
+**Step one, set TWO secrets, not one.** Every function picks them up on its next invocation. No redeploy needed, because they are read at call time.
 
 ```bash
 supabase secrets set MISTRAL_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
 ```
 
-**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose, and it is the same attribute that answers "where is our data going" today.
+```bash
+supabase secrets set MISTRAL_MODEL=mistral-small-latest --project-ref leffyisvfvjwzilydlwf
+```
 
-**Step three, remove the MiniMax branch.** Once step two is confirmed, delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again.
+**The model id is not optional and it is the step that goes wrong.** The default in `textmodel.ts` was `mistral-large-latest`, which Mistral no longer serves, so setting only the key sends every agent into its holding reply. Learned the hard way on 4 September 2026, twice: once on the dead default, and once on `mistral-medium-3-5-26-04`, which is the model's NAME in Mistral's overview table and not its API id. The id form is `mistral-small-latest`, `mistral-medium-latest`, or a dated snapshot such as `mistral-medium-2604`.
 
-**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. Model names move. Confirm the current one on Mistral's model page and set it without touching code:
+`mistral-small-latest` is the current choice. It resolves to Mistral Small 4, its reasoning is off unless a request passes `reasoning_effort: high`, so it does not burn the token budget thinking, and unlike `mistral-medium` it is not scheduled for deprecation inside the pilot window.
+
+**Step two, prove it switched.**
+
+This step used to say: look at the span attribute `yaadly.model.region`, which reads `eu` when it worked. That is still true and it is still the right answer **once tracing is on**. It was not on. `OTEL_EXPORTER_OTLP_ENDPOINT` has never been set on this project, so the tracer is completely inert and there are no spans to read. A proof method that needs infrastructure nobody has set up is not a proof method. Rewritten 4 September 2026 to say what actually worked.
+
+Post a synthetic job through `yaad-post-job` in draft mode. It is public, it calls the model, and it hands the model's own answer straight back in the `read` field:
 
 ```bash
-supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzilydlwf
+curl -s -X POST "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-post-job" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Content-Type: application/json" -d '{"mode":"draft","assist":true,"desc":"Di pipe unda mi kitchen sink a leak bad since Tuesday and di cupboard bottom gone soft. One storey house inna Portmore. Mi cousin Winston have di key from 8 inna di morning."}'
 ```
+
+`"read": null` means the model did not answer. A filled-in card with `"trade": "Plumbing"` means it did, and since `mistral-small-latest` is a Mistral model id that MiniMax would reject outright, an answer is itself the proof the call went to `api.mistral.ai` in the EU.
+
+It leaves a draft job in the desk. Delete it when you are done.
+
+When `read` comes back null, the reason is now in the logs rather than nowhere. Look for a line naming the provider and the status:
+
+```bash
+supabase functions logs yaad-post-job --project-ref leffyisvfvjwzilydlwf
+```
+
+Turning on a real OTLP endpoint is still worth doing and would make this a one-query answer across all nine functions instead of one function at a time. It is not a prerequisite for the switch.
+
+**Step three, remove the MiniMax branch.** Still outstanding as of 4 September 2026. Delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the nine functions using the two loops below. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again. `MINIMAX_API_KEY` is still set as a secret and should come out at the same time.
+
+Two other things belong to the same piece of work: `docs/privacy.html` still tells the public that text drafting happens in China, which stopped being true on 4 September 2026, and that page says plainly that the sentence stays until the switch is made. It has been made.
+
+**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. See step one, which is where that goes wrong.
 
 **To point at something else entirely**, no code change: set `TEXT_MODEL_KEY`, `TEXT_MODEL_API`, `TEXT_MODEL_NAME` and `TEXT_MODEL_REGION`. Those take priority over everything. A new hard-coded provider in that file is a new country receiving personal data, so it is a founder decision and a line in the data inventory before it is a code change.
 
-**Deploying the eight**, from disk only, never by pasting file contents:
+**Deploying the nine**, from disk only, never by pasting file contents.
+
+The loop that used to be here was wrong in three ways and the third was dangerous. It said eight functions when there are nine. It named `yaad-whatsapp-webhook`, deleted on 1 September 2026, so it errored partway. And it applied `--no-verify-jwt` to every function in the list, which is exactly the blanket form CLAUDE.md §12 exists to forbid: running it would have stripped platform authentication from six functions that require it, silently, with the deploy still reporting success. Corrected 4 September 2026.
+
+**Six require a JWT. Deploy these WITHOUT the flag:**
 
 ```bash
-for f in yaad-agent yaad-completion yaad-inbound yaad-invoice yaad-kickoff yaad-post-job yaad-sketch yaad-whatsapp-webhook; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-quote-pack yaad-sketch; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf; done
 ```
+
+**Three carry their own authentication and keep the flag:**
+
+```bash
+for f in yaad-inbound yaad-notify-client yaad-post-job; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+```
+
+Read the live settings before trusting the split above, the same way §12 says to. It was true on 4 September 2026 and it is a list, which means it will go stale:
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+Then check `verify_jwt` still reads the same after deploying. A deploy that silently flipped it succeeds and says nothing.
 
 ---
 
