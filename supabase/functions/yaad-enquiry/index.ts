@@ -50,6 +50,22 @@ const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
 // this", and that promise is only true if replies reach a person.
 const REPLY_TO     = Deno.env.get("YAAD_REPLY_TO") ?? "monique@yaadly.co.uk";
 
+// The WhatsApp receipt, for somebody who left a phone number rather than an
+// email. Dark until the template exists, exactly like yaad-daily-checkin, and
+// for the same reason: a business-initiated WhatsApp message needs a Meta
+// approved Content Template, and submitting one is a Twilio console action
+// that no migration can perform. Until the secret is set nothing is sent and
+// the row says wa_invited, which is true, rather than pretending.
+//
+// The template's body should carry one variable, the person's name, and read
+// as a receipt and not as marketing, or Meta will refuse the category:
+//   "Thanks {{1}}, your enquiry reached Yaadly. Monique replies within one
+//    working day. You can reply here any time."
+const WA_RECEIPT_SID = Deno.env.get("TWILIO_CONTENT_SID_ENQUIRY_RECEIPT") ?? "";
+const TWILIO_SID     = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+const TWILIO_TOKEN   = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+const TWILIO_FROM    = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+
 // Per caller, per hour. Generous: a genuine person who writes twice because
 // they forgot something must never meet a wall.
 const PER_CALLER_PER_HOUR = 6;
@@ -160,7 +176,27 @@ Deno.serve(async (req: Request) => {
   // throttle protects the mail path, it does not get to lose somebody's
   // question.
   const willEmail = Boolean(email) && recipientBudgetLeft && globalBudgetLeft;
-  const receipt = !email ? "no_email" : willEmail ? "sent" : "throttled";
+  // "no_email" was the honest name for a hole and a bad name for a state: it
+  // read on the desk as a failure, when what it actually means is "they left a
+  // phone number, so no receipt could be emailed and none was". Two better
+  // outcomes now exist for that case.
+  //
+  //   wa_receipt  a Meta approved template went out from the Yaadly number.
+  //               Only possible where TWILIO_CONTENT_SID_ENQUIRY_RECEIPT is
+  //               set: free text to somebody who has never written to us is
+  //               refused, which is the same wall the daily check-in hit.
+  //   wa_invited  no template exists, so nothing was sent, and the page
+  //               instead offered them one tap into WhatsApp. If they take it
+  //               they open the 24 hour window themselves and a person can
+  //               answer freely from then on, with no template and no cost.
+  //               That is the route that works today.
+  const phone = !email ? contact.replace(/\D/g, "") : "";
+  const canTemplate = Boolean(WA_RECEIPT_SID && TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM && phone.length >= 7);
+  const receipt = email
+    ? (willEmail ? "sent" : "throttled")
+    : canTemplate ? "wa_receipt"
+    : phone.length >= 7 ? "wa_invited"
+    : "no_contact";
 
   // ── write the enquiry ───────────────────────────────────────────────────
   const { data: row, error: insertErr } = await trace.span("db.insert enquiries", SpanKind.CLIENT, {
@@ -189,6 +225,40 @@ Deno.serve(async (req: Request) => {
   }
 
   root.setAttributes({ "yaadly.enquiry.outcome": "recorded" });
+
+  // ── the WhatsApp receipt, where they left a phone ───────────────────────
+  //
+  // Runs only when a Meta approved template exists. Same anti-amplification
+  // reasoning as the email receipt above and the throttle it lives behind:
+  // this form is open to the internet, so anything it can send to a stranger's
+  // number is something a stranger can make it send. The throttle is what
+  // makes this safe, not the template.
+  //
+  // Failure is swallowed on purpose. The enquiry is already recorded and
+  // already on the desk. A receipt that does not arrive is a courtesy missed,
+  // not a message lost, and it must never turn into an error for the person
+  // who just wrote in.
+  if (canTemplate) {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+        method: "POST",
+        headers: {
+          Authorization: "Basic " + btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          To: `whatsapp:+${phone}`,
+          From: TWILIO_FROM,
+          ContentSid: WA_RECEIPT_SID,
+          ContentVariables: JSON.stringify({ "1": name }),
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) console.error("enquiry whatsapp receipt", r.status, (await r.text()).slice(0, 200));
+    } catch (e) {
+      console.error("enquiry whatsapp receipt threw", String(e).slice(0, 200));
+    }
+  }
 
   // ── the receipt ─────────────────────────────────────────────────────────
   let emailed = false;

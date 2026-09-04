@@ -1349,8 +1349,12 @@ const VIEWS = [
         : chip_("ok", r.channel || "chat")},
       {h:"Reference", f:r => r.kind === "thread" ? id_(r.ref) : mute_("no job yet")},
       {h:"Heard from us", f:r => r.kind === "enquiry"
-        ? (r.receipt === "no_email" ? chip_("crit","nothing at all")
+        ? (r.receipt === "no_email" || r.receipt === "no_contact" ? chip_("crit","nothing at all")
           : r.receipt === "failed" ? chip_("crit","receipt failed")
+          : r.receipt === "wa_invited" ? chip_("warn","offered WhatsApp") + sub_("nothing sent, they must tap first")
+          : r.receipt === "wa_receipt" ? chip_("ok","WhatsApp receipt")
+          : r.receipt === "throttled" ? chip_("warn","throttled")
+          : r.receipt === "sent" ? chip_("ok","emailed")
           : r.receipt ? chip_("ok", r.receipt) : mute_("not recorded"))
         : chip_("ok","assistant answered")},
       {h:"With you", f:r => r.handed_over ? chip_("warn","handed over") : mute_("no")},

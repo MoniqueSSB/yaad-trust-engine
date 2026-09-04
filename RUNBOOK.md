@@ -2644,11 +2644,16 @@ It exists because until 4 September the desk knew who was waiting and would not 
 
 *Answering them is one tap now.* The enquiry email in your inbox carries an **Answer on WhatsApp** button, and the desk row carries **Open WhatsApp to them**. Both open WhatsApp with a first line already written. Neither sends anything, and both go from your own WhatsApp rather than the Yaadly number. When you have actually sent it, press **I have answered this**.
 
-*They still get no automatic receipt, and that is not fixed.* It cannot be, without one of two things, and both cost money:
+*They are acknowledged now, and it costs nothing.* The form's own success message tells them there is nowhere to send a copy and offers **one tap into WhatsApp**, with their message already written and their name in it.
 
-- **A Meta approved WhatsApp template** for an enquiry receipt. A message to somebody who has never written to the Yaadly number is business-initiated, so free text is refused, exactly the wall the daily check-in hit. The only approved templates today are APPROVE, DAILY_CHECKIN and QUOTE.
-- **`TWILIO_SMS_FROM`**, a Twilio number provisioned for SMS. Not set. SMS is billed per message.
+That is the whole trick, and it is worth understanding rather than just using. WhatsApp refuses free text from a business to somebody who has never written to it. **The moment they tap and say hello, they have written to it**, the 24 hour window opens, and from then on you can answer freely from the Yaadly number with no template and no cost. The problem was never that we could not talk to them. It was that we were trying to speak first.
 
-Until one of those exists, a phone-only enquirer hears nothing at all until you message them. The desk says `nothing at all` in the **Heard from us** column so it is never a surprise, and those rows are the ones to answer first.
+The desk says **offered WhatsApp** on those rows, and `nothing sent, they must tap first` under it. That is the honest state: they have been told how to reach you and nothing has been sent to them.
+
+*Fully automatic is one Twilio console action away, if you want it.* Set `TWILIO_CONTENT_SID_ENQUIRY_RECEIPT` to an approved template and `yaad-enquiry` sends the receipt itself, with no tap needed, and the desk says **WhatsApp receipt** instead. Until the secret is set nothing is sent, the same as the daily check-in. Submit it as **Utility**, with one variable, the name, and wording that reads as a receipt:
+
+> Thanks {{1}}, your enquiry reached Yaadly. Monique replies within one working day. You can reply here any time.
+
+**Do not reach for SMS instead.** `TWILIO_SMS_FROM` is unset, SMS bills per message, and wiring a paid send to a form open to the internet is an open relay that charges you. The throttle comment already in `yaad-enquiry` makes that argument about email; it is sharper for SMS.
 
 **Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
