@@ -406,6 +406,15 @@ Deno.serve(async (req: Request) => {
       const row = {
         title: s(b.workType) ? `${s(b.workType)} job, ${parish || "Jamaica"}` : "Job request",
         parish, descr: buildDescr(b), addr, access_contact: access,
+        // 'form', not 'web'. The job id has said JOB-WEB- since this function
+        // was written and that prefix is now ambiguous: yaad-inbound mints the
+        // same prefix for the chat widget on yaadly.co.uk. These are two
+        // different things that need telling apart, because one is somebody
+        // filling in the job form deliberately and the other is somebody
+        // typing into a chat bubble, and they convert nothing like each other.
+        // The prefix is left alone; changing a primary key format to carry a
+        // fact a column can carry is how ids stop being ids.
+        source: "form",
         ...cardCols(b), stage: 0, open: false,
       };
 

@@ -26,9 +26,17 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // nothing, rather than quietly doing half the job.
 //
 // A worker's reply lands back through yaad-inbound exactly like any other
-// WhatsApp message. Wiring that reply into the same draft/confirm/relay
-// loop evidence already gets, so a voice note with no photo attached still
-// produces a report, is the next piece, not this one.
+// WhatsApp message, and it already goes through the same draft, confirm and
+// relay loop a photo update gets. This comment used to say that was "the
+// next piece, not this one." It was wrong on the day it was written: the
+// worker text and voice lane shipped in the SAME commit as this function
+// (78a3910, "Add geotagged arrival check-in, a daily worker prompt and
+// text/voice reports"). A text or voice reply from a worker with one active
+// job is transcribed if needed, filed into evidence with no file attached,
+// and picked up by schedule_evidence_landed_notify() exactly as a photo is,
+// so it does produce a report and the worker still confirms it before the
+// client sees a word. Corrected 4 Sep 2026: a comment naming a gap that does
+// not exist sends the next session off building something twice.
 //
 // Meant to be called on a schedule, same shape as yaad-job-health: a
 // pg_cron job inside this database, presenting a secret held here only as

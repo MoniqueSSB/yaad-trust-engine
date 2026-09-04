@@ -111,10 +111,22 @@ jobs:
       # The banned-language screen exists twice, once in Python for the engine
       # and once in Deno for the live functions, because they are two runtimes
       # and the rule has to hold in both. Two copies of a rule drift, so both
-      # suites assert the same five phrases. If somebody loosens one pattern,
-      # one of these two jobs goes red.
-      - name: Run the Deno guardrail tests
-        run: deno test --allow-read supabase/functions/_shared/
+      # suites assert the same phrases. If somebody loosens one pattern, one of
+      # these two jobs goes red.
+      #
+      # POINTED AT THE WHOLE TREE, 4 Sep 2026, and that is the point of this
+      # step now. It used to read `supabase/functions/_shared/`, which ran ten
+      # tests and left forty-eight sitting unenforced next door in yaad-inbound:
+      # the Twilio signature check that is the only door in front of four money
+      # RPCs, the price guard that stops an invented figure reaching a client,
+      # the job-code matcher that decides which job an approval lands on. All
+      # forty-eight passed the day they were written and no build has ever
+      # depended on them. `deno test` only picks up files matching its own
+      # naming convention, so widening the path runs the tests and never an
+      # index.ts. Do not narrow this back to one directory: a test nobody runs
+      # is documentation, not a control.
+      - name: Run the Deno guardrail and Edge Function tests
+        run: deno test --allow-read supabase/functions/
 
       # The provider decision lives in _shared/textmodel.ts and nowhere else.
       # A hard-coded model endpoint in a function is how the estate ended up on
@@ -250,3 +262,35 @@ jobs:
             exit 1
           fi
           echo "No key-shaped strings found in tracked files."
+
+      # Added 4 Sep 2026. The scan above looks for prefixed key shapes (sk-,
+      # nvapi-, JWT). It cannot see a bare hex string, so it walked straight
+      # past the notify trigger secret, which is 64 hex characters and was
+      # committed as a plaintext literal in two migrations, in a public
+      # repository, twice. Rotation fixed the exposure; this step is what
+      # stops the third time.
+      #
+      # The two historical migrations are excluded by path on purpose. They
+      # are applied history: editing them would not remove the value from git
+      # history and rewriting applied migrations is its own hazard. The value
+      # in them is dead. See DECISIONS.md.
+      - name: Scan tracked files for bare hex secrets
+        run: |
+          set -e
+          # Real 64-hex values that are NOT secrets: content hashes, lockfile
+          # integrity fields, git object ids. Those are filtered by context on
+          # the line rather than by path, so a new lockfile does not silently
+          # widen the hole.
+          matches=$(git grep -nIE "['\"][0-9a-f]{64}['\"]" -- . \
+            ':!.github/workflows/ci.yml' \
+            ':!**/package-lock.json' \
+            ':!**/*.lock' \
+            ':!supabase/migrations/20260901g_workers_couldnt_reach_their_own_kickoff_pack.sql' \
+            ':!supabase/migrations/20260902c_quote_pack_dual_agreement.sql' \
+            | grep -viE 'sha-?256|sha-?512|checksum|integrity|digest|[^a-z]hash|fingerprint|commit|placeholder|example|redacted|x{8,}' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "::error::A bare 64-character hex literal is committed. If it is a secret, rotate it first, then remove it. If it is a content hash, name it so on the same line (sha256, checksum, digest)."
+            exit 1
+          fi
+          echo "No bare hex secrets found in tracked files."

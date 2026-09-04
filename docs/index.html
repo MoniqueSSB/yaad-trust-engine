@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Yaadly · Property work in Jamaica, managed while you're abroad</title>
-<meta name="description" content="Tell Yaadly what needs doing on your property in Jamaica. We price it and put a vetted tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you sign it off. Launching in Kingston and Portmore.">
+<meta name="description" content="Tell Yaadly what needs doing on your property in Jamaica. You buy the job from Yaadly, we put an identity checked tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you accept it. Launching in Kingston and Portmore.">
 <meta property="og:title" content="Yaadly · Property work in Jamaica, managed while you're abroad">
-<meta property="og:description" content="We price it and put a vetted tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you sign it off. Launching in Kingston and Portmore.">
+<meta property="og:description" content="You buy the job from Yaadly, we put an identity checked tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you accept it. Launching in Kingston and Portmore.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://yaadly.co.uk/">
 <meta property="og:site_name" content="Yaadly">
@@ -49,6 +49,7 @@ html::after{
 body{font-family:var(--body);background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:var(--purple);text-decoration:none}
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* NAV */
 
@@ -225,11 +226,13 @@ h1.display em{
 .baseline span:nth-child(3) i{background:#4ADE80}
 
 /* TODAY AND PLANNED. Two columns so the roadmap cannot be read as the
-   product. Money held with a licensed provider is planned, not live:
-   docs/marketplace.html says so and CLAUDE.md section 9 lists payment
-   integration as not built. This block is where that truth lives on the
-   homepage. Keep it honest when something ships: move the line, do not
-   delete the column. */
+   product. Corrected 4 Sep 2026: this comment used to say money holding
+   was "planned, not live" and cited marketplace.html, which no longer
+   says it, and payment came off the CLAUDE.md section 9 not-yet list on
+   3 Sep. What is still not live is CARD payment, which is stated on
+   payments.html, services.html and terms.html. This block is where that
+   truth lives on the homepage. Keep it honest when something ships:
+   move the line, do not delete the column. */
 .status{border-top:1px solid var(--line);padding:52px 0 56px;position:relative;z-index:1}
 .status .lead{text-align:center;max-width:640px;margin:0 auto 30px}
 .status h2{font-family:var(--disp);font-weight:300;font-size:clamp(26px,3.2vw,36px);letter-spacing:-0.02em;line-height:1.1;margin-bottom:10px}
@@ -315,21 +318,22 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
         <span class="w"><i style="animation-delay:.54s">you&rsquo;re</i></span>
         <span class="w"><i style="animation-delay:.62s"><em>abroad.</em></i></span>
       </h1>
-      <p class="sub">Tell us what needs doing. We price it and put a vetted tradesperson on it, each stage is photographed, and <b>a named person at Yaadly reviews the finished work</b> before you sign it off.</p>
+      <p class="sub">Tell us what needs doing. <b>You buy the job from Yaadly</b>, we put an identity checked tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you accept it.</p>
       <div class="cta">
         <a class="btn" href="https://app.yaadly.co.uk/jobs/new">Start a project</a>
-        <a class="btn ghost" href="/contact" id="ask-yaadly">Ask Yaadly</a>
+        <a class="btn ghost" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener">Message us on WhatsApp</a>
       </div>
       <p class="cta-note">Free to start. A person reads it within one working day. &nbsp;·&nbsp; A tradesperson in Jamaica? <a href="https://app.yaadly.co.uk/apply">Join as a worker &rarr;</a></p>
     </div>
 
+    <h2 class="vh">Choose your route into Yaadly</h2>
     <div class="doors" id="doors">
 
       <!-- DOOR 1: PROPERTY OWNERS -->
       <a class="door" href="https://app.yaadly.co.uk/jobs/new">
         <div class="door-who"><i></i>For property owners</div>
         <div class="door-head-row">
-          <span class="door-title">Get work done</span>
+          <h3 class="door-title">Get work done</h3>
         </div>
         <div class="door-list">
           <div class="door-li"><span><b>Post a job</b>, Yaadly prices it</span><span class="m">Free</span></div>
@@ -344,7 +348,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
       <a class="door gold" href="https://app.yaadly.co.uk/apply">
         <div class="door-who"><i></i>For tradespeople in Jamaica</div>
         <div class="door-head-row">
-          <span class="door-title">Join as a worker</span>
+          <h3 class="door-title">Join as a worker</h3>
         </div>
         <div class="door-list">
           <div class="door-li"><span><b>Apply once</b>, identity checked</span><span class="m">Free</span></div>
@@ -358,7 +362,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
 
     <div class="rail">
       <div class="rail-line"></div>
-      <p class="rail-biz"><b>Run a company with property risk in Jamaica?</b> Agents, insurers, developers: independent inspections and forwardable reports.</p>
+      <p class="rail-biz"><b>Already have your own contractor?</b> Keep them. Yaadly can be the eyes instead: we attend, record and write it up, and you pay your contractor directly. Agents, insurers and developers work with us the same way.</p>
       <div class="rail-links">
         <span><a class="ov" href="/business">Yaadly for business <span class="ar">&rarr;</span></a></span>
         <span class="sep">·</span>
@@ -368,10 +372,10 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
 
     <div class="baseline">
       <span><i></i>Evidence at every stage</span>
-      <span><i></i>A named person approves every release, never an automatic timer</span>
+      <span><i></i>A named person checks the work before anyone is paid</span>
       <span><i></i>Independent checks, as a service</span>
       <span><i></i>AI drafts, a named human decides</span>
-      <span><i></i>Human reply the same day</span>
+      <span><i></i>A person replies within one working day</span>
     </div>
   </div>
 </section>
@@ -386,11 +390,11 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
       <div class="scol">
         <h3><i></i>Live now</h3>
         <ul>
-          <li><span><b>Describe your job</b> on WhatsApp or the web, and a person replies the same day.</span></li>
-          <li><span><b>Vetted tradespeople.</b> Every worker passes an identity check before they can quote.</span></li>
+          <li><span><b>Describe your job</b> on WhatsApp or the web, and a person replies within one working day.</span></li>
+          <li><span><b>Identity checked tradespeople.</b> Every worker passes an identity check before they can quote, and three referees are spoken to before any job over &pound;500. <a href="/faq">What we check</a>.</span></li>
           <li><span><b>Quotes read by a person</b> before they reach you, with a written agreement for both sides.</span></li>
           <li><span><b>Photo evidence</b> for each stage, in your own portal, wherever you are.</span></li>
-          <li><span><b>Inspections and reports</b> as a managed service, with prices published.</span></li>
+          <li><span><b>Inspections and reports</b> as a managed service, with prices published. Use these on your own contractor too.</span></li>
           <li><span><b>You pay Yaadly, not the tradesperson.</b> Yaadly engages the tradesperson and pays them under our own separate agreement with them, so they are never left waiting on you for their money. Your sign-off is what closes the job with us: we do not treat it as finished, and we do not take the balance, until you have said the work is right. Payment terms are agreed in writing for each job before anything starts.</span></li>
         </ul>
       </div>
@@ -407,14 +411,14 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
 </section>
 
 <a class="wa-float" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener" aria-label="Message Yaadly on WhatsApp">
-  <span class="wa-label">Message us on WhatsApp · answered day or night</span>
+  <span class="wa-label">Message us on WhatsApp · a person replies within one working day</span>
   <span class="wa-btn"><svg viewBox="0 0 32 32"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.7.9 3.6 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.3l-.4-.2-4.9 1 1-4.7-.3-.4c-1-1.5-1.5-3.3-1.5-5.2 0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.1 10.8-8.5 10.8zm5.4-7.3c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.3-.7.3-1.3.2-1.4-.1-.1-.3-.2-.6-.3z"/></svg></span>
 </a>
 
 <footer><div class="wrap"><div class="fgrid">
   <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
   <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
-  <span>A human confirms every step that moves money or changes a reputation.</span>
+  <span>A named person at Yaadly confirms every step that moves money or changes a reputation.</span>
   <div class="flinks">
     <a href="/marketplace">Overview</a>
     <a href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
@@ -426,6 +430,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
     <a href="/contact">Contact</a>
     <a href="https://app.yaadly.co.uk/portal">Client portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
+    <a href="/how-we-use-ai">How we use AI</a>
     <a href="/privacy">Privacy</a>
     <a href="/cancellation">Cancelling</a>
     <a href="/terms">Terms</a>
@@ -435,14 +440,11 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
 <script>
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* Ask Yaadly: open the chat in the corner if it has loaded, otherwise the
-   link goes to the contact page as written. No new integration: this presses
-   the same launcher chat.js already puts on the page. */
-const ask = document.getElementById('ask-yaadly');
-if(ask){ ask.addEventListener('click', e => {
-  const l = document.getElementById('yc-launch');
-  if(l){ e.preventDefault(); l.click(); }
-}); }
+/* The hero's second button was "Ask Yaadly", which pressed the chat.js
+   launcher. Replaced 4 Sep 2026 with WhatsApp, per the CTA hierarchy in
+   docs/COPY-GUIDELINES.md section 5: WhatsApp owns the secondary slot on
+   every consumer page, and the chat launcher is not a CTA. chat.js still
+   puts its own launcher on the right edge, so nothing was lost. */
 
 /* parallax orbs */
 if(!reduce && matchMedia('(pointer:fine)').matches){

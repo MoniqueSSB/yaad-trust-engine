@@ -192,7 +192,10 @@ Return STRICT JSON only, exactly this shape:
 Rules you must not break:
 - Report only what the worker said. Never add detail, never estimate progress as a percentage, never guess a completion date the worker did not give.
 - Never promise the work is good, finished, or that payment will be released. A human reviews the evidence and the client approves.
-- Never use the word escrow, and never say money is held for anyone. Yaadly is the principal contractor: the client buys the job from Yaadly, and Yaadly engages and pays the tradesperson separately. So the client's approval closes a stage with Yaadly; it does not release funds to anybody.
+- Never use the word escrow, and never describe the client's money as held.
+  Yaadly is principal: the client buys the job from Yaadly at one agreed price,
+  and Yaadly engages and pays the tradesperson. Payment terms are agreed in
+  writing for each job, and a named person approves every release.
 - Never make the worker sound unprofessional. Translate register, not dignity.
 - If the update is too vague to report, say so plainly and put the missing detail in what_happens_next.
 - Never use dash characters, use a comma or colon instead.`;
@@ -840,6 +843,11 @@ Deno.serve(async (req: Request) => {
     // substitute for the richer free-text message when that can still be
     // delivered: see the send site below.
     let waTemplate: { sid: string; vars: Record<string, string> } | undefined;
+    // A SECOND, different thing from waTemplate, and the difference is the
+    // whole design. waTemplate is a FALLBACK: it replaces a message that could
+    // not be delivered. approveButton is an ADDITION: it follows a message
+    // that was delivered, carrying the one thing free text cannot, a button.
+    let approveButton: { sid: string; vars: Record<string, string> } | undefined;
 
     if (kind === "service_booked") {
       // Fires the moment an enquiry is converted in the desk. A receipt with
@@ -1084,6 +1092,31 @@ Deno.serve(async (req: Request) => {
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
         : "Review it and reply from your portal.";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+
+      // ── the approve button, 4 September 2026 ──────────────────────────
+      //
+      // This is the one message in the system that asks a client to approve,
+      // and approving means typing JOB-WA-1757000000000 correctly on a phone
+      // to move money. A Quick Reply button makes it one tap.
+      //
+      // IT IS SENT AFTER THE FREE TEXT, NOT INSTEAD OF IT, and that is the
+      // point. The free text here carries the worker's own words about what
+      // was done, the AI's notes, the item codes and the photographs
+      // themselves. A template's fixed variable slots hold none of that, and
+      // this file's own header records why sending a template in place of a
+      // richer message is the wrong trade. So the report goes as it always
+      // has, and the button follows it.
+      //
+      // The payload is the bare job code, because yaad-inbound reads a tapped
+      // payload as the message text and hands it to the same
+      // matchApprovingJob() and the same RPC a typed code goes through. The
+      // button is a way of typing, not a new authority.
+      //
+      // Unset secret means no second message and nothing changes.
+      const approveSid = Deno.env.get("TWILIO_CONTENT_SID_APPROVE") ?? "";
+      if (approveSid && clientPhone) {
+        approveButton = { sid: approveSid, vars: { "1": String(job.title ?? "your job"), "2": String(job.id) } };
+      }
       root.setAttributes({ "yaadly.notify.photos_attached": photoUrls.length, "yaadly.notify.was_customised": !!overrideText });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
@@ -1228,6 +1261,21 @@ Deno.serve(async (req: Request) => {
           const sms = await sendTwilio(recipientPhone, line, "sms", trace);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
+      }
+
+      // The button, once the report itself has landed on WhatsApp. Only on
+      // WhatsApp, because a button is a WhatsApp thing and an SMS fallback
+      // would just be a second copy of nothing. Only after a successful send,
+      // because a lone "Approve" button arriving with no report in front of it
+      // asks somebody to approve work they have not been shown.
+      //
+      // Its failure is recorded and never propagated: the client already has
+      // the report and the typed code still works, so a missing button is a
+      // worse experience and not a lost message.
+      if (approveButton && wa.sent && wa.via === "twilio whatsapp") {
+        const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton);
+        root.setAttributes({ "yaadly.notify.approve_button": btn.sent });
+        if (!btn.sent) console.error(`approve button not sent for ${jobId}: ${btn.reason ?? "unknown"}`);
       }
     }
 

@@ -13,10 +13,9 @@
  * They move inside a details element, closed by default, one per stage. A
  * client who never opens it loses nothing; a client in a dispute has it all.
  *
- * The button that actually approves a stage moved to its own Approvals tab
- * (3 Sep 2026), next to the money it releases and behind its own hold point,
- * so this ledger only ever answers "what is the proof", never "shall I
- * release the money" in the same breath.
+ * The button that actually accepts a stage moved to its own Approvals tab
+ * (3 Sep 2026), behind its own hold point, so this ledger only ever answers
+ * "what is the proof", never "shall I sign this off" in the same breath.
  */
 
 import Link from "next/link";

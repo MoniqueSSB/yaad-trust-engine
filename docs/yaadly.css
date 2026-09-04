@@ -289,6 +289,10 @@ textarea.f{min-height:110px;resize:vertical}
 /* faq */
 details.fq{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-top:10px}
 details.fq summary{cursor:pointer;font-weight:700;font-size:15px;padding:15px 18px;list-style:none}
+/* The question text is a real h2 inside the summary, so the FAQ has a
+   document outline a screen reader can navigate, while the summary keeps
+   its disclosure semantics. The h2 inherits everything so nothing moves. */
+details.fq summary>h2{display:inline;font:inherit;color:inherit;margin:0;letter-spacing:inherit}
 details.fq summary::-webkit-details-marker{display:none}
 details.fq summary::after{content:"+";float:right;color:var(--tealb)}
 details.fq[open] summary::after{content:"\2212"}

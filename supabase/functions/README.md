@@ -46,6 +46,9 @@ two copies of one prompt with only one of them maintained.)
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
 | `yaad-sketch` | true | Site Sketch Pack: video stills → rooms, condition schedule, schematic, admin session only |
 | `yaad-inbound` | false | Every inbound message: Twilio WhatsApp and SMS, Resend email, and since 2 Sep 2026 the chat widget on yaadly.co.uk (`channel: "web"`, see `web-chat.ts`). One intake assistant, one handoff rule, one banned-language screen, three doors. The web door has no signature; the Origin check plus the `web_chat_attempts` throttle stand in for one, the same posture as `yaad-enquiry` |
+| `yaad-report` | true | The report drafting agent: an inspector's notes and photograph captions become the findings of a draft report, admin session only. **No severity field and no verdict field in its schema**, the same shape as `yaad-invoice` having no amount field. See below |
+| `yaad-message-status` | **false** | Twilio's delivery callbacks: queued, sent, delivered, read, failed, undelivered, keyed on Twilio's own MessageSid into `message_deliveries`. Carries its own authentication (the same HMAC check `yaad-inbound` uses, from `_shared/twilio-signature.ts`) and refuses outright when the token is missing. Records what it is told and acts on nothing, so a forged callback can only ever make a status wrong, never move anything |
+| `yaad-phone-check` | true | Twilio Lookup on a number a worker typed: is it real, is it a mobile, and what is it in E.164. Called from the portal's link-your-number form before the number is saved. Holds no service-role key and touches no table; it reports and the caller decides. `verify_jwt` stays true because Lookup costs money per call |
 | `yaad-desk-reply` | true | Monique's typed reply to a Conversations thread, sent from the Yaadly Twilio number, or into `web_chat_replies` for a website chat thread. No model call anywhere in it; `is_admin()` checked inside as well. A send marks the thread `human_handling`, so `yaad-inbound` stands down until the desk hands it back |
 
 `verify_jwt` matters, and the count in this paragraph was wrong too. It said
@@ -66,6 +69,22 @@ line has now been wrong twice, and it is the control.
 load-bearing rather than housekeeping: without the per-recipient cap it is an
 open relay pointed at whoever somebody names.
 
+## Secrets added on 4 September 2026
+
+All Supabase Edge Function secrets. Every one of them is a switch: while it is
+unset the feature it belongs to does nothing at all, so none of these changes
+behaviour on the live number until it is set.
+
+| Secret | Turns on | Set up |
+|---|---|---|
+| `HUBSPOT_LEAD_WEBHOOK_SECRET` | a confirmed job becoming a HubSpot contact and deal | already set, both sides |
+| `TWILIO_CONTENT_SID_APPROVE` | the tap-to-approve button on the message asking a client to approve | needs a Quick Reply template |
+| `TWILIO_CONTENT_SID_DESK_REPLY` | the nudge sent when a desk reply lands outside the 24 hour window | needs a Utility template |
+| `TWILIO_STATUS_CALLBACK_URL` | Twilio reporting whether a message was delivered, read or failed | needs `yaad-message-status` deployed |
+
+Full instructions for each are in RUNBOOK.md. Nothing here is a code change:
+they are all "build the thing in Twilio, then set the value".
+
 ## Tracing
 
 Every function is instrumented with OpenTelemetry via `otel.ts`, a
@@ -84,29 +103,49 @@ same shape of trace: a signature check, a model call, a `db.insert jobs` (or
 API webhook that never received real traffic and was deleted 1 Sep 2026, see
 DECISIONS.md.)
 
-A new job runs as a guided intake instead of a single-shot card: the agent
-asks Monique's seven questions one at a time, holding the answers between
-messages in `wa_intake_sessions` (deleted when the job is created). Whatever
-the opening message already answered is prefilled and not asked again, and
-the job is only inserted once the set is complete.
+A new job is a conversation, not a questionnaire. The whole thread lives in
+`intake_threads`, keyed on channel plus sender, and every turn is read back to
+the model as one transcript so the second line means something. The job row is
+written on every turn and stays `draft` until the client agrees the read-back
+is right.
 
-The last question asks for an email, and the answer is the one thing the
-intake can refuse: anything that is neither an address nor a refusal is asked
-again rather than saved. The address is never written to `jobs.client_email`,
+(This paragraph used to describe a guided seven question intake held in
+`wa_intake_sessions`. That belonged to `yaad-whatsapp-webhook`, deleted 1 Sep
+2026. `wa_intake_sessions` now holds three short-lived WORKER lanes only:
+`evidence`, `report_confirm` and `text_update`. Corrected 4 Sep 2026, along
+with the Mid-chat view in the concierge, which was describing the same
+questionnaire.)
+
+An email address the client types is never written to `jobs.client_email`,
 because that column is the binding and a mailbox nobody has proved must not
 bind a job. It only receives the portal link, and clicking that link is what
-binds, as everywhere else.
+binds, as everywhere else. On the email channel the sender address is different:
+they had to control that mailbox to send from it, so it binds directly.
 
 Every inbound message id is recorded in `wa_inbound_seen` before any state
-changes and before the transcription and model calls. Meta retries a delivery
-that does not get a prompt 2xx, and without the ledger the retry was read as
-the client's next answer: a question skipped, or a second job for one client.
-A repeat now returns 200 having touched nothing.
+changes and before the transcription and model calls, keyed on Twilio's
+`MessageSid` and Resend's `email_id`. A redelivery that does not get a prompt
+2xx would otherwise be read as the client's next answer: a question skipped, a
+photograph filed twice, or a second job for one client. A repeat now returns
+200 having touched nothing.
 
-The root span's `yaadly.webhook.outcome` says which path ran: `duplicate`,
-`intake_started`, `intake_answer`, `intake_photo`, `intake_retry`,
-`intake_email_retry`, `intake_cancelled`, `job_created`, `job_insert_failed`,
-`follow_up_answered`, or `follow_up_escalated`.
+**This was aspirational until 4 September 2026 and is now true.** The ledger
+was created on 30 August for the Meta webhook, that function was deleted on 1
+September, and for three days this paragraph described a control that no live
+code read or wrote. The same table also carries the per-number hourly throttle
+(40 an hour), which this endpoint had no equivalent of at all while the website
+chat door had three.
+
+The root span's `yaadly.inbound.outcome` says which path ran. As of 4 Sep
+2026: `duplicate`, `throttled`, `unverifiable`, `bad_signature`, `held_for_human`,
+`web_thread_adopted`, `web_poll`, `web_bad_origin`, `web_bad_token`,
+`web_throttled_caller`, `web_throttled_global`, `gathering`, `job_created`,
+`job_write_failed` or `uncaught`. `yaadly.agents_paused` says whether the desk
+switch was on, which is the difference between "the model wrote nothing" and
+"the model was never asked".
+
+(This list previously named the outcomes of `yaad-whatsapp-webhook`'s guided
+intake, none of which this function has ever emitted.)
 
 ### Turning it on
 
@@ -205,3 +244,44 @@ stills are pulled from the video in the browser with a `<video>` element and a
 canvas. The walkthrough of somebody's home never leaves the machine it was
 loaded on. Only the stills she keeps are uploaded, six per call, which is also
 what keeps each request inside the function's timeout.
+
+
+## yaad-report, and the two fields it does not have
+
+Three of the seven priced services are a document: the Deposit Protection
+Check, the Condition Report and the Technical Sign-off. `services.html`
+promises a verdict on page one, normally within 72 hours of the visit. Typed by
+hand, a £249 report costs an evening, which caps the whole business at roughly
+four reports a week.
+
+So the agent drafts the findings. It does not write the two things the client
+is actually paying for.
+
+**A client paying for a Condition Report is not buying prose.** They are buying
+somebody with seven years of UK construction project management saying "this
+one is Severe, and here is what I would do about it". Draft the prose and you
+save an evening. Draft the rating and you have sold a judgment nobody made.
+
+| Move | Who makes it | What stops the function |
+|---|---|---|
+| Rating a finding Severe, Moderate or Low | Monique | no field in the schema; `report_guard_issue` refuses to issue with any finding unrated; `report_stamp_rater` requires `is_admin()` and records who rated it |
+| Writing the page one verdict | Monique | no field in the schema; the same trigger refuses to issue without one |
+| Stating a measurement | nobody, ever | the prompt forbids it, `MEASUREMENT_RE` scrubs and reports what arrives anyway, and `has_measurement()` refuses the issue |
+| Pricing a remedy | Monique | no field in the schema, same as `yaad-invoice` |
+| Answering valuation, title, structure or boundaries | four named professionals | the prompt routes them to `questions` instead of writing a finding |
+
+`MEASUREMENT_RE` here and `has_measurement()` in `20260904c` are the same rule
+the sketch packs already use, deliberately reused rather than reimplemented: a
+second copy of that regex would drift, and the sketch one is already tested
+against eighteen sentences.
+
+There is a second scrub, `RATING_WORDS`, which is belt and braces on rule 1.
+A model told not to rate will occasionally rate in prose anyway, and "this is a
+severe problem" inside a body reads to a client exactly like the rating they
+paid a person for.
+
+The function holds no service-role key. Every database call goes out under the
+caller's own token, so RLS is doing the access control.
+
+Proof: `supabase/tests/report_guards.sql`, eleven assertions.
+Schema: `supabase/migrations/20260904n_the_report_drafter.sql`.

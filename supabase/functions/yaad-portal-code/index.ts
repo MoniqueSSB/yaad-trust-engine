@@ -16,7 +16,16 @@
  *     opened in a different browser than the one they started in is the
  *     classic way magic links strand somebody
  *   - it can go over WhatsApp or SMS as easily as email, through Twilio,
- *     which matters when half this audience gave a phone number and no email
+ *     for the client who has an email on file but does not read it
+ *
+ * That second line used to say this "matters when half this audience gave a
+ * phone number and no email." It was wrong, and wrong in the direction that
+ * made the phone channel look load bearing. This function REQUIRES a valid
+ * email address and returns 400 without one (see the check below), because
+ * the code comes from generateLink and generateLink is keyed on an email.
+ * There is no such thing as a portal user without one. Email is the rail;
+ * WhatsApp is a second copy of the same code for somebody who will see it
+ * sooner. Corrected 4 Sep 2026.
  *   - GoTrue's own email templates are left alone
  *
  * Verifying happens in the browser against Supabase, not here. This function
@@ -43,6 +52,74 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+/* Twilio Verify, the supported rail for a one time code.
+ *
+ * WHY THIS EXISTS AT ALL. A sign in code is an AUTHENTICATION message in
+ * WhatsApp's own categories. Free text carries it fine inside the 24 hour
+ * customer service window and not at all outside it, and the tempting fix,
+ * pushing an OTP through one of our own UTILITY templates, is the thing
+ * that gets a sender flagged. A flagged sender takes every other message
+ * this business sends down with it. Verify uses Meta's own pre-defined
+ * authentication templates instead, so there is no template here for
+ * anybody to write, submit, or get wrong.
+ *
+ * WHAT IT DOES NOT CHANGE, which is the important half. Supabase still
+ * mints the code (generateLink's email_otp) and the browser still verifies
+ * it against Supabase. Verify is used purely as a DELIVERY rail, by handing
+ * it our own code as CustomCode, so nothing about who owns the session
+ * moves. We deliberately never call Verify's own VerificationCheck: this
+ * function issues and delivers and holds no logic about who is signed in,
+ * exactly as its header says, and routing the check through Twilio would
+ * quietly make that untrue.
+ *
+ * Unset TWILIO_VERIFY_SERVICE_SID means every line below is skipped and the
+ * free text path behaves exactly as it did before this was added. */
+async function sendVerify(
+  to: string, code: string, channel: "whatsapp" | "sms", trace: Trace,
+) {
+  const service = Deno.env.get("TWILIO_VERIFY_SERVICE_SID") ?? "";
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  if (!service) return { sent: false, reason: "TWILIO_VERIFY_SERVICE_SID not set" };
+  if (!sid || !tok) return { sent: false, reason: "TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set" };
+  // Verify wants E.164 and nothing else. The free text path is more
+  // forgiving because Twilio's Messages API is; this one is not.
+  const digits = to.replace(/\D/g, "");
+  if (digits.length < 7) return { sent: false, reason: "number not usable" };
+  return await trace.span("twilio.verify.start", SpanKind.CLIENT, {
+    "server.address": "verify.twilio.com", "messaging.system": "twilio",
+    "yaadly.verify.channel": channel,
+  }, async (s) => {
+    try {
+      const r = await fetch(`https://verify.twilio.com/v2/Services/${service}/Verifications`, {
+        method: "POST",
+        headers: {
+          Authorization: "Basic " + btoa(`${sid}:${tok}`),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        // CustomCode is what makes this a delivery rail rather than a second
+        // source of truth: Twilio sends OUR code, the one Supabase will
+        // actually accept back. Four to ten characters; a Supabase email_otp
+        // is six digits and fits.
+        body: new URLSearchParams({ To: `+${digits}`, Channel: channel, CustomCode: code }),
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      if (r.ok) return { sent: true, via: `twilio verify ${channel}` };
+      // Named, never swallowed, same reason as the Resend failure below: a
+      // sign in code that went nowhere is somebody locked out of their own
+      // job, and the desk needs the real reason to answer them.
+      const reason = `verify ${r.status}: ${(await r.text()).slice(0, 140)}`;
+      s.recordError(reason);
+      return { sent: false, reason };
+    } catch (e) {
+      const reason = String(e).slice(0, 160);
+      s.recordError(reason);
+      return { sent: false, reason };
+    }
+  });
+}
 
 /* Twilio, same shape as yaad-quote-landed. Two copies rather than a shared
    module because sync-shared.sh copies one file into every function and a
@@ -221,20 +298,40 @@ Deno.serve(async (req: Request) => {
       .not("client_phone", "is", null).neq("client_phone", "")
       .order("updated_at", { ascending: false }).limit(1).maybeSingle();
 
-    /* Deliberately NOT a content template, unlike the quote notification.
-       A sign in code is an AUTHENTICATION message in WhatsApp's own
-       categories, which has its own template rules, and Twilio's Verify
-       product is the supported way to send one. Pushing an OTP through an
-       ordinary utility template is the kind of thing that gets a sender
-       flagged, and a flagged sender takes every other message down with it.
+    /* Still deliberately NOT one of our own content templates. A sign in
+       code is an AUTHENTICATION message in WhatsApp's own categories, and
+       pushing an OTP through an ordinary UTILITY template is the thing that
+       gets a sender flagged, which would take every other message this
+       business sends down with it.
 
-       So over WhatsApp this stays free text, which works inside the 24 hour
-       window and fails honestly outside it. Email is the reliable path for a
-       sign in code and always will be. */
+       What changed, 4 Sep 2026: Twilio Verify is now tried FIRST when
+       TWILIO_VERIFY_SERVICE_SID is set. Verify uses Meta's own pre-defined
+       authentication templates, so it reaches a client who has been quiet
+       more than 24 hours, which free text simply cannot. It carries OUR
+       code, not one of Twilio's, so nothing else in the sign in flow moves.
+
+       Free text stays underneath it, in the order it always had. Inside the
+       24 hour window free text is perfectly legitimate and costs less than a
+       verification, so it is the right thing to fall back to rather than
+       reporting failure. With the secret unset, this block behaves exactly
+       as it did before Verify existed. Email is the reliable path for a sign
+       in code either way and always will be. */
     if (job?.client_phone) {
-      phoneResult = await sendTwilio(String(job.client_phone), line, "whatsapp", trace);
+      const phone = String(job.client_phone);
+      phoneResult = await sendVerify(phone, otp, "whatsapp", trace);
       if (!phoneResult.sent) {
-        const sms = await sendTwilio(String(job.client_phone), line, "sms", trace);
+        // SMS through Verify depends on the Verify service having an SMS
+        // sender of its own; it reports honestly when it does not, the same
+        // as every other leg here.
+        const verifySms = await sendVerify(phone, otp, "sms", trace);
+        if (verifySms.sent) phoneResult = verifySms;
+      }
+      if (!phoneResult.sent) {
+        const wa = await sendTwilio(phone, line, "whatsapp", trace);
+        if (wa.sent) phoneResult = wa;
+      }
+      if (!phoneResult.sent) {
+        const sms = await sendTwilio(phone, line, "sms", trace);
         if (sms.sent) phoneResult = sms;
       }
     }

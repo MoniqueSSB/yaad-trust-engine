@@ -14,29 +14,30 @@ from dataclasses import dataclass
 from .telemetry import record_guardrail_event
 
 # 1. Never market payment holding as escrow.
-#
-# The PATTERNS are unchanged and must stay that way. The GUIDANCE strings for
-# the two money patterns were rewritten on 4 September 2026, because they still
-# told a reader to describe the pre-3-September arrangement: "held safely with a
-# licensed payment provider" and "Yaadly orchestrates the flow". Under the
-# principal-contractor structure Yaadly is not holding or orchestrating anybody
-# else's money, it is being paid for a job it sells. Guidance is what the next
-# person reads when they hit the screen, so stale guidance propagates the old
-# model into the next fix. Keep this list identical to the Deno port.
 BANNED_TERMS: dict[str, str] = {
-    r"\bescrow(ed|s)?\b": (
-        "Never 'escrow'. Yaadly is the principal contractor: the client buys the job from "
-        "Yaadly, and Yaadly engages and pays the tradesperson under a separate agreement."
-    ),
+    r"\bescrow(ed|s)?\b": "Use 'held safely with a licensed payment provider', never 'escrow'.",
     r"\b100\s?%": "No absolute claims. Give the real figure or drop the claim.",
     r"\bzero (fraud|risk|conflicts?)\b": "No absolute claims.",
     r"\bremoves? all fraud\b": "No absolute claims.",
     r"\bguarantee[sd]? (?:no|zero) \w+": "No absolute claims.",
     r"\bfully covered\b": "Say 'protected up to the guarantee limit', not 'fully covered'.",
-    r"\bwe hold (?:your |the )?(?:money|funds)\b": (
-        "Yaadly holds nobody's money. A stage closes when the client approves that stage's "
-        "evidence, and the balance falls due to Yaadly. Nothing is released to a third party."
-    ),
+    r"\bwe hold (?:your |the )?(?:money|funds)\b": "Yaadly orchestrates the flow, it does not hold funds itself.",
+    # Added 4 September 2026. The line above catches the active voice and only
+    # the active voice, and the passive is the form a model actually reaches
+    # for: "money is held and released stage by stage". That exact sentence was
+    # sitting in the WhatsApp assistant's own list of approved facts, so the one
+    # phrase the screen exists to stop was the phrase the instructions supplied.
+    #
+    # Deliberately narrow. It bans the claim that THE CLIENT'S money is sitting
+    # with Yaadly awaiting release, which is the escrow reading and is wrong
+    # under the principal structure settled on 3 September: the client buys the
+    # job from Yaadly outright. It does not touch "held safely with a licensed
+    # payment provider", which CLAUDE.md section 8 prescribes by name and which
+    # is not this session's to retire.
+    r"\b(?:your|the client'?s?|their)\s+(?:money|funds?)\s+(?:is|are|was|were|will be)\s+(?:being\s+)?held\b":
+        "Yaadly is principal: the client buys the job from Yaadly. Never describe the client's money as held.",
+    r"\bwe(?:'re|\s+are)\s+holding\s+(?:your|the|their)\s+(?:money|funds?)\b":
+        "Yaadly is principal: the client buys the job from Yaadly. Never say Yaadly is holding money.",
 }
 
 # 3. AI assists and drafts. Humans decide anything involving money or trust.

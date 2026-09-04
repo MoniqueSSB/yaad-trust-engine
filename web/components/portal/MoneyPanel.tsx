@@ -110,7 +110,7 @@ export function MoneyPanel({
                 label={side === "client" ? "Worker labour" : "Your labour price"}
                 value={money(labour) ?? "—"}
                 width={fee != null && labour != null ? Math.round((labour / (labour + fee)) * 100) : 100}
-                caption="Staged across the payment stages in the Kickoff Pack. A stage closes when the client has seen that stage's evidence and agreed the work is right. The tradesperson is paid by Yaadly under its own agreement with them, so their money does not wait on that."
+                caption="Paid across the payment stages in the Kickoff Pack, each one paid once that stage has been accepted and checked."
               />
               {materials != null && materials > 0 && (
                 <MoneyRow
@@ -121,8 +121,8 @@ export function MoneyPanel({
                   caption={
                     materialsReleased > 0
                       ? (money(materialsReleased) ?? "") +
-                        " paid to the worker against a receipt. Passed through at cost, never fee'd on either side."
-                      : "Paid to the worker against a receipt before labour starts, once the client has said where materials are kept. Not yet paid. Passed through at cost, never fee'd on either side."
+                        " released to the worker against a receipt. Never fee'd on either side."
+                      : "Paid to the worker against a receipt before labour starts, once the client has said where materials are kept. Not released yet. Never fee'd on either side."
                   }
                 />
               )}
@@ -157,7 +157,7 @@ export function MoneyPanel({
         <p className="mb-1 mt-1 text-[12.5px] text-dim">
           {side === "client"
             ? "Every invoice on this job, newest last. Paid by bank transfer."
-            : "Raised in your favour as the client approves each stage."}
+            : "Raised in your favour by Yaadly as each stage is accepted and checked."}
         </p>
 
         {invoices.length === 0 ? (
@@ -165,8 +165,8 @@ export function MoneyPanel({
             <b className="mb-1 block text-[14px] font-semibold text-ink">No invoices yet</b>
             <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
               {side === "client"
-                ? "The first will be Yaadly's Guarantee & Support fee once you have chosen a quote. Stage invoices follow, one per stage, each raised only after you approve that stage."
-                : "A pay invoice is raised the moment the client approves a stage. Nothing appears here before that."}
+                ? "The first will be Yaadly's Guarantee & Support fee once you have chosen a quote. Stage invoices follow, one per stage, each raised only after you have accepted that stage."
+                : "Yaadly raises a pay invoice as soon as a stage is accepted and checked. Nothing appears here before that."}
             </p>
           </div>
         ) : (

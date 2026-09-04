@@ -20,7 +20,7 @@ export function ServiceNext() {
           </h3>
           <p className="mt-2 text-[13px] leading-relaxed text-mute">
             Your scope is already written and your exclusions already exist,
-            they came out of the report. Post it and vetted workers quote
+            they came out of the report. Post it and identity checked workers quote
             against that scope, not a vague description. The Works Agreement is
             half-drafted before anybody sees it.
           </p>

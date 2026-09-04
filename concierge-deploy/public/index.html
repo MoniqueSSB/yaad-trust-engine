@@ -690,6 +690,33 @@ async function deskReply(row, vals){
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
 }
 
+// A note on a conversation. Written straight to the row under Monique's own
+// session, so RLS is the control and this function is only the form.
+async function deskNote(row, vals){
+  const { error } = await sb.from("intake_threads")
+    .update({ desk_notes: String(vals.desk_notes || "").slice(0, 4000) })
+    .eq("channel", row.channel).eq("from_addr", row.from_addr);
+  if (error) throw new Error(error.message);
+}
+
+// Correcting what a job says before it goes to the board.
+//
+// The description on a job that arrived by conversation is written by the
+// assistant: its reading of the scope, the access note, what is worth
+// confirming, and then the client's own words kept verbatim underneath. The
+// client gets to correct it, at the read-back. Monique never did, and she is
+// the one who knows the parish is wrong because she has been there.
+//
+// The whole current text is loaded into the box so this is an edit and not a
+// replacement: the "In their own words" block at the bottom is the client's
+// and should survive being corrected around.
+async function deskEditDescr(row, vals){
+  const text = String(vals.descr || "").trim();
+  if (!text) throw new Error("An empty description would lose what the client said. Leave it, or write the correction.");
+  const { error } = await sb.from("jobs").update({ descr: text.slice(0, 8000) }).eq("id", row.id);
+  if (error) throw new Error(error.message);
+}
+
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
 const money = (p) => "£" + (p / 100).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -728,6 +755,9 @@ const TONE = {
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
   // calls / waitlist
+  // reports. reviewed is amber, not grey: it has been read and still is not
+  // with the client, so it is outstanding rather than finished.
+  reviewed:"warn",
   requested:"warn", booked:"ok", held:"warn",
   // enquiries. "replied" and not "answered": disputes already own answered,
   // where it means the worker has responded and you still have to decide. A
@@ -828,6 +858,72 @@ const VIEWS = [
         says:() => "Marks it as not real work. The row stays on the record, it just stops appearing as something waiting." },
     ]},
 
+  { k:"reports", g:"Documents & money", label:"Reports", icon:"case",
+    title:"Reports", table:"v_reports_open",
+    sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
+    select:"*",
+    order:"drafted_at",
+    search:["number","client_name","property","kind"],
+    empty:["No reports yet","Write up what you saw on the visit below and the agent will draft the findings."],
+    panel: () => `
+      <div class="card">
+        <b>Draft a report from your notes</b>
+        <p class="mute" style="margin:6px 0 12px">Write what you saw, roughly is fine. The agent turns it into findings in the house structure. <b>It cannot rate them and it cannot write the verdict</b>, so what lands below is deliberately unfinished: that judgment is what the client is paying you for.</p>
+        <div class="fgroup" style="max-width:560px">
+          <label class="fl">Which service</label>
+          <select id="rptKind" class="inp">
+            <option value="deposit_check">Deposit Protection Check</option>
+            <option value="condition">Condition Report</option>
+            <option value="technical_signoff">Technical Sign-off</option>
+            <option value="visual_check">Visual Check</option>
+          </select>
+          <label class="fl" style="margin-top:10px">Client name</label>
+          <input id="rptClient" class="inp" placeholder="As it should read on the report">
+          <label class="fl" style="margin-top:10px">Property</label>
+          <input id="rptProperty" class="inp" placeholder="Town or parish, and the kind of building">
+          <label class="fl" style="margin-top:10px">Your notes from the visit</label>
+          <textarea id="rptNotes" class="inp" rows="8" placeholder="Everything you saw, in any order. The agent adds nothing you did not write down, and tells you what it could not source."></textarea>
+          <button class="btn g" id="rptGo" style="margin-top:12px">Draft the findings</button>
+          <p class="mute" id="rptOut" style="margin-top:10px"></p>
+        </div>
+      </div>`,
+    cols:[
+      {h:"Report", f:r => id_(r.number || "draft") + sub_((r.kind || "").replace(/_/g," "))},
+      {h:"Client & property", f:r => esc(r.client_name || "Not named") + sub_(r.property || "No property given")},
+      {h:"Findings", f:r => esc(String(r.findings ?? 0)) + sub_(r.unrated ? r.unrated + " still unrated" : "all rated")},
+      {h:"Verdict", f:r => r.needs_verdict ? chip_("crit","not written") : chip_("ok","written")},
+      {h:"Measurements pulled", f:r => r.scrubbed ? chip_("warn", r.scrubbed + " scrubbed") : mute_("none")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Visited", f:r => mute_(r.visited_on ? ago_(r.visited_on) : "not given")},
+    ],
+    actions:[
+      { label:"Rate a finding", cls:"",
+        when:r => r.status !== "issued" && r.unrated > 0,
+        rpc:"rate_finding",
+        ask:[
+          { k:"ord", label:"Which finding, by its number", placeholder:"1" },
+          { k:"severity", label:"How serious is it",
+            options:[["severe","Severe"],["moderate","Moderate"],["low","Low"]] },
+        ],
+        args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
+        says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
+      { label:"Write the verdict", cls:"",
+        when:r => r.status !== "issued",
+        rpc:"write_report_verdict",
+        ask:[
+          { k:"line", label:"The one line for page one", placeholder:"Hold. Do not pay this deposit as it stands." },
+          { k:"verdict", label:"The paragraph under it", type:"long",
+            placeholder:"What you would do and why, in your own words. No model has seen this field." },
+        ],
+        args:(r, v) => ({ p_report:r.id, p_line:v.line, p_verdict:v.verdict }),
+        says:() => "Writes the verdict on page one. services.html promises the client this within 72 hours of the visit, and it is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
+      { label:"Issue it", cls:"",
+        when:r => r.status !== "issued" && r.unrated === 0 && !r.needs_verdict,
+        rpc:"issue_report",
+        args:(r) => ({ p_report:r.id }),
+        says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
+    ]},
+
   { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",
     title:"Jobs", table:"jobs",
     sub:"Every job and where it has got to, including everything that arrives by WhatsApp, email and the website form. What somebody actually typed is under In their own words, kept exactly as they wrote it. Hover to read the whole thing. A budget band is the client's private figure and is never shown here. Materials store is where the client said materials are to be kept: until that is answered the database will not let a materials tranche or materials evidence be recorded at all.",
@@ -852,6 +948,10 @@ const VIEWS = [
     // be refused by Postgres, which is the correct outcome but a silly way to
     // find out.
     actions:[
+      { label:"Correct what this job says", cls:"g",
+        says:() => "Edits the description workers read when this job is on the board. The whole current text is loaded in, so correct it rather than retyping it, and leave the client's own words at the bottom alone: that block is the record of what they actually said. Nothing is sent to anybody by saving this.",
+        ask:[{ k:"descr", label:"The description", type:"long", from:r => r.descr || "" }],
+        call: deskEditDescr },
       // Read only, so it sits first: it is the thing you do BEFORE deciding
       // any of the below, and it is the only button here that cannot change
       // anything. Only offered where there is enough text to be worth
@@ -1269,7 +1369,7 @@ const VIEWS = [
 
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
-    sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back.",
+    sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back. Newest message is the last thing said, so you can triage without opening rows. Your notes are yours: the client never sees them and the assistant never reads them. To correct what the job itself says before workers see it, open the job under Jobs and use Correct what this job says.",
     select:"*",
     order:"last_at", search:["job_id","from_addr","transcript","channel"],
     empty:["No conversations yet","When somebody writes in by WhatsApp or email, the whole thread is kept here."],
@@ -1278,13 +1378,15 @@ const VIEWS = [
       {h:"From", f:r => esc(r.from_addr || "unknown") + sub_(r.channel || "")},
       {h:"Who has it", f:r => r.human_handling ? chip_("warn","with you") : chip_("mute","assistant")},
       {h:"Turns", n:true, f:r => String(r.turns ?? 0)},
+      {h:"Newest message", f:r => lastSaid_(r.transcript)},
       {h:"The conversation", f:r => transcript_(r.transcript)},
+      {h:"Your notes", f:r => r.desk_notes ? said_(r.desk_notes) : mute_("none")},
       {h:"Last heard", f:r => mute_(ago_(r.last_at))},
     ],
     actions:[
       { label:"Reply from the Yaadly number",
         when:r => r.channel === "whatsapp" || r.channel === "sms",
-        says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only delivers a typed reply within 24 hours of their last message; outside that the send is refused and told to you honestly.",
+        says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only carries a typed reply within 24 hours of their last message. Outside that your words are not lost: they are saved, a short approved message goes telling them a reply is waiting, and yours goes out in full the moment they write back. You can see anything waiting under Waiting to send.",
         ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
         call: deskReply },
       { label:"Reply in their website chat",
@@ -1296,14 +1398,56 @@ const VIEWS = [
         when:r => r.human_handling === true,
         says:() => "The assistant starts answering this number again from their next message. Nothing is sent to the client by pressing this.",
         set:{ human_handling:false } },
+      // Nowhere to write "called her, she is away until the 20th" until 4 Sep
+      // 2026. Deliberately not the transcript: the transcript is what was
+      // actually said, it is quoted back to the assistant as the
+      // conversation, and a client can read their own once their email is
+      // proven on the job. A note is none of those things.
+      { label:"Write a note to yourself", cls:"g",
+        says:() => "Kept on this conversation, for you. The client never sees it, the assistant never reads it, and it is never sent to a model. Use it for the phone call that happened off the record, or the reason this one is parked.",
+        ask:[{ k:"desk_notes", label:"Your note", type:"long",
+               from:r => r.desk_notes || "",
+               placeholder:"Called her Tuesday, she is away until the 20th. Number on the job is her brother's." }],
+        call: deskNote },
+    ]},
+
+  { k:"delivery", g:"Inbox", label:"Did it arrive", icon:"pulse",
+    title:"Message delivery", table:"message_deliveries",
+    sub:"What actually happened to the messages Yaadly sent. Twilio accepting a message is not the same as a phone receiving one: a number that has left WhatsApp, a handset that never comes online, a message a carrier drops, all look like success from our side. This is where the real answer lands. Read means they opened it. Failed or undelivered means somebody is waiting on a message that is never coming, and that is the only row here worth acting on.",
+    select:"*",
+    order:"sent_at", search:["to_addr","job_id","message_sid","status"],
+    empty:["Nothing recorded yet","Delivery reporting starts once yaad-message-status is deployed and the callback URL is set."],
+    cols:[
+      {h:"To", f:r => id_(r.to_addr || "unknown") + sub_(r.channel || "")},
+      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
+      {h:"What it was", f:r => esc(r.kind || "a message")},
+      {h:"Outcome", f:r => deliveryTone_(r)},
+      {h:"Sent", f:r => mute_(ago_(r.sent_at))},
+      {h:"Last heard", f:r => mute_(ago_(r.updated_at))},
+    ]},
+
+  { k:"waiting", g:"Inbox", label:"Waiting to send", icon:"clock",
+    title:"Replies waiting to send", table:"pending_desk_replies",
+    sub:"Replies you typed that WhatsApp would not carry, because more than 24 hours had passed since that person last wrote. Nothing is lost: each one goes out automatically the moment they send anything back, which is the thing that reopens the window. A short approved message has already gone telling them a reply is waiting. There is no button here and nothing to press. A row that sits for days is somebody who never wrote back, which is worth seeing rather than worth chasing with a timer.",
+    select:"*",
+    order:"created_at", search:["to_addr","job_id","body"],
+    empty:["Nothing waiting","When you reply to somebody more than 24 hours after their last message, it waits here until they write back."],
+    cols:[
+      {h:"To", f:r => id_(r.to_addr) + sub_(r.channel || "")},
+      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("no job")},
+      {h:"What you said", f:r => said_(r.body)},
+      {h:"State", f:r => r.sent_at ? chip_("ok","delivered") : chip_("warn","waiting on them")},
+      {h:"Tries", n:true, f:r => r.attempts ? String(r.attempts) : mute_("0")},
+      {h:"Typed", f:r => mute_(ago_(r.created_at))},
+      {h:"Delivered", f:r => r.sent_at ? mute_(ago_(r.sent_at)) : mute_("not yet")},
     ]},
 
   { k:"wamid", g:"Inbox", label:"Mid-chat", icon:"clock",
     title:"Mid-chat", table:"wa_intake_sessions",
-    sub:"Everybody caught partway through a WhatsApp conversation, before a job, an application or a photo has been filed anywhere else. The assistant asks one question at a time, and this is where you see exactly which question a person has been left sitting on. There is nothing to do here and no button to press: a row disappears on its own once the conversation finishes, and one gone quiet for more than two days is not lost, it restarts fresh the moment they write in again.",
+    sub:"Workers caught partway through answering the assistant, and only workers: a client describing a job is a free conversation and lives under Conversations instead. Three things land here. A worker who has sent photographs and not yet said which job they belong to, a worker sitting on a drafted report waiting to send it or reword it, and a worker whose written update could have been about more than one of their jobs. There is nothing to do here and no button to press: a row disappears on its own once they answer, and one gone quiet for more than two days is not lost, it restarts fresh the moment they write in again.",
     select:"*", hide:["answers"],
     order:"updated_at", search:["wa_id"],
-    empty:["Nobody mid-chat right now","When the WhatsApp assistant is partway through asking somebody about a job, a worker signup, or which job a photo belongs to, it shows here."],
+    empty:["Nobody mid-chat right now","When a worker has sent something and the assistant is waiting on them to say which job it belongs to, it shows here."],
     pre: preWaMid,
     cols:[
       {h:"Number", f:r => id_(r.wa_id) + sub_(waLaneLabel_(r))},
@@ -1504,35 +1648,86 @@ function ownWords(descr){
        + (waiting ? sub_("still gathering, the assistant has asked for more") : "");
 }
 
-// The fixed question order the WhatsApp assistant asks, one lane at a time.
-// Copied here rather than read from the webhook, because the desk has no
-// way to import from a Deno function. Kept in the same order and the same
-// keys as the intake steps in yaad-inbound: if that
-// order changes, this copy goes stale and needs updating alongside it.
-const WA_CLIENT_STEPS = ["what","where","access","when","name","from","email"];
-const WA_CLIENT_LABELS = {
-  what:"what needs doing", where:"where the property is",
-  access:"who can let a worker in", when:"how soon they need it",
-  name:"their name", from:"where they are writing from", email:"their email",
+// The lanes wa_intake_sessions actually holds, corrected 4 September 2026.
+//
+// WHAT WAS HERE BEFORE. A seven step client questionnaire and a five step
+// worker signup, copied from INTAKE_STEPS and WORKER_STEPS in
+// yaad-whatsapp-webhook. That function was deleted on 1 September 2026 and
+// nothing replaced those two lanes: yaad-inbound does client intake as a free
+// conversation held in intake_threads, and worker signup happens at
+// app.yaadly.co.uk/apply. So this view was describing, in confident detail,
+// a questionnaire nobody has been asked since August, and the table it reads
+// has had zero rows the whole time.
+//
+// WHAT IS ACTUALLY IN THERE. Three worker lanes, all of them short lived,
+// all written by yaad-inbound:
+//   evidence        photos staged, waiting on the worker to name the job
+//   report_confirm  a drafted report waiting on the worker to send or reword
+//   text_update     a written update that named more than one possible job
+//
+// text_update has existed since 1 September and this desk had never been
+// told about it, so a worker sitting on that question showed up as "not a
+// lane this desk knows: text_update". The view was honest about not knowing,
+// which is the right behaviour and is why it is being fixed rather than
+// having been silently wrong.
+const WA_LANE_LABEL = {
+  evidence: "worker, naming the job a photo belongs to",
+  report_confirm: "worker, confirming a drafted report before the client sees it",
+  text_update: "worker, naming the job a written update belongs to",
 };
-const WA_WORKER_STEPS = ["name","trade","parishes","years","proof"];
-const WA_WORKER_LABELS = {
-  name:"their name", trade:"their trade", parishes:"which parishes they cover",
-  years:"how long they have done this work", proof:"a photo of finished work",
-};
-const WA_LANE_LABEL = { client:"client, describing a job", worker:"worker, signing up", evidence:"worker, naming the job for a photo", report_confirm:"you, confirming a drafted report" };
 
-// The lane is stored inside the answers jsonb rather than as its own column
-// (see the webhook's laneOf), so a session with no marker at all is read as
-// what it always was before evidence and worker lanes existed: a client.
-// Anything else is returned as-is rather than folded into "client": a lane
-// this view has never been taught is a fact worth seeing, not a guess worth
-// hiding.
-function waLane_(r){
-  const l = String(r?.answers?._lane || "").trim();
-  return l || "client";
+// The lane is stored inside the answers jsonb rather than as its own column,
+// so it is read out of there. A row with no marker at all used to be read as
+// "client", which was right while a client questionnaire existed and is now
+// a guess at a lane nothing writes; it is returned as itself instead, the
+// same way an unrecognised lane always was. A fact worth seeing beats a
+// guess worth hiding.
+// Delivery, coloured by what it means rather than by what Twilio called it.
+// Only failed and undelivered are red: those are the ones where somebody is
+// waiting on a message that is not coming. Accepted and queued are honestly
+// unknown rather than good, so they stay neutral instead of reading as a tick.
+function deliveryTone_(r){
+  const s = String(r.status || "").toLowerCase();
+  const code = r.error_code ? sub_("Twilio " + r.error_code) : "";
+  if (s === "read")                          return chip_("ok", "read") + code;
+  if (s === "delivered")                     return chip_("ok", "delivered") + code;
+  if (s === "failed" || s === "undelivered") return chip_("crit", s) + code;
+  if (s === "sent")                          return chip_("warn", "sent, not confirmed") + code;
+  return chip_("mute", s || "unknown") + code;
 }
-const waKnownLane_ = (lane) => lane === "client" || lane === "worker" || lane === "evidence" || lane === "report_confirm";
+
+// The newest thing on a thread, on its own.
+//
+// Conversations has always shown the transcript, which is the whole back and
+// forth truncated to 110 characters, so the newest message is at the far end
+// of a blob and reliably out of sight. Triage from a phone means seeing what
+// somebody just said without opening a row, so the last turn gets its own
+// column. The transcript column stays: this replaces nothing, it surfaces the
+// one line the other column buries.
+//
+// yaad-inbound joins turns with a blank line, and yaad-desk-reply labels its
+// own with "Monique (from the desk):", so splitting on the blank line and
+// taking the last piece is the whole job.
+function lastSaid_(t){
+  const parts = String(t || "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+  if (!parts.length) return mute_("nothing yet");
+  const last = parts[parts.length - 1].replace(/\s+/g, " ");
+  // Three speakers now, since 4 Sep 2026: the client, you, and the assistant.
+  // Saying which one had the last word is most of the value of this column.
+  const mine = /^Monique \(from the desk\):/.test(last);
+  const bot = /^Yaadly:/.test(last);
+  const body = last.replace(/^(Monique \(from the desk\)|Yaadly):\s*/, "");
+  const cut = body.length > 90 ? body.slice(0, 90) + "\u2026" : body;
+  const who = mine ? sub_("your reply, the last word so far")
+            : bot  ? sub_("the assistant, waiting on them")
+            : "";
+  return `<span title="${esc(body)}">${esc(cut)}</span>` + who;
+}
+
+function waLane_(r){
+  return String(r?.answers?._lane || "").trim() || "none recorded";
+}
+const waKnownLane_ = (lane) => Object.prototype.hasOwnProperty.call(WA_LANE_LABEL, lane);
 
 // The label shown next to the number. An unrecognised lane says so by name,
 // the same way the pricing lookup says "no public price exists" rather than
@@ -1556,11 +1751,11 @@ function waStuck_(r){
   if (lane === "report_confirm") {
     return `confirming the drafted report for ${a.job_id || "a job"} before it reaches the client`;
   }
-  if (waKnownLane_(lane)) {
-    const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
-    const labels = lane === "worker" ? WA_WORKER_LABELS : WA_CLIENT_LABELS;
-    const next = steps.find(k => !String(a[k] ?? "").trim());
-    return next ? labels[next] : "answered everything, about to be filed";
+  if (lane === "text_update") {
+    const choices = a.job_choices || [];
+    return choices.length
+      ? `naming which of ${choices.length} jobs their written update is about`
+      : "naming the job their written update is about";
   }
   return "not a lane this desk recognises yet, open the row to see what is there";
 }
@@ -1592,10 +1787,13 @@ function waFacts_(r){
       ...(a.ai_summary ? [`AI noticed: ${a.ai_summary}`] : []),
     ];
   }
-  if (waKnownLane_(lane)) {
-    const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
-    const lines = steps.filter(k => String(a[k] ?? "").trim()).map(k => `${k}: ${a[k]}`);
-    return lines.length ? lines : ["nothing yet"];
+  if (lane === "text_update") {
+    const choices = (a.job_choices || []).map(c => `${c.id} (${c.title})`).join(", ");
+    return [
+      `worker: ${a.worker_email || "not matched"}`,
+      `what they wrote: ${a.text || "not recorded"}`,
+      `job choices offered: ${choices || "none yet"}`,
+    ];
   }
   const lines = Object.entries(a).filter(([k]) => k !== "_lane")
     .map(([k, v]) => `${k}: ${v && typeof v === "object" ? JSON.stringify(v) : (v === "" ? "(blank)" : v)}`);
@@ -1761,8 +1959,8 @@ function paintKill(){
   b.classList.toggle("off", AGENTS_PAUSED);
   b.textContent = AGENTS_PAUSED ? "Agents: paused" : "Agents: live";
   b.title = AGENTS_PAUSED
-    ? "Paused. Nothing this desk starts will call a model. This is a desk-side control only: yaad-inbound is not covered and still answers incoming messages on its own."
-    : "Live. Drafting an invoice or describing stills calls a model. yaad-inbound never reads this row either way.";
+    ? "Paused. Nothing this desk starts will call a model, and yaad-inbound has answered incoming messages without one since 4 Sep 2026: it keeps the message, tells you, and says a person is picking it up."
+    : "Live. Drafting an invoice or describing stills calls a model, and so does the assistant that answers WhatsApp and the website chat.";
 }
 
 async function setAgentsPaused(next){
@@ -2296,17 +2494,6 @@ const PRICE_BENCHMARKS = {
 /* END GENERATED PRICE BENCHMARKS */
 
 // ---- Kickoff packs: what is actually in the newest draft.
-// Reordered 4 September 2026. "Notes for you" and "Open questions" now come
-// FIRST, and payment stages third.
-//
-// Until today a guardrail-clean pack approved itself and went to a client, so
-// the order these rendered in barely mattered: mostly nobody was reading them.
-// The agent audit removed that auto-issue, which means every pack now waits on
-// a person reading this page and pressing Approve. human_review_notes is the
-// model's own list of "specific things the project manager must personally
-// verify or correct before issuing this to the client", and it was ninth.
-// Payment stages are third because the MODEL picks those percentages, and they
-// are Yaadly's commercial terms on this job.
 const KICK_DOCS = [
   ["human_review_notes","Notes for you"], ["open_questions","Open questions"],
   ["payment_schedule","Payment stages"], ["scope_of_works","Works scope"],
@@ -2416,7 +2603,7 @@ const DOC_RENDERERS = {
     return renderAny(v.note || "")
       + (stages.length ? `<h4>Stages</h4><ul>${stages.map(s =>
           `<li><b>${esc(s.stage || "stage")}</b>${s.proportion_percent != null ? " &middot; " + esc(String(s.proportion_percent)) + "%" : ""}`
-          + (s.release_condition ? `<br><span class="docsub">Signed off on: ${esc(s.release_condition)}</span>` : "")
+          + (s.release_condition ? `<br><span class="docsub">Releases on: ${esc(s.release_condition)}</span>` : "")
           + (Array.isArray(s.evidence_required) && s.evidence_required.length ? `<br><span class="docsub">Evidence: ${esc(s.evidence_required.join(", "))}</span>` : "")
           + `</li>`).join("")}</ul>` : "")
       + (tpl && tpl.instruction ? `<h4>Cost tracking table</h4><p>${esc(tpl.instruction)}${Array.isArray(tpl.columns) && tpl.columns.length ? " Columns: " + esc(tpl.columns.join(", ")) + "." : ""}</p>` : "");
@@ -2574,7 +2761,7 @@ function panelSvc(rows){
 // Every row says what reads it. A row nothing reads is said to be a row
 // nothing reads, because that is the difference between a switch and a label.
 const SETTING_META = {
-  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. <b>It is enforced by this page, not by the functions</b>, and it does not reach everything: yaad-inbound answers people on its own and never reads this row, so an incoming message is still replied to while this is on.", true],
+  agents_paused:        ["Pause every agent", "Stops invoice drafting and sketch description from calling a model, and since 4 Sep 2026 it reaches <b>yaad-inbound</b> too, so the assistant answering WhatsApp and the website chat stops calling a model as well. Nobody is left in silence: their message is still kept, you still get the push, and they are told a person is picking it up.", true],
   worker_guidelines_version: ["Worker Guidelines in force", "current_doc_version() reads this, and the quote policy refuses an insert from anybody signed on an older version. Bumping it stops quoting until they re-sign.", false],
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
@@ -2696,6 +2883,48 @@ function renderTableView(k){
   $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
     : tableCard(v, rows));
+  // A panel is inert markup until something wires it. Only the Reports panel
+  // has a control today, so this is one call and not a framework.
+  if (k === "reports") wireReportDrafter();
+}
+
+// The one panel with a button in it.
+//
+// Kept out of the registry deliberately: an action there operates on a row you
+// have opened, and this creates the row in the first place. Everything it can
+// do is bounded by yaad-report, which has no severity field and no verdict
+// field, so the worst outcome here is a draft nobody wanted, sitting at draft.
+function wireReportDrafter(){
+  const go = $("rptGo"); if (!go) return;
+  go.addEventListener("click", async () => {
+    const notes = ($("rptNotes").value || "").trim();
+    const out = $("rptOut");
+    if (notes.length < 40) {
+      out.innerHTML = '<span style="color:var(--coral)">Write a bit more first. Under forty characters is not a visit, and a thin report is worse than none.</span>';
+      return;
+    }
+    go.disabled = true; out.textContent = "Drafting. This takes a few seconds.";
+    try {
+      const j = await rptFn({
+        kind: $("rptKind").value,
+        client_name: ($("rptClient").value || "").trim() || null,
+        property: ($("rptProperty").value || "").trim() || null,
+        notes,
+      });
+      const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
+      if (j.scrubbed && j.scrubbed.length) {
+        bits.push(`<b>${j.scrubbed.length} measurement${j.scrubbed.length === 1 ? "" : "s"} removed</b> before saving: ${j.scrubbed.map(x => esc(x.text)).join(", ")}. Worth a look: it means the notes carried dimensions Yaadly does not produce.`);
+      }
+      if (j.omitted && j.omitted.length) bits.push(`It could not source: ${j.omitted.map(esc).join("; ")}.`);
+      if (j.questions && j.questions.length) bits.push(`For you to answer: ${j.questions.map(esc).join("; ")}.`);
+      bits.push("Now rate every finding and write the verdict. It will not issue until you have.");
+      out.innerHTML = bits.join("<br><br>");
+      $("rptNotes").value = "";
+      await loadTableView("reports");
+    } catch (e) {
+      out.innerHTML = '<span style="color:var(--coral)">' + esc(String(e.message || e)) + "</span>";
+    } finally { go.disabled = false; }
+  });
 }
 
 function setCount(k, n, hot){
@@ -2884,7 +3113,6 @@ async function writeAction(k, a, row, vals){
 
 async function runAction(k, a, row, btn){
   if (a.ask) return drawAsk(k, a, row, btn);
-
   // A READ action asks a question and shows the answer. It writes nothing, so
   // it skips the confirm (there is nothing to be sure about), leaves the
   // drawer open (the answer is the point) and does not reload the table
@@ -2921,7 +3149,6 @@ async function runAction(k, a, row, btn){
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
 
 // ---------------------------------------------------------------- router
-
 
 // ---- Price check ---------------------------------------------------------
 //
@@ -3117,7 +3344,7 @@ document.addEventListener("click", (e) => {
   if (kill) {
     const next = !AGENTS_PAUSED;
     if (!confirm(next
-      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. yaad-inbound is not covered and keeps replying to incoming messages."
+      ? "Pause every agent?\n\nInvoice drafting and sketch description stop calling a model, and so does the assistant that answers WhatsApp and the website chat. Anybody who writes in is still recorded, still pushed to your phone, and told you are picking it up yourself."
       : "Let this desk call agents again?")) return;
     setAgentsPaused(next);
     return;
@@ -3378,6 +3605,51 @@ async function loadOverview(){
     countOf("questions",   q => q.eq("published", false)),
   ]);
 
+  // ── how the assistant is actually doing ────────────────────────────────
+  //
+  // These columns went live on 4 September 2026 and nothing showed them, which
+  // made them a fact nobody could act on. Together they are the only honest
+  // read on whether the WhatsApp assistant is helping or grinding people down:
+  // how many conversations it has had, how many became a real job, and how
+  // many it had to hand to you.
+  //
+  // Deliberately all-time rather than a rolling window. At this stage the
+  // totals are small enough that a window would mostly measure how quiet last
+  // week was, and a denominator that moves on its own is how a number stops
+  // meaning anything.
+  const [waTotal, waDone, waHanded, waWaiting, waFailed] = await Promise.all([
+    countOf("jobs", q => q.eq("source", "whatsapp")),
+    countOf("jobs", q => q.eq("source", "whatsapp").eq("status", "awaiting_client_setup")),
+    countOf("jobs", q => q.eq("source", "whatsapp").eq("handed_to_human", true)),
+    countOf("pending_desk_replies", q => q.is("sent_at", null)),
+    countOf("message_deliveries", q => q.in("status", ["failed", "undelivered"])),
+  ]);
+  // Median would be better than mean on a long tail, but this reads a column
+  // rather than computing over rows, and at forty jobs the difference is
+  // noise. Revisit when it is not.
+  // ── the promise on the front of the website ────────────────────────────
+  //
+  // "A person replies within one working day" is the most concrete thing
+  // yaadly.co.uk says, and until 4 September 2026 nothing measured it. These
+  // two numbers are the whole of it: did we keep it, and is anybody waiting
+  // right now. The assistant answering does not count towards either, because
+  // the site promises a PERSON.
+  // v_reply_clock is sla_first_reply plus the contact form, sharing one
+  // definition of the promise via within_one_working_day().
+  const clockQ = await sb.from("v_reply_clock").select("kind,ref,channel,hours_waiting,breached").limit(300);
+  const CLOCK = clockQ.data || [];
+  const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
+  const sla = slaRows.data || [];
+  const answered = sla.filter(r => r.met !== null);
+  const slaMet = answered.filter(r => r.met === true).length;
+  const slaPct = answered.length ? Math.round((slaMet / answered.length) * 100) : null;
+  const waitingNow = sla.filter(r => r.awaiting_human_since && r.met === null);
+  const oldestWait = waitingNow.reduce((a, r) => Math.max(a, Number(r.hours) || 0), 0);
+
+  const turnRows = await sb.from("jobs").select("intake_turns").eq("source", "whatsapp").gt("intake_turns", 0);
+  const turns = (turnRows.data || []).map(r => Number(r.intake_turns) || 0);
+  const avgTurns = turns.length ? (turns.reduce((a, b) => a + b, 0) / turns.length).toFixed(1) : "0";
+
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
 
   $("ovTiles").innerHTML = [
@@ -3396,12 +3668,47 @@ async function loadOverview(){
     tile("", "Feedback", String(fbN), "Unprompted, from the site"),
   ].join("");
 
+  // A second row, about the assistant rather than about your queue. Nothing
+  // here is a task: it is the scoreboard for the thing answering people while
+  // you are asleep.
+  $("ovTiles").innerHTML += [
+    tile("", "WhatsApp conversations", String(waTotal), "All time, from the assistant"),
+    tile(waDone ? "ok" : "", "Became a real job", String(waDone), waTotal ? `${Math.round((waDone / waTotal) * 100)}% of them` : "None yet"),
+    tile(waHanded ? "warn" : "", "Handed to you", String(waHanded), waTotal ? `${Math.round((waHanded / waTotal) * 100)}% needed a person` : "None yet"),
+    tile("", "Messages to finish one", avgTurns, "Average, where it got there"),
+    tile(waWaiting ? "warn" : "", "Replies waiting to send", String(waWaiting), waWaiting ? "Outside the 24 hour window" : "Nothing held"),
+    tile(waFailed ? "crit" : "ok", "Messages that failed", String(waFailed), waFailed ? "Somebody is waiting on nothing" : "All delivered"),
+    tile(slaPct === null ? "" : slaPct >= 90 ? "ok" : slaPct >= 70 ? "warn" : "crit",
+      "Replied within a working day", slaPct === null ? "n/a" : slaPct + "%",
+      answered.length ? `${slaMet} of ${answered.length} conversations` : "Nobody has needed a person yet"),
+    tile(oldestWait >= 24 ? "crit" : oldestWait ? "warn" : "ok",
+      "Longest anyone is waiting", oldestWait ? Math.round(oldestWait) + " hr" : "0",
+      waitingNow.length ? `${waitingNow.length} waiting on a person` : "Nobody is waiting"),
+  ].join("");
+
   const needs = [];
+  if (oldestWait >= 24) needs.push(alertRow("crit","!",
+    "Somebody has been waiting " + Math.round(oldestWait) + " hours for a person",
+    "The site promises a person replies within one working day. This one is past that, and it is the most concrete promise Yaadly makes anywhere.", "Open conversations", "threads"));
+  else if (waitingNow.length) needs.push(alertRow("warn","?",
+    waitingNow.length + (waitingNow.length === 1 ? " conversation is waiting on you" : " conversations are waiting on you"),
+    "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Open conversations", "threads"));
+  if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
+    "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
   if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
-  if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
+  // The contact form, aged. sla_first_reply measures conversations and stops
+  // there, and the business page sends companies to this form, so an enquiry
+  // sitting for a week is the most expensive silence on the desk.
+  const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
+  const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
+    .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
+  if (enqBreached) needs.push(alertRow("crit","!",
+    enqBreached + (enqBreached === 1 ? " enquiry is" : " enquiries are") + " past one working day",
+    "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Read them", "enq"));
+  else if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
     "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
   if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),
     "Somebody asked on the public board and nothing publishes on its own. Read it, check it carries no phone number or address, then publish it or leave it.", "Read them", "asks"));
@@ -3445,7 +3752,7 @@ async function loadOverview(){
   setCount("kick", kickDraft, false);
   if (AGENTS_PAUSED) {
     $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
-      "Invoice drafting and sketch description are off. yaad-inbound is not covered by this switch and is still replying to people who write in.",
+      "Invoice drafting and sketch description are off, and so is the assistant that answers WhatsApp and the website chat. People who write in are still recorded and still reach your phone.",
       "Open settings","set"));
   }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
@@ -3548,7 +3855,7 @@ async function loadHealth(){
     "The whole promise of this desk is that an approval binds to the exact files. A row with no sha256 cannot be bound to anything, so signing it off is a signature on air.");
 
   if (AGENTS_PAUSED) add("warn","Agents are paused, and the pause does not reach everything",
-    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. One function is not covered, because nothing here starts it: yaad-inbound is woken by an incoming message and calls a model before this desk knows the message exists. Reading app_settings.agents_paused at the top of it is what would make the switch mean everything it looks like it means. (yaad-whatsapp-webhook was named here too until 4 Sep 2026; it was deleted on 1 Sep.)");
+    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. yaad-inbound is covered too, as of 4 Sep 2026: it is woken by an incoming message rather than by this desk, so it reads app_settings.agents_paused itself before calling a model, which is what makes this switch mean what it looks like it means. It stops the model and nothing else: the message, the photographs and the push to your phone all still happen.");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
     "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view.");
@@ -4279,6 +4586,32 @@ $("policyRaise").addEventListener("click", async () => {
 // The measurement rule is enforced in three places and this is the first one
 // she sees: anything the model says with a number and a unit in it is scrubbed
 // server side and reported back here, in the open, rather than quietly fixed.
+
+const RPT_FN = SUPABASE_URL + "/functions/v1/yaad-report";
+
+// The report drafter's door.
+//
+// Until this existed, yaad-report was deployed, guarded and unreachable: the
+// Reports view could rate a finding and write a verdict, and nothing anywhere
+// could produce a draft to do that to. A guarded function nobody can call is
+// not a safe feature, it is an unfinished one.
+//
+// Same pause rule as fn() and skFn(). Drafting a report is a model call and
+// the switch in the top bar has to stop it, or the switch covers less than it
+// says again.
+async function rptFn(payload){
+  if (AGENTS_PAUSED) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
+  const r = await fetch(RPT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
 
 const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
 let SK_FRAMES = [];     // [{n, t, data, keep}]

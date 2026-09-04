@@ -58,15 +58,16 @@ export function WorkerDirectory({ workers }: { workers: Worker[] }) {
     return (
       <p className="mt-5 rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
         The worker network is being built parish by parish, and nobody is
-        listed before verification is complete: government photo ID on a video
-        call, and references called. Profiles appear here as workers pass.
+        listed before both checks are complete: an identity check run by an
+        independent verification provider, and a Jamaican TRN checked against
+        the name on that ID. Profiles appear here as workers pass.
       </p>
     );
   }
   return (
     <>
       <p className="mt-4 font-mono-app text-[11px] font-medium uppercase tracking-[0.06em] text-dim">
-        Every profile verified: government photo ID on a video call, references called
+        Every profile: identity checked with an independent provider, TRN checked against the ID
       </p>
       <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         {workers.map((w, i) => {
