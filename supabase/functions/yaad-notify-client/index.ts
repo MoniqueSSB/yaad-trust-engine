@@ -672,6 +672,11 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
       admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
         .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+    // The quote pack stands in for the checklist when there is no Kickoff
+    // Pack, which since 4 Sep 2026 is the ordinary case.
+    const { data: qp } = await admin.from("quote_pack_drafts")
+      .select("docs").eq("job_id", jobId).eq("status", "approved")
+      .order("approved_at", { ascending: false }).limit(1).maybeSingle();
     const { data: pins } = await admin.from("work_log_pins")
       .select("shared_at, far_from_site, address")
       .eq("job_id", jobId).eq("stage", stage).order("shared_at", { ascending: false });
@@ -680,6 +685,7 @@ async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) 
       evidence: ev ?? [],
       arrivals: arr ?? [],
       checklist: pack?.docs?.evidence_checklist ?? null,
+      quoteStages: qp?.docs?.payment_stages ?? null,
       pins: pins ?? [],
       parish: job?.parish ?? null,
     });

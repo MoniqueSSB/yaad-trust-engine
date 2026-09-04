@@ -83,6 +83,9 @@ export type ChecksInput = {
   arrivals: ArrivalRow[];
   /** docs.evidence_checklist from the job's approved Kickoff Pack, if it has one. */
   checklist: ChecklistGroup[] | null;
+  /** docs.payment_stages from the job's approved Quote Pack. Used only when
+   *  there is no Kickoff Pack, which since 4 Sep 2026 is the ordinary case. */
+  quoteStages?: { stage?: string; evidence_note?: string }[] | null;
   pins?: PinRow[];
   parish?: string | null;
 };
@@ -111,8 +114,22 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
   // line means guessing from a free-text label, which is the same unreliable
   // move the dropped before-and-after check was. Showing the list and the
   // count lets the worker do the matching, which he can do and this cannot.
+  // Falls back to the QUOTE pack's own stage evidence note when there is no
+  // Kickoff Pack. Added 4 September 2026, the same day the Kickoff Pack came
+  // out of the default booking flow on the founder's instruction: most jobs
+  // will not have one from now on, and without this fallback the spine of
+  // these checks would have gone quiet on almost every job the day after it
+  // was built. The quote pack carries one evidence_note per payment stage
+  // rather than a list of items, so it is a thinner source, and a thinner
+  // source is worth far more here than none.
   const group = Array.isArray(checklist) ? checklist[stage - 1] : null;
-  const wanted = (group?.items ?? []).map((i) => String(i?.item ?? "").trim()).filter(Boolean);
+  let wanted = (group?.items ?? []).map((i) => String(i?.item ?? "").trim()).filter(Boolean);
+  let wantedFrom = "the Kickoff Pack";
+  if (!wanted.length && Array.isArray(input.quoteStages)) {
+    const qs = input.quoteStages[stage - 1];
+    const note = String(qs?.evidence_note ?? "").trim();
+    if (note) { wanted = [note]; wantedFrom = "the quote"; }
+  }
   if (wanted.length) {
     const filed = evidence.length;
     out.push({
@@ -121,7 +138,7 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
       detail: filed >= wanted.length
         ? `Stage ${stage} asks for ${wanted.length} thing${wanted.length === 1 ? "" : "s"} and ${filed} ${filed === 1 ? "is" : "are"} filed.`
         : `Stage ${stage} asks for ${wanted.length} thing${wanted.length === 1 ? "" : "s"} and ${filed} ${filed === 1 ? "is" : "are"} filed. `
-          + `The pack asks for: ${wanted.join("; ")}.`,
+          + `What ${wantedFrom} asks for: ${wanted.join("; ")}.`,
       severity: "gap",
       audience: "worker",
     });
@@ -129,7 +146,7 @@ export function runEvidenceChecks(input: ChecksInput): Check[] {
     out.push({
       name: "Checklist",
       passed: true,
-      detail: "No approved Kickoff Pack checklist for this stage, so there is nothing to check the filing against.",
+      detail: "No Kickoff Pack checklist and no quote stage note for this stage, so there is nothing to check the filing against.",
       severity: "note",
       audience: "desk",
     });

@@ -239,3 +239,36 @@ Deno.test("pins are optional input: omitting them entirely still runs", () => {
   assertEquals(byName(checks, "Location pin").passed, false);
   assertEquals(workerGaps(checks).length > 0, true, "the other checks still work");
 });
+
+// ── the quote pack stands in when there is no Kickoff Pack ───────────────
+//
+// Since 4 Sep 2026 the Kickoff Pack is an addition rather than the route, so
+// most jobs will not have one. Without this fallback the spine of these
+// checks would go quiet on almost every job.
+
+Deno.test("with no Kickoff Pack, the quote's own stage evidence note is used", () => {
+  const c = byName(runEvidenceChecks({
+    stage: 1, evidence: [], arrivals: [arrival()], checklist: null,
+    quoteStages: [{ stage: "First fix", evidence_note: "Pressure test photo and the receipt" }],
+  }), "Checklist");
+  assertEquals(c.passed, false);
+  assert(c.detail.includes("Pressure test photo"), c.detail);
+  assert(c.detail.includes("the quote"), "it says where the requirement came from: " + c.detail);
+});
+
+Deno.test("a Kickoff Pack still wins when there is one", () => {
+  const c = byName(runEvidenceChecks({
+    stage: 2, evidence: [], arrivals: [arrival()], checklist: CHECKLIST,
+    quoteStages: [{ evidence_note: "ignore me" }, { evidence_note: "and me" }],
+  }), "Checklist");
+  assert(c.detail.includes("Receipt for the cement"), "the richer source is preferred");
+  assert(c.detail.includes("the Kickoff Pack"), c.detail);
+});
+
+Deno.test("neither source means no claim, said to the desk", () => {
+  const c = byName(runEvidenceChecks({
+    stage: 1, evidence: [photo()], arrivals: [arrival()], checklist: null, quoteStages: null,
+  }), "Checklist");
+  assertEquals(c.passed, true);
+  assertEquals(c.audience, "desk");
+});

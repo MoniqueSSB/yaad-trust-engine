@@ -1878,7 +1878,9 @@ Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean dr
 
 **Kickoff Pack.** Built and linked automatically, then waits at `draft`. Approve it in the desk under **Kickoff packs**. Read **Notes for you** first: it is the model's own list of what a project manager must personally verify, and it now renders at the top of the pack for that reason. Payment stages render third because the model picks those percentages and they are Yaadly's commercial terms on the job.
 
-**This one blocks a booking.** `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides, and neither side can confirm a pack nobody has approved. If a client is stuck at "waiting to be booked", check here first. `yaad-kickoff-check` pushes to your phone on every poll where any pack is waiting, saying exactly this.
+**This one blocks a booking, on the jobs that use it.** `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides, and neither side can confirm a pack nobody has approved. If a client is stuck at "waiting to be booked", check here first. `yaad-kickoff-check` pushes to your phone on every poll where any pack is waiting.
+
+**Since 4 September 2026 most jobs will not have a Kickoff Pack at all.** Accepting a price in the portal calls `agree_quote_as_me` and books on `quote_confirmed`, with no pack anywhere. A pack is ordered only when a client presses "Ask for full project documentation first". So if a job is stuck waiting on a pack, check the client actually asked for one: on the ordinary route the pack queue is irrelevant.
 
 **Quote Pack.** Waits at `ready` in **Quote Pack Drafts**. RLS keeps an unapproved draft off a worker's screen (20260901r), so until you approve it a worker sees no scoping document. He can still quote without one, so this delays a courtesy rather than stalling the board.
 

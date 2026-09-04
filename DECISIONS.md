@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · The Kickoff Pack becomes an addition, and it turns out it was only ever mandatory by accident
+
+**Founder's instruction:** take the Kickoff Pack out of the flow, offer it where a client wants project documentation, leave the Quote Pack as it now is.
+
+**The first finding was that the database already agreed with her.** `_do_choose_worker` books a job on either of two conditions: the quote is `quote_confirmed`, meaning both sides agreed the PRICE and there is no pack anywhere, or it is `kickoff_requested` and the pack is confirmed by both sides. A no-pack route has existed the whole time. Nothing about the booking gate needed changing, and ripping one out would have broken the path a client who genuinely wants documentation takes.
+
+**It was mandatory in practice because of one missing function.** The only thing that produces `quote_confirmed` is `agree_quote_via_whatsapp`, which identifies people by the last nine digits of a phone number. A client in the portal has a session and an email and no phone match, so the Accept button had exactly one RPC it could call, `request_kickoff_as_me`. Accepting a price therefore always ordered a ten section project pack with a risk register and a document schedule, on a £300 leaking pipe as readily as on a renovation. The pack was optional in Postgres and compulsory in the product, and nobody had noticed because the two facts lived in different files.
+
+**So the fix is a door, not a demolition.** `agree_quote_as_me` is the portal twin of the WhatsApp function: same table, same dual agreement rows, same resulting status, identified by the session's own email. The Accept button now confirms the price, and a second, quieter control underneath asks for full project documentation. An old link arriving at `/portal/join` with no `want` parameter takes the price route, deliberately: the safe fallback is the smaller thing, never silently ordering a project pack nobody asked for.
+
+**A consequence in the other direction, fixed in the same commit.** The evidence completeness checks built hours earlier use the Kickoff Pack's `evidence_checklist` as their spine. If most jobs stop having a pack, that check goes quiet on most jobs, and the biggest gap the audit closed would have half reopened the same day. The Quote Pack carries one `evidence_note` per payment stage, so it now stands in when there is no Kickoff Pack. It is a thinner source than a per-item checklist, and a thinner source is worth much more here than none. The check says which document it read the requirement from, so nobody is left guessing why a stage asks for one thing rather than five.
+
+**Open, and it is a solicitor question rather than a code one.** On the pack route the dual confirmed artefact is the Kickoff Pack. On the price route it is the accepted quote and its Quote Pack: scope, inclusions, exclusions, rough timeline and payment stages. That is a narrower document, it is very probably the right one for a small repair, and it is a real change in what a client has signed up to. It belongs in the solicitor brief. Flagged here, not decided here.
+
+---
+
 ## 2026-09-04 · Neither pack issues itself any more, and the string that gave it away was six words long
 
 **What was happening.** A cron approved any Kickoff Pack or Quote Pack whose guardrail came back clean and sent it to a client or a worker. The row it wrote said `approved_by: "system: auto-issued, guardrail-clean"`, which states the whole defect in six words. The guardrail is a banned-word scan, a currency regex and a CJK check. It knows whether the draft said "escrow" or wrote a price. It cannot know whether the scope is right, whether the exclusions protect the trade, whether the risk register is honest, or whether the payment stages run in the order the building actually demands. A clean scan was standing in for a judgement it had never made.
