@@ -20,46 +20,91 @@
 # be waiting deliberately, and deleting a deployed function is not reversible.
 #
 # Run:  scripts/check-deploy-drift.sh
-# Needs: the Supabase CLI, logged in. Same auth `supabase functions list` uses.
+# Needs: the Supabase CLI, authenticated. Run `npx supabase login` once, or
+#        export SUPABASE_ACCESS_TOKEN.
+#
+# ON ERRORS. The first version of this script hid the CLI's stderr and then
+# guessed at the cause, so an unauthenticated run produced a Python traceback
+# about empty JSON, and a malformed project ref produced the confident and
+# wrong sentence "most likely you are not logged in". It now prints what the
+# CLI actually said and offers login as a possibility, not a diagnosis.
+# Guessing at somebody else's error is worse than showing it to them.
 
 set -euo pipefail
 
 PROJECT_REF="${YAAD_PROJECT_REF:-leffyisvfvjwzilydlwf}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
 command -v npx >/dev/null 2>&1 || { echo "npx not found. Install Node, then retry." >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 not found." >&2; exit 1; }
 
 echo "Project: $PROJECT_REF"
 echo "Branch:  $(git -C "$here" branch --show-current 2>/dev/null || echo 'not a git checkout')"
 echo
 
-live_json="$(npx --yes supabase functions list --project-ref "$PROJECT_REF" 2>/dev/null)" || {
-  echo "Could not reach Supabase. Are you logged in? Try: npx supabase login" >&2
-  exit 1
+# stdout and stderr kept apart, and both kept. `|| rc=$?` rather than a bare
+# call so `set -e` does not kill us before the diagnosis can run.
+rc=0
+npx --yes supabase functions list --project-ref "$PROJECT_REF" \
+  >"$tmp/out" 2>"$tmp/err" || rc=$?
+
+read_list() {
+  python3 - "$1" "$tmp/out" "$tmp/err" "$rc" <<'PYEOF'
+import json, sys
+
+mode, out_path, err_path, rc = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+out = open(out_path).read().strip()
+err = open(err_path).read().strip()
+
+def die(*lines):
+    for line in lines:
+        print(line, file=sys.stderr)
+    print("", file=sys.stderr)
+    print("If that reads like an authorisation problem, the fix is one of:", file=sys.stderr)
+    print("  npx supabase login", file=sys.stderr)
+    print("  export SUPABASE_ACCESS_TOKEN=sbp_...   (Supabase, Account, Access Tokens)", file=sys.stderr)
+    sys.exit(1)
+
+doc = None
+if out:
+    try:
+        doc = json.loads(out[out.find("{"):out.rfind("}") + 1])
+    except Exception:
+        doc = None
+
+if isinstance(doc, dict) and "functions" in doc:
+    for f in sorted(doc["functions"], key=lambda x: x["slug"]):
+        if mode == "slugs":
+            print(f["slug"])
+        elif mode == "open" and not f.get("verify_jwt", True):
+            print(f["slug"])
+    sys.exit(0)
+
+print("Could not read the deployed function list.", file=sys.stderr)
+print("", file=sys.stderr)
+if isinstance(doc, dict) and isinstance(doc.get("error"), dict):
+    e = doc["error"]
+    die("The Supabase CLI returned an error:",
+        "  %s" % e.get("message", "(no message)"),
+        "  code: %s" % e.get("code", "(none)"))
+if err:
+    die("The Supabase CLI said:", *["  " + l for l in err.splitlines()[:20]])
+if out:
+    die("It returned this, which is not a function list:", *["  " + l for l in out.splitlines()[:10]])
+die("  It returned nothing at all (exit %s)." % rc)
+PYEOF
 }
 
-# The CLI prints an upgrade notice after the JSON, so take the object only.
-parse() {
-  python3 -c '
-import sys, json
-raw = sys.stdin.read()
-d = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
-mode = sys.argv[1]
-for f in sorted(d["functions"], key=lambda x: x["slug"]):
-    if mode == "slugs":
-        print(f["slug"])
-    elif mode == "open" and not f["verify_jwt"]:
-        print(f["slug"])
-' "$1"
-}
-
-printf '%s\n' "$live_json" | parse slugs > /tmp/yaad_live_fns.$$
-ls -d "$here"/supabase/functions/yaad-* 2>/dev/null | sed 's|.*/||' | sort > /tmp/yaad_repo_fns.$$
+read_list slugs >"$tmp/live"
+ls -d "$here"/supabase/functions/yaad-* 2>/dev/null | sed 's|.*/||' | sort >"$tmp/repo"
 
 drift=0
 
 echo "== Deployed, but no source on this branch =="
-if out=$(comm -13 /tmp/yaad_repo_fns.$$ /tmp/yaad_live_fns.$$) && [ -n "$out" ]; then
+if out="$(comm -13 "$tmp/repo" "$tmp/live")" && [ -n "$out" ]; then
   echo "$out" | sed 's/^/  /'
   echo "  (check other branches before assuming it is orphaned: git log --all -- supabase/functions/<name>)"
   drift=1
@@ -69,7 +114,7 @@ fi
 echo
 
 echo "== On this branch, but not deployed =="
-if out=$(comm -23 /tmp/yaad_repo_fns.$$ /tmp/yaad_live_fns.$$) && [ -n "$out" ]; then
+if out="$(comm -23 "$tmp/repo" "$tmp/live")" && [ -n "$out" ]; then
   echo "$out" | sed 's/^/  /'
   drift=1
 else
@@ -80,10 +125,8 @@ echo
 echo "== Running WITHOUT platform auth (verify_jwt false) =="
 echo "   Compare against the list in CLAUDE.md 12. Each one needs --no-verify-jwt"
 echo "   preserved on every redeploy, or it silently gains a token check."
-printf '%s\n' "$live_json" | parse open | sed 's/^/  /'
+read_list open | sed 's/^/  /'
 echo
-
-rm -f /tmp/yaad_live_fns.$$ /tmp/yaad_repo_fns.$$
 
 if [ "$drift" -eq 1 ]; then
   echo "Drift found. Nothing has been changed: read the notes above and decide."
