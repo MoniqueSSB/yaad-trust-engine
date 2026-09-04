@@ -50,6 +50,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { checkAttrs, deskPack, runEvidenceChecks, workerGaps } from "./evidence-checks.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -635,22 +636,55 @@ async function pingDeskOnEscalation(
   admin: any, jobId: string, jobTitle: string, summary: FindingSummary,
 ): Promise<void> {
   if (!summary.escalate && summary.worst !== "high") return;
+  await ntfyPush(admin, `Photo review flagged: ${jobTitle}`,
+    `${jobId}: the photo review flagged something (severity ${summary.worst}`
+      + `${summary.escalate ? ", professional look suggested" : ""}). The client has NOT been told this. `
+      + `Your call whether to say anything. What it saw: ${summary.desk.slice(0, 400)}`,
+    "warning");
+}
+
+/** One push to Monique's phone. Extracted 4 Sep 2026 when the evidence checks
+ *  needed the same thing; it never throws, because a notification must never
+ *  break the report it rides on. */
+async function ntfyPush(admin: any, title: string, body: string, tags: string): Promise<void> {
   try {
     const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
     if (!st?.value) return;
     await fetch(`https://ntfy.sh/${st.value}`, {
       method: "POST",
-      headers: {
-        Title: `Photo review flagged: ${jobTitle}`.slice(0, 120),
-        Priority: "high",
-        Tags: "warning",
-      },
-      body: `${jobId}: the photo review flagged something (severity ${summary.worst}`
-        + `${summary.escalate ? ", professional look suggested" : ""}). The client has NOT been told this. `
-        + `Your call whether to say anything. What it saw: ${summary.desk.slice(0, 400)}`,
+      headers: { Title: title.slice(0, 120), Priority: "high", Tags: tags },
+      body,
       signal: AbortSignal.timeout(4000),
     });
-  } catch (_) { /* a notification must never break the report going out */ }
+  } catch (_) { /* never let a notification break a report */ }
+}
+
+/** Fetch what the checks need and run them. Everything it reads is a hard
+ *  column; nothing here calls a model, and nothing it returns can act. */
+async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) {
+  try {
+    const [{ data: ev }, { data: arr }, { data: job }, { data: pack }] = await Promise.all([
+      admin.from("evidence").select("label, mime, captured_at, created_at, kind, item_code")
+        .eq("job_id", jobId).eq("stage", stage).order("created_at", { ascending: true }),
+      admin.from("arrival_log").select("arrived_at, arrived_on, lat, far_from_site")
+        .eq("job_id", jobId).eq("stage", stage).order("arrived_at", { ascending: true }),
+      admin.from("jobs").select("parish").eq("id", jobId).maybeSingle(),
+      admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    return runEvidenceChecks({
+      stage,
+      evidence: ev ?? [],
+      arrivals: arr ?? [],
+      checklist: pack?.docs?.evidence_checklist ?? null,
+      parish: job?.parish ?? null,
+    });
+  } catch (e) {
+    // A failed check must never stop the report. Say so in the logs, which as
+    // of 4 Sep 2026 is where a failure in this function is actually readable.
+    console.error("assembleEvidenceChecks failed:", String(e).slice(0, 300));
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -948,6 +982,23 @@ Deno.serve(async (req: Request) => {
       const aiSummaries = findings ? summariseFindings(findings, photoUrls) : null;
       const aiSummary = aiSummaries?.client ?? "";
       if (aiSummaries) await pingDeskOnEscalation(admin, jobId, job.title, aiSummaries);
+
+      // The evidence completeness checks, live at last (roadmap item 6). They
+      // are deterministic, they read only hard columns, and they decide
+      // nothing: the worker sees the short list of what is missing while he is
+      // still on site and can fix it, and the desk is told only when something
+      // actually is. Founder's own call, 4 Sep 2026: worker first, desk on
+      // gaps. That is the Mirror Rule, because the same check that gives the
+      // client a complete pack keeps the worker off the hook for one he could
+      // have finished in two minutes.
+      const evChecks = await assembleEvidenceChecks(admin, jobId, job.stage ?? 1);
+      const gaps = workerGaps(evChecks);
+      if (gaps.length) {
+        await ntfyPush(admin, `Evidence gaps: ${job.title}`,
+          `${jobId} stage ${job.stage ?? 1}: ${gaps.length} thing${gaps.length === 1 ? "" : "s"} missing. `
+            + `The worker has been told and can still fix it.\n\n${deskPack(evChecks)}`.slice(0, 900),
+          "clipboard");
+      }
       // Named once here, on more than one photo, so a reply naming a code
       // means something without repeating "Items: ..." on every line below.
       const itemsLine = photoUrls.length > 1
@@ -981,6 +1032,11 @@ Deno.serve(async (req: Request) => {
         `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
         `"${draftText}"`,
         aiSummaries?.desk ? `AI noticed: ${aiSummaries.desk}` : null,
+        // The gaps sit BELOW the draft and ABOVE the reply instruction, so a
+        // worker reads what the client would be told, then what is missing,
+        // then what to do. Nothing here stops him replying 1: the choice is
+        // still his, and a stage is never blocked by this.
+        gaps.length ? `Still missing on this stage:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
         itemsLine,
         `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
       ].filter(Boolean).join("\n\n");
@@ -989,6 +1045,7 @@ Deno.serve(async (req: Request) => {
         "yaadly.notify.ai_review_ran": findings !== null,
         "yaadly.notify.ai_finding_count": findings?.length ?? 0,
         "yaadly.notify.draft_sent_to_worker": !!workerPhone,
+        ...checkAttrs(evChecks),
       });
     } else if (kind === "evidence_report_confirmed") {
       // The other half of evidence_landed's new shape: fired only once the

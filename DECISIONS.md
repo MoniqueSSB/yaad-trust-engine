@@ -6,6 +6,28 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · The evidence checks are live, and three of the audit's own seven were wrong
+
+**The gap this closes.** `yaad/agents/verification.py` has checked an evidence chain since the engine was written, and CLAUDE.md §10 calls those gates the moat: they come out of seven years of construction project management and they are the one part an agent cannot supply. The agent audit found they were imported by exactly two files, `run_demo.py` and `tests/`, and ran on no live job at all. What ran instead was a vision model describing photographs, which by construction cannot notice what is ABSENT. That is the whole point of a completeness check and it was the thing not running.
+
+**The hard rule, and it shaped every decision below.** The checks assemble a pack and decide nothing. Nothing blocks a stage, writes `evidence.ok` or touches `stage_approvals`; `approve_stage()` still requires a named human and is still the only door. A completeness check that could block is a machine standing between a worker and getting paid, which is exactly the shape §3 exists to refuse. A test asserts the shape of a `Check` object so no field carrying an instruction to act can be added quietly.
+
+**Worker first, desk on gaps.** Founder's decision when it was put to her. A worker still on site can fix a missing clip in two minutes and the desk cannot, so the gap list rides in the draft he already gets before the client is told anything, and Monique is pushed only when something actually is missing. It is the Mirror Rule read properly: the same check that gives the client a complete pack keeps the worker off the hook for one he could have finished before leaving.
+
+**Three of the seven checks proposed did not survive her reading, and she was right on all three.**
+
+*Before and after was dropped outright.* It read `evidence.label`, which is text the worker types, and the word "after" in a caption is not proof of an after shot. It misfires in both directions. Where a job genuinely needs a before and an after, the approved Kickoff Pack says so and the checklist check covers it. Her point, and it is the general one: a check nobody can trust is worse than no check, because it spends the attention the real findings need.
+
+*The site check became desk-only and reports a distance rather than a verdict.* `far_from_site` means 30km from a parish centroid, and the migration that added it says in as many words that a materials run, a parish border and a bad GPS fix all raise it exactly as loudly as a wrong site would. Putting that in front of a tradesperson reads as an accusation the data cannot support. It now goes to the desk alone, saying what else produces the same flag, and a test asserts it can never appear in a worker's list.
+
+*The checklist check became the spine*, because it is the only one that knows what THIS job actually agreed: it reads the `evidence_checklist` out of the Kickoff Pack both sides confirmed. It counts and lists what the pack asks for, and deliberately does NOT claim to know which item is missing, because matching a filed photograph to a checklist line means guessing from a free-text label, which is the same unreliable move as the dropped check. A test enforces that it never names a specific missing item.
+
+**One of the three objections was mine and was wrong.** I told her the clip check also read label text. It reads `evidence.mime`, which comes off the uploaded file rather than off anything typed, so it is one of the reliable ones. Corrected before building rather than after.
+
+**What could not be ported, and is not faked.** Two Python checks have no live data behind them: evidence rows carry no lat/lon, only the arrival tap does, so "is this photograph geotagged" is unanswerable; and there is no duration column, so "is this clip long enough to be usable" is unanswerable. Both need a schema change and both are decisions, not details to smuggle into a port. They are named in RUNBOOK §20 so the next person does not add them by guessing.
+
+---
+
 ## 2026-09-04 · The principal-contractor sweep finally reached the agent prompts, which the 3 September pass had missed
 
 **On 3 September eleven public places stopped saying "nobody is paid until you approve". The prompts were not in that pass, and prompts are where copy comes from.** So the two documents a client and a tradesperson actually sign, the Kickoff Pack and the Quote Kickoff Pack, were still being generated from instructions describing money held and released against evidence. That is the escrow shape the principal structure exists to avoid, being manufactured fresh on every draft, a day after the marketing pages stopped saying it. Fixing pages and leaving the generator is the shape of defect worth naming: the page is the output, the prompt is the press.

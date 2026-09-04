@@ -1842,3 +1842,24 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **Take it down** removes it from the public page again, along with any answers under it, because an answer is only public while its question is. The row stays for you.
 
 **To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
+
+---
+
+## 20. The evidence gap list is wrong, or nobody is getting it
+
+The completeness checks run in `yaad-notify-client` when evidence lands on a stage, debounced 90 seconds so a burst of photographs makes one check. They are deterministic, in `supabase/functions/_shared/evidence-checks.ts`, and they read only hard columns. No model is involved.
+
+**They never block anything.** They assemble a list. `approve_stage()` still requires a named human and is still the only door. If a change ever proposes letting these gate a stage or a payment, that is the request CLAUDE.md §3 exists to refuse.
+
+**The worker gets the gaps, the desk gets a push only when there are gaps.** Founder decision, 4 September 2026. A worker still on site can fix a gap in two minutes; the desk cannot.
+
+**If the gap list looks wrong, check in this order:**
+
+1. **Does the job have an approved Kickoff Pack?** The checklist check reads `kickoff_packs.docs.evidence_checklist` where `status = 'approved'`. No pack means no checklist claim, and the check says so to the desk rather than inventing a count.
+2. **Is the stage number right?** The checklist is a list and stage N reads entry N-1, the same convention `stageLabel()` uses. A pack with fewer entries than the job has stages returns nothing for the later ones.
+3. **Is it the clip check?** It reads `evidence.mime`, not the label. A video uploaded with a wrong mime reads as a photograph. That is deliberate: reading the label instead would mean trusting text the worker typed.
+4. **Is it the site note?** That one is desk-only and never reaches a worker. It fires on `arrival_log.far_from_site`, which is 30km from a parish centroid, and a materials run or a bad GPS fix raises it exactly as loudly as a wrong site. It is a glance, not a finding.
+
+**Nobody getting the push at all:** `app_settings.ntfy_topic` is where it goes. Unset, and `ntfyPush()` returns silently by design, because a missing notification must never break the report it rides on.
+
+**Two checks are deliberately absent** and should not be added by guessing. "Is this photograph geotagged" needs lat/lon on `evidence`, which only `arrival_log` has. "Is this clip long enough" needs a duration column, which does not exist. Both are schema changes and both are decisions.
