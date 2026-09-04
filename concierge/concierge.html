@@ -2063,12 +2063,23 @@ function reviewCounterpart(r, all){
 }
 
 // ---- Kickoff packs: what is actually in the newest draft.
+// Reordered 4 September 2026. "Notes for you" and "Open questions" now come
+// FIRST, and payment stages third.
+//
+// Until today a guardrail-clean pack approved itself and went to a client, so
+// the order these rendered in barely mattered: mostly nobody was reading them.
+// The agent audit removed that auto-issue, which means every pack now waits on
+// a person reading this page and pressing Approve. human_review_notes is the
+// model's own list of "specific things the project manager must personally
+// verify or correct before issuing this to the client", and it was ninth.
+// Payment stages are third because the MODEL picks those percentages, and they
+// are Yaadly's commercial terms on this job.
 const KICK_DOCS = [
-  ["scope_of_works","Works scope"], ["payment_schedule","Payment stages"],
+  ["human_review_notes","Notes for you"], ["open_questions","Open questions"],
+  ["payment_schedule","Payment stages"], ["scope_of_works","Works scope"],
   ["evidence_checklist","Evidence checklist"], ["risk_register","Risk register"],
   ["timeline","Timeline"], ["document_pack","Document pack"],
-  ["communications_list","Who to call"], ["open_questions","Open questions"],
-  ["human_review_notes","Notes for you"], ["cover_note","Cover note"],
+  ["communications_list","Who to call"], ["cover_note","Cover note"],
   ["cost_breakdown","Cost breakdown"], ["terms_placeholders","Terms to confirm"],
 ];
 

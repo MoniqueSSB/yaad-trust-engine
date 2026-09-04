@@ -1869,3 +1869,20 @@ The completeness checks run in `yaad-notify-client` when evidence lands on a sta
 **A pin is not a photo geotag and never can be.** WhatsApp re-encodes images on send and discards EXIF, GPS included, and this project's own portal upload path strips location deliberately. There was never a photo geotag to read. Anyone proposing to recover one is proposing something that does not work.
 
 **Two checks remain absent** and should not be added by guessing. "Is this clip long enough" needs a duration column, which does not exist. "Receipts geolocated" needs lat/lon on `evidence` rows, which only `arrival_log` and `work_log_pins` have. Both are schema changes and both are decisions.
+
+---
+
+## 21. A pack is not reaching a client or a worker
+
+Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean draft was approved by a cron and went straight out. Roadmap item 7 of the agent audit removed that, because the guardrail is a banned-word scan and a currency regex, and a clean scan was standing in for a judgement it never made.
+
+**Kickoff Pack.** Built and linked automatically, then waits at `draft`. Approve it in the desk under **Kickoff packs**. Read **Notes for you** first: it is the model's own list of what a project manager must personally verify, and it now renders at the top of the pack for that reason. Payment stages render third because the model picks those percentages and they are Yaadly's commercial terms on the job.
+
+**This one blocks a booking.** `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides, and neither side can confirm a pack nobody has approved. If a client is stuck at "waiting to be booked", check here first. `yaad-kickoff-check` pushes to your phone on every poll where any pack is waiting, saying exactly this.
+
+**Quote Pack.** Waits at `ready` in **Quote Pack Drafts**. RLS keeps an unapproved draft off a worker's screen (20260901r), so until you approve it a worker sees no scoping document. He can still quote without one, so this delays a courtesy rather than stalling the board.
+
+**No push arriving?** Both use `app_settings.ntfy_topic`. Unset, and the helper returns silently by design, because a notification must never break a scheduled run.
+
+**Do not restore auto-issue.** If a change proposes it, or proposes approving on a guardrail pass, that is roadmap item 7 being undone. The guardrail cannot read whether a scope is right or a risk register is honest, and the model chooses the payment staging.
+

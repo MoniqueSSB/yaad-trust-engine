@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · Neither pack issues itself any more, and the string that gave it away was six words long
+
+**What was happening.** A cron approved any Kickoff Pack or Quote Pack whose guardrail came back clean and sent it to a client or a worker. The row it wrote said `approved_by: "system: auto-issued, guardrail-clean"`, which states the whole defect in six words. The guardrail is a banned-word scan, a currency regex and a CJK check. It knows whether the draft said "escrow" or wrote a price. It cannot know whether the scope is right, whether the exclusions protect the trade, whether the risk register is honest, or whether the payment stages run in the order the building actually demands. A clean scan was standing in for a judgement it had never made.
+
+**The sharpest part is the payment staging.** The Kickoff prompt asks the model for five to seven stages with whole-number percentages summing to 100, and the model picks them, then explains its own weighting to the client in a covering note. Those are Yaadly's commercial terms on a specific job, drafted by a model and issued by a cron. The pack also asks the model to write `human_review_notes`, "specific things the project manager must personally verify or correct before issuing this to the client", and nothing in the pipeline required anybody to read them. The instruction to a human existed and the door past it was open.
+
+**The founder's own correction of 1 September was already pointing here**, live: "I never saw when the small pack was issued for review." A review step was added in response, and then phase 2 approved anything clean, so a clean pack still went out unread. The review step existed and the auto-issue reached past it.
+
+**What changed, and what deliberately did not.** The drafting is untouched: both packs are still written by the model within a poll, which is the part that saves the time. The Kickoff Pack is still built and still linked to its quote, because that is plumbing. Only the approval moved to a person. `trg_notify_kickoff_pack_ready` fires on the transition into `approved`, so a worker now hears about a pack when a human approves it and not before, which is the right order and was previously the wrong one by accident.
+
+**The bottleneck this creates is real and is handled rather than denied.** The audit flagged it when the item was written: a queue can become the new problem. An unapproved Kickoff Pack BLOCKS A BOOKING, because `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides and neither side can confirm what nobody has approved. So `yaad-kickoff-check` now pushes to the founder's phone on any poll where a pack is waiting, and says in the message that a booking is stuck behind it. The Quote Pack is gentler: RLS hides an unapproved draft from workers, but a worker can still quote without one, so that delays a courtesy rather than stalling the board.
+
+**One desk change came with it.** `human_review_notes` and `open_questions` now render FIRST in a pack, and payment stages third. They were ninth and eighth. While packs approved themselves the order barely mattered because mostly nobody was reading them; now every pack waits on somebody reading that page, so the model's own list of what a human must verify is the first thing on it.
+
+---
+
 ## 2026-09-04 · The geotag check comes back as a WhatsApp location share, which is a better thing than the one it replaces
 
 **Founder's instruction, on being told the check could not be ported: do it through Twilio, "as this might be better".** It is better, and the reasoning is worth keeping because the obvious alternative is a dead end that looks alive.
