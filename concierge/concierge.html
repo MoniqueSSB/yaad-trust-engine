@@ -726,6 +726,9 @@ const TONE = {
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
   // calls / waitlist
+  // reports. reviewed is amber, not grey: it has been read and still is not
+  // with the client, so it is outstanding rather than finished.
+  reviewed:"warn",
   requested:"warn", booked:"ok", held:"warn",
   // enquiries. "replied" and not "answered": disputes already own answered,
   // where it means the worker has responded and you still have to decide. A
@@ -824,6 +827,72 @@ const VIEWS = [
       { label:"Bin it", cls:"d", when:r => r.status !== "binned",
         set:{ status:"binned" },
         says:() => "Marks it as not real work. The row stays on the record, it just stops appearing as something waiting." },
+    ]},
+
+  { k:"reports", g:"Documents & money", label:"Reports", icon:"case",
+    title:"Reports", table:"v_reports_open",
+    sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
+    select:"*",
+    order:"drafted_at",
+    search:["number","client_name","property","kind"],
+    empty:["No reports yet","Write up what you saw on the visit below and the agent will draft the findings."],
+    panel: () => `
+      <div class="card">
+        <b>Draft a report from your notes</b>
+        <p class="mute" style="margin:6px 0 12px">Write what you saw, roughly is fine. The agent turns it into findings in the house structure. <b>It cannot rate them and it cannot write the verdict</b>, so what lands below is deliberately unfinished: that judgment is what the client is paying you for.</p>
+        <div class="fgroup" style="max-width:560px">
+          <label class="fl">Which service</label>
+          <select id="rptKind" class="inp">
+            <option value="deposit_check">Deposit Protection Check</option>
+            <option value="condition">Condition Report</option>
+            <option value="technical_signoff">Technical Sign-off</option>
+            <option value="visual_check">Visual Check</option>
+          </select>
+          <label class="fl" style="margin-top:10px">Client name</label>
+          <input id="rptClient" class="inp" placeholder="As it should read on the report">
+          <label class="fl" style="margin-top:10px">Property</label>
+          <input id="rptProperty" class="inp" placeholder="Town or parish, and the kind of building">
+          <label class="fl" style="margin-top:10px">Your notes from the visit</label>
+          <textarea id="rptNotes" class="inp" rows="8" placeholder="Everything you saw, in any order. The agent adds nothing you did not write down, and tells you what it could not source."></textarea>
+          <button class="btn g" id="rptGo" style="margin-top:12px">Draft the findings</button>
+          <p class="mute" id="rptOut" style="margin-top:10px"></p>
+        </div>
+      </div>`,
+    cols:[
+      {h:"Report", f:r => id_(r.number || "draft") + sub_((r.kind || "").replace(/_/g," "))},
+      {h:"Client & property", f:r => esc(r.client_name || "Not named") + sub_(r.property || "No property given")},
+      {h:"Findings", f:r => esc(String(r.findings ?? 0)) + sub_(r.unrated ? r.unrated + " still unrated" : "all rated")},
+      {h:"Verdict", f:r => r.needs_verdict ? chip_("crit","not written") : chip_("ok","written")},
+      {h:"Measurements pulled", f:r => r.scrubbed ? chip_("warn", r.scrubbed + " scrubbed") : mute_("none")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Visited", f:r => mute_(r.visited_on ? ago_(r.visited_on) : "not given")},
+    ],
+    actions:[
+      { label:"Rate a finding", cls:"",
+        when:r => r.status !== "issued" && r.unrated > 0,
+        rpc:"rate_finding",
+        ask:[
+          { k:"ord", label:"Which finding, by its number", placeholder:"1" },
+          { k:"severity", label:"How serious is it",
+            options:[["severe","Severe"],["moderate","Moderate"],["low","Low"]] },
+        ],
+        args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
+        says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
+      { label:"Write the verdict", cls:"",
+        when:r => r.status !== "issued",
+        rpc:"write_report_verdict",
+        ask:[
+          { k:"line", label:"The one line for page one", placeholder:"Hold. Do not pay this deposit as it stands." },
+          { k:"verdict", label:"The paragraph under it", type:"long",
+            placeholder:"What you would do and why, in your own words. No model has seen this field." },
+        ],
+        args:(r, v) => ({ p_report:r.id, p_line:v.line, p_verdict:v.verdict }),
+        says:() => "Writes the verdict on page one. services.html promises the client this within 72 hours of the visit, and it is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
+      { label:"Issue it", cls:"",
+        when:r => r.status !== "issued" && r.unrated === 0 && !r.needs_verdict,
+        rpc:"issue_report",
+        args:(r) => ({ p_report:r.id }),
+        says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
     ]},
 
   { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",
@@ -2570,6 +2639,48 @@ function renderTableView(k){
   $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
     : tableCard(v, rows));
+  // A panel is inert markup until something wires it. Only the Reports panel
+  // has a control today, so this is one call and not a framework.
+  if (k === "reports") wireReportDrafter();
+}
+
+// The one panel with a button in it.
+//
+// Kept out of the registry deliberately: an action there operates on a row you
+// have opened, and this creates the row in the first place. Everything it can
+// do is bounded by yaad-report, which has no severity field and no verdict
+// field, so the worst outcome here is a draft nobody wanted, sitting at draft.
+function wireReportDrafter(){
+  const go = $("rptGo"); if (!go) return;
+  go.addEventListener("click", async () => {
+    const notes = ($("rptNotes").value || "").trim();
+    const out = $("rptOut");
+    if (notes.length < 40) {
+      out.innerHTML = '<span style="color:var(--coral)">Write a bit more first. Under forty characters is not a visit, and a thin report is worse than none.</span>';
+      return;
+    }
+    go.disabled = true; out.textContent = "Drafting. This takes a few seconds.";
+    try {
+      const j = await rptFn({
+        kind: $("rptKind").value,
+        client_name: ($("rptClient").value || "").trim() || null,
+        property: ($("rptProperty").value || "").trim() || null,
+        notes,
+      });
+      const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
+      if (j.scrubbed && j.scrubbed.length) {
+        bits.push(`<b>${j.scrubbed.length} measurement${j.scrubbed.length === 1 ? "" : "s"} removed</b> before saving: ${j.scrubbed.map(x => esc(x.text)).join(", ")}. Worth a look: it means the notes carried dimensions Yaadly does not produce.`);
+      }
+      if (j.omitted && j.omitted.length) bits.push(`It could not source: ${j.omitted.map(esc).join("; ")}.`);
+      if (j.questions && j.questions.length) bits.push(`For you to answer: ${j.questions.map(esc).join("; ")}.`);
+      bits.push("Now rate every finding and write the verdict. It will not issue until you have.");
+      out.innerHTML = bits.join("<br><br>");
+      $("rptNotes").value = "";
+      await loadTableView("reports");
+    } catch (e) {
+      out.innerHTML = '<span style="color:var(--coral)">' + esc(String(e.message || e)) + "</span>";
+    } finally { go.disabled = false; }
+  });
 }
 
 function setCount(k, n, hot){
@@ -3037,6 +3148,10 @@ async function loadOverview(){
   // two numbers are the whole of it: did we keep it, and is anybody waiting
   // right now. The assistant answering does not count towards either, because
   // the site promises a PERSON.
+  // v_reply_clock is sla_first_reply plus the contact form, sharing one
+  // definition of the promise via within_one_working_day().
+  const clockQ = await sb.from("v_reply_clock").select("kind,ref,channel,hours_waiting,breached").limit(300);
+  const CLOCK = clockQ.data || [];
   const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
   const sla = slaRows.data || [];
   const answered = sla.filter(r => r.met !== null);
@@ -3098,7 +3213,16 @@ async function loadOverview(){
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
-  if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
+  // The contact form, aged. sla_first_reply measures conversations and stops
+  // there, and the business page sends companies to this form, so an enquiry
+  // sitting for a week is the most expensive silence on the desk.
+  const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
+  const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
+    .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
+  if (enqBreached) needs.push(alertRow("crit","!",
+    enqBreached + (enqBreached === 1 ? " enquiry is" : " enquiries are") + " past one working day",
+    "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Read them", "enq"));
+  else if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
     "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
   if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),
     "Somebody asked on the public board and nothing publishes on its own. Read it, check it carries no phone number or address, then publish it or leave it.", "Read them", "asks"));
@@ -3976,6 +4100,32 @@ $("policyRaise").addEventListener("click", async () => {
 // The measurement rule is enforced in three places and this is the first one
 // she sees: anything the model says with a number and a unit in it is scrubbed
 // server side and reported back here, in the open, rather than quietly fixed.
+
+const RPT_FN = SUPABASE_URL + "/functions/v1/yaad-report";
+
+// The report drafter's door.
+//
+// Until this existed, yaad-report was deployed, guarded and unreachable: the
+// Reports view could rate a finding and write a verdict, and nothing anywhere
+// could produce a draft to do that to. A guarded function nobody can call is
+// not a safe feature, it is an unfinished one.
+//
+// Same pause rule as fn() and skFn(). Drafting a report is a model call and
+// the switch in the top bar has to stop it, or the switch covers less than it
+// says again.
+async function rptFn(payload){
+  if (AGENTS_PAUSED) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
+  const r = await fetch(RPT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
 
 const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
 let SK_FRAMES = [];     // [{n, t, data, keep}]

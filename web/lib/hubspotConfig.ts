@@ -78,6 +78,7 @@ export function stageKeyById(stageId: string): DealStageKey | null {
 }
 
 /**
+/**
  * Stages where the client has paid Yaadly and Yaadly has not yet paid the
  * tradesperson. Anything about paying a worker or refunding a client should
  * ask this rather than compare stage IDs by hand, so the rule lives in one
@@ -87,6 +88,20 @@ export function stageKeyById(stageId: string): DealStageKey | null {
  * membership is identical; the old names described Yaadly as holding somebody
  * else's money, which under the principal structure is both wrong and the
  * specific reading CLAUDE.md section 8 exists to prevent.
+ *
+ * TWO SESSIONS MADE THIS FIX INDEPENDENTLY on the same day, one naming it
+ * CLIENT_PAID_STAGES and one OWED_TO_WORKER_STAGES. This name won because it
+ * landed on main first, not because it was better, and the duplication is
+ * worth a line here: the same finding surfacing twice in one day means it was
+ * findable, and this file's own comment had predicted it.
+ *
+ * ONE THING NEITHER SESSION HAD AT FIRST. The live portal ALREADY said
+ * "Client Paid" before either of us touched it. Five of the seven labels
+ * matched this map and this one did not, so the stale half was the repository
+ * and no client was ever shown the old word. If they disagree again, the
+ * portal is the truth and this file is the bug. Read the live labels rather
+ * than assuming: ask HubSpot for the `dealstage` property on the deals object,
+ * which returns every stage's internal value and its current label.
  */
 export const OWED_TO_WORKER_STAGES: readonly DealStageId[] = [
   DEAL_STAGES.CLIENT_PAID,
