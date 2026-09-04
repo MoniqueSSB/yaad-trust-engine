@@ -194,7 +194,7 @@ export type StageMove = {
  *
  * Webhooks get redelivered. Without the read before the write, a duplicate
  * "payment confirmed" arriving after the client had already approved the
- * evidence would haul the deal back to Funds Held, and the board would then be
+ * evidence would haul the deal back to Client Paid, and the board would then be
  * lying about where somebody's money is.
  *
  * `changed: false` is a success, not an error. A redelivered webhook should

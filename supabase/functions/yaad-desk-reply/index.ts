@@ -290,6 +290,17 @@ Deno.serve(async (req: Request) => {
       `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}`,
       {
         method: "PATCH",
+        // THE REPLY CLOCK. This is the only place a real person answering is
+        // recorded, which is what makes the "a person replies within one
+        // working day" promise on every public page checkable at all.
+        //
+        //   first_human_reply_at  set ONCE and never overwritten (see
+        //                         firstReply above), because the promise is
+        //                         about the first answer, not the most recent.
+        //   awaiting_human_since  cleared here, so a thread that has been
+        //                         answered stops counting against the desk.
+        //
+        // first_client_at is set on the way in, by yaad-inbound, not here.
         body: JSON.stringify({
           transcript, human_handling: true, last_at: new Date().toISOString(),
           awaiting_human_since: null, ...firstReply,

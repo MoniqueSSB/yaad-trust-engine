@@ -324,7 +324,44 @@ The body ended with the link variable. It now ends with a sentence after it. Kee
 
 **The four variables, in order:** job title, worker name, price, link.
 
-**Sign in codes deliberately do NOT use a template.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules, and Twilio Verify is the supported product for one. Pushing an OTP through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Over WhatsApp a sign in code stays free text: it works inside the 24 hour window and fails honestly outside it, and email remains the reliable path for it.
+**Sign in codes deliberately do NOT use one of our templates.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules. Pushing one through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Since 4 September 2026 they go through **Twilio Verify** instead, which uses Meta's own pre-defined authentication templates, so there is no template here for anybody to write or submit. See the Verify section below.
+
+---
+
+## The WhatsApp template for stage approvals
+
+**Two sessions built this on 4 September 2026, separately, on the same day.** The one that survives is the one on `main`, written up under "Tap to approve, instead of typing a job code" further down this file. Build that template, not any other. Its secret is **`TWILIO_CONTENT_SID_APPROVE`** and its button payload is **`{{2}}`, the bare job code**.
+
+The version that lost, recorded so nobody rebuilds it: a fixed button payload (`yaadly_approve_stage`) resolved by a new `matchApprovingButton()` that approved only when exactly one job was waiting on the client. It was safe, but it was a second door onto the approval path with its own matching rule, and the surviving design needs no new door at all: the payload IS the job code, so a tap arrives as the same string a typed code does and goes through the same `matchApprovingJob()`, the same phone check and the same RPC. One door beats two safe ones. See DECISIONS.md.
+
+**If a template was already approved carrying the button id `yaadly_approve_stage`, it is the wrong one** and will match no job. Build the `{{2}}` one and leave the other unused; a rejected or unused template costs nothing, and `TWILIO_CONTENT_SID_APPROVE` unset means nothing changes meanwhile.
+
+---
+
+## Twilio Verify, for sign in codes only
+
+**What it is for, and what it is deliberately not.** A sign in code cannot go through one of our own UTILITY templates without risking the WhatsApp sender, and as free text it only reaches somebody who has messaged us in the last 24 hours. Verify solves exactly that and nothing else. It uses Meta's pre-defined authentication templates, so **there is no template to write, submit or get approved for this one.**
+
+**Supabase still owns the code and the session.** `yaad-portal-code` takes the six digit `email_otp` out of `generateLink`, exactly as before, and hands it to Verify as `CustomCode`. Verify is a delivery rail, not a second source of truth. The browser still verifies against Supabase and this function still never sees the code come back. **`VerificationCheck` is deliberately never called.** If a future change routes the check through Twilio, that moves session minting out of the browser and into an Edge Function, which is a different and much larger decision; say so rather than doing it.
+
+**With `TWILIO_VERIFY_SERVICE_SID` unset, nothing changes.** The free text path behaves exactly as it did before Verify was added. Order of attempts when it IS set: Verify WhatsApp, Verify SMS, free text WhatsApp, free text SMS, with email running independently through Resend either way. Free text stays underneath because inside the 24 hour window it is legitimate and costs less than a verification.
+
+**Console setup, and it is longer than the template ones because Meta is involved:**
+
+1. **Messaging Service.** Twilio Console, Messaging, Services. Create one (or reuse one) and add the existing WhatsApp sender to it. Verify will not accept a bare number: it needs the `MG...` SID of a Messaging Service that contains the sender. This is the step people miss.
+2. **Verify Service.** Console, Verify, Services, **Create new**. The friendly name is what appears in the message, so make it `Yaadly`.
+3. **WhatsApp tab** on that Verify Service. Paste the `MG...` Messaging Service SID from step 1.
+4. Copy the Verify Service SID, which starts `VA`, and set it:
+
+```bash
+npx supabase secrets set TWILIO_VERIFY_SERVICE_SID=VApasteTheRealSidHere --project-ref leffyisvfvjwzilydlwf
+```
+
+Read fresh on every call, so no redeploy of the secret itself. `yaad-portal-code` does need deploying once for the code change, `verify_jwt` read live first as always.
+
+**Two things that can stop this before it starts.** Since March 2024 Twilio has no generic WhatsApp sender for Verify: you must bring your own, which we have. And `CustomCode` is documented as an ordinary optional parameter, but if a verification comes back rejecting it, that is an account level feature and Twilio support enables it. If they will not, the fallback is to stop passing `CustomCode` and let Verify mint its own code, which then means calling `VerificationCheck` and the much larger change above. **Do not make that change without asking.**
+
+**If a code does not arrive**, the trace names the leg: `twilio.verify.start` with `yaadly.verify.channel`, then the free text `twilio.send.*` spans underneath. The response body carries `phone.reason` verbatim, including Verify's own error text, which is what the desk needs to answer somebody locked out of their own job.
 
 ---
 
@@ -1844,9 +1881,19 @@ Signed links here last 3600 seconds, not the 300 used for a one-shot WhatsApp or
 
 **That is the honest, expected answer until a WhatsApp Content Template is approved and its ContentSid is set.** This ping is business-initiated on a fixed schedule, every day, on every live job, so it can never rely on the free 24 hour customer-service window `yaad-notify-client` and `yaad-job-health` sometimes get to use: it always sends through a Meta-approved template, no exceptions, or it sends nothing at all rather than gambling on Twilio error 63016 mid-run. To bring it live:
 
-1. Twilio console → Messaging → Content Template Builder → new WhatsApp template, category **Utility** (this is an operational check-in on an existing job, not marketing, category matters for approval speed).
-2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title.
-3. Submit for WhatsApp approval. Usually resolves within a day; Twilio's console shows the status.
+1. Twilio console, Messaging, then Content Template Builder (Products and Services, then Templates, on the newer console). **Create new template**, filled in as:
+
+   | Field | What to put in it |
+   |---|---|
+   | Template name | `yaadly_daily_checkin_v1`. Lower case, letters, numbers and underscores only. |
+   | Template language | English |
+   | Select content type | **Text** (`twilio/text`). No buttons on this one. |
+   | Body | the sentence below |
+   | Variable 1 sample | `Kitchen sink pipe leak` |
+   | Category, at submit | **Utility**. An operational check-in on an existing job, not marketing, and the category decides both approval speed and whether it is approved at all. |
+
+2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title, and the sentence deliberately neither opens nor closes with it.
+3. **Save and submit for WhatsApp approval.** Usually resolves within a day; Twilio's console shows the status.
 4. Once approved, copy its ContentSid (`HX...`) and set it as the `TWILIO_CONTENT_SID_DAILY_CHECKIN` function secret on the `leffyisvfvjwzilydlwf` project. No redeploy needed, it is read fresh from the environment on every run.
 
 **Runs once a day, 21:00 UTC (16:00 Jamaica), via pg_cron.** Same shape as `yaad-job-health`: a shared secret, generated once and kept only as a SHA-256 hash in `app_settings.daily_checkin_cron_secret_sha256`, plaintext living solely in the cron job's own stored command (`select command from cron.job where jobname = 'yaad-daily-checkin'` if it ever needs re-deriving). A manual run is available to a signed-in admin the same way `yaad-job-health` is, no secret needed, `is_admin()` is enough.
@@ -2636,3 +2683,154 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **One reply promise, site wide:** a person replies within one working day. Not "same day", not "any time", not "day or night", not "24 hours".
 
 **After changing copy on the app side**, run `npm --prefix web run typecheck`, `npm --prefix web test` and `npm --prefix web run lint`. Several tests assert on visible strings.
+
+---
+
+## The reply clock, and what to do when the Overview goes coral
+
+The Overview's first tile is **Oldest thing waiting**. It reads `v_reply_clock`, which lists everything nobody has answered yet, oldest first, across `intake_threads` (WhatsApp, SMS, email, website chat) and `enquiries` (the contact form).
+
+- **Amber** means somebody is waiting and is still inside one working day.
+- **Coral, with an alert row above the tiles**, means the published promise has been missed. Every public page says a person replies within one working day. Clear these first, before evidence and before drafts, because it is the one promise a client can check without your help.
+
+**A thread leaves the clock when you reply from the desk**, not when you read it. `yaad-desk-reply` stamps `first_human_reply_at` once and never clears it, so the number is about the first answer rather than the most recent. An enquiry leaves the clock when its status becomes `replied` or `converted`, stamped by `trg_enquiry_reply_clock`.
+
+**If the tile says "nothing" and you know somebody is waiting**, the row has been answered in a way that did not go through the desk (a reply sent from your own phone, for instance). That is not a bug in the clock, it is the clock telling the truth about what it can see. Reply from the desk, or mark the enquiry, and it will correct itself.
+
+**One working day is 24 hours here**, not a business-hours calculation, because clients are in the UK, the United States and Canada and workers are in Jamaica. The interval lives in `v_reply_clock` and nowhere else.
+
+---
+
+## Pausing the agents, including the one that answers WhatsApp at 2am
+
+The switch is in the top bar of the desk and writes `app_settings.agents_paused`.
+
+**Since 4 September 2026 it reaches `yaad-inbound`**, which is the function that answers WhatsApp, SMS, email and the website chat. Before that it did not, and the desk said so in three places.
+
+What paused actually does:
+
+- No model call happens anywhere, on any path through `yaad-inbound`.
+- The message is still recorded. Photographs and voice notes are still kept and still transcribed, because those build the record you then read.
+- The client is told a person is reading it and given their reference. Nobody is left in silence.
+- The thread is handed to you on their **first** message, not after three turns.
+
+**If you pause and somebody still gets an assistant reply**, check in this order:
+
+1. `select value from app_settings where key = 'agents_paused'` actually says `true`.
+2. The deployed `yaad-inbound` is the current one. `agentsPaused()` should be in it. Redeploy from disk if not.
+3. Whether the reply was really from the assistant, or from the desk, or a Twilio template such as the daily check-in, which this switch does not touch.
+
+**The read fails closed.** If `app_settings` cannot be read at all, inbound treats itself as paused and hands every conversation to you. So a flood of handoffs with no obvious cause is a symptom of the settings read failing, not of the switch being stuck on.
+
+**Do not widen the Settings or Health copy without widening the code.** A switch that claims more than it does is worse than no switch, and that now cuts in both directions.
+
+---
+
+## Renaming a HubSpot deal stage
+
+Stage labels reach clients through deal notifications, workflow emails, exports and any screenshot. **`guardrails.scan` never sees them**, so the banned-language rules are yours to enforce here by hand. A stage called "Funds Held" was live until 4 September 2026 while every page on the site said Yaadly does not hold money on a client's behalf.
+
+To rename one:
+
+1. **Relabel in the HubSpot UI. Never delete and recreate.** Settings, Data Management, Objects, Deals, Pipelines. Relabelling keeps the internal stage ID; recreating mints a new one and every ID in `web/lib/hubspotConfig.ts` goes stale at once.
+2. Update `STAGE_LABELS` in `hubspotConfig.ts` so the file and the portal agree.
+3. If the meaning changed rather than only the wording, rename the key in `DEAL_STAGES` and every use of it, and say why in `DECISIONS.md`.
+4. `npm --prefix web run typecheck && npm --prefix web test`.
+
+**Read the portal before you believe this repository.** On 4 September 2026 `hubspotConfig.ts` said `Funds Held` and the live pipeline already said `Client Paid`, so the stale half was the code. Ask HubSpot for the `dealstage` property on the deals object, or open Settings, Data Management, Objects, Deals, Pipelines. It returns every stage's internal value and its current label.
+
+`presentationscheduled` is the one that matters: it must never carry a label suggesting Yaadly holds anybody's money. It reads `Client Paid`, and `STAGE_LABELS` has been corrected to match.
+
+---
+
+## Drafting a report
+
+`yaad-report` turns the notes you wrote on site into the findings of a draft report. It does not finish it, and it cannot.
+
+1. Write your notes however you like, roughly is fine, and gather the photograph captions. Fewer than 40 characters of notes is refused rather than drafted thinly.
+2. Call the function with `kind` (`deposit_check`, `condition`, `technical_signoff` or `visual_check`), your `notes`, and any `captions`. It writes a `reports` row at `draft` and its `report_findings`.
+3. **Rate every finding** Severe, Moderate or Low. Nothing drafts this and nothing ever will. Your rating is stamped with your email and the time.
+4. **Write the verdict and the page one line.** Same rule.
+5. Move the report to `issued`. That mints its number and records who issued it.
+
+**If it refuses to issue**, the message says which of the three it is: an unrated finding, a missing verdict, or a measurement that survived the scrubber. All three are the gate working. The third one names the offending sentence: reword it in words rather than numbers, or refer it to a surveyor.
+
+**Check the `scrubbed` array on the report.** It lists every measurement the model produced and had removed. A long list means the notes themselves were full of dimensions, which is worth knowing before you sign something that says Yaadly does not measure.
+
+**If the draft comes back thin or wrong**, it is almost always the notes rather than the model. It is forbidden from adding anything you did not record, which is the correct behaviour and will look like laziness the first time. Read the `omitted` list it returns: that is the agent telling you what it could not source.
+
+---
+
+## Reading a job's whole history
+
+`agent_actions` is the append-only record of what the agents drafted and what a named person then decided. `v_job_history` reads one job as a single list, oldest first.
+
+Use it when a client disputes something, when you want to know why a job took nine days, or before any conversation where somebody is going to ask who decided what.
+
+**It refuses to record a consequential action against a machine.** Releasing or withholding funds, refunding, ruling on a dispute, changing a reputation, suspending a worker, approving a job or a stage: all of these require `actor_kind = 'human'` and a real name. "system", "auto", "agent" and an empty actor are refused by the check constraint. If a write fails with `agent_actions_human_only`, the code doing the writing is wrong, not the constraint.
+
+**Nothing can edit it through the API.** Insert, update and delete are revoked from `anon` and `authenticated`. Writes come from the Edge Functions on the service role. That is what makes it worth putting in front of somebody.
+
+---
+
+## Publishing a change to the How We Use AI page
+
+`docs/how-we-use-ai.html` is linked from the footer of all twelve public pages and from the business page. It makes three specific, checkable claims:
+
+1. The invoicing model has no field for an amount.
+2. The sketch packs cannot state a measurement, stopped in three places.
+3. Identity documents are held back before the file is fetched, with no setting to override.
+
+**If any of those three stops being true, that page becomes a false claim to clients**, which is worse than never having made it. Before changing anything in `yaad-invoice`, `yaad-sketch` or `yaad-vetting-review`'s `IDENTITY_DOCS`, read that page and decide which sentence has to change with it.
+
+The provider list is deliberately not repeated there. It lives on `privacy.html`, and that is the one to update when a provider changes.
+
+---
+
+## What is applied and deployed, as at 4 September 2026
+
+Applied to the database: `agent_actions` and `v_job_history`; `reports`, `report_findings` and their guards; `rate_finding`, `write_report_verdict`, `issue_report` and `v_reports_open`; `enquiries.first_replied_at` with its trigger, and `v_reply_clock`.
+
+Deployed: `yaad-report`, version 1, `verify_jwt` true.
+
+`yaad-inbound` v121 and `yaad-desk-reply` v17 are also deployed, by three way merge rather than by overwriting. Read the next section before you deploy either again.
+
+---
+
+## Deploying a function a parallel session is also working on
+
+This happened on 4 September 2026 and will happen again, because `CLAUDE.md` section 12 says parallel sessions share this tree.
+
+**Never deploy from the repository on the assumption it matches production.** Production had a whole file, `yaad-inbound/trades.ts`, that existed in no branch, and 86 changed lines in `index.ts` adding WhatsApp location pin evidence. Deploying this branch over it would have silently deleted both.
+
+The safe sequence, all of it. Download into a scratch directory, never over your working copy:
+
+```bash
+supabase functions download yaad-inbound --project-ref leffyisvfvjwzilydlwf --use-api
+```
+
+Then three way merge, where the base is the commit your branch started from:
+
+```bash
+git merge-file -L mine -L base -L live <your-copy> <base-copy> <downloaded-copy>
+```
+
+Exit code 0 means it merged cleanly. Anything above 0 is the number of conflicts, and you read every one. Then confirm BOTH sides survived by grepping for something only yours has and something only theirs has, typecheck, run the tests, and only then deploy.
+
+**Preserve the live verify_jwt per function. Read it, do not remember it:**
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+`yaad-inbound` is false and keeps `--no-verify-jwt`, because it carries its own Twilio signature check and origin throttle. `yaad-desk-reply` and `yaad-report` are true and must NOT get that flag.
+
+**A version number moving is not proof the code changed.** Between two checks that day `yaad-inbound` went v114 to v120 and `yaad-desk-reply` v11 to v16, and both sources were byte identical: somebody had redeployed everything unchanged. Diff the downloads before you panic, and before you re-merge.
+
+**The standing risk this leaves.** A bulk deploy with no function named deploys every function from whichever checkout it is run in. Run from a tree without this branch, it discards this work exactly as silently. If two people are working, name the function you mean.
+
+**Prove it after deploying.** Post an empty JSON body to the function and read the code:
+
+- `yaad-inbound` answers 403 with a signature error. Correct: the request reached the code and its own check refused it.
+- `yaad-desk-reply` and `yaad-report` answer 401, missing authorization header. Correct: platform auth stopped it before the code ran.
+- A 503 or a timeout means the bundle did not boot.
