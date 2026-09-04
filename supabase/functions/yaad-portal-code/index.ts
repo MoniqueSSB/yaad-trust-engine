@@ -16,7 +16,16 @@
  *     opened in a different browser than the one they started in is the
  *     classic way magic links strand somebody
  *   - it can go over WhatsApp or SMS as easily as email, through Twilio,
- *     which matters when half this audience gave a phone number and no email
+ *     for the client who has an email on file but does not read it
+ *
+ * That second line used to say this "matters when half this audience gave a
+ * phone number and no email." It was wrong, and wrong in the direction that
+ * made the phone channel look load bearing. This function REQUIRES a valid
+ * email address and returns 400 without one (see the check below), because
+ * the code comes from generateLink and generateLink is keyed on an email.
+ * There is no such thing as a portal user without one. Email is the rail;
+ * WhatsApp is a second copy of the same code for somebody who will see it
+ * sooner. Corrected 4 Sep 2026.
  *   - GoTrue's own email templates are left alone
  *
  * Verifying happens in the browser against Supabase, not here. This function
