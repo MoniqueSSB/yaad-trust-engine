@@ -21,9 +21,18 @@ export const PUBLISHED_POUNDS = new Set([45, 70, 95, 125, 149, 245, 249, 349, 39
 export const PUBLISHED_JMD = new Set([3500, 4500]);
 export const PUBLISHED_PERCENTS = new Set([2, 5, 12, 15]);
 
+// Rewritten 4 September 2026. It used to say "Yaadly does not price the work
+// itself; a vetted worker quotes against the written scope", which was the
+// position before the principal structure was settled on 3 September, and is
+// the exact sentence docs/marketplace.html retired that day: a client
+// receiving a quote from a worker is a client contracting with that worker.
+// This string fires precisely when the guard has stripped a reply bare, which
+// is to say when a client has just asked about money, so it is the worst place
+// in the system for a retired claim to be sitting.
 export const NO_PRICE_SENTENCE =
-  "Yaadly does not price the work itself; a vetted worker quotes against the written scope. "
-  + "Yaadly's own services and their published prices are at yaadly.co.uk/prices.";
+  "I cannot give you a figure myself. A person at Yaadly prices the job against real "
+  + "material costs and real day rates, and you get that price in writing before anything "
+  + "starts. Yaadly's own services and their published prices are at yaadly.co.uk/prices.";
 
 const POUNDS = /£\s?(\d[\d,]*)(?:\.\d+)?/g;
 const JMD = /J\$\s?(\d[\d,]*)(?:\.\d+)?/g;
