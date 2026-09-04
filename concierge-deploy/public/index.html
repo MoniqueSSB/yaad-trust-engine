@@ -7,20 +7,27 @@
 <title>Yaadly Concierge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,200;1,9..144,300;1,9..144,400;1,9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
-  --bg:#08110F; --panel:#0F1B17; --panel2:#14231E; --rail:#0B1613;
-  --line:#1F332C; --line2:#284439;
-  --ink:#F2FAF7; --mute:#9DB8AE; --dim:#67807A;
-  --teal:#14B8A6; --tealb:#2DD4BF; --mango:#FFB020; --coral:#FF6B4A; --sand:#FDE68A;
-  --soft:#0F2B26; --softline:#1E4A42;
+  /* Realigned onto the shared Yaadly brand tokens, 3 Sep 2026 (see
+     DECISIONS.md). Values only, not names: tone_()/chip_() and every
+     .chip.ok/.warn/.crit rule reference --teal/--mango/--coral by name,
+     so nothing downstream needed to change. "Proven" is now purple,
+     "held" gold, "blocked" coral, same as docs/yaadly.css and
+     web/app/globals.css. Hardcoded hex outside this block (the brand
+     mark, the avatar gradient, the calendar legend) is a separate pass. */
+  --bg:#07071A; --panel:rgba(255,255,255,0.028); --panel2:rgba(255,255,255,0.05); --rail:#050512;
+  --line:rgba(155,115,245,0.11); --line2:rgba(155,115,245,0.22);
+  --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
+  --teal:#9B73F5; --tealb:#C4AAFF; --mango:#F59E0B; --coral:#F87171; --sand:#FBBF24;
+  --soft:rgba(155,115,245,0.07); --softline:rgba(155,115,245,0.2);
   --r:14px;
-  --grad:linear-gradient(90deg,#14B8A6,#FFB020);
-  --disp:'Anton',Impact,Haettenschweiler,sans-serif;
-  --body:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --grad:linear-gradient(90deg,#9B73F5,#F59E0B);
+  --disp:'Fraunces',Georgia,serif;
+  --body:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.55 var(--body);-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
@@ -35,7 +42,7 @@ a{color:var(--tealb);text-decoration:none}
 .shell{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
 .rail{background:var(--rail);border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;min-width:0}
 .brand{display:flex;align-items:center;gap:9px;padding:4px 8px 16px}
-.mark{width:30px;height:30px;border-radius:8px;background:var(--teal);display:grid;place-items:center;color:#04211D;font-family:var(--disp);font-size:16px}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--teal);display:grid;place-items:center;color:#160B2E;font-family:var(--disp);font-size:16px}
 .brand b{font-size:15px;letter-spacing:-.01em;line-height:1.1;display:block}
 .brand span{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);display:block}
 .rgrp{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);padding:14px 10px 6px}
@@ -48,16 +55,16 @@ a{color:var(--tealb);text-decoration:none}
 
 /* ---------- topbar ---------- */
 .main{min-width:0;display:flex;flex-direction:column}
-.top{display:flex;align-items:center;gap:12px;padding:12px 22px;border-bottom:1px solid var(--line);background:rgba(8,17,15,.94);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.top{display:flex;align-items:center;gap:12px;padding:12px 22px;border-bottom:1px solid var(--line);background:rgba(7,7,26,.94);backdrop-filter:blur(10px);position:sticky;top:0;z-index:20;flex-wrap:wrap}
 .srch{flex:1;min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--ink);font:inherit;font-size:13px}
 .srch::placeholder{color:var(--dim)}
 .srch:focus{border-color:var(--teal);outline:none}
 .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mute)}
-.who .av{width:27px;height:27px;border-radius:8px;background:linear-gradient(135deg,#FFB020,#FF6B4A);display:grid;place-items:center;color:#04211D;font-weight:700;font-size:11px}
-.kill{font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:100px;border:1px solid rgba(45,212,191,.4);color:var(--tealb);transition:.14s;white-space:nowrap}
-.kill:hover{background:rgba(45,212,191,.1)}
-.kill.off{border-color:rgba(255,107,74,.42);color:var(--coral)}
-.kill.off:hover{background:rgba(255,107,74,.1)}
+.who .av{width:27px;height:27px;border-radius:8px;background:linear-gradient(135deg,#F59E0B,#F87171);display:grid;place-items:center;color:#160B2E;font-weight:700;font-size:11px}
+.kill{font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:100px;border:1px solid rgba(196,170,255,.4);color:var(--tealb);transition:.14s;white-space:nowrap}
+.kill:hover{background:rgba(196,170,255,.1)}
+.kill.off{border-color:rgba(248,113,113,.42);color:var(--coral)}
+.kill.off:hover{background:rgba(248,113,113,.1)}
 .kill:disabled{opacity:.5;cursor:progress}
 
 .body{padding:22px;flex:1;max-width:1180px;width:100%}
@@ -101,24 +108,24 @@ tbody tr:last-child td{border-bottom:0}
 td.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
 td .id{font-family:var(--mono);font-size:11.5px;color:var(--tealb)}
 td .sub{display:block;font-size:11px;color:var(--dim);margin-top:2px}
-tr.unpriced td{background:rgba(255,176,32,.07)}
+tr.unpriced td{background:rgba(245,158,11,.07)}
 
 /* ---------- chips ---------- */
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:100px;white-space:nowrap}
-.chip.ok{background:rgba(45,212,191,.13);color:var(--tealb)}
-.chip.warn{background:rgba(255,176,32,.13);color:var(--mango)}
-.chip.crit{background:rgba(255,107,74,.13);color:var(--coral)}
+.chip.ok{background:rgba(196,170,255,.13);color:var(--tealb)}
+.chip.warn{background:rgba(245,158,11,.13);color:var(--mango)}
+.chip.crit{background:rgba(248,113,113,.13);color:var(--coral)}
 .chip.mute{background:var(--panel2);color:var(--dim)}
 .chip.ai{background:rgba(179,157,255,.14);color:#B39DFF}
 .chip.dot::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
 
 /* ---------- buttons ---------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:12.5px;padding:8px 15px;border-radius:100px;background:var(--grad);color:#04211D;transition:.14s}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:12.5px;padding:8px 15px;border-radius:100px;background:var(--grad);color:#160B2E;transition:.14s}
 .btn:hover{filter:brightness(1.1)}
 .btn.g{background:transparent;border:1px solid var(--line2);color:var(--ink)}
 .btn.g:hover{border-color:var(--teal);color:var(--tealb);filter:none}
-.btn.d{background:rgba(255,107,74,.12);border:1px solid rgba(255,107,74,.4);color:var(--coral)}
-.btn.d:hover{background:rgba(255,107,74,.2);filter:none}
+.btn.d{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.4);color:var(--coral)}
+.btn.d:hover{background:rgba(248,113,113,.2);filter:none}
 .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
 .brow{display:flex;gap:7px;flex-wrap:wrap}
 
@@ -127,9 +134,9 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .jst{display:flex;flex-direction:column;gap:2px;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);min-width:64px}
 .jst .jn{font-family:var(--mono);font-size:8.5px;color:var(--dim)}
 .jst .jt{font-size:10px;color:var(--mute);line-height:1.25}
-.jst.done{border-color:rgba(45,212,191,.4);background:rgba(45,212,191,.07)}
+.jst.done{border-color:rgba(196,170,255,.4);background:rgba(196,170,255,.07)}
 .jst.done .jn,.jst.done .jt{color:var(--tealb)}
-.jst.now{border-color:var(--mango);background:rgba(255,176,32,.1)}
+.jst.now{border-color:var(--mango);background:rgba(245,158,11,.1)}
 .jst.now .jn,.jst.now .jt{color:var(--mango)}
 .stg{display:flex;gap:3px;width:104px}
 .stg i{flex:1;height:5px;border-radius:3px;background:var(--line)}
@@ -138,13 +145,13 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 
 /* ---------- alerts ---------- */
 .alert{display:flex;gap:12px;padding:13px 15px;border-radius:12px;margin-top:9px;border:1px solid;align-items:flex-start}
-.alert.crit{background:rgba(255,107,74,.06);border-color:rgba(255,107,74,.28)}
-.alert.warn{background:rgba(255,176,32,.06);border-color:rgba(255,176,32,.28)}
-.alert.ok{background:rgba(45,212,191,.05);border-color:rgba(45,212,191,.24)}
+.alert.crit{background:rgba(248,113,113,.06);border-color:rgba(248,113,113,.28)}
+.alert.warn{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.28)}
+.alert.ok{background:rgba(196,170,255,.05);border-color:rgba(196,170,255,.24)}
 .alert .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;font-size:12px;font-weight:700}
-.alert.crit .ic{background:rgba(255,107,74,.16);color:var(--coral)}
-.alert.warn .ic{background:rgba(255,176,32,.16);color:var(--mango)}
-.alert.ok .ic{background:rgba(45,212,191,.16);color:var(--tealb)}
+.alert.crit .ic{background:rgba(248,113,113,.16);color:var(--coral)}
+.alert.warn .ic{background:rgba(245,158,11,.16);color:var(--mango)}
+.alert.ok .ic{background:rgba(196,170,255,.16);color:var(--tealb)}
 .alert b{display:block;font-size:13px;margin-bottom:3px}
 .alert p{font-size:12.5px;color:var(--mute);line-height:1.55}
 .alert .act{margin-left:auto;flex:0 0 auto}
@@ -163,11 +170,11 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .cd.pad{border-color:transparent;background:transparent}
 .cd.today{box-shadow:inset 0 0 0 1px var(--mango)}
 .cd.today .dn{color:var(--mango);font-weight:700}
-.cd.booked{background:rgba(255,176,32,.12);border-color:rgba(255,176,32,.4)}
+.cd.booked{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4)}
 .cd.booked .dn{color:var(--mango);font-weight:700}
-.cd.pending{background:rgba(255,107,74,.1);border-color:rgba(255,107,74,.35)}
+.cd.pending{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.35)}
 .cd.pending .dn{color:var(--coral)}
-.cd.clash{background:rgba(255,107,74,.2);border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
+.cd.clash{background:rgba(248,113,113,.2);border-color:var(--coral);box-shadow:0 0 0 1px var(--coral)}
 .cd .dt{display:flex;gap:2px}
 .cd .dt i{width:3px;height:3px;border-radius:50%;background:var(--mango)}
 .cd.pending .dt i{background:var(--coral)}
@@ -177,29 +184,29 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .nextup{display:grid;gap:8px}
 .nu{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:12px;color:var(--mute);line-height:1.5}
 .nu b{display:block;color:var(--ink);font-size:12.5px;margin-bottom:2px}
-.nu.pend{border-color:rgba(255,107,74,.35);background:rgba(255,107,74,.05)}
-.nu.clash{border-color:var(--coral);background:rgba(255,107,74,.1)}
+.nu.pend{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.05)}
+.nu.clash{border-color:var(--coral);background:rgba(248,113,113,.1)}
 .calside h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
 
 /* ---------- evidence ---------- */
 .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
-.thumbs>i{height:74px;border-radius:9px;background:linear-gradient(135deg,#14231E,#0F2B26);border:1px solid var(--softline);display:flex;align-items:flex-end;padding:6px;font-size:9.5px;color:var(--dim);font-style:normal;line-height:1.3}
+.thumbs>i{height:74px;border-radius:9px;background:linear-gradient(135deg,#17172E,#0E0E20);border:1px solid var(--softline);display:flex;align-items:flex-end;padding:6px;font-size:9.5px;color:var(--dim);font-style:normal;line-height:1.3}
 .thumbs>a.thumb{position:relative;height:74px;border-radius:9px;overflow:hidden;border:1px solid var(--softline);display:block}
-.thumbs>a.thumb img,.thumbs>a.thumb video{width:100%;height:100%;object-fit:cover;display:block;background:#0F2B26}
+.thumbs>a.thumb img,.thumbs>a.thumb video{width:100%;height:100%;object-fit:cover;display:block;background:#0E0E20}
 .thumbs>a.thumb span{position:absolute;left:0;right:0;bottom:0;padding:5px 6px;font-size:9.5px;color:#fff;line-height:1.3;background:linear-gradient(0deg,rgba(0,0,0,.65),transparent)}
 .fp{font-family:var(--mono);font-size:9.5px;color:var(--dim);word-break:break-all;margin-top:9px;padding-top:9px;border-top:1px solid var(--softline)}
 .reqlist{margin-top:10px}
 .reqrow{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-top:1px solid var(--softline);font-size:12.5px;color:var(--mute);line-height:1.5}
 .reqlist .reqrow:first-child{border-top:0}
 .reqrow i{width:15px;height:15px;border-radius:50%;border:1px solid var(--line);flex:0 0 auto;display:grid;place-items:center;font-size:9px;font-style:normal;margin-top:1px;color:transparent}
-.reqrow.ok i{border-color:var(--tealb);background:rgba(45,212,191,.16);color:var(--tealb)}
+.reqrow.ok i{border-color:var(--tealb);background:rgba(196,170,255,.16);color:var(--tealb)}
 .reqrow.ok{color:var(--ink)}
 .reqrow.miss i{border-color:var(--coral)}
 .reqrow.miss{color:var(--coral)}
 .reqdoc{border-top:1px solid var(--softline)}
 .reqlist .reqdoc:first-child{border-top:0}
 .reqdoc summary{padding:7px 0;font-size:12.5px;color:var(--ink);line-height:1.6;cursor:pointer}
-.reqdoc summary i{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--tealb);background:rgba(45,212,191,.16);color:var(--tealb);font-size:9px;font-style:normal;margin-right:6px}
+.reqdoc summary i{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--tealb);background:rgba(196,170,255,.16);color:var(--tealb);font-size:9px;font-style:normal;margin-right:6px}
 .reqdoc[open] summary{color:var(--tealb)}
 .docbody{white-space:pre-wrap;color:var(--mute);font-size:12.5px;line-height:1.65;padding:2px 4px 16px 21px;max-height:360px;overflow-y:auto;word-break:break-word}
 .docstruct{color:var(--mute);font-size:12.5px;line-height:1.6;padding:2px 4px 16px 21px;max-height:360px;overflow-y:auto;word-break:break-word}
@@ -224,9 +231,9 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .vitem{display:grid;grid-template-columns:24px 1fr auto;gap:10px;align-items:start;padding:10px 0;border-top:1px solid var(--softline)}
 .vrec .vitem:first-child{border-top:0}
 .vitem .vi{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:12px;border:1px solid var(--line);background:var(--bg);color:var(--dim)}
-.vitem.ok .vi{border-color:rgba(45,212,191,.45);background:rgba(45,212,191,.1);color:var(--tealb)}
-.vitem.gap .vi{border-color:rgba(255,176,32,.45);background:rgba(255,176,32,.1);color:var(--mango)}
-.vitem.block .vi{border-color:rgba(255,107,74,.5);background:rgba(255,107,74,.1);color:var(--coral)}
+.vitem.ok .vi{border-color:rgba(196,170,255,.45);background:rgba(196,170,255,.1);color:var(--tealb)}
+.vitem.gap .vi{border-color:rgba(245,158,11,.45);background:rgba(245,158,11,.1);color:var(--mango)}
+.vitem.block .vi{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.1);color:var(--coral)}
 .vitem h6{font-size:12.5px;color:var(--ink);margin-bottom:2px}
 .vitem p{font-size:11.5px;color:var(--mute);line-height:1.45}
 .vitem .vs{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);white-space:nowrap;padding-top:3px}
@@ -246,7 +253,7 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 .tg span{font-size:12px;color:var(--dim);display:block;margin-top:2px;line-height:1.5}
 .sw{width:42px;height:24px;border-radius:100px;background:var(--line);position:relative;flex:0 0 auto;transition:.16s}
 .sw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--dim);transition:.16s}
-.sw.on{background:rgba(45,212,191,.3)}
+.sw.on{background:rgba(196,170,255,.3)}
 .sw.on::after{left:21px;background:var(--tealb)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:840px){.grid2{grid-template-columns:1fr}}
@@ -255,8 +262,8 @@ tr.unpriced td{background:rgba(255,176,32,.07)}
 
 /* ---------- rail counts ---------- */
 .cnt{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:100px;background:var(--soft);border:1px solid var(--softline);color:var(--dim)}
-.cnt.wait{background:rgba(255,176,32,.14);border-color:rgba(255,176,32,.4);color:var(--mango)}
-.cnt.hot{background:rgba(255,107,74,.14);border-color:rgba(255,107,74,.42);color:var(--coral)}
+.cnt.wait{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.4);color:var(--mango)}
+.cnt.hot{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.42);color:var(--coral)}
 h1.vh .cnt{margin-left:10px;vertical-align:middle}
 
 /* ---------- forms ---------- */
@@ -271,10 +278,10 @@ td input,td select{padding:6px 9px;font-size:13px}
 .hint{font-size:12px;color:var(--dim);margin-top:8px;line-height:1.5}
 .msg{padding:11px 14px;border-radius:12px;font-size:12.5px;margin-bottom:12px;border:1px solid;line-height:1.55}
 .msg.err{background:rgba(229,72,77,.08);border-color:rgba(229,72,77,.35);color:#FFB3B3}
-.msg.ok{background:rgba(45,212,191,.05);border-color:rgba(45,212,191,.24);color:var(--tealb)}
-.msg.warn{background:rgba(255,176,32,.06);border-color:rgba(255,176,32,.28);color:var(--mango)}
+.msg.ok{background:rgba(196,170,255,.05);border-color:rgba(196,170,255,.24);color:var(--tealb)}
+.msg.warn{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.28);color:var(--mango)}
 .grand{font-family:var(--disp);font-size:28px;letter-spacing:.01em;text-align:right;margin-top:10px;font-variant-numeric:tabular-nums}
-.qs{margin:13px 0 0;padding:13px 15px;background:rgba(255,176,32,.06);border:1px solid rgba(255,176,32,.28);border-radius:12px}
+.qs{margin:13px 0 0;padding:13px 15px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.28);border-radius:12px}
 .qs h4{margin:0 0 7px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--mango);font-weight:700}
 .qs ul{margin:0;padding-left:17px;font-size:12.5px;color:var(--mute);line-height:1.6}
 .note{font-size:12.5px;color:var(--mute);background:var(--bg);border-left:2px solid var(--teal);padding:11px 13px;border-radius:0 10px 10px 0;margin-top:13px;white-space:pre-wrap;line-height:1.6}
@@ -287,8 +294,8 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 .pthumb{position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--bg)}
 .pthumb.out{opacity:.28}
 .pthumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
-.pthumb .n{position:absolute;top:5px;left:5px;background:var(--teal);color:#04211D;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px;font-family:var(--mono)}
-.pthumb .x{position:absolute;top:5px;right:5px;background:rgba(8,17,15,.82);color:#fff;border-radius:100px;width:22px;height:22px;font-size:13px;line-height:1}
+.pthumb .n{position:absolute;top:5px;left:5px;background:var(--teal);color:#160B2E;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px;font-family:var(--mono)}
+.pthumb .x{position:absolute;top:5px;right:5px;background:rgba(7,7,26,.82);color:#fff;border-radius:100px;width:22px;height:22px;font-size:13px;line-height:1}
 .pthumb .cap{padding:6px 8px;font-size:10.5px;color:var(--mute);line-height:1.35}
 
 /* ---------- gate ---------- */
@@ -413,10 +420,10 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
       <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
       <div class="cal-grid" id="calGrid"></div>
       <div class="cal-key">
-        <span><i style="background:rgba(255,176,32,.4)"></i>Booked</span>
-        <span><i style="background:rgba(255,107,74,.35)"></i>Awaiting confirmation</span>
-        <span><i style="background:rgba(255,107,74,.5);box-shadow:0 0 0 1px #FF6B4A"></i>Clash</span>
-        <span><i style="background:transparent;box-shadow:inset 0 0 0 1px #FFB020"></i>Today</span>
+        <span><i style="background:rgba(245,158,11,.4)"></i>Booked</span>
+        <span><i style="background:rgba(248,113,113,.35)"></i>Awaiting confirmation</span>
+        <span><i style="background:rgba(248,113,113,.5);box-shadow:0 0 0 1px #F87171"></i>Clash</span>
+        <span><i style="background:transparent;box-shadow:inset 0 0 0 1px #F59E0B"></i>Today</span>
       </div>
     </div>
     <div class="calside">
@@ -553,7 +560,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ JOB INVOICES -->
 <section class="view" data-view="jobinv">
   <h1 class="vh">Job Invoices</h1>
-  <p class="vsub">One row per booked job. Raises Yaadly's own 15% Guarantee &amp; Support fee as a single invoice, due at the start of the job, 15% of the whole accepted quote's labour price: never the worker's own pay, which the client still pays the worker direct, per the payment terms agreed between them.</p>
+  <p class="vsub">One row per booked job. Raises the client's single all-in invoice: the labour price, Yaadly's 15% Guarantee &amp; Support fee, and materials at cost. The client buys the whole job from Yaadly and is never billed for the worker. What Yaadly owes the tradesperson, their quoted labour less the agreed 12% plus materials, is a separate payable raised once the job is complete.</p>
   <div id="jiMsg"></div>
   <div id="jiBody"><div class="empty"><b>Reading your booked jobs&hellip;</b></div></div>
 
@@ -637,6 +644,7 @@ const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
 const REPLY_FN = SUPABASE_URL + "/functions/v1/yaad-desk-reply";
+const AGENT_FN = SUPABASE_URL + "/functions/v1/yaad-agent";
 
 // The Conversations reply lane. Monique's words, typed here, sent from the
 // Yaadly number by yaad-desk-reply so they continue the chat the client
@@ -676,8 +684,10 @@ const ago_  = (v) => {
   const d = Math.floor(mins / 1440);
   return d + (d === 1 ? " day" : " days");
 };
-// Teal is proven, mango is waiting on somebody, coral is blocked, mute is a
+// Purple is proven, gold is waiting on somebody, coral is blocked, mute is a
 // neutral fact. Nothing else gets a colour. A tone is a claim about state.
+// (Realigned onto the shared brand palette 3 Sep 2026, same meaning, new
+// hues; the --teal/--mango variable names underneath are unchanged.)
 const TONE = {
   // intakes
   new:"warn", triaged:"warn", converted:"ok", binned:"mute",
@@ -702,6 +712,28 @@ const TONE = {
   raised:"crit", answered:"warn", resolved:"ok",
 };
 const tone_ = (s) => chip_(TONE[String(s || "").toLowerCase()] || "mute", s || "none");
+
+// ---- Ask a Yaad: what to look at twice before publishing.
+//
+// A LOOSER COPY OF web/lib/ask.ts ON PURPOSE, and the looseness is the point.
+// The form refuses anything that can only be a phone number, and deliberately
+// lets a bare run of seven digits through, because in Jamaican dollars that
+// is a price and "is 1500000 fair for a bathroom" is the question the board
+// exists to answer. That ambiguity has to land somewhere, and it lands here,
+// with the person who can read the sentence around the number. A chip on a
+// queue can afford to be wrong. A message that blocks somebody's question
+// cannot.
+//
+// This duplicates a rule rather than importing it, the way the Deno and
+// Python guardrails do, because this file loads from disk with no build step.
+// If web/lib/ask.ts changes, change this too.
+function askFlag(r){
+  const t = String(r.body || "") + " " + String(r.area || "");
+  if (/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(t)) return chip_("crit", "an email address");
+  if (/(?<![\d,.])\d{7,}(?![\d,.])/.test(t) || /\+\d[\d\s().-]{6,}\d/.test(t) || /(?<![\d,.])\d{3}[\s.-]\d{4}(?![\d,.])/.test(t))
+    return chip_("warn", "a number, check it is not a phone");
+  return mute_("nothing obvious");
+}
 
 // The Supabase library loads from a CDN. Creating the client at the top of this
 // script would throw if it never arrived, and then NOTHING below would run,
@@ -792,6 +824,16 @@ const VIEWS = [
     // be refused by Postgres, which is the correct outcome but a silly way to
     // find out.
     actions:[
+      // Read only, so it sits first: it is the thing you do BEFORE deciding
+      // any of the below, and it is the only button here that cannot change
+      // anything. Only offered where there is enough text to be worth
+      // summarising; on two lines you may as well read it.
+      { label:"Summarise this thread", cls:"g",
+        when:r => String(r.descr || "").length > 400,
+        read:async r => {
+          const j = await agentFn({ mode:"summarise", text:String(r.descr || "").slice(0, 12000), job_id:r.id });
+          return renderThreadSummary(j && j.result);
+        } },
       { label:"Open it to the board", cls:"", when:r => r.status !== "open_for_quotes",
         set:{ status:"open_for_quotes", open:true },
         says:r => `Puts this on the public board. Vetted workers in ${r.parish || "this parish"} can see it and quote. The address and phone stay hidden from them. If the client has not signed the Client Guidelines the database will refuse this, and that refusal is the gate working.` },
@@ -1172,9 +1214,33 @@ const VIEWS = [
       {h:"State", f:r => tone_(r.status || "open")},
     ]},
 
+  { k:"photos", g:"Services", label:"Job photos", icon:"photo",
+    title:"Job photos", table:"job_photos",
+    sub:"Every photograph a client has sent with a job. They arrive over WhatsApp and land in the private intake bucket, so nothing here is a public picture and none of these links last: each one is signed for an hour when you open this page. On the board is the only thing that publishes one. Leave it off unless the client has told you they want workers to see it: a photograph sent into a WhatsApp conversation is not consent to put it on a public page, and app.yaadly.co.uk/jobs is a public page.",
+    select:"id,job_id,caption,img,storage_path,mime,bytes,kind,source,position,board_ok,created_at",
+    order:"created_at", search:["job_id","caption","source"], hide:["img","storage_path"],
+    empty:["No photographs yet","One lands here the moment a client sends a picture on WhatsApp."],
+    pre: preJobPhotos,
+    cols:[
+      {h:"Picture", f:r => photoCell(r)},
+      {h:"Job", f:r => id_(r.job_id) + sub_(r.caption || "")},
+      {h:"Came from", f:r => esc(r.source || "unknown") + sub_(r.kind || r.mime || "")},
+      {h:"Size", n:true, f:r => r.bytes ? mute_(Math.round(r.bytes / 1024) + " KB") : mute_("not recorded")},
+      {h:"On the board", f:r => r.board_ok ? chip_("ok","published") : chip_("mute","private")},
+      {h:"Arrived", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Show it on the board", cls:"", when:r => !r.board_ok,
+        set:{ board_ok:true },
+        says:r => `Publishes this photograph on app.yaadly.co.uk/jobs, where anybody on the internet can see it while ${r.job_id} is open for quotes. Only do this if the client has said they want workers to see it.` },
+      { label:"Take it off the board", cls:"g", when:r => r.board_ok === true,
+        set:{ board_ok:false },
+        says:() => "Removes it from the public board straight away. The photograph stays on the job for you, the client and the booked worker. Anybody already holding a signed link keeps it until it expires, which is within the hour." },
+    ]},
+
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
-    sub:"The full back and forth with anybody who wrote in by WhatsApp or email, kept word for word. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back.",
+    sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back.",
     select:"*",
     order:"last_at", search:["job_id","from_addr","transcript","channel"],
     empty:["No conversations yet","When somebody writes in by WhatsApp or email, the whole thread is kept here."],
@@ -1190,6 +1256,11 @@ const VIEWS = [
       { label:"Reply from the Yaadly number",
         when:r => r.channel === "whatsapp" || r.channel === "sms",
         says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only delivers a typed reply within 24 hours of their last message; outside that the send is refused and told to you honestly.",
+        ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
+        call: deskReply },
+      { label:"Reply in their website chat",
+        when:r => r.channel === "web",
+        says:r => "Puts your words, exactly as typed, into the chat window on yaadly.co.uk, where they appear as you within a few seconds if the visitor still has the page open. If they have left, they cannot see it: the widget gave them a WhatsApp button with this reference, so expect them there. Replying also marks the thread as with you.",
         ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
         call: deskReply },
       { label:"Hand back to the assistant", cls:"g",
@@ -1291,6 +1362,28 @@ const VIEWS = [
       {h:"Why", f:r => esc(String(r.why || "").slice(0,90))},
       {h:"What would be better", f:r => esc(String(r.better || "").slice(0,90))},
       {h:"When", f:r => mute_(ago_(r.created_at))},
+    ]},
+
+  { k:"asks", g:"Inbox", label:"Questions", icon:"chat",
+    title:"Ask a Yaad", table:"questions",
+    sub:"Questions typed into app.yaadly.co.uk/ask by anybody at all. Nothing here is public until you publish it, and that gate is the only thing between an open text box on the internet and a page with the Yaadly name on it. Publishing puts the words on a public page exactly as they were typed. Read the whole thing before you do, and look at the marked ones twice: a question that carries something number-shaped may be somebody's phone number, which does not belong on a public board.",
+    select:"id,body,area,published,created_at",
+    order:"created_at", search:["body","area"],
+    empty:["No questions yet","Somebody asking on app.yaadly.co.uk/ask writes here. Until 3 September 2026 nothing could: the table had no insert policy, so every question was refused and the page said Received anyway."],
+    cols:[
+      {h:"The question", f:r => esc(String(r.body || "").slice(0,140))},
+      {h:"Area", f:r => r.area ? esc(r.area) : mute_("not given")},
+      {h:"Worth a second read", f:r => askFlag(r)},
+      {h:"On the board", f:r => r.published ? chip_("ok","published") : chip_("mute","waiting on you")},
+      {h:"Asked", f:r => mute_(ago_(r.created_at))},
+    ],
+    actions:[
+      { label:"Publish it", cls:"", when:r => !r.published,
+        set:{ published:true },
+        says:() => "Puts this question on app.yaadly.co.uk/ask, word for word, where anybody on the internet can read it and any vetted worker can answer it. Check it carries no name, no phone number, no email and no address first. Nothing else publishes it: this button is the gate." },
+      { label:"Take it down", cls:"g", when:r => r.published === true,
+        set:{ published:false },
+        says:() => "Removes it from the public page straight away, along with any answers under it, because an answer is only public while its question is. The row stays for you." },
     ]},
 
   { k:"set", g:"System", label:"Settings", icon:"gear",
@@ -1729,6 +1822,37 @@ async function signEvidenceImgs(rows){
     const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
     for (const r of items) r.img = byPath.get(r.storage_path) || null;
   } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
+// ---- Job photos: the client's own pictures, from the private intake bucket.
+//
+// Same treatment as evidence above, different bucket. WhatsApp intake writes
+// these to 'intake' (private, storage.buckets.intake.public = false) and
+// records the path on the row; img stays null on every insert path, which is
+// what leaves somewhere to put the signed link. This desk's own session is
+// covered by "admins read every bucket", so it can sign every row here,
+// published or not: deciding what the public board carries is the job of
+// board_ok, and you cannot decide it without looking at the photograph.
+async function preJobPhotos(rows){
+  const items = (rows || []).filter(r => r.storage_path && !r.img);
+  if (!items.length) return;
+  try {
+    const { data, error } = await sb.storage.from("intake")
+      .createSignedUrls(items.map(r => r.storage_path), 3600);
+    if (error || !data) return;
+    const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
+    for (const r of items) r.img = byPath.get(r.storage_path) || null;
+  } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
+// A picture, or an honest word about why there is not one. A row with no
+// storage_path predates the bucket and never had a file behind it.
+function photoCell(r){
+  if (r.img) {
+    return `<a class="thumb" href="${esc(r.img)}" target="_blank" rel="noopener" title="${esc(r.caption || "photo")}">`
+         + `<img src="${esc(r.img)}" alt="${esc(r.caption || "photo")}" loading="lazy" style="width:88px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--softline);display:block"></a>`;
+  }
+  return mute_(r.storage_path ? "could not be signed" : "no file");
 }
 
 async function preEvidence(rows){
@@ -2516,6 +2640,24 @@ async function writeAction(k, a, row, vals){
 
 async function runAction(k, a, row, btn){
   if (a.ask) return drawAsk(k, a, row, btn);
+
+  // A READ action asks a question and shows the answer. It writes nothing, so
+  // it skips the confirm (there is nothing to be sure about), leaves the
+  // drawer open (the answer is the point) and does not reload the table
+  // (nothing changed). Added for the thread summariser, 4 Sep 2026. Everything
+  // below this block is the ordinary write path, untouched.
+  if (a.read) {
+    btn.disabled = true;
+    $("drwMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Reading the thread.</div>';
+    try {
+      $("drwMsg").innerHTML = await a.read(row);
+    } catch (e) {
+      $("drwMsg").innerHTML = `<div class="msg err"><b>That did not run.</b><br>${esc(e && e.message ? e.message : String(e))}</div>`;
+    }
+    btn.disabled = false;
+    return;
+  }
+
   if (!confirm((a.says ? a.says(row) + "\n\n" : "") + a.label + "?")) return;
   btn.disabled = true;
   $("drwMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Writing.</div>';
@@ -2600,6 +2742,54 @@ async function fn(payload){
   const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
   return j;
+}
+
+// The thread summariser. Added 4 September 2026, roadmap item 5 from the agent
+// audit, and it is the FIRST thing in this desk ever to call yaad-agent: that
+// function has existed since August and nothing had wired it up, which the
+// audit had wrongly recorded as "triggered from the desk".
+//
+// A job's descr grows by concatenation on every turn of a WhatsApp or web chat
+// thread, so a client who has written five times leaves a wall of text and the
+// answer to "what do they actually want" is somewhere inside it. Three
+// sentences and a flag, for one reader.
+//
+// It goes through AGENTS_PAUSED like everything else this desk starts, because
+// it IS something this desk starts, which is the whole scope of that switch.
+// Read only: it writes nothing, sends nothing, and nobody but Monique ever
+// sees the output.
+async function agentFn(payload){
+  if (AGENTS_PAUSED) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
+  const r = await fetch(AGENT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the agent returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+/** yaad-agent hands back the model's raw text in .result. Parse the JSON out of
+ *  it, and if it did not answer in JSON, show what it did say rather than
+ *  pretending nothing came back. */
+function renderThreadSummary(raw){
+  const text = String(raw == null ? "" : raw).replace(/```(?:json)?/gi, "").trim();
+  let d = null;
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) { try { d = JSON.parse(m[0]); } catch (_) { d = null; } }
+  if (!d) {
+    return `<div class="msg warn"><b>The agent did not answer in the expected shape.</b><br>`
+      + `${esc(text.slice(0, 600)) || "It returned nothing at all."}</div>`;
+  }
+  const row = (k, v) => v ? `<div class="dfield"><span class="dk">${esc(k)}</span><span class="dv">${esc(v)}</span></div>` : "";
+  const flag = d.flag
+    ? `<div class="msg err" style="margin-bottom:10px"><b>Needs you today:</b> ${esc(d.flag)}</div>` : "";
+  const body = row("wants", d.wants) + row("still missing", d.unknown) + row("worried about", d.worried);
+  return flag + (body || `<div class="msg warn">The agent read the thread and found nothing worth summarising.</div>`)
+    + `<div class="msg ok" style="margin-top:10px">Read only. Nothing was written, and nothing was sent to the client or the worker.</div>`;
 }
 
 let CATALOGUE = [];
@@ -2746,7 +2936,7 @@ async function loadOverview(){
 
   const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
          invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
-         enqNew] = await Promise.all([
+         enqNew, asksNew] = await Promise.all([
     countOf("intakes",     q => q.in("status", ["new","triaged"])),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
     countOf("evidence",    q => q.eq("ok", false)),
@@ -2763,6 +2953,7 @@ async function loadOverview(){
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
     countOf("enquiries",   q => q.not("status", "in", "(replied,converted)")),
+    countOf("questions",   q => q.eq("published", false)),
   ]);
 
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
@@ -2775,6 +2966,7 @@ async function loadOverview(){
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked"),
     tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to"),
+    tile(asksNew ? "warn" : "ok", "Questions to publish", String(asksNew), asksNew ? "Waiting on your read" : "Board is clear"),
     tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
     tile("", "Jobs on the board", String(jobsOpen), "Open to workers"),
     tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every job has a client"),
@@ -2789,6 +2981,8 @@ async function loadOverview(){
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
   if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
     "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
+  if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),
+    "Somebody asked on the public board and nothing publishes on its own. Read it, check it carries no phone number or address, then publish it or leave it.", "Read them", "asks"));
   if (intakeNew) needs.push(alertRow("warn","?", intakeNew + (intakeNew === 1 ? " intake is untriaged" : " intakes are untriaged"),
     "Somebody asked for help and nobody has read it yet. That is the clock people judge you on.", "Open intake", "intake"));
   if (appsWaiting) needs.push(alertRow("warn","?", appsWaiting + (appsWaiting === 1 ? " application is part way through vetting" : " applications are part way through vetting"),
@@ -2874,7 +3068,7 @@ async function loadMoney(){
     <div class="card">
       <div class="kv">
         <span class="k2">Client, Guarantee and Support</span><span class="v2">15% on labour</span>
-        <span class="k2">Worker</span><span class="v2">12%, keeps 88%</span>
+        <span class="k2">Worker</span><span class="v2">engaged at quote less 12%</span>
         <span class="k2">Blended</span><span class="v2">27%</span>
         <span class="k2">Materials</span><span class="v2">never fee'd</span>
         <span class="k2">Yaadly Remote, digital</span><span class="v2">10%</span>
@@ -2965,8 +3159,8 @@ async function loadHealth(){
 
 // ---------------------------------------------------------------- invoices
 
-// Teal is proven, mango is waiting on somebody, coral is blocked. A sent
-// invoice is waiting on money, so it is mango, not teal. Only paid is teal.
+// Purple is proven, gold is waiting on somebody, coral is blocked. A sent
+// invoice is waiting on money, so it is gold, not purple. Only paid is purple.
 const INV_CHIP = { draft:"warn", sent:"warn", paid:"ok", void:"mute" };
 const SK_CHIP  = { draft:"warn", approved:"warn", issued:"ok", void:"mute" };
 const chipFor = (map, s) => `<span class="chip ${map[s] || "mute"} dot">${esc(s)}</span>`;
@@ -3295,7 +3489,7 @@ async function loadJobInvoices(){
       btn.disabled = true;
       say("jiMsg", "ok", `Raising the agency fee on ${job}…`);
       try {
-        const { data, error } = await sb.rpc("raise_job_agency_fee_invoice", { p_job: job });
+        const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
         if (error) throw error;
         const row = (data || [])[0];
         if (!row) throw new Error("Raised nothing to send.");
@@ -3526,7 +3720,7 @@ async function loadAgencyFees(){
         btn.disabled = true;
         say("feesMsg", "ok", `Raising the agency fee on ${job}…`);
         try {
-          const { data, error } = await sb.rpc("raise_job_agency_fee_invoice", { p_job: job });
+          const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
           if (error) throw error;
           const row = (data || [])[0];
           if (!row) throw new Error("Raised nothing to send.");
