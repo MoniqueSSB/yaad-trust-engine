@@ -92,10 +92,21 @@ comment on column public.agent_actions.refs is
   'The rows this action touched, as {table: id}. Enough to find the evidence again in six months.';
 
 -- What a dispute actually asks for: one job, one list, oldest first.
-create or replace view public.v_job_history as
+--
+-- security_invoker is load bearing and not decoration. A Postgres view runs
+-- with its OWNER's rights by default, which would have made this view read
+-- every job's history for anybody who could select from it, straight past the
+-- policy above. The comment underneath claims it inherits row level security;
+-- this setting is the only thing that makes that claim true. Same reason
+-- 20260903g exists, and the same setting the parallel session put on
+-- sla_first_reply.
+create or replace view public.v_job_history
+with (security_invoker = true) as
   select a.job_id, a.at, a.actor, a.actor_kind, a.action, a.summary, a.refs
     from public.agent_actions a
    order by a.job_id, a.at;
 
 comment on view public.v_job_history is
-  'One job read as a single story. Inherits row level security from agent_actions, so a client sees their own job and nobody else''s.';
+  'One job read as a single story. security_invoker means it inherits row level security from agent_actions, so a client sees their own job and nobody else''s.';
+
+grant select on public.v_job_history to authenticated;

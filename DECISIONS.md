@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · Applied, and the two things applying taught that reading did not
+
+**Four migrations applied and `yaad-report` deployed.** The ledger, the report schema, the report RPCs and the contact form half of the reply clock. `yaad-report` is version 1 with `verify_jwt` true. `yaad-inbound` and `yaad-desk-reply` were deliberately not deployed: `yaad-inbound` is on version 114, redeployed by the parallel session the same day, so pushing this branch's copy would have discarded work that is live and not in any branch here.
+
+**The first apply failed, and it was right to.** `reports.service_id` was declared `uuid`. Both `services.id` and `jobs.id` are `text` in this database, so Postgres refused the foreign key outright. Nothing was half-created. That is the argument for applying against the real schema rather than the one in your head, and for applying one file at a time rather than a push.
+
+**Two views were about to leak.** `v_job_history` and `v_reports_open` were written without `security_invoker = true`. A Postgres view runs with its owner's rights by default, so both would have read straight past the row level security on the tables underneath, and `v_job_history`'s own comment claimed it inherited that security. Caught before applying, by looking at what the parallel session had put on `sla_first_reply` and asking why. The setting is now on all three views in this batch, with the reason written at each one.
+
+**The reply clock had two bugs that only live rows could show.** Reading `breached` off `sla_first_reply.met` meant a thread nobody had ever answered came back `breached = false`, because `within_one_working_day()` returns null when either timestamp is missing, and the null was being read as "fine". That is the exact row the view exists to surface. Reading `hours` off the same view meant any thread the assistant was still handling showed no elapsed time at all. Both now measure against `now()`.
+
+**The clock runs from when the client first wrote, not from when the thread became a person's problem.** The parallel session's `awaiting_human_since` is the right thing to sort a queue by. It is the wrong thing to measure a promise by, because the promise on four public pages is that a person replies within one working day of somebody writing in, and an assistant answering does not start that clock over. This over-reports rather than under-reports, which is the correct direction for a published promise.
+
+**What it found on the first run: sixteen people waiting, thirteen of them past one working day, the oldest six point four days.** Eleven of the sixteen are contact form enquiries, which is the door the business page sends companies to. None of this was visible anywhere before today, and none of it is a system failure: it is a queue nobody could see.
+
+---
+
 ## 2026-09-04 · A parallel session had already built the reply clock, and theirs was better
 
 **Before applying anything I read the live database, and it was ahead of every branch.** `20260904105323_the_one_working_day_promise_becomes_measurable` was already applied, from a session running in parallel on the same repository. It had added `first_client_at`, `first_human_reply_at` and `awaiting_human_since` to `intake_threads`, a `within_one_working_day()` function and an `sla_first_reply` view. My own migration, written hours earlier, added a `first_human_reply_at` column by the same name and a `v_reply_clock` view measuring the same published promise by a different rule.

@@ -1945,3 +1945,34 @@ Use it when a client disputes something, when you want to know why a job took ni
 **If any of those three stops being true, that page becomes a false claim to clients**, which is worse than never having made it. Before changing anything in `yaad-invoice`, `yaad-sketch` or `yaad-vetting-review`'s `IDENTITY_DOCS`, read that page and decide which sentence has to change with it.
 
 The provider list is deliberately not repeated there. It lives on `privacy.html`, and that is the one to update when a provider changes.
+
+---
+
+## What is applied and deployed, as at 4 September 2026
+
+Applied to the database: `agent_actions` and `v_job_history`; `reports`, `report_findings` and their guards; `rate_finding`, `write_report_verdict`, `issue_report` and `v_reports_open`; `enquiries.first_replied_at` with its trigger, and `v_reply_clock`.
+
+Deployed: `yaad-report`, version 1, `verify_jwt` true.
+
+**Not deployed, on purpose:** `yaad-inbound` and `yaad-desk-reply`. Both are edited in this branch and `yaad-inbound` was redeployed by a parallel session the same day, so deploying from here would discard live work. Until they go out:
+
+- `first_human_reply_at` is never written, so the thread half of the reply clock shows everything as unanswered. The enquiries half is accurate.
+- `agents_paused` still does not reach `yaad-inbound`. The desk copy in this branch says it does. **That copy is ahead of what is deployed**, so do not trust the switch until the deploy happens.
+
+Deploy them, once the parallel session has landed and this branch has been rebased onto it:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+`yaad-inbound` carries its own Twilio signature check and origin throttle, so it keeps `--no-verify-jwt`. `yaad-desk-reply` must NOT have that flag: it runs with platform auth on.
+
+```bash
+supabase functions deploy yaad-desk-reply --project-ref leffyisvfvjwzilydlwf
+```
+
+**Check the live setting before either deploy**, because this file goes stale and that is the failure mode it exists to prevent:
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```

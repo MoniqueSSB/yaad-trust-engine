@@ -129,7 +129,12 @@ revoke all on function public.write_report_verdict(uuid, text, text) from anon;
 revoke all on function public.issue_report(uuid) from anon;
 
 -- What the desk lists: every report with how much of it is still on her.
-create or replace view public.v_reports_open as
+--
+-- security_invoker for the same reason as v_job_history: without it this view
+-- runs as its owner and hands every client's draft report to anybody who can
+-- select from it, past the policies in 20260904c.
+create or replace view public.v_reports_open
+with (security_invoker = true) as
   select r.id, r.number, r.kind, r.status, r.client_name, r.property,
          r.visited_on, r.drafted_at, r.issued_at,
          (select count(*) from public.report_findings f where f.report_id = r.id) as findings,
@@ -139,4 +144,6 @@ create or replace view public.v_reports_open as
     from public.reports r;
 
 comment on view public.v_reports_open is
-  'Every report and what is still outstanding on it: how many findings are unrated, whether the verdict is written, and how many measurements were scrubbed out of the draft.';
+  'Every report and what is still outstanding on it: how many findings are unrated, whether the verdict is written, and how many measurements were scrubbed out of the draft. security_invoker, so it shows the caller only what the policies on reports already allow them.';
+
+grant select on public.v_reports_open to authenticated;

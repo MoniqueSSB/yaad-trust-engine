@@ -30,7 +30,11 @@ create table if not exists public.reports (
   id           uuid primary key default gen_random_uuid(),
   number       text unique,
   job_id       text references public.jobs(id) on delete set null,
-  service_id   uuid references public.services(id) on delete set null,
+  -- text, not uuid. services.id and jobs.id are both text in this database;
+  -- assuming uuid here was caught by Postgres refusing the foreign key on the
+  -- first apply, 4 Sep 2026, which is the argument for applying against the
+  -- real schema rather than the one in your head.
+  service_id   text references public.services(id) on delete set null,
   kind         text not null check (kind in ('deposit_check', 'condition', 'technical_signoff', 'visual_check')),
 
   client_name  text,

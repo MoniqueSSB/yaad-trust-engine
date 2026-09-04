@@ -59,6 +59,22 @@ create trigger trg_enquiry_reply_clock
 --
 -- security_invoker so it is read with the caller's own rights, matching
 -- 20260903g and their own view.
+-- Two things this deliberately does NOT take from sla_first_reply, found by
+-- reading the live rows on 4 Sep 2026 rather than trusting the query:
+--
+--   `met`   is null while nobody has replied, because within_one_working_day()
+--           needs two timestamps. Reading breached off it meant a thread that
+--           had NEVER been answered came back breached = false, which is the
+--           exact opposite of the truth and the one row this view exists to
+--           surface. Unanswered rows are measured against now() instead.
+--   `hours` is null unless the thread was formally handed over, so a client
+--           the assistant is still talking to showed no elapsed time at all.
+--
+-- The clock runs from when the CLIENT FIRST WROTE, not from when the thread
+-- became a person's problem. The promise on four public pages is "a person
+-- replies within one working day", and that person's day starts when somebody
+-- writes in, not when an assistant gives up. This over-reports rather than
+-- under-reports, which is the right direction for a promise you have published.
 create or replace view public.v_reply_clock
 with (security_invoker = true) as
   select
@@ -66,8 +82,9 @@ with (security_invoker = true) as
     coalesce(s.job_id, s.from_addr)             as ref,
     s.channel                                   as channel,
     coalesce(s.first_client_at, s.awaiting_human_since) as waiting_since,
-    round(s.hours::numeric, 1)                  as hours_waiting,
-    (s.met is not null and s.met = false)       as breached
+    round((extract(epoch from (now() - coalesce(s.first_client_at, s.awaiting_human_since))) / 3600.0)::numeric, 1) as hours_waiting,
+    coalesce(public.within_one_working_day(
+      coalesce(s.first_client_at, s.awaiting_human_since), now()), true) = false as breached
   from public.sla_first_reply s
   where s.first_human_reply_at is null
     and coalesce(s.first_client_at, s.awaiting_human_since) is not null
