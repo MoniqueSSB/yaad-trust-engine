@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · A stall that resolves is written down before it is deleted
+
+**The system review asked for stall rate and time to unstall. Only the first was computable, and finding out why took reading the delete rather than the table.** `job_stall_state` holds one row per job that has gone quiet long enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes that row the moment the job moves again. So the table answers "what is stuck right now" perfectly and answers "how long do things stay stuck" not at all, because the evidence a stall ever happened leaves with the row. `worker_stall_history` sounds like the missing piece and is not: it is a view over the same live table, so it empties at the same instant.
+
+**The delete stays.** The comment on the table says the clock should genuinely reset rather than leave a stale flag lingering, and that is correct: a stall flag that outlives the stall is how a job gets chased twice and a worker gets a reputation from a row nobody cleared. The fix is one row written on the way out, not a change to the behaviour. `clear_resolved_job_stalls()` now inserts into `job_stall_resolved` and then deletes exactly as it did; nudging, escalating and clearing are untouched, and `yaad-job-health` needed no change at all because it already went through the RPC rather than deleting directly.
+
+**The clock is named for what it actually measures, and that was the real decision.** `hours_stalled` runs from when Yaadly *noticed* (`nudged_at`) to when the job moved again, not from when the job went quiet. The tempting version computes the earlier moment from `job_silence_hours()` at delete time and produces a bigger, more impressive-sounding number that nobody can point at a row for. The moment a job went quiet is not recorded anywhere in this system, so that number would be a reconstruction presented as a measurement. Time from noticing to moving is smaller, honest, and the half Yaadly can actually do something about.
+
+**It is not retrospective and the desk says so.** History starts the day the migration ran, so "Time to get moving again" reads n/a until stalls resolve after it, and the tile is uncoloured in that state rather than green. Same reasoning as draft acceptance below: a metric with no data underneath it should look empty, not look healthy.
+
+---
+
 ## 2026-09-04 · The leaked notify secret is dead, the two files that carry it stay, and the scanner learns a new shape
 
 **A 64 character hex secret sits in plaintext in two committed migrations, `20260901g` line 110 and `20260902c` line 353, in a repository that is public.** It is the value trigger functions present to `yaad-notify-client` to prove they are the database and not a stranger. This was found during an unrelated WhatsApp audit and carried forward rather than acted on at the time, which was the right call: it is a live credential and rotating one is not a thing to do in passing.

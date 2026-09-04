@@ -1657,6 +1657,32 @@ Deno.serve(async (req: Request) => {
         });
         await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
         root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.customised": said !== "1" });
+
+        // This reply is the only moment anybody says whether the draft was
+        // good enough, and until 4 September 2026 it went to a trace span and
+        // nowhere else. Spans are not queryable, they expire, and they are off
+        // entirely unless an OTLP endpoint is configured, so in practice the
+        // number did not exist. Written only when the relay itself worked: a
+        // decision that never reached the client is not a decision.
+        //
+        // Deliberately not inside relay_confirmed_report(): the override text
+        // is already resolved by the line above, so by the time the RPC runs
+        // an accepted draft and a rewrite are the same argument. Only here
+        // knows.
+        if (!error) {
+          const draftText = String(a.draft_text ?? "");
+          await supabase.from("draft_decisions").insert({
+            job_id: a.job_id, stage: Number(a.stage) || 0, kind: "evidence_report",
+            accepted: said === "1",
+            drafted_chars: draftText.length,
+            sent_chars: overrideText.length,
+            drafted_at: reportSession.updated_at ?? null,
+          }).then(
+            () => {},
+            (e: unknown) => console.error("draft_decisions insert failed:", String(e).slice(0, 160)),
+          );
+        }
+
         if (error) return twiml("That did not go through. Try again, or send it again in a moment.");
         return twiml(said === "1"
           ? "Sent to the client as drafted."

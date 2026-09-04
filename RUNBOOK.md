@@ -603,6 +603,90 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## Stall rate, and how long a stall lasts
+
+**Two different questions, and until 4 September 2026 only one of them had an
+answer.** `job_stall_state` holds one row per job that has gone quiet long
+enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes
+that row the moment the job moves again. The delete is right: the clock should
+genuinely reset rather than leave a stale flag lingering. But it also threw away
+the only evidence the stall ever happened, so "how many are stuck right now"
+was answerable and "how long do they stay stuck" was not answerable at all.
+
+**What changed.** `clear_resolved_job_stalls()` now writes one
+`job_stall_resolved` row on its way out, then deletes exactly as before.
+Nudging, escalating and clearing all behave identically; the only difference is
+that the stall leaves a record. Nothing about this is retrospective: the
+history starts on the day the migration ran, so the time-to-unstall number is
+empty until stalls resolve after it.
+
+**What the clock measures, and it matters that this is said plainly.** It runs
+from **when Yaadly noticed** (`nudged_at`) to when the job moved again. Not
+from when the job actually went quiet. That earlier moment is not recorded
+anywhere, and back-computing it from `job_silence_hours()` at delete time would
+be inventing a figure nobody can point at a row for. Time from noticing to
+moving is also the more useful half, because it is the part Yaadly controls.
+
+**On the Overview**: "Jobs gone quiet" is the rate right now, stalled over live
+jobs, amber when anything is stalled and red once anything has escalated.
+"Time to get moving again" is the 30 day average, green under a day, amber
+under three, red past that.
+
+```sql
+select * from public.stall_metrics;
+select job_id, nudged_at, resolved_at, hours_stalled
+  from public.job_stall_resolved order by resolved_at desc limit 20;
+```
+
+**If the time figure reads n/a and stalls have definitely resolved**, check the
+cron is calling `clear_resolved_job_stalls()` rather than deleting from
+`job_stall_state` directly. A direct delete still clears the flag and writes no
+history, which is exactly the state this section exists to have fixed.
+
+---
+
+## Draft acceptance, the headline metric
+
+**Why this one and not "percentage resolved without a human".** The product is
+that a named person decided. A metric that improves when the person is removed
+argues against the thing being sold. Draft acceptance is the honest inverse: it
+measures whether the AI saved somebody time, and it can only go up by the
+drafting getting better.
+
+**Where it comes from.** When a worker sends an update, the assistant drafts
+the client-facing report and sends it to that worker with a choice: reply `1`
+to send it as written, or type their own version. That reply is the only moment
+anybody says whether the draft was good enough. Until 4 September 2026 it went
+to a trace span and nowhere else, which is off entirely unless an OTLP endpoint
+is configured, so in practice the number did not exist.
+
+`yaad-inbound` now writes a `draft_decisions` row at that moment, and only when
+the relay itself worked: a decision that never reached the client is not a
+decision.
+
+**On the Overview**: "Drafts sent as written". Deliberately not coloured until
+there are at least five decisions, because a sample of one reading 100% is not
+good news, it is no news, and colouring it invites trusting it too early.
+
+**The number to act on is roughly 60%.** Below that the drafter is costing time
+rather than saving it and should be paused rather than tuned indefinitely.
+
+```sql
+select * from public.draft_acceptance;
+```
+
+**`kind` exists from the start** so the report drafter writes the same rows when
+it is built. One table answering "how often is a draft good enough" across every
+drafter beats one table per agent.
+
+**Why the row is not written inside `relay_confirmed_report()`.** `yaad-inbound`
+resolves `1` into the stored draft text before calling that RPC, so by the time
+it runs, an accepted draft and a rewrite are the same argument. Only the code
+that read the worker's reply knows which happened.
+
+---
+
+
 ## The one working day promise, and how it is measured
 
 yaadly.co.uk says "a person replies within one working day" on the services

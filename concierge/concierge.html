@@ -3037,6 +3037,29 @@ async function loadOverview(){
   // two numbers are the whole of it: did we keep it, and is anybody waiting
   // right now. The assistant answering does not count towards either, because
   // the site promises a PERSON.
+  // Draft acceptance: how often what the assistant wrote was good enough to
+  // send as written. The headline metric for this business, because unlike
+  // "resolved without a human" it can only improve by the drafting getting
+  // better, never by a gate being removed.
+  const draftRows = await sb.from("draft_acceptance").select("kind,decisions,accepted,pct");
+  const drafts = (draftRows.data || []).reduce((a, r) => ({
+    decisions: a.decisions + Number(r.decisions || 0),
+    accepted: a.accepted + Number(r.accepted || 0),
+  }), { decisions: 0, accepted: 0 });
+  const draftPct = drafts.decisions ? Math.round((drafts.accepted / drafts.decisions) * 100) : null;
+
+  // Stall rate, and how long a stall lasts. job_stall_state holds only what is
+  // stuck RIGHT NOW, because a row is deleted the moment the job moves again.
+  // job_stall_resolved is what that delete now writes down on its way out, so
+  // the second half of this is only true forwards from 4 September 2026.
+  const stallRow = await sb.from("stall_metrics").select("*").maybeSingle();
+  const stall = stallRow.data || {};
+  const stalledNow = Number(stall.stalled_now || 0);
+  const liveJobs = Number(stall.live_jobs || 0);
+  const unstallHrs = stall.avg_hours_to_unstall === null || stall.avg_hours_to_unstall === undefined
+    ? null : Number(stall.avg_hours_to_unstall);
+  const unstallN = Number(stall.resolved_30d || 0);
+
   const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
   const sla = slaRows.data || [];
   const answered = sla.filter(r => r.met !== null);
@@ -3083,6 +3106,22 @@ async function loadOverview(){
     tile(oldestWait >= 24 ? "crit" : oldestWait ? "warn" : "ok",
       "Longest anyone is waiting", oldestWait ? Math.round(oldestWait) + " hr" : "0",
       waitingNow.length ? `${waitingNow.length} waiting on a person` : "Nobody is waiting"),
+    // Not coloured green at 100%: a tiny sample reading 100 is not good news,
+    // it is no news, and colouring it would invite trusting it too early.
+    tile(draftPct === null ? "" : drafts.decisions < 5 ? "" : draftPct >= 60 ? "ok" : "warn",
+      "Drafts sent as written", draftPct === null ? "n/a" : draftPct + "%",
+      drafts.decisions
+        ? `${drafts.accepted} of ${drafts.decisions} in 30 days` + (drafts.decisions < 5 ? ", too few to read yet" : "")
+        : "No drafts decided yet"),
+    tile(stalledNow ? (Number(stall.escalated_now || 0) ? "crit" : "warn") : "ok",
+      "Jobs gone quiet", String(stalledNow),
+      liveJobs ? `${Math.round((stalledNow / liveJobs) * 100)}% of ${liveJobs} live jobs` : "No live jobs"),
+    // Measured from when Yaadly noticed, not from when the job actually went
+    // quiet. That earlier moment is not recorded anywhere and a number nobody
+    // can point at a row for is worse than no number.
+    tile(unstallHrs === null ? "" : unstallHrs <= 24 ? "ok" : unstallHrs <= 72 ? "warn" : "crit",
+      "Time to get moving again", unstallHrs === null ? "n/a" : Math.round(unstallHrs) + " hr",
+      unstallN ? `${unstallN} in 30 days, from when we chased` : "Nothing has unstalled yet"),
   ].join("");
 
   const needs = [];
@@ -3094,6 +3133,9 @@ async function loadOverview(){
     "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Open conversations", "threads"));
   if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
     "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
+  if (Number(stall.escalated_now || 0)) needs.push(alertRow("crit","!",
+    stall.escalated_now + (Number(stall.escalated_now) === 1 ? " job has been quiet long enough to escalate" : " jobs have been quiet long enough to escalate"),
+    "The worker was nudged and it did not move it. The client has been told. This is the point where a job stops being late and starts being a job somebody walked away from.", "See them", "stalled"));
   if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
