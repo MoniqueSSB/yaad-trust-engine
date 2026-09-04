@@ -46,7 +46,7 @@ export type DealStageId = (typeof DEAL_STAGES)[DealStageKey];
 export const STAGE_LABELS: Record<DealStageId, string> = {
   appointmentscheduled: "Inquiry and Scoping",
   qualifiedtobuy: "Quote Sent",
-  presentationscheduled: "Client Paid, Work In Progress",
+  presentationscheduled: "Client Paid",
   decisionmakerboughtin: "Evidence Submitted",
   contractsent: "Client Approved",
   closedwon: "Completed and Paid",
@@ -75,10 +75,20 @@ export function stageKeyById(stageId: string): DealStageKey | null {
  * that: nothing is held on anybody's behalf at any point. The old label
  * described a business Yaadly deliberately is not.
  *
- * The comment at the top of this file predicted exactly this class of failure
- * and it happened anyway, because a stage label is not agent output and
- * guardrails.scan never sees one. Stage labels reach clients through deal
- * notifications, workflow emails, exports and screenshots.
+ * A stage label is not agent output and guardrails.scan never sees one, while
+ * stage labels do reach clients through deal notifications, workflow emails,
+ * exports and screenshots. So this map is the only control there is.
+ *
+ * CORRECTED the same day, having read the live portal instead of trusting this
+ * file: the pipeline ALREADY said "Client Paid". Five of the seven labels
+ * matched the map below and this one did not, so the stale half was the
+ * repository, and no client was ever shown the old word. The map now matches
+ * the portal exactly.
+ *
+ * If they disagree again, the portal is the truth and this file is the bug.
+ * Read the live labels rather than assuming: ask HubSpot for the `dealstage`
+ * property on the deals object, which returns every stage's internal value and
+ * its current label.
  */
 export const CLIENT_PAID_STAGES: readonly DealStageId[] = [
   DEAL_STAGES.CLIENT_PAID,

@@ -1898,7 +1898,9 @@ To rename one:
 3. If the meaning changed rather than only the wording, rename the key in `DEAL_STAGES` and every use of it, and say why in `DECISIONS.md`.
 4. `npm --prefix web run typecheck && npm --prefix web test`.
 
-**Outstanding manual step from 4 September 2026:** the code now says `Client Paid, Work In Progress` for stage `presentationscheduled`. The label in the HubSpot portal still says `Funds Held` until somebody relabels it there. The code change does not perform it.
+**Read the portal before you believe this repository.** On 4 September 2026 `hubspotConfig.ts` said `Funds Held` and the live pipeline already said `Client Paid`, so the stale half was the code. Ask HubSpot for the `dealstage` property on the deals object, or open Settings, Data Management, Objects, Deals, Pipelines. It returns every stage's internal value and its current label.
+
+`presentationscheduled` is the one that matters: it must never carry a label suggesting Yaadly holds anybody's money. It reads `Client Paid`, and `STAGE_LABELS` has been corrected to match.
 
 ---
 
