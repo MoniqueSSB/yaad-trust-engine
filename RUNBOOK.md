@@ -306,7 +306,7 @@ The body ended with the link variable. It now ends with a sentence after it. Kee
 
 **The four variables, in order:** job title, worker name, price, link.
 
-**Sign in codes deliberately do NOT use a template.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules, and Twilio Verify is the supported product for one. Pushing an OTP through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Over WhatsApp a sign in code stays free text: it works inside the 24 hour window and fails honestly outside it, and email remains the reliable path for it.
+**Sign in codes deliberately do NOT use one of our templates.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules. Pushing one through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Since 4 September 2026 they go through **Twilio Verify** instead, which uses Meta's own pre-defined authentication templates, so there is no template here for anybody to write or submit. See the Verify section below.
 
 ---
 
@@ -353,6 +353,33 @@ Read fresh on every call, so no redeploy.
 This is not hypothetical. On 4 September 2026 both `TWILIO_CONTENT_SID_DAILY_CHECKIN` and `TWILIO_CONTENT_SID_APPROVAL` were set to the literal placeholder `HXpasteithere`, straight out of a copied command, and matching digests are what found it. Both were unset the same evening. The damage would not have shown up for months: `yaad-daily-checkin` stops reporting "not set" the moment the secret exists, tries to send against an invalid SID, and writes `daily_checkin_log` regardless of whether the send worked, so every worker reads as asked and none of them were. **Unset is the correct state until Meta has actually approved the template.** Both functions are written for it.
 
 **If a tap does nothing at all**, the payload is the first place to look: `select command from cron.job` is irrelevant here, this is Twilio's own console. Check the button's `id` in the Content Template Builder matches `yaadly_approve_stage` character for character. A mismatch falls through as `not_ours` and the message lands in the ordinary intake pipeline, which is the safe failure but looks like silence. The trace attribute `yaadly.whatsapp_approval.button_outcome` names which branch ran.
+
+---
+
+## Twilio Verify, for sign in codes only
+
+**What it is for, and what it is deliberately not.** A sign in code cannot go through one of our own UTILITY templates without risking the WhatsApp sender, and as free text it only reaches somebody who has messaged us in the last 24 hours. Verify solves exactly that and nothing else. It uses Meta's pre-defined authentication templates, so **there is no template to write, submit or get approved for this one.**
+
+**Supabase still owns the code and the session.** `yaad-portal-code` takes the six digit `email_otp` out of `generateLink`, exactly as before, and hands it to Verify as `CustomCode`. Verify is a delivery rail, not a second source of truth. The browser still verifies against Supabase and this function still never sees the code come back. **`VerificationCheck` is deliberately never called.** If a future change routes the check through Twilio, that moves session minting out of the browser and into an Edge Function, which is a different and much larger decision; say so rather than doing it.
+
+**With `TWILIO_VERIFY_SERVICE_SID` unset, nothing changes.** The free text path behaves exactly as it did before Verify was added. Order of attempts when it IS set: Verify WhatsApp, Verify SMS, free text WhatsApp, free text SMS, with email running independently through Resend either way. Free text stays underneath because inside the 24 hour window it is legitimate and costs less than a verification.
+
+**Console setup, and it is longer than the template ones because Meta is involved:**
+
+1. **Messaging Service.** Twilio Console, Messaging, Services. Create one (or reuse one) and add the existing WhatsApp sender to it. Verify will not accept a bare number: it needs the `MG...` SID of a Messaging Service that contains the sender. This is the step people miss.
+2. **Verify Service.** Console, Verify, Services, **Create new**. The friendly name is what appears in the message, so make it `Yaadly`.
+3. **WhatsApp tab** on that Verify Service. Paste the `MG...` Messaging Service SID from step 1.
+4. Copy the Verify Service SID, which starts `VA`, and set it:
+
+```bash
+npx supabase secrets set TWILIO_VERIFY_SERVICE_SID=VApasteTheRealSidHere --project-ref leffyisvfvjwzilydlwf
+```
+
+Read fresh on every call, so no redeploy of the secret itself. `yaad-portal-code` does need deploying once for the code change, `verify_jwt` read live first as always.
+
+**Two things that can stop this before it starts.** Since March 2024 Twilio has no generic WhatsApp sender for Verify: you must bring your own, which we have. And `CustomCode` is documented as an ordinary optional parameter, but if a verification comes back rejecting it, that is an account level feature and Twilio support enables it. If they will not, the fallback is to stop passing `CustomCode` and let Verify mint its own code, which then means calling `VerificationCheck` and the much larger change above. **Do not make that change without asking.**
+
+**If a code does not arrive**, the trace names the leg: `twilio.verify.start` with `yaadly.verify.channel`, then the free text `twilio.send.*` spans underneath. The response body carries `phone.reason` verbatim, including Verify's own error text, which is what the desk needs to answer somebody locked out of their own job.
 
 ---
 

@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · Twilio Verify carries the sign in code, and carries OUR code rather than its own
+
+**Reversal, recorded as one.** Earlier the same day the founder's position was that Verify stays unbuilt and the reasoning for steering off it was sound. She changed that call in the same session. The reason it is worth building is the one that made it look risky: a sign in code cannot go through one of our own UTILITY templates without risking the WhatsApp sender, and as free text it only ever reaches somebody who has messaged us in the last 24 hours. Verify is the product that solves exactly that, using Meta's own pre-defined authentication templates, so it removes a risk rather than adding one, and there is no template for anybody here to write or submit.
+
+**The design decision that matters is `CustomCode`.** Verify's ordinary model is that Twilio mints the code and Twilio checks it. Adopting that would move session minting out of the browser and into an Edge Function, because Supabase would no longer be the thing that issued the code it is being asked to accept. That is a large change to the authentication model and it was not made. Instead `yaad-portal-code` keeps taking the six digit `email_otp` out of `generateLink` and hands it to Verify as `CustomCode`, so **Verify is a delivery rail and not a second source of truth.** `VerificationCheck` is deliberately never called. The function's own header says it issues and delivers and holds no logic about who is signed in; routing the check through Twilio would have quietly made that untrue while every test still passed.
+
+**Free text stays underneath, on purpose.** Order is Verify WhatsApp, Verify SMS, free text WhatsApp, free text SMS, with email running independently either way. Inside the 24 hour window free text is legitimate and costs less than a verification, so falling back to it beats reporting failure. With `TWILIO_VERIFY_SERVICE_SID` unset the whole Verify path is skipped and the function behaves exactly as it did before, which is the same shape every other secret-gated addition in this repository uses.
+
+**Not a new vendor, and worth saying so explicitly rather than assuming it.** Verify is a different product at Twilio, who already receive the client's phone number and the code itself on the existing free text path. No new third party sees personal data, so CLAUDE.md section 6's "flag it first" gate is satisfied by this paragraph rather than by a fresh decision. Verify is priced per verification rather than per message, which is a real cost the free text path did not have; the figure varies by destination country and is in the founder's own Twilio console.
+
+**Two things could still stop it, both outside this repository.** Since March 2024 Twilio provides no generic WhatsApp sender for Verify, so the existing sender has to sit inside a Messaging Service and that `MG` SID goes on the Verify Service's WhatsApp tab. And `CustomCode` is documented as an ordinary optional parameter but has historically been an account level feature; if Twilio rejects it, the only honest options are a support request or the much larger `VerificationCheck` rework, and the runbook says not to make that second change without asking.
+
+**Verified:** `deno check` clean. **Not verified:** a real verification actually sending, which needs the Verify Service to exist and the secret to be set, neither of which a build session can do. The secret is unset, so nothing has changed in production.
+
+---
+
 ## 2026-09-04 · Tap-to-approve reaches a client outside the 24 hour window, and the button is never allowed to pick the job
 
 **The problem it solves.** `evidence_report_confirmed` is the one message a client actually has to act on, and it goes out days after they last spoke to us. WhatsApp will not deliver free text to somebody who has been quiet 24 hours, so that message was dropping to SMS and then email exactly when it mattered most. `TWILIO_CONTENT_SID_APPROVAL` gives it the same out-of-window fallback `quote_arrived` already had, with one quick-reply Approve button on it.
