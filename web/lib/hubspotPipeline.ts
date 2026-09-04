@@ -4,7 +4,9 @@
  * Stage IDs, lifecycle membership and the funds-held rule all come from
  * ./hubspotConfig. Nothing in this file hardcodes a stage ID or a label.
  *
- * NAMING: the stage this advances to is CLIENT_PAID. Guardrail 1 in
+ * NAMING: the stage this advances to is CLIENT_PAID (renamed from FUNDS_HELD
+ * on 4 September 2026, when the principal structure made "funds held" a
+ * description of a business Yaadly no longer runs). Guardrail 1 in
  * yaad/guardrails.py bans the e-word, and that scanner only screens text on
  * its way out of an agent. A HubSpot stage name never passes through it, so a
  * banned word in a stage constant would slip the net and then surface on the
@@ -105,7 +107,11 @@ function token(): string {
 
 type HubSpotBody = Record<string, unknown> | null;
 
-async function hubspotFetch(path: string, init: RequestInit = {}): Promise<HubSpotBody> {
+/** Exported so hubspotLeads.ts can reach HubSpot through the same client:
+ *  one place that knows the base URL, the token, which failures are worth
+ *  retrying and how to say so. A second fetch wrapper would be a second set of
+ *  answers to those questions, free to drift from these. */
+export async function hubspotFetch(path: string, init: RequestInit = {}): Promise<HubSpotBody> {
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {

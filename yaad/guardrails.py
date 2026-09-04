@@ -22,6 +22,22 @@ BANNED_TERMS: dict[str, str] = {
     r"\bguarantee[sd]? (?:no|zero) \w+": "No absolute claims.",
     r"\bfully covered\b": "Say 'protected up to the guarantee limit', not 'fully covered'.",
     r"\bwe hold (?:your |the )?(?:money|funds)\b": "Yaadly orchestrates the flow, it does not hold funds itself.",
+    # Added 4 September 2026. The line above catches the active voice and only
+    # the active voice, and the passive is the form a model actually reaches
+    # for: "money is held and released stage by stage". That exact sentence was
+    # sitting in the WhatsApp assistant's own list of approved facts, so the one
+    # phrase the screen exists to stop was the phrase the instructions supplied.
+    #
+    # Deliberately narrow. It bans the claim that THE CLIENT'S money is sitting
+    # with Yaadly awaiting release, which is the escrow reading and is wrong
+    # under the principal structure settled on 3 September: the client buys the
+    # job from Yaadly outright. It does not touch "held safely with a licensed
+    # payment provider", which CLAUDE.md section 8 prescribes by name and which
+    # is not this session's to retire.
+    r"\b(?:your|the client'?s?|their)\s+(?:money|funds?)\s+(?:is|are|was|were|will be)\s+(?:being\s+)?held\b":
+        "Yaadly is principal: the client buys the job from Yaadly. Never describe the client's money as held.",
+    r"\bwe(?:'re|\s+are)\s+holding\s+(?:your|the|their)\s+(?:money|funds?)\b":
+        "Yaadly is principal: the client buys the job from Yaadly. Never say Yaadly is holding money.",
 }
 
 # 3. AI assists and drafts. Humans decide anything involving money or trust.

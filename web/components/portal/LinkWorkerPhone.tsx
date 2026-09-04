@@ -11,7 +11,7 @@ import { linkWorkerPhone } from "@/app/portal/worker-phone-actions";
  * whose number changed.
  */
 export function LinkWorkerPhone({ phone }: { phone: string | null }) {
-  const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+  const [state, setState] = useState<"idle" | "busy" | "error" | "warn">("idle");
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState(!phone);
 
@@ -35,8 +35,24 @@ export function LinkWorkerPhone({ phone }: { phone: string | null }) {
             setState("busy");
             setMsg("");
             try {
-              await linkWorkerPhone(fd);
-              setState("idle");
+              // The action now answers rather than throwing, because there are
+              // three outcomes and not two: saved, saved with something worth
+              // knowing (a landline cannot receive WhatsApp), and refused
+              // because Twilio says the number is not real.
+              const res = await linkWorkerPhone(fd);
+              if (!res.ok) {
+                setState("error");
+                setMsg(res.error);
+                return;
+              }
+              if (res.warning) {
+                // Saved, and still worth saying out loud: everything Yaadly
+                // sends a worker goes to this number.
+                setState("warn");
+                setMsg(res.warning);
+              } else {
+                setState("idle");
+              }
               setEditing(false);
             } catch (e) {
               setState("error");
@@ -62,6 +78,9 @@ export function LinkWorkerPhone({ phone }: { phone: string | null }) {
       )}
       {state === "error" && (
         <p role="alert" className="mt-2 text-[12.5px] leading-relaxed text-coral">{msg}</p>
+      )}
+      {state === "warn" && (
+        <p role="status" className="mt-2 text-[12.5px] leading-relaxed text-mango">{msg}</p>
       )}
     </section>
   );

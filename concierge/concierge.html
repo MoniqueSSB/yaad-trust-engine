@@ -661,6 +661,33 @@ async function deskReply(row, vals){
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
 }
 
+// A note on a conversation. Written straight to the row under Monique's own
+// session, so RLS is the control and this function is only the form.
+async function deskNote(row, vals){
+  const { error } = await sb.from("intake_threads")
+    .update({ desk_notes: String(vals.desk_notes || "").slice(0, 4000) })
+    .eq("channel", row.channel).eq("from_addr", row.from_addr);
+  if (error) throw new Error(error.message);
+}
+
+// Correcting what a job says before it goes to the board.
+//
+// The description on a job that arrived by conversation is written by the
+// assistant: its reading of the scope, the access note, what is worth
+// confirming, and then the client's own words kept verbatim underneath. The
+// client gets to correct it, at the read-back. Monique never did, and she is
+// the one who knows the parish is wrong because she has been there.
+//
+// The whole current text is loaded into the box so this is an edit and not a
+// replacement: the "In their own words" block at the bottom is the client's
+// and should survive being corrected around.
+async function deskEditDescr(row, vals){
+  const text = String(vals.descr || "").trim();
+  if (!text) throw new Error("An empty description would lose what the client said. Leave it, or write the correction.");
+  const { error } = await sb.from("jobs").update({ descr: text.slice(0, 8000) }).eq("id", row.id);
+  if (error) throw new Error(error.message);
+}
+
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
 const money = (p) => "£" + (p / 100).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -698,10 +725,10 @@ const TONE = {
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
+  // calls / waitlist
   // reports. reviewed is amber, not grey: it has been read and still is not
   // with the client, so it is outstanding rather than finished.
   reviewed:"warn",
-  // calls / waitlist
   requested:"warn", booked:"ok", held:"warn",
   // enquiries. "replied" and not "answered": disputes already own answered,
   // where it means the worker has responded and you still have to decide. A
@@ -823,13 +850,12 @@ const VIEWS = [
         when:r => r.status !== "issued" && r.unrated > 0,
         rpc:"rate_finding",
         ask:[
-          { k:"ord", label:"Which finding, by its number" , placeholder:"1" },
+          { k:"ord", label:"Which finding, by its number", placeholder:"1" },
           { k:"severity", label:"How serious is it",
             options:[["severe","Severe"],["moderate","Moderate"],["low","Low"]] },
         ],
         args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
         says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
-
       { label:"Write the verdict", cls:"",
         when:r => r.status !== "issued",
         rpc:"write_report_verdict",
@@ -840,7 +866,6 @@ const VIEWS = [
         ],
         args:(r, v) => ({ p_report:r.id, p_line:v.line, p_verdict:v.verdict }),
         says:() => "Writes the verdict on page one. services.html promises the client this within 72 hours of the visit, and it is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
-
       { label:"Issue it", cls:"",
         when:r => r.status !== "issued" && r.unrated === 0 && !r.needs_verdict,
         rpc:"issue_report",
@@ -872,6 +897,10 @@ const VIEWS = [
     // be refused by Postgres, which is the correct outcome but a silly way to
     // find out.
     actions:[
+      { label:"Correct what this job says", cls:"g",
+        says:() => "Edits the description workers read when this job is on the board. The whole current text is loaded in, so correct it rather than retyping it, and leave the client's own words at the bottom alone: that block is the record of what they actually said. Nothing is sent to anybody by saving this.",
+        ask:[{ k:"descr", label:"The description", type:"long", from:r => r.descr || "" }],
+        call: deskEditDescr },
       { label:"Open it to the board", cls:"", when:r => r.status !== "open_for_quotes",
         set:{ status:"open_for_quotes", open:true },
         says:r => `Puts this on the public board. Vetted workers in ${r.parish || "this parish"} can see it and quote. The address and phone stay hidden from them. If the client has not signed the Client Guidelines the database will refuse this, and that refusal is the gate working.` },
@@ -1278,7 +1307,7 @@ const VIEWS = [
 
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
-    sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back.",
+    sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back. Newest message is the last thing said, so you can triage without opening rows. Your notes are yours: the client never sees them and the assistant never reads them. To correct what the job itself says before workers see it, open the job under Jobs and use Correct what this job says.",
     select:"*",
     order:"last_at", search:["job_id","from_addr","transcript","channel"],
     empty:["No conversations yet","When somebody writes in by WhatsApp or email, the whole thread is kept here."],
@@ -1287,13 +1316,15 @@ const VIEWS = [
       {h:"From", f:r => esc(r.from_addr || "unknown") + sub_(r.channel || "")},
       {h:"Who has it", f:r => r.human_handling ? chip_("warn","with you") : chip_("mute","assistant")},
       {h:"Turns", n:true, f:r => String(r.turns ?? 0)},
+      {h:"Newest message", f:r => lastSaid_(r.transcript)},
       {h:"The conversation", f:r => transcript_(r.transcript)},
+      {h:"Your notes", f:r => r.desk_notes ? said_(r.desk_notes) : mute_("none")},
       {h:"Last heard", f:r => mute_(ago_(r.last_at))},
     ],
     actions:[
       { label:"Reply from the Yaadly number",
         when:r => r.channel === "whatsapp" || r.channel === "sms",
-        says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only delivers a typed reply within 24 hours of their last message; outside that the send is refused and told to you honestly.",
+        says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only carries a typed reply within 24 hours of their last message. Outside that your words are not lost: they are saved, a short approved message goes telling them a reply is waiting, and yours goes out in full the moment they write back. You can see anything waiting under Waiting to send.",
         ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
         call: deskReply },
       { label:"Reply in their website chat",
@@ -1305,14 +1336,56 @@ const VIEWS = [
         when:r => r.human_handling === true,
         says:() => "The assistant starts answering this number again from their next message. Nothing is sent to the client by pressing this.",
         set:{ human_handling:false } },
+      // Nowhere to write "called her, she is away until the 20th" until 4 Sep
+      // 2026. Deliberately not the transcript: the transcript is what was
+      // actually said, it is quoted back to the assistant as the
+      // conversation, and a client can read their own once their email is
+      // proven on the job. A note is none of those things.
+      { label:"Write a note to yourself", cls:"g",
+        says:() => "Kept on this conversation, for you. The client never sees it, the assistant never reads it, and it is never sent to a model. Use it for the phone call that happened off the record, or the reason this one is parked.",
+        ask:[{ k:"desk_notes", label:"Your note", type:"long",
+               from:r => r.desk_notes || "",
+               placeholder:"Called her Tuesday, she is away until the 20th. Number on the job is her brother's." }],
+        call: deskNote },
+    ]},
+
+  { k:"delivery", g:"Inbox", label:"Did it arrive", icon:"pulse",
+    title:"Message delivery", table:"message_deliveries",
+    sub:"What actually happened to the messages Yaadly sent. Twilio accepting a message is not the same as a phone receiving one: a number that has left WhatsApp, a handset that never comes online, a message a carrier drops, all look like success from our side. This is where the real answer lands. Read means they opened it. Failed or undelivered means somebody is waiting on a message that is never coming, and that is the only row here worth acting on.",
+    select:"*",
+    order:"sent_at", search:["to_addr","job_id","message_sid","status"],
+    empty:["Nothing recorded yet","Delivery reporting starts once yaad-message-status is deployed and the callback URL is set."],
+    cols:[
+      {h:"To", f:r => id_(r.to_addr || "unknown") + sub_(r.channel || "")},
+      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
+      {h:"What it was", f:r => esc(r.kind || "a message")},
+      {h:"Outcome", f:r => deliveryTone_(r)},
+      {h:"Sent", f:r => mute_(ago_(r.sent_at))},
+      {h:"Last heard", f:r => mute_(ago_(r.updated_at))},
+    ]},
+
+  { k:"waiting", g:"Inbox", label:"Waiting to send", icon:"clock",
+    title:"Replies waiting to send", table:"pending_desk_replies",
+    sub:"Replies you typed that WhatsApp would not carry, because more than 24 hours had passed since that person last wrote. Nothing is lost: each one goes out automatically the moment they send anything back, which is the thing that reopens the window. A short approved message has already gone telling them a reply is waiting. There is no button here and nothing to press. A row that sits for days is somebody who never wrote back, which is worth seeing rather than worth chasing with a timer.",
+    select:"*",
+    order:"created_at", search:["to_addr","job_id","body"],
+    empty:["Nothing waiting","When you reply to somebody more than 24 hours after their last message, it waits here until they write back."],
+    cols:[
+      {h:"To", f:r => id_(r.to_addr) + sub_(r.channel || "")},
+      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("no job")},
+      {h:"What you said", f:r => said_(r.body)},
+      {h:"State", f:r => r.sent_at ? chip_("ok","delivered") : chip_("warn","waiting on them")},
+      {h:"Tries", n:true, f:r => r.attempts ? String(r.attempts) : mute_("0")},
+      {h:"Typed", f:r => mute_(ago_(r.created_at))},
+      {h:"Delivered", f:r => r.sent_at ? mute_(ago_(r.sent_at)) : mute_("not yet")},
     ]},
 
   { k:"wamid", g:"Inbox", label:"Mid-chat", icon:"clock",
     title:"Mid-chat", table:"wa_intake_sessions",
-    sub:"Everybody caught partway through a WhatsApp conversation, before a job, an application or a photo has been filed anywhere else. The assistant asks one question at a time, and this is where you see exactly which question a person has been left sitting on. There is nothing to do here and no button to press: a row disappears on its own once the conversation finishes, and one gone quiet for more than two days is not lost, it restarts fresh the moment they write in again.",
+    sub:"Workers caught partway through answering the assistant, and only workers: a client describing a job is a free conversation and lives under Conversations instead. Three things land here. A worker who has sent photographs and not yet said which job they belong to, a worker sitting on a drafted report waiting to send it or reword it, and a worker whose written update could have been about more than one of their jobs. There is nothing to do here and no button to press: a row disappears on its own once they answer, and one gone quiet for more than two days is not lost, it restarts fresh the moment they write in again.",
     select:"*", hide:["answers"],
     order:"updated_at", search:["wa_id"],
-    empty:["Nobody mid-chat right now","When the WhatsApp assistant is partway through asking somebody about a job, a worker signup, or which job a photo belongs to, it shows here."],
+    empty:["Nobody mid-chat right now","When a worker has sent something and the assistant is waiting on them to say which job it belongs to, it shows here."],
     pre: preWaMid,
     cols:[
       {h:"Number", f:r => id_(r.wa_id) + sub_(waLaneLabel_(r))},
@@ -1513,35 +1586,86 @@ function ownWords(descr){
        + (waiting ? sub_("still gathering, the assistant has asked for more") : "");
 }
 
-// The fixed question order the WhatsApp assistant asks, one lane at a time.
-// Copied here rather than read from the webhook, because the desk has no
-// way to import from a Deno function. Kept in the same order and the same
-// keys as INTAKE_STEPS and WORKER_STEPS in yaad-whatsapp-webhook: if that
-// order changes, this copy goes stale and needs updating alongside it.
-const WA_CLIENT_STEPS = ["what","where","access","when","name","from","email"];
-const WA_CLIENT_LABELS = {
-  what:"what needs doing", where:"where the property is",
-  access:"who can let a worker in", when:"how soon they need it",
-  name:"their name", from:"where they are writing from", email:"their email",
+// The lanes wa_intake_sessions actually holds, corrected 4 September 2026.
+//
+// WHAT WAS HERE BEFORE. A seven step client questionnaire and a five step
+// worker signup, copied from INTAKE_STEPS and WORKER_STEPS in
+// yaad-whatsapp-webhook. That function was deleted on 1 September 2026 and
+// nothing replaced those two lanes: yaad-inbound does client intake as a free
+// conversation held in intake_threads, and worker signup happens at
+// app.yaadly.co.uk/apply. So this view was describing, in confident detail,
+// a questionnaire nobody has been asked since August, and the table it reads
+// has had zero rows the whole time.
+//
+// WHAT IS ACTUALLY IN THERE. Three worker lanes, all of them short lived,
+// all written by yaad-inbound:
+//   evidence        photos staged, waiting on the worker to name the job
+//   report_confirm  a drafted report waiting on the worker to send or reword
+//   text_update     a written update that named more than one possible job
+//
+// text_update has existed since 1 September and this desk had never been
+// told about it, so a worker sitting on that question showed up as "not a
+// lane this desk knows: text_update". The view was honest about not knowing,
+// which is the right behaviour and is why it is being fixed rather than
+// having been silently wrong.
+const WA_LANE_LABEL = {
+  evidence: "worker, naming the job a photo belongs to",
+  report_confirm: "worker, confirming a drafted report before the client sees it",
+  text_update: "worker, naming the job a written update belongs to",
 };
-const WA_WORKER_STEPS = ["name","trade","parishes","years","proof"];
-const WA_WORKER_LABELS = {
-  name:"their name", trade:"their trade", parishes:"which parishes they cover",
-  years:"how long they have done this work", proof:"a photo of finished work",
-};
-const WA_LANE_LABEL = { client:"client, describing a job", worker:"worker, signing up", evidence:"worker, naming the job for a photo", report_confirm:"you, confirming a drafted report" };
 
-// The lane is stored inside the answers jsonb rather than as its own column
-// (see the webhook's laneOf), so a session with no marker at all is read as
-// what it always was before evidence and worker lanes existed: a client.
-// Anything else is returned as-is rather than folded into "client": a lane
-// this view has never been taught is a fact worth seeing, not a guess worth
-// hiding.
-function waLane_(r){
-  const l = String(r?.answers?._lane || "").trim();
-  return l || "client";
+// The lane is stored inside the answers jsonb rather than as its own column,
+// so it is read out of there. A row with no marker at all used to be read as
+// "client", which was right while a client questionnaire existed and is now
+// a guess at a lane nothing writes; it is returned as itself instead, the
+// same way an unrecognised lane always was. A fact worth seeing beats a
+// guess worth hiding.
+// Delivery, coloured by what it means rather than by what Twilio called it.
+// Only failed and undelivered are red: those are the ones where somebody is
+// waiting on a message that is not coming. Accepted and queued are honestly
+// unknown rather than good, so they stay neutral instead of reading as a tick.
+function deliveryTone_(r){
+  const s = String(r.status || "").toLowerCase();
+  const code = r.error_code ? sub_("Twilio " + r.error_code) : "";
+  if (s === "read")                          return chip_("ok", "read") + code;
+  if (s === "delivered")                     return chip_("ok", "delivered") + code;
+  if (s === "failed" || s === "undelivered") return chip_("crit", s) + code;
+  if (s === "sent")                          return chip_("warn", "sent, not confirmed") + code;
+  return chip_("mute", s || "unknown") + code;
 }
-const waKnownLane_ = (lane) => lane === "client" || lane === "worker" || lane === "evidence" || lane === "report_confirm";
+
+// The newest thing on a thread, on its own.
+//
+// Conversations has always shown the transcript, which is the whole back and
+// forth truncated to 110 characters, so the newest message is at the far end
+// of a blob and reliably out of sight. Triage from a phone means seeing what
+// somebody just said without opening a row, so the last turn gets its own
+// column. The transcript column stays: this replaces nothing, it surfaces the
+// one line the other column buries.
+//
+// yaad-inbound joins turns with a blank line, and yaad-desk-reply labels its
+// own with "Monique (from the desk):", so splitting on the blank line and
+// taking the last piece is the whole job.
+function lastSaid_(t){
+  const parts = String(t || "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+  if (!parts.length) return mute_("nothing yet");
+  const last = parts[parts.length - 1].replace(/\s+/g, " ");
+  // Three speakers now, since 4 Sep 2026: the client, you, and the assistant.
+  // Saying which one had the last word is most of the value of this column.
+  const mine = /^Monique \(from the desk\):/.test(last);
+  const bot = /^Yaadly:/.test(last);
+  const body = last.replace(/^(Monique \(from the desk\)|Yaadly):\s*/, "");
+  const cut = body.length > 90 ? body.slice(0, 90) + "\u2026" : body;
+  const who = mine ? sub_("your reply, the last word so far")
+            : bot  ? sub_("the assistant, waiting on them")
+            : "";
+  return `<span title="${esc(body)}">${esc(cut)}</span>` + who;
+}
+
+function waLane_(r){
+  return String(r?.answers?._lane || "").trim() || "none recorded";
+}
+const waKnownLane_ = (lane) => Object.prototype.hasOwnProperty.call(WA_LANE_LABEL, lane);
 
 // The label shown next to the number. An unrecognised lane says so by name,
 // the same way the pricing lookup says "no public price exists" rather than
@@ -1565,11 +1689,11 @@ function waStuck_(r){
   if (lane === "report_confirm") {
     return `confirming the drafted report for ${a.job_id || "a job"} before it reaches the client`;
   }
-  if (waKnownLane_(lane)) {
-    const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
-    const labels = lane === "worker" ? WA_WORKER_LABELS : WA_CLIENT_LABELS;
-    const next = steps.find(k => !String(a[k] ?? "").trim());
-    return next ? labels[next] : "answered everything, about to be filed";
+  if (lane === "text_update") {
+    const choices = a.job_choices || [];
+    return choices.length
+      ? `naming which of ${choices.length} jobs their written update is about`
+      : "naming the job their written update is about";
   }
   return "not a lane this desk recognises yet, open the row to see what is there";
 }
@@ -1601,10 +1725,13 @@ function waFacts_(r){
       ...(a.ai_summary ? [`AI noticed: ${a.ai_summary}`] : []),
     ];
   }
-  if (waKnownLane_(lane)) {
-    const steps = lane === "worker" ? WA_WORKER_STEPS : WA_CLIENT_STEPS;
-    const lines = steps.filter(k => String(a[k] ?? "").trim()).map(k => `${k}: ${a[k]}`);
-    return lines.length ? lines : ["nothing yet"];
+  if (lane === "text_update") {
+    const choices = (a.job_choices || []).map(c => `${c.id} (${c.title})`).join(", ");
+    return [
+      `worker: ${a.worker_email || "not matched"}`,
+      `what they wrote: ${a.text || "not recorded"}`,
+      `job choices offered: ${choices || "none yet"}`,
+    ];
   }
   const lines = Object.entries(a).filter(([k]) => k !== "_lane")
     .map(([k, v]) => `${k}: ${v && typeof v === "object" ? JSON.stringify(v) : (v === "" ? "(blank)" : v)}`);
@@ -1770,8 +1897,8 @@ function paintKill(){
   b.classList.toggle("off", AGENTS_PAUSED);
   b.textContent = AGENTS_PAUSED ? "Agents: paused" : "Agents: live";
   b.title = AGENTS_PAUSED
-    ? "Paused. Nothing calls a model, including yaad-inbound: an incoming message is recorded and handed to you instead of answered."
-    : "Live. Drafting an invoice or describing stills calls a model, and yaad-inbound answers people who write in.";
+    ? "Paused. Nothing this desk starts will call a model, and yaad-inbound has answered incoming messages without one since 4 Sep 2026: it keeps the message, tells you, and says a person is picking it up."
+    : "Live. Drafting an invoice or describing stills calls a model, and so does the assistant that answers WhatsApp and the website chat.";
 }
 
 async function setAgentsPaused(next){
@@ -2368,7 +2495,7 @@ function panelSvc(rows){
 // Every row says what reads it. A row nothing reads is said to be a row
 // nothing reads, because that is the difference between a switch and a label.
 const SETTING_META = {
-  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model, and since 4 Sep 2026 stops <b>yaad-inbound</b> too: an incoming WhatsApp, SMS, email or website message is recorded, its photographs and voice notes are kept, and the client is told a person is reading it, with no model call anywhere. The thread is handed to you on the first message rather than the third. If the switch cannot be read at all, inbound treats that as paused.", true],
+  agents_paused:        ["Pause every agent", "Stops invoice drafting and sketch description from calling a model, and since 4 Sep 2026 it reaches <b>yaad-inbound</b> too, so the assistant answering WhatsApp and the website chat stops calling a model as well. Nobody is left in silence: their message is still kept, you still get the push, and they are told a person is picking it up.", true],
   worker_guidelines_version: ["Worker Guidelines in force", "current_doc_version() reads this, and the quote policy refuses an insert from anybody signed on an older version. Bumping it stops quoting until they re-sign.", false],
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
@@ -2715,7 +2842,7 @@ document.addEventListener("click", (e) => {
   if (kill) {
     const next = !AGENTS_PAUSED;
     if (!confirm(next
-      ? "Pause every agent?\n\nInvoice drafting and sketch description stop calling a model, and so does yaad-inbound: anyone who writes in is recorded and told a person is reading it, and the thread lands in your queue on their first message. Photographs and voice notes are still kept."
+      ? "Pause every agent?\n\nInvoice drafting and sketch description stop calling a model, and so does the assistant that answers WhatsApp and the website chat. Anybody who writes in is still recorded, still pushed to your phone, and told you are picking it up yourself."
       : "Let this desk call agents again?")) return;
     setAgentsPaused(next);
     return;
@@ -2906,17 +3033,6 @@ async function loadOverview(){
   VISITS = vis.data || [];
   renderCal();
 
-  // The reply clock. One view, oldest first, so the Overview can finally say
-  // how long rather than only how many. "A person replies within one working
-  // day" is on four public pages and until 4 Sep 2026 nothing measured it.
-  // See 20260904a_the_one_working_day_promise_gets_a_clock.sql.
-  const clockQ = await sb.from("v_reply_clock")
-    .select("kind,ref,channel,hours_waiting,breached")
-    .order("hours_waiting", { ascending: false }).limit(200);
-  const CLOCK = clockQ.data || [];
-  const oldest = CLOCK[0] || null;
-  const breached = CLOCK.filter(r => r.breached).length;
-
   const [intakeNew, appsWaiting, evidWaiting, quotesOut, callsNew, disputesOpen,
          invDraft, invSent, pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsigned,
          enqNew, asksNew] = await Promise.all([
@@ -2939,15 +3055,54 @@ async function loadOverview(){
     countOf("questions",   q => q.eq("published", false)),
   ]);
 
+  // ── how the assistant is actually doing ────────────────────────────────
+  //
+  // These columns went live on 4 September 2026 and nothing showed them, which
+  // made them a fact nobody could act on. Together they are the only honest
+  // read on whether the WhatsApp assistant is helping or grinding people down:
+  // how many conversations it has had, how many became a real job, and how
+  // many it had to hand to you.
+  //
+  // Deliberately all-time rather than a rolling window. At this stage the
+  // totals are small enough that a window would mostly measure how quiet last
+  // week was, and a denominator that moves on its own is how a number stops
+  // meaning anything.
+  const [waTotal, waDone, waHanded, waWaiting, waFailed] = await Promise.all([
+    countOf("jobs", q => q.eq("source", "whatsapp")),
+    countOf("jobs", q => q.eq("source", "whatsapp").eq("status", "awaiting_client_setup")),
+    countOf("jobs", q => q.eq("source", "whatsapp").eq("handed_to_human", true)),
+    countOf("pending_desk_replies", q => q.is("sent_at", null)),
+    countOf("message_deliveries", q => q.in("status", ["failed", "undelivered"])),
+  ]);
+  // Median would be better than mean on a long tail, but this reads a column
+  // rather than computing over rows, and at forty jobs the difference is
+  // noise. Revisit when it is not.
+  // ── the promise on the front of the website ────────────────────────────
+  //
+  // "A person replies within one working day" is the most concrete thing
+  // yaadly.co.uk says, and until 4 September 2026 nothing measured it. These
+  // two numbers are the whole of it: did we keep it, and is anybody waiting
+  // right now. The assistant answering does not count towards either, because
+  // the site promises a PERSON.
+  // v_reply_clock is sla_first_reply plus the contact form, sharing one
+  // definition of the promise via within_one_working_day().
+  const clockQ = await sb.from("v_reply_clock").select("kind,ref,channel,hours_waiting,breached").limit(300);
+  const CLOCK = clockQ.data || [];
+  const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
+  const sla = slaRows.data || [];
+  const answered = sla.filter(r => r.met !== null);
+  const slaMet = answered.filter(r => r.met === true).length;
+  const slaPct = answered.length ? Math.round((slaMet / answered.length) * 100) : null;
+  const waitingNow = sla.filter(r => r.awaiting_human_since && r.met === null);
+  const oldestWait = waitingNow.reduce((a, r) => Math.max(a, Number(r.hours) || 0), 0);
+
+  const turnRows = await sb.from("jobs").select("intake_turns").eq("source", "whatsapp").gt("intake_turns", 0);
+  const turns = (turnRows.data || []).map(r => Number(r.intake_turns) || 0);
+  const avgTurns = turns.length ? (turns.reduce((a, b) => a + b, 0) / turns.length).toFixed(1) : "0";
+
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
 
-  const hrs = (h) => h == null ? "nothing" : h < 1 ? "under an hour" : h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + " days";
-
   $("ovTiles").innerHTML = [
-    tile(breached ? "crit" : oldest ? "warn" : "ok", "Oldest thing waiting", hrs(oldest?.hours_waiting),
-      breached
-        ? breached + (breached === 1 ? " item is" : " items are") + " past one working day"
-        : oldest ? "Inside one working day" : "Everyone has had an answer"),
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute"),
     tile(evidWaiting ? "warn" : "ok", "Evidence to check", String(evidWaiting), evidWaiting ? "Waiting on your eyes" : "Nothing waiting"),
     tile(intakeNew ? "warn" : "ok", "Intake to triage", String(intakeNew), intakeNew ? "Read it and decide" : "Queue is clear"),
@@ -2963,14 +3118,47 @@ async function loadOverview(){
     tile("", "Feedback", String(fbN), "Unprompted, from the site"),
   ].join("");
 
+  // A second row, about the assistant rather than about your queue. Nothing
+  // here is a task: it is the scoreboard for the thing answering people while
+  // you are asleep.
+  $("ovTiles").innerHTML += [
+    tile("", "WhatsApp conversations", String(waTotal), "All time, from the assistant"),
+    tile(waDone ? "ok" : "", "Became a real job", String(waDone), waTotal ? `${Math.round((waDone / waTotal) * 100)}% of them` : "None yet"),
+    tile(waHanded ? "warn" : "", "Handed to you", String(waHanded), waTotal ? `${Math.round((waHanded / waTotal) * 100)}% needed a person` : "None yet"),
+    tile("", "Messages to finish one", avgTurns, "Average, where it got there"),
+    tile(waWaiting ? "warn" : "", "Replies waiting to send", String(waWaiting), waWaiting ? "Outside the 24 hour window" : "Nothing held"),
+    tile(waFailed ? "crit" : "ok", "Messages that failed", String(waFailed), waFailed ? "Somebody is waiting on nothing" : "All delivered"),
+    tile(slaPct === null ? "" : slaPct >= 90 ? "ok" : slaPct >= 70 ? "warn" : "crit",
+      "Replied within a working day", slaPct === null ? "n/a" : slaPct + "%",
+      answered.length ? `${slaMet} of ${answered.length} conversations` : "Nobody has needed a person yet"),
+    tile(oldestWait >= 24 ? "crit" : oldestWait ? "warn" : "ok",
+      "Longest anyone is waiting", oldestWait ? Math.round(oldestWait) + " hr" : "0",
+      waitingNow.length ? `${waitingNow.length} waiting on a person` : "Nobody is waiting"),
+  ].join("");
+
   const needs = [];
-  if (breached) needs.push(alertRow("crit","!", breached + (breached === 1 ? " person has" : " people have") + " waited more than one working day",
-    "Every page on the site says a person replies within one working day. The oldest has been waiting " + hrs(oldest?.hours_waiting) + ". This is the promise clients judge you on, and the only one they can check themselves.", "Open intake", "intake"));
+  if (oldestWait >= 24) needs.push(alertRow("crit","!",
+    "Somebody has been waiting " + Math.round(oldestWait) + " hours for a person",
+    "The site promises a person replies within one working day. This one is past that, and it is the most concrete promise Yaadly makes anywhere.", "Open conversations", "threads"));
+  else if (waitingNow.length) needs.push(alertRow("warn","?",
+    waitingNow.length + (waitingNow.length === 1 ? " conversation is waiting on you" : " conversations are waiting on you"),
+    "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Open conversations", "threads"));
+  if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
+    "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
   if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
-  if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
+  // The contact form, aged. sla_first_reply measures conversations and stops
+  // there, and the business page sends companies to this form, so an enquiry
+  // sitting for a week is the most expensive silence on the desk.
+  const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
+  const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
+    .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
+  if (enqBreached) needs.push(alertRow("crit","!",
+    enqBreached + (enqBreached === 1 ? " enquiry is" : " enquiries are") + " past one working day",
+    "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Read them", "enq"));
+  else if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
     "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
   if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),
     "Somebody asked on the public board and nothing publishes on its own. Read it, check it carries no phone number or address, then publish it or leave it.", "Read them", "asks"));
@@ -3014,7 +3202,7 @@ async function loadOverview(){
   setCount("kick", kickDraft, false);
   if (AGENTS_PAUSED) {
     $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
-      "Invoice drafting and sketch description are off, and so is yaad-inbound: people who write in are recorded and handed straight to you. Nothing is answered by a model.",
+      "Invoice drafting and sketch description are off, and so is the assistant that answers WhatsApp and the website chat. People who write in are still recorded and still reach your phone.",
       "Open settings","set"));
   }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
@@ -3117,7 +3305,7 @@ async function loadHealth(){
     "The whole promise of this desk is that an approval binds to the exact files. A row with no sha256 cannot be bound to anything, so signing it off is a signature on air.");
 
   if (AGENTS_PAUSED) add("warn","Agents are paused, and the pause does not reach everything",
-    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. yaad-inbound reads the same row directly since 4 Sep 2026, so the message that wakes it at two in the morning is recorded and handed to you instead of answered by a model. Transcription and media storage deliberately keep running while paused, because they produce the record you then read.");
+    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. yaad-inbound is covered too, as of 4 Sep 2026: it is woken by an incoming message rather than by this desk, so it reads app_settings.agents_paused itself before calling a model, which is what makes this switch mean what it looks like it means. It stops the model and nothing else: the message, the photographs and the push to your phone all still happen.");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
     "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view.");

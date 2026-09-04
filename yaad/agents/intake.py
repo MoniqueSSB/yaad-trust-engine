@@ -3,6 +3,19 @@
 Turns whatever the client sent (typed text, photo captions, or a Patois voice
 note transcript) into a structured Job Card. Voice is one option, never a
 requirement. The agent asks at most three clarifying questions and never more.
+
+A NOTE ON THE TRADE LIST, because it looks like drift and is not.
+
+The eight trades below are NOT the eighteen in data/job-taxonomy.js that the
+live product uses. They are lookup keys into benchmarks.py, which is keyed
+"roofing:minor", "plumbing:unclog" and so on, and CLAUDE.md section 5 is
+explicit that pricing is a lookup and never a model. Renaming these to match
+the product taxonomy would silently break every price band in the engine,
+which is the one failure this project can least afford.
+
+So: two vocabularies on purpose. If the two are ever unified, benchmarks.py
+has to be rekeyed in the same commit. Checked and left alone deliberately on
+4 September 2026 during the WhatsApp agent audit.
 """
 
 from __future__ import annotations

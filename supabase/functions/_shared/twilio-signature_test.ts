@@ -8,6 +8,11 @@
 //
 // Run: deno test supabase/functions/yaad-inbound/twilio-signature_test.ts
 
+// Moved here with its module on 4 September 2026. It used to live in
+// yaad-inbound, which was fine while that was the only consumer and wrong the
+// moment yaad-message-status became the second: a shared module's test should
+// not live inside one arbitrary caller, where it would be orphaned the day
+// that caller stopped importing it.
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 
@@ -84,7 +89,7 @@ Deno.test("no token configured means unchecked, not refused", async () => {
 /* ── the gate stays wired ─────────────────────────────────────────────────
    Proves index.ts is actually running this file's logic rather than a
    second copy of its own that has quietly drifted from it. */
-const inboundSource = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+const inboundSource = await Deno.readTextFile(new URL("../yaad-inbound/index.ts", import.meta.url));
 
 Deno.test("yaad-inbound uses this signature check rather than its own copy", () => {
   assert(inboundSource.includes('from "./twilio-signature.ts"'), "yaad-inbound no longer imports twilio-signature.ts");
@@ -99,5 +104,30 @@ Deno.test("yaad-inbound uses this signature check rather than its own copy", () 
   assert(
     /isTwilio && !sig\.checked/.test(inboundSource),
     "yaad-inbound no longer refuses a Twilio request it could not verify",
+  );
+});
+
+/* ── the second consumer ─────────────────────────────────────────────────
+   yaad-message-status became the reason this module moved into _shared. It
+   runs with --no-verify-jwt like yaad-inbound, so the same rule applies to it:
+   the module may report "nothing was verified", and the function is what has
+   to decide that such a request does not get in. */
+
+const statusSource = await Deno.readTextFile(
+  new URL("../yaad-message-status/index.ts", import.meta.url),
+);
+
+Deno.test("yaad-message-status uses this check and refuses what it cannot verify", () => {
+  assert(
+    statusSource.includes('from "./twilio-signature.ts"'),
+    "yaad-message-status no longer imports the shared signature check",
+  );
+  assert(
+    /if \(!sig\.checked\)/.test(statusSource),
+    "yaad-message-status no longer refuses a callback it could not verify",
+  );
+  assert(
+    /if \(!sig\.ok\)/.test(statusSource),
+    "yaad-message-status no longer refuses a bad signature",
   );
 });

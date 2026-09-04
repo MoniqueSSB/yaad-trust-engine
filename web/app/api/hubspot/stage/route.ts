@@ -62,10 +62,13 @@ import {
  * releasing funds is its own human decision, and is not this endpoint.
  */
 const EVENTS: Record<string, (dealId: string) => Promise<StageMove>> = {
-  // client_paid is the name. payment_held is kept as an accepted alias so a
-  // sender configured against the old name does not start failing silently on
-  // the day the stage was relabelled (4 Sep 2026). Both reach the same stage.
-  // Drop the alias once nothing is sending it.
+  // 'client_paid' replaced 'payment_held' on 4 September 2026, alongside the
+  // stage rename in hubspotConfig.ts. 'payment_held' is kept as an accepted
+  // alias rather than deleted: this is a wire contract, nothing in the
+  // repository sends it today but a sender configured outside the repository
+  // would break silently, and a webhook that starts answering 400 to a sender
+  // nobody can see is the worst kind of outage. Remove the alias once the
+  // senders are known.
   client_paid: advanceDealToClientPaid,
   payment_held: advanceDealToClientPaid,
   evidence_submitted: advanceDealToEvidenceSubmitted,

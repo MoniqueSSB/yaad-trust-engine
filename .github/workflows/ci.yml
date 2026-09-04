@@ -111,10 +111,22 @@ jobs:
       # The banned-language screen exists twice, once in Python for the engine
       # and once in Deno for the live functions, because they are two runtimes
       # and the rule has to hold in both. Two copies of a rule drift, so both
-      # suites assert the same five phrases. If somebody loosens one pattern,
-      # one of these two jobs goes red.
-      - name: Run the Deno guardrail tests
-        run: deno test --allow-read supabase/functions/_shared/
+      # suites assert the same phrases. If somebody loosens one pattern, one of
+      # these two jobs goes red.
+      #
+      # POINTED AT THE WHOLE TREE, 4 Sep 2026, and that is the point of this
+      # step now. It used to read `supabase/functions/_shared/`, which ran ten
+      # tests and left forty-eight sitting unenforced next door in yaad-inbound:
+      # the Twilio signature check that is the only door in front of four money
+      # RPCs, the price guard that stops an invented figure reaching a client,
+      # the job-code matcher that decides which job an approval lands on. All
+      # forty-eight passed the day they were written and no build has ever
+      # depended on them. `deno test` only picks up files matching its own
+      # naming convention, so widening the path runs the tests and never an
+      # index.ts. Do not narrow this back to one directory: a test nobody runs
+      # is documentation, not a control.
+      - name: Run the Deno guardrail and Edge Function tests
+        run: deno test --allow-read supabase/functions/
 
       # The provider decision lives in _shared/textmodel.ts and nowhere else.
       # A hard-coded model endpoint in a function is how the estate ended up on

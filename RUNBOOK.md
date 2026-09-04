@@ -53,7 +53,13 @@ Read `verify_jwt` for the function you are about to deploy, then match it.
 supabase functions deploy yaad-agent --project-ref leffyisvfvjwzilydlwf
 ```
 
-**`verify_jwt` is false**, only the endpoints that carry their own authentication (`yaad-inbound`, `yaad-whatsapp-webhook`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`), so deploy with the flag:
+**`verify_jwt` is false**, only the endpoints that carry their own authentication, so deploy with the flag. **Read the live setting before you deploy, do not trust this list**, which is the whole point of the rule and which this line itself got wrong: it named four functions when ten were actually running without platform auth, and it named `yaad-whatsapp-webhook`, deleted on 1 September 2026. As of 4 September 2026 the list is `yaad-inbound`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`, `yaad-website-intake`, `yaad-post-job`, `yaad-book-service`, `yaad-portal-code`, `yaad-quote-landed`, `yaad-notify-client` and `yaad-message-status`.
+
+`yaad-message-status` was added on 4 September 2026 and this line was updated in the same change, which is the whole discipline: the previous session added six endpoints to this set and left the list naming four, which is the failure the list exists to prevent. **`yaad-phone-check`, added the same day, is deliberately NOT on it**: Twilio Lookup is charged per call and the only legitimate caller is a signed-in worker, so it keeps platform auth and deploys with no flag.
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
 
 ```bash
 supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
@@ -166,10 +172,22 @@ supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzily
 
 **To point at something else entirely**, no code change: set `TEXT_MODEL_KEY`, `TEXT_MODEL_API`, `TEXT_MODEL_NAME` and `TEXT_MODEL_REGION`. Those take priority over everything. A new hard-coded provider in that file is a new country receiving personal data, so it is a founder decision and a line in the data inventory before it is a code change.
 
-**Deploying the eight**, from disk only, never by pasting file contents:
+**Deploying them**, from disk only, never by pasting file contents.
+
+**Do not paste the loop that used to be here.** It ran `--no-verify-jwt` across eight functions at once, including `yaad-whatsapp-webhook`, which no longer exists, and including `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff` and `yaad-sketch`, which all run with `verify_jwt = true`. Pasting it would have silently stripped platform authentication from five admin-only endpoints, the deploy would have succeeded, and nothing would have said so. That is exactly the failure CLAUDE.md section 12 describes when it says the flag is per function and never a blanket. Corrected 4 September 2026.
+
+Read the live settings first, then deploy each function with the flag it already has:
 
 ```bash
-for f in yaad-agent yaad-completion yaad-inbound yaad-invoice yaad-kickoff yaad-post-job yaad-sketch yaad-whatsapp-webhook; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+```bash
+for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-sketch; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf; done
+```
+
+```bash
+for f in yaad-inbound yaad-post-job yaad-notify-client; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
 ```
 
 ---
@@ -585,11 +603,616 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## The one working day promise, and how it is measured
+
+yaadly.co.uk says "a person replies within one working day" on the services
+page, the business page and the desk pages. It is the most concrete promise the
+site makes. Until 4 September 2026 nothing measured it: no timestamp for when a
+person answered, no age on any alert, no way to say at the end of a week
+whether it held.
+
+**Three timestamps on `intake_threads`, and the rule in one function.**
+
+| Column | Set by | Meaning |
+|---|---|---|
+| `first_client_at` | `yaad-inbound`, on a new thread only | the clock starts |
+| `first_human_reply_at` | `yaad-desk-reply`, once, never overwritten | a real person answered |
+| `awaiting_human_since` | set on handover, cleared on reply | who is still owed one |
+
+**The assistant answering does not count.** The site promises a PERSON.
+Counting the assistant would make the number beautiful and meaningless, and
+quietly turn the promise into something the site does not make.
+
+**`first_human_reply_at` is written once.** The promise is about the first
+reply, so a long conversation cannot make a slow start look fast.
+
+**`first_client_at` is only set on a new thread.** Otherwise every new message
+would restart the clock and the promise would always look met.
+
+**The rule lives in `within_one_working_day()`**: same day or the next working
+day, weekends excluded. Verified against six cases including the one that
+matters, Friday afternoon to Monday morning, which counts as met.
+**Jamaica public holidays are deliberately not handled.** Adding a holiday
+table for a metric nobody has looked at yet would be inventing precision. When
+it matters it goes in that function and nowhere else.
+
+**On the Overview**: "Replied within a working day" as a percentage, and
+"Longest anyone is waiting" in hours. Anything past 24 hours raises a red
+alert, because that is the promise broken rather than a queue getting long.
+
+**Read it directly** with the `sla_first_reply` view, one row per conversation.
+
+```sql
+select from_addr, job_id, met, round(hours::numeric,1) as hours
+  from public.sla_first_reply
+ where met is not null order by first_client_at desc limit 20;
+```
+
+**The backfill is honest about what it does not know.** Existing rows took
+`last_at` as their start, which is the only timestamp those rows ever carried.
+Threads that already had a person on them were left null rather than guessed: a
+made up SLA figure is worse than a missing one, because it would be quoted.
+
+---
+
+
+## The assistant's own numbers, on the Overview
+
+A second row of tiles, added 4 September 2026, about the assistant rather than
+about your queue: conversations it has had, how many became a real job, how
+many it had to hand to you, the average number of messages it took, replies
+waiting outside the 24 hour window, and messages that never arrived.
+
+**Handed to you, read next to messages to finish one, is the honest read on
+whether it is helping.** A rising handover rate or a rising message count means
+it is grinding people down, whatever the conversations look like one at a time.
+
+**All time, not a rolling window, and deliberately so.** At this volume a
+window would mostly measure how quiet last week was, and a denominator that
+moves on its own is how a number stops meaning anything. Worth revisiting when
+there are enough jobs for a window to say something.
+
+**Handed to you starts near zero for a reason.** It was backfilled only where a
+conversation still existed in `intake_threads`, which is five threads. It is a
+going forward number, not a history.
+
+**Messages that failed is the only one that is a task.** It raises an alert,
+because Twilio accepted those and the phone never got them, so somebody is
+waiting on a message that is not coming and nothing else in the system knows.
+
+---
+
+
+## Reading a conversation in the desk
+
+**Conversations now shows both halves.** Until 4 September 2026 the transcript
+held only what the client said; the assistant's replies went nowhere. Lines are
+labelled:
+
+| Prefix | Who |
+|---|---|
+| *(none)* | the client |
+| `Yaadly:` | the assistant |
+| `Monique (from the desk):` | you |
+| `Monique (from the desk, waiting to send):` | you, queued outside the 24 hour window |
+
+The **Newest message** column says which of the three had the last word, which
+is usually the whole question: a thread whose last line is the assistant is
+waiting on the client, and one whose last line is the client is waiting on
+somebody.
+
+**If a client ever says "your assistant told me X", it is now in the
+transcript.** Before this it existed only in the raw `yaad-inbound` function
+logs, which are private to the project and expire.
+
+**What is recorded is what was sent**, not what the model drafted. If the
+banned-language screen blocked a reply, the transcript shows the holding
+message that actually went, because a record claiming Yaadly said something it
+refused to send would be worse than no record. The blocked draft is still in
+the function log, as it always was.
+
+---
+
+
+## Knowing whether a message actually arrived
+
+**Twilio returning 201 means Twilio took the message, not that a phone got
+it.** A number that has left WhatsApp, a handset that never comes online, a
+message a carrier drops: all of them look exactly like success from the sending
+side. Every send in this system was fire and forget.
+
+It matters most for a desk reply, because by then the assistant has already
+promised the client that Monique would come back to them on that number. A
+silent failure leaves a promise nobody kept and nobody knows.
+
+`yaad-message-status` receives Twilio's callbacks and records them in
+`message_deliveries`. The desk shows them under **Did it arrive**.
+
+**Only failed and undelivered are red.** Accepted and queued are honestly
+unknown rather than good, so they stay neutral rather than reading as a tick.
+Read means they opened it.
+
+### Turning it on
+
+Deploy the function **with the flag**, because Twilio holds no Supabase
+session and the endpoint carries its own HMAC check instead:
+
+```bash
+supabase functions deploy yaad-message-status --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+Then point sends at it:
+
+```bash
+supabase secrets set TWILIO_STATUS_CALLBACK_URL=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-message-status --project-ref leffyisvfvjwzilydlwf
+```
+
+```bash
+supabase functions deploy yaad-desk-reply --project-ref leffyisvfvjwzilydlwf
+```
+
+Until that secret is set, no callback is requested and nothing changes.
+
+**A forged callback can only make a status wrong.** This endpoint records what
+it is told and acts on nothing, which is why it is safe to expose at all. It
+still refuses a request it cannot verify, the same call `yaad-inbound` makes:
+an endpoint that cannot tell who is calling does not get a development mode.
+
+**It always answers 200 once verified**, even when the database write fails.
+Twilio retries anything else, and a retry storm over a database blip would turn
+a cosmetic problem into a real one. Failures are in the function log.
+
+**A note on `twilio-signature.ts`.** It moved into `_shared/` on 4 September
+2026 when this became the second function to verify a Twilio signature. Two
+hand-copied versions of the check standing in front of endpoints that run with
+`--no-verify-jwt` could have drifted in silence; in `_shared` the build fails if
+they differ.
+
+---
+
+
+## A worker's number is checked before it is saved
+
+**The failure this closes.** A worker's whole surface is WhatsApp: the quote
+pack, the Kickoff Pack confirmation, the daily check-in, the prompt for
+evidence, the draft report they approve before a client sees it. All of it goes
+to `worker_profiles.phone`, which they type into a form themselves. A landline
+or one transposed digit means none of it arrives, nothing anywhere says so, and
+the first person to notice is a client asking why nobody turned up.
+
+`yaad-phone-check` runs Twilio Lookup when they submit the form.
+
+| Twilio says | What happens |
+|---|---|
+| Not a real number | Refused, with the reason, while they are still looking at the form |
+| A landline | **Saved**, with a warning shown. A worker with no mobile is a business problem, not a validation error |
+| A mobile | Saved, in proper E.164 |
+| Lookup unreachable or unconfigured | Saved exactly as typed, as it was before this existed |
+
+**It also fixes the stored shape**, which is the quieter win. `link_worker_phone`
+strips a number to bare digits, so "876 555 1234" was stored as 8765551234
+while Twilio delivers 18765551234 for the same person. That mismatch is why
+phone matching was ever written as "the last nine digits", the rule 20260904b
+had to replace because it made two numbers in different countries one person.
+Saving Lookup's E.164 stops the mismatch being created in the first place.
+
+**Nothing to configure.** It uses `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`,
+already set as Supabase secrets. Deploy with **no** flag, because `verify_jwt`
+must stay true: Lookup is charged per call and the only legitimate caller is a
+signed-in worker on their own form.
+
+```bash
+supabase functions deploy yaad-phone-check --project-ref leffyisvfvjwzilydlwf
+```
+
+**Why it is a function and not a server action.** The Twilio credentials live
+as Supabase secrets and nowhere else. The web app runs on Cloudflare Workers
+and does not have them, and copying a credential into a second place to save
+one HTTP hop is a bad trade.
+
+---
+
+
+## A worker checks in by dropping a location pin
+
+**Nothing to set up.** No template, no secret, no Twilio console step. WhatsApp
+has sent location pins natively for years and Twilio puts the coordinates
+straight on the inbound webhook, so this works the moment `yaad-inbound` is
+deployed.
+
+**How a worker uses it.** In the Yaadly chat: paperclip, Location, Send your
+current location. That is the Arrival Log entry. They get back "Checked in on
+JOB-XX (Roof leak, Portland). That is on the Arrival Log now."
+
+If they have more than one job running it asks which, with the same job code
+prompt the photo and update lanes already use. With one job it just logs it,
+because the portal has never asked for a code either: arrival is evidence, not
+a release.
+
+**Why this is better evidence than the portal button**, not just easier. A pin
+carries coordinates; the button carries only a timestamp. The coordinates go
+through the same 30km parish check the portal uses, so a pin dropped a long way
+from the job's parish is recorded and flagged (`arrival_log.far_from_site`)
+rather than refused. Flagged and not refused is deliberate: a parish centroid
+is a rough thing and a worker on a real job at the edge of a parish must not be
+locked out by geometry.
+
+**A second pin the same day changes nothing.** The Jamaica-local unique
+constraint holds, and they are told they are already checked in.
+
+### What it cannot do
+
+`log_arrival_via_whatsapp` refuses unless the sender's number belongs to a
+published worker who is already the worker on that job. A number that merely
+resembles another (the last-nine-digits collision) is refused, and a worker
+cannot check in on a colleague's job. Both are asserted in
+`supabase/tests/arrival_pin_guards.sql`, seven checks, all passing 4 September
+2026.
+
+**A structural note for whoever changes this next.** The logic now lives in
+`_do_log_arrival()`, which takes the worker's email as a parameter and is not
+reachable from PostgREST. `log_arrival()` (the portal) and
+`log_arrival_via_whatsapp()` are both thin wrappers that establish who the
+worker is and delegate, which is the same split `_do_approve_stage` and
+`_do_choose_worker` already use. Test 7 in that rig exists to catch the portal
+door losing its session check during a future edit.
+
+---
+
+
+## Tap to approve, instead of typing a job code
+
+**The friction this removes.** To approve a stage, a client sends the job's own
+code, `JOB-WA-1757000000000`. That code is deliberately hard to produce by
+accident: `approval-match.ts` refuses ordinals, titles and a bare "yes",
+because every plain message a client sends passes through that check and a
+stray "1" must never approve anything. The safety is right. The cost is that
+somebody has to type thirteen digits correctly, on a phone, to move money.
+
+**How a tap works.** Twilio delivers a WhatsApp Quick Reply tap as an ordinary
+inbound message, with `ButtonPayload` carrying whatever the template's button
+was built with. `yaad-inbound` takes the payload as the message text, so **put
+the job's own code in the payload** and a tap arrives as the same string a
+typed code does.
+
+**Nothing else changes, and that is deliberate.** The tap goes through the same
+`matchApprovingJob()`, the same phone check against `jobs.client_phone`, the
+same security definer RPCs and the same refusals in the same words. A button
+cannot do anything a typed code could not, and cannot reach a job the sender's
+number is not on. It is a way of typing, not a new authority. Giving buttons
+their own branch that trusted the payload would have made the button the thing
+being trusted rather than the code plus the number, and that is the gate this
+product sells.
+
+**It is inert until you build a template**, so nothing changes on the live
+number today.
+
+### Building the template
+
+**Twilio Console, Messaging, Content Template Builder, Create new.** Content
+type **Quick Reply**, category **Utility**.
+
+Body, with one variable for the job:
+
+```
+Your Yaadly job {{1}} has evidence waiting for you to look at. Approve it here, or reply with anything if something is not right.
+```
+
+Add one button:
+
+| Field | Value |
+|---|---|
+| Button text | `Approve` |
+| Button payload | `{{2}}` |
+
+Set the samples to a job title for `{{1}}` and a job code such as
+`JOB-WA-1757000000000` for `{{2}}`. Submit for WhatsApp approval.
+
+**The payload must be the bare job code and nothing else.** Not "APPROVE
+JOB-WA-...", not a label, not a sentence. `matchApprovingJob()` looks for the
+code inside the text, so extra words would still work, but only by luck, and
+the code alone is the thing that has been reasoned about.
+
+Then set the SID and redeploy:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_APPROVE=HX... --project-ref leffyisvfvjwzilydlwf
+```
+
+**Both halves are now built.** `yaad-notify-client` sends the button on the
+`evidence_report_confirmed` notification, which is the one message in the whole
+system that asks a client to approve. (Not `evidence_landed`, which despite the
+name goes to the WORKER, carrying the drafted report for them to send or
+reword.)
+
+**The button is sent AFTER the report, not instead of it,** and that is the
+part not to undo. The report itself carries the worker's own words about what
+was done, the AI's notes, the item codes and the photographs. A template's
+fixed variable slots hold none of that, and this file's own header records why
+sending a template in place of a richer message is the wrong trade. So the
+report goes as it always has, and a short second message follows carrying the
+button. `approve-button_test.ts` fails the build if that ever inverts.
+
+It only follows a successful WhatsApp delivery, because a lone Approve button
+arriving with no report in front of it asks somebody to approve work they have
+not been shown. If the button send itself fails, it is logged and nothing else
+happens: the client already has the report and the typed code still works.
+
+Trace attribute: `yaadly.notify.approve_button`.
+
+### If a tap ever fails
+
+The trace attribute `yaadly.inbound.tapped` says whether a message arrived as a
+tap or as typing. That is the difference between a broken template and a client
+mistyping, and it is the first thing to look at.
+
+---
+
+
+## A reply outside WhatsApp's 24 hour window
+
+**The rule is WhatsApp's, not Twilio's and not ours.** A business may send free
+text only within 24 hours of the person's last message. Outside that, Twilio
+refuses with code 63016 and nothing is delivered.
+
+It matters here more than it would elsewhere. You work evenings, a few hours a
+day. A client writes Tuesday afternoon, you reach the desk Wednesday night:
+that is outside the window, and it is the ordinary shape of the week rather
+than an edge case. Meanwhile the assistant has already told them you would come
+back to them on this number.
+
+**What happens now, since 4 September 2026.** Nothing is lost. `yaad-desk-reply`
+keeps your words in `pending_desk_replies`, sends a short approved template
+saying a reply is waiting, records it on the transcript, and claims the thread
+so the assistant stays quiet. The moment that number sends anything at all,
+`yaad-inbound` delivers your reply in full, in your own words. The client's own
+message is what reopens the window, so it is the only trigger; there is no
+timer and no cron.
+
+You can see anything waiting in the desk, under **Waiting to send**. A row that
+sits there for days is somebody who never wrote back, which is worth seeing
+rather than worth chasing.
+
+### The one setup step, and it needs the Twilio console
+
+The nudge cannot go until an approved template exists. Without it the reply is
+still saved and still delivered later, but the client is never told to write
+back, so it may sit a long time. The function says so in the note it returns.
+
+**Twilio Console, Messaging, Content Template Builder, Create new.**
+
+| Field | Value |
+|---|---|
+| Template name | `yaadly_desk_reply_waiting` |
+| Language | English |
+| Category | **Utility**, not Marketing |
+| Content type | Text |
+
+Body, exactly this, one variable:
+
+```
+Monique at Yaadly has replied to your message about {{1}}. Send any message back here and her reply will come through straight away.
+```
+
+Set the sample for `{{1}}` to a job code such as `JOB-WA-1757000000000`. Submit
+it for WhatsApp approval. Utility templates about an existing conversation are
+normally approved quickly.
+
+**Then set the SID in two places** (the same value), and redeploy:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_DESK_REPLY=HX... --project-ref leffyisvfvjwzilydlwf
+```
+
+```bash
+supabase functions deploy yaad-desk-reply --project-ref leffyisvfvjwzilydlwf
+```
+
+**Why your actual words are not in the template.** A template's variable slots
+are approved for one specific sentence. `yaad-notify-client`'s own header
+records why reusing a template to carry a different sentence is how a WhatsApp
+sender gets flagged. So the template says a reply is waiting, and your words go
+as free text once the window is open, which is the only way they arrive as you
+wrote them.
+
+**A related thing worth checking while you are in there.**
+`TWILIO_CONTENT_SID_QUOTE` is set as a Supabase secret and its value cannot be
+read back, so nothing here can confirm the template it names still exists. If
+`yaad-notify-client`'s quote fallback ever needs to fire, a stale SID would
+fail silently. Worth eyeballing the Content Template Builder list while the
+page is open.
+
+---
+
+
+## Turning the HubSpot lead sync on
+
+**Both HubSpot setup steps are done, 4 September 2026.**
+
+The deal property `yaadly_job_id` exists as a single-line text property, created
+by Monique. Verified live: an exact-match search on it returns cleanly, which is
+the call `findDealByJobId` makes before every write.
+
+The `default` pipeline's stage `presentationscheduled` was renamed from **"Funds
+Held"** to **"Client Paid"**, using the HubSpot API with the token in the main
+checkout's `.env`. Label only: `displayOrder` and `metadata` were read first and
+sent back unchanged so the PATCH could not quietly reorder the board or alter
+the stage's win probability. The internal id is untouched, which is what the
+code matches on. All seven stage labels now match `STAGE_LABELS` in
+`hubspotConfig.ts` exactly.
+
+It mattered because that label is client-facing whenever a deal notification or
+workflow email goes out, and "funds held" described a structure Yaadly stopped
+operating on 3 September when it became principal.
+
+**If a stage ever needs renaming again: rename, never delete and recreate.** The
+internal id survives a rename and is what every stage move matches on;
+recreating a stage hands out a new id and breaks them all at once.
+
+**Then deploy.** Nothing happens until both are out:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+The web app deploys with its usual OpenNext build, which carries the new
+`/api/hubspot/lead` route.
+
+**What actually gets sent, and what does not.** Name if they gave one, the
+number they messaged from, parish, trade, urgency, the job code, and which door
+they came through. The job description, the address, the photographs and their
+email are deliberately held back: the description is whatever somebody typed on
+WhatsApp and routinely carries the address, who is alone in the house, and a
+voice note transcribed in their own words, none of which a sales pipeline
+needs. The same test file fails the build if that list is widened. Widening it
+is a data protection decision and it is Monique's.
+
+**It fires once, on a confirmed job.** Not on a greeting, not mid conversation,
+not on a thread handed to a person. A CRM full of people who said "hi" is a CRM
+nobody opens.
+
+**When it does not work, nothing breaks.** The sync runs after the client has
+already been answered, and every failure is a log line in `yaad-inbound`
+starting `hubspot lead:`. A CRM that missed a lead is a worse day; a client who
+was not answered is a worse business. Check the function logs, and the trace
+span `hubspot.lead` for the status code. If `yaadly_job_id` has not been
+created, the error says so in words rather than leaving you with HubSpot's own
+400.
+
+**To turn it off again**, remove the secret from either side. The function
+checks for it before doing anything at all.
+
+```bash
+supabase secrets unset HUBSPOT_LEAD_WEBHOOK_SECRET --project-ref leffyisvfvjwzilydlwf
+```
+
+---
+
+## Checking the assistant still reads Patois
+
+Twenty minutes, from a phone, and it wants doing before the December pilot and
+after any change to the intake prompt.
+
+"UNDERSTAND Patois perfectly" is the single most important line in that prompt
+and nothing automated can check it: judging whether a model understood "di pipe
+unda di sink bruk" needs the model. So this is a manual run, and the ten
+messages are checked in.
+
+1. Open `supabase/functions/yaad-inbound/patois-fixtures.ts`. Ten messages,
+   each with a one sentence note saying what the assistant has to get right.
+2. Send each one to the Yaadly WhatsApp number from a phone that is **not** on
+   a job and **not** a published worker, or every message gets diverted into a
+   worker lane before it reaches intake. Wait for the reply before the next.
+3. Mark each against its own `mustGetRight` line. Three are the ones that
+   matter most: the two marked SAFETY, which must refuse to say whether
+   something is safe, and the one marked PRICE, which must give no number even
+   though it is asked for a ballpark in the same breath.
+4. Bin the ten draft jobs afterwards. They will be `JOB-WA-` rows at status
+   `draft`, visible under Jobs in the concierge.
+
+`deno test --allow-read supabase/functions/` runs the one thing that can be
+automated: every trade the fixtures expect is still a trade the prompt offers.
+If somebody renames a trade, that goes red, and without it a whole run of this
+harness would be unmarkable without anybody noticing.
+
+---
+
+## The reply is late, or Twilio logged an 11200
+
+Twilio abandons an inbound message webhook at about fifteen seconds. Past that
+it logs error 11200 and the sender gets nothing, which from their side is
+identical to the message vanishing.
+
+Since 4 September 2026 the whole request runs on one budget of twelve seconds
+(`supabase/functions/yaad-inbound/deadline.ts`). Every slow step asks it for a
+slice rather than carrying its own timeout, and a step with no room left is not
+started at all.
+
+**Read the trace first.** Three attributes answer nearly everything:
+
+- `yaadly.request.spent_ms` how long it actually took.
+- `yaadly.request.budget_ms` twelve seconds for Twilio, ninety for email.
+- `yaadly.reply.source` `model` when the assistant wrote the reply, `card` when
+  it ran out of clock and the reply was built from the classification instead,
+  `none` when there was no classification either.
+
+**A run of `card` is the signal worth acting on.** It means replies are still
+going out and still make sense, but the writer is being squeezed, so something
+ahead of it is slow. Usually the transcriber. It is a warning, not an outage.
+
+**A run of `none` means the classifier is failing or being skipped.** Check the
+function logs for lines beginning `classify:`, which name the reason: an HTTP
+status from the provider, a body that was not JSON, or "skipped, no time left".
+
+**What gets dropped, in order.** The reserves are set so the last thing
+squeezed is the only step with a fallback: transcription, then the classifier,
+then the writer. Photographs are bounded too, and one that could not be fetched
+in time is recorded on the job as missing so it can be asked for again.
+
+**Do not fix this by raising a single timeout.** That is what the file used to
+do and it is why a voice note could not be answered: a 90 second transcription
+behind a 45 second media fetch behind a 25 second model call, every number
+sensible on its own and no one number wrong. `two-calls_test.ts` fails the
+build if a fixed timeout comes back on this path.
+
+---
+
+## Somebody says the assistant has gone quiet
+
+Check these three, in this order.
+
+1. **Is the desk switch on?** Settings in the concierge, "Pause every agent".
+   Since 4 September 2026 that switch reaches `yaad-inbound`: when it is on,
+   the assistant does not call a model, and every message gets a fixed holding
+   reply saying Monique is picking it up herself. The message, the photographs
+   and the push to her phone all still happen. This is the switch working, not
+   a fault. Trace attribute: `yaadly.agents_paused`.
+2. **Has the thread been handed over?** `intake_threads.human_handling` true
+   means she has taken it, and the assistant stays quiet until "Hand back to
+   the assistant" is pressed in Conversations. There is deliberately no
+   timeout.
+3. **Have they hit the throttle?** Forty messages an hour from one number, from
+   4 September 2026, counted off `wa_inbound_seen`. They get a plain sentence
+   rather than silence. Outcome attribute reads `throttled`.
+
+```sql
+select from_addr, count(*) from public.wa_inbound_seen
+ where seen_at > now() - interval '1 hour' group by 1 order by 2 desc;
+```
+
+A fourth possibility, and the only one that is actually a fault: the job write
+failed. Outcome `job_write_failed`, an urgent push titled "A job did not save",
+and the conversation is kept with `human_handling` set so she picks it up. The
+client got a real reply either way; nothing else will chase it.
+
+---
+
+## Correcting what a job says before workers see it
+
+The description on a job that came in by conversation is the assistant's
+reading of it, with the client's own words kept verbatim underneath. The client
+corrects it at the read-back. Until 4 September 2026 Monique could not correct
+it at all.
+
+Jobs, open the row, **Correct what this job says**. The whole current text
+loads into the box so it is an edit rather than a retype. Leave the "In their
+own words" block at the bottom alone: that is the record of what the client
+actually said, and it is what a dispute would be read against.
+
+Notes that are for her and not for the job go in Conversations, **Write a note
+to yourself**. Those are never shown to the client, never read by
+`yaad-inbound` and never sent to a model, which is exactly why they are a
+separate column from the transcript rather than a line inside it.
+
+---
+
 ## Worker WhatsApp evidence now runs on Twilio, not Meta
 
-**There is no Meta setup to finish. It was tried, reverted, and moved.** `yaad-whatsapp-webhook` (Meta) is back to client intake and worker signup only, exactly as it was before 31 Aug 2026. The photo-texting feature lives in `yaad-inbound` now, on the number already registered with Twilio.
+**There is no Meta setup to finish. It was tried, reverted, and moved.** The Meta webhook was deleted on 1 September 2026 (see DECISIONS.md); it never received real traffic. Everything WhatsApp lives in `yaad-inbound` now, on the number already registered with Twilio.
 
-**A worker's evidence message is recognised by three things, checked in this order inside `yaad-inbound`:** the channel is `whatsapp` (not plain SMS), the sender's number matches a published (`active = true`) worker's `worker_profiles.phone` on the last 9 digits, and the message carries an image or video attachment. Miss any one of those and the message falls through to the ordinary client-intake pipeline this endpoint has always run, unchanged.
+**A worker's evidence message is recognised by four things, checked in this order inside `yaad-inbound`:** the channel is `whatsapp` (not plain SMS), Monique has not personally taken this number over (`intake_threads.human_handling`), the sender's number matches a published (`active = true`) worker's `worker_profiles.phone`, and the message carries an image or video attachment. Miss any one of those and the message falls through to the ordinary client-intake pipeline this endpoint has always run, unchanged.
+
+**Two things changed here on 4 September 2026.** The number match is now `samePhone()` in `supabase/functions/yaad-inbound/phone.ts`, which requires a full match or a country-code-sized difference, rather than the last nine digits, which treated two numbers in different countries as one person. And a worker whose message asks for a person ("can I speak to someone") is no longer filed as evidence: it falls through and reaches you, the same way a client asking for a person always has.
 
 **To see whether a worker's number is actually linked**, same query as before, table and matching logic are unchanged by the provider switch:
 

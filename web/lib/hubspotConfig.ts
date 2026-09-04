@@ -25,7 +25,22 @@
 
 export const PIPELINE_ID = "default";
 
-/** Yaadly's deal lifecycle, mapped onto HubSpot's real stage IDs. */
+/**
+ * Yaadly's deal lifecycle, mapped onto HubSpot's real stage IDs.
+ *
+ * FUNDS_HELD WAS RENAMED TO CLIENT_PAID on 4 September 2026, and the label
+ * with it. On 3 September Yaadly became principal on every lane: the client
+ * buys the job from Yaadly at one agreed price, and Yaadly engages and pays
+ * the tradesperson. There is no pot of the client's money sitting anywhere
+ * waiting to be released, so a board column reading "Funds Held" described a
+ * structure the business had stopped operating, in the one place the file's
+ * own header warns about: stage labels surface in deal notifications and
+ * workflow emails, so a wrong name does reach clients.
+ *
+ * The stage ID underneath is untouched. Renaming a label in the HubSpot UI
+ * does not change its internal ID, which is exactly why relabelling is the
+ * supported path and deleting and recreating is not.
+ */
 export const DEAL_STAGES = {
   INQUIRY_SCOPING: "appointmentscheduled",
   QUOTE_SENT: "qualifiedtobuy",
@@ -63,41 +78,39 @@ export function stageKeyById(stageId: string): DealStageKey | null {
 }
 
 /**
- * Stages where the client has paid Yaadly and the tradesperson has not yet
- * been paid for the work. Anything that releases or refunds money should ask
- * this rather than compare stage IDs by hand, so the rule lives in one place.
+/**
+ * Stages where the client has paid Yaadly and Yaadly has not yet paid the
+ * tradesperson. Anything about paying a worker or refunding a client should
+ * ask this rather than compare stage IDs by hand, so the rule lives in one
+ * place.
  *
- * RENAMED 4 Sep 2026, and the rename is the point. This was FUNDS_HELD, and
- * its label in HubSpot was "Funds Held", while terms.html, services.html,
- * business.html and the desk all say plainly that Yaadly does not hold money
- * on a client's behalf. Under the principal structure settled on 3 Sep,
- * a client pays Yaadly for the job and Yaadly pays its subcontractor out of
- * that: nothing is held on anybody's behalf at any point. The old label
- * described a business Yaadly deliberately is not.
+ * Renamed from FUNDS_HELD_STAGES / isHoldingFunds on 4 September 2026. The
+ * membership is identical; the old names described Yaadly as holding somebody
+ * else's money, which under the principal structure is both wrong and the
+ * specific reading CLAUDE.md section 8 exists to prevent.
  *
- * A stage label is not agent output and guardrails.scan never sees one, while
- * stage labels do reach clients through deal notifications, workflow emails,
- * exports and screenshots. So this map is the only control there is.
+ * TWO SESSIONS MADE THIS FIX INDEPENDENTLY on the same day, one naming it
+ * CLIENT_PAID_STAGES and one OWED_TO_WORKER_STAGES. This name won because it
+ * landed on main first, not because it was better, and the duplication is
+ * worth a line here: the same finding surfacing twice in one day means it was
+ * findable, and this file's own comment had predicted it.
  *
- * CORRECTED the same day, having read the live portal instead of trusting this
- * file: the pipeline ALREADY said "Client Paid". Five of the seven labels
- * matched the map below and this one did not, so the stale half was the
- * repository, and no client was ever shown the old word. The map now matches
- * the portal exactly.
- *
- * If they disagree again, the portal is the truth and this file is the bug.
- * Read the live labels rather than assuming: ask HubSpot for the `dealstage`
- * property on the deals object, which returns every stage's internal value and
- * its current label.
+ * ONE THING NEITHER SESSION HAD AT FIRST. The live portal ALREADY said
+ * "Client Paid" before either of us touched it. Five of the seven labels
+ * matched this map and this one did not, so the stale half was the repository
+ * and no client was ever shown the old word. If they disagree again, the
+ * portal is the truth and this file is the bug. Read the live labels rather
+ * than assuming: ask HubSpot for the `dealstage` property on the deals object,
+ * which returns every stage's internal value and its current label.
  */
-export const CLIENT_PAID_STAGES: readonly DealStageId[] = [
+export const OWED_TO_WORKER_STAGES: readonly DealStageId[] = [
   DEAL_STAGES.CLIENT_PAID,
   DEAL_STAGES.EVIDENCE_SUBMITTED,
   DEAL_STAGES.CLIENT_APPROVED,
 ];
 
-export function isClientPaidAndUnreleased(stageId: string): boolean {
-  return CLIENT_PAID_STAGES.includes(stageId as DealStageId);
+export function isOwedToWorker(stageId: string): boolean {
+  return OWED_TO_WORKER_STAGES.includes(stageId as DealStageId);
 }
 
 export type PropertyDef = {
@@ -116,7 +129,20 @@ const PARISHES = [
 export const CONTACT_PROPERTIES = {
   contactType: { name: "contact_type", label: "Contact type", type: "dropdown", options: ["Client", "Worker", "Inspector", "Other"] },
   certificationStatus: { name: "certification_status", label: "Certification status", type: "dropdown", options: ["ID Verified", "Trade Certification", "None"] },
-  tradeSpecialization: { name: "trade_specialization", label: "Trade specialization", type: "dropdown", options: ["Roofing", "Plumbing", "Electrical", "Carpentry", "Masonry", "Painting", "Tiling", "General repairs"] },
+  // The eighteen trades from data/job-taxonomy.js, which is the generated
+  // source of truth for every trade dropdown in the product and is what the
+  // WhatsApp assistant, the job form and the board all use. This field carried
+  // a different, shorter list of eight with different names ("Carpentry",
+  // "General repairs"), so a worker's trade in the CRM could not be matched to
+  // a worker's trade anywhere else without a translation nobody had written.
+  // Corrected 4 September 2026. If job-taxonomy.js changes, change this.
+  tradeSpecialization: { name: "trade_specialization", label: "Trade specialization", type: "dropdown", options: [
+    "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
+    "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
+    "Landscaping", "General Handyman", "Solar Install", "Water Tank & Pump",
+    "Locks & Security Doors", "Windows & Glazing", "Carpentry & Joinery",
+    "Drainage & Septic", "Fencing", "CCTV & Alarms",
+  ] },
   yearsOfExperience: { name: "years_of_experience", label: "Years of experience", type: "number" },
   countryOfResidence: { name: "country_of_residence", label: "Country of residence", type: "dropdown", options: ["UK", "US", "Canada", "Jamaica"] },
   parishOfProperty: { name: "parish_of_property", label: "Parish of property", type: "dropdown", options: PARISHES },
@@ -128,11 +154,46 @@ export const DEAL_PROPERTIES = {
   projectType: { name: "project_type", label: "Project type", type: "dropdown", options: ["Repair", "Renovation", "New build", "Maintenance"] },
   estimatedStart: { name: "estimated_start", label: "Estimated start", type: "date" },
   estimatedCompletion: { name: "estimated_completion", label: "Estimated completion", type: "date" },
-  service: { name: "service", label: "Service", type: "dropdown", options: ["Deposit Protection Check £149", "Project Setup Pack £399", "Oversight Retainer £350/mo"] },
+  // NAMES ONLY, NO PRICES, 4 September 2026. This dropdown carried "Deposit
+  // Protection Check £149, Project Setup Pack £399, Oversight Retainer
+  // £350/mo", and by the time anybody looked all three were wrong: the first
+  // two prices had moved, the retainer was published at £395, and Project
+  // Setup Pack was deactivated in the catalogue by 20260903h. A price written
+  // into a CRM dropdown label is a fourth copy of a number that already lives
+  // in service_catalogue, docs/services.html and faq.ts, and it is the copy
+  // nobody remembers to update. service_catalogue is the only place a price
+  // may come from; this field says which service, and nothing else.
+  //
+  // The list is the nine rows with active = true, read live on 4 Sep 2026.
+  service: { name: "service", label: "Service", type: "dropdown", options: [
+    "Visual Check",
+    "Deposit Protection Check",
+    "Condition Report",
+    "Technical Sign-off",
+    "Oversight Retainer",
+    "Oversight Retainer, On The Ground",
+    "Property Care, standard home",
+    "Property Care, large home",
+    "Property Care, villa",
+  ] },
   currency: { name: "currency", label: "Currency paid in", type: "dropdown", options: ["GBP", "USD", "CAD"] },
   quoteValueReviewed: { name: "quote_value_reviewed", label: "Quote value reviewed", type: "number" },
   parish: { name: "parish", label: "Parish", type: "dropdown", options: PARISHES },
   workType: { name: "work_type", label: "Work type", type: "dropdown", options: ["Labour only", "Materials + labour", "Full project management"] },
+  // The job's own code, and the reason a lead can be synced twice without
+  // producing two deals. Added 4 September 2026 with the WhatsApp lead sync:
+  // a redelivered message, a client who confirms twice, or a retry all reach
+  // the same job, and without something to search on, each one would create a
+  // fresh deal and the board would start lying about the size of the pipeline.
+  //
+  // THE ONLY ENTRY IN THIS FILE THE LEAD SYNC ACTUALLY DEPENDS ON. Everything
+  // else here is a specification of what should be created in HubSpot, not a
+  // record of what has been: checked against the live portal on 4 September
+  // 2026, and most of it does not exist there. Since HubSpot rejects an entire
+  // write for one unrecognised property, hubspotLeads.ts uses standard
+  // properties plus this one and nothing else. Must exist as a single-line
+  // text property; see RUNBOOK.md, "Turning the HubSpot lead sync on".
+  jobId: { name: "yaadly_job_id", label: "Yaadly job code", type: "text" },
 } satisfies Record<string, PropertyDef>;
 
 export const TICKET_PROPERTIES = {
