@@ -42,7 +42,11 @@ TAXONOMY_TO_BENCHMARK = {
     "Masonry & Concrete": "masonry",
     "Painting & Decorating": "painting",
     "Grille & Gate Welding": "metalwork",
-    "Fencing": "metalwork",
+    # Fencing is deliberately NOT mapped. The only metalwork band on file is a
+    # window or door grill from a single seller in St Ann, and checking a
+    # fence quote against a window grill is a wrong reference dressed as a
+    # right one. An unmapped trade is simply not offered, which is the honest
+    # outcome: there is no fencing benchmark.
     "Landscaping": "grounds",
     "General Handyman": "general repair",
 }

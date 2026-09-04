@@ -2289,7 +2289,6 @@ const PRICE_BENCHMARKS = {
     "Masonry & Concrete": "masonry",
     "Painting & Decorating": "painting",
     "Grille & Gate Welding": "metalwork",
-    "Fencing": "metalwork",
     "Landscaping": "grounds",
     "General Handyman": "general repair"
   }
@@ -2940,11 +2939,29 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 // the bottom is suspiciously low. They are deliberately coarse. This is a
 // conversation starter, not a valuation.
 
-function pcBandFor(trade, variant){
+// Three outcomes, not two, and the distinction is the whole honesty of this
+// panel.
+//
+// A family can have real bands and no ":*" default: plumbing has unclog, tank
+// and septic and nothing generic, and so do metalwork and grounds. Six of the
+// ten mapped trades are like that. The first version of this returned null for
+// them, which the panel rendered as "no public price exists in Jamaica for
+// this work". That sentence is FALSE for plumbing, and it is the single
+// sentence this whole product is built on, so saying it when it is not true is
+// as damaging as inventing a number. Fixed before this shipped anywhere.
+//
+//   band          a real reference to show
+//   need_variant  bands exist, say which kind of job. NOT a price claim.
+//   none          genuinely no public price. The honest answer, said out loud.
+function pcLookup(trade, variant){
   const fam = PRICE_BENCHMARKS.taxonomy_to_benchmark[trade];
-  if (!fam) return null;
   const b = PRICE_BENCHMARKS.bands;
-  return b[fam + ":" + (variant || "*")] || b[fam + ":*"] || null;
+  if (!fam) return { state: "none" };
+  const hit = b[fam + ":" + (variant || "*")] || b[fam + ":*"];
+  if (hit) return { state: "band", band: hit };
+  const vs = Object.keys(b).filter(k => k.split(":")[0] === fam)
+                           .map(k => k.split(":")[1]).filter(v => v !== "*");
+  return vs.length ? { state: "need_variant", variants: vs } : { state: "none" };
 }
 
 function pcVariantsFor(trade){
@@ -3006,7 +3023,20 @@ async function runPriceCheck(){
   if (!(quoted > 0)) return say("pcMsg","err","Put in the figure the worker quoted, in J$.");
   say("pcMsg","ok","Looking it up.");
 
-  const band = pcBandFor(trade, variant);
+  const look = pcLookup(trade, variant);
+  if (look.state === "need_variant") {
+    // Deliberately makes NO claim about price. There are bands here; the
+    // question is which job this is.
+    $("pcOut").innerHTML =
+      `<div class="card" style="padding:16px">
+        <b style="font-size:16px">${esc(trade)}</b>
+        <p style="margin-top:8px">There are researched bands for this trade, but they are per kind of job and none of them is a general figure. Say which one this is and check it again.</p>
+        <div class="dfield"><span class="dk">bands on file</span><span class="dv">${look.variants.map(esc).join(", ")}</span></div>
+        <p class="note" style="margin-top:8px">This is not a statement that no price exists. It is a question about which job you mean.</p>
+      </div>`;
+    return say("pcMsg","warn","Pick the kind of job from the variant list, then check it again.");
+  }
+  const band = look.state === "band" ? look.band : null;
   const r = pcReview(band, quoted);
   const gbp = Math.round(quoted / PRICE_BENCHMARKS.jmd_per_gbp);
 

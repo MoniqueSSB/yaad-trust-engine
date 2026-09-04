@@ -1906,7 +1906,9 @@ That rewrites the generated block inside `concierge/concierge.html`. Copy the fi
 
 **The verdict thresholds** are ported verbatim from `review_quote()`: over 2x the top of the band is a red flag, over 1.3x is worth asking about, under half the bottom is suspiciously low. Coarse on purpose. Six cases are checked against the Python source directly.
 
-**A trade with no band family** simply is not offered in the dropdown. Only the ten taxonomy trades in `TAXONOMY_TO_BENCHMARK` map onto seeded families; the other eight have no benchmark at all, and offering them would imply a lookup that cannot happen.
+**A trade with no band family** simply is not offered in the dropdown. Nine of the eighteen taxonomy trades map onto seeded families; the rest have no benchmark at all, and offering them would imply a lookup that cannot happen. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and checking a fence against it is a wrong reference dressed as a right one.
+
+**Three outcomes, not two, and the difference matters.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. Those report **"say which kind of job"** and list the variants. They must never report "no public price exists", which is the third outcome and is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. A test asserts no mapped trade can fall into the wrong one.
 
 **Nothing here is ever shown to a client or a worker.** `quote_reviews` is admin-only in RLS, deliberately with no party read policy. A band beside somebody's price reads as an estimate, and estimating is QS work, which is the one thing Yaadly does not guarantee.
 
