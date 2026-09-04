@@ -1954,25 +1954,44 @@ Applied to the database: `agent_actions` and `v_job_history`; `reports`, `report
 
 Deployed: `yaad-report`, version 1, `verify_jwt` true.
 
-**Not deployed, on purpose:** `yaad-inbound` and `yaad-desk-reply`. Both are edited in this branch and `yaad-inbound` was redeployed by a parallel session the same day, so deploying from here would discard live work. Until they go out:
+`yaad-inbound` v121 and `yaad-desk-reply` v17 are also deployed, by three way merge rather than by overwriting. Read the next section before you deploy either again.
 
-- `first_human_reply_at` is never written, so the thread half of the reply clock shows everything as unanswered. The enquiries half is accurate.
-- `agents_paused` still does not reach `yaad-inbound`. The desk copy in this branch says it does. **That copy is ahead of what is deployed**, so do not trust the switch until the deploy happens.
+---
 
-Deploy them, once the parallel session has landed and this branch has been rebased onto it:
+## Deploying a function a parallel session is also working on
+
+This happened on 4 September 2026 and will happen again, because `CLAUDE.md` section 12 says parallel sessions share this tree.
+
+**Never deploy from the repository on the assumption it matches production.** Production had a whole file, `yaad-inbound/trades.ts`, that existed in no branch, and 86 changed lines in `index.ts` adding WhatsApp location pin evidence. Deploying this branch over it would have silently deleted both.
+
+The safe sequence, all of it. Download into a scratch directory, never over your working copy:
 
 ```bash
-supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+supabase functions download yaad-inbound --project-ref leffyisvfvjwzilydlwf --use-api
 ```
 
-`yaad-inbound` carries its own Twilio signature check and origin throttle, so it keeps `--no-verify-jwt`. `yaad-desk-reply` must NOT have that flag: it runs with platform auth on.
+Then three way merge, where the base is the commit your branch started from:
 
 ```bash
-supabase functions deploy yaad-desk-reply --project-ref leffyisvfvjwzilydlwf
+git merge-file -L mine -L base -L live <your-copy> <base-copy> <downloaded-copy>
 ```
 
-**Check the live setting before either deploy**, because this file goes stale and that is the failure mode it exists to prevent:
+Exit code 0 means it merged cleanly. Anything above 0 is the number of conflicts, and you read every one. Then confirm BOTH sides survived by grepping for something only yours has and something only theirs has, typecheck, run the tests, and only then deploy.
+
+**Preserve the live verify_jwt per function. Read it, do not remember it:**
 
 ```bash
 supabase functions list --project-ref leffyisvfvjwzilydlwf
 ```
+
+`yaad-inbound` is false and keeps `--no-verify-jwt`, because it carries its own Twilio signature check and origin throttle. `yaad-desk-reply` and `yaad-report` are true and must NOT get that flag.
+
+**A version number moving is not proof the code changed.** Between two checks that day `yaad-inbound` went v114 to v120 and `yaad-desk-reply` v11 to v16, and both sources were byte identical: somebody had redeployed everything unchanged. Diff the downloads before you panic, and before you re-merge.
+
+**The standing risk this leaves.** A bulk deploy with no function named deploys every function from whichever checkout it is run in. Run from a tree without this branch, it discards this work exactly as silently. If two people are working, name the function you mean.
+
+**Prove it after deploying.** Post an empty JSON body to the function and read the code:
+
+- `yaad-inbound` answers 403 with a signature error. Correct: the request reached the code and its own check refused it.
+- `yaad-desk-reply` and `yaad-report` answer 401, missing authorization header. Correct: platform auth stopped it before the code ran.
+- A 503 or a timeout means the bundle did not boot.
