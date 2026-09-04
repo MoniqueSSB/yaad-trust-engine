@@ -10,6 +10,7 @@ import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import { FAQ_FACTS } from "./faq.ts";
 import { priceFigureGuard } from "./price-figures.ts";
+import { TRADES_PROMPT_LINE } from "./trades.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -506,11 +507,7 @@ conversation, use "".
 Return exactly:
 {"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""],"enough":false,"confirmed":false,"wants_human":false,"reply":""}
 
-trade: one of Plumbing, Roofing, Electrical, Tiling, Masonry & Concrete,
-Painting & Decorating, Grille & Gate Welding, Air Conditioning, Landscaping,
-General Handyman, Solar Install, Water Tank & Pump, Locks & Security Doors,
-Windows & Glazing, Carpentry & Joinery, Drainage & Septic, Fencing,
-CCTV & Alarms. Empty if unclear.
+trade: ${TRADES_PROMPT_LINE}
 
 "enough" is true only when you know all three of: what the work is, which
 parish the property is in (this is the field workers and matching actually

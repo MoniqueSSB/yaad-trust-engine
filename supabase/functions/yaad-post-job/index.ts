@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { TRADES } from "./trades.ts";
 
 // The six-step "Post a job" wizard on yaadly.co.uk posts here twice.
 //
@@ -118,13 +119,10 @@ function cardCols(b: Record<string, unknown>) {
 
 // The 18 trades are the routing key: workers subscribe by trade and the board
 // filters on it, so this list is not free text and never has been.
-const TRADES = [
-  "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
-  "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
-  "Landscaping", "General Handyman", "Solar Install", "Water Tank & Pump",
-  "Locks & Security Doors", "Windows & Glazing", "Carpentry & Joinery",
-  "Drainage & Septic", "Fencing", "CCTV & Alarms",
-];
+// TRADES now comes from _shared/trades.ts, generated from
+// data/job-taxonomy.js and drift-checked in CI. It used to be an
+// 18 item copy here, which happened to agree with yaad-inbound's own
+// copy and disagreed with app_settings.trade_list by eight trades.
 
 // Every other list the model may answer from is sent up by the page, because
 // the taxonomy lives in one place (data/job-taxonomy.js) and a second copy
@@ -158,7 +156,10 @@ function cleanLists(raw: unknown): Lists {
  *  case-insensitively and handed back in the list's own spelling. Anything
  *  else is dropped rather than corrected: a blank the client fills herself is
  *  worth more than a value nothing downstream recognises. */
-function fromList(value: unknown, list: string[] | undefined): string {
+// readonly because the shared TRADES list is readonly, and it should stay
+// that way: this function only reads, and a shared source of truth nobody can
+// splice is the point of moving it out of here in the first place.
+function fromList(value: unknown, list: readonly string[] | undefined): string {
   const v = s(value);
   if (!v || !list?.length) return "";
   return list.find((o) => o.toLowerCase() === v.toLowerCase()) ?? "";
