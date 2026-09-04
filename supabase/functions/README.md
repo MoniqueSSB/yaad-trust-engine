@@ -245,4 +245,4 @@ The function holds no service-role key. Every database call goes out under the
 caller's own token, so RLS is doing the access control.
 
 Proof: `supabase/tests/report_guards.sql`, eleven assertions.
-Schema: `supabase/migrations/20260904c_the_report_drafter.sql`.
+Schema: `supabase/migrations/20260904n_the_report_drafter.sql`.

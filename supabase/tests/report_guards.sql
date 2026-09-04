@@ -16,7 +16,8 @@
 do $$
 declare v text; ok boolean; msg text;
 begin
-  create temp table t(n int generated always as identity, name text, result text) on commit drop;
+  create temp table if not exists t(n int generated always as identity, name text, result text);
+  delete from t;
 
   delete from public.reports where property like 'TEST-RPT%';
 
@@ -132,8 +133,14 @@ begin
   end;
 
   raise notice '%', (select string_agg(lpad(n::text,2)||'. '||name||E'\n    '||result, E'\n' order by n) from t);
+  -- The notice above is for psql. The select after this block is what any
+  -- other connection sees, because NOTICE does not travel over PostgREST and
+  -- a test whose result is invisible half the time is not a test.
 
   delete from public.agent_actions where actor in ('yaad-report','system','monique@yaadly.co.uk') and summary in
     ('drafted and approved','auto released','Stage 2 evidence checked and passed');
   delete from public.reports where property like 'TEST-RPT%';
 end $$;
+
+select n, name, result from t order by n;
+drop table if exists t;

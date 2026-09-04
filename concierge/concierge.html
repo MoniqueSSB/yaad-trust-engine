@@ -835,7 +835,29 @@ const VIEWS = [
     select:"*",
     order:"drafted_at",
     search:["number","client_name","property","kind"],
-    empty:["No reports yet","Draft one from a visit and it lands here for you to rate and sign."],
+    empty:["No reports yet","Write up what you saw on the visit below and the agent will draft the findings."],
+    panel: () => `
+      <div class="card">
+        <b>Draft a report from your notes</b>
+        <p class="mute" style="margin:6px 0 12px">Write what you saw, roughly is fine. The agent turns it into findings in the house structure. <b>It cannot rate them and it cannot write the verdict</b>, so what lands below is deliberately unfinished: that judgment is what the client is paying you for.</p>
+        <div class="fgroup" style="max-width:560px">
+          <label class="fl">Which service</label>
+          <select id="rptKind" class="inp">
+            <option value="deposit_check">Deposit Protection Check</option>
+            <option value="condition">Condition Report</option>
+            <option value="technical_signoff">Technical Sign-off</option>
+            <option value="visual_check">Visual Check</option>
+          </select>
+          <label class="fl" style="margin-top:10px">Client name</label>
+          <input id="rptClient" class="inp" placeholder="As it should read on the report">
+          <label class="fl" style="margin-top:10px">Property</label>
+          <input id="rptProperty" class="inp" placeholder="Town or parish, and the kind of building">
+          <label class="fl" style="margin-top:10px">Your notes from the visit</label>
+          <textarea id="rptNotes" class="inp" rows="8" placeholder="Everything you saw, in any order. The agent adds nothing you did not write down, and tells you what it could not source."></textarea>
+          <button class="btn g" id="rptGo" style="margin-top:12px">Draft the findings</button>
+          <p class="mute" id="rptOut" style="margin-top:10px"></p>
+        </div>
+      </div>`,
     cols:[
       {h:"Report", f:r => id_(r.number || "draft") + sub_((r.kind || "").replace(/_/g," "))},
       {h:"Client & property", f:r => esc(r.client_name || "Not named") + sub_(r.property || "No property given")},
@@ -2617,6 +2639,48 @@ function renderTableView(k){
   $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
     : tableCard(v, rows));
+  // A panel is inert markup until something wires it. Only the Reports panel
+  // has a control today, so this is one call and not a framework.
+  if (k === "reports") wireReportDrafter();
+}
+
+// The one panel with a button in it.
+//
+// Kept out of the registry deliberately: an action there operates on a row you
+// have opened, and this creates the row in the first place. Everything it can
+// do is bounded by yaad-report, which has no severity field and no verdict
+// field, so the worst outcome here is a draft nobody wanted, sitting at draft.
+function wireReportDrafter(){
+  const go = $("rptGo"); if (!go) return;
+  go.addEventListener("click", async () => {
+    const notes = ($("rptNotes").value || "").trim();
+    const out = $("rptOut");
+    if (notes.length < 40) {
+      out.innerHTML = '<span style="color:var(--coral)">Write a bit more first. Under forty characters is not a visit, and a thin report is worse than none.</span>';
+      return;
+    }
+    go.disabled = true; out.textContent = "Drafting. This takes a few seconds.";
+    try {
+      const j = await rptFn({
+        kind: $("rptKind").value,
+        client_name: ($("rptClient").value || "").trim() || null,
+        property: ($("rptProperty").value || "").trim() || null,
+        notes,
+      });
+      const bits = [`Drafted ${j.findings} finding${j.findings === 1 ? "" : "s"}, all unrated, no verdict.`];
+      if (j.scrubbed && j.scrubbed.length) {
+        bits.push(`<b>${j.scrubbed.length} measurement${j.scrubbed.length === 1 ? "" : "s"} removed</b> before saving: ${j.scrubbed.map(x => esc(x.text)).join(", ")}. Worth a look: it means the notes carried dimensions Yaadly does not produce.`);
+      }
+      if (j.omitted && j.omitted.length) bits.push(`It could not source: ${j.omitted.map(esc).join("; ")}.`);
+      if (j.questions && j.questions.length) bits.push(`For you to answer: ${j.questions.map(esc).join("; ")}.`);
+      bits.push("Now rate every finding and write the verdict. It will not issue until you have.");
+      out.innerHTML = bits.join("<br><br>");
+      $("rptNotes").value = "";
+      await loadTableView("reports");
+    } catch (e) {
+      out.innerHTML = '<span style="color:var(--coral)">' + esc(String(e.message || e)) + "</span>";
+    } finally { go.disabled = false; }
+  });
 }
 
 function setCount(k, n, hot){
@@ -4036,6 +4100,32 @@ $("policyRaise").addEventListener("click", async () => {
 // The measurement rule is enforced in three places and this is the first one
 // she sees: anything the model says with a number and a unit in it is scrubbed
 // server side and reported back here, in the open, rather than quietly fixed.
+
+const RPT_FN = SUPABASE_URL + "/functions/v1/yaad-report";
+
+// The report drafter's door.
+//
+// Until this existed, yaad-report was deployed, guarded and unreachable: the
+// Reports view could rate a finding and write a verdict, and nothing anywhere
+// could produce a draft to do that to. A guarded function nobody can call is
+// not a safe feature, it is an unfinished one.
+//
+// Same pause rule as fn() and skFn(). Drafting a report is a model call and
+// the switch in the top bar has to stop it, or the switch covers less than it
+// says again.
+async function rptFn(payload){
+  if (AGENTS_PAUSED) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
+  const r = await fetch(RPT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
 
 const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
 let SK_FRAMES = [];     // [{n, t, data, keep}]
