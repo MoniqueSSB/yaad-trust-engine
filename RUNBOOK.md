@@ -356,6 +356,18 @@ This is not hypothetical. On 4 September 2026 both `TWILIO_CONTENT_SID_DAILY_CHE
 
 ---
 
+## What is deployed does not match what is in the repository
+
+**Run `scripts/check-deploy-drift.sh`.** Read only: it deploys nothing and deletes nothing. It prints three things, deployed-with-no-source-on-this-branch, on-this-branch-but-not-deployed, and the live list of endpoints running without platform auth.
+
+**Why drift happens at all, and why it is not a fault.** Edge Functions are deployed by hand, from whichever branch somebody was on, and parallel sessions share this working tree. Nothing reconciles the two ends. A function on `main` that is not deployed may be waiting deliberately; a function deployed from an unmerged branch may be a probe somebody needed live for an afternoon. **That is why the script only reports.** Deploying something another session left undeployed, and deleting a deployed function, are both decisions with consequences, and neither is a tidy-up.
+
+**As of 4 September 2026** the drift was: `yaad-nim-probe` and `yaad-report` deployed with no source on `main` (`yaad-report` lives on an unmerged branch, found with `git log --all -- supabase/functions/yaad-report`; `yaad-nim-probe` is an NVIDIA probe from August that predates the move to Mistral), `yaad-vision` in the repository and not deployed, and `yaad-phone-check` and `yaad-message-status` on `main` and not deployed. Nothing broken, nothing acted on.
+
+**Before deploying anything the script names**, read its live `verify_jwt` first. The script prints that list for exactly this reason: ten endpoints run without platform auth and each needs `--no-verify-jwt` preserved, or the redeploy silently puts a token check in front of Twilio, a database trigger, or a public form. See CLAUDE.md §12.
+
+---
+
 ## Twilio Verify, for sign in codes only
 
 **What it is for, and what it is deliberately not.** A sign in code cannot go through one of our own UTILITY templates without risking the WhatsApp sender, and as free text it only reaches somebody who has messaged us in the last 24 hours. Verify solves exactly that and nothing else. It uses Meta's pre-defined authentication templates, so **there is no template to write, submit or get approved for this one.**
