@@ -1899,3 +1899,47 @@ To rename one:
 4. `npm --prefix web run typecheck && npm --prefix web test`.
 
 **Outstanding manual step from 4 September 2026:** the code now says `Client Paid, Work In Progress` for stage `presentationscheduled`. The label in the HubSpot portal still says `Funds Held` until somebody relabels it there. The code change does not perform it.
+
+---
+
+## Drafting a report
+
+`yaad-report` turns the notes you wrote on site into the findings of a draft report. It does not finish it, and it cannot.
+
+1. Write your notes however you like, roughly is fine, and gather the photograph captions. Fewer than 40 characters of notes is refused rather than drafted thinly.
+2. Call the function with `kind` (`deposit_check`, `condition`, `technical_signoff` or `visual_check`), your `notes`, and any `captions`. It writes a `reports` row at `draft` and its `report_findings`.
+3. **Rate every finding** Severe, Moderate or Low. Nothing drafts this and nothing ever will. Your rating is stamped with your email and the time.
+4. **Write the verdict and the page one line.** Same rule.
+5. Move the report to `issued`. That mints its number and records who issued it.
+
+**If it refuses to issue**, the message says which of the three it is: an unrated finding, a missing verdict, or a measurement that survived the scrubber. All three are the gate working. The third one names the offending sentence: reword it in words rather than numbers, or refer it to a surveyor.
+
+**Check the `scrubbed` array on the report.** It lists every measurement the model produced and had removed. A long list means the notes themselves were full of dimensions, which is worth knowing before you sign something that says Yaadly does not measure.
+
+**If the draft comes back thin or wrong**, it is almost always the notes rather than the model. It is forbidden from adding anything you did not record, which is the correct behaviour and will look like laziness the first time. Read the `omitted` list it returns: that is the agent telling you what it could not source.
+
+---
+
+## Reading a job's whole history
+
+`agent_actions` is the append-only record of what the agents drafted and what a named person then decided. `v_job_history` reads one job as a single list, oldest first.
+
+Use it when a client disputes something, when you want to know why a job took nine days, or before any conversation where somebody is going to ask who decided what.
+
+**It refuses to record a consequential action against a machine.** Releasing or withholding funds, refunding, ruling on a dispute, changing a reputation, suspending a worker, approving a job or a stage: all of these require `actor_kind = 'human'` and a real name. "system", "auto", "agent" and an empty actor are refused by the check constraint. If a write fails with `agent_actions_human_only`, the code doing the writing is wrong, not the constraint.
+
+**Nothing can edit it through the API.** Insert, update and delete are revoked from `anon` and `authenticated`. Writes come from the Edge Functions on the service role. That is what makes it worth putting in front of somebody.
+
+---
+
+## Publishing a change to the How We Use AI page
+
+`docs/how-we-use-ai.html` is linked from the footer of all twelve public pages and from the business page. It makes three specific, checkable claims:
+
+1. The invoicing model has no field for an amount.
+2. The sketch packs cannot state a measurement, stopped in three places.
+3. Identity documents are held back before the file is fetched, with no setting to override.
+
+**If any of those three stops being true, that page becomes a false claim to clients**, which is worse than never having made it. Before changing anything in `yaad-invoice`, `yaad-sketch` or `yaad-vetting-review`'s `IDENTITY_DOCS`, read that page and decide which sentence has to change with it.
+
+The provider list is deliberately not repeated there. It lives on `privacy.html`, and that is the one to update when a provider changes.

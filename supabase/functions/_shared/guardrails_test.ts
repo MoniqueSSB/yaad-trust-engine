@@ -97,7 +97,7 @@ Deno.test("yaad-inbound still screens inside the one path to a client", () => {
 });
 
 Deno.test("the draft producers still flag banned language", () => {
-  for (const fn of ["yaad-completion", "yaad-kickoff"]) {
+  for (const fn of ["yaad-completion", "yaad-kickoff", "yaad-report"]) {
     const src = Deno.readTextFileSync(new URL(`../${fn}/index.ts`, import.meta.url));
     assert(src.includes("guardrails.scan("), `${fn} no longer screens its draft`);
   }

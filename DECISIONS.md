@@ -6,6 +6,28 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · The report drafter, the action ledger, and the page that explains the rule
+
+**The capacity ceiling was never demand or supply. It was an evening.** Three of the seven priced services are a document: the Deposit Protection Check, the Condition Report and the Technical Sign-off. Typed by hand, a £249 report costs an evening, which caps the business at roughly four reports a week, which is roughly the October Gate. `yaad-report` drafts the findings so the evening is spent judging rather than typing.
+
+**The line it does not cross is the whole design.** A client paying for a Condition Report is not buying prose, which a model writes perfectly well. They are buying somebody with seven years of UK construction project management saying "this one is Severe, and here is what I would do". Draft the prose and you save an evening. Draft the rating and you have sold a judgment nobody made. So the schema has **no severity field and no verdict field**, exactly as `yaad-invoice` has no amount field, and `report_guard_issue` refuses to issue a report while any finding is unrated or the verdict is empty. Rating requires `is_admin()` and stamps who did it and when.
+
+**Measurements reuse the sketch pack's rule rather than getting a second one.** `has_measurement()` already exists and is already tested against eighteen sentences. A second copy of that regex in a second migration would drift, and the drift would be silent, so `report_offending_text()` calls the existing function. `MEASUREMENT_RE` in the function mirrors `yaad-sketch`'s own for the same reason and must move with it.
+
+**There is a second scrubber, `RATING_WORDS`, and it exists because rule 1 is not enough.** A model told not to rate will occasionally rate in prose anyway, and "this is a severe problem" inside a finding body reads to a client exactly like the rating they paid a person for. The schema stops the field. The scrubber stops the sentence.
+
+**The action ledger is a record for a solicitor, not a log for a developer.** The trail already existed and was scattered across a dozen tables plus an OpenTelemetry exporter that is inert until an endpoint is configured, so reconstructing a disputed job was archaeology. `agent_actions` is append only, with `actor` and `actor_kind` both not null, and a check constraint that refuses to record a consequential action against a machine. That list is `HUMAN_ONLY_DECISIONS` from `yaad/guardrails.py` plus `approve_stage`, which is the name the live system actually uses for the step that moves money. The rule was already true in Python and in Deno; this puts it in the layer nothing can talk past. `insert`, `update` and `delete` are revoked explicitly from `anon` and `authenticated` rather than left to the absence of a policy, because absence is easy to undo by accident.
+
+**A client can read their own job's history, and that is deliberate.** Rows carrying a `job_id` are readable by that job's client or worker. Rows without one are desk-wide and admin only. Showing somebody the sequence of what happened on their own job is the product, not a leak.
+
+**The How We Use AI page exists because the governance was real and invisible.** The strongest thing about this system was visible in one place: a decorative activity strip on the business page. The page states the rule, then proves it three ways that are checkable rather than promised: the invoicing model has no field for a number, the sketches cannot state a measurement and are stopped three times over, and identity documents are held back before the file is even fetched. It links to `privacy.html` for the provider list rather than repeating it, because a duplicated list drifts and that page is already exemplary, including the uncomfortable part about the text model being in China until the move to the EU.
+
+**The apply flow was deliberately left alone.** Linking the new page from the consent component would change the copy that earned every existing `ai-review-v3` consent, and `CLAUDE.md` §6 says the wording and the version move together. Bumping to v4 for a hyperlink is a legal decision about every applicant's recorded answer, and §10 makes that Monique's rather than mine. The link is in the footer of all twelve public pages and on the business page instead.
+
+**The business page's "Agent activity, live" strip now says "How one job runs, illustrative".** The timestamps were always illustrative. With a pulsing dot and the word live next to them, they read as telemetry, and a sharp prospect asking to see the real feed would have found the claim was decoration.
+
+---
+
 ## 2026-09-04 · Three holes between what the site promises and what the system does, closed
 
 **The site's most repeated promise had no clock behind it.** "A person replies within one working day" is on `index.html`, `services.html`, `business.html` and `marketplace.html`, and nothing in the database recorded whether it was kept. The desk Overview counts what is waiting and has never been able to say how long, so an enquiry nine minutes old and one four days old rendered as the same tile. `20260904a` adds `intake_threads.first_human_reply_at`, `enquiries.first_replied_at` and one view, `v_reply_clock`, that the Overview reads for an "Oldest thing waiting" tile and a breach alert. Nothing gates on it. It records, which is the whole point: the promise was already being made, and the only question was whether anyone could check it.
