@@ -42,7 +42,7 @@ import { NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/webhookSignature";
 import {
   HubSpotError,
-  advanceDealToFundsHeld,
+  advanceDealToClientPaid,
   advanceDealToEvidenceSubmitted,
   advanceDealToClientApproved,
   advanceDealToCompletedPaid,
@@ -62,7 +62,15 @@ import {
  * releasing funds is its own human decision, and is not this endpoint.
  */
 const EVENTS: Record<string, (dealId: string) => Promise<StageMove>> = {
-  payment_held: advanceDealToFundsHeld,
+  // 'client_paid' replaced 'payment_held' on 4 September 2026, alongside the
+  // stage rename in hubspotConfig.ts. 'payment_held' is kept as an accepted
+  // alias rather than deleted: this is a wire contract, nothing in the
+  // repository sends it today but a sender configured outside the repository
+  // would break silently, and a webhook that starts answering 400 to a sender
+  // nobody can see is the worst kind of outage. Remove the alias once the
+  // senders are known.
+  client_paid: advanceDealToClientPaid,
+  payment_held: advanceDealToClientPaid,
   evidence_submitted: advanceDealToEvidenceSubmitted,
   client_approved: advanceDealToClientApproved,
   worker_paid: advanceDealToCompletedPaid,
