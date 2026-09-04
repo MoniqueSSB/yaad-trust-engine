@@ -644,6 +644,7 @@ const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
 const REPLY_FN = SUPABASE_URL + "/functions/v1/yaad-desk-reply";
+const AGENT_FN = SUPABASE_URL + "/functions/v1/yaad-agent";
 
 // The Conversations reply lane. Monique's words, typed here, sent from the
 // Yaadly number by yaad-desk-reply so they continue the chat the client
@@ -823,6 +824,16 @@ const VIEWS = [
     // be refused by Postgres, which is the correct outcome but a silly way to
     // find out.
     actions:[
+      // Read only, so it sits first: it is the thing you do BEFORE deciding
+      // any of the below, and it is the only button here that cannot change
+      // anything. Only offered where there is enough text to be worth
+      // summarising; on two lines you may as well read it.
+      { label:"Summarise this thread", cls:"g",
+        when:r => String(r.descr || "").length > 400,
+        read:async r => {
+          const j = await agentFn({ mode:"summarise", text:String(r.descr || "").slice(0, 12000), job_id:r.id });
+          return renderThreadSummary(j && j.result);
+        } },
       { label:"Open it to the board", cls:"", when:r => r.status !== "open_for_quotes",
         set:{ status:"open_for_quotes", open:true },
         says:r => `Puts this on the public board. Vetted workers in ${r.parish || "this parish"} can see it and quote. The address and phone stay hidden from them. If the client has not signed the Client Guidelines the database will refuse this, and that refusal is the gate working.` },
@@ -2629,6 +2640,24 @@ async function writeAction(k, a, row, vals){
 
 async function runAction(k, a, row, btn){
   if (a.ask) return drawAsk(k, a, row, btn);
+
+  // A READ action asks a question and shows the answer. It writes nothing, so
+  // it skips the confirm (there is nothing to be sure about), leaves the
+  // drawer open (the answer is the point) and does not reload the table
+  // (nothing changed). Added for the thread summariser, 4 Sep 2026. Everything
+  // below this block is the ordinary write path, untouched.
+  if (a.read) {
+    btn.disabled = true;
+    $("drwMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Reading the thread.</div>';
+    try {
+      $("drwMsg").innerHTML = await a.read(row);
+    } catch (e) {
+      $("drwMsg").innerHTML = `<div class="msg err"><b>That did not run.</b><br>${esc(e && e.message ? e.message : String(e))}</div>`;
+    }
+    btn.disabled = false;
+    return;
+  }
+
   if (!confirm((a.says ? a.says(row) + "\n\n" : "") + a.label + "?")) return;
   btn.disabled = true;
   $("drwMsg").innerHTML = '<div class="msg ok"><span class="spin"></span>Writing.</div>';
@@ -2713,6 +2742,54 @@ async function fn(payload){
   const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
   return j;
+}
+
+// The thread summariser. Added 4 September 2026, roadmap item 5 from the agent
+// audit, and it is the FIRST thing in this desk ever to call yaad-agent: that
+// function has existed since August and nothing had wired it up, which the
+// audit had wrongly recorded as "triggered from the desk".
+//
+// A job's descr grows by concatenation on every turn of a WhatsApp or web chat
+// thread, so a client who has written five times leaves a wall of text and the
+// answer to "what do they actually want" is somewhere inside it. Three
+// sentences and a flag, for one reader.
+//
+// It goes through AGENTS_PAUSED like everything else this desk starts, because
+// it IS something this desk starts, which is the whole scope of that switch.
+// Read only: it writes nothing, sends nothing, and nobody but Monique ever
+// sees the output.
+async function agentFn(payload){
+  if (AGENTS_PAUSED) {
+    throw new Error("Agents are paused. The switch in the top bar turns them back on. Nothing was sent to a model.");
+  }
+  const r = await fetch(AGENT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the agent returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+/** yaad-agent hands back the model's raw text in .result. Parse the JSON out of
+ *  it, and if it did not answer in JSON, show what it did say rather than
+ *  pretending nothing came back. */
+function renderThreadSummary(raw){
+  const text = String(raw == null ? "" : raw).replace(/```(?:json)?/gi, "").trim();
+  let d = null;
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) { try { d = JSON.parse(m[0]); } catch (_) { d = null; } }
+  if (!d) {
+    return `<div class="msg warn"><b>The agent did not answer in the expected shape.</b><br>`
+      + `${esc(text.slice(0, 600)) || "It returned nothing at all."}</div>`;
+  }
+  const row = (k, v) => v ? `<div class="dfield"><span class="dk">${esc(k)}</span><span class="dv">${esc(v)}</span></div>` : "";
+  const flag = d.flag
+    ? `<div class="msg err" style="margin-bottom:10px"><b>Needs you today:</b> ${esc(d.flag)}</div>` : "";
+  const body = row("wants", d.wants) + row("still missing", d.unknown) + row("worried about", d.worried);
+  return flag + (body || `<div class="msg warn">The agent read the thread and found nothing worth summarising.</div>`)
+    + `<div class="msg ok" style="margin-top:10px">Read only. Nothing was written, and nothing was sent to the client or the worker.</div>`;
 }
 
 let CATALOGUE = [];
