@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { fetchModel, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import { TRADES } from "./trades.ts";
 
 // The six-step "Post a job" wizard on yaadly.co.uk posts here twice.
@@ -214,7 +214,7 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
       ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
     }, async (sp) => {
-      const r = await fetch(prov.api, {
+      const r = await fetchModel(prov.api, {
         method: "POST",
         headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -224,8 +224,7 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
             { role: "user", content: text.slice(0, 6000) },
           ],
         }),
-        signal: AbortSignal.timeout(20000),
-      });
+      }, { timeoutMs: 20000 });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
       // Every return null below used to be silent: recorded on the span only,

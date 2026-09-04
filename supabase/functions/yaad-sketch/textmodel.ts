@@ -105,6 +105,63 @@ export function pickTextProvider(): TextProvider | null {
   return null;
 }
 
+/**
+ * One fetch, retried once when the answer is worth asking for again.
+ *
+ * ── Why this exists ──
+ *
+ * Added 4 September 2026, after the agent audit found `readTheJob` treating a
+ * 429 exactly like a refusal: return null, and the client gets the hardcoded
+ * generic opener instead of an answer. One rate limit, one lost reply.
+ *
+ * Mistral's free tier allows roughly ONE REQUEST PER SECOND against a cap of
+ * about a billion tokens a month. At Yaadly's volume the monthly cap is
+ * irrelevant, an intake call is around 3,000 tokens so it would take some
+ * 300,000 messages to reach, and the per-second limit is the only one that can
+ * realistically bite: two people writing in during the same second, or a
+ * client sending three photographs that each land as their own webhook.
+ * Waiting a beat and asking again fixes precisely that.
+ *
+ * ── Why only once, and why this short ──
+ *
+ * This runs inside a Twilio webhook, and Twilio abandons a webhook that has
+ * not answered in about 15 seconds. A generous retry ladder would turn a rate
+ * limit into a timeout, which is the same silence for the client and harder to
+ * diagnose. One retry after a short pause stays well inside the budget.
+ *
+ * Only 429 and 5xx are retried. A 400 or a 401 will fail identically the
+ * second time: a wrong model id and a wrong key are not conditions that pass
+ * with patience, and retrying them just doubles the wait before the fallback.
+ */
+export async function fetchModel(
+  url: string,
+  init: RequestInit,
+  opts: { timeoutMs: number; retryDelayMs?: number },
+): Promise<Response> {
+  const delay = opts.retryDelayMs ?? 1200;
+  const once = () => fetch(url, { ...init, signal: AbortSignal.timeout(opts.timeoutMs) });
+
+  let res: Response;
+  try {
+    res = await once();
+  } catch (e) {
+    // A timeout or a dropped connection. Worth one more go for the same
+    // reason a 503 is: the request never reached a decision.
+    await new Promise((r) => setTimeout(r, delay));
+    return await once();
+  }
+
+  if (res.status === 429 || res.status >= 500) {
+    // The body is read and discarded on purpose. Leaving it unread on a
+    // response nobody will use leaks the connection in Deno.
+    try { await res.text(); } catch (_) { /* nothing to do with it */ }
+    console.error(`fetchModel: http ${res.status}, retrying once in ${delay}ms`);
+    await new Promise((r) => setTimeout(r, delay));
+    return await once();
+  }
+  return res;
+}
+
 /** The error to return when no provider is configured at all. */
 export const NO_PROVIDER_MESSAGE =
   "No text model is configured. Set MISTRAL_API_KEY in the Edge Function secrets.";

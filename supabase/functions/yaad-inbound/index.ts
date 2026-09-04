@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { fetchModel, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
@@ -466,7 +466,7 @@ async function readTheJob(text: string, trace: Trace) {
       ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
     }, async (sp) => {
-      const r = await fetch(prov.api, {
+      const r = await fetchModel(prov.api, {
         method: "POST",
         headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -597,8 +597,7 @@ guessing. Never invent a worker, a timescale, a fee, or a guarantee.` },
             { role: "user", content: text.slice(0, 6000) },
           ],
         }),
-        signal: AbortSignal.timeout(25000),
-      });
+      }, { timeoutMs: 25000 });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
       // Every return null below used to be silent: recorded on the span only,
