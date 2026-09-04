@@ -1385,7 +1385,7 @@ function ownWords(descr){
 // The fixed question order the WhatsApp assistant asks, one lane at a time.
 // Copied here rather than read from the webhook, because the desk has no
 // way to import from a Deno function. Kept in the same order and the same
-// keys as INTAKE_STEPS and WORKER_STEPS in yaad-whatsapp-webhook: if that
+// keys as the intake steps in yaad-inbound: if that
 // order changes, this copy goes stale and needs updating alongside it.
 const WA_CLIENT_STEPS = ["what","where","access","when","name","from","email"];
 const WA_CLIENT_LABELS = {
@@ -1639,8 +1639,8 @@ function paintKill(){
   b.classList.toggle("off", AGENTS_PAUSED);
   b.textContent = AGENTS_PAUSED ? "Agents: paused" : "Agents: live";
   b.title = AGENTS_PAUSED
-    ? "Paused. Nothing this desk starts will call a model. yaad-inbound and yaad-whatsapp-webhook are not covered and still reply to incoming messages."
-    : "Live. Drafting an invoice or describing stills calls a model. yaad-inbound and yaad-whatsapp-webhook run whatever this says.";
+    ? "Paused. Nothing this desk starts will call a model. This is a desk-side control only: yaad-inbound is not covered and still answers incoming messages on its own."
+    : "Live. Drafting an invoice or describing stills calls a model. yaad-inbound never reads this row either way.";
 }
 
 async function setAgentsPaused(next){
@@ -2206,7 +2206,7 @@ function panelSvc(rows){
 // Every row says what reads it. A row nothing reads is said to be a row
 // nothing reads, because that is the difference between a switch and a label.
 const SETTING_META = {
-  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. It does not reach everything. <b>yaad-inbound and yaad-whatsapp-webhook answer people on their own and never read this row</b>, so an incoming message is still replied to while this is on.", true],
+  agents_paused:        ["Pause every agent this desk starts", "Stops invoice drafting and sketch description from calling a model. <b>It is enforced by this page, not by the functions</b>, and it does not reach everything: yaad-inbound answers people on its own and never reads this row, so an incoming message is still replied to while this is on.", true],
   worker_guidelines_version: ["Worker Guidelines in force", "current_doc_version() reads this, and the quote policy refuses an insert from anybody signed on an older version. Bumping it stops quoting until they re-sign.", false],
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
@@ -2553,7 +2553,7 @@ document.addEventListener("click", (e) => {
   if (kill) {
     const next = !AGENTS_PAUSED;
     if (!confirm(next
-      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. yaad-inbound and yaad-whatsapp-webhook are not covered and keep replying to incoming messages."
+      ? "Pause every agent this desk starts?\n\nInvoice drafting and sketch description will stop calling a model. yaad-inbound is not covered and keeps replying to incoming messages."
       : "Let this desk call agents again?")) return;
     setAgentsPaused(next);
     return;
@@ -2829,7 +2829,7 @@ async function loadOverview(){
   setCount("kick", kickDraft, false);
   if (AGENTS_PAUSED) {
     $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
-      "Invoice drafting and sketch description are off. yaad-inbound and yaad-whatsapp-webhook are not covered by this switch and are still replying to people who write in.",
+      "Invoice drafting and sketch description are off. yaad-inbound is not covered by this switch and is still replying to people who write in.",
       "Open settings","set"));
   }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
@@ -2932,7 +2932,7 @@ async function loadHealth(){
     "The whole promise of this desk is that an approval binds to the exact files. A row with no sha256 cannot be bound to anything, so signing it off is a signature on air.");
 
   if (AGENTS_PAUSED) add("warn","Agents are paused, and the pause does not reach everything",
-    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. Two functions are not covered, because nothing here starts them: yaad-inbound and yaad-whatsapp-webhook are woken by an incoming message and call a model before this desk knows the message exists. Reading app_settings.agents_paused at the top of those two is what would make the switch mean everything it looks like it means.");
+    "Everything this desk starts is stopped, in the one guard fn() and skFn() both go through. One function is not covered, because nothing here starts it: yaad-inbound is woken by an incoming message and calls a model before this desk knows the message exists. Reading app_settings.agents_paused at the top of it is what would make the switch mean everything it looks like it means. (yaad-whatsapp-webhook was named here too until 4 Sep 2026; it was deleted on 1 Sep.)");
 
   if (unsigned) add("warn", unsigned + " job" + (unsigned === 1 ? " has" : "s have") + " no client account behind them",
     "status is stuck at awaiting_client_setup, so client_go_live() has nothing signed in to open. They are at the top of the Intake view.");
