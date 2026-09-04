@@ -3052,6 +3052,20 @@ async function loadOverview(){
   // stuck RIGHT NOW, because a row is deleted the moment the job moves again.
   // job_stall_resolved is what that delete now writes down on its way out, so
   // the second half of this is only true forwards from 4 September 2026.
+  // Evidence completeness at sign-off. Read from the snapshot stage_approvals
+  // takes at approval time, not from the evidence table, so a photograph filed
+  // the day after does not quietly improve the number. All time, because
+  // approvals are the rarest thing in the system.
+  const evCompRow = await sb.from("evidence_completeness").select("*").maybeSingle();
+  const ec = evCompRow.data || {};
+  const signoffs = Number(ec.signoffs || 0);
+  const pctOf = n => signoffs ? Math.round((Number(n || 0) / signoffs) * 100) : null;
+  const withEv = pctOf(ec.with_any_evidence);
+  const withFp = pctOf(ec.fully_fingerprinted);
+  const withArr = pctOf(ec.with_arrival);
+  const noEv = signoffs - Number(ec.with_any_evidence || 0);
+  const noFp = Number(ec.with_any_evidence || 0) - Number(ec.fully_fingerprinted || 0);
+
   const stallRow = await sb.from("stall_metrics").select("*").maybeSingle();
   const stall = stallRow.data || {};
   const stalledNow = Number(stall.stalled_now || 0);
@@ -3122,6 +3136,19 @@ async function loadOverview(){
     tile(unstallHrs === null ? "" : unstallHrs <= 24 ? "ok" : unstallHrs <= 72 ? "warn" : "crit",
       "Time to get moving again", unstallHrs === null ? "n/a" : Math.round(unstallHrs) + " hr",
       unstallN ? `${unstallN} in 30 days, from when we chased` : "Nothing has unstalled yet"),
+    // Three separate numbers rather than one completeness score. The gaps have
+    // different causes: no evidence is a desk problem, no fingerprint is a
+    // plumbing problem, no arrival is a thing workers could not do from a
+    // phone until now. One percentage would hide which.
+    tile(withEv === null ? "" : withEv === 100 ? "ok" : "crit",
+      "Signed off with evidence", withEv === null ? "n/a" : withEv + "%",
+      signoffs ? `${ec.with_any_evidence} of ${signoffs} sign-offs, all time` : "Nothing signed off yet"),
+    tile(withFp === null ? "" : withFp === 100 ? "ok" : "warn",
+      "Bound to the exact files", withFp === null ? "n/a" : withFp + "%",
+      signoffs ? `${ec.fully_fingerprinted} of ${signoffs} carry a fingerprint on every item` : "Nothing signed off yet"),
+    tile(withArr === null ? "" : withArr >= 80 ? "ok" : "warn",
+      "Arrival logged first", withArr === null ? "n/a" : withArr + "%",
+      signoffs ? `${ec.with_arrival} of ${signoffs} had the worker on site on record` : "Nothing signed off yet"),
   ].join("");
 
   const needs = [];
@@ -3133,6 +3160,12 @@ async function loadOverview(){
     "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Open conversations", "threads"));
   if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
     "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
+  if (noEv) needs.push(alertRow("crit","!",
+    noEv + (noEv === 1 ? " stage was signed off with no evidence on file at all" : " stages were signed off with no evidence on file at all"),
+    "An approval with nothing behind it is the one thing this business sells, missing. Worth knowing which, because it is either a test row or a habit forming.", "See sign-offs", "evid"));
+  if (noFp) needs.push(alertRow("warn","?",
+    noFp + (noFp === 1 ? " sign-off is not bound to the exact files" : " sign-offs are not bound to the exact files"),
+    "An evidence item with no sha256 means the approval is attached to a label, not to the bytes. If the file is later swapped, nothing notices.", "See sign-offs", "evid"));
   if (Number(stall.escalated_now || 0)) needs.push(alertRow("crit","!",
     stall.escalated_now + (Number(stall.escalated_now) === 1 ? " job has been quiet long enough to escalate" : " jobs have been quiet long enough to escalate"),
     "The worker was nudged and it did not move it. The client has been told. This is the point where a job stops being late and starts being a job somebody walked away from.", "See them", "stalled"));

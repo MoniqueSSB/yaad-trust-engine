@@ -603,6 +603,49 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## Evidence completeness at sign-off
+
+**The question is what you had in front of you when you decided, not what is
+on the job now.** Counting rows in `evidence` per job answers the weaker
+version, because a photograph filed the day after an approval counts towards it
+identically. `stage_approvals.evidence` is a snapshot taken at approval time,
+each item carrying the sha256 of the exact bytes, so that is what these views
+read. Nothing filed afterwards can improve the number, and there is a rig
+proving both halves of that: `supabase/tests/signoff_snapshot_guards.sql`,
+five tests, all passing on 4 September 2026. Test 4 exists so tests 2 and 3
+cannot pass by being vacuous.
+
+```sql
+select * from public.evidence_completeness;
+select * from public.evidence_at_signoff order by approved_at desc limit 20;
+```
+
+**Three numbers, not one score, and that is on purpose.** The gaps have
+different causes and one percentage would hide which is open:
+
+- **Signed off with evidence.** Red at anything under 100%. An approval with
+  nothing behind it is the product missing.
+- **Bound to the exact files.** Every item in the snapshot carries a sha256. An
+  item without one means the approval is attached to a label rather than to the
+  bytes, so a file swapped later goes unnoticed.
+- **Arrival logged first.** The worker was on site, on record, before the stage
+  was approved. **Expect this one to read low for now and do not read it as
+  workers cutting corners**: until the location pin lane shipped (`20260904h`)
+  the only way to log arrival was to sign into the portal mid-job, which
+  `CLAUDE.md` §9 says outright is not a thing a worker in Portmore will do.
+  This number is the measure of whether the pin lane fixed it.
+
+**What is deliberately not measured: whether there is a before and an after.**
+Nothing in the schema records which a photograph is. The labels usually say so
+in free text, and reading it out of them would be a guess presented as a check.
+Measuring it needs a field that says so, which is a product decision.
+
+**`located` and `flagged_far_from_site` are in `evidence_at_signoff` but not on
+the Overview.** Both are about the pin lane, which has no real traffic yet.
+Promote them once it does.
+
+---
+
 ## Stall rate, and how long a stall lasts
 
 **Two different questions, and until 4 September 2026 only one of them had an

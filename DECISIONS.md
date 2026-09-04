@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · Evidence completeness is measured from the snapshot, not from the evidence table
+
+**The obvious implementation is wrong in a way that flatters the business.** Counting rows in `evidence` per approved job gives a completeness figure that goes up when a worker files a photograph the day after sign-off. The measure is supposed to say what the named human had in front of them at the moment they decided, and that version says something closer to what eventually turned up. `stage_approvals.evidence` already holds the right thing: a snapshot written at approval time, each item carrying the sha256 of the exact bytes. Reading the snapshot makes the number structurally incapable of improving retrospectively, which is the property that matters, and a rig proves it by filing evidence and an arrival after an approval and confirming neither moves the row.
+
+**Three separate numbers rather than one completeness score.** The three gaps have unrelated causes: a sign-off with no evidence is a desk habit, a sign-off with an unfingerprinted item is plumbing, and a sign-off with no Arrival Log is a thing workers could not do from a phone until the location pin lane shipped the same day. A single composite would have read near zero on live data and implied workers were cutting corners, when the arrival leg had no usable route until now. Separate numbers say which one is actually open, and the arrival number is now the measure of whether the pin lane worked.
+
+**Before-and-after is not measured, and that is a refusal rather than an omission.** Nothing in the schema records which a photograph is. The labels say it in free text often enough that inferring it would work most of the time, and a check that works most of the time on evidence is worse than no check, because it reads as covered. Measuring it needs a field that says so, which is a product decision and hers.
+
+---
+
 ## 2026-09-04 · A stall that resolves is written down before it is deleted
 
 **The system review asked for stall rate and time to unstall. Only the first was computable, and finding out why took reading the delete rather than the table.** `job_stall_state` holds one row per job that has gone quiet long enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes that row the moment the job moves again. So the table answers "what is stuck right now" perfectly and answers "how long do things stay stuck" not at all, because the evidence a stall ever happened leaves with the row. `worker_stall_history` sounds like the missing piece and is not: it is a view over the same live table, so it empties at the same instant.
