@@ -698,6 +698,9 @@ const TONE = {
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
   draft:"warn", paid:"ok", void:"mute", issued:"ok", failed:"crit", ready:"ok", approved:"ok",
+  // reports. reviewed is amber, not grey: it has been read and still is not
+  // with the client, so it is outstanding rather than finished.
+  reviewed:"warn",
   // calls / waitlist
   requested:"warn", booked:"ok", held:"warn",
   // enquiries. "replied" and not "answered": disputes already own answered,
@@ -797,6 +800,52 @@ const VIEWS = [
       { label:"Bin it", cls:"d", when:r => r.status !== "binned",
         set:{ status:"binned" },
         says:() => "Marks it as not real work. The row stays on the record, it just stops appearing as something waiting." },
+    ]},
+
+  { k:"reports", g:"Documents & money", label:"Reports", icon:"case",
+    title:"Reports", table:"v_reports_open",
+    sub:"The priced reports: Deposit Protection Checks, Condition Reports, Technical Sign-offs and Visual Checks. yaad-report drafts the findings. It cannot rate one and it cannot write the verdict, because that is the judgment the client actually paid for. A report will not issue while a single finding is unrated, while the verdict is empty, or while any sentence in it states a measurement. Each of those refusals is the gate working, not a bug.",
+    select:"*",
+    order:"drafted_at",
+    search:["number","client_name","property","kind"],
+    empty:["No reports yet","Draft one from a visit and it lands here for you to rate and sign."],
+    cols:[
+      {h:"Report", f:r => id_(r.number || "draft") + sub_((r.kind || "").replace(/_/g," "))},
+      {h:"Client & property", f:r => esc(r.client_name || "Not named") + sub_(r.property || "No property given")},
+      {h:"Findings", f:r => esc(String(r.findings ?? 0)) + sub_(r.unrated ? r.unrated + " still unrated" : "all rated")},
+      {h:"Verdict", f:r => r.needs_verdict ? chip_("crit","not written") : chip_("ok","written")},
+      {h:"Measurements pulled", f:r => r.scrubbed ? chip_("warn", r.scrubbed + " scrubbed") : mute_("none")},
+      {h:"State", f:r => tone_(r.status)},
+      {h:"Visited", f:r => mute_(r.visited_on ? ago_(r.visited_on) : "not given")},
+    ],
+    actions:[
+      { label:"Rate a finding", cls:"",
+        when:r => r.status !== "issued" && r.unrated > 0,
+        rpc:"rate_finding",
+        ask:[
+          { k:"ord", label:"Which finding, by its number" , placeholder:"1" },
+          { k:"severity", label:"How serious is it",
+            options:[["severe","Severe"],["moderate","Moderate"],["low","Low"]] },
+        ],
+        args:(r, v) => ({ p_report:r.id, p_ord:Number(v.ord), p_severity:v.severity }),
+        says:r => `Rates one of the ${r.findings} findings on this report in your name, stamped with your email and the time. Nothing drafts this and nothing ever will: it is the professional judgment the client paid for.` },
+
+      { label:"Write the verdict", cls:"",
+        when:r => r.status !== "issued",
+        rpc:"write_report_verdict",
+        ask:[
+          { k:"line", label:"The one line for page one", placeholder:"Hold. Do not pay this deposit as it stands." },
+          { k:"verdict", label:"The paragraph under it", type:"long",
+            placeholder:"What you would do and why, in your own words. No model has seen this field." },
+        ],
+        args:(r, v) => ({ p_report:r.id, p_line:v.line, p_verdict:v.verdict }),
+        says:() => "Writes the verdict on page one. services.html promises the client this within 72 hours of the visit, and it is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
+
+      { label:"Issue it", cls:"",
+        when:r => r.status !== "issued" && r.unrated === 0 && !r.needs_verdict,
+        rpc:"issue_report",
+        args:(r) => ({ p_report:r.id }),
+        says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
     ]},
 
   { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",

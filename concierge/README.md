@@ -46,7 +46,7 @@ the `VIEWS` registry in `concierge.html` if the count here matters to you.
 |---|---|
 | Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes |
 | People | Applications, Workers, Clients, Reviews |
-| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money |
+| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money, Reports |
 | Services | Services, Marketplace, Job photos |
 | Inbox | Conversations, Mid-chat, Calls, Enquiries, Waiting list, Feedback, Questions |
 | System | Settings, Health |
@@ -236,3 +236,30 @@ curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/
 ```
 
 See `../concierge-deploy/README.md` for why it is a separate origin.
+
+## Finishing a report
+
+`Reports` is where a drafted report becomes a client's report. `yaad-report`
+writes the findings; it has no severity field and no verdict field, so what
+lands in this view is deliberately unfinished.
+
+Three buttons, in order:
+
+1. **Rate a finding.** By its number, Severe, Moderate or Low. Stamped with
+   your email and the time. Nothing drafts this.
+2. **Write the verdict.** The one line for page one, and the paragraph under
+   it. No model has seen that field.
+3. **Issue it.** Only appears once every finding is rated and the verdict is
+   written, and the database refuses it anyway if either is missing or if a
+   sentence states a measurement.
+
+All three go through Postgres functions rather than column writes, so the rule
+is checked in the database whoever is calling and this page is only the form in
+front of it. Each one writes to `agent_actions` as you, by name, which is how
+the ledger can later show that the drafting was a machine and the judgment was
+a person.
+
+**The "Measurements pulled" column is worth reading.** It counts what the
+scrubber removed from the draft before it was saved. A high number means the
+notes from the visit were full of dimensions, which is worth knowing before you
+sign a document that says Yaadly does not measure.
