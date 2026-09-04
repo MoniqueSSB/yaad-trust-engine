@@ -314,16 +314,29 @@ The body ended with the link variable. It now ends with a sentence after it. Kee
 
 **Not submitted yet, and nothing breaks while it is missing.** `TWILIO_CONTENT_SID_APPROVAL` unset simply means `yaad-notify-client`'s `evidence_report_confirmed` behaves exactly as it did before: free text with the photos attached, then Meta, then SMS, then email. The template is the fallback for one specific failure, a client who has been quiet more than 24 hours, and for nothing else. It is never a substitute for the free-text message when that can still be delivered, because the free text carries the worker's own words, the AI's note and the photographs themselves, and four fixed variable slots cannot hold any of that.
 
-**Submit it as:**
+**Submit it as**, field by field in the Content Template Builder (Console, Messaging, then Content Template Builder; on the newer console it is Products and Services, then Templates). Click **Create new template**:
 
-1. Twilio console, Messaging, Content Template Builder, new template, content type **twilio/quick-reply**, category **Utility**. This is an operational message about work already under way, not marketing.
-2. Body, two variables:
+| Field | What to put in it |
+|---|---|
+| Template name | `yaadly_stage_approval_v1`. Lower case, letters, numbers and underscores only: Meta rejects anything else, and the name goes to them with the template. |
+| Template language | English |
+| Select content type | **Quick reply** (`twilio/quick-reply`) |
+| Body | the paragraph below |
+| Variable 1 sample | `Kitchen sink pipe leak` |
+| Variable 2 sample | `https://app.yaadly.co.uk/portal/jobs/JOB-WEB-1788006231445` |
+| Button 1, button text | `Approve` (20 characters is the ceiling) |
+| Button 1, ID | `yaadly_approve_stage` |
+| Category, at submit | **Utility**. Operational message about work already under way, not marketing. |
 
-   > Yaadly here. There is an update on {{1}} waiting for your review, photos and all, in your portal: {{2}} Tap Approve below if you are happy for this stage to close, or reply here with anything you want changed.
+Body, exactly:
 
-   `{{1}}` is the job title, `{{2}}` is the portal link. Neither opens nor closes the body, which is the rule that got `yaadly_quote_landed` rejected the first time.
-3. One quick-reply button. Title **Approve** (20 characters is the ceiling). Its `id` must be exactly `yaadly_approve_stage`, lower case. That string is matched in `approval-match.ts` and is deliberately NOT an environment variable: a typo in a secret would read as an ordinary message rather than as a broken button, which is the failure you would never notice.
-4. Suggested name `yaadly_stage_approval_v1`. Submit, wait for Meta, then:
+> Yaadly here. There is an update on {{1}} waiting for your review, photos and all, in your portal: {{2}} Tap Approve below if you are happy for this stage to close, or reply here with anything you want changed.
+
+`{{1}}` is the job title, `{{2}}` is the portal link. Neither opens nor closes the body, which is the rule that got `yaadly_quote_landed` rejected the first time. Add both with **+ Add Variable** or by typing `{{1}}` and `{{2}}` straight into the body; the sample values are required for a WhatsApp submission and are only ever shown to the reviewer.
+
+The button field may be labelled **ID** or **Payload** depending on which console you are looking at. It is the one that is not visible to the client. `yaadly_approve_stage` must match character for character: it is matched in `approval-match.ts` and is deliberately NOT an environment variable, because a typo in a secret would read as an ordinary message rather than as a broken button, which is the failure you would never notice.
+
+Then **Save and submit for WhatsApp approval**. That assigns the `HX` SID and sends it to Meta. When it comes back approved:
 
 ```bash
 npx supabase secrets set TWILIO_CONTENT_SID_APPROVAL=HXxxxxxxxx --project-ref leffyisvfvjwzilydlwf
@@ -1081,9 +1094,19 @@ Signed links here last 3600 seconds, not the 300 used for a one-shot WhatsApp or
 
 **That is the honest, expected answer until a WhatsApp Content Template is approved and its ContentSid is set.** This ping is business-initiated on a fixed schedule, every day, on every live job, so it can never rely on the free 24 hour customer-service window `yaad-notify-client` and `yaad-job-health` sometimes get to use: it always sends through a Meta-approved template, no exceptions, or it sends nothing at all rather than gambling on Twilio error 63016 mid-run. To bring it live:
 
-1. Twilio console → Messaging → Content Template Builder → new WhatsApp template, category **Utility** (this is an operational check-in on an existing job, not marketing, category matters for approval speed).
-2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title.
-3. Submit for WhatsApp approval. Usually resolves within a day; Twilio's console shows the status.
+1. Twilio console, Messaging, then Content Template Builder (Products and Services, then Templates, on the newer console). **Create new template**, filled in as:
+
+   | Field | What to put in it |
+   |---|---|
+   | Template name | `yaadly_daily_checkin_v1`. Lower case, letters, numbers and underscores only. |
+   | Template language | English |
+   | Select content type | **Text** (`twilio/text`). No buttons on this one. |
+   | Body | the sentence below |
+   | Variable 1 sample | `Kitchen sink pipe leak` |
+   | Category, at submit | **Utility**. An operational check-in on an existing job, not marketing, and the category decides both approval speed and whether it is approved at all. |
+
+2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title, and the sentence deliberately neither opens nor closes with it.
+3. **Save and submit for WhatsApp approval.** Usually resolves within a day; Twilio's console shows the status.
 4. Once approved, copy its ContentSid (`HX...`) and set it as the `TWILIO_CONTENT_SID_DAILY_CHECKIN` function secret on the `leffyisvfvjwzilydlwf` project. No redeploy needed, it is read fresh from the environment on every run.
 
 **Runs once a day, 21:00 UTC (16:00 Jamaica), via pg_cron.** Same shape as `yaad-job-health`: a shared secret, generated once and kept only as a SHA-256 hash in `app_settings.daily_checkin_cron_secret_sha256`, plaintext living solely in the cron job's own stored command (`select command from cron.job where jobname = 'yaad-daily-checkin'` if it ever needs re-deriving). A manual run is available to a signed-in admin the same way `yaad-job-health` is, no secret needed, `is_admin()` is enough.
