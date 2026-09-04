@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · The Pricing agent is reachable, and the log matters more than the panel
+
+**The gap.** `yaad/agents/pricing.py` has existed since the engine was written and ran nowhere but `run_demo.py` and the tests. Its `review_quote()` is the Deposit Protection Check in miniature, and the Deposit Protection Check is £149 on the published price list. The audit's roadmap item 9 was to make it reachable.
+
+**No model, and the file says so in several places.** CLAUDE.md §5 is unusually emphatic: pricing is a lookup, a hallucinated band breaks precisely the thing the business exists to fix, and "no public price exists in Jamaica for this work" is a correct and complete answer rather than a gap to fill. The desk panel is a lookup and a few thresholds. A test asserts the four honest gaps (painting, masonry, septic, general repair) stay empty after generation, because a silently dropped null band would show as "not looked up" instead of "there is no such price", which is a much weaker statement and the opposite of the point.
+
+**Generated, not copied.** The desk is a static page with no server behind it, so it needs the numbers in the file. A second hand-typed table is a second set of numbers the moment anybody edits one, so `scripts/gen_price_benchmarks.py` writes them into a marked block in `concierge.html` from `yaad/benchmarks.py`, and `tests/test_price_benchmarks.py` re-runs the generator and fails if the page has drifted. Same pattern as the trades list earlier the same day, same reason.
+
+**The thresholds were ported verbatim and then checked against the source**, not eyeballed. Six cases through the JavaScript in a browser and the same six through `review_quote()` in Python: dead centre, over 2x, under half, 1.27x just inside the band, an honest gap, and a real mid-band figure. All six agree.
+
+**One mapping had to be invented and it is in the open.** The benchmarks were seeded against the engine's own short vocabulary (roofing, metalwork, grounds) and the desk speaks the 18 taxonomy trades. `TAXONOMY_TO_BENCHMARK` maps ten of them; the other eight have no seeded family and are simply not offered, because a dropdown entry that cannot be looked up implies a lookup that will not happen. A test asserts every mapped trade lands on a family that actually has bands.
+
+**`quote_reviews` is the part that compounds.** The panel answers one question; the table is the proprietary price database the plan describes as both a future product feature and an investor asset, and it starts empty. It stores the band AS IT READ AT THE TIME rather than referencing the benchmark, because benchmarks get revised and a past judgement has to stay readable against the numbers somebody actually saw. It also carries a free-text note, because a quote is high due to bad access or a changed spec or somebody trying it on, and only a person knows which.
+
+**Admin only, deliberately with no party read policy.** The audit flagged the risk as a copy risk rather than a code one: a band shown beside a worker's price reads as an estimate, and estimating is quantity surveying, which is the one thing Yaadly explicitly does not guarantee. It stays internal until the founder settles that wording.
+
+---
+
 ## 2026-09-04 · The Kickoff Pack becomes an addition, and it turns out it was only ever mandatory by accident
 
 **Founder's instruction:** take the Kickoff Pack out of the flow, offer it where a client wants project documentation, leave the Quote Pack as it now is.

@@ -578,6 +578,34 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
 </section>
 
+<!-- ============================================ PRICE CHECK -->
+<section class="view" data-view="pricecheck">
+  <h1 class="vh">Price check</h1>
+  <p class="vsub">Paste a worker's figure and see it against the researched band for that trade. <b>This is a reference, not an estimate.</b> Yaadly guarantees project management and oversight judgment; estimating is a quantity surveyor's job and this does not do it. Every band carries its own source and confidence so you can argue with it. Nothing here is ever shown to a client or a worker. For several trades the honest answer is that no public price exists in Jamaica, and saying so out loud is the point rather than a gap to fill.</p>
+  <div class="card" style="padding:16px;margin-bottom:14px">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+      <label style="flex:1 1 210px"><span class="dk" style="display:block;margin-bottom:5px">Trade</span>
+        <select id="pcTrade" class="inp" style="width:100%"></select></label>
+      <label style="flex:1 1 150px"><span class="dk" style="display:block;margin-bottom:5px">Variant, if you know it</span>
+        <select id="pcVariant" class="inp" style="width:100%"></select></label>
+      <label style="flex:1 1 150px"><span class="dk" style="display:block;margin-bottom:5px">Quoted, J$</span>
+        <input id="pcAmount" class="inp" type="number" min="1" step="1" placeholder="185000" style="width:100%"></label>
+      <button id="pcRun" class="btn" type="button">Check it</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
+      <label style="flex:1 1 150px"><span class="dk" style="display:block;margin-bottom:5px">Job, optional</span>
+        <input id="pcJob" class="inp" type="text" placeholder="JOB-0002" style="width:100%"></label>
+      <label style="flex:2 1 320px"><span class="dk" style="display:block;margin-bottom:5px">What you make of it, optional</span>
+        <input id="pcNotes" class="inp" type="text" placeholder="access is bad, three flights, no lift" style="width:100%"></label>
+    </div>
+  </div>
+  <div id="pcMsg"></div>
+  <div id="pcOut"></div>
+  <h2 class="vh" style="font-size:17px;margin-top:26px">Reviewed so far</h2>
+  <p class="vsub">Every check you log lands here. There are no public prices in Jamaica for most of this work, so this table is how that stops being true: one reviewed quote at a time, it becomes the price database the whole "no farrin price" promise rests on.</p>
+  <div id="pcLog"><div class="empty"><b>Nothing logged yet.</b></div></div>
+</section>
+
 <!-- ============================================ AGENCY FEES -->
 <section class="view" data-view="fees">
   <h1 class="vh">Agency Fees</h1>
@@ -1133,6 +1161,7 @@ const VIEWS = [
   { k:"fees", g:"Documents & money", label:"Agency Fees", icon:"bill", hand:true },
   { k:"materials", g:"Documents & money", label:"Materials tranches", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
+  { k:"pricecheck", g:"Documents & money", label:"Price check", icon:"bill", hand:true },
 
   { k:"docs", g:"Documents & money", label:"Signatures", icon:"pen",
     title:"Signatures", table:"doc_signatures",
@@ -2062,6 +2091,211 @@ function reviewCounterpart(r, all){
   return chip_("warn", "waiting on the other side");
 }
 
+/* BEGIN GENERATED PRICE BENCHMARKS, do not edit by hand */
+// Source: yaad/benchmarks.py. Regenerate with
+//   python3 scripts/gen_price_benchmarks.py
+// tests/test_price_benchmarks.py fails if this drifts from the source.
+const PRICE_BENCHMARKS = {
+  "generated_from": "yaad/benchmarks.py",
+  "jmd_per_gbp": 210.0,
+  "market_context": "Prices trend up through 2026 and 2027: Hurricane Melissa (Oct 2025) spiked demand for zinc, ply and lumber, mining output fell 37.5 percent per STATIN pushing materials up, and a Feb 2025 collective labour agreement adds 19 percent to construction wages over two years.",
+  "day_rates_jmd": {
+    "general labourer": [
+      3000,
+      3500
+    ],
+    "skilled mason": [
+      7000,
+      12000
+    ],
+    "roofing": [
+      7000,
+      12000
+    ],
+    "plumbing": [
+      7000,
+      12000
+    ],
+    "electrical": [
+      7000,
+      12000
+    ],
+    "masonry": [
+      7000,
+      12000
+    ],
+    "painting": [
+      7000,
+      12000
+    ],
+    "metalwork": [
+      7000,
+      12000
+    ]
+  },
+  "materials_jmd": {
+    "cement (42.5kg bag)": [
+      1400,
+      2000
+    ],
+    "6in concrete block": [
+      140,
+      280
+    ],
+    "plywood sheet": [
+      3450,
+      7190
+    ],
+    "zinc roof sheet": [
+      5000,
+      5000
+    ],
+    "emulsion paint (gallon)": [
+      5000,
+      6500
+    ],
+    "treated lumber 2x4 (per ft)": [
+      120,
+      120
+    ]
+  },
+  "bands": {
+    "roofing:minor": {
+      "label": "Minor roof repair",
+      "low_jmd": 75000,
+      "high_jmd": 75000,
+      "low_gbp": 357,
+      "high_gbp": 357,
+      "confidence": "high",
+      "source": "Government ROOFS grant tier",
+      "note": ""
+    },
+    "roofing:major": {
+      "label": "Major roof damage repair",
+      "low_jmd": 200000,
+      "high_jmd": 200000,
+      "low_gbp": 952,
+      "high_gbp": 952,
+      "confidence": "high",
+      "source": "Government ROOFS grant tier",
+      "note": ""
+    },
+    "roofing:severe": {
+      "label": "Severe roof or structural reconstruction",
+      "low_jmd": 200000,
+      "high_jmd": 500000,
+      "low_gbp": 952,
+      "high_gbp": 2381,
+      "confidence": "high",
+      "source": "Government ROOFS grant tier",
+      "note": ""
+    },
+    "roofing:*": {
+      "label": "Roof repair, tier unconfirmed",
+      "low_jmd": 75000,
+      "high_jmd": 200000,
+      "low_gbp": 357,
+      "high_gbp": 952,
+      "confidence": "high",
+      "source": "Government ROOFS grant tiers",
+      "note": "Spans the minor to major tiers. Confirm the tier before quoting."
+    },
+    "metalwork:grill": {
+      "label": "Window or door grill, custom",
+      "low_jmd": 25000,
+      "high_jmd": 30000,
+      "low_gbp": 119,
+      "high_gbp": 143,
+      "confidence": "low",
+      "source": "Single seller, St Ann",
+      "note": "One vendor only. Treat as indicative, not a benchmark."
+    },
+    "plumbing:unclog": {
+      "label": "Unclog drain",
+      "low_jmd": 1664,
+      "high_jmd": 3750,
+      "low_gbp": 8,
+      "high_gbp": 18,
+      "confidence": "medium",
+      "source": "UWI card 2019-20, inflated 30 to 50 percent",
+      "note": "Base figures are dated. Inflation applied."
+    },
+    "plumbing:tank": {
+      "label": "Water tank install",
+      "low_jmd": 18850,
+      "high_jmd": 21750,
+      "low_gbp": 90,
+      "high_gbp": 104,
+      "confidence": "medium",
+      "source": "UWI card 2019-20, inflated 30 to 50 percent",
+      "note": ""
+    },
+    "grounds:monthly": {
+      "label": "Gardener, monthly",
+      "low_jmd": 10000,
+      "high_jmd": 25000,
+      "low_gbp": 48,
+      "high_gbp": 119,
+      "confidence": "high",
+      "source": "Three corroborating sources",
+      "note": ""
+    },
+    "painting:*": {
+      "label": "Painting",
+      "low_jmd": null,
+      "high_jmd": null,
+      "low_gbp": null,
+      "high_gbp": null,
+      "confidence": "none",
+      "source": "No public price exists in Jamaica",
+      "note": "Price from materials plus day rate, and log the quote."
+    },
+    "masonry:*": {
+      "label": "Block wall",
+      "low_jmd": null,
+      "high_jmd": null,
+      "low_gbp": null,
+      "high_gbp": null,
+      "confidence": "none",
+      "source": "No public price exists in Jamaica",
+      "note": "Price from materials plus day rate, and log the quote."
+    },
+    "plumbing:septic": {
+      "label": "Septic",
+      "low_jmd": null,
+      "high_jmd": null,
+      "low_gbp": null,
+      "high_gbp": null,
+      "confidence": "none",
+      "source": "No public price exists in Jamaica",
+      "note": ""
+    },
+    "general repair:*": {
+      "label": "General repair",
+      "low_jmd": null,
+      "high_jmd": null,
+      "low_gbp": null,
+      "high_gbp": null,
+      "confidence": "none",
+      "source": "No public price exists in Jamaica",
+      "note": ""
+    }
+  },
+  "taxonomy_to_benchmark": {
+    "Roofing": "roofing",
+    "Plumbing": "plumbing",
+    "Drainage & Septic": "plumbing",
+    "Water Tank & Pump": "plumbing",
+    "Masonry & Concrete": "masonry",
+    "Painting & Decorating": "painting",
+    "Grille & Gate Welding": "metalwork",
+    "Fencing": "metalwork",
+    "Landscaping": "grounds",
+    "General Handyman": "general repair"
+  }
+};
+/* END GENERATED PRICE BENCHMARKS */
+
 // ---- Kickoff packs: what is actually in the newest draft.
 // Reordered 4 September 2026. "Notes for you" and "Open questions" now come
 // FIRST, and payment stages third.
@@ -2689,7 +2923,154 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 
 // ---------------------------------------------------------------- router
 
-const BESPOKE = { over: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees, materials: loadMaterials };
+
+// ---- Price check ---------------------------------------------------------
+//
+// The Pricing agent, finally reachable. yaad/agents/pricing.py has existed
+// since the engine was written and ran nowhere but run_demo.py and the tests.
+//
+// THERE IS NO MODEL IN THIS. CLAUDE.md section 5: pricing is a lookup against
+// researched benchmarks, and "no public price exists in Jamaica for this work"
+// is a correct and complete answer rather than a gap to fill. The bands below
+// are generated from yaad/benchmarks.py; tests/test_price_benchmarks.py fails
+// if the copy in this page drifts from the engine's.
+//
+// The thresholds are ported verbatim from review_quote(): more than double the
+// top of the band is a red flag, above 1.3x is worth asking about, under half
+// the bottom is suspiciously low. They are deliberately coarse. This is a
+// conversation starter, not a valuation.
+
+function pcBandFor(trade, variant){
+  const fam = PRICE_BENCHMARKS.taxonomy_to_benchmark[trade];
+  if (!fam) return null;
+  const b = PRICE_BENCHMARKS.bands;
+  return b[fam + ":" + (variant || "*")] || b[fam + ":*"] || null;
+}
+
+function pcVariantsFor(trade){
+  const fam = PRICE_BENCHMARKS.taxonomy_to_benchmark[trade];
+  if (!fam) return [];
+  return Object.keys(PRICE_BENCHMARKS.bands)
+    .filter(k => k.split(":")[0] === fam)
+    .map(k => k.split(":")[1])
+    .filter(v => v !== "*");
+}
+
+/** review_quote(), ported. Returns a verdict and the lines behind it. */
+function pcReview(band, quoted){
+  const flags = [];
+  if (!band || band.low_jmd === null || band.high_jmd === null) {
+    flags.push("No public benchmark exists for this trade in Jamaica. Ask for the quote split into materials and labour, plus expected days on site, and check each half separately.");
+    return { verdict: "no benchmark, judged on structure only", flags };
+  }
+  flags.push("Benchmark figures are labour and call-out unless stated. If the quote includes the item itself (a tank, sheets, a grill), compare the labour half only. Always ask for the split.");
+  const lo = Number(band.low_jmd), hi = Number(band.high_jmd);
+  let verdict;
+  if (quoted > hi * 2) {
+    verdict = "red flag";
+    flags.push("Quoted J$" + quoted.toLocaleString() + " against a benchmark topping out near J$" + hi.toLocaleString() + ". More than double the reference. Worth a direct conversation before any deposit moves.");
+  } else if (quoted > hi * 1.3) {
+    verdict = "high, ask questions";
+    flags.push("Quoted J$" + quoted.toLocaleString() + " sits above the J$" + lo.toLocaleString() + " to J$" + hi.toLocaleString() + " reference. Could be legitimate (access, spec, post-Melissa materials). Ask for the split.");
+  } else if (quoted < lo * 0.5) {
+    verdict = "suspiciously low";
+    flags.push("Well under the reference. Underquoting usually reappears as a mid-job variation. Confirm what is excluded.");
+  } else {
+    verdict = "within the expected range";
+  }
+  return { verdict, flags };
+}
+
+const PC_TONE = { "red flag":"crit", "high, ask questions":"warn", "suspiciously low":"warn",
+                  "within the expected range":"ok", "no benchmark, judged on structure only":"mute" };
+
+async function loadPriceCheck(){
+  const trades = Object.keys(PRICE_BENCHMARKS.taxonomy_to_benchmark);
+  const sel = $("pcTrade");
+  if (sel && !sel.options.length) {
+    sel.innerHTML = trades.map(t => `<option>${esc(t)}</option>`).join("");
+    const syncVariants = () => {
+      const vs = pcVariantsFor(sel.value);
+      $("pcVariant").innerHTML = `<option value="">not sure</option>` + vs.map(v => `<option>${esc(v)}</option>`).join("");
+    };
+    sel.onchange = syncVariants; syncVariants();
+    $("pcRun").onclick = runPriceCheck;
+  }
+  await loadPriceLog();
+}
+
+async function runPriceCheck(){
+  const trade = $("pcTrade").value;
+  const variant = $("pcVariant").value || null;
+  const quoted = Number($("pcAmount").value);
+  if (!(quoted > 0)) return say("pcMsg","err","Put in the figure the worker quoted, in J$.");
+  say("pcMsg","ok","Looking it up.");
+
+  const band = pcBandFor(trade, variant);
+  const r = pcReview(band, quoted);
+  const gbp = Math.round(quoted / PRICE_BENCHMARKS.jmd_per_gbp);
+
+  const bandLine = (band && band.low_jmd !== null)
+    ? `J$${Number(band.low_jmd).toLocaleString()} to J$${Number(band.high_jmd).toLocaleString()} (about GBP ${band.low_gbp} to ${band.high_gbp})`
+    : "no public price exists in Jamaica for this work";
+
+  $("pcOut").innerHTML =
+    `<div class="card" style="padding:16px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin-bottom:10px">
+        <b style="font-size:16px">${esc(trade)}${variant ? " · " + esc(variant) : ""}</b>
+        ${chip_(PC_TONE[r.verdict] || "mute", r.verdict)}
+      </div>
+      <div class="dfield"><span class="dk">quoted</span><span class="dv">J$${quoted.toLocaleString()} (about GBP ${gbp.toLocaleString()})</span></div>
+      <div class="dfield"><span class="dk">reference</span><span class="dv">${esc(bandLine)}</span></div>
+      <div class="dfield"><span class="dk">confidence</span><span class="dv">${esc(band ? band.confidence : "none")}</span></div>
+      <div class="dfield"><span class="dk">source</span><span class="dv">${esc(band ? band.source : "no benchmark on file")}</span></div>
+      ${band && band.note ? `<div class="dfield"><span class="dk">note</span><span class="dv">${esc(band.note)}</span></div>` : ""}
+      <ul class="reqlist" style="margin-top:10px">${r.flags.map(f => `<li>${esc(f)}</li>`).join("")}</ul>
+      <p class="note" style="margin-top:10px">${esc(PRICE_BENCHMARKS.market_context)}</p>
+      <p class="note" style="margin-top:8px"><b>A reference, not an estimate.</b> Never show this to a client or a worker.</p>
+      <button id="pcLog1" class="btn" type="button" style="margin-top:12px">Log this review</button>
+    </div>`;
+  say("pcMsg","ok","Checked. Nothing is saved until you log it.");
+
+  $("pcLog1").onclick = async () => {
+    $("pcLog1").disabled = true;
+    const { data: who } = await sb.auth.getUser();
+    const { error } = await sb.from("quote_reviews").insert({
+      trade, variant, quoted_jmd: quoted,
+      band_low_jmd: band ? band.low_jmd : null,
+      band_high_jmd: band ? band.high_jmd : null,
+      confidence: band ? band.confidence : "none",
+      source: band ? band.source : "no benchmark on file",
+      verdict: r.verdict,
+      job_id: ($("pcJob").value || "").trim() || null,
+      notes: ($("pcNotes").value || "").trim() || null,
+      reviewed_by: (who && who.user && who.user.email) || "unknown",
+    });
+    if (error) { $("pcLog1").disabled = false; return say("pcMsg","err","That did not save: " + esc(error.message)); }
+    say("pcMsg","ok","Logged. That is one more real price on the record.");
+    await loadPriceLog();
+  };
+}
+
+async function loadPriceLog(){
+  const { data, error } = await sb.from("quote_reviews")
+    .select("trade,variant,quoted_jmd,band_low_jmd,band_high_jmd,verdict,confidence,parish,job_id,notes,created_at")
+    .order("created_at", { ascending: false }).limit(50);
+  if (error) return say("pcMsg","err","Could not read the log: " + esc(error.message));
+  if (!data || !data.length) { $("pcLog").innerHTML = `<div class="empty"><b>Nothing logged yet.</b><br>Every check you log is one more real Jamaican price on the record.</div>`; return; }
+  $("pcLog").innerHTML =
+    `<div class="tw"><table><thead><tr><th>Trade</th><th>Quoted</th><th>Reference</th><th>Verdict</th><th>Job</th><th>When</th></tr></thead><tbody>` +
+    data.map(r => `<tr>
+      <td>${esc(r.trade)}${r.variant ? sub_(r.variant) : ""}</td>
+      <td class="num">J$${Number(r.quoted_jmd).toLocaleString()}</td>
+      <td>${r.band_low_jmd !== null ? "J$" + Number(r.band_low_jmd).toLocaleString() + " to J$" + Number(r.band_high_jmd).toLocaleString() : mute_("no public price")}</td>
+      <td>${chip_(PC_TONE[r.verdict] || "mute", r.verdict)}</td>
+      <td>${r.job_id ? id_(r.job_id) : mute_("none")}</td>
+      <td>${mute_(ago_(r.created_at))}</td></tr>`).join("") +
+    `</tbody></table></div>`;
+}
+
+const BESPOKE = { pricecheck: loadPriceCheck, over: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees, materials: loadMaterials };
 let currentView = "over";
 
 function go(v){
