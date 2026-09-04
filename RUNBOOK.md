@@ -2640,4 +2640,15 @@ It exists because until 4 September the desk knew who was waiting and would not 
 - `nothing at all` means the automatic receipt never even reached them. It happens when somebody leaves a phone number rather than an email, so there is no address to send a receipt to. They have had complete silence since they wrote, and they should be first.
 - `receipt failed` means we tried and it bounced.
 
-**The known gap.** An enquiry from somebody who left only a phone number cannot be answered from the desk at all, and cannot be acknowledged automatically either. Both halves of that are the same missing piece: `yaad-desk-reply` sends to an existing conversation, and an enquiry is not one. Until it is built, those people need a WhatsApp message from you by hand.
+**Somebody who left a phone number and not an email.** Two separate things happen to them, and only one is fixed.
+
+*Answering them is one tap now.* The enquiry email in your inbox carries an **Answer on WhatsApp** button, and the desk row carries **Open WhatsApp to them**. Both open WhatsApp with a first line already written. Neither sends anything, and both go from your own WhatsApp rather than the Yaadly number. When you have actually sent it, press **I have answered this**.
+
+*They still get no automatic receipt, and that is not fixed.* It cannot be, without one of two things, and both cost money:
+
+- **A Meta approved WhatsApp template** for an enquiry receipt. A message to somebody who has never written to the Yaadly number is business-initiated, so free text is refused, exactly the wall the daily check-in hit. The only approved templates today are APPROVE, DAILY_CHECKIN and QUOTE.
+- **`TWILIO_SMS_FROM`**, a Twilio number provisioned for SMS. Not set. SMS is billed per message.
+
+Until one of those exists, a phone-only enquirer hears nothing at all until you message them. The desk says `nothing at all` in the **Heard from us** column so it is never a surprise, and those rows are the ones to answer first.
+
+**Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.

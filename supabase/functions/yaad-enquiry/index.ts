@@ -338,6 +338,32 @@ ${message}
 ${heard}
 Answer within 24 hours, that is what the page promises.`;
 
+      // HOW TO ANSWER THIS ONE, in the email itself.
+      //
+      // Where they left an address, Reply-To is set and the mail app already
+      // does the right thing. Where they left a PHONE, this email used to
+      // arrive with no Reply-To at all: it landed in the inbox and could not
+      // be answered from the inbox, and there is no automatic receipt to them
+      // either, so they had heard nothing from anybody. Found live on 4 Sep
+      // 2026 with a real person waiting on an urgent roof.
+      //
+      // A wa.me link is not automation and is not pretending to be. It is one
+      // tap from the phone she reads mail on, and it opens WhatsApp with the
+      // message already written. Deliberately NOT a send from the Yaadly
+      // number: that is business-initiated, so it needs a Meta approved
+      // template that does not exist, and SMS needs a TWILIO_SMS_FROM that is
+      // not set. Both are decisions with a cost attached. This needs neither
+      // and works today.
+      const digits = email ? "" : contact.replace(/\D/g, "");
+      const waText = encodeURIComponent(
+        `Hello ${name}, this is Monique from Yaadly. Thank you for your enquiry, I am picking it up now.`,
+      );
+      const answerBlock = email
+        ? `<p style="margin:0 0 18px;font-size:13px;color:#67807a">Reply to this email and it goes straight to them.</p>`
+        : digits.length >= 7
+          ? `<p style="margin:0 0 18px"><a href="https://wa.me/${digits}?text=${waText}" style="background:#14b8a6;color:#04211d;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:100px;display:inline-block">Answer on WhatsApp</a><br><span style="font-size:12.5px;color:#67807a">They left a phone number, not an email, so replying to this message reaches nobody and no automatic receipt could be sent to them. They have heard nothing at all. This opens WhatsApp with a first line ready.</span></p>`
+          : `<p style="margin:0 0 18px;font-size:13px;color:#b3261e">They left no usable way to reach them. Nothing can be sent, and nothing was.</p>`;
+
       const html =
 `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
 <p style="margin:0 0 14px"><b>${esc(name)}</b> sent an enquiry through yaadly.co.uk.</p>
@@ -347,6 +373,7 @@ Answer within 24 hours, that is what the page promises.`;
 <tr><td style="padding:4px 14px 4px 0;color:#67807a;white-space:nowrap">Sent</td><td style="padding:4px 0">${esc(when)}</td></tr>
 </table>
 <div style="margin:0 0 18px;padding:14px 16px;border-radius:12px;background:#f2f7f5;border:1px solid #dbe7e3;white-space:pre-wrap">${esc(message)}</div>
+${answerBlock}
 <p style="margin:0;font-size:12.5px;color:#67807a">${esc(heard)}<br>Answer within 24 hours, that is what the page promises.</p>
 </div>`;
 

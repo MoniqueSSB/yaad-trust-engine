@@ -1340,7 +1340,13 @@ const VIEWS = [
     cols:[
       {h:"Waiting", f:r => (r.breached ? chip_("crit", Math.round(r.hours_waiting/24*10)/10 + " days") : chip_("warn", Math.round(r.hours_waiting) + " hr"))},
       {h:"Who", f:r => esc(r.who || "unknown") + sub_(r.contact || r.channel || "")},
-      {h:"How they wrote", f:r => chip_(r.kind === "enquiry" ? "mute" : "ok", r.kind === "enquiry" ? "contact form" : (r.channel || "chat"))},
+      {h:"Where it came from", f:r => r.kind === "enquiry"
+        ? chip_("mute","contact form") + sub_("yaadly.co.uk/contact, emailed to you")
+        : r.channel === "web" ? chip_("ok","website chat") + sub_("the widget on yaadly.co.uk")
+        : r.channel === "whatsapp" ? chip_("ok","WhatsApp") + sub_("the Yaadly number, via Twilio")
+        : r.channel === "sms" ? chip_("ok","SMS") + sub_("the Yaadly number")
+        : r.channel === "email" ? chip_("ok","email") + sub_("in.yaadly.co.uk")
+        : chip_("ok", r.channel || "chat")},
       {h:"Reference", f:r => r.kind === "thread" ? id_(r.ref) : mute_("no job yet")},
       {h:"Heard from us", f:r => r.kind === "enquiry"
         ? (r.receipt === "no_email" ? chip_("crit","nothing at all")
@@ -1361,6 +1367,27 @@ const VIEWS = [
         says:() => "Puts your words into the chat window on yaadly.co.uk, where they appear as you within a few seconds if the visitor still has the page open. If they have left they cannot see it, and the widget gave them a WhatsApp button with this reference, so expect them there. Either way this stamps the reply clock and clears the row.",
         ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
         call: deskReply },
+      // Not a send. It opens the right app with the first line written, which
+      // is the whole distance between "somebody is waiting" and "answered".
+      // An automatic send to a phone needs a Meta approved template or a paid
+      // SMS number, and both are decisions with a cost, so neither is
+      // pretended at here. See RUNBOOK.md.
+      { label:"Open WhatsApp to them", cls:"",
+        when:r => r.kind === "enquiry" && !!r.contact && !/@/.test(r.contact) && r.contact.replace(/\D/g,"").length >= 7,
+        says:r => `Opens WhatsApp on this machine with ${esc(r.contact)} and a first line ready. It sends nothing on its own and it does not go from the Yaadly number, it goes from you. When you have actually sent it, press I have answered this.`,
+        call: async (row) => {
+          const digits = String(row.contact || "").replace(/\D/g, "");
+          const text = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"}, this is Monique from Yaadly. Thank you for your enquiry, I am picking it up now.`);
+          window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
+        } },
+      { label:"Open an email to them", cls:"",
+        when:r => r.kind === "enquiry" && !!r.contact && /@/.test(r.contact),
+        says:r => `Opens your mail app to ${esc(r.contact)}. The enquiry also arrived in your inbox with reply-to set to them, so answering there works just as well. Press I have answered this once you have.`,
+        call: async (row) => {
+          const subj = encodeURIComponent("Your enquiry to Yaadly");
+          const body = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"},\n\nThank you for your enquiry, I am picking it up now.\n\nMonique\nYaadly\n`);
+          window.open(`mailto:${encodeURIComponent(String(row.contact))}?subject=${subj}&body=${body}`, "_blank", "noopener");
+        } },
       { label:"I have answered this", cls:"g",
         when:r => r.kind === "enquiry",
         rpc:"mark_enquiry_replied",
