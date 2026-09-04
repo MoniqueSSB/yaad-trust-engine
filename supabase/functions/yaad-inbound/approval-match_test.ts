@@ -7,7 +7,7 @@
 // Run: deno test supabase/functions/yaad-inbound/approval-match_test.ts
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { matchApprovingJob, type ApprovableJob } from "./approval-match.ts";
+import { APPROVE_BUTTON_PAYLOAD, matchApprovingButton, matchApprovingJob, type ApprovableJob } from "./approval-match.ts";
 
 const ONE: ApprovableJob[] = [{ id: "JOB-WEB-1788006231445", title: "Kitchen sink pipe leak", stage: 2 }];
 const TWO: ApprovableJob[] = [
@@ -59,6 +59,48 @@ Deno.test("a message naming two jobs at once approves neither", () => {
   assertEquals(matchApprovingJob("JOB-WEB-1788006231445 and JOB-WA-1787995411470 both please", TWO), null);
 });
 
+/* ── the Approve button on the out-of-window template ──────────────────────
+   The button payload is fixed when Meta approves the template and cannot
+   carry a job code, so these prove the matcher refuses to guess rather than
+   quietly picking one. */
+
+Deno.test("the Approve button approves when exactly one job is waiting", () => {
+  const r = matchApprovingButton(APPROVE_BUTTON_PAYLOAD, ONE);
+  assertEquals(r.outcome, "approve");
+  assertEquals(r.outcome === "approve" ? r.job.id : null, "JOB-WEB-1788006231445");
+});
+
+Deno.test("the Approve button asks which job when more than one is waiting", () => {
+  // The whole point of the shape: a fixed payload plus two open jobs is
+  // exactly the ambiguity that would otherwise raise a worker pay invoice
+  // against the wrong stage.
+  const r = matchApprovingButton(APPROVE_BUTTON_PAYLOAD, TWO);
+  assertEquals(r.outcome, "ask_which");
+  assertEquals(r.outcome === "ask_which" ? r.jobs.length : 0, 2);
+});
+
+Deno.test("the Approve button approves nothing when nothing is waiting", () => {
+  assertEquals(matchApprovingButton(APPROVE_BUTTON_PAYLOAD, []).outcome, "nothing_waiting");
+});
+
+Deno.test("case and surrounding whitespace do not change the payload match", () => {
+  assertEquals(matchApprovingButton(`  ${APPROVE_BUTTON_PAYLOAD.toUpperCase()} `, ONE).outcome, "approve");
+});
+
+Deno.test("somebody else's button payload is not ours and falls through", () => {
+  // A button on any other template, now or later, must leave the message
+  // to the ordinary pipeline rather than being read as an approval.
+  assertEquals(matchApprovingButton("yaadly_something_else", ONE).outcome, "not_ours");
+  assertEquals(matchApprovingButton("Approve", ONE).outcome, "not_ours");
+  assertEquals(matchApprovingButton("", ONE).outcome, "not_ours");
+});
+
+Deno.test("typing the button's own words is not the same as tapping it", () => {
+  // If Body arrives carrying the button's text, "Approve" reaches the
+  // free-text matcher as ordinary words. It must still approve nothing.
+  assertEquals(matchApprovingJob("Approve", ONE), null);
+});
+
 /* ── the gate stays wired ─────────────────────────────────────────────────
    Proves index.ts is actually running this file's logic rather than a
    second copy of its own that has quietly drifted from it. */
@@ -67,6 +109,14 @@ const inboundSource = await Deno.readTextFile(new URL("./index.ts", import.meta.
 Deno.test("yaad-inbound imports matchApprovingJob rather than defining its own", () => {
   assert(inboundSource.includes('from "./approval-match.ts"'), "yaad-inbound no longer imports approval-match.ts");
   assert(inboundSource.includes("approve_stage_via_whatsapp"), "yaad-inbound no longer calls approve_stage_via_whatsapp");
+});
+
+Deno.test("yaad-inbound reads the button payload rather than the button's words", () => {
+  // Without ButtonPayload, a tap on Approve can arrive looking like
+  // somebody typing the word, match no code, and be filed as a comment on
+  // the evidence and forwarded to the worker as a complaint.
+  assert(inboundSource.includes('f.get("ButtonPayload")'), "yaad-inbound no longer parses ButtonPayload");
+  assert(inboundSource.includes("matchApprovingButton"), "yaad-inbound no longer runs the button through matchApprovingButton");
 });
 
 Deno.test("yaad-inbound also wires quote acceptance through the same strict match", () => {

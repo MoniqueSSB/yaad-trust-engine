@@ -31,11 +31,15 @@
  * sentence to send a different sentence is exactly the kind of thing that
  * gets a WhatsApp sender flagged, and it would mean sending a fixed
  * sentence instead of the real one, missing whatever the free text alone
- * carries. quote_arrived is the one exception, and only as a fallback: if
+ * carries. Two kinds are the exception, both only as a fallback: if
  * the free-text send fails specifically for landing outside WhatsApp's 24
- * hour window, and TWILIO_CONTENT_SID_QUOTE is configured, it retries once
- * with that approved template (yaadly_quote_landed_v2) rather than
- * reporting the failure and stopping there. Deliberately not used
+ * hour window, and the matching secret is configured, the send retries once
+ * with an approved template rather than reporting the failure and stopping
+ * there. quote_arrived uses TWILIO_CONTENT_SID_QUOTE
+ * (yaadly_quote_landed_v2); evidence_report_confirmed uses
+ * TWILIO_CONTENT_SID_APPROVAL, which carries a single Approve button so a
+ * client outside the window can close the stage with one tap instead of
+ * typing a code. Deliberately not used
  * unconditionally: quote_arrived's free text carries the worker's own
  * proposed scope in words (Stage 6, founder's decision 31 Aug 2026, the
  * client's reply to THIS message is what stands in for the portal's scope
@@ -733,9 +737,10 @@ Deno.serve(async (req: Request) => {
     let line = "";
     let photoUrls: EvidencePhoto[] = [];
     let attachPhotos: string[] = [];
-    // Only quote_arrived has an approved WhatsApp Content Template
-    // (yaadly_quote_landed_v2); see the header comment for why it is the
-    // one kind that may reuse it, and only as a fallback for the specific
+    // Two kinds have an approved WhatsApp Content Template: quote_arrived
+    // (yaadly_quote_landed_v2) and evidence_report_confirmed
+    // (yaadly_stage_approval_v1). See the header comment for why only
+    // those two may reuse one, and only as a fallback for the specific
     // failure it exists to fix (outside the 24 hour window), never as a
     // substitute for the richer free-text message when that can still be
     // delivered: see the send site below.
@@ -948,6 +953,23 @@ Deno.serve(async (req: Request) => {
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
         : "Review it and reply from your portal.";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+      // The out-of-window fallback for the one message a client actually
+      // has to act on. The free text above carries the worker's own words,
+      // the AI's note and the photos themselves, none of which fit four
+      // fixed variable slots, so the template is never a substitute for it:
+      // it is what a client more than 24 hours quiet gets INSTEAD of
+      // nothing. Its single Approve button comes back through
+      // yaad-inbound's matchApprovingButton(), which approves only when
+      // exactly one job is waiting on this client and asks which when more
+      // than one is. A tap is still a named human approving; nothing here
+      // decides on their behalf.
+      const approvalSid = Deno.env.get("TWILIO_CONTENT_SID_APPROVAL") ?? "";
+      if (approvalSid && clientPhone) {
+        waTemplate = {
+          sid: approvalSid,
+          vars: { "1": String(job.title ?? "your job"), "2": roomLink },
+        };
+      }
       root.setAttributes({ "yaadly.notify.photos_attached": photoUrls.length, "yaadly.notify.was_customised": !!overrideText });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client

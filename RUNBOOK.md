@@ -310,6 +310,35 @@ The body ended with the link variable. It now ends with a sentence after it. Kee
 
 ---
 
+## The WhatsApp template for stage approvals (tap-to-approve)
+
+**Not submitted yet, and nothing breaks while it is missing.** `TWILIO_CONTENT_SID_APPROVAL` unset simply means `yaad-notify-client`'s `evidence_report_confirmed` behaves exactly as it did before: free text with the photos attached, then Meta, then SMS, then email. The template is the fallback for one specific failure, a client who has been quiet more than 24 hours, and for nothing else. It is never a substitute for the free-text message when that can still be delivered, because the free text carries the worker's own words, the AI's note and the photographs themselves, and four fixed variable slots cannot hold any of that.
+
+**Submit it as:**
+
+1. Twilio console, Messaging, Content Template Builder, new template, content type **twilio/quick-reply**, category **Utility**. This is an operational message about work already under way, not marketing.
+2. Body, two variables:
+
+   > Yaadly here. There is an update on {{1}} waiting for your review, photos and all, in your portal: {{2}} Tap Approve below if you are happy for this stage to close, or reply here with anything you want changed.
+
+   `{{1}}` is the job title, `{{2}}` is the portal link. Neither opens nor closes the body, which is the rule that got `yaadly_quote_landed` rejected the first time.
+3. One quick-reply button. Title **Approve** (20 characters is the ceiling). Its `id` must be exactly `yaadly_approve_stage`, lower case. That string is matched in `approval-match.ts` and is deliberately NOT an environment variable: a typo in a secret would read as an ordinary message rather than as a broken button, which is the failure you would never notice.
+4. Suggested name `yaadly_stage_approval_v1`. Submit, wait for Meta, then:
+
+```bash
+npx supabase secrets set TWILIO_CONTENT_SID_APPROVAL=HXxxxxxxxx --project-ref leffyisvfvjwzilydlwf
+```
+
+Read fresh on every call, so no redeploy.
+
+**What happens when the button is tapped.** Twilio posts back to `yaad-inbound` with `ButtonPayload` set to the id above and `Body` set to the button's visible words. `matchApprovingButton()` then approves **only when that client has exactly one job sitting at `status = 'evidence'`**. With more than one it replies listing the codes and asks which, and the answer comes back through the same exact-code match every approval has always used. With none it says so. It never picks one.
+
+**Why it works that way, and do not "improve" it.** A WhatsApp quick-reply payload is fixed when Meta approves the template, so the button cannot carry the job's own code. An approval fires `raise_worker_pay_invoice_on_stage_approval`, so a wrong guess raises a real payable against the wrong worker on the wrong stage. A tap is still a named human approving; a tap that the machine then *matched to a job it chose* would not be. If a future session proposes reading the button as "approve whatever is most recent", that is the thing this design exists to refuse.
+
+**If a tap does nothing at all**, the payload is the first place to look: `select command from cron.job` is irrelevant here, this is Twilio's own console. Check the button's `id` in the Content Template Builder matches `yaadly_approve_stage` character for character. A mismatch falls through as `not_ours` and the message lands in the ordinary intake pipeline, which is the safe failure but looks like silence. The trace attribute `yaadly.whatsapp_approval.button_outcome` names which branch ran.
+
+---
+
 ## A worker says they cannot quote a job
 
 The refusal names the reason, so read it before changing anything. All of them come from `enforce_vetted_worker_on_quote`, which runs in Postgres, so no deploy can talk past it.

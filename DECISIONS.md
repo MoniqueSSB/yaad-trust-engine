@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · Tap-to-approve reaches a client outside the 24 hour window, and the button is never allowed to pick the job
+
+**The problem it solves.** `evidence_report_confirmed` is the one message a client actually has to act on, and it goes out days after they last spoke to us. WhatsApp will not deliver free text to somebody who has been quiet 24 hours, so that message was dropping to SMS and then email exactly when it mattered most. `TWILIO_CONTENT_SID_APPROVAL` gives it the same out-of-window fallback `quote_arrived` already had, with one quick-reply Approve button on it.
+
+**The template is a fallback, not a replacement, and that is the same reasoning `quote_arrived` is built on.** The free text carries the worker's own words, the AI's note and the photographs as attachments. A four-slot template holds none of that. So the template only ever fires on the specific failure "outside WhatsApp's 24 hour window", never in place of a richer message that can still be delivered. A client more than a day quiet gets this instead of nothing, which is the whole of the claim.
+
+**The hard part is that a WhatsApp quick-reply payload is fixed when Meta approves the template.** It cannot carry the job's own code. That is precisely the ambiguity `matchApprovingJob()` was written to refuse, and refusing it is not fussiness: approving a stage fires `raise_worker_pay_invoice_on_stage_approval`, so a wrong guess raises a real payable against the wrong worker. `matchApprovingButton()` therefore approves only when the client has exactly one job at `status = 'evidence'`. More than one and it lists the codes and asks; none and it says so. It never chooses. The tap removes typing, not the decision: the person tapping is the named human in CLAUDE.md section 2, and nothing downstream of the tap decides anything on their behalf.
+
+**Three shapes were put to the founder and she picked this one.** The alternatives were a URL button into a code-gated approve page, which does not exist today and would have meant building one, and a template whose only job is to reopen the 24 hour window so the real message can follow, which is safest but costs two messages. Button-when-unambiguous was chosen as the smallest change that keeps the client inside WhatsApp.
+
+**The button id lives in code, not in an environment variable.** `APPROVE_BUTTON_PAYLOAD` in `approval-match.ts` is `yaadly_approve_stage`, and the approved template has to match it character for character. A secret would have made a typo look like an ordinary inbound message rather than a broken button, and that is a failure nobody would notice for weeks. A mismatch today falls through as `not_ours` into the ordinary intake pipeline, which is the safe direction, and `yaadly.whatsapp_approval.button_outcome` on the trace names which branch ran.
+
+**One bug was fixed on the way that had nothing to do with templates.** Twilio sets `Body` to a button's visible text, so before this change a tap on any quick-reply button would have arrived looking like a client typing that word, matched no job code, and been filed as a comment on the evidence and forwarded to the worker as a complaint. Silently. `parseInbound()` now reads `ButtonPayload`, and the button lane runs ahead of the free-text lane for exactly that reason.
+
+**Verified:** `deno check` clean on both touched functions, and `approval-match_test.ts` at 17 tests including six new ones covering one job, two jobs, none, casing, a foreign payload, and the fact that typing the word "Approve" still approves nothing. **Not verified:** a real Twilio-signed webhook carrying a real `ButtonPayload`, which needs `TWILIO_AUTH_TOKEN` and an approved template, neither of which exists in a build session. The template is not submitted yet; `RUNBOOK.md` carries the exact body, button id and secret command.
+
+---
+
 ## 2026-09-04 · The leaked notify secret is dead, the two files that carry it stay, and the scanner learns a new shape
 
 **A 64 character hex secret sits in plaintext in two committed migrations, `20260901g` line 110 and `20260902c` line 353, in a repository that is public.** It is the value trigger functions present to `yaad-notify-client` to prove they are the database and not a stranger. This was found during an unrelated WhatsApp audit and carried forward rather than acted on at the time, which was the right call: it is a live credential and rotating one is not a thing to do in passing.

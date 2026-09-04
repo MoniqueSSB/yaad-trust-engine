@@ -5,7 +5,7 @@ import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
-import { matchApprovingJob } from "./approval-match.ts";
+import { APPROVE_BUTTON_PAYLOAD, matchApprovingButton, matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import { FAQ_FACTS } from "./faq.ts";
@@ -48,7 +48,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 type Media = { url: string; mime: string };
-type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string };
+type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string; buttonPayload?: string };
 
 /** photo, video, audio or file, from whatever Twilio says it is. */
 function mediaKind(mime: string): string {
@@ -96,6 +96,15 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
       name: s(f.get("ProfileName")),
       text: s(f.get("Body")),
       media,
+      // A quick-reply button on an approved Content Template.
+      // ButtonPayload carries the id fixed when Meta approved the template;
+      // ButtonText carries the words on the button, and Twilio may put
+      // those in Body as well. Twilio's own webhook reference documents
+      // both button fields but does not say what Body holds on a tap, so
+      // this reads the payload and never infers a tap from the text: a
+      // client typing "Approve" and a client tapping Approve must not be
+      // the same event, whichever way Body happens to arrive.
+      buttonPayload: s(f.get("ButtonPayload")),
     };
   }
 
@@ -1570,6 +1579,53 @@ Deno.serve(async (req: Request) => {
           if (error) return twiml(`That did not go through: ${error.message}`);
           return twiml(`Booked. ${bookTarget.title} is on. A message with the price and how payment works is coming through next.`);
         }
+      }
+
+      // The Approve button on the out-of-window template, tapped rather
+      // than typed. Runs BEFORE the free-text block below for one reason:
+      // if Body arrives carrying the button's own words, a tap on "Approve"
+      // reads as a client typing "Approve", matches no code, and gets filed
+      // as a comment on the evidence and forwarded to the worker as a
+      // complaint. Silently, and looking like nothing went wrong.
+      //
+      // matchApprovingButton() never guesses which job was meant: see its
+      // own comment in approval-match.ts. One job waiting approves it, more
+      // than one asks which, and the answer comes back through the exact
+      // code match below exactly as it always has.
+      if (msg.buttonPayload) {
+        const { data: buttonAwaiting } = await supabase.from("jobs")
+          .select("id, title, stage, client_phone")
+          .eq("status", "evidence")
+          .not("client_phone", "is", null);
+        const buttonTail = msg.from.replace(/\D/g, "").slice(-9);
+        const buttonMine = (buttonAwaiting ?? []).filter((j: any) =>
+          String(j.client_phone ?? "").replace(/\D/g, "").slice(-9) === buttonTail);
+
+        const tapped = matchApprovingButton(msg.buttonPayload, buttonMine as any);
+        root.setAttributes({
+          "yaadly.whatsapp_approval.button": msg.buttonPayload.slice(0, 64),
+          "yaadly.whatsapp_approval.button_outcome": tapped.outcome,
+        });
+        if (tapped.outcome === "approve") {
+          const { error } = await supabase.rpc("approve_stage_via_whatsapp", { p_job: tapped.job.id, p_phone: msg.from });
+          root.setAttributes({ "yaadly.whatsapp_approval.job": tapped.job.id, "yaadly.whatsapp_approval.outcome": error ? "refused" : "approved" });
+          if (error) return twiml(`That did not go through: ${error.message}`);
+          const label = await stageLabel(supabase, tapped.job.id, tapped.job.stage ?? 1);
+          return twiml(`Approved. ${label} of ${tapped.job.title} is confirmed, and the worker is paid for it. Nothing else to do.`);
+        }
+        if (tapped.outcome === "ask_which") {
+          // Deliberately not a numbered menu: a reply of "1" must not
+          // approve anything, which is the whole reason matchApprovingJob()
+          // refuses ordinals. The codes are the answer.
+          const list = tapped.jobs.map((j) => `${j.id} (${j.title})`).join("\n");
+          return twiml(`You have more than one job waiting on your review, so we will not guess which one you meant. Reply with the code of the one you are approving:\n\n${list}`);
+        }
+        if (tapped.outcome === "nothing_waiting") {
+          return twiml("Nothing is waiting on your review just now, so there is nothing to approve. If you think that is wrong, say what you are looking at and a person will pick it up.");
+        }
+        // "not_ours": some other button on some other template. Falls
+        // through to the ordinary pipeline, unrecognised rather than
+        // guessed at, the same as any message this file does not claim.
       }
 
       // Stage 6: a client approving a stage by replying, rather than
