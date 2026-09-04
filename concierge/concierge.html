@@ -2161,7 +2161,7 @@ const DOC_RENDERERS = {
     return renderAny(v.note || "")
       + (stages.length ? `<h4>Stages</h4><ul>${stages.map(s =>
           `<li><b>${esc(s.stage || "stage")}</b>${s.proportion_percent != null ? " &middot; " + esc(String(s.proportion_percent)) + "%" : ""}`
-          + (s.release_condition ? `<br><span class="docsub">Releases on: ${esc(s.release_condition)}</span>` : "")
+          + (s.release_condition ? `<br><span class="docsub">Signed off on: ${esc(s.release_condition)}</span>` : "")
           + (Array.isArray(s.evidence_required) && s.evidence_required.length ? `<br><span class="docsub">Evidence: ${esc(s.evidence_required.join(", "))}</span>` : "")
           + `</li>`).join("")}</ul>` : "")
       + (tpl && tpl.instruction ? `<h4>Cost tracking table</h4><p>${esc(tpl.instruction)}${Array.isArray(tpl.columns) && tpl.columns.length ? " Columns: " + esc(tpl.columns.join(", ")) + "." : ""}</p>` : "");

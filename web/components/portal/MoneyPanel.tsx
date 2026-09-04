@@ -110,7 +110,7 @@ export function MoneyPanel({
                 label={side === "client" ? "Worker labour" : "Your labour price"}
                 value={money(labour) ?? "—"}
                 width={fee != null && labour != null ? Math.round((labour / (labour + fee)) * 100) : 100}
-                caption="Paid across the payment stages in the Kickoff Pack, each released only when the client approves that stage's evidence."
+                caption="Staged across the payment stages in the Kickoff Pack. A stage closes when the client has seen that stage's evidence and agreed the work is right. The tradesperson is paid by Yaadly under its own agreement with them, so their money does not wait on that."
               />
               {materials != null && materials > 0 && (
                 <MoneyRow
@@ -121,8 +121,8 @@ export function MoneyPanel({
                   caption={
                     materialsReleased > 0
                       ? (money(materialsReleased) ?? "") +
-                        " released to the worker against a receipt. Never fee'd on either side."
-                      : "Paid to the worker against a receipt before labour starts, once the client has said where materials are kept. Not released yet. Never fee'd on either side."
+                        " paid to the worker against a receipt. Passed through at cost, never fee'd on either side."
+                      : "Paid to the worker against a receipt before labour starts, once the client has said where materials are kept. Not yet paid. Passed through at cost, never fee'd on either side."
                   }
                 />
               )}

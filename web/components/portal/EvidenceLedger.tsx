@@ -73,7 +73,7 @@ export function EvidenceLedger({
      urgent fact than which stage number the job happens to be on. */
   const headline = awaitingApproval
     ? role === "client"
-      ? "Photos are in and waiting on you. Money moves when you approve them."
+      ? "Photos are in and waiting on you. This stage closes when you approve them."
       : "Photos are in. The client has been asked to approve them."
     : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."

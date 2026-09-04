@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-04 · The principal-contractor sweep finally reached the agent prompts, which the 3 September pass had missed
+
+**On 3 September eleven public places stopped saying "nobody is paid until you approve". The prompts were not in that pass, and prompts are where copy comes from.** So the two documents a client and a tradesperson actually sign, the Kickoff Pack and the Quote Kickoff Pack, were still being generated from instructions describing money held and released against evidence. That is the escrow shape the principal structure exists to avoid, being manufactured fresh on every draft, a day after the marketing pages stopped saying it. Fixing pages and leaving the generator is the shape of defect worth naming: the page is the output, the prompt is the press.
+
+**Ten places, not the six the audit counted.** The audit found six. Sweeping properly turned up four more: the Kickoff prompt's rule 1 as well as its rule 4, `EvidenceLedger.tsx` telling a client "money moves when you approve them", `PackStageProgress.tsx` rendering "releases on approval", and four rows of the prototype's own tables labelled "Held ... Releases on approval". The lesson for the next sweep is that grepping the phrase the audit noticed finds the instances the audit already found; grepping the *shape* finds the rest.
+
+**What the replacement copy says, and why it is the same sentence on both sides.** A stage closes when the client has seen that stage's evidence and agreed the work is right, and the balance for it becomes due to Yaadly. The tradesperson is engaged and paid by Yaadly under a separate agreement and never waits on the client. Both halves are stated in both packs on purpose. It is the Mirror Rule: the client's protection is that nothing closes without evidence, the worker's protection is that his money does not hang on a stranger abroad opening WhatsApp, and each one reads better when the other is on the page next to it. For the worker-facing Quote Pack the prompt now says to state it plainly where it helps, because it is the strongest line in the recruitment pitch.
+
+**`release_condition` keeps its name, deliberately.** The obvious move was to rename the JSON key to something honest like `sign_off_evidence`. It is read in six places and, more to the point, it is a key inside Kickoff Packs already stored in the database, so renaming it would leave every pack issued before today rendering a blank where its condition used to be. The key stays, the prompt now tells the model what kind of sentence belongs in it, and the schema line says in as many words that the name is legacy. The labels around it moved instead: the desk now reads "Signed off on" rather than "Releases on", on both the concierge copy and the deployed one.
+
+**One thing changed that nothing renders.** `PackStageProgress.tsx` is imported by nothing as at 4 September 2026. Its copy was swept anyway and a note added saying so. Wrong copy sitting in an unused component is not harmless, it is a trap primed for whoever wires it up, and it costs two lines to defuse now against an incident later.
+
+**Flagged, not changed.** The prototype shows a client approval window of five days that then "auto-approves". That is a client response deadline rather than a payment releasing on a timer, so it is not the thing CLAUDE.md §3 forbids, but it sits close enough to it to be a founder decision rather than a copy fix. It is untouched and it is hers.
+
+---
+
 ## 2026-09-04 · The text model is in the EU, and the reason the switch was hard to land is that model failures were invisible
 
 **The move itself was one secret, as designed.** `MISTRAL_API_KEY` and `MISTRAL_MODEL` were set on the Supabase project and every one of the nine functions that calls a text model picked Mistral up on its next invocation, with no redeploy, because `_shared/textmodel.ts` reads the provider at call time. That part of the 30 August design held exactly as intended. Client and worker text now goes to `api.mistral.ai` in the EU rather than to MiniMax in China, ahead of the December pilot and ahead of any real client data existing. The database was already in eu-west-3, so the text model was the last part of the system outside the EU.
