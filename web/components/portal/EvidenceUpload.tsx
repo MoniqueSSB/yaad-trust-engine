@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { uploadEvidence } from "@/app/portal/evidence-actions";
+import { EVIDENCE_PHASES, PHASE_OPTION } from "@/lib/portal/evidence-sections";
 
 export function EvidenceUpload({
   jobId,
@@ -16,9 +17,10 @@ export function EvidenceUpload({
 }) {
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
-  // Only so the before/after control can take itself out of the way on
-  // materials, where the database refuses a phase outright. Being shown a
-  // choice that would be thrown away is worse than not being shown it.
+  // Only so the section control can take itself out of the way on materials,
+  // which is a section in its own right and which the database refuses a phase
+  // on outright. Being shown a choice that would be thrown away is worse than
+  // not being shown it.
   const [kind, setKind] = useState<"work" | "materials">("work");
   return (
     <form
@@ -51,7 +53,7 @@ export function EvidenceUpload({
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
       <input type="hidden" name="jobId" value={jobId} />
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_140px_120px_auto]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_120px_auto]">
         <input name="label" required maxLength={140} placeholder='What this shows, e.g. "The joint before work"'
           className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal" />
         {/* Materials on site is its own kind because it does a different job:
@@ -65,21 +67,22 @@ export function EvidenceUpload({
             {storeType ? "Materials on site" : "Materials (no store named)"}
           </option>
         </select>
-        {/* Before or after is declared here, in answer to the question, and is
-            never read back out of the label. A photograph of a cracked joint
-            captioned "the joint before work" is a sentence about a before; it
-            is not the worker saying this one is the before. Leaving it as "not
-            a before or an after" is a real answer and files perfectly well:
-            most site photographs are neither. Materials carry no phase, so the
-            control says why rather than disappearing. */}
+        {/* Which section of the job this belongs to, declared here in answer
+            to the question and never read back out of the label. A photograph
+            of a cracked joint captioned "the joint before work" is a sentence
+            about a before; it is not the worker saying this one is the before.
+            Leaving it unmarked is a real answer and files perfectly well.
+            Materials is its own section and carries no phase, so the control
+            says why rather than disappearing. */}
         <select name="phase" defaultValue="" disabled={kind === "materials"} className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40">
           {kind === "materials" ? (
-            <option value="">Not a before or after</option>
+            <option value="">Its own section</option>
           ) : (
             <>
-              <option value="">Neither</option>
-              <option value="before">Before</option>
-              <option value="after">After</option>
+              <option value="">Not marked</option>
+              {EVIDENCE_PHASES.map((ph) => (
+                <option key={ph} value={ph}>{PHASE_OPTION[ph]}</option>
+              ))}
             </>
           )}
         </select>

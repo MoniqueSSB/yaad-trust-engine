@@ -2997,21 +2997,25 @@ The desk says **offered WhatsApp** on those rows, and `nothing sent, they must t
 
 ---
 
-## The before/after marker on evidence
+## The evidence sections
 
-**What it is.** Since 5 September 2026 every work photograph, video and note can carry a declaration of whether it is the **before** or the **after**. It is on `evidence.phase`, it is set by the person filing it in answer to a direct question, and nothing infers it from the caption. `terms.html` and `faq.html` promise the client a before and an after; this is the record that shows one was kept.
+**What they are.** Since 5 September 2026 a job's evidence is read in five sections rather than as one pile: **before**, **during the work**, **problems found**, **after**, and **materials on site**.
+
+The first four are on `evidence.phase`, set by the person filing the item in answer to a direct question. Nothing infers it from the caption. The fifth is not a phase at all: materials has lived on `evidence.kind` since 20260828c, because filing it is what moves the risk in the materials to the client, and the database refuses a phase on it. The words are defined once, in `web/lib/portal/evidence-sections.ts`, so the client page, the Completion Report and the upload forms cannot drift into three different vocabularies.
 
 **Where a worker answers it.**
 
-- *Portal, photo:* a Before / After / Neither dropdown next to the label.
+- *Portal, photo:* a Before / During the work / A problem found / After dropdown next to the label, defaulting to Not marked.
 - *Portal, video:* the same dropdown on the video upload form.
-- *WhatsApp:* after the job code and the "what does this show" question, the worker is asked `Is this the BEFORE or the AFTER? Reply B for before, A for after, or N if it is neither.` Only that reply is read as the answer.
+- *WhatsApp:* after the job code and the "what does this show" question, the worker is asked `Which is this? Reply B for before, D for during the work, A for after, or P for a problem you found. Reply N if it is none of those.` Only that reply is read as the answer. The parser accepts the full words too, and takes I or "issue" as well as P.
 
-**It never blocks anything.** An answer that is neither word files the evidence with no phase and tells the worker so. Nothing is refused, no stage is held, and a stage can still be approved with no before on file. That is deliberate: whether a missing before should ever stop an approval is a decision for Monique, not a default.
+**It never blocks anything.** An answer that is none of them files the evidence unmarked and tells the worker so. Nothing is refused, no stage is held, and a stage can still be approved with no before on file. That is deliberate: whether a missing before should ever stop an approval is a decision for Monique, not a default.
 
-**Where to see it.** Client portal, on each evidence card and in "Show the record for this stage". Completion Report, on the evidence index line. Client's WhatsApp report, in the `Items:` line as `A1 (before), A2 (after)`. Admin desk Overview, the **Before and after on record** tile.
+**A problem found is not a quality score and must never be reported as one.** A worker who photographs rot behind a panel is doing the job properly. The desk tile counts them and is deliberately left uncoloured, because a green tick on a low number is an instruction to stop reporting them. What the count is actually for is spotting a stage carrying several, which is a stage where the job has stopped being the job that was quoted.
 
-### If the desk tile reads 0% and you think that is wrong
+**Where to see it.** Client portal, grouped under headings on the job page, with a badge on each card and a line in "Show the record for this stage". Completion Report, on the evidence index line. Client's WhatsApp report, in the `Items:` line as `A1 (before), A2 (problem found), A3 (after)`. Admin desk Overview, the **Before and after on record** and **Problems found on site** tiles.
+
+### If the Before and after tile reads 0% and you think that is wrong
 
 It is almost certainly right. The tile reads `evidence_completeness.with_before_and_after`, which reads `evidence_at_signoff`, which reads the **snapshot taken at approval time**, not the evidence table. So:
 
@@ -3021,13 +3025,13 @@ It is almost certainly right. The tile reads `evidence_completeness.with_before_
 Check what a given sign-off actually holds:
 
 ```sql
-select job_id, stage, items, has_before, has_after, before_and_after
+select job_id, stage, items, has_before, has_during, has_after, issues, before_and_after
   from public.evidence_at_signoff order by approved_at desc limit 20;
 ```
 
 ### If a worker says the database refused their upload
 
-The only phase-related refusal is a **before or after on materials evidence**, which the constraint `evidence_phase_chk` rejects. Materials is a custody record, not a stage of the work. Both portal forms disable the dropdown when Materials is chosen, and both server paths drop the value, so this should only ever be reachable by a direct API call. Check with:
+The only phase-related refusal is a **phase on materials evidence**, which the constraint `evidence_phase_chk` rejects. Materials is a custody record and a section in its own right, not a part of the work. Both portal forms disable the dropdown when Materials is chosen, and both server paths drop the value, so this should only ever be reachable by a direct API call. Note that a materials upload on a job where the client has never named a store is refused for a different reason entirely, by `trg_evidence_materials_needs_store`, and that message says so in words worth reading. Check with:
 
 ```sql
 select id, job_id, kind, phase from public.evidence where phase is not null and kind = 'materials';
@@ -3058,4 +3062,4 @@ Run the rig, which proves a phase declared after a sign-off cannot improve it:
 \i supabase/tests/evidence_phase_guards.sql
 ```
 
-Seven checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-client` and `yaad-evidence-video`, which all write or read the column.
+Nine checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-client` and `yaad-evidence-video`, which all write or read the column.

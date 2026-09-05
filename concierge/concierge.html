@@ -3291,6 +3291,13 @@ async function loadOverview(){
   // was, so the honest answer is that we cannot show the pair, not that there
   // was not one. See 20260905c.
   const withBA = pctOf(ec.with_before_and_after);
+  // Problems found on site, counted rather than scored. This is not a quality
+  // measure and must never be read as one: a worker who reports rot behind a
+  // panel is doing the job properly. It is here because a stage carrying
+  // several is a stage where the job stopped being the job that was quoted,
+  // and that is a conversation with the client, not a number to drive down.
+  const issuesRaised = Number(ec.issues_raised || 0);
+  const signoffsWithIssues = Number(ec.with_issues || 0);
   const noEv = signoffs - Number(ec.with_any_evidence || 0);
   const noFp = Number(ec.with_any_evidence || 0) - Number(ec.fully_fingerprinted || 0);
 
@@ -3408,7 +3415,16 @@ async function loadOverview(){
     tile(withBA === null ? "" : withBA >= 80 ? "ok" : "warn",
       "Before and after on record", withBA === null ? "n/a" : withBA + "%",
       signoffs
-        ? `${ec.with_before_and_after} of ${signoffs} had both. ${ec.with_before} marked a before, ${ec.with_after} an after`
+        ? `${ec.with_before_and_after} of ${signoffs} had both. ${ec.with_before} marked a before, ${ec.with_after} an after, ${ec.with_during || 0} filed during the work`
+        : "Nothing signed off yet"),
+    // Never coloured at all, for the reason above the variable: reporting a
+    // problem is the worker doing their job, and a green tick on a low number
+    // would be an instruction to stop reporting them.
+    tile("", "Problems found on site", String(issuesRaised),
+      signoffs
+        ? (issuesRaised
+            ? `Across ${signoffsWithIssues} of ${signoffs} sign-offs. Anything that changes price or timeline is agreed in writing first`
+            : "None reported since workers could mark one")
         : "Nothing signed off yet"),
     // Never coloured. This is a capacity reading, not a target: a low evening
     // is a quiet week, not a bad one, and a green tick on it would invite

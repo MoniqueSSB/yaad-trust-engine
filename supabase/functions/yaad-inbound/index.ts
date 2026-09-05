@@ -262,31 +262,50 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// The worker's answer to "is this a before or an after", read from a reply
-// sent in answer to exactly that question and nothing else. Deliberately not
-// applied to captions: a caption saying "the joint before work" is a sentence
-// about a before, not a declaration that this photograph is one, and
-// 20260905c refuses to record a guess as a declaration. Returns undefined for
-// a reply that answers neither way, which the caller treats as "nobody said".
+// The worker's answer to which section of the job a photograph belongs to,
+// read from a reply sent in answer to exactly that question and nothing else.
+// Deliberately not applied to captions: a caption saying "the joint before
+// work" is a sentence about a before, not a declaration that this photograph
+// is one, and 20260905c refuses to record a guess as a declaration. Returns
+// undefined for a reply that answers none of them, which the caller treats as
+// "nobody said" and files anyway.
+//
+// PROBLEM rather than ISSUE as the word offered, because that is what a worker
+// on site actually says, and P does not collide with B, D or A. Both words are
+// accepted here regardless of which one was asked for.
+type PhaseAnswer = "before" | "during" | "after" | "issue";
+
+function readPhaseAnswer(text: string): PhaseAnswer | undefined {
+  const t = text.trim().toLowerCase().replace(/[.!,]+$/, "");
+  if (/^(b|before|bfore|befor|the before|before pic|before photo|before shot)$/.test(t)) return "before";
+  if (/^(d|during|dur|in progress|progress|working|mid|midway)$/.test(t)) return "during";
+  if (/^(a|after|afta|the after|after pic|after photo|after shot|done|finished)$/.test(t)) return "after";
+  if (/^(p|i|problem|problems|issue|issues|a problem|fault|damage|snag)$/.test(t)) return "issue";
+  return undefined;
+}
+
 // One short question, in the words a worker would use. Kept as a constant
 // because it goes out from three places in the evidence lane and they must not
 // drift into three slightly different questions.
 const PHASE_QUESTION =
-  'Is this the BEFORE or the AFTER? Reply B for before, A for after, or N if it is neither.';
+  'Which is this? Reply B for before, D for during the work, A for after, or P for a problem you found. Reply N if it is none of those.';
 
-function readPhaseAnswer(text: string): "before" | "after" | undefined {
-  const t = text.trim().toLowerCase().replace(/[.!,]+$/, "");
-  if (/^(b|before|bfore|befor|the before|before pic|before photo|before shot)$/.test(t)) return "before";
-  if (/^(a|after|afta|the after|after pic|after photo|after shot|done|finished)$/.test(t)) return "after";
-  return undefined;
-}
+// What the worker is told it went down as. "the before" reads naturally, "the
+// issue" does not, and a worker who has just reported rot behind a panel
+// should see the word they would use for it.
+const PHASE_SAID: Record<PhaseAnswer, string> = {
+  before: "the before",
+  during: "during the work",
+  after: "the after",
+  issue: "a problem found on site",
+};
 
 // hasCaption is the record of whether a worker actually said what this is,
 // separate from label itself: label always holds something displayable
 // ("Sent on WhatsApp" when nothing was said), but that fallback text is not
 // context, and the dispatch loop needs to tell the two apart to know
 // whether to ask.
-type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean; phase?: "before" | "after" | null };
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean; phase?: PhaseAnswer | null };
 
 // Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
 // a straight download rather than a two-step lookup: fetchMedia() above
@@ -319,8 +338,8 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
   const { error: insErr } = await admin.from("evidence").insert({
     job_id: jobId, label: item.label, img: null, storage_path: finalPath,
     bytes: item.bytes, mime: item.mime, kind: "work", stage,
-    // null when the worker did not answer the before/after question, which is
-    // an honest third answer and never blocks the filing. See 20260905c.
+    // null when the worker did not answer the section question, which is an
+    // honest answer in itself and never blocks the filing. See 20260905c.
     phase: item.phase ?? null,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });
@@ -1772,15 +1791,15 @@ Deno.serve(async (req: Request) => {
         // free text that was never meant to answer that question.
         const confirmedJob: { id: string; stage: number } | null =
           answers.confirmed_job ? { id: answers.confirmed_job, stage: answers.confirmed_stage } : null;
-        // Set the moment the before/after question goes out, so the next plain
-        // reply is read as the answer to it rather than as another caption.
+        // Set the moment the section question goes out, so the next plain reply
+        // is read as the answer to it rather than as another caption.
         const awaitingPhase: boolean = !!answers.awaiting_phase;
         const media = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
 
         if (media.length) {
           const items = (await Promise.all(media.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text, deadline)))).filter(Boolean) as PendingEvidence[];
           const next = [...pending, ...items];
-          // A photograph arriving after the before/after question has gone out,
+          // A photograph arriving after the section question has gone out,
           // with nothing said about it, still needs the context question it
           // would have got had it come in with the others. So the batch steps
           // back rather than sweeping the new one up under an answer that was
@@ -1804,19 +1823,22 @@ Deno.serve(async (req: Request) => {
             : `That one did not come through. ${prompt}`);
         }
 
-        // ── the before/after answer ──────────────────────────────────────
+        // ── which section of the job this belongs to ──────────────────────────────────────
         //
         // terms.html promises the client a before photograph and an after
         // photograph on every stage. Until 5 Sep 2026 nothing in the system
         // recorded which was which, so the promise could not be shown to have
         // been kept, only asserted. This is where a worker says so, in answer
-        // to a question asked for that purpose and nothing else.
+        // to a question asked for that purpose and nothing else. Four answers:
+        // before, during, after, and a problem found on site, which is the one
+        // a client most needs put in front of them and the one a free-text
+        // caption buries.
         //
-        // It never blocks. An answer that is neither word files the evidence
-        // with no phase on it and says as much, rather than asking again and
-        // standing between a worker and their own work log. Whether a stage
-        // may be approved without a before is a separate question, and a
-        // human's, not this webhook's.
+        // It never blocks. An answer that is none of them files the evidence
+        // unmarked and says as much, rather than asking again and standing
+        // between a worker and their own work log. Whether a stage may be
+        // approved without a before is a separate question, and a human's, not
+        // this webhook's.
         if (awaitingPhase && confirmedJob) {
           const phase = readPhaseAnswer(msg.text) ?? null;
           const stamped = pending.map((item) => ({ ...item, phase }));
@@ -1830,8 +1852,8 @@ Deno.serve(async (req: Request) => {
           if (!filed) return twiml("Nothing saved properly there. Try sending the photo again.");
           const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
           let body = phase
-            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as the ${phase}. Keep them coming.`
-            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell from that whether it was a before or an after, so it is on record as neither. Keep them coming.`;
+            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}. Keep them coming.`
+            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked. Keep them coming.`;
           const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
           if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
           return twiml(body);
@@ -1848,8 +1870,8 @@ Deno.serve(async (req: Request) => {
             ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
             : pending;
           // The context is held on the session rather than filed, because the
-          // before/after question still has to go out and the answer belongs
-          // on the same rows. Nothing is written to evidence until it does.
+          // section question still has to go out and the answer belongs on the
+          // same rows. Nothing is written to evidence until it does.
           await supabase.from("wa_intake_sessions")
             .update({ answers: { ...answers, pending: described, awaiting_phase: true }, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
@@ -1873,9 +1895,10 @@ Deno.serve(async (req: Request) => {
         }
 
         // Everything already carries a caption, so no context question is
-        // needed, but the before/after one still is: a worker who captioned
-        // their photograph has said what it shows, not which half of the pair
-        // it is. Same single question, same session, same never-blocking rule.
+        // needed, but the section one still is: a worker who captioned their
+        // photograph has said what it shows, not which part of the job it
+        // belongs to. Same single question, same session, same rule that it
+        // never blocks.
         await supabase.from("wa_intake_sessions")
           .update({
             answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage, awaiting_phase: true },

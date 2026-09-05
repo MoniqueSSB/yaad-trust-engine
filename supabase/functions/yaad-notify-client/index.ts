@@ -318,13 +318,22 @@ async function stageLabel(admin: any, jobId: string, stageNum: number): Promise<
   return `stage ${stageNum}`;
 }
 
-// "A1 (before), A2 (after)". The worker's own answer to which half of the pair
-// a photograph is, put where the client already looks for the codes, so a
-// before and its after can be told apart without opening the portal. Silent
-// when nobody said, which is most photographs: see 20260905c.
+// "A1 (before), A2 (problem found), A3 (after)". The worker's own answer to
+// which part of the job a photograph belongs to, put where the client already
+// looks for the codes, so a before, its after and anything found on the way can
+// be told apart without opening the portal. Silent when nobody said, which is
+// most photographs filed before 5 Sep 2026: see 20260905c.
+const PHASE_IN_LIST: Record<string, string> = {
+  before: "before",
+  during: "during",
+  issue: "problem found",
+  after: "after",
+};
+
 function itemCode(p: EvidencePhoto): string {
   const code = p.code ?? "?";
-  return p.phase === "before" || p.phase === "after" ? `${code} (${p.phase})` : code;
+  const said = p.phase ? PHASE_IN_LIST[p.phase] : null;
+  return said ? `${code} (${said})` : code;
 }
 
 async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<EvidencePhoto[]> {

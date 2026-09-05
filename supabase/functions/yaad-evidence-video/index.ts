@@ -142,12 +142,13 @@ Deno.serve(async (req: Request) => {
       const stageRaw = s(b.stage);
       const stage = /^\d+$/.test(stageRaw) ? parseInt(stageRaw, 10) : null;
       const kind = s(b.kind) === "materials" ? "materials" : "work";
-      // Before or after, declared on the upload form. Materials carry none:
-      // the constraint in 20260905c refuses it, so it is dropped here rather
-      // than sent to be rejected. Anything else is null, meaning nobody said.
+      // Which section of the job this belongs to, declared on the upload form.
+      // Materials is its own section and carries no phase: the constraint in
+      // 20260905c refuses it, so it is dropped here rather than sent to be
+      // rejected. Anything else is null, meaning nobody said.
       const phaseIn = s(b.phase);
       const phase = kind === "materials" ? null
-        : phaseIn === "before" || phaseIn === "after" ? phaseIn : null;
+        : ["before", "during", "after", "issue"].includes(phaseIn) ? phaseIn : null;
 
       if (!path.startsWith(`${jobId}/`)) {
         return json({ error: "That file does not belong to this job." }, 403);

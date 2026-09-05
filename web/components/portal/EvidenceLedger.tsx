@@ -21,6 +21,7 @@
 import Link from "next/link";
 import { EvidenceItemComment } from "./EvidenceItemComment";
 import { whenDateTime } from "@/lib/date";
+import { phaseBadge, sectionsOf } from "@/lib/portal/evidence-sections";
 
 export type EvidenceItem = {
   id: string;
@@ -30,9 +31,12 @@ export type EvidenceItem = {
   created_at: string | null;
   sha256: string | null;
   stage: number | null;
-  /** 'before' or 'after' as declared by whoever filed it, or null for neither.
-      Never inferred from the label: see 20260905c. */
+  /** Which section of the job this belongs to, as declared by whoever filed
+      it, or null if nobody said. Never inferred from the label: see
+      20260905c. */
   phase?: string | null;
+  /** 'materials' is its own section and carries no phase. See 20260828c. */
+  kind?: string | null;
 };
 
 type StageState = "done" | "now" | "todo";
@@ -176,80 +180,38 @@ export function EvidenceLedger({
 
               {mine.length > 0 && (
                 <>
-                  <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {mine.map((e) => (
-                      <li
-                        key={e.id}
-                        className="overflow-hidden rounded-xl border border-line bg-panel"
-                      >
-                        {e.img && e.img.startsWith("data:audio/") ? (
-                          /* A voice note, not a photograph: the client's own
-                             words from the job wizard, played rather than
-                             shown. */
-                          <div className="grid h-36 w-full place-items-center bg-panel2 px-3">
-                            <audio
-                              controls
-                              preload="metadata"
-                              src={e.img}
-                              className="w-full"
-                            />
-                          </div>
-                        ) : e.img ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={e.img}
-                            alt={e.label ?? "Evidence photo"}
-                            className="h-36 w-full object-cover"
+                  {/* Read in the order of the work rather than the order the
+                      files arrived. A client scanning a stage wants the before
+                      next to the before, and wants a problem found on site to
+                      be somewhere they will actually see it rather than
+                      seventh in a grid. Empty sections are not drawn: a stage
+                      with no problems should look like a stage with no
+                      problems, not like a stage with an empty box on it. */}
+                  {sectionsOf(mine).map((sec) => (
+                    <section key={sec.key} className="mt-3.5">
+                      <div className="flex items-baseline gap-2">
+                        <h4 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+                          {sec.heading}
+                        </h4>
+                        <span className="text-[11px] text-dim">
+                          {sec.items.length}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[11.5px] leading-relaxed text-dim">
+                        {sec.note}
+                      </p>
+                      <ul className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {sec.items.map((e) => (
+                          <EvidenceCard
+                            key={e.id}
+                            e={e}
+                            role={role}
+                            jobId={jobId}
                           />
-                        ) : (
-                          <div className="grid h-16 w-full place-items-center bg-panel2 text-[11.5px] text-dim">
-                            Filed without an image
-                          </div>
-                        )}
-                        <div className="p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <b className="text-[13px] leading-snug">
-                              {/* The worker's own answer to "is this a before
-                                  or an after", shown ahead of their words so a
-                                  client scanning a stage can find the pair
-                                  without reading every caption. */}
-                              {(e.phase === "before" || e.phase === "after") && (
-                                <span className="mr-1.5 rounded-full bg-tealb/15 px-1.5 py-0.5 align-middle text-[9.5px] font-bold uppercase tracking-wide text-tealb">
-                                  {e.phase}
-                                </span>
-                              )}
-                              {e.label ?? "Evidence"}
-                            </b>
-                            {e.ok != null && (
-                              <span
-                                className={
-                                  "flex-none rounded-full px-2 py-0.5 text-[9.5px] font-bold " +
-                                  (e.ok
-                                    ? "bg-tealb/15 text-tealb"
-                                    : "bg-mango/15 text-mango")
-                                }
-                              >
-                                {e.ok ? "Checked" : "Awaiting check"}
-                              </span>
-                            )}
-                          </div>
-                          {e.created_at && (
-                            <p className="mt-0.5 text-[11px] text-dim">
-                              {stamp(e.created_at)}
-                            </p>
-                          )}
-                          {/* Client only, the same rule the Approve button
-                              already follows: a worker commenting on their
-                              own photo is not what this exists for, and
-                              the RLS insert policy would refuse it anyway
-                              if a stray call ever got this far. */}
-                          {role === "client" && jobId && (
-                            <EvidenceItemComment jobId={jobId} evidenceId={e.id} />
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                        ))}
+                      </ul>
+                    </section>
+                  ))}
 
                   {/* The audit trail, one click away rather than in the way.
                       Closed by default; a native details element so it works
@@ -268,8 +230,8 @@ export function EvidenceLedger({
                       {mine.map((e) => (
                         <li key={e.id} className="text-[11px] text-dim">
                           <b className="text-mute">{e.label ?? "Evidence"}</b>
-                          {e.phase === "before" || e.phase === "after"
-                            ? " · filed as the " + e.phase
+                          {phaseBadge(e.phase, e.kind)
+                            ? " · " + phaseBadge(e.phase, e.kind)
                             : ""}
                           {e.created_at ? " · " + stamp(e.created_at) : ""}
                           {e.sha256 ? (
@@ -292,5 +254,87 @@ export function EvidenceLedger({
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * One evidence item. Lifted out of the stage loop when the flat grid became
+ * five grouped ones, purely so the grouping is readable; the markup inside is
+ * unchanged from when it sat inline.
+ */
+function EvidenceCard({
+  e,
+  role,
+  jobId,
+}: {
+  e: EvidenceItem;
+  role: "client" | "worker";
+  jobId?: string;
+}) {
+  const badge = phaseBadge(e.phase, e.kind);
+  return (
+    <li className="overflow-hidden rounded-xl border border-line bg-panel">
+      {e.img && e.img.startsWith("data:audio/") ? (
+        /* A voice note, not a photograph: the client's own words from the job
+           wizard, played rather than shown. */
+        <div className="grid h-36 w-full place-items-center bg-panel2 px-3">
+          <audio controls preload="metadata" src={e.img} className="w-full" />
+        </div>
+      ) : e.img ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={e.img}
+          alt={e.label ?? "Evidence photo"}
+          className="h-36 w-full object-cover"
+        />
+      ) : (
+        <div className="grid h-16 w-full place-items-center bg-panel2 text-[11.5px] text-dim">
+          Filed without an image
+        </div>
+      )}
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <b className="text-[13px] leading-snug">
+            {/* Kept on the card as well as over the section, because a card
+                seen on its own, linked to or scrolled past its heading, should
+                still say what it is. A problem found on site is coloured apart
+                from the rest: it is the one a client must not skim over. */}
+            {badge && (
+              <span
+                className={
+                  "mr-1.5 rounded-full px-1.5 py-0.5 align-middle text-[9.5px] font-bold uppercase tracking-wide " +
+                  (e.phase === "issue"
+                    ? "bg-coral/15 text-coral"
+                    : "bg-tealb/15 text-tealb")
+                }
+              >
+                {badge}
+              </span>
+            )}
+            {e.label ?? "Evidence"}
+          </b>
+          {e.ok != null && (
+            <span
+              className={
+                "flex-none rounded-full px-2 py-0.5 text-[9.5px] font-bold " +
+                (e.ok ? "bg-tealb/15 text-tealb" : "bg-mango/15 text-mango")
+              }
+            >
+              {e.ok ? "Checked" : "Awaiting check"}
+            </span>
+          )}
+        </div>
+        {e.created_at && (
+          <p className="mt-0.5 text-[11px] text-dim">{stamp(e.created_at)}</p>
+        )}
+        {/* Client only, the same rule the Approve button already follows: a
+            worker commenting on their own photo is not what this exists for,
+            and the RLS insert policy would refuse it anyway if a stray call
+            ever got this far. */}
+        {role === "client" && jobId && (
+          <EvidenceItemComment jobId={jobId} evidenceId={e.id} />
+        )}
+      </div>
+    </li>
   );
 }
