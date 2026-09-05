@@ -14,7 +14,40 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Done over the API, not the Dashboard.** The runbook had this as "a Stripe Dashboard change on each of the eight links". It is one API call per link, which is also how the links were created, so the change is repeatable and reviewable instead of eight rounds of clicking that nobody can check afterwards.
 
+**The booking form landed the same day, from a parallel session, and its reasoning found a defect in this one.** That change offers no pay button at all when the client has not asked for an early start, because a card authorisation lasts seven days and the cancellation wait is fourteen, so the hold is guaranteed to expire before work can begin. A payment link cannot reproduce that: the client is already on the pay page and a dropdown cannot gate the Pay button. Rather than drop the option and force the early start, the second option now names the consequence, "Wait the full 14 days. The hold may expire and we will contact you." The booking form remains the primary route and the only one covering invoice jobs over £500. These links are the fallback for a client sent one directly.
+
 **Two things were left honestly unfinished rather than papered over.** The account has no Terms of service URL set at Settings, Public details, and that is Dashboard only: the Stripe connector exposes payment links but not account settings. Stripe accepts `terms_of_service = required` without one and renders a tickbox linked to nothing, which is the failure mode worth naming, because it reads as covered. The first wording said "the cancellation information linked above" and was therefore false on the live page; it was checked against the real checkout page, found wrong, and rewritten to name `yaadly.co.uk/cancellation` in plain text so that it is true either way. And nothing in this repository reads `starttiming` back: it lives on the Stripe Checkout Session and there is no column for it on `services`. Both are written up in `RUNBOOK.md` rather than left in a session that ends.
+
+---
+
+## 2026-09-05 · The way out of a false positive is a wider desk, not a narrower rule
+
+**The problem was never the flag.** `approve_quote_pack_draft()` refuses a flagged draft outright with no override, which is right: nobody should be able to wave flagged content through to a client. But Approve was the only action, so a draft the guardrail caught for the wrong reason had no route forward at all. The job stopped and nothing said so.
+
+**The tempting fix was to narrow the pattern so paint stopped matching.** That is exactly what §3 exists to refuse. A loosened banned-language rule is permanent and applies to every future client; a stuck draft is one row. And separating "your job is fully covered" from "surface fully covered" by regex is not a thing to get right under pressure.
+
+**So the desk gained an action and the rule did not move.** `yaad-quote-pack-rescan` takes a corrected pack from a signed-in admin, runs it through the same verdict function the drafter uses, and writes what that function says. It never touches `status`, so it cannot approve anything, and a correction that is still dirty stays dirty and is still refused by Postgres.
+
+**The verdict itself moved into `_shared/quote-pack-verdict.ts`, and that is the load-bearing part.** Two things now decide whether a pack is clean. If they ever computed it differently, a correction could clear a flag the drafter would still have raised, and the flag would stop meaning anything. One function, both callers, seven tests including the exact painting case that started this.
+
+**The scanner is passed into it as an argument rather than imported.** `sync-shared.sh` and the CI drift check both decide what to copy by reading which shared files an `index.ts` imports, so a shared file importing another shared file would have the second deleted as an orphan. Taking `scan` as a parameter keeps both imports visible where the tooling looks.
+
+**Probed after deploying**: no token gives a platform 401, the publishable key alone gives "Not signed in.", and `is_admin()` was confirmed to take no arguments and be executable by `authenticated`, so a real admin is not refused by the check meant to let them through. The write path itself is not exercised end to end, because that needs a signed-in admin session; the logic it depends on is unit tested.
+## 2026-09-05 · The site promised to ask for something and never asked
+
+**`docs/cancellation.html` has said this all along, in its own words: "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking."** Nothing anywhere asked. The booking form collected a name, a contact, a parish and a free text note, and then the work started. So the page described a control that did not exist, which is worse than not having the control, because it reads as covered.
+
+**What that is worth in money.** A Condition Report is £249. Client books Monday, pays Monday, checker attends Wednesday, Yaadly pays the checker. Client cancels on day ten. Without a recorded express request they owe nothing and Yaadly has paid the checker out of its own pocket. The 14 day right comes from the Consumer Contracts Regulations 2013 and cannot be signed away, but a client who genuinely asked for an early start owes a proportionate amount for work done. The whole difference between those two outcomes is whether anyone asked, and kept the answer.
+
+**Where it was fixed matters more than the fix.** The obvious place was the Stripe checkout, and that is where the runbook had it filed. Wrong place. Stripe only sees card jobs, so every invoice job over £500 would still have been exposed, and those are the big ones. The booking form sees everything. It is also, word for word, where the published page already said the ask would happen. Fixing it there closed the gap and made the site honest in one change; a Stripe-only fix would have done neither.
+
+**The checkbox is not required, and that was the actual decision.** Requiring it is the tempting version: everyone waives, the exposure goes to zero, and the number on the dashboard looks perfect. It is also worthless. A consent nobody can decline is not a request anybody made, and a regulator reading a form where the box could not be left unticked would treat it as exactly that. So it is optional, an unticked box is a recorded answer with its own note on the booking, and the client who leaves it alone gets their full 14 days before anything starts. The Mirror Rule cuts the same way here as anywhere else: the client's right to wait is as real as Yaadly's need to start.
+
+**A consequence that fell out of it, and is the better half of the change.** If the client has not asked to start early, **no pay button is offered at all**. A card authorisation lasts seven days on every brand and the wait is fourteen, so a hold taken at that moment is guaranteed to expire before the job can legally begin. Offering it would have produced a client who believed they had paid, an authorisation that quietly died on day seven, and a job nobody could start. Nobody asked for this rule; it is what the seven and the fourteen do when put next to each other.
+
+**`START_NOW_VERSION` ships with the wording**, copying `AI_CONSENT_VERSION` from the apply flow for the reason given in CLAUDE.md §6: a consent is only worth what the sentence that earned it said. The sentence is stored on the booking rather than reconstructed later, because only the page can say what was actually in front of that client on that day.
+
+**Not closed: Stripe checkout still carries no tickbox.** It needs the account, and the account was not reachable from the session that did this work. The remaining exposure is narrower than it was rather than gone, and the runbook says so in those terms rather than being marked done.
 
 ---
 
@@ -32,13 +65,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ## 2026-09-05 · A guardrail fired correctly on a phrase that meant something else, and the fix was the desk, not the rule
 
-**"fully covered" is on the banned list because "your job is fully covered" is a promise about money.** A quote pack said "First coat applied evenly over all railings, surface fully covered". Paint on a railing. The job sat held for 80 hours.
+**"fully covered" is on the banned list because "your job is fully covered" is a promise about money.** A quote pack said "First coat applied evenly over all railings, surface fully covered". Paint on a railing, so the rule fired on the decorating sense of a phrase it exists to catch in the financial sense. This was a TEST job: every job in this database is (`CLAUDE.md` §12), so nobody was waiting and the elapsed time meant nothing. Recorded for what it predicts rather than what it cost, because painting is a large share of the trade list and the same phrase will block a real job the same way.
 
 **The tempting fix was to narrow the pattern, and that is precisely what §3 exists to refuse.** Distinguishing the financial sense from the decorating sense by regex is not a thing to attempt under time pressure on a live job, and a loosened banned-language rule is permanent while the stuck job is temporary. The pattern was left exactly as it is.
 
 **What was actually broken was the desk.** A flagged draft has one action, Approve, and `approve_quote_pack_draft()` refuses on any flag with no override, correctly. So there was no route at all from "this flag is a false positive" to "this job can move", and nothing surfaced that a job had stopped. The missing thing is a correction path, not a weaker rule.
 
 **How the one live pack was cleared sets the precedent.** The wording was changed, then `_shared/guardrails.ts` was run over the corrected text and its verdict written down: original flagged, corrected clean, price check clean. The flag was recomputed by the real scanner rather than edited to `false` by hand, and `guardrail.rescan_note` records that. The draft stayed at `ready`, so a named human still approves it. Editing the flag directly is the move that would turn that column from a record into a decoration.
+
+---
+
 
 ---
 
@@ -51,6 +87,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **CI's Deno job gained `--allow-env`, and finding that was the point of running the suite with CI's exact flags.** The module's whole behaviour is "do nothing unless configured", so the test that matters is the one proving the unset case changes no send, and that test cannot be written without setting and clearing the variable. Locally the looser flags passed; under CI's flags all three failed. Caught before pushing rather than as a red build.
 
 **Six functions were redeployed and four of them run without platform auth.** Each was deployed with its own live `verify_jwt` read back first, which is the trap §12 exists for: a blanket redeploy would have silently added a token check to `yaad-inbound`, `yaad-enquiry`, `yaad-portal-code` and `yaad-notify-client` and broken Twilio intake, the contact form and the portal sign-in at once. Verified afterwards that all four still answer with their own refusal rather than a platform 401, and that the list of eleven is unchanged.
+
+---
+
 ## 2026-09-05 · The card path existed and nobody could find it
 
 **Founder's report: "I cannot book each service directly with Stripe, I should be able to."** She was right, and the reason is worth keeping, because the code was not broken. All eight Stripe payment links existed, were live, and were correctly wired. The page simply never offered them. The link appeared only after the booking form was submitted, as a few words of ordinary text inside a longer sentence, and the grey box directly beneath the form still said "Card payment is not switched on yet, so for now everything is invoiced." A client following the page as written would never have looked for a card. **A feature that is built, deployed and invisible is not shipped**, and the thing that made it invisible was stale copy sitting next to it contradicting it.
@@ -124,7 +163,7 @@ Changed on `docs/business.html`: the credential cell, the hero, the case file st
 
 **Excluding the auto-issued rows was right. Excluding the tables was not.** The `system:%` filter was doing the real work and still is: 314 auto-issued rows stay out, because a guardrail-clean pack issuing itself is the system deciding the content was clean, not a person deciding anything. But the same tables carry the human path, and `approve_quote_pack_draft()` is admin only, refuses outright on any guardrail flag rather than offering an override, and attributes the approval to the signed-in admin specifically so the row can prove a named human confirmed it. That is a desk decision by any definition and it was being thrown away. It changes no number today, because nobody has ever cleared one. It stops the first from going uncounted.
 
-**The correction surfaced a live problem, which is the part worth keeping.** Chasing the sequence turned up one draft held at `ready` for 78 hours: `JOB-WEB-1788281626906`, flagged for the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board, and no worker could see anything to quote, because the pack they read was held. Nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. `packs_awaiting_a_person` and a red tile now say it out loud.
+**The correction surfaced a real gap, on a test row.** Chasing the sequence turned up a draft held at `ready`: `JOB-WEB-1788281626906`, flagged for "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board while no worker could see anything to quote, because the pack they read was held, and nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. Every job here is a test job, so nothing was actually lost; the gap in the desk is real regardless of what the row was. `packs_awaiting_a_person` and a red tile now say it out loud.
 
 **The general shape of the mistake, worth naming.** I reasoned about what a table was for from its column names and its row counts rather than from the migration that created it, and wrote the conclusion into a comment as though it were established. The row counts were right and the story around them was invented. Reading `20260901r` first would have cost two minutes.
 
