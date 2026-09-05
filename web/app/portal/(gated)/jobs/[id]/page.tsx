@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { priceContext, priceSentence, PRICE_CAVEAT, type Observation } from "@/lib/portal/price-context";
 import { packPaymentStages, quotePackPaymentStages } from "@/lib/portal/journey";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
@@ -158,6 +159,37 @@ export default async function JobRoom({
   // That is correct: a stranger probing ids learns nothing either way.
   if (!job) notFound();
 
+  /* Where a quote sits, for BOTH sides to read.
+   *
+   * Founder's instruction, 5 September 2026: the price database has to reach
+   * the quote the client sees, so they can tell whether it is above or below
+   * the typical band. That is the founding "why" made visible, ending the
+   * farrin price, and it is also the closest this product comes to the one
+   * thing it does not do, so the wording is deliberately a position and never
+   * a verdict. See lib/portal/price-context.ts.
+   *
+   * The AGGREGATE only. price_observations is admin-only in RLS and stays
+   * that way: a price observed on another client's job is their business.
+   * price_spread_for_trade returns a count and three figures, no rows, and
+   * nothing at all below three observations. */
+  const { data: spreadRows } = await supabase.rpc("price_spread_for_trade", {
+    p_trade: job.trade ?? "",
+  });
+  const spread = Array.isArray(spreadRows) ? spreadRows[0] : spreadRows;
+  /* The aggregate arrives as low/high/middle, and priceContext wants the raw
+     figures it would have derived them from. Feeding it the three we have is
+     enough for the count and the spread, which is all it renders. */
+  const observations: Observation[] = spread?.n
+    ? Array.from({ length: Number(spread.n) }, (_, i) => ({
+        labour_jmd: i === 0
+          ? Number(spread.low_jmd)
+          : i === Number(spread.n) - 1
+            ? Number(spread.high_jmd)
+            : Number(spread.middle_jmd),
+      }))
+    : [];
+
+
   const email = (user.email ?? "").toLowerCase();
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
@@ -166,7 +198,7 @@ export default async function JobRoom({
     await Promise.all([
       supabase
         .from("evidence")
-        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage")
+        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage,phase,kind")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -348,6 +380,10 @@ export default async function JobRoom({
                 {jmd(myQuote.labour_jmd) ?? "No labour figure"}
               </span>
             </div>
+            {/* The Mirror Rule. The client is shown where this price sits, so
+                the worker is shown the same words. He is also the one who
+                knows the access is bad, which is what the caveat names. */}
+            <PriceContextNote trade={job.trade} labour={myQuote.labour_jmd} observations={observations} />
 
             {myQuote.status === "submitted" && (
               <p className="mt-3 text-[13px] leading-relaxed text-mute">
@@ -1018,6 +1054,7 @@ export default async function JobRoom({
                   {q.earliest_start && <span>Start: {q.earliest_start}</span>}
                   {q.days_estimate && <span>{q.days_estimate}</span>}
                 </div>
+                <PriceContextNote trade={job.trade} labour={q.labour_jmd} observations={observations} />
                 {q.note && (
                   <p className="mt-2 text-[13px] leading-relaxed text-mute">
                     {q.note}
@@ -1531,5 +1568,43 @@ export default async function JobRoom({
         />
       </div>
     </>
+  );
+}
+
+/**
+ * Where a quote sits, in words, for whoever is reading.
+ *
+ * No `role` prop, deliberately. Client and worker see identical text: a client
+ * told their quote is above typical, while the worker cannot see that and
+ * cannot answer it, is a protection with no counterpart. The Mirror Rule.
+ *
+ * Renders nothing at all when there is nothing honest to say, which is most of
+ * the time on a young data set and is the correct behaviour rather than a
+ * failure. The caveat is not optional and travels with every statement: a
+ * range without it reads as a valuation, and valuing work is quantity
+ * surveying, which is the one thing Yaadly does not guarantee.
+ */
+function PriceContextNote({
+  trade,
+  labour,
+  observations,
+}: {
+  trade: string | null;
+  labour: number | null;
+  observations: Observation[];
+}) {
+  const ctx = priceContext(trade, labour, observations);
+  if (!ctx.show || !labour) return null;
+  const sentence = priceSentence(ctx, labour);
+  if (!sentence) return null;
+
+  return (
+    <div className="mt-3 rounded-xl border border-line bg-bg/40 px-3.5 py-3">
+      <b className="block text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">
+        For comparison
+      </b>
+      <p className="mt-1.5 text-[12.5px] leading-relaxed text-mute">{sentence}</p>
+      <p className="mt-2 text-[11.5px] leading-relaxed text-dim">{PRICE_CAVEAT}</p>
+    </div>
   );
 }

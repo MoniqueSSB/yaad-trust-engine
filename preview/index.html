@@ -2400,7 +2400,7 @@ function wgDoc(){
  '<span class="pill m" style="margin-left:auto">For all Yaadly tradespeople</span></div>'+
 
  dsec(1,'What Yaadly is, and what you are agreeing to',
- '<p>Yaadly connects vetted tradespeople with property owners, most of them overseas, and holds every job to one standard: <b>work is proven with evidence, and money moves when the client approves that evidence.</b> These guidelines are the rules of working with us. They exist to protect you as much as the client. Every rule here has a named counterpart on the other side, and nobody carries the risk alone.</p>'+
+ '<p>Yaadly connects vetted tradespeople with property owners, most of them overseas, and holds every job to one standard: <b>work is proven with evidence, and a stage closes when the client approves that evidence. You are engaged and paid by Yaadly, not by the client, so your money never waits on them.</b> These guidelines are the rules of working with us. They exist to protect you as much as the client. Every rule here has a named counterpart on the other side, and nobody carries the risk alone.</p>'+
  '<div class="callout"><b>What Yaadly charges you:</b> <b>12% of your agreed labour price</b> on a completed job, taken at the point you are paid, so you keep <b>88%</b>. Remote digital work carries 10% instead. Materials are never charged a fee \u2014 at cost is at cost. <b>What you never pay:</b> joining is free, quoting is free, there are no lead fees whether you win the job or not, and there is no subscription.</div>'+
  '<p class="amend"><b>Amended in v1.1.</b> Version 1.0 stated that workers are never charged. That was wrong. It is corrected here rather than quietly, and no signature against v1.0 is carried over onto this wording \u2014 everyone re-signs.</p>')+
 
@@ -4010,7 +4010,7 @@ function scopeDoc(i){
   '<div class="sdrow"><span class="sk">Access</span><span class="sv">Winston S. on site from 08:00<small>Contact details held by Yaadly, released to the worker on the morning of the visit only.</small></span></div>'+
   '<div class="sdrow"><span class="sk">Stages</span><span class="sv">Stage 1, first fix and pressure test, 60%<br>Stage 2, base removed, cleaned, signed off, 40%<small>Totals 100%. Enforced by the database, not by a button.</small></span></div>'+
   '<div class="sdrow"><span class="sk">Evidence</span><span class="sv">3 arrival photos, before and after each stage, one clip per stage<small>Checked against this scope before you are asked to sign anything off.</small></span></div>'+
-  '<div class="sdrow"><span class="sk">Money</span><span class="sv">£345.00 all in. Stage 1 held before work starts.<small>Held by Yaadly, released only on your sign-off.</small></span></div>'+
+  '<div class="sdrow"><span class="sk">Money</span><span class="sv">£345.00 all in, agreed with Yaadly.<small>You buy the job from Yaadly. A stage closes when you have seen the evidence and agreed the work is right. Yaadly engages and pays the tradesperson separately, so nobody is waiting on you for their wages.</small></span></div>'+
   '<div class="sdrow"><span class="sk">If it changes</span><span class="sv">Nobody does extra work and asks after.<small>A variation is written, priced and agreed here before a tool is lifted on it.</small></span></div>'+
   '<div class="sigrow">'+
    '<div class="sigbox'+(scopeClient?' done':'')+'"><b>'+(scopeClient?'✓ You agreed · 25 Aug 19:20':'You have not agreed yet')+'</b><span>Monique S., client</span></div>'+
@@ -4050,7 +4050,7 @@ service:[
   x:'svc-m1-live',a:[['Ask how it is going',0],['Book a call',0]]},
 
  {b:'Waiting on you',h:'Milestone 1 evidence is in',p:'Three items against the checklist. Approving releases 40%.',
-  t:[['Waiting on you','3','m','M1 items'],['Held','£159.60','','Releases on approval'],['Checklist','3 of 3','','Complete'],['You have','5 days','','Then auto-approves']],
+  t:[['Waiting on you','3','m','M1 items'],['Stage balance','£159.60','','Due on sign-off'],['Checklist','3 of 3','','Complete'],['You have','5 days','','Then auto-approves']],
   x:'svc-m1-ev',a:[['Approve and release milestone 1',1],['Book a walkthrough first',0]]},
 
  {b:'Milestone 1 done',h:'£159.60 released. Milestone 2 funded.',p:'Same again, I work, I prove it, you sign it off. Three releases on this service, not one.',
@@ -4062,7 +4062,7 @@ service:[
   x:'svc-m2-live',a:[['Ask how it is going',0],['Sit in on the briefing call',0]]},
 
  {b:'Waiting on you',h:'Milestone 2 evidence is in',p:'Four items including the contractor briefing. Approving releases another 40%.',
-  t:[['Waiting on you','4','m','M2 items'],['Held','£159.60','','Releases on approval'],['Checklist','4 of 4','','Complete'],['You have','5 days','','Then auto-approves']],
+  t:[['Waiting on you','4','m','M2 items'],['Stage balance','£159.60','','Due on sign-off'],['Checklist','4 of 4','','Complete'],['You have','5 days','','Then auto-approves']],
   x:'svc-m2-ev',a:[['Approve and release milestone 2',1],['Send back with a note',0]]},
 
  {b:'Waiting on you',h:'Milestone 3, handover pack',p:'Everything as one PDF, a walkthrough call, and your confirmation you understand it. Final 20%.',
@@ -4105,7 +4105,7 @@ client:[
   x:'stage1-live',a:[['Ask how it is going',0],['Book a video walkthrough',0]]},
 
  {b:'Waiting on you, stage one',h:'Stage one evidence is in',p:'Six items against a four-item checklist. Approving is a signature bound to a fingerprint of exactly these files. If it is not right, do not approve it, raise it with Delroy below.',
-  t:[['Waiting on you','6','m','Stage 1 items'],['Held','£207','','Releases on approval'],['Checklist','4 of 4','','All required proof in'],['You have','5 days','','Then it auto-approves']],
+  t:[['Waiting on you','6','m','Stage 1 items'],['Stage balance','£207','','Due on sign-off'],['Checklist','4 of 4','','All required proof in'],['You have','5 days','','Then it auto-approves']],
   x:'stage1-ev',a:[['Approve and release stage one',1],['Book a walkthrough first',0]]},
 
  {b:'Stage one done',h:'£207 released. Stage two funded.',p:'He has £158.40. Stage two is funded and held. Two releases, not one lump.',
@@ -4117,7 +4117,7 @@ client:[
   x:'stage2-live',a:[['Ask how it is going',0],['Book a walkthrough',0]]},
 
  {b:'Waiting on you, stage two',h:'Stage two evidence is in',p:'Four items, checklist complete. Same rules, same route if something is wrong.',
-  t:[['Waiting on you','4','m','Stage 2 items'],['Held','£138','','Releases on approval'],['Checklist','4 of 4','','Complete'],['You have','5 days','','Then it auto-approves']],
+  t:[['Waiting on you','4','m','Stage 2 items'],['Stage balance','£138','','Due on sign-off'],['Checklist','4 of 4','','Complete'],['You have','5 days','','Then it auto-approves']],
   x:'stage2-ev',a:[['Approve and release stage two',1],['Book a walkthrough first',0]]},
 
  {b:'Done',h:'Both stages released. Job closed.',p:'Two releases, two evidence sets, both signed by you. The report carries both.',
