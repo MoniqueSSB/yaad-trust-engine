@@ -674,6 +674,44 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## The 5 September 2026 deploy, and what is still not wired
+
+Three functions went to production on 5 September: `yaad-message-status`
+(`--no-verify-jwt`), `yaad-phone-check` and `yaad-vision` (both without the
+flag, platform auth on). `scripts/check-deploy-drift.sh` then reported no drift
+in either direction.
+
+**Verified by probe, not by reading the deploy output**, because a successful
+upload says nothing about whether the flag landed:
+
+```bash
+B=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-message-status" \
+  -H "Content-Type: application/x-www-form-urlencoded" --data "MessageSid=SMtest&MessageStatus=failed"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-phone-check" \
+  -H "Content-Type: application/json" --data '{"phone":"+18765551234"}'
+```
+
+Correct answers are **403** ("Signature check failed.") and **401** ("Missing
+authorization header"). A 200 from the first means the signature check is not
+running and anybody can write delivery statuses; a 200 from the second means
+the flag was passed by mistake and Lookup, which costs money per call, is open.
+
+**`yaad-message-status` is deployed and not yet receiving anything.** Twilio
+only posts to it once `TWILIO_STATUS_CALLBACK_URL` is set as a secret and sends
+start quoting it, and that secret is not set. Until then `message_deliveries`
+stays empty and the Overview's "Messages that failed" tile reads zero because
+nothing is reporting, not because everything arrived. The value is:
+
+```
+https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-message-status
+```
+
+**`TWILIO_CONTENT_SID_DESK_REPLY` is still unset** and unrelated to this
+deploy. `TWILIO_CONTENT_SID_APPROVE` was set on 4 September.
+
+---
+
 ## Passing or blocking an applicant, and why the buttons changed
 
 **Deciding whether somebody can earn on this platform is a §2 decision, and
