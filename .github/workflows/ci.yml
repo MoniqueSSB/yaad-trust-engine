@@ -214,6 +214,39 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_not_a_real_key
         run: npx next build
 
+  desk:
+    name: Admin desk script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # ESLint lives in web/node_modules; the desk is not part of the app but
+      # this is the only place the repository installs anything.
+      - name: Install
+        run: npm ci
+        working-directory: web
+
+      # concierge.html is one file with one very large inline script, and until
+      # 5 September 2026 nothing in CI read a line of it. Twice the same bug has
+      # shipped from it: the 17-18 August temporal dead zone that broke admin
+      # sign-in on a direct link, and one found on 5 September where three
+      # consts sat below the tile that read them, so loadOverview() threw
+      # "Cannot access 'owedOldest' before initialization" and rendered 13 tiles
+      # instead of 29, losing the entire "what needs me today" alert list.
+      # Both were found by walking into them.
+      #
+      # The check is deliberately ONE narrow rule rather than a style pass. The
+      # stock no-use-before-define reports 17 findings on this file, every one
+      # of them safe, because it flags reads inside functions that only run
+      # later. A job that cries wolf gets switched off. See the script.
+      - name: The desk has no dead zone reads
+        run: node scripts/check-desk-script.mjs
+
   taxonomy:
     name: Job taxonomy has not drifted
     runs-on: ubuntu-latest
