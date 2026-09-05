@@ -674,6 +674,44 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## A quote pack held on a phrase that was not the phrase the rule is for
+
+**What happened, 5 September 2026.** `JOB-WEB-1788281626906` sat held for 80
+hours. The banned-language rule caught **"fully covered"**, and it was right to
+look: that phrase is on the list because "your job is fully covered" is a
+promise about money and cover that Yaadly must never make.
+
+The pack said: *"First coat applied evenly over all railings, surface fully
+covered"*. Paint, on a railing. Nothing to do with cover at all.
+
+**The real defect was not the false positive.** It was that a flagged draft has
+exactly one action on the desk, Approve, and `approve_quote_pack_draft()`
+refuses outright on any flag with no override, correctly. So there was no route
+from "this flag is wrong" to "this job can move". The job simply stopped, and
+nothing said so.
+
+**How this one was corrected, and the rule to follow next time.** The wording
+was changed to "complete coverage with no bare metal showing", then re-scanned
+by running `_shared/guardrails.ts` itself over the corrected text: original
+flagged `["fully covered"]`, corrected flagged nothing, price check found
+nothing. **The flag was recomputed by the real scanner, never cleared by
+hand.** `guardrail.rescan_note` on the row records exactly that. The draft
+stayed at `ready`, so a named human still presses Approve.
+
+**Never clear `banned_language_detected` by editing the JSON to false.** That
+is the one move that turns this table from a record into a decoration. Change
+the wording, run the scanner, write what the scanner says.
+
+**Expect this phrase again.** Painting and decorating is a large share of the
+trade list and "fully covered" is ordinary language for paint coverage. The
+banned pattern was deliberately left alone: narrowing a guardrail so a job can
+proceed is exactly the change `CLAUDE.md` §3 exists to refuse, and telling the
+financial sense from the decorating sense by regex is not something to attempt
+under time pressure on a live job. Widening the desk's options is the right
+fix; loosening the rule is not.
+
+---
+
 ## The 5 September 2026 deploy, and what is still not wired
 
 Three functions went to production on 5 September: `yaad-message-status`
