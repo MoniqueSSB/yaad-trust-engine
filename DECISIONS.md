@@ -20,6 +20,31 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Evidence is read in five sections, and a photograph says which one it is in
+
+**The website was ahead of the system on the one claim the business rests on.** `terms.html` has promised, since it was written, that every stage is documented with "arrival on site, before photographs, materials receipts, after photographs, and a walk-round video at the end", and `faq.html` promises the Completion Report shows the before and after. Four of those five were recorded. Before and after were not. `20260904t` said so in its own comment and deliberately left it: "nothing in the schema records that... reading it out of the labels would be a guess dressed as a check... that is a product decision, not a view." Founder instruction, 5 September, was that the system is the half that moves.
+
+**Five sections, and only four of them are a new field.** before, during the work, problems found, after, and materials on site. Materials was already its own thing on `evidence.kind` from `20260828c`, because filing it is what moves the risk in the materials to the client, so it becomes a section by being displayed as one rather than by being duplicated into the new column. The constraint refuses a phase on it, which keeps the two from ever disagreeing. The words live once in `web/lib/portal/evidence-sections.ts`; three copies of "Problems found" that slowly become three phrasings is how a client ends up asking what the difference is between an issue and a problem.
+
+**Problems found earn their own section, and that is the half of this with teeth.** A before and an after prove the work. A problem found on site is the thing that changes what the work *is*: rot behind a panel, a pipe nobody knew was there. Buried seventh in a grid of photographs with a free-text caption, a client scrolls past it and finds out when the price moves. In its own section, coral rather than teal, with a line saying anything that changes price or timeline is agreed in writing first, it is the thing they cannot miss. `terms.html` now says that too.
+
+**Counted, never scored.** The desk tile for problems is deliberately uncoloured. A worker who reports rot is doing the job properly, and a green tick on a low number is an instruction to stop reporting them. What the count is for is a stage carrying several, which is a stage where the job has stopped being the job that was quoted.
+
+**Declared, never inferred, and that is the whole design.** `evidence.phase` is set because a person answered a direct question: a select on the portal upload forms, a one-letter reply to "Which is this? B, D, A or P" on WhatsApp. Nothing reads it out of the label. The same reasoning `evidence.kind` used in `20260828c`: a rule that turns on somebody typing a particular word is not a rule. "Before I started I had to move the tank" is a sentence about a before; it is not a declaration that the photograph is one. The tempting version of this feature is a regex over existing labels, which would have backfilled a number that looked like history and was actually a guess.
+
+**Null is an honest answer in itself.** It means nobody said, and it must never read as "no". Every row filed before today carries it, and a worker who answers with something that is neither word still gets their evidence filed, with a reply saying it went on record as neither. Nothing about this column blocks anything: it records and it reports. Whether a stage may ever be approved without a before on file is a separate decision and the founder's, not this migration's, because §10 puts what counts as verified on her side of the line.
+
+**It goes into the approval snapshot, not just the table.** `_do_approve_stage` writes `phase` alongside the `sha256` into `stage_approvals.evidence`, and `evidence_at_signoff` reads the snapshot. Without that, a worker marking last week's photograph as the before, today, would improve last week's approval, which is the exact failure `20260904t` and `supabase/tests/signoff_snapshot_guards.sql` exist to prevent, one column along. `supabase/tests/evidence_phase_guards.sql` asserts it in both directions.
+
+**One extra WhatsApp exchange, accepted on purpose.** The worker lane asks the section question as its own step rather than reading it out of the caption, so filing a photo is one message longer than it was. That was weighed against merging it into the "what does this show?" prompt and parsing the first word. The dedicated question was chosen because the answer is unambiguous, it matches how the job code is already handled (always asked, always checked, never assumed), and a wrong section is worse than a slow one. P is offered rather than I for a problem, because P collides with nothing and "problem" is the word a worker on site actually uses; both are accepted. If it proves to be friction the workers feel, merging the two prompts is a small change.
+
+**An issue never stands in for a before or an after.** A stage where the worker only ever photographed problems must not read as complete, so `before_and_after` counts exactly those two words and the rig asserts it on a job with nothing but issues on file.
+
+**The desk gets a tile, never coloured red.** Before-and-after reads near zero for a while, and correctly so: nothing filed before 5 September declared either way. A red tile there would blame workers for a measure that had only just started.
+
+
+---
+
 ## 2026-09-05 · The model retry ignored Retry-After, so it bought a second identical refusal
 
 **Observed rather than reasoned.** On 4 September the Mistral 429s were watched doing exactly this: the retry fired, waited its fixed 1200ms, and got 429 again. That is what ruled out a burst from a test loop and pointed at a quota or a sustained throttle instead. The retry was not helping; it was spending the caller's budget to reach the same answer.
