@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The materials route belongs at posting, and today the worker decides it by accident
+
+**Founder's instruction was that the client answers the materials question at quote stage. Tracing where it actually sits found something worse than a missing field.** `specs/MATERIALS-ROUTE-FLOW-SPEC.md` is the written journey; this records the finding.
+
+**Nobody asks the client who is supplying the materials, and the worker decides it by whether he types a number.** `jobs.materials_by` exists, is written once by `yaad-post-job` as unconstrained free text, and is read only to print a chip on the board and a column in the desk. Nothing branches on it. The real decision is made in `web/app/jobs/actions.ts`, where the worker enters `materials_jmd` on his quote, and the client's only materials question is where to keep them.
+
+**And that question fires after the client has accepted a quote.** The go-live gate in `web/lib/portal/gates.ts` shows "Say where materials are kept" only once an accepted quote carries materials money. The route question cannot live at that point, because by then every quote on the job is priced: a worker who priced materials for a client who was always going to supply them quoted the wrong job, and the client accepted a number that should never have been on the page. The gate's own comment makes the argument for moving it, "a worker cannot price this honestly without it", which is true of the store and much truer of who is buying. So the spec puts both at posting, before any worker sees the job.
+
+**Two of the four options in the prototype cannot survive the principal structure, which is why this is not just a field to wire up.** `preview/index.html` offers "Worker supplies and invoices with receipts", which is the venue model, since the worker does not invoice a client he has no contract with; and "Split, agree item by item", which mixes both routes on one job. Clause 8 forbids the split, and not for tidiness: the workmanship obligation and the risk on the goods have to sit with the same party, or nobody can say who is answerable when a wall fails. "Not sure, worker to advise" leaves it open at the exact moment quoting starts. Only "I supply the materials" survives, as Route B.
+
+**Written as a spec and deliberately not built.** It moves the intake form, the board, the quote form, the go-live gate and the invoicing order, which is five surfaces on one instruction, and §1 of `CLAUDE.md` says explain before building and keep the pieces checkable. The spec lists the six changes smallest first so the size is visible before anything moves.
+
+**One design note worth keeping.** The client's answer is a commercial decision about who carries the risk on the goods, wearing the clothes of a form field. Route B is not a cheaper Route A: it moves materials risk, programme risk and part of the guarantee onto the client. So the spec writes the consequence next to the option at the moment of choosing, rather than leaving it to the terms page, which is the same rule the rest of the product runs on.
+
 ## 2026-09-05 · The payment route splits on whether Yaadly buys materials, not on the job's price
 
 **Founder's decision, settling the collision the Route A entry below opened.** Making materials a stage payable before work starts ran into the £500 threshold of 3 September, where at or under £500 the card is authorised at booking and captured on the client's approval, and "your card is not charged until you approve the work" is scoped to exactly that route. A materials stage payable up front means capturing something at booking on a small job, which makes that sentence false on some jobs and true on others with nothing on the page saying which.
