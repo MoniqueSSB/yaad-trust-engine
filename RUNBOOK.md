@@ -754,11 +754,43 @@ covered"*. Paint, on a railing. Nothing to do with cover at all.
 down is what it predicts, not what it cost: with a real painting job the same
 phrase blocks it the same way, and there is no route out.
 
-**The real defect is not the false positive.** It is that a flagged draft has
+**The real defect was not the false positive.** It was that a flagged draft had
 exactly one action on the desk, Approve, and `approve_quote_pack_draft()`
-refuses outright on any flag with no override, correctly. So there is no route
-from "this flag is wrong" to "this job can move", and nothing on the Overview
-counted a held pack until this was found. On a real job that is a dead stop.
+refuses outright on any flag with no override, correctly. So there was no route
+from "this flag is wrong" to "this job can move". On a real job that is a dead
+stop.
+
+### Correcting a held pack, from 5 September 2026
+
+The Quote Pack Drafts view has a second action, **"Correct the wording"**. It
+loads the whole pack into a box, you fix the words, and it goes to
+`yaad-quote-pack-rescan`.
+
+**It clears nothing.** The corrected text goes through
+`_shared/quote-pack-verdict.ts`, which is the identical function the drafter
+uses, not a second opinion. A correction that is still dirty stays dirty, the
+desk tells you which words tripped it, and `approve_quote_pack_draft()` still
+refuses. `status` is never touched, so a named human still presses Approve
+afterwards.
+
+**The whole pack is in the box, not just the flagged line**, because a flag can
+be in any section and showing one sentence invites fixing it while a second
+copy of the phrase sits in another.
+
+**No model is called.** This is your edit being re-checked, not a redraft, so
+there is no pause switch to honour. Redrafting from the brief is
+`yaad-quote-pack`'s separate job.
+
+The row keeps `rescanned_by`, `rescanned_at`, `rescan_note` and
+`previous_banned_samples` in its `guardrail`, so what was flagged before a
+correction is still readable afterwards.
+
+**Why the banned pattern was not narrowed instead.** "fully covered" is on the
+list because "your job is fully covered" is a promise about money. Telling that
+apart from paint coverage by regex is not something to attempt under time
+pressure, and a loosened rule is permanent and applies to every future client
+while a stuck draft is one row. `CLAUDE.md` §3. Widen what the desk can do,
+never the rule.
 
 **How this one was corrected, and the rule to follow next time.** The wording
 was changed to "complete coverage with no bare metal showing", then re-scanned

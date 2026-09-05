@@ -1346,6 +1346,16 @@ const VIEWS = [
         rpc:"approve_quote_pack_draft",
         args:(r) => ({ p_draft_id:r.id }),
         says:() => "Marks this draft approved. A worker writing a quote on this job sees it as the starting point for their own scope, timeline and payment stages the moment they open the form. Refused outright if the guardrail still flags price or banned language: fix the draft or wait for a fresh one first." },
+
+      { label:"Correct the wording", cls:"g", when:r => r.status === "ready",
+        ask:[
+          { k:"docs", label:"The pack. Correct the wording, keep the shape.", type:"long",
+            from:r => JSON.stringify(r.docs, null, 2) },
+          { k:"note", label:"Why (optional, kept on the row)",
+            placeholder:"\"fully covered\" was about paint, not about cover" },
+        ],
+        call: deskRescanPack,
+        says:r => `Re-checks this pack with the same rule the drafter uses. It clears nothing: if the wording still trips the guardrail it stays flagged and Approve still refuses it. Nothing is sent to anybody, and no model is called.` },
     ]},
 
   { k:"kickd", g:"Documents & money", label:"Kickoff Drafts", icon:"doc",
@@ -4607,6 +4617,45 @@ async function rptFn(payload){
   const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
   return j;
+}
+
+const QPR_FN = SUPABASE_URL + "/functions/v1/yaad-quote-pack-rescan";
+
+// Correcting a held quote pack.
+//
+// A flagged draft used to have exactly one action, Approve, and Postgres
+// refuses that outright while a flag stands. So there was no route from "this
+// flag is a false positive" to "this job can move". The case that showed it
+// was a painting pack saying "surface fully covered": the phrase is banned
+// because "your job is fully covered" is a promise about money, and it fired
+// on paint covering a railing.
+//
+// This does NOT clear a flag. The corrected wording goes through the same
+// verdict function the drafter uses, so a correction that is still dirty stays
+// dirty and Approve still refuses it. No model is called: this is your edit
+// being re-checked, not a redraft, which is why there is no pause check here.
+async function qprFn(payload){
+  const r = await fetch(QPR_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+// The whole pack goes into the box, because a flag can be in any section and
+// showing only the flagged one would invite correcting a sentence while a
+// second copy of the phrase sits in another.
+async function deskRescanPack(row, vals){
+  let docs;
+  try { docs = JSON.parse(String(vals.docs || "")); }
+  catch (e) { throw new Error("That is not valid JSON, so nothing was saved. " + String(e.message || e)); }
+  const out = await qprFn({ draftId: row.id, docs, note: String(vals.note || "").trim() });
+  if (!out.clean) {
+    throw new Error("Saved, and it is STILL flagged: " + (out.guardrail.banned_samples || []).concat(out.guardrail.samples || []).join(", ") + ". Fix those words and run it again.");
+  }
 }
 
 const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";

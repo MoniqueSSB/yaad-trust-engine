@@ -10,6 +10,7 @@ that actually serves real users. That is why these files are here.
 |---|---|---|
 | `yaad-agent` | true | Intake and Reporting agents (MiniMax-M2.7), admin session only |
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
+| `yaad-quote-pack-rescan` | true | An admin corrects a held quote pack's wording; the same verdict function the drafter uses decides again. Approves nothing, never touches `status`, calls no model. |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |
 | `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |

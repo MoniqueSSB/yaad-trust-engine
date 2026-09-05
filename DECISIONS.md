@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The way out of a false positive is a wider desk, not a narrower rule
+
+**The problem was never the flag.** `approve_quote_pack_draft()` refuses a flagged draft outright with no override, which is right: nobody should be able to wave flagged content through to a client. But Approve was the only action, so a draft the guardrail caught for the wrong reason had no route forward at all. The job stopped and nothing said so.
+
+**The tempting fix was to narrow the pattern so paint stopped matching.** That is exactly what §3 exists to refuse. A loosened banned-language rule is permanent and applies to every future client; a stuck draft is one row. And separating "your job is fully covered" from "surface fully covered" by regex is not a thing to get right under pressure.
+
+**So the desk gained an action and the rule did not move.** `yaad-quote-pack-rescan` takes a corrected pack from a signed-in admin, runs it through the same verdict function the drafter uses, and writes what that function says. It never touches `status`, so it cannot approve anything, and a correction that is still dirty stays dirty and is still refused by Postgres.
+
+**The verdict itself moved into `_shared/quote-pack-verdict.ts`, and that is the load-bearing part.** Two things now decide whether a pack is clean. If they ever computed it differently, a correction could clear a flag the drafter would still have raised, and the flag would stop meaning anything. One function, both callers, seven tests including the exact painting case that started this.
+
+**The scanner is passed into it as an argument rather than imported.** `sync-shared.sh` and the CI drift check both decide what to copy by reading which shared files an `index.ts` imports, so a shared file importing another shared file would have the second deleted as an orphan. Taking `scan` as a parameter keeps both imports visible where the tooling looks.
+
+**Probed after deploying**: no token gives a platform 401, the publishable key alone gives "Not signed in.", and `is_admin()` was confirmed to take no arguments and be executable by `authenticated`, so a real admin is not refused by the check meant to let them through. The write path itself is not exercised end to end, because that needs a signed-in admin session; the logic it depends on is unit tested.
+
+---
+
 ## 2026-09-05 · Migrations are named to sort last, and the check tests that rather than the format
 
 **Four collisions in one day is a scheme problem, not four mistakes.** Migrations were named `<date><letter>`. Parallel sessions share this repository and cannot see each other's branches, so two sessions both take the next free letter and both are correct at the time. On 5 September `20260904k` through `n` were claimed twice, then `20260905a` and `b` were claimed twice more. It never surfaces as a git conflict, because the filenames differ, so both sets merge quietly into a directory whose entire purpose is applying things in order.
