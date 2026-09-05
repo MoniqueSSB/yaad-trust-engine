@@ -724,21 +724,123 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## Creating TWILIO_CONTENT_SID_DESK_REPLY
+
+**What it is for.** You reply from the desk to somebody who last wrote more
+than 24 hours ago. WhatsApp will not carry free text that far, so
+`yaad-desk-reply` saves your words in `pending_desk_replies` and sends an
+approved template instead saying a reply is waiting. The moment they write
+back, the window reopens and `yaad-inbound` flushes your real words in full.
+
+**Without it your reply is still saved, and they are never told to write
+back**, so it sits there until they happen to message. That is the whole cost
+of not having it.
+
+**Your words never go in the template.** A template's variable slots are
+approved for one specific sentence, and reusing one to carry different text is
+how a sender gets flagged.
+
+### The template
+
+One variable, `{{1}}`, which `yaad-desk-reply` fills with the job code, or with
+the literal words "your job" when the thread has no job yet. So the sentence
+has to read correctly both ways.
+
+```
+Hi, this is Yaadly. There is a reply waiting for you about {{1}}. WhatsApp only lets us send it after you message us, so send us anything back and it will come through straight away.
+```
+
+Checked against `_shared/guardrails.ts`: no banned language, no dashes, reads
+correctly with a job code and with "your job".
+
+### Steps
+
+1. Twilio Console, **Messaging, Content Template Builder, Create new**.
+2. Name it `yaadly_desk_reply_waiting`, language English. The name is internal.
+3. Content type **Text**.
+4. Paste the body above. Give `{{1}}` a sample value, `JOB-WEB-1788281626906`.
+5. Save, then **Submit for WhatsApp approval**, category **Utility**. It is
+   utility because it is about an enquiry the person already started. Choosing
+   Marketing invites a slower review and a stricter bar for no benefit.
+6. Wait for Meta. Usually minutes, sometimes a day. It is out of your hands.
+7. When approved, copy the Content SID. It starts `HX`.
+8. Set it:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_DESK_REPLY=HXyour_sid_here --project-ref leffyisvfvjwzilydlwf
+```
+
+**No redeploy is needed.** The function reads it with `Deno.env.get` at send
+time, so the next send picks it up.
+
+### Checking it worked
+
+Send a desk reply to a number that last wrote more than 24 hours ago. The
+response says a short approved message has gone, rather than the sentence about
+the secret not being configured. Then:
+
+```sql
+select to_addr, job_id, created_at, sent_at from public.pending_desk_replies order by created_at desc limit 5;
+```
+
+Your words should be sitting there unsent, and they go out on their own the
+moment that number replies.
+
+---
+
 ## A quote pack held on a phrase that was not the phrase the rule is for
 
-**What happened, 5 September 2026.** `JOB-WEB-1788281626906` sat held for 80
-hours. The banned-language rule caught **"fully covered"**, and it was right to
-look: that phrase is on the list because "your job is fully covered" is a
-promise about money and cover that Yaadly must never make.
+**What happened, 5 September 2026.** A quote pack draft on the test job
+`JOB-WEB-1788281626906` was held. The banned-language rule caught **"fully
+covered"**, and it was right to look: that phrase is on the list because "your
+job is fully covered" is a promise about money and cover that Yaadly must never
+make.
 
 The pack said: *"First coat applied evenly over all railings, surface fully
 covered"*. Paint, on a railing. Nothing to do with cover at all.
 
-**The real defect was not the false positive.** It was that a flagged draft has
+**No client was waiting.** Every job in this database is a test job
+(`CLAUDE.md` §12), so the elapsed time meant nothing. The reason to write this
+down is what it predicts, not what it cost: with a real painting job the same
+phrase blocks it the same way, and there is no route out.
+
+**The real defect was not the false positive.** It was that a flagged draft had
 exactly one action on the desk, Approve, and `approve_quote_pack_draft()`
 refuses outright on any flag with no override, correctly. So there was no route
-from "this flag is wrong" to "this job can move". The job simply stopped, and
-nothing said so.
+from "this flag is wrong" to "this job can move". On a real job that is a dead
+stop.
+
+### Correcting a held pack, from 5 September 2026
+
+The Quote Pack Drafts view has a second action, **"Correct the wording"**. It
+loads the whole pack into a box, you fix the words, and it goes to
+`yaad-quote-pack-rescan`.
+
+**It clears nothing.** The corrected text goes through
+`_shared/quote-pack-verdict.ts`, which is the identical function the drafter
+uses, not a second opinion. A correction that is still dirty stays dirty, the
+desk tells you which words tripped it, and `approve_quote_pack_draft()` still
+refuses. `status` is never touched, so a named human still presses Approve
+afterwards.
+
+**The whole pack is in the box, not just the flagged line**, because a flag can
+be in any section and showing one sentence invites fixing it while a second
+copy of the phrase sits in another.
+
+**No model is called.** This is your edit being re-checked, not a redraft, so
+there is no pause switch to honour. Redrafting from the brief is
+`yaad-quote-pack`'s separate job.
+
+The row keeps `rescanned_by`, `rescanned_at`, `rescan_note` and
+`previous_banned_samples` in its `guardrail`, so what was flagged before a
+correction is still readable afterwards.
+
+**Why the banned pattern was not narrowed instead.** "fully covered" is on the
+list because "your job is fully covered" is a promise about money. Telling that
+apart from paint coverage by regex is not something to attempt under time
+pressure, and a loosened rule is permanent and applies to every future client
+while a stuck draft is one row. `CLAUDE.md` §3. Widen what the desk can do,
+never the rule.
 
 **How this one was corrected, and the rule to follow next time.** The wording
 was changed to "complete coverage with no bare metal showing", then re-scanned
@@ -873,10 +975,13 @@ which is correct behaviour: `approve_quote_pack_draft()` is admin only and
 refuses outright on any flag rather than offering an override. What was missing
 was anybody being told.
 
-**Found live on 5 September 2026**: `JOB-WEB-1788281626906`, Painting and
-Decorating in Kingston, pack drafted 2 September, held 78 hours, flagged for
-the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The
-guardrail did its job perfectly and the job sat for three days.
+**Found on 5 September 2026 on a TEST job**: `JOB-WEB-1788281626906`, drafted
+2 September, flagged for the phrase "fully covered", which is on the banned
+list in `CLAUDE.md` §8. Nothing in this database is a real client, worker or
+job (`CLAUDE.md` §12), so no one was actually waiting; the elapsed time is just
+how long a test row sat. What is real is the shape: the phrase appeared as
+"surface fully covered", about paint on a railing, and painting is a large part
+of the trade list.
 
 ```sql
 select * from public.packs_awaiting_a_person;

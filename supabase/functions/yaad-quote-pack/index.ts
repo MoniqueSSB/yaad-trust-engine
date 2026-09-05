@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { missingSections, verdictFor } from "./quote-pack-verdict.ts";
 
 // Quote Kickoff Pack agent, 1 Sep 2026.
 //
@@ -163,29 +164,24 @@ async function runDraft(draftId: string, job: Record<string, unknown>, trace: Tr
       await fail(finishReason === "length" ? "ran out of room before it finished" : "did not return usable JSON");
       return;
     }
-    const missing = ["scope_summary", "included", "excluded", "rough_timeline", "payment_stages"].filter((k) => !(k in docs));
+    const missing = missingSections(docs);
     if (missing.length) { await fail(`Missing sections: ${missing.join(", ")}`); return; }
 
     // Same guardrail discipline as yaad-kickoff: the model is told never to
     // price and never to say escrow, this checks whether it did anyway.
-    const blob = JSON.stringify(docs);
-    const priceHits = [
-      ...(blob.match(/(?:J?\$|£|€|USD|JMD|GBP)\s?[\d,]+(?:\.\d+)?/gi) ?? []),
-      ...(blob.match(/\b\d[\d,]{2,}(?:\.\d{2})?\s?(?:dollars|pounds|JMD|USD|GBP)\b/gi) ?? []),
-    ];
-    const priced = priceHits.length > 0;
-    const bannedHits = guardrails.scan(blob);
+    //
+    // The verdict moved into _shared/quote-pack-verdict.ts on 5 September 2026
+    // when yaad-quote-pack-rescan became the second thing that decides whether
+    // a pack is clean. If the drafter and the rescan door ever computed it
+    // differently, correcting a pack could clear a flag the drafter would
+    // still have raised, and the flag would stop meaning anything.
+    const verdict = verdictFor(docs, guardrails.scan);
 
     const up = await draftsWrite("PATCH", `?id=eq.${draftId}`, {
       status: "ready",
       docs,
       model: prov.model,
-      guardrail: {
-        price_language_detected: priced,
-        samples: priceHits.slice(0, 5),
-        banned_language_detected: bannedHits.length > 0,
-        banned_samples: [...new Set(bannedHits.map((f) => f.term))].slice(0, 5),
-      },
+      guardrail: verdict,
       finished_at: new Date().toISOString(),
     });
     if (!up.ok) await fail(`Draft finished but could not be saved (db ${up.status}).`);

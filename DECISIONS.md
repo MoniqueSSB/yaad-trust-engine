@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The way out of a false positive is a wider desk, not a narrower rule
+
+**The problem was never the flag.** `approve_quote_pack_draft()` refuses a flagged draft outright with no override, which is right: nobody should be able to wave flagged content through to a client. But Approve was the only action, so a draft the guardrail caught for the wrong reason had no route forward at all. The job stopped and nothing said so.
+
+**The tempting fix was to narrow the pattern so paint stopped matching.** That is exactly what §3 exists to refuse. A loosened banned-language rule is permanent and applies to every future client; a stuck draft is one row. And separating "your job is fully covered" from "surface fully covered" by regex is not a thing to get right under pressure.
+
+**So the desk gained an action and the rule did not move.** `yaad-quote-pack-rescan` takes a corrected pack from a signed-in admin, runs it through the same verdict function the drafter uses, and writes what that function says. It never touches `status`, so it cannot approve anything, and a correction that is still dirty stays dirty and is still refused by Postgres.
+
+**The verdict itself moved into `_shared/quote-pack-verdict.ts`, and that is the load-bearing part.** Two things now decide whether a pack is clean. If they ever computed it differently, a correction could clear a flag the drafter would still have raised, and the flag would stop meaning anything. One function, both callers, seven tests including the exact painting case that started this.
+
+**The scanner is passed into it as an argument rather than imported.** `sync-shared.sh` and the CI drift check both decide what to copy by reading which shared files an `index.ts` imports, so a shared file importing another shared file would have the second deleted as an orphan. Taking `scan` as a parameter keeps both imports visible where the tooling looks.
+
+**Probed after deploying**: no token gives a platform 401, the publishable key alone gives "Not signed in.", and `is_admin()` was confirmed to take no arguments and be executable by `authenticated`, so a real admin is not refused by the check meant to let them through. The write path itself is not exercised end to end, because that needs a signed-in admin session; the logic it depends on is unit tested.
+
+---
+
 ## 2026-09-05 · Eighteen live database objects existed in no migration, and one of them was the security model
 
 **What was found.** A sweep of every function in the live `public` schema against every function defined in `supabase/migrations` found eighteen running with no definition in this repository: seventeen ordinary ones plus `price_spread_for_trade`, which the client's own quote page calls by name. They were applied straight to the database, mostly through the Supabase MCP, which assigns its own version number and writes no file. So the repository has been describing a database it cannot rebuild.
@@ -58,7 +74,7 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ## 2026-09-05 · A guardrail fired correctly on a phrase that meant something else, and the fix was the desk, not the rule
 
-**"fully covered" is on the banned list because "your job is fully covered" is a promise about money.** A quote pack said "First coat applied evenly over all railings, surface fully covered". Paint on a railing. The job sat held for 80 hours.
+**"fully covered" is on the banned list because "your job is fully covered" is a promise about money.** A quote pack said "First coat applied evenly over all railings, surface fully covered". Paint on a railing, so the rule fired on the decorating sense of a phrase it exists to catch in the financial sense. This was a TEST job: every job in this database is (`CLAUDE.md` §12), so nobody was waiting and the elapsed time meant nothing. Recorded for what it predicts rather than what it cost, because painting is a large share of the trade list and the same phrase will block a real job the same way.
 
 **The tempting fix was to narrow the pattern, and that is precisely what §3 exists to refuse.** Distinguishing the financial sense from the decorating sense by regex is not a thing to attempt under time pressure on a live job, and a loosened banned-language rule is permanent while the stuck job is temporary. The pattern was left exactly as it is.
 
@@ -156,7 +172,7 @@ Changed on `docs/business.html`: the credential cell, the hero, the case file st
 
 **Excluding the auto-issued rows was right. Excluding the tables was not.** The `system:%` filter was doing the real work and still is: 314 auto-issued rows stay out, because a guardrail-clean pack issuing itself is the system deciding the content was clean, not a person deciding anything. But the same tables carry the human path, and `approve_quote_pack_draft()` is admin only, refuses outright on any guardrail flag rather than offering an override, and attributes the approval to the signed-in admin specifically so the row can prove a named human confirmed it. That is a desk decision by any definition and it was being thrown away. It changes no number today, because nobody has ever cleared one. It stops the first from going uncounted.
 
-**The correction surfaced a live problem, which is the part worth keeping.** Chasing the sequence turned up one draft held at `ready` for 78 hours: `JOB-WEB-1788281626906`, flagged for the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board, and no worker could see anything to quote, because the pack they read was held. Nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. `packs_awaiting_a_person` and a red tile now say it out loud.
+**The correction surfaced a real gap, on a test row.** Chasing the sequence turned up a draft held at `ready`: `JOB-WEB-1788281626906`, flagged for "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board while no worker could see anything to quote, because the pack they read was held, and nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. Every job here is a test job, so nothing was actually lost; the gap in the desk is real regardless of what the row was. `packs_awaiting_a_person` and a red tile now say it out loud.
 
 **The general shape of the mistake, worth naming.** I reasoned about what a table was for from its column names and its row counts rather than from the migration that created it, and wrote the conclusion into a comment as though it were established. The row counts were right and the story around them was invented. Reading `20260901r` first would have cost two minutes.
 
