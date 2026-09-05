@@ -14,10 +14,17 @@
 -- rather than assumed. kickoff_packs and quote_pack_drafts both have an
 -- approved_by column, and on 4 September 2026 they held 7 and 307 rows
 -- respectively, every one of them reading 'system: auto-issued,
--- guardrail-clean'. Those are documents issued automatically after a human
--- accepted a quote, not decisions anybody sat down and made. Counting them
--- would have reported a desk getting through three hundred items and would
--- have been nonsense in the direction that flatters the business.
+-- guardrail-clean'. Counting them would have reported a desk getting through
+-- three hundred items and would have been nonsense in the direction that
+-- flatters the business.
+--
+-- CORRECTED BY 20260905a, READ THAT ONE TOO. This comment originally called
+-- them "documents issued automatically after a human accepted a quote", which
+-- is wrong and wrong in a way that matters. The quote pack does not follow a
+-- quote, it is what a worker quotes AGAINST, and it is the gate on whether a
+-- job reaches a worker at all. Excluding the auto-issued rows was right;
+-- excluding the whole table also discarded the human path, where an admin
+-- clears a flagged draft that was deliberately held for them.
 --
 -- So the rule is explicit: a row counts only when a real person is named.
 -- Anything prefixed 'system:' is excluded, and the exclusion is a pattern
@@ -57,7 +64,7 @@ with (security_invoker = true) as
        and mr.released_by not like 'system:%';
 
 comment on view public.desk_decisions is
-  'Every consequential step a named person actually took, with when. Rows whose approver reads system:* are excluded on purpose: kickoff packs and quote packs are auto-issued after a human accepted a quote, and counting them as decisions would report a desk getting through hundreds of items a day.';
+  'Every consequential step a named person actually took, with when. Rows whose approver reads system:* are excluded on purpose: an auto-issued guardrail-clean pack is the system deciding the content was clean, not a person sitting down to a decision. Superseded by 20260905a, which adds back the human path on the pack tables.';
 
 grant select on public.desk_decisions to authenticated;
 

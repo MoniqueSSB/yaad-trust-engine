@@ -3162,6 +3162,16 @@ async function loadOverview(){
   // Capacity: how many consequential decisions fit in one working session.
   // A session rolls over at 05:00 Jamaica time rather than midnight, so a
   // sign-off at half past midnight belongs to the evening that just happened.
+  // Quote packs held for a person. This is a queue, not a score, and it is
+  // the one queue that stops a job dead: an approved quote pack is what RLS
+  // lets a worker read before pricing the job, so a held one means the job
+  // shows as open for quotes and no worker can actually see what to quote.
+  // Nothing on this page counted these until 5 September 2026, and one had
+  // been sitting for three days.
+  const heldQ = await sb.from("packs_awaiting_a_person").select("kind,ref,job_id,hours_waiting");
+  const held = heldQ.data || [];
+  const heldHrs = held.reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
+
   const capRow = await sb.from("desk_capacity").select("*").maybeSingle();
   const cap = capRow.data || {};
   const capSessions = Number(cap.sessions || 0);
@@ -3280,6 +3290,11 @@ async function loadOverview(){
       capSessions
         ? `Average over ${capSessions} ${capSessions === 1 ? "session" : "sessions"}, busiest was ${cap.busiest_session}`
         : "No sessions recorded yet"),
+    tile(heldHrs >= 24 ? "crit" : held.length ? "warn" : "ok",
+      "Quote packs held", String(held.length),
+      held.length
+        ? `Longest waiting ${Math.round(heldHrs)} hr, and its job cannot be quoted`
+        : "Every pack is with the workers"),
   ].join("");
 
   const needs = [];
@@ -3291,6 +3306,10 @@ async function loadOverview(){
     "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Open conversations", "threads"));
   if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
     "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
+  if (held.length) needs.push(alertRow(heldHrs >= 24 ? "crit" : "warn", "!",
+    held.length + (held.length === 1 ? " quote pack is held and its job cannot be quoted" : " quote packs are held and those jobs cannot be quoted"),
+    "The guardrail flagged wording in the pack and stopped it, which is correct. But an approved quote pack is what a worker reads before pricing, so until you clear or redraft it the job sits showing as open for quotes with nothing a worker can actually see. Longest held: " + Math.round(heldHrs) + " hours.",
+    "Open the drafts", "qpd"));
   if (noEv) needs.push(alertRow("crit","!",
     noEv + (noEv === 1 ? " stage was signed off with no evidence on file at all" : " stages were signed off with no evidence on file at all"),
     "An approval with nothing behind it is the one thing this business sells, missing. Worth knowing which, because it is either a test row or a habit forming.", "See sign-offs", "evid"));

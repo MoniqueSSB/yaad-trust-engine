@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The quote pack is the gate, and I described it as an afterthought
+
+**Correcting myself, because the error was load bearing.** `20260904s` excluded `quote_pack_drafts` and `kickoff_packs` from the capacity count and justified it by calling them "documents issued automatically after a human accepted a quote, not decisions anybody sat down and made". The quote pack does not follow a quote. It is what a worker quotes *against*: RLS only lets a worker read a draft at status `approved`, and `20260901r` is explicit that `approved` rather than `ready` is the gate the worker's own quote form reads. In the founder's words, it is the only thing that needs to approve a job. The kickoff pack is the one that comes later, and it follows payment rather than acceptance.
+
+**Excluding the auto-issued rows was right. Excluding the tables was not.** The `system:%` filter was doing the real work and still is: 314 auto-issued rows stay out, because a guardrail-clean pack issuing itself is the system deciding the content was clean, not a person deciding anything. But the same tables carry the human path, and `approve_quote_pack_draft()` is admin only, refuses outright on any guardrail flag rather than offering an override, and attributes the approval to the signed-in admin specifically so the row can prove a named human confirmed it. That is a desk decision by any definition and it was being thrown away. It changes no number today, because nobody has ever cleared one. It stops the first from going uncounted.
+
+**The correction surfaced a live problem, which is the part worth keeping.** Chasing the sequence turned up one draft held at `ready` for 78 hours: `JOB-WEB-1788281626906`, flagged for the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board, and no worker could see anything to quote, because the pack they read was held. Nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. `packs_awaiting_a_person` and a red tile now say it out loud.
+
+**The general shape of the mistake, worth naming.** I reasoned about what a table was for from its column names and its row counts rather than from the migration that created it, and wrote the conclusion into a comment as though it were established. The row counts were right and the story around them was invented. Reading `20260901r` first would have cost two minutes.
+
+---
+
 ## 2026-09-04 · Capacity counts only decisions a person made, and a worker vetting decision is not recorded at all
 
 **The capacity metric was one query away from being nonsense in the direction that flatters.** `kickoff_packs` and `quote_pack_drafts` both carry an `approved_by`, which reads as a human approval and is not one: every row of both reads `system: auto-issued, guardrail-clean`, 314 of them against 11 real decisions. A capacity view over "things with an approver" would have reported a desk getting through three hundred items and nobody would have had a reason to doubt it. `desk_decisions` therefore excludes anything whose approver matches `system:%`, as a pattern rather than a table list, so a future auto-issuer cannot quietly join the count.

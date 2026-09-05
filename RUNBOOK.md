@@ -640,6 +640,39 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## A quote pack held at "ready", and why it stops a job dead
+
+**An approved quote pack is what a worker reads before pricing a job.** RLS on
+`quote_pack_drafts` only lets a worker see a draft at status `approved`, so a
+draft held at `ready` means the job shows as `open_for_quotes`, shows as open
+on the board, and has nothing a worker can actually look at. The job is not
+slow. It is stopped, and nothing about its status says so.
+
+A clean draft auto-approves. A draft the guardrail flags is held on purpose,
+which is correct behaviour: `approve_quote_pack_draft()` is admin only and
+refuses outright on any flag rather than offering an override. What was missing
+was anybody being told.
+
+**Found live on 5 September 2026**: `JOB-WEB-1788281626906`, Painting and
+Decorating in Kingston, pack drafted 2 September, held 78 hours, flagged for
+the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The
+guardrail did its job perfectly and the job sat for three days.
+
+```sql
+select * from public.packs_awaiting_a_person;
+select job_id, status, guardrail from public.quote_pack_drafts where status = 'ready';
+```
+
+**On the Overview**: "Quote packs held", amber at one, red once anything has
+been waiting a day, plus an alert row naming the wait. Opens the Quote Pack
+Drafts view.
+
+**To clear one**, read the pack, fix the flagged wording or redraft it, then
+approve it from that view. The flag itself tells you what tripped it, in
+`guardrail.banned_samples`. Never clear one by editing the guardrail.
+
+---
+
 ## Desk capacity, how much gets through in an evening
 
 **The question behind it.** The product is that a named human confirms every
@@ -663,10 +696,17 @@ reasonable. `supabase/tests/desk_capacity_guards.sql` pins the boundary at
 **Only rows naming a real person count.** `kickoff_packs` and
 `quote_pack_drafts` carry an `approved_by` that reads `system: auto-issued,
 guardrail-clean`, and on 4 September 2026 there were 314 of those against 11
-real decisions. They are documents issued automatically after a human accepted
-a quote, not decisions anybody sat down and made. The exclusion is a `system:%`
-pattern rather than a table list, so a new auto-issuer cannot quietly join the
-count. Tests 4 and 5 in the rig are the guard.
+real decisions. An auto-issued guardrail-clean pack is the system deciding the
+content was clean, not a person sitting down to a decision. The exclusion is a
+`system:%` pattern rather than a table list, so a new auto-issuer cannot quietly
+join the count. Tests 4 and 5 in the rig are the guard.
+
+**A pack a person actually cleared does count**, and getting that wrong is the
+correction in `20260905a`. `approve_quote_pack_draft()` is admin only, refuses
+outright on any guardrail flag rather than offering an override, and attributes
+the approval to the signed-in admin so the row can prove a named human
+confirmed it. That is a desk decision by any definition, and excluding the
+whole table rather than the auto-issued rows threw it away.
 
 **The tile is never coloured, and that is deliberate.** A quiet evening is a
 quiet week, not a bad one. Colouring throughput invites treating it as the
