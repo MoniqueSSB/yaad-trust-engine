@@ -25,6 +25,20 @@ import { SiteNav } from "@/components/SiteNav";
  *  - There is no public figure anywhere for how many workers or jobs are on
  *    the board, so none is claimed here, per the brief.
  *
+ * Corrected 5 Sep 2026. Two sentences here still described the venue model
+ * the principal structure replaced on 3 September: "the client chooses who
+ * they engage" and "Yaadly is a marketplace, not an employer". The client
+ * does not engage the tradesperson at all. The fee copy was reframed with
+ * them, from 12% taken out of the worker's money to Yaadly engaging him at
+ * his price less 12%, which is the wording on docs/payments.html and clause 6
+ * of legal/subcontractor-agreement-DRAFT.md. Same arithmetic, different
+ * money: see DECISIONS.md for why the difference is legal rather than tonal.
+ *
+ * The opening paragraph went the same way on her instruction the same day.
+ * "Yaadly connects vetted tradespeople with property owners" is the venue
+ * again, in the first sentence a tradesperson reads. Yaadly takes the work
+ * on and engages him to carry it out, and his agreement is with Yaadly.
+ *
  * No application logic lives here. Every action funnels to the existing
  * /apply flow.
  */
@@ -37,8 +51,8 @@ const BENEFITS: { h: string; p: string }[] = [
     p: "Nothing to join, nothing per quote, nothing per lead, win or lose. You're never charged for a job you don't get.",
   },
   {
-    h: "You keep 88%",
-    p: "Yaadly's fee is 12% of your agreed labour price, taken when you're paid. Remote digital work is 10%. Materials are never fee'd, at cost is at cost, and there's no subscription.",
+    h: "Your price, less 12%",
+    p: "You set your labour price and Yaadly engages you at that price less 12%. Remote digital work is 10%. Nothing comes out of money of yours: you're Yaadly's subcontractor, so the client's payment was never yours. Materials are never fee'd, at cost is at cost, and there's no subscription.",
   },
   {
     h: "You set your own price",
@@ -81,9 +95,11 @@ export default function TradesInfo() {
           Work in Kingston &amp; Portmore, paid on proof
         </h1>
         <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-mute">
-          Yaadly connects vetted tradespeople with property owners, most of them overseas, who need
-          real work proven with evidence before money moves. This page is where you find out if
-          that’s for you. Applying is separate, and takes about two minutes.
+          Yaadly takes on repair and maintenance work for property owners in Jamaica, most of them
+          living overseas, and engages vetted tradespeople to carry it out. Your agreement is with
+          Yaadly, never with the client, and every stage is proven with evidence before money moves.
+          This page is where you find out if that’s for you. Applying is separate, and takes about
+          two minutes.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -134,13 +150,21 @@ export default function TradesInfo() {
 
         {/* ── fees & allocation ────────────────────────────────────── */}
         <h2 className="mt-14 font-display text-[clamp(20px,3vw,26px)] uppercase leading-none">
-          Fees, and how work reaches you
+          What you’re paid, and how work reaches you
         </h2>
         <div className="mt-5 grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <div className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
-            <b className="text-ink">What Yaadly charges you:</b> 12% of your agreed labour price on a
-            completed job, taken at the point you’re paid, so you keep 88%. Remote digital work
-            carries 10% instead. Materials are never charged a fee.
+            <b className="text-ink">What you’re paid:</b> you set your labour price, and Yaadly
+            engages you at that price less 12%. Remote digital work is 10% instead. You see both
+            figures, your price and what Yaadly pays you, in writing before you accept anything, and
+            neither moves afterwards. Materials carry no fee at all: they’re paid to you at cost
+            against a receipt.
+            <p className="mt-2">
+              <b className="text-ink">Nothing is deducted from money of yours.</b> You’re Yaadly’s
+              subcontractor, not the client’s, so what a client pays Yaadly was never your money for
+              anything to be taken out of. Yaadly buys the job from you at the agreed figure and
+              sells it to the client separately.
+            </p>
             <p className="mt-2">
               <b className="text-ink">What you never pay:</b> joining, quoting, and leads, whether you
               win the job or not. There’s no subscription.
@@ -149,7 +173,9 @@ export default function TradesInfo() {
           <div className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
             <b className="text-ink">How a job reaches you:</b> clients post jobs against the same
             trades and parishes you pick on your profile. A job in a parish you haven’t ticked never
-            reaches you. You quote against the jobs you want; the client chooses who they engage.
+            reaches you. You quote for the jobs you want, and if your quote is the one taken, Yaadly
+            engages you on that job as its subcontractor. The client buys the job from Yaadly and
+            never contracts with you, which is why you never chase a client for money.
           </div>
         </div>
 
@@ -168,9 +194,11 @@ export default function TradesInfo() {
           Is work guaranteed?
         </h2>
         <p className="mt-4 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
-          No. Yaadly is a marketplace, not an employer. Clients post real jobs by trade and parish,
-          and you quote against the ones you want. You’ll win some and lose others. Quoting is always
-          free, so there’s no cost to trying, but nothing here promises a set amount of work.
+          No, and nothing here promises a set amount of work. Yaadly engages you job by job as its
+          subcontractor, and that is not employment: Yaadly is under no obligation to offer you a
+          job, and you’re under no obligation to take one. Clients post real jobs by trade and
+          parish, and you quote for the ones you want. You’ll win some and lose others. Quoting is
+          always free, so there’s no cost to trying.
         </p>
 
         {/* ── what happens after ───────────────────────────────────── */}
@@ -179,7 +207,7 @@ export default function TradesInfo() {
         </h2>
         <ol className="mt-5 space-y-3">
           {[
-            "Your profile is created the moment you send the first screen: your trades, your parishes, and one way to show your work — a CV, a portfolio, links, or photos of finished jobs. Any one of these is enough to start.",
+            "Your profile is created the moment you send the first screen: your trades, your parishes, and one way to show your work, whether that's a CV, a portfolio, links, or photos of finished jobs. Any one of these is enough to start.",
             "A person at the Yaadly desk reads it, not a queue. You hear back within 24 hours.",
             "Verification comes next: government photo ID, a live photo and video taken on camera, your TRN, proof of address, and three references we call directly. We chase these over WhatsApp so you're not stuck waiting on a screen.",
             "Your profile goes public once those checks clear, not before, the same rule every worker on the board was held to.",
