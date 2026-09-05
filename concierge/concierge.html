@@ -3527,8 +3527,8 @@ async function loadOverview(){
   // prices into the quote the client sees, and RLS only lets a worker read it
   // at approved, so a held one means no quote is built and the client hears
   // nothing, while the job still shows as open for quotes.
-  // Nothing on this page counted these until 5 September 2026, and one had
-  // been sitting for three days.
+  // Nothing on this page counted these until 5 September 2026, when a held
+  // draft was found only by going looking for it.
   const heldQ = await sb.from("packs_awaiting_a_person").select("kind,ref,job_id,hours_waiting");
   const held = heldQ.data || [];
   const heldHrs = held.reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
