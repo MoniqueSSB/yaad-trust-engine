@@ -834,7 +834,7 @@ content was clean, not a person sitting down to a decision. The exclusion is a
 join the count. Tests 4 and 5 in the rig are the guard.
 
 **A pack a person actually cleared does count**, and getting that wrong is the
-correction in `20260905a`. `approve_quote_pack_draft()` is admin only, refuses
+correction in `20260905c`. `approve_quote_pack_draft()` is admin only, refuses
 outright on any guardrail flag rather than offering an override, and attributes
 the approval to the signed-in admin so the row can prove a named human
 confirmed it. That is a desk decision by any definition, and excluding the
@@ -3045,3 +3045,82 @@ The desk says **offered WhatsApp** on those rows, and `nothing sent, they must t
 **Do not reach for SMS instead.** `TWILIO_SMS_FROM` is unset, SMS bills per message, and wiring a paid send to a form open to the internet is an open relay that charges you. The throttle comment already in `yaad-enquiry` makes that argument about email; it is sharper for SMS.
 
 **Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
+
+## A client asked for a worker by name and nothing seems to have happened
+
+The button on a worker profile records the request on the job row and holds
+the job off the open board for 48 hours so only that worker can price it. Work
+through it in this order.
+
+1. **Is it on the row at all?** In the desk, Jobs, find the job. The Worker
+   column shows an amber "asked, held for them" chip with the worker's address
+   under it while the hold is live. If it says nothing, the request never
+   landed: either the client did not arrive through a profile page, or the
+   slug did not resolve to an ACTIVE worker profile. `yaad-post-job` drops a
+   request it cannot resolve rather than recording a name nobody vetted.
+2. **Did the worker get told?** The message fires when the job goes LIVE, not
+   when the draft is saved, so a job still sitting as a draft has correctly
+   told nobody. There is no per-notification log on this path:
+   `yaad-notify-client` does not write `message_deliveries`, only
+   `yaad-desk-reply` does, so do not go looking for a row that was never
+   written. Check two things instead. First, does the worker have a phone
+   number on their profile: without one there is nobody to send to and the
+   function stops quietly. Second, the Supabase logs for `yaad-notify-client`
+   around the time the job went live, which is the only place this send leaves
+   a trace.
+3. **The worker cannot find the job.** It is deliberately NOT on the open
+   board while the hold is live. It appears at the top of app.yaadly.co.uk/jobs
+   for that worker only, in a gold panel, and only when they are signed in and
+   count as an approved worker (published profile plus a signed Worker
+   Guidelines). If they are signed in and see nothing, check those two things
+   first: the panel reads `my_requested_jobs`, which matches on their own
+   signed-in email.
+4. **Another worker says they cannot quote it.** That is the hold working. The
+   refusal message names the date and time it opens up.
+5. **The client needs it opened now.** Either ask the worker to press "Pass on
+   this job", or at the desk set `request_state` to `declined` on the job row.
+   Either opens it to the board immediately; the desk route does not message
+   the client, the worker's own route does.
+
+The window is 48 hours and it lives in ONE place: `public.request_is_live` in
+`20260905a`. Change the interval there and every gate follows. Nothing has to
+run for a hold to lapse, so there is no cron job here to check.
+
+## Putting a worker's photograph, video and work on their public profile
+
+Nothing is published automatically, ever. Order matters.
+
+1. **Ask them, and record the answer.** Applicants answer on the last screen
+   of /apply. For anybody who joined before that question existed, ask them
+   yourself, then in the desk, Workers, open the row and use "Record their
+   answer about a public profile". The Public profile column shows "never
+   asked" until you do. Do not record granted on somebody you have not asked.
+2. **Look at the files.** Open the worker's row in the drawer. Under "public
+   profile" each candidate file has an "open it" link, signed for an hour,
+   pointing at the private original. Opening one publishes nothing.
+3. **Publish.** "Put their photograph, video and work up" copies each file
+   into the public showcase bucket and records your address against it. It
+   refuses if consent is not granted, and it refuses if it cannot tell who is
+   signed in, because the record of who published it is the point.
+4. **Check it.** Open `app.yaadly.co.uk/workers/<slug>`. The photograph
+   replaces the initials block, the video appears as "<name>, in thirty
+   seconds", and the work photos appear as "Work <name> showed us", above the
+   evidence portfolio and labelled as not carrying the evidence trail.
+
+**To take it down.** If they ask you to remove it, do BOTH: "Take their public
+profile down", which deletes the copies and the rows, AND record their answer
+as declined. Recording declined alone empties the profile immediately (the
+view re-tests consent on every read) but leaves the files sitting in a public
+bucket. Deleting alone leaves their answer saying granted, so the next publish
+would put it all straight back.
+
+**Why a copy and not a link.** The vetting originals are destroyed ninety days
+after they arrive, which is what the applicant was promised. A profile served
+out of that bucket would work for three months and then go blank. The published
+copy is a separate file in a separate bucket and is not on that clock.
+
+**What can never be published.** Only three doc types are eligible:
+`profile_photo`, `intro_video`, `portfolio`. The photo ID, the selfie, the face
+turn, proof of address, the TRN, the CV and the certificates are vetting papers
+and are not even fetched by the desk's preview. Widening that list is a legal
+decision, not a tidy-up.

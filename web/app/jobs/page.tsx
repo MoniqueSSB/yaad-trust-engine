@@ -4,6 +4,7 @@ import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/comp
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { QuotePanel } from "@/components/QuotePanel";
+import { RequestedJobs, type RequestedJob } from "@/components/RequestedJobs";
 
 export const dynamic = "force-dynamic";
 
@@ -88,6 +89,19 @@ export default async function Board({
     ]);
     if (wp && sig) vmode = "worker";
   }
+
+  /* Jobs a client asked THIS worker for by name, still inside the 48 hour
+     first-refusal window. They are deliberately absent from open_jobs while
+     the hold is live, so without this query the one person entitled to quote
+     would be the one person who could not see it. my_requested_jobs filters
+     on the caller's own JWT email in Postgres; there is no .eq() here for the
+     same reason the portal has none on jobs. Visitors get an empty list. */
+  const { data: requestedData } = vmode === "worker"
+    ? await supabase.from("my_requested_jobs")
+        .select("id,title,parish,trade,descr,urgency,holds_until")
+        .order("requested_at", { ascending: true })
+    : { data: [] as RequestedJob[] };
+  const requested = (requestedData ?? []) as RequestedJob[];
 
   let jq = supabase.from("open_jobs").select("*").order("updated_at", { ascending: false });
   if (trade) jq = jq.eq("trade", trade);
@@ -248,6 +262,14 @@ export default async function Board({
             {label}
           </span>
         ))}
+      </div>
+
+      {/* Above the tabs and above the board, because a two day clock is
+          running on it and the client who asked chose this worker on purpose.
+          Renders nothing at all for a visitor, a client, or a worker nobody
+          has asked for. See components/RequestedJobs.tsx. */}
+      <div className="mt-8">
+        <RequestedJobs jobs={requested} />
       </div>
 
       {/* ── TABS ─────────────────────────────────────────────── */}

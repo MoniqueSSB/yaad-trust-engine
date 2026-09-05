@@ -384,6 +384,27 @@ Deno.serve(async (req: Request) => {
     // ───────────────────────── draft ─────────────────────────
     if (mode === "draft") {
       const existing = s(b.jobId);
+
+      /* The client tapped "Book <name> for a job" on a worker's profile.
+         The browser sends the public SLUG, never an email, and it is
+         resolved here against an ACTIVE profile for two reasons: a
+         hand-typed slug cannot put a request on somebody nobody vetted, and
+         the page the client is standing on never learns a worker's email
+         address. Left out of the row entirely when it does not resolve, so
+         re-saving a draft without the slug cannot wipe a request that was
+         already recorded. What happens next is the 48 hour first-refusal
+         hold in 20260905a; this function only records who was asked. */
+      let request: Record<string, string> = {};
+      const wantSlug = s(b.requestedWorker);
+      if (wantSlug) {
+        const { data: w } = await admin.from("worker_profiles")
+          .select("worker_email").eq("slug", wantSlug).eq("active", true).maybeSingle();
+        if (w?.worker_email) {
+          request = { requested_worker_email: String(w.worker_email), request_state: "pending" };
+          root.setAttributes({ "yaadly.post.requested_worker": wantSlug });
+        }
+      }
+
       const row = {
         title: s(b.workType) ? `${s(b.workType)} job, ${parish || "Jamaica"}` : "Job request",
         parish, descr: buildDescr(b), addr, access_contact: access,
@@ -397,6 +418,7 @@ Deno.serve(async (req: Request) => {
         // fact a column can carry is how ids stop being ids.
         source: "form",
         ...cardCols(b), stage: 0, open: false,
+        ...request,
       };
 
       if (existing) {
