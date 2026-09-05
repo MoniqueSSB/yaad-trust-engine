@@ -179,6 +179,13 @@ body {
 .fl{display:block;font-size:11px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
 .jf{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:11px;padding:11px 12px;color:var(--ink);font:inherit;font-size:14px}
 .jf:focus{outline:none;border-color:var(--teal)}
+/* The native option list is drawn by the OS, not by this stylesheet, so
+   without color-scheme it comes up white on a page that is dark everywhere
+   else. Scoped to selects rather than :root deliberately: on :root it would
+   also restyle every scrollbar and input in the app, which is a bigger change
+   than a dropdown needs. Height is pinned so it matches the text inputs
+   beside it, which selects do not do on their own across browsers. */
+select.jf{color-scheme:dark;cursor:pointer;height:44px}
 .pcrule{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:14px}
 @media(max-width:760px){.pcrule{grid-template-columns:1fr}}
 .pcbox{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel)}

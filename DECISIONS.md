@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The trade picker is a dropdown, and it retires the filter box that was itself the fix for this
+
+**Founder's call after seeing step 2 on a phone: the first screen was too long.** She was right, and the materials question added to it. Stage 1 now fits one phone screen with the button visible, where before the trade chips alone took most of a screen before the first real question.
+
+**What it replaced was a documented decision, so this supersedes it rather than ignoring it.** The chip grid had a filter box above it, added because eighteen chips and then fourteen more is two full phone screens on the highest-intent page in the funnel. That reasoning was right about the problem and only half right about the fix: the filter made the list shorter to READ, and did nothing to the page, because an empty box still rendered all eighteen chips. A select is one row tall whatever the taxonomy grows to. It also absorbs the filter's job, since typing a letter inside an open native select jumps to the matching option.
+
+**Native select, not a custom combobox.** It opens the phone's own picker, which a client in Croydon or Kingston already knows; it is reachable by keyboard and screen reader with no aria work; and it cannot render a half-finished popup on a slow connection. It retires an accessibility fix as well: the chips carried a comment about a screen reader hearing eighteen ungrouped buttons and never being told the group was required, which needed `role="group"`, `aria-labelledby` and `aria-pressed` to solve. A labelled select announces its own name, state and value with none of that.
+
+**The cost, stated rather than glossed.** Choosing is now tap, scroll, tap instead of one tap, and the options are invisible until opened. That is the trade for the stage fitting a screen, and it is reversible in one commit if the funnel numbers say otherwise.
+
+**One CSS rule went with it, scoped deliberately.** `select.jf` sets `color-scheme: dark` and a fixed height. Without the first, the OS draws the option list white on a page that is dark everywhere else; on `:root` it would also restyle every scrollbar and input in the app, which is a bigger change than a dropdown needs. The height is pinned because selects do not match text input heights on their own across browsers.
+
+**Noticed and left alone, because it predates this and affects every field on the page:** scrolling an input into view puts it under the 91px sticky nav. The chips had it too. It is a scroll-margin fix on the form container, not a dropdown problem, and it is its own change.
+
 ## 2026-09-05 · Step 1 built: the route is a real column, and the materials list is an order rather than a note
 
 **Founder's go on the spec, plus one addition that closed a hole in it: the worker states the materials the job needs, so he does not travel to a site that cannot start.** That addition matters more than it first sounds. As written, Route B told a client they were supplying the materials and gave them no way to know what to buy, which guarantees the wasted journey rather than preventing it. Her instinct fixed the spec, not just the build.

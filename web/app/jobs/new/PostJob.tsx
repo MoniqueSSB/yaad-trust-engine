@@ -84,13 +84,6 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
   const [saveFailed, setSaveFailed] = useState(false);
   const [sent, setSent] = useState(false);
   const [restored, setRestored] = useState(false);
-  /* Narrows the trade chips as you type. Eighteen chips then fourteen more is
-     two full phone screens before the first question is answered, on the page
-     with the highest intent in the funnel. A filter is the fix that invents
-     nothing: the taxonomy carries no grouping, so any categories would be made
-     up here and would then disagree with every other list of trades in the
-     product. An empty box shows all eighteen, exactly as before. */
-  const [tradeFilter, setTradeFilter] = useState("");
 
   const set = <K extends keyof Fields>(k: K, v: Fields[K]) => setF((p) => ({ ...p, [k]: v }));
   const key = STAGES[stage].key;
@@ -456,48 +449,50 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
           {key === "work" && (
             <div className="grid gap-4">
               <div className="fgroup">
-                {/* A group with a name, and buttons that say whether they are
-                    on. These were bare <button>s inside a plain <div>, so a
-                    screen reader heard eighteen unrelated buttons, could not
-                    tell which one was chosen, and never heard that the group
-                    was required. aria-pressed rather than a radiogroup because
-                    these really are toggles: tapping the chosen one clears it,
-                    which a radio cannot do. The tick and plus are decoration
-                    once the state is announced, so they are hidden. */}
-                <label className="fl" id="lbl-trade">
+                {/* A dropdown rather than eighteen chips. Founder's call,
+                    5 Sep 2026, to shorten the first screen.
+
+                    WHAT THIS REPLACED, so the reasoning is not lost. It was a
+                    chip grid with a filter box above it, and the filter existed
+                    because eighteen chips and then fourteen more is two full
+                    phone screens before the first question is answered, on the
+                    page with the highest intent in the funnel. The filter made
+                    the list shorter to READ; it did not make the page shorter,
+                    because the chips were still all there once the box was
+                    empty. A select is one row tall whatever the taxonomy does,
+                    so the whole stage now fits a phone screen, and it takes the
+                    filter with it: typing a letter inside an open native select
+                    jumps to the matching option already.
+
+                    NATIVE, not a custom combobox. It opens the phone's own
+                    picker, which a client in Croydon or Kingston already knows
+                    how to use, it is reachable by keyboard and screen reader
+                    with no aria work at all, and it cannot render a
+                    half-finished popup on a slow connection. The accessibility
+                    note that used to sit here, about eighteen bare buttons a
+                    screen reader could not group, stops applying: a labelled
+                    select announces its own name, state and value.
+
+                    The cost, stated: choosing is now tap, scroll, tap rather
+                    than one tap, and the options are not visible until it is
+                    opened. That is the trade for the page fitting a screen. */}
+                <label className="fl" htmlFor="trade">
                   What kind of work is it{" "}
                   <span className={"src " + (f.trade ? "ok" : "req")}>
                     {f.trade ? "Chosen" : "Required"}
                   </span>
                 </label>
-                <input
-                  type="search"
-                  value={tradeFilter}
-                  onChange={(e) => setTradeFilter(e.target.value)}
-                  placeholder="Start typing to narrow the list, e.g. roof"
-                  aria-label="Filter the trades"
-                  className="jf mb-2.5"
-                />
-                <div className="chips" role="group" aria-labelledby="lbl-trade">
-                  {TRADES.filter((t) =>
-                    t.toLowerCase().includes(tradeFilter.trim().toLowerCase()),
-                  ).map((t) => (
-                    <button key={t} type="button" aria-pressed={f.trade === t}
-                      className={f.trade === t ? "on" : ""}
-                      onClick={() => set("trade", f.trade === t ? "" : t)}>
-                      <span aria-hidden="true">{f.trade === t ? "✓ " : "+ "}</span>{t}
-                    </button>
+                <select
+                  id="trade"
+                  className="jf"
+                  value={f.trade}
+                  onChange={(e) => set("trade", e.target.value)}
+                >
+                  <option value="">Choose the closest trade</option>
+                  {TRADES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </div>
-                {/* Nothing matching is not an error and not a dead end: the
-                    next question is a free text box a person reads. */}
-                {tradeFilter.trim() !== "" &&
-                  !TRADES.some((t) => t.toLowerCase().includes(tradeFilter.trim().toLowerCase())) && (
-                    <p role="status" className="mt-2 text-[12.5px] leading-relaxed text-goldb">
-                      Nothing matches &ldquo;{tradeFilter.trim()}&rdquo;. Pick the closest
-                      trade, or clear the box and describe it in your own words below.
-                    </p>
-                  )}
+                </select>
                 <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                   Not sure which? Pick the closest. A person reads this and will
                   put it right if it needs changing.
