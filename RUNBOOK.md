@@ -150,28 +150,64 @@ This is the Python engine only. The live Edge Functions are step 9.
 
 ## 9. Switching the text model to the EU
 
-The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set.
+The nine live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`, `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack` and `yaad-sketch`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set. (`yaad-kickoff` also has a provider picker of its own, which checks OpenRouter and NVIDIA first and otherwise falls through to the shared one.)
+
+**Done on 4 September 2026, all three steps.** The switch is live, the MiniMax branch is gone, and there is no fallback provider any more. This section is kept as the record of how it was done and as the procedure for the next provider change, not as outstanding work.
 
 **MiniMax is the current choice, deliberately.** Founder decision, 30 August 2026: the data flowing through these functions today is synthetic, and a China transfer of invented job cards is not what the DPIA is about. **The trigger for this step is real client and worker data, which arrives with the December pilot.** Do it before then, not after.
 
-**Step one, set the secret.** One command, and every function picks it up on its next invocation. No redeploy needed, because it is read at call time.
+**Step one, set TWO secrets, not one.** Every function picks them up on its next invocation. No redeploy needed, because they are read at call time.
 
 ```bash
 supabase secrets set MISTRAL_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
 ```
 
-**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose, and it is the same attribute that answers "where is our data going" today.
+```bash
+supabase secrets set MISTRAL_MODEL=mistral-small-latest --project-ref leffyisvfvjwzilydlwf
+```
 
-**Step three, remove the MiniMax branch.** Once step two is confirmed, delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again.
+**The model id is not optional and it is the step that goes wrong.** The default in `textmodel.ts` was `mistral-large-latest`, which Mistral no longer serves, so setting only the key sends every agent into its holding reply. Learned the hard way on 4 September 2026, twice: once on the dead default, and once on `mistral-medium-3-5-26-04`, which is the model's NAME in Mistral's overview table and not its API id. The id form is `mistral-small-latest`, `mistral-medium-latest`, or a dated snapshot such as `mistral-medium-2604`.
 
-**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. Model names move. Confirm the current one on Mistral's model page and set it without touching code:
+`mistral-small-latest` is the current choice. It resolves to Mistral Small 4, its reasoning is off unless a request passes `reasoning_effort: high`, so it does not burn the token budget thinking, and unlike `mistral-medium` it is not scheduled for deprecation inside the pilot window.
+
+**Step two, prove it switched.**
+
+This step used to say: look at the span attribute `yaadly.model.region`, which reads `eu` when it worked. That is still true and it is still the right answer **once tracing is on**. It was not on. `OTEL_EXPORTER_OTLP_ENDPOINT` has never been set on this project, so the tracer is completely inert and there are no spans to read. A proof method that needs infrastructure nobody has set up is not a proof method. Rewritten 4 September 2026 to say what actually worked.
+
+Post a synthetic job through `yaad-post-job` in draft mode. It is public, it calls the model, and it hands the model's own answer straight back in the `read` field:
 
 ```bash
-supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzilydlwf
+curl -s -X POST "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-post-job" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Content-Type: application/json" -d '{"mode":"draft","assist":true,"desc":"Di pipe unda mi kitchen sink a leak bad since Tuesday and di cupboard bottom gone soft. One storey house inna Portmore. Mi cousin Winston have di key from 8 inna di morning."}'
 ```
+
+`"read": null` means the model did not answer. A filled-in card with `"trade": "Plumbing"` means it did, and since `mistral-small-latest` is a Mistral model id that MiniMax would reject outright, an answer is itself the proof the call went to `api.mistral.ai` in the EU.
+
+It leaves a draft job in the desk. Delete it when you are done.
+
+When `read` comes back null, the reason is now in the logs rather than nowhere. Look for a line naming the provider and the status:
+
+```bash
+supabase functions logs yaad-post-job --project-ref leffyisvfvjwzilydlwf
+```
+
+Turning on a real OTLP endpoint is still worth doing and would make this a one-query answer across all nine functions instead of one function at a time. It is not a prerequisite for the switch.
+
+**Step three, remove the MiniMax branch. Done, 4 September 2026.** The branch is out of `_shared/textmodel.ts`, `sync-shared.sh` has pushed the change into all nine copies, all nine are redeployed, and the `MINIMAX_API_KEY` secret has been unset. `docs/privacy.html` now names Mistral in the European Union, and the table row and both dates on that page moved with it.
+
+There is deliberately no fallback provider now. With no Mistral key configured, `pickTextProvider()` returns null and every caller gets `NO_PROVIDER_MESSAGE`, which is a loud failure rather than a quiet reroute to China. Do not add a fallback back in. If a provider ever needs changing again, use the four `TEXT_MODEL_*` secrets, which take priority over everything and need no deploy.
+
+**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. See step one, which is where that goes wrong.
 
 **To point at something else entirely**, no code change: set `TEXT_MODEL_KEY`, `TEXT_MODEL_API`, `TEXT_MODEL_NAME` and `TEXT_MODEL_REGION`. Those take priority over everything. A new hard-coded provider in that file is a new country receiving personal data, so it is a founder decision and a line in the data inventory before it is a code change.
 
+**Deploying the nine**, from disk only, never by pasting file contents.
+
+The loop that used to be here was wrong in three ways and the third was dangerous. It said eight functions when there are nine. It named `yaad-whatsapp-webhook`, deleted on 1 September 2026, so it errored partway. And it applied `--no-verify-jwt` to every function in the list, which is exactly the blanket form CLAUDE.md §12 exists to forbid: running it would have stripped platform authentication from six functions that require it, silently, with the deploy still reporting success. Corrected 4 September 2026.
+
+**Six require a JWT. Deploy these WITHOUT the flag:**
+
+```bash
+for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-quote-pack yaad-sketch; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf; done
 **Deploying them**, from disk only, never by pasting file contents.
 
 **Do not paste the loop that used to be here.** It ran `--no-verify-jwt` across eight functions at once, including `yaad-whatsapp-webhook`, which no longer exists, and including `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff` and `yaad-sketch`, which all run with `verify_jwt = true`. Pasting it would have silently stripped platform authentication from five admin-only endpoints, the deploy would have succeeded, and nothing would have said so. That is exactly the failure CLAUDE.md section 12 describes when it says the flag is per function and never a blanket. Corrected 4 September 2026.
@@ -189,6 +225,20 @@ for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-sketch; do su
 ```bash
 for f in yaad-inbound yaad-post-job yaad-notify-client; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
 ```
+
+**Three carry their own authentication and keep the flag:**
+
+```bash
+for f in yaad-inbound yaad-notify-client yaad-post-job; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+```
+
+Read the live settings before trusting the split above, the same way §12 says to. It was true on 4 September 2026 and it is a list, which means it will go stale:
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+Then check `verify_jwt` still reads the same after deploying. A deploy that silently flipped it succeeds and says nothing.
 
 ---
 
@@ -2891,6 +2941,73 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
 
 ---
+
+## 20. The evidence gap list is wrong, or nobody is getting it
+
+The completeness checks run in `yaad-notify-client` when evidence lands on a stage, debounced 90 seconds so a burst of photographs makes one check. They are deterministic, in `supabase/functions/_shared/evidence-checks.ts`, and they read only hard columns. No model is involved.
+
+**They never block anything.** They assemble a list. `approve_stage()` still requires a named human and is still the only door. If a change ever proposes letting these gate a stage or a payment, that is the request CLAUDE.md §3 exists to refuse.
+
+**The worker gets the gaps, the desk gets a push only when there are gaps.** Founder decision, 4 September 2026. A worker still on site can fix a gap in two minutes; the desk cannot.
+
+**If the gap list looks wrong, check in this order:**
+
+1. **Does the job have an approved Kickoff Pack?** The checklist check reads `kickoff_packs.docs.evidence_checklist` where `status = 'approved'`. No pack means no checklist claim, and the check says so to the desk rather than inventing a count.
+2. **Is the stage number right?** The checklist is a list and stage N reads entry N-1, the same convention `stageLabel()` uses. A pack with fewer entries than the job has stages returns nothing for the later ones.
+3. **Is it the clip check?** It reads `evidence.mime`, not the label. A video uploaded with a wrong mime reads as a photograph. That is deliberate: reading the label instead would mean trusting text the worker typed.
+4. **Is it the site note?** That one is desk-only and never reaches a worker. It fires on `arrival_log.far_from_site`, which is 30km from a parish centroid, and a materials run or a bad GPS fix raises it exactly as loudly as a wrong site. It is a glance, not a finding.
+
+**Nobody getting the push at all:** `app_settings.ntfy_topic` is where it goes. Unset, and `ntfyPush()` returns silently by design, because a missing notification must never break the report it rides on.
+
+**The location pin.** A worker sharing a location on WhatsApp lands in `work_log_pins` via `yaad-inbound`. Twilio delivers `Latitude`, `Longitude`, `Address` and `Label` as ordinary inbound parameters; nothing is installed for this. The worker is asked which job it belongs to and the code is always checked, the same rule the evidence lane follows: nothing lands on a job until the worker names it.
+
+**A missing pin is never a gap.** It is a note, and the test suite enforces that. `arrival_log`'s own migration sets the rule, that GPS strengthens the record and never gates it, and it holds here without exception. If a change ever proposes making a pin required, that turns a voluntary thing into an obligation and a worker starts being judged for declining. Refuse it.
+
+**A pin is not a photo geotag and never can be.** WhatsApp re-encodes images on send and discards EXIF, GPS included, and this project's own portal upload path strips location deliberately. There was never a photo geotag to read. Anyone proposing to recover one is proposing something that does not work.
+
+**Two checks remain absent** and should not be added by guessing. "Is this clip long enough" needs a duration column, which does not exist. "Receipts geolocated" needs lat/lon on `evidence` rows, which only `arrival_log` and `work_log_pins` have. Both are schema changes and both are decisions.
+
+---
+
+## 21. A pack is not reaching a client or a worker
+
+Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean draft was approved by a cron and went straight out. Roadmap item 7 of the agent audit removed that, because the guardrail is a banned-word scan and a currency regex, and a clean scan was standing in for a judgement it never made.
+
+**Kickoff Pack.** Built and linked automatically, then waits at `draft`. Approve it in the desk under **Kickoff packs**. Read **Notes for you** first: it is the model's own list of what a project manager must personally verify, and it now renders at the top of the pack for that reason. Payment stages render third because the model picks those percentages and they are Yaadly's commercial terms on the job.
+
+**This one blocks a booking, on the jobs that use it.** `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides, and neither side can confirm a pack nobody has approved. If a client is stuck at "waiting to be booked", check here first. `yaad-kickoff-check` pushes to your phone on every poll where any pack is waiting.
+
+**Since 4 September 2026 most jobs will not have a Kickoff Pack at all.** Accepting a price in the portal calls `agree_quote_as_me` and books on `quote_confirmed`, with no pack anywhere. A pack is ordered only when a client presses "Ask for full project documentation first". So if a job is stuck waiting on a pack, check the client actually asked for one: on the ordinary route the pack queue is irrelevant.
+
+**Quote Pack.** Waits at `ready` in **Quote Pack Drafts**. RLS keeps an unapproved draft off a worker's screen (20260901r), so until you approve it a worker sees no scoping document. He can still quote without one, so this delays a courtesy rather than stalling the board.
+
+**No push arriving?** Both use `app_settings.ntfy_topic`. Unset, and the helper returns silently by design, because a notification must never break a scheduled run.
+
+**Do not restore auto-issue.** If a change proposes it, or proposes approving on a guardrail pass, that is roadmap item 7 being undone. The guardrail cannot read whether a scope is right or a risk register is honest, and the model chooses the payment staging.
+
+---
+
+## 22. A price check looks wrong, or a band has changed
+
+The Price check view in the desk reads bands generated from `yaad/benchmarks.py`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+
+**To change a band:** edit `yaad/benchmarks.py`, then run
+
+```bash
+python3 scripts/gen_price_benchmarks.py
+```
+
+That rewrites the generated block inside `concierge/concierge.html`. Copy the file into `concierge-deploy/public/index.html` and deploy the desk. `tests/test_price_benchmarks.py` fails if the page has drifted from the engine, so a hand edit to the page is caught rather than shipped.
+
+**"No public price exists in Jamaica for this work" is a correct answer**, not a missing row. Painting, masonry, septic and general repair are deliberately empty: four-agent research on 1 August 2026 found no public prices for them anywhere in the country, and that gap is the reason the product exists. Do not fill them with a guess. A test asserts those four stay empty.
+
+**The verdict thresholds** are ported verbatim from `review_quote()`: over 2x the top of the band is a red flag, over 1.3x is worth asking about, under half the bottom is suspiciously low. Coarse on purpose. Six cases are checked against the Python source directly.
+
+**A trade with no band family** simply is not offered in the dropdown. Nine of the eighteen taxonomy trades map onto seeded families; the rest have no benchmark at all, and offering them would imply a lookup that cannot happen. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and checking a fence against it is a wrong reference dressed as a right one.
+
+**Three outcomes, not two, and the difference matters.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. Those report **"say which kind of job"** and list the variants. They must never report "no public price exists", which is the third outcome and is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. A test asserts no mapped trade can fall into the wrong one.
+
+**Nothing here is ever shown to a client or a worker.** `quote_reviews` is admin-only in RLS, deliberately with no party read policy. A band beside somebody's price reads as an estimate, and estimating is QS work, which is the one thing Yaadly does not guarantee.
 
 ## Changing anything a customer reads about money, checks or prices
 

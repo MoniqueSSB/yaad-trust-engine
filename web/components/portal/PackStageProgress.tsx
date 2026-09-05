@@ -4,9 +4,15 @@ import { jmd } from "@/lib/money";
 /**
  * The current stage, read straight from the approved Kickoff Pack rather
  * than a generic label: what it is called, what proportion of the labour
- * price releases on it, what evidence proves it, and the programme it sits
+ * price it carries, what evidence proves it, and the programme it sits
  * inside. Renders nothing for a job with no pack stage to show, which is
  * exactly the state every job was in before the pack could be approved.
+ *
+ * Nothing imports this component as at 4 September 2026. Its copy was swept
+ * anyway, in the principal-contractor pass: it said an amount "releases on
+ * approval", which is the escrow shape, and wrong copy sitting unused is a
+ * trap for whoever wires it up. "At sign-off" is true on both sides without
+ * needing to know which one is reading.
  */
 
 
@@ -43,7 +49,7 @@ export function PackStageProgress({
         )}
         {amountDue != null && (
           <span className="font-bold text-tealb">
-            {jmd(amountDue)} releases on approval
+            {jmd(amountDue)} at sign-off
           </span>
         )}
       </div>

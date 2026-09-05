@@ -30,9 +30,15 @@ Deno.test("banned language is caught, same phrases as the Python suite", () => {
 });
 
 Deno.test("approved language passes", () => {
+  // Same fixture and same reasoning as the Python suite, changed in the same
+  // commit. The old sentence ("held safely with a licensed payment provider
+  // and released to the worker within 24 hours of your approval") passes the
+  // screen but describes escrow, and this test is the worked example of GOOD
+  // copy, so the wrong sentence sat here as the thing to imitate.
   assert(isClean(
-    "Payment is held safely with a licensed payment provider and released to the worker "
-    + "within 24 hours of your approval. Work is protected up to the guarantee limit.",
+    "You buy the job from Yaadly, and a stage closes once you have seen the evidence "
+    + "and agreed the work is right. The tradesperson is engaged and paid by Yaadly under "
+    + "its own separate agreement. Work is protected up to the guarantee limit.",
   ));
 });
 
