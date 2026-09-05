@@ -169,10 +169,26 @@ the Route B consequence shown next to it. `yaad-post-job` maps the answer the
 way it already maps the three store types, and refuses an unrecognised value
 rather than storing free text.
 
-**Step 3. The store question moves to posting on Route A.** It stays enforced in
-Postgres by `materials_store_nominated()`; what changes is when it is asked. The
-go-live gate in `gates.ts` becomes a catch for jobs that reached acceptance
-without it, not the normal path.
+**Step 3. The store question moves to posting on Route A, done 5 September
+2026.** It stays enforced in Postgres by `materials_store_nominated()`; what
+changed is when it is asked. `STORES` and `storeAnswered()` in
+`web/lib/jobs/new-form.ts` mirror the three codes and the rule that the two
+named stores require a description; the server side already existed in
+`yaad-post-job`. The go-live gate in `gates.ts` is now a catch for jobs arriving
+by other doors, WhatsApp through `yaad-inbound`, the desk, and everything posted
+before the question existed, with a comment saying so, since a redundant-looking
+gate is one somebody deletes.
+
+Route B does not ask, because the client is delivering their own materials, so
+there is no tranche for Postgres to refuse and no pricing question for the
+worker. A required question with no consequence is how a form teaches people to
+skip questions.
+
+The free-text room description is deliberately kept OUT of the saved draft. Its
+type is kept, because "nowhere securable" is a fact the worker prices against
+and it names no room, while the description names where the valuable things are
+kept on a property that is often empty, and a draft sits in `localStorage` for a
+week on a phone other people use.
 
 **Step 4. The quote form carries the materials list**, on both routes, and hides
 the materials money field on Route B. The trigger from step 1 is already behind

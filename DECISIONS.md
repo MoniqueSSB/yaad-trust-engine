@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Step 3: the materials store question moves to posting, on Route A only
+
+**The gate it replaces carried the argument for moving it.** "Say where materials are kept" was a go-live checklist item that fired only once an accepted quote had materials money on it, and its own copy said a worker cannot price the job honestly without the answer: with nowhere securable he buys in drops and drives the surplus off site each night, and those trips belong in his quote. All true, and all useless as a question asked after the quotes are in and the client has accepted a number. It is now asked at posting, on the property stage, so the worker prices the real job.
+
+**Route A only, and that is a rule about consequences rather than tidiness.** On Route B the client buys and delivers the materials themselves, so there is no tranche for `materials_store_nominated()` to refuse and no pricing question for the worker. Asking anyway would be a required question with no consequence, which is how a form teaches people that questions can be skipped. Verified in a browser both ways: the question is present on Route A and absent on Route B.
+
+**The server side already existed, which is why this is a form change.** `yaad-post-job` has mapped `materialsStore` through `STORE_TYPE` onto the three codes since the custody work, and withholds the free text from the job board. What was missing was anything asking the client. `STORES` and `storeAnswered()` in `new-form.ts` mirror the three sentences and the Postgres rule that the two named stores require a description, because "indoors" is not somewhere a camera can be pointed and the worker has to film the materials in that exact place. The mirror is asserted in the tests: if `storeAnswered()` and `materials_store_nominated()` disagree, a client sees "nothing outstanding" while the database still refuses to release a tranche.
+
+**The free-text room description is deliberately excluded from the saved draft, and the type is not.** Everything else in a draft describes the job. That one describes where the valuable things are kept on a property that is often empty, in the client's own words, and a draft lives in `localStorage` for a week precisely so somebody who was interrupted on a Friday can come back, which also means a stranger on the same phone next month. The type is kept because "nowhere securable" is a fact the worker prices against and names no room. A restored draft asks for the description again, which is the right cost.
+
+**The go-live gate stays, with a comment saying why.** On a job posted through the form it should already be satisfied when the checklist first renders, which makes it look redundant to the next person reading it. It is not: jobs also arrive over WhatsApp through `yaad-inbound`, from the desk, and every job posted before this question existed has no answer at all.
+
 ## 2026-09-05 · The trade and parish pickers are dropdowns, and they retire the filter box that was itself the fix for this
 
 **Founder's call after seeing step 2 on a phone: the first screen was too long.** She was right, and the materials question added to it. Stage 1 now fits one phone screen with the button visible, where before the trade chips alone took most of a screen before the first real question.

@@ -154,6 +154,61 @@ export const MATERIALS = [
 export const clientSuppliesMaterials = (materialsBy: string) =>
   materialsBy === MATERIALS[1].value;
 
+/** True on Route A, where Yaadly buys the materials and therefore has to know
+ *  where they are going before anybody prices the job. */
+export const yaadlyBuysMaterials = (materialsBy: string) =>
+  materialsBy === MATERIALS[0].value;
+
+/* ── where materials are kept ─────────────────────────────────────────────
+ * Step 3 of specs/MATERIALS-ROUTE-FLOW-SPEC.md. Asked at POSTING now, on
+ * Route A only, where it used to be a go-live checklist item after a quote
+ * had already been accepted.
+ *
+ * WHY IT MOVED. The gate it replaces carried its own argument for moving it:
+ * "a worker cannot price this honestly without it. With nowhere securable he
+ * buys in drops and drives the surplus off site each night, and those trips
+ * belong in his quote." All true, and all useless as a question asked after
+ * the quotes are in. Asked at posting, the worker prices the real job.
+ *
+ * ROUTE A ONLY. On Route B the client is supplying and delivering the
+ * materials themselves, so there is no tranche for Postgres to refuse and no
+ * pricing question for the worker. Asking anyway would be a required question
+ * with no consequence, which is how forms teach people to skip questions.
+ *
+ * THESE THREE SENTENCES ARE LOAD BEARING. yaad-post-job maps them, lowercased,
+ * onto the three codes jobs_materials_store_type_chk permits, and
+ * materials_store_nominated() in 20260828c is what refuses a materials release
+ * without one. A copy edit here that is not made there stops mapping, the type
+ * lands null, and the job silently cannot pay for materials later.
+ */
+export const STORES = [
+  {
+    value: "A lockable room, store or container on site",
+    note: "A back room, a store, a container, anything that locks",
+  },
+  {
+    value: "Indoors, inside the house",
+    note: "Inside, but not behind its own lock",
+  },
+  {
+    value: "Nowhere securable, buy in drops",
+    note: "Nothing on the property is safe to leave. The worker buys what each stage needs and takes the surplus away, and those trips are in his price",
+  },
+] as const;
+
+/** The one answer that stands on its own, because there is nowhere to
+ *  describe. The other two REQUIRE a description, mirroring
+ *  nominate_materials_store in 20260828d: "indoors" is not somewhere a camera
+ *  can be pointed, and the worker has to film the materials in that exact
+ *  place. */
+export const STORE_NONE_AVAILABLE = STORES[2].value;
+
+/** Mirrors materials_store_nominated() in Postgres. The two must agree or a
+ *  client sees "nothing outstanding" while the database still refuses to
+ *  release a materials tranche on the job. */
+export const storeAnswered = (store: string, where: string) =>
+  store !== "" && (store === STORE_NONE_AVAILABLE || where.trim() !== "");
+
 /** The two patterns from 20260831d, restated so the tests can prove the four
  *  sentences above still land on the right side of them. Kept here rather
  *  than in the test file so that anybody editing ACCESS sees them. */
@@ -188,13 +243,15 @@ export type Fields = {
   urgency: string;
   accessType: string;
   materialsBy: string;
+  materialsStore: string;
+  materialsStoreWhere: string;
   name: string;
   contact: string;
 };
 
 export const EMPTY_FIELDS: Fields = {
   trade: "", parish: "", desc: "", urgency: "", accessType: "", materialsBy: "",
-  name: "", contact: "",
+  materialsStore: "", materialsStoreWhere: "", name: "", contact: "",
 };
 
 /** Whether a stage has enough on it to move forward.
@@ -221,7 +278,9 @@ export function stageComplete(key: StageKey, f: Fields): boolean {
   switch (key) {
     case "work":     return f.trade !== "" && f.desc.trim().length >= MIN_DESC
                          && f.materialsBy !== "";
-    case "property": return f.parish !== "" && f.accessType !== "";
+    case "property": return f.parish !== "" && f.accessType !== ""
+                         && (!yaadlyBuysMaterials(f.materialsBy)
+                             || storeAnswered(f.materialsStore, f.materialsStoreWhere));
     case "urgency":  return f.urgency !== "";
     case "evidence": return true;
     case "reach":    return f.name.trim().length > 1 && (looksLikeEmail(f.contact) || looksLikePhone(f.contact));
@@ -264,8 +323,17 @@ export const DRAFT_KEY = "yaadly.job.new.v1";
  *  enough that a stranger on the same phone next month sees a clean form. */
 export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+/* materialsStoreWhere is deliberately NOT in here. Everything else on this
+   list describes the job; that one describes where the valuable things are
+   kept on a property that is often empty ("the back room off the veranda, key
+   with my aunt"). A draft lives in localStorage for a week, and the whole
+   point of the week is that a stranger on the same phone next month sees a
+   clean form. The TYPE is kept, because "nowhere securable" is a fact about
+   the job the worker prices against and it names no room. A restored draft
+   asks for the description again, which is the right cost. */
 export type DraftFields =
-  Pick<Fields, "trade" | "parish" | "desc" | "urgency" | "accessType" | "materialsBy">;
+  Pick<Fields, "trade" | "parish" | "desc" | "urgency" | "accessType"
+             | "materialsBy" | "materialsStore">;
 
 export type StoredDraft = { v: 1; jobId: string; at: number; fields: DraftFields };
 
@@ -273,6 +341,7 @@ export function draftFields(f: Fields): DraftFields {
   return {
     trade: f.trade, parish: f.parish, desc: f.desc, urgency: f.urgency,
     accessType: f.accessType, materialsBy: f.materialsBy,
+    materialsStore: f.materialsStore,
   };
 }
 
@@ -302,7 +371,7 @@ export function parseDraft(raw: string | null, now: number): StoredDraft | null 
   const fields: DraftFields = {
     trade: str("trade"), parish: str("parish"), desc: str("desc"),
     urgency: str("urgency"), accessType: str("accessType"),
-    materialsBy: str("materialsBy"),
+    materialsBy: str("materialsBy"), materialsStore: str("materialsStore"),
   };
   if (!worthKeeping(fields)) return null;
   return { v: 1, jobId: typeof d.jobId === "string" ? d.jobId : "", at, fields };
@@ -323,5 +392,6 @@ export function restoreFields(
     urgency: inList(d.fields.urgency, URGENCY.map((u) => u.value)),
     accessType: inList(d.fields.accessType, ACCESS.map((a) => a.value)),
     materialsBy: inList(d.fields.materialsBy, MATERIALS.map((m) => m.value)),
+    materialsStore: inList(d.fields.materialsStore, STORES.map((x) => x.value)),
   };
 }

@@ -50,6 +50,8 @@ const full = () => ({
   urgency: "Urgent, within 48 hours",
   accessType: "No inside access needed, outside work only",
   materialsBy: "Yaadly buys the materials",
+  materialsStore: "A lockable room, store or container on site",
+  materialsStoreWhere: "The back room off the veranda, key with my aunt",
   name: "Test Client",
   contact: "test@example.com",
 });
@@ -198,7 +200,7 @@ describe("the saved draft keeps the work and none of the person", () => {
     assert.doesNotMatch(raw, /Test Client/);
     assert.doesNotMatch(raw, /test@example\.com/);
     assert.deepEqual(Object.keys(JSON.parse(raw).fields).sort(),
-      ["accessType", "desc", "materialsBy", "parish", "trade", "urgency"]);
+      ["accessType", "desc", "materialsBy", "materialsStore", "parish", "trade", "urgency"]);
   });
 
   test("what is written comes back", () => {
@@ -365,5 +367,129 @@ describe("a saved draft keeps the materials answer", () => {
     };
     const kept = m.restoreFields(d, { trades: ["Roofing"], parishes: ["Kingston"] });
     assert.equal(kept.materialsBy, "");
+  });
+});
+
+/* ── where materials are kept ─────────────────────────────────────────────
+ *
+ * Step 3 of specs/MATERIALS-ROUTE-FLOW-SPEC.md. Load bearing twice over.
+ *
+ * yaad-post-job maps these three sentences, lowercased, onto the three codes
+ * jobs_materials_store_type_chk permits. A copy edit here that is not made
+ * there stops mapping, materials_store_type lands null, and
+ * materials_store_nominated() in 20260828c then refuses every materials
+ * release on the job. Nothing goes red at the time; it fails weeks later
+ * when somebody tries to pay for cement.
+ *
+ * The STORE_TYPE map in supabase/functions/yaad-post-job/index.ts is:
+ *
+ *     "a lockable room, store or container on site" -> lockable
+ *     "indoors, inside the house"                   -> indoors
+ *     "nowhere securable, buy in drops"             -> none_available
+ *
+ * And storeAnswered() mirrors materials_store_nominated(). If those two
+ * disagree, a client sees "nothing outstanding" while Postgres still refuses
+ * to release a tranche, which is the exact failure the gates.ts comment
+ * warns about.
+ */
+describe("the store wording maps to a store type", () => {
+  const MAPPED = {
+    "a lockable room, store or container on site": "lockable",
+    "indoors, inside the house": "indoors",
+    "nowhere securable, buy in drops": "none_available",
+  };
+
+  test("every option still maps to a code in yaad-post-job", () => {
+    assert.equal(m.STORES.length, 3);
+    for (const o of m.STORES) {
+      assert.ok(
+        MAPPED[o.value.toLowerCase()],
+        `"${o.value}" does not match STORE_TYPE in yaad-post-job, so it would post as null`,
+      );
+    }
+  });
+
+  test("the none_available option is the one flagged as standing alone", () => {
+    assert.equal(MAPPED[m.STORE_NONE_AVAILABLE.toLowerCase()], "none_available");
+  });
+});
+
+describe("storeAnswered mirrors materials_store_nominated in Postgres", () => {
+  test("nothing chosen is not answered", () => {
+    assert.equal(m.storeAnswered("", ""), false);
+    assert.equal(m.storeAnswered("", "the back room"), false);
+  });
+
+  test("a lockable store with no room named is NOT answered", () => {
+    assert.equal(m.storeAnswered(m.STORES[0].value, ""), false);
+    assert.equal(m.storeAnswered(m.STORES[0].value, "   "), false);
+  });
+
+  test("indoors with no room named is NOT answered either", () => {
+    assert.equal(m.storeAnswered(m.STORES[1].value, ""), false);
+  });
+
+  test("nowhere securable stands on its own", () => {
+    assert.equal(m.storeAnswered(m.STORE_NONE_AVAILABLE, ""), true);
+  });
+
+  test("a named room completes the other two", () => {
+    assert.equal(m.storeAnswered(m.STORES[0].value, "The back room off the veranda"), true);
+    assert.equal(m.storeAnswered(m.STORES[1].value, "The spare bedroom"), true);
+  });
+});
+
+describe("the store question is asked on Route A only", () => {
+  const routeB = () => ({
+    ...full(),
+    materialsBy: "I am supplying the materials myself",
+    materialsStore: "", materialsStoreWhere: "",
+  });
+
+  test("Route A cannot leave the property stage without it", () => {
+    const f = { ...full(), materialsStore: "", materialsStoreWhere: "" };
+    assert.equal(m.stageComplete("property", f), false);
+  });
+
+  test("Route A completes once it is answered", () => {
+    assert.equal(m.stageComplete("property", full()), true);
+  });
+
+  test("Route B does not ask, and completes without it", () => {
+    assert.equal(m.yaadlyBuysMaterials(routeB().materialsBy), false);
+    assert.equal(m.stageComplete("property", routeB()), true);
+  });
+
+  test("Route A with a lockable store but no room named is still incomplete", () => {
+    assert.equal(
+      m.stageComplete("property", { ...full(), materialsStoreWhere: "" }),
+      false,
+    );
+  });
+});
+
+describe("the saved draft keeps the store TYPE and not the room", () => {
+  /* The type is a fact about the job the worker prices against and names no
+     room. The free text names where the valuable things are kept on a
+     property that is often empty, and a draft sits in localStorage for a
+     week on a phone other people use. */
+  test("the room description is never written to the draft", () => {
+    const raw = m.serialiseDraft("JOB-WEB-1", full(), Date.now());
+    assert.doesNotMatch(raw, /veranda/i);
+    assert.doesNotMatch(raw, /my aunt/i);
+  });
+
+  test("the type does come back, so the worker's pricing answer survives", () => {
+    const back = m.parseDraft(m.serialiseDraft("JOB-WEB-1", full(), Date.now()), Date.now());
+    assert.equal(back.fields.materialsStore, "A lockable room, store or container on site");
+  });
+
+  test("a store option that no longer exists is dropped on restore", () => {
+    const d = {
+      v: 1, jobId: "JOB-1", at: Date.now(),
+      fields: { ...full(), materialsStore: "In the yard under a tarpaulin" },
+    };
+    const kept = m.restoreFields(d, { trades: ["Roofing"], parishes: ["Kingston"] });
+    assert.equal(kept.materialsStore, "");
   });
 });
