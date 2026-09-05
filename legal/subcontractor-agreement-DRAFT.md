@@ -10,7 +10,7 @@ wrote about itself. That is the gap this fills.
 
 It follows the same convention as `docs/terms.html`: **what is settled is set
 out in full, and what is genuinely open is a marked box rather than a plausible
-paragraph nobody has checked.** There are seven marked boxes. They are collected
+paragraph nobody has checked.** There are six marked boxes. They are collected
 at the end as well as appearing in place. Written wording over an open point
 would read exactly like checked wording, which is worse than a visible gap.
 
@@ -21,10 +21,11 @@ Each is marked. The rest is a description of how Yaadly already works, written
 down, and an adviser tightening it is a different job from an adviser deciding
 it.
 
-**One box, at clause 11, is arithmetic rather than law, and it is the one to
-read first.** Two figures set on 5 September 2026 contradict each other and
-contradict Yaadly's own published day rate research. The draft departs from the
-instruction there and says exactly where and why.
+**The money terms at clauses 10 and 11 are settled and are not open points.**
+£25 for attending a site that is not as described. Where the work is not done to
+the agreed scope, the agreed price is not earned, and the fallback is the day
+rate for the trade carried on the engagement note, with no figure fixed in this
+agreement. Founder's decision, 5 September 2026, put twice.
 
 **It is written to be read by the person signing it.** A tradesperson in
 Portmore on a phone. Short sentences, second person, no defined-term
@@ -273,24 +274,25 @@ means, and it is why the client comes to Yaadly and not to you. It does not
 move your obligation under this clause: as between you and Yaadly, defective
 work is yours to make good.
 
-**If a review finds the work is not completed to the agreed scope.** Yaadly
-reviews the finished work against the scope on your engagement note. That
-review decides what you are paid, so it runs in this order and no other:
+**If the work is not done to the agreed scope, you do not get the agreed
+price.** The price on your engagement note buys a finished result, not a day of
+your time, and that is the deal any main contractor works to. Everything below
+is how that is decided, not whether.
 
-1. **A named person carries out the review.** Never software, and never
-   automatically on a timer or a score.
-2. **You are told what is wrong and shown the evidence, before any decision
+1. **A named person carries out the review.** Never software, never a timer,
+   never a score.
+2. **You are told what is wrong and shown the evidence before any decision
    about money is taken.** You may put your side, and it is recorded.
-3. **You get the chance to go back and finish it.** If you do, and it then
-   meets the agreed scope, **you are paid the full agreed price.** Going back
-   costs you nothing beyond your own time and materials, and the full price is
-   never lost by returning.
-4. Only if you decline to go back, or the work cannot be brought to the agreed
-   scope, are you paid **the day rate for your trade for the days you actually
+3. **You get the chance to go back and finish it.** Bring it to the agreed
+   scope and **you are paid the full agreed price.** Fixing it is the fastest
+   route to the full money, and returning never costs you the price.
+4. If you will not go back, or the work cannot be brought to the agreed scope,
+   you are paid **the day rate for your trade for the days you actually
    worked**, instead of the agreed price.
-5. **The day rate for your trade is stated on your engagement note before you
-   start**, so the fallback is a number you saw and accepted, never one
-   produced after the argument started.
+5. **The day rate for your trade is on your engagement note before you start.**
+   No day rate figure is written into this agreement, deliberately: a number
+   fixed in a contract signed today is wrong within a year, and the engagement
+   note tracks the real rate for your trade instead.
 6. Days actually worked are counted from your Arrival Log and your Midnight
    Work-Log. That is the evidence you already file, and it is why filing it
    protects you.
@@ -299,35 +301,21 @@ review decides what you are paid, so it runs in this order and no other:
 8. A named person decides, in writing, with the reason given. You may challenge
    it under clause 19, and the challenge is heard by a person.
 
-Materials you bought and filed receipts for are paid at cost either way. They
-are not part of this and are never withheld.
+**Materials you bought and filed receipts for are paid at cost either way.**
+That is money out of your own pocket for the client's job, not your profit on
+it, and it is never withheld.
 
-> **Open point 4, for the founder, and this one is arithmetic before it is law.**
-> Two figures were set on 5 September 2026 and they do not sit together. Against
-> `JMD_PER_GBP = 210.0` in `yaad/benchmarks.py`, the £25 attendance fee at clause
-> 10 is **5,250 JMD**. The shortfall day rate proposed alongside it was **3,000
-> JMD**. So turning round at a mis-sold gate pays 75% more than working a full
-> day, which is a standing reason to find a site mis-sold, and the mis-sold
-> finding is made by the worker who benefits from it.
->
-> The second half is worse. `DAY_RATES_JMD` in the same file puts **general
-> labourer at 3,000 to 3,500** and **every skilled trade at 7,000 to 12,000**,
-> and those bands are published on `yaadly.co.uk/prices.html` as Yaadly's own
-> research. A 3,000 flat shortfall rate therefore pays a skilled mason below the
-> labourer floor Yaadly itself published, on Yaadly's own judgment, in Yaadly's
-> own financial favour. That is the Farrin price argument turned around and
-> pointed at the worker, and it is the one screenshot this business cannot
-> afford.
->
-> This draft therefore writes the shortfall rate as **the day rate for that
-> trade, stated on the engagement note**, rather than a flat 3,000. That is a
-> deliberate departure from the instruction, made because the instruction
-> collides with the founder's own published data, and it is hers to reverse.
-> What still needs her: whether the attendance fee stays at £25 once the
-> shortfall rate rises above it, or whether a wasted journey is deliberately
-> worth more than a disputed day.
+> **Settled 5 September 2026, twice, and deliberately without a figure.** The
+> shortfall is the day rate for the trade, carried on the engagement note per
+> job. No day rate is fixed in this agreement. A flat figure was put and
+> rejected: written into a signed contract it drifts out of line with Yaadly's
+> own published day rate research within a year, and a subcontract paying a
+> skilled tradesperson at a rate the platform itself has stopped standing behind
+> is the Farrin price argument aimed the wrong way. The reasoning is in
+> `DECISIONS.md`. The founder's position, stated plainly: work not done right
+> does not earn the price.
 
-> **Open point 5, for the adviser, two questions in one clause.**
+> **Open point 4, for the adviser, two questions in one clause.**
 > First: how long the making-good obligation lasts, and whether liability is
 > capped at the job value or uncapped. `docs/terms.html` correctly refuses to
 > promise a workmanship guarantee to clients before it is insured, and quotes
@@ -367,7 +355,7 @@ You report any accident or injury on site to Yaadly the same day.
 You hold your own public liability insurance and keep it in force for as long
 as you take jobs under this agreement, and you show the certificate on request.
 
-> **Open point 6: what level, and whether it is realistic.** Requiring cover a
+> **Open point 5: what level, and whether it is realistic.** Requiring cover a
 > good tradesperson in Jamaica cannot actually buy would exclude exactly the
 > people this platform is for, and a requirement everybody ignores is worse
 > than none because it reads as covered. The honest options are a level set
@@ -413,7 +401,7 @@ you met through Yaadly for work of the same kind.
 This does not stop you working for anyone you already knew, and it does not
 stop a client engaging you for something unrelated once that period is up.
 
-> **Open point 7, for the adviser: the period, and whether this survives at
+> **Open point 6, for the adviser: the period, and whether this survives at
 > all.** A restraint has to be no wider than reasonably necessary to protect a
 > legitimate interest or it is unenforceable in full, and an over-broad clause
 > here does not degrade gracefully, it falls over and protects nothing. Twelve
@@ -577,24 +565,24 @@ For the adviser brief, and for the founder where marked.
 3. **Payment days, and insolvency** (clause 7). A figure that will be honoured.
    And what the tradesperson's position is if Yaadly cannot pay. Founder for
    the number, adviser for the disclosure.
-4. **The two money figures collide** (clauses 10 and 11). The £25 attendance fee
-   is 5,250 JMD at the rate in `yaad/benchmarks.py`, and a 3,000 JMD shortfall
-   day rate is both below that and below the labourer floor Yaadly published.
-   This draft writes the shortfall as the trade's own published day rate
-   instead, which is a departure from the instruction and is hers to reverse.
-   Founder.
-5. **Making good: how long, capped or not, and is the shortfall a penalty**
+4. **Making good: how long, capped or not, and is the shortfall a penalty**
    (clause 11). The first two settle with the insurance, in one decision. The
    third is new and is the adviser's. Founder and adviser together.
-6. **The tradesperson's insurance** (clause 13). What level, whether it is
+5. **The tradesperson's insurance** (clause 13). What level, whether it is
    actually purchasable in Jamaica, or whether Yaadly carries it for the panel.
    Founder, with a cost attached.
-7. **Going direct** (clause 16). The period, and whether the clause survives at
+6. **Going direct** (clause 16). The period, and whether the clause survives at
    all. Adviser.
 
-Plus **clause 24, governing law**, which is not numbered with the seven because
-it is not a gap in a clause, it is the frame the other seven are tested in, and
+Plus **clause 24, governing law**, which is not numbered with the six because
+it is not a gap in a clause, it is the frame the other six are tested in, and
 it decides first.
+
+**Settled, and listed here so they are not reopened by accident:** the £25
+attendance fee (clause 10), and the rule that work not done to the agreed scope
+does not earn the agreed price, with the day rate carried on the engagement note
+rather than fixed in this agreement (clause 11). Founder's decisions of
+5 September 2026.
 
 ---
 

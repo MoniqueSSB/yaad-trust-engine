@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Confirmed, same evening: the shortfall stays a day rate with no figure in the agreement
+
+**Put back twice and settled.** "Keep it as day rate, don't put a price on it", and then "if you don't do the work right you don't get paid, FACT". Both are the founder's call and both are now in clause 11, so the entry below records the reasoning and this one records the outcome, which is the order they should be read in.
+
+**What that means in the document.** No day rate figure appears anywhere in the agreement. The number lives on the engagement note, per job, per trade, issued before the work starts, so it tracks the real rate instead of freezing a 2026 number into a contract that will still be signed in 2028. The £25 attendance fee at clause 10 stays as a figure because it is a fixed sum for a wasted journey rather than a rate that moves with the trade.
+
+**The principle was stated bluntly and the clause now reads that way.** The opening line of the shortfall section is that the price on the engagement note buys a finished result, not a day of the worker's time, and work not done to the agreed scope does not earn it. That is orthodox for a fixed price subcontract and the earlier draft had it buried under process. The process still follows, because it is what makes the clause enforceable rather than a penalty and because §2 of `CLAUDE.md` requires a named human on any consequential decision, and this is one: notice, evidence shown before any money decision, a route back to the full price by going back and finishing, a day rate floor for days actually worked, and a named person deciding in writing with a reason.
+
+**One carve-out was kept and is not a softening of the rule.** Receipted materials are paid at cost whatever the review finds. That is the worker's own cash spent on the client's job, not his profit on it, and withholding it is not a price adjustment, it is taking his money. The rule bites on the price, which is what the price is for.
+
 ## 2026-09-05 · The attendance fee is £25, and the shortfall day rate collided with Yaadly's own published research
 
 **Two figures came in together and only one of them survived contact with `yaad/benchmarks.py`.** The attendance fee at clause 10 of the subcontract draft is settled at £25 for turning up to a site that is not as the client described. The second instruction was that a worker who was on site and actually worked is paid a day rate of 3,000 JMD rather than the full quote where a review finds the job was not completed correctly. The intent is right and ordinary: nobody pays full price for work that is not done. The numbers were not.
