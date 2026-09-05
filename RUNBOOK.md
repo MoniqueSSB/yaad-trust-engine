@@ -3435,3 +3435,16 @@ copy is a separate file in a separate bucket and is not on that clock.
 turn, proof of address, the TRN, the CV and the certificates are vetting papers
 and are not even fetched by the desk's preview. Widening that list is a legal
 decision, not a tidy-up.
+
+---
+
+## The one-tap link in a booking email did not sign somebody in
+
+The service booking receipt carries a single-use sign-in token (`?t=` on the `/portal/join` link, minted by `oneTapJoinLink()` in `yaad-notify-client`). Symptoms and what each one means:
+
+1. **"That link has expired, or it has already been used."** Normal and expected. The token is single use and short lived, so a link tapped days later, or tapped twice, lands here. Nothing is broken: the email form on that same screen sends a fresh sign-in code and that path is unchanged. Tell the client to type their email on the page they are already looking at.
+2. **The receipt has no `&t=` on its link at all.** Token minting failed and the function fell back to the plain join link on purpose, so the receipt still went. Look for the `auth.one_tap_link` span on that request; it records the actual reason. Everything still works, with one extra step.
+3. **"You are signed in, but that job code would not attach to your account."** Auth worked and `claim_code_as_me()` refused. Usually the booking already carries a different `client_email`, or the rate limiter in `portal_code_attempts` has tripped after five failures in fifteen minutes. Check `services.client_email` against the address the receipt went to.
+4. **Never test a real token twice.** Spending it is the point. To retest, have the desk re-send the receipt, which mints a new one.
+
+The token is deliberately removed from the address bar on arrival, so it will not be in the client's history or in a screenshot they send you. Ask for the email instead, not the link.

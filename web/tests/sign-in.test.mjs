@@ -142,8 +142,30 @@ describe("the join page", () => {
   // as a stage sitting there unseen from first render.
   const source = readFileSync(join(HERE, "../app/portal/join/page.tsx"), "utf8");
 
-  test("starts on the email stage, not the code stage", () => {
-    assert.match(source, /useState<"email" \| "code">\("email"\)/);
+  // Amended 5 Sep 2026, founder's decision, when a THIRD stage arrived: the
+  // booking receipt now carries a single-use sign-in token, so a client who
+  // taps it has nothing to type and meets no form at all. The assertion below
+  // changed shape. The property it guards did not: the stage holding the
+  // sign-in code field must never be the stage this page opens on.
+  test("starts on the email stage, or the one-tap stage, never the code stage", () => {
+    assert.match(source, /useState<Stage>\(\(\) => \(params\.get\("t"\) \? "link" : "email"\)\)/);
+    assert.doesNotMatch(source, /useState<Stage>\("code"\)/);
+  });
+
+  test("spends the one-tap token once, and takes it off the address bar first", () => {
+    // Single use means single use: a second attempt shows an expired screen
+    // for a link that worked. And an unspent token in a query string is a
+    // live credential, so it comes out of the address bar before anything
+    // else on the page runs.
+    assert.match(source, /spent\.current = true/);
+    assert.match(source, /history\.replaceState/);
+  });
+
+  test("an expired or already-spent one-tap link falls back to the email stage", () => {
+    // The fallback is the whole reason this is safe to ship: a dead link is
+    // never a dead end, it is one button away from the code that always
+    // worked.
+    assert.match(source, /setStage\("email"\)/);
   });
 
   test("only moves to the code stage from inside sendCode, after delivery is confirmed", () => {
