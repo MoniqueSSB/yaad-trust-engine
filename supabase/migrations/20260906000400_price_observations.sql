@@ -1,8 +1,16 @@
+-- Named 20260906 although it was written on 5 September 2026. The prefix is an
+-- ordering token, not a date. scripts/check-migration-order.mjs requires a new
+-- migration to sort after every existing one, the last of which is
+-- 20260905d_a_vetting_decision_says_who_made_it.sql, and no 14-digit stamp
+-- beginning 20260905 can sort after a letter, because '9' sorts before 'd'. So
+-- on the day the rule landed, the first correct name is the next day's. The
+-- ordering is what the check is protecting and the ordering is right.
+--
 -- Every quote a worker submits is a real Jamaican price. Keep them all.
 --
 -- ── Why this is not quote_reviews ──
 --
--- 20260904x_quote_reviews holds JUDGEMENTS: Monique looked at a figure, read
+-- 20260906000300_quote_reviews holds JUDGEMENTS: Monique looked at a figure, read
 -- the band, and formed a view. Those are valuable and there will never be many
 -- of them, because they cost her attention.
 --
