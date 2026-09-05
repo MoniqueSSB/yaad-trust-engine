@@ -1768,6 +1768,11 @@ Deno.serve(async (req: Request) => {
     const agentsPaused = String(pauseRow?.value ?? "") === "true";
     root.setAttributes({ "yaadly.agents_paused": agentsPaused });
 
+    // Declared here rather than at the client pipeline below because the
+    // WhatsApp worker lane now sets it too. One voice note, one transcription,
+    // one flag, whichever lane ends up reading it.
+    let spoken = false;
+
     // A worker mid "which job" answer, or a fresh photo from a number
     // linked to a published worker (worker_profiles.phone). Only on the
     // WhatsApp channel and only ahead of the client-intake pipeline below:
@@ -2486,13 +2491,47 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // TRANSCRIBED ONCE, HERE, AND KEPT. Everything below this line that
+      // wants the words reads msg.text, on either side of the worker/client
+      // fork.
+      //
+      // Until 5 September 2026 the worker lane below transcribed into a local
+      // variable, purely to decide whether a worker was filing an update, and
+      // when the number turned out not to be a worker it dropped through and
+      // threw the transcript away. The client pipeline then fetched the same
+      // file from Twilio and transcribed it a SECOND time, on what was left of
+      // a twelve second budget, and the slice left for it was shorter than the
+      // work takes. Found live on a real voice note: both calls returned the
+      // words, in 1.7s and 3.2s, the second caller had already given up at its
+      // own deadline, msg.text became "[message with no readable text]", and
+      // the client was sent the opener that fires when the model produced
+      // nothing, asking her to say what she had just said.
+      //
+      // Placed HERE and not at the top of the function on purpose. Every lane
+      // above this one (stage approvals, evidence comments, button taps) acts
+      // on msg.text, and some of them take a consequential action from it.
+      // Handing those a machine transcript of a voice note is a separate
+      // decision with a human gate in it, and it is not this change.
+      if (!msg.text) {
+        const voiceNote = msg.media.find((m) => m.mime.startsWith("audio/"));
+        if (voiceNote) {
+          const said = (await transcribeUrl(voiceNote.url, trace, deadline)).trim();
+          if (said) { msg.text = said; spoken = true; }
+        }
+      }
+
       // A worker's own freeform update, unclaimed by anything more
       // specific above: a reply to yaad-daily-checkin most days, but this
-      // is the general door, not a check-in-only one. Voice transcribed
-      // right here, locally, so a worker's own voice note never falls
-      // through into the client-intake pipeline below and gets read as a
-      // stranger describing a brand new job (nothing above this point
-      // transcribes, and until this lane existed nothing needed to).
+      // is the general door, not a check-in-only one. It reads the
+      // transcription done just above, so a worker's own voice note never
+      // falls through into the client-intake pipeline below and gets read as
+      // a stranger describing a brand new job.
+      //
+      // One consequence of transcribing before the condition rather than
+      // inside it: wantsAPerson() now reads a worker's spoken words as well
+      // as a typed message, so a worker who ASKS for a person in a voice note
+      // reaches one instead of having it filed as evidence. That direction is
+      // deliberate. It only ever routes toward a named human, never away.
       //
       // Filed straight into evidence, no new pipeline: composeEvidenceReport
       // (yaad-notify-client) already reads evidence.label text for the
@@ -2504,11 +2543,7 @@ Deno.serve(async (req: Request) => {
       // to the ordinary pipeline, which hands the thread to Monique and tells
       // them so, rather than turning their question into a client report.
       if (!deskHasThisNumber && !wantsAPerson(msg.text) && (!msg.media.length || msg.media.every((m) => m.mime.startsWith("audio/")))) {
-        let text = msg.text.trim();
-        if (!text) {
-          const voiceNote = msg.media.find((m) => m.mime.startsWith("audio/"));
-          if (voiceNote) text = (await transcribeUrl(voiceNote.url, trace, deadline)).trim();
-        }
+        const text = msg.text.trim();
         if (text) {
           const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
           if (found && found.jobs.length === 1) {
@@ -2535,8 +2570,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Voice first: it is how most of these actually arrive.
-    let spoken = false;
+    // Voice first: it is how most of these actually arrive. On WhatsApp the
+    // transcription already happened above and msg.text is set, so this is a
+    // no-op; the guard is what makes it one. On email and the website chat
+    // this is still where it happens, and still only once.
     const voice = msg.media.find((m) => m.mime.startsWith("audio/") || (!m.mime && !msg.text));
     if (!msg.text && voice) {
       const said = await transcribeUrl(voice.url, trace, deadline);
