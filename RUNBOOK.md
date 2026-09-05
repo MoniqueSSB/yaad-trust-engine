@@ -3435,3 +3435,68 @@ copy is a separate file in a separate bucket and is not on that clock.
 turn, proof of address, the TRN, the CV and the certificates are vetting papers
 and are not even fetched by the desk's preview. Widening that list is a legal
 decision, not a tidy-up.
+
+## Checking the database and the repository still describe the same thing
+
+Symptom you are trying to avoid: the repository looks complete, and a rebuild
+from it produces a database that is missing something nobody noticed was only
+ever in production. It has happened three times, on 3, 4 and 5 September 2026,
+the last time to `is_admin()` and to the event trigger that switches row level
+security on for new tables.
+
+The cause is not carelessness. SQL applied through the Supabase MCP goes
+straight to the database and writes no file, and nothing afterwards reconciles
+the two. `scripts/check-deploy-drift.sh` does this job for Edge Functions.
+There is no equivalent for the schema, so it is done by hand.
+
+**1. The offline half, no credentials needed, catches the worst cases.** Every
+function a migration calls should be defined in a migration:
+
+```bash
+grep -rhoiE 'create table (if not exists )?(public\.)?[a-z_]+' supabase/migrations/ \
+  | grep -oiE '[a-z_]+$' | sort -u > /tmp/tables.txt
+grep -rhoE '\bpublic\.[a-z_]+\(' supabase/migrations/ | sed 's/public\.//; s/(//' | sort -u > /tmp/called.txt
+comm -23 /tmp/called.txt /tmp/tables.txt | while read -r fn; do
+  grep -rqiE "function[[:space:]]+(public\.)?${fn}[[:space:]]*\(" supabase/migrations/ \
+    || echo "called but never defined: $fn"
+done
+```
+
+The table subtraction matters: without it the check reports every table a
+migration writes to and nobody reads it twice. `is_admin` printed here for
+weeks and nobody ran it.
+
+Read what it prints carefully, because it catches two different faults. A
+FUNCTION name is the case above. A TABLE name means that table is written to
+by a migration and created by none, which is the same drift one level up and
+is the state this repository is in: on 5 September 2026 `jobs`, `evidence`,
+`job_quotes`, `applications`, `app_settings`, `kickoff_drafts` and
+`kickoff_packs` all printed. See DECISIONS.md.
+
+**2. The live half, needs the MCP or the SQL editor.** List every function in
+`public` and compare against the same grep. In the SQL editor:
+
+```sql
+select string_agg(p.proname, ',' order by p.proname)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prokind = 'f';
+```
+
+**What to do with a gap.** Read the definition back out and commit it as a
+recovery migration, transcribed rather than rewritten, saying in the header
+that it is transcribed and untested because production already has it:
+
+```sql
+select pg_get_functiondef(p.oid)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname = 'the_function_name';
+```
+
+Grants have to be read separately, with `has_function_privilege`, because
+`pg_get_functiondef` does not include them. A recovered function with no grant
+line is a function nobody can call after a rebuild.
+
+**Do not run a recovery migration against production.** It is written to be a
+no-op there and it should stay unrun, because an event trigger recovery has to
+drop and recreate the trigger, and there is no reason to open that window on a
+live database to prove a file you can read.
