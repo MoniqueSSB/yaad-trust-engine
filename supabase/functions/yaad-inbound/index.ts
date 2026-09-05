@@ -669,7 +669,7 @@ will not write a neat brief. Read the WHOLE conversation, oldest first, and
 treat later lines as answers to earlier ones.
 
 Lines beginning "Yaadly:" are what YOU said on an earlier turn. Lines beginning
-"Monique (from the desk):" are a real person at Yaadly. Everything else is the
+"Yaadly (from the desk):" are a real person at Yaadly. Everything else is the
 client. Read them as a conversation: a short line is usually an answer to the
 question just above it, and "yes" means yes to whatever Yaadly last asked.
 
@@ -702,7 +702,7 @@ If there is no such line, "confirmed" is always false. "yes", "that’s it", "co
 "nothing else", "go ahead" are all confirmation. Adding another detail is NOT
 confirmation, it is more information. Silence is not confirmation.
 
-"wants_human" is true when they ask to speak to a person, to Monique, to talk
+"wants_human" is true when they ask to speak to a person, to Monique by name, to talk
 on the phone, or say they would rather explain it to somebody. Being annoyed is
 not the same as asking for a person; only set it when they actually ask.
 
@@ -805,7 +805,7 @@ Rules:
   Never ask again for something you can see you have already asked for and been
   given. If you asked something and they answered something else, you may ask
   once more, in different words, and then let it go.
-- Lines beginning "Monique (from the desk):" are a real person at Yaadly. Do
+- Lines beginning "Yaadly (from the desk):" are a real person at Yaadly. Do
   not contradict her, and never repeat an answer she has already given.
 - Never state a price, a budget or a cost for the work, and never estimate one
   even if asked directly. The only figures you may ever repeat are Yaadly's own
@@ -1576,7 +1576,7 @@ Deno.serve(async (req: Request) => {
         if ((count ?? 0) > WA_PER_NUMBER_PER_HOUR) {
           root.setAttributes({ "yaadly.inbound.outcome": "throttled", "yaadly.inbound.hour_count": count ?? 0 });
           return isTwilio
-            ? twiml("That is a lot of messages in one hour. Give it a little while and send it again, and Monique will pick it up either way.")
+            ? twiml("That is a lot of messages in one hour. Give it a little while and send it again, and Yaadly will pick it up either way.")
             : json({ error: "Too many messages in one hour." }, 429);
         }
       }
@@ -1658,7 +1658,7 @@ Deno.serve(async (req: Request) => {
       }
       if ((everyone ?? 0) >= WEB_PER_HOUR) {
         root.setAttributes({ "yaadly.inbound.outcome": "web_throttled_global" });
-        return json({ error: "The chat is busy right now. Carry on on WhatsApp and Monique will pick it up." }, 429);
+        return json({ error: "The chat is busy right now. Carry on on WhatsApp and Yaadly will pick it up." }, 429);
       }
       await supabase.from("web_chat_attempts").insert({ caller_key: callerKey, visitor_key: msg.from });
       // Housekeeping, one call in twenty, never on the request's critical path.
@@ -1689,7 +1689,7 @@ Deno.serve(async (req: Request) => {
     const THREAD_HOURS = 12;
     const threadKey = { channel: msg.channel, from_addr: msg.from || "unknown" };
     const priorQ = await supabase.from("intake_threads")
-      .select("job_id,transcript,turns,last_at,stage,human_handling")
+      .select("job_id,transcript,turns,last_at,stage,human_handling,contact_hint")
       .eq("channel", threadKey.channel).eq("from_addr", threadKey.from_addr)
       .maybeSingle();
     // let, not const: the website-chat adoption below swaps in the web
@@ -1697,6 +1697,7 @@ Deno.serve(async (req: Request) => {
     // continues it rather than starting over.
     let prior = priorQ.data as {
       job_id: string; transcript: string; turns: number; last_at: string; stage: string; human_handling: boolean;
+      contact_hint: string | null;
     } | null;
     const deskHasThisNumber = prior?.human_handling === true;
 
@@ -2521,13 +2522,13 @@ Deno.serve(async (req: Request) => {
       } catch (_) { /* never let a notification break intake */ }
       root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
       if (isTwilio) {
-        return twiml("Monique has this and is coming back to you herself. I have added your message so she sees it.");
+        return twiml("Someone at Yaadly has this and is coming back to you. I have added your message so they see it.");
       }
       if (isWeb) {
         // On the web there is no reply lane back to this widget, so the
         // honest sentence is where she will actually answer: WhatsApp.
         return webSay(
-          "Monique has this and is picking it up herself. I have added your message so she sees it. Her reply will show up here, or carry on with her on WhatsApp if you are leaving this page.",
+          "Someone at Yaadly has this and is picking it up. I have added your message so they see it. Their reply will show up here, or carry on on WhatsApp if you are leaving this page.",
           { reference: heldJobId, handoff: true },
         );
       }
@@ -2559,13 +2560,13 @@ Deno.serve(async (req: Request) => {
         // ambiguous and falls through to a fresh chat rather than a guess.
         let webThread: { job_id: string; transcript: string; turns: number; stage: string } | null = null;
         const { data: exact } = await supabase.from("intake_threads")
-          .select("job_id,transcript,turns,stage")
+          .select("job_id,transcript,turns,stage,contact_hint")
           .eq("channel", "web").eq("job_id", typedRef).maybeSingle();
         if (exact) webThread = exact;
         else {
           const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
           const { data: recent } = await supabase.from("intake_threads")
-            .select("job_id,transcript,turns,stage")
+            .select("job_id,transcript,turns,stage,contact_hint")
             .eq("channel", "web").gt("last_at", weekAgo).limit(200);
           const near = (recent ?? []).filter((t) =>
             String(t.job_id).startsWith(typedRef) || typedRef.startsWith(String(t.job_id)));
@@ -2605,7 +2606,7 @@ Deno.serve(async (req: Request) => {
                 });
               }
             } catch (_) { /* never let a notification break intake */ }
-            return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Monique was already on this one and will come back to you on this number.`);
+            return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Someone at Yaadly was already on this one and will come back to you on this number.`);
           }
 
           // Otherwise the assistant carries on. The web conversation becomes
@@ -2622,6 +2623,10 @@ Deno.serve(async (req: Request) => {
             last_at: new Date().toISOString(),
             stage: String(webThread.stage ?? "gathering") === "done" ? "confirming" : String(webThread.stage ?? "gathering"),
             human_handling: false,
+            // Carried across, not dropped. They are the same person and this
+            // is the same request; a contact they offered on the website is
+            // still the way to reach them if this number goes quiet too.
+            contact_hint: (webThread as { contact_hint?: string | null }).contact_hint ?? null,
           };
         }
       }
@@ -2740,6 +2745,32 @@ Deno.serve(async (req: Request) => {
     // someone signs in with that address and the code matches.
     const provenEmail = msg.channel === "email" ? bareEmail(msg.from) : "";
     const typedEmail = msg.channel !== "email" ? s(card?.client_email).toLowerCase() : "";
+
+    // A WAY TO REACH THEM, taken from whatever they have already typed.
+    //
+    // The intake asks for an email as its LAST question, so a conversation
+    // that stops early never reaches it, and the ones that stop early are
+    // exactly the ones somebody needed to follow up. Three web threads sat
+    // two and a half days with no email, no phone and no way to be contacted
+    // at all, one of them having asked to speak to a person.
+    //
+    // Deterministic on purpose: a regex over their own words, not a question
+    // the model has to remember to ask. The failure being fixed is the model
+    // never getting that far.
+    //
+    // NOT A BINDING. This goes to intake_threads.contact_hint and nowhere
+    // near jobs.client_email, which is identity and is only ever set by
+    // claim_code_as_me() when somebody signs in and the code matches. A
+    // string typed into a chat window proves nothing about who typed it. It
+    // is a way for a person at Yaadly to try, and that is all it is.
+    const emailIn = msg.text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)?.[0] ?? "";
+    // Seven digits or more, so a house number or a quantity is not mistaken
+    // for a phone number. Kept as typed rather than normalised: it is shown
+    // to a human, who reads a number better than any parser.
+    const phoneIn = (msg.text.match(/\+?[\d][\d\s().-]{6,}\d/g) ?? [])
+      .map((m) => m.trim())
+      .find((m) => m.replace(/\D/g, "").length >= 7) ?? "";
+    const contactIn = (typedEmail || emailIn || phoneIn || "").slice(0, 200);
 
     const HANDOFF_TURNS = 3;
     // A paused assistant hands every thread over. It has just declined to
@@ -2861,7 +2892,7 @@ Deno.serve(async (req: Request) => {
       } catch (_) { /* the record is already safe; a failed push must not undo that */ }
 
       const sorry = "Thanks, I have got your message and I have kept it. Something went wrong writing it up at our end, "
-        + "so Monique is picking this one up herself rather than me. You will not have to say any of it twice.";
+        + "so someone at Yaadly is picking this one up rather than me. You will not have to say any of it twice.";
       // Recorded like any other reply. say() cannot be used here, because it
       // is defined further down with the reply section, but the record has to
       // hold either way: "if a client says your assistant told me X, it is in
@@ -2905,6 +2936,10 @@ Deno.serve(async (req: Request) => {
       // that is the moment a person owes them an answer. Not touched on the
       // turns before that: the assistant answering is not the promise.
       ...(handingOver ? { human_handling: true, awaiting_human_since: nowIso } : {}),
+      // Set once, never overwritten. The first way somebody offered to be
+      // reached is the one they meant; a later message mentioning a
+      // landlord's number should not quietly replace it.
+      ...(contactIn && !prior?.contact_hint ? { contact_hint: contactIn } : {}),
     }, { onConflict: "channel,from_addr" });
 
     // Three pushes for one conversation is noise, and noise gets muted, and a
@@ -3013,6 +3048,26 @@ Deno.serve(async (req: Request) => {
       // deterministically and on the same closed pattern list, and the result
       // is what gets written. twiml() and webSay() screen again on their own
       // way out; they are the gate, this is the record.
+      // A WEB CONVERSATION THAT ENDS HERE ENDS UNREACHABLE.
+      //
+      // A reply into the chat window is seen only while the page is open, and
+      // nobody has it open two days later. If they have offered no email and
+      // no number by the time a person is taking over, there is no way to
+      // follow them up at all, which is exactly what happened to three people
+      // in September 2026, one of whom had asked to speak to somebody.
+      //
+      // Asked here rather than added to the model's questions, because the
+      // failure being fixed is a conversation that stopped before the model
+      // ever reached its last question. Web only: WhatsApp and SMS already
+      // carry a number, and email already carries an address.
+      //
+      // Optional, and it says so. Somebody who would rather stay anonymous
+      // until they have decided is not doing anything wrong, and a demand at
+      // the door is how you lose them.
+      const askForContact = (isWeb && !contactIn && !prior?.contact_hint)
+        ? " If you would rather not sit with this page open, leave an email or a number here and she can come back to you directly instead."
+        : "";
+
       const say = async (text: string, handoff = false) => {
         const blocked = guardrails.scan(text).length > 0;
         const wentOut = blocked ? (isWeb ? WEB_SAFE_FALLBACK : guardrails.SAFE_FALLBACK) : text;
@@ -3063,7 +3118,7 @@ Deno.serve(async (req: Request) => {
       if (agentsPaused) {
         return say(
           `Thanks, I have got your message and it is saved${stage === "done" ? ` as ${jobId}` : ""}. ` +
-          `Monique is picking these up herself right now rather than me answering, so she will come back to you on this. ` +
+          `Someone at Yaadly is picking these up right now rather than me answering, so they will come back to you on this. ` +
           `You will not have to say any of it twice.`,
           true,
         );
@@ -3076,12 +3131,13 @@ Deno.serve(async (req: Request) => {
         if (isWeb) {
           return say(
             `Of course. Everything you have told me is saved as ${jobId}, so you will not have to say it twice. ` +
-            `Monique will answer here herself when she picks this up. If you are leaving this page, tap the WhatsApp button and carry on there instead; everything you have said comes with you.`,
+            `Someone at Yaadly will answer here when they pick this up. If you are leaving this page, tap the WhatsApp button and carry on there instead; everything you have said comes with you.` +
+            askForContact,
             true,
           );
         }
         return say(
-          `Of course. I am passing this to Monique now and she will come back to you on this number herself. ` +
+          `Of course. I am passing this to a person at Yaadly now and they will come back to you on this number. ` +
           `She reads every one of these personally, so it will not be instant. ` +
           `Everything you have told me is saved${stage === "done" ? ` as ${jobId}` : ""}, so you will not have to say it twice.`,
         );
@@ -3137,13 +3193,14 @@ Deno.serve(async (req: Request) => {
         if (isWeb) {
           return say(
             (noQuestions ? noQuestions + " " : "") +
-            `I have not got quite enough to write this up properly, so this is one for Monique to read herself. Your reference is ${jobId}. She will answer here when she picks it up, or carry on on WhatsApp if you are leaving this page; everything you have said comes with you.`,
+            `I have not got quite enough to write this up properly, so this is one for a person at Yaadly to read. Your reference is ${jobId}. They will answer here when they pick it up, or carry on on WhatsApp if you are leaving this page; everything you have said comes with you.` +
+            askForContact,
             true,
           );
         }
         return say(
           (noQuestions ? noQuestions + " " : "") +
-          `I have not got quite enough to write this up properly, so I am passing it to Monique to read herself. She will come back to you on this number, and she reads every one personally, so it will not be instant. Your reference is ${jobId}.`,
+          `I have not got quite enough to write this up properly, so I am passing it to a person at Yaadly to read. They will come back to you on this number, and every one is read personally, so it will not be instant. Your reference is ${jobId}.`,
         );
       }
 
@@ -3203,7 +3260,7 @@ Deno.serve(async (req: Request) => {
       // that skips the gate is how the third one gets written.
       return twiml(
         "Sorry, something went wrong at our end and I could not read that properly. "
-        + "Send it again in a moment, or Monique will pick it up herself.",
+        + "Send it again in a moment, or someone at Yaadly will pick it up.",
       );
     }
     return json({ error: "Inbound failed." }, 500);

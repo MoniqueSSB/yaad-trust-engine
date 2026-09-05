@@ -68,4 +68,4 @@ export function webReferenceIn(text: string): string | null {
  *  reason as the original: the draft that triggered this is not trustworthy. */
 export const WEB_SAFE_FALLBACK =
   "Thanks for your message, I have got it. Let me pass this one to a person at Yaadly "
-  + "rather than answer it myself. Monique will answer here when she picks it up, or carry on with her on WhatsApp if you are leaving this page.";
+  + "rather than answer it myself. Someone at Yaadly will answer here when they pick it up, or carry on on WhatsApp if you are leaving this page.";
