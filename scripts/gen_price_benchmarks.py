@@ -109,11 +109,66 @@ def write_into(path: Path) -> bool:
     return True
 
 
+WEB_TS = ROOT / "web" / "lib" / "portal" / "price-bands.ts"
+
+
+def web_module() -> str:
+    """The same numbers again, as a TypeScript module for the web app.
+
+    A third consumer, and the reason the generator exists rather than three
+    hand-typed tables: the engine reads them in Python, the desk in a script
+    block, and from 5 September 2026 the client and the worker see them on a
+    quote. Three copies edited by hand would be three different price lists
+    inside a week, and the whole premise is that a client in London pays what
+    a client in Portmore pays.
+    """
+    body = json.dumps(payload(), indent=2, ensure_ascii=False)
+    return (
+        "// GENERATED FILE, do not edit by hand.\n"
+        "//\n"
+        "// Source: yaad/benchmarks.py. Regenerate with\n"
+        "//   python3 scripts/gen_price_benchmarks.py\n"
+        "// tests/test_price_benchmarks.py fails if this drifts from the source.\n"
+        "//\n"
+        "// CLAUDE.md section 5: pricing is a LOOKUP, never a model. Nothing that\n"
+        "// imports this may interpolate, average or smooth a band, and where a band\n"
+        "// says no public price exists in Jamaica, that is a correct and complete\n"
+        "// answer rather than a gap to fill.\n\n"
+        "export type GeneratedBand = {\n"
+        "  label: string;\n"
+        "  low_jmd: number | null;\n"
+        "  high_jmd: number | null;\n"
+        "  low_gbp: number | null;\n"
+        "  high_gbp: number | null;\n"
+        "  confidence: string;\n"
+        "  source: string;\n"
+        "  note: string;\n"
+        "};\n\n"
+        "export type PriceBenchmarks = {\n"
+        "  generated_from: string;\n"
+        "  jmd_per_gbp: number;\n"
+        "  market_context: string;\n"
+        "  day_rates_jmd: Record<string, number[]>;\n"
+        "  materials_jmd: Record<string, number[]>;\n"
+        "  bands: Record<string, GeneratedBand>;\n"
+        "  taxonomy_to_benchmark: Record<string, string>;\n"
+        "};\n\n"
+        f"export const PRICE_BENCHMARKS: PriceBenchmarks = {body} as const;\n"
+    )
+
+
 def main() -> None:
-    targets = [ROOT / "concierge" / "concierge.html"]
-    for t in targets:
-        changed = write_into(t)
-        print(("updated  " if changed else "in step  ") + str(t.relative_to(ROOT)))
+    changed = write_into(ROOT / "concierge" / "concierge.html")
+    print(("updated  " if changed else "in step  ") + "concierge/concierge.html")
+
+    new = web_module()
+    old = WEB_TS.read_text(encoding="utf-8") if WEB_TS.exists() else None
+    if old != new:
+        WEB_TS.parent.mkdir(parents=True, exist_ok=True)
+        WEB_TS.write_text(new, encoding="utf-8")
+        print("updated  " + str(WEB_TS.relative_to(ROOT)))
+    else:
+        print("in step  " + str(WEB_TS.relative_to(ROOT)))
 
 
 if __name__ == "__main__":
