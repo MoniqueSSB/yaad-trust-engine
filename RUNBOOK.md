@@ -2785,7 +2785,15 @@ Then book each service in turn and confirm the posted `service` value and the bu
 
 Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
 
-**Still open, and now more exposed than it was:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker. This was written as "missing before a link should go live". The links went live anyway and the card path was made prominent on 5 September 2026, so the gap is now load bearing rather than theoretical: every card booking taken before the checkbox exists carries it. Fixing it is a Stripe Dashboard change on each of the eight links, not a code change here, and it was flagged to the founder on the day.
+**Closed on the booking side, 5 September 2026, and still open on the Stripe side.** The express request to start work inside the client's 14 day cancellation period is now asked for and recorded at booking, which is where `docs/cancellation.html` always said it would be: "we will ask you for that in writing at booking".
+
+**How it works.** An unticked checkbox in the booking panel on `docs/services.html`. Ticking it posts `startNow`, `startNowVersion` and the exact sentence shown, and `yaad-book-service` writes all three into the booking's `notes`, so the record of who asked, and of what they were actually shown, survives the browser. Not ticking is a valid and recorded answer: the note then reads "NO request to start inside the 14 days. Do not begin work, and do not take payment, before the cancellation period has run out."
+
+**The checkbox is deliberately not required.** A tick nobody can decline is not a request anybody made, and a client who does not want an early start is entitled to have the 14 days run. If they leave it alone, the confirmation says so and **no pay button is offered at all**: a card authorisation lasts seven days and the wait is fourteen, so a hold taken then is guaranteed to expire before the job can begin.
+
+**`START_NOW_VERSION` and the wording move together**, same rule as `AI_CONSENT_VERSION` in the apply flow. Reword the checkbox without bumping the version and you silently reinterpret every answer already given. Both live at the top of the script block in `docs/services.html`, next to each other for that reason.
+
+**Still open: Stripe checkout carries no equivalent.** A client who reaches a payment link some other way, or who is sent one directly, still ticks nothing. Closing that is `consent_collection[terms_of_service]=required` plus `custom_text[terms_of_service_acceptance][message]` on each of the eight links, which is an update rather than a replacement, so the URLs do not change. It needs the Stripe account. The booking form now covers every booking that comes through the site, including the invoice jobs over £500 that never had a payment link to attach a tickbox to, so the remaining gap is narrower than it was.
 
 ---
 
