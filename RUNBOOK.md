@@ -3186,3 +3186,75 @@ copy is a separate file in a separate bucket and is not on that clock.
 turn, proof of address, the TRN, the CV and the certificates are vetting papers
 and are not even fetched by the desk's preview. Widening that list is a legal
 decision, not a tidy-up.
+
+## The staging prefix in the evidence bucket, and the sweep that empties it
+
+`yaad-inbound` puts an inbound WhatsApp photo or video into
+`evidence/_pending/<uuid>` the moment it arrives, before it knows which job it
+belongs to. When the worker answers the job code, the "what does this show"
+question and the before/after question, the file is MOVED to
+`<job_id>/<uuid>`. A move is a rename, so a filed item leaves nothing behind.
+
+Anything still under `_pending/` is a photo somebody sent and then never
+answered for. Until 5 September 2026 nothing removed those.
+
+### Look at what is there
+
+```bash
+supabase storage ls "ss:///evidence/_pending/" --experimental --project-ref leffyisvfvjwzilydlwf
+```
+
+`{"paths":[]}` means the prefix is empty, which is the normal state. Objects
+appear only while a conversation is mid-flight, or when one was abandoned.
+
+### Ask the sweep what it would delete, without deleting anything
+
+Signed in as an admin, from the desk's browser console, or with any admin
+session token:
+
+```bash
+curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-evidence-sweep -H "Content-Type: application/json" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer <your admin session token>" -d '{"dry_run": true}'
+```
+
+It answers with `staged` (everything in the prefix), `held_by_live_session`
+(paths a conversation touched in the last 72 hours still names, which are never
+touched), `would_delete`, `would_drop_sessions`, and a `sample` of up to ten
+paths. Drop `"dry_run": true` and it does it.
+
+### The schedule
+
+pg_cron runs it at 04:23 UTC daily, an hour clear of `yaad-vetting-purge` at
+03:17. Same secret-hash pattern: the job presents a secret and the function
+checks it against `app_settings.evidence_sweep_cron_secret_sha256`. See
+`20260906013700_the_staging_prefix_gets_a_sweep.sql`.
+
+Proof it is on:
+
+```sql
+select jobname, schedule, active from cron.job where jobname = 'yaad-evidence-sweep';
+select status_code, content, created from net._http_response order by created desc limit 5;
+```
+
+To rotate the secret, re-run the `do $do$ ... $do$;` block in that migration.
+It overwrites the hash and reschedules the job in one transaction.
+
+### What it will not delete
+
+An object goes only when it is older than 72 hours, no intake session updated
+in the last 72 hours still names it, and no `public.evidence` row carries it as
+`storage_path`. 72 rather than 48 so it can never race a live conversation.
+Nothing it touches is a job, a piece of filed evidence, money or a Yaad Score.
+
+It also deletes the abandoned evidence session row itself. That is not tidying.
+`yaad-inbound` means to drop a stale evidence session at 48 hours, but the
+branch that does it sits after the evidence branch and is never reached, so the
+row lives forever. If the files went and the row stayed, a worker coming back on
+day five would be asked what their photo shows, answer, and be told "Confirmed,
+but nothing saved properly". Removing both means they are simply read fresh.
+
+### If it starts finding hundreds of objects a night
+
+That is workers abandoning the evidence conversation, not a bug in the sweep.
+Read it as a product signal: the job code question, the "what does this show"
+question or the before/after question is losing people. The count is in the
+trace attribute `yaadly.sweep.deleted`.

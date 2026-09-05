@@ -1857,3 +1857,55 @@ worker handed in would spend the credibility of the checked thing on the
 unchecked one.
 
 `20260905b_a_worker_gets_a_face_a_voice_and_work_to_show.sql`.
+
+## The staging prefix is swept on a clock, and the abandoned session goes with it (5 Sep 2026)
+
+`yaad-inbound` stages an inbound WhatsApp photo at `evidence/_pending/<uuid>`
+before it knows which job it belongs to, then moves it to `<job_id>/<uuid>`
+once the worker has answered the job code, the context question and the
+before/after question. A move is a rename, so anything left in that prefix is
+evidence nobody ever answered for. Nothing removed it.
+
+The prefix was checked before any of this was written, and it held zero
+objects. That is the honest number, and on its own it argues for doing nothing.
+It was still built and still scheduled, for two reasons. The leak is
+prospective rather than historical: abandonment is a December behaviour, not an
+August one, and the prefix is empty now precisely because almost nobody has
+used the lane yet. And a purge that exists but is never called is the exact
+failure `20260827f` was written to record, where every vetting document carried
+a deletion date that nothing acted on for a month. Writing the function without
+the schedule would have repeated it deliberately.
+
+So it follows `yaad-vetting-purge` rather than inventing a second pattern: an
+Edge Function with two doors, a signed-in admin or a secret checked against a
+SHA-256 hash in `app_settings`, called nightly by pg_cron through pg_net,
+because the job lives inside the database and cannot read the function's
+environment. Its own secret rather than the purge's, so rotating one does not
+silently break the other.
+
+Three things make a deletion safe, and the interesting one is not the age.
+72 hours clears the 48 the intake code already treats as stale, so it can never
+race a live conversation. No `public.evidence` row may claim the path, which
+structurally can never happen because finalising renames the object out of the
+prefix, and is there as a belt against a future writer that files a staged path
+directly. The load-bearing check is the third: no intake session touched in the
+last 72 hours may still name the path, whatever the object's own age says. That
+makes it safe by construction rather than safe by the margin between two
+numbers.
+
+It deletes the abandoned session row too, which looks like scope creep and is
+not. `yaad-inbound` intends to drop a stale evidence session at 48 hours, but
+that branch sits after the evidence branch and returns before reaching it, so
+for an evidence session it never runs and nothing else deletes the row. Had the
+sweep taken the files and left the row, a worker returning on day five would be
+asked what their photo shows, answer, and be told "Confirmed, but nothing saved
+properly", a failure the sweep would have introduced. Taking both means that
+worker is read fresh, which is what the 48 hour rule was written to do. Only
+the evidence lane; the other lanes hold no staged files.
+
+Nothing in it rules on anything. It deletes working state that the code already
+meant to discard, and touches no job, no filed evidence, no money and no Yaad
+Score.
+
+`supabase/functions/yaad-evidence-sweep/`,
+`20260906013700_the_staging_prefix_gets_a_sweep.sql`.
