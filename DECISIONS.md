@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The business page stopped claiming independence, because sometimes the trades are ours
+
+**The business page claimed, in six places, that Yaadly is independent of every contractor on the job.** The credential strip put it most plainly: "Never pricing, supplying or managing the trade being assessed." The founder read it and said it is untrue, because on some engagements the people on site are working under her and she supplied them. She is right, and the claim was not a slip of wording: Full Project Management and Property Care both put a Yaadly tradesperson on the property, so the sentence describes the oversight lane and quietly denies the existence of the other one.
+
+**It was also the most attackable sentence on the page.** The audience is agents, developers, insurers and lenders. Doc 03 on that same page promised "never a contractor marking their own work" while Doc 04 offered a review by the firm that, on a managed job, supplied the contractor. The first risk person to read both would have found it.
+
+**Three replacements were put to the founder and she chose the narrower, harder claim.** Not "independent unless I supply the trade", which keeps the strong word and buries the exception, and not "no commission from any trade", which would have needed checking against the 12% on the managed side. She chose: **the person who assesses is never the person who did the work, and both are named on the report.** When the tradesperson is Yaadly's, a different Yaadly assessor reviews it. Weaker word, true on both lanes, and it cannot be broken by the business growing into the managed lane.
+
+**It commits operations, not just copy.** The report has to name the person who did the work and the person who assessed it, and they cannot be the same person. On a small job where the founder is the only Yaadly person on the ground, either somebody else attends the review or the report says the work is Yaadly's own. That is the cost of the claim and it was accepted with the claim.
+
+Changed on `docs/business.html`: the credential cell, the hero, the case file stamp, Doc 03, Doc 04 and its title, plus the meta description, `og:title`, `og:description` and `og:image:alt`, because the claim was in the Google and social preview text too. The rule is written up in `docs/COPY-GUIDELINES.md` §4. **`docs/services.html` still carries the same claim** in its hero and meta description, "You cannot be there. Someone independent should be.", and Full Project Management is on that page. Not fixed, deliberately: the founder scoped this change to the business page.
+
+---
+
 ## 2026-09-04 · Tap-to-approve was built twice on the same day, and the simpler one won
 
 **Two sessions built the same feature, separately, hours apart.** Both reached "a Quick Reply button so a client does not have to type a thirteen digit job code on a phone to move money." They disagreed on one thing, and that one thing decided it.
