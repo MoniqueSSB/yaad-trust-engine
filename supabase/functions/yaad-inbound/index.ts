@@ -1696,6 +1696,21 @@ Deno.serve(async (req: Request) => {
       // Aug 2026: "There should be approval for it to link to the right
       // job where they ask for the confirmation of the job and the
       // confirmation of the code."
+      // The deletion clock, said out loud.
+      //
+      // A photo sent over WhatsApp is parked in evidence/_pending until the
+      // worker answers which job it is for and what it shows. It is not on
+      // the job until they do, and yaad-evidence-sweep deletes anything
+      // still unanswered after 72 hours. A worker who is never told that
+      // finds out by having their evidence quietly disappear, which is the
+      // opposite of what an evidence trail is for.
+      //
+      // Said when the photo is first parked and again if a reply does not
+      // match a job, not on every message: a clock repeated four times in a
+      // row reads as nagging and stops being heard.
+      const UNFILED_NOTICE = "It is not attached to a job or a stage until you send the code, and an unattached photo is deleted after 72 hours.";
+      const UNFILED_NOTICE_SHORT = "It is not on the job until you answer, and an unfiled photo is deleted after 72 hours.";
+
       const codePrompt = (choices: { id: string; title: string }[]) =>
         choices.length === 1
           ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply with the code ${choices[0].id} to confirm, or tell us the right job.`
@@ -1789,7 +1804,7 @@ Deno.serve(async (req: Request) => {
 
         const pick = pickJobChoice(msg.text, choices);
         if (!pick) {
-          return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
+          return twiml(`Sorry, that did not match a job. ${codePrompt(choices)} ${UNFILED_NOTICE}`);
         }
 
         // Only asked once per batch, and only when something still needs
@@ -1799,7 +1814,7 @@ Deno.serve(async (req: Request) => {
           await supabase.from("wa_intake_sessions")
             .update({ answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage }, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
-          return twiml(`Got it, that's for ${pick.id}. What does this show? A line on what was done helps the client understand it faster.`);
+          return twiml(`Got it, that's for ${pick.id}. What does this show? A line on what was done helps the client understand it faster. ${UNFILED_NOTICE_SHORT}`);
         }
 
         let filed = 0;
@@ -1890,7 +1905,7 @@ Deno.serve(async (req: Request) => {
             photo_count: items.length,
             updated_at: new Date().toISOString(),
           });
-          return twiml(`Got it. ${codePrompt(activeJobs)}`);
+          return twiml(`Got it. ${codePrompt(activeJobs)} ${UNFILED_NOTICE}`);
         }
       }
 
