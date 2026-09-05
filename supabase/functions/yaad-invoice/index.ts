@@ -408,7 +408,14 @@ Deno.serve(async (req) => {
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
+      // Without this the caller sees only "did not return a usable draft",
+      // which reads the same for a wrong key, a dead model id and a genuinely
+      // confused prompt. The span carried the status and the span goes
+      // nowhere until an OTLP endpoint exists. Added 4 Sep 2026.
+      if (!r.ok) {
+        const msg = `yaad-invoice: ${prov.name} http ${r.status}: ${JSON.stringify(j).slice(0, 200)}`;
+        s.recordError(msg); console.error(msg);
+      }
       return j?.choices?.[0]?.message?.content ?? "";
     });
 

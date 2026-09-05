@@ -58,6 +58,15 @@ const existing = git(["ls-tree", "-r", "--name-only", BASE, "--", DIR])
   .split("\n").filter((f) => f.endsWith(".sql")).map((f) => f.split("/").pop()).sort();
 const last = existing[existing.length - 1] ?? "";
 
+// A file that is already ON the base branch is not new, whatever the index
+// says. Merging the base in stages every file the merge brought with it, so
+// without this the check fires on somebody else's already-merged migrations
+// the moment you merge main, which is exactly when a person would run it. It
+// even compared the newest base migration against itself. A check that cries
+// wolf is one people stop reading, which is the whole reason it exists.
+const onBase = new Set(existing);
+added = added.filter((p) => !onBase.has(p.split("/").pop()));
+
 let bad = 0;
 for (const path of added.sort()) {
   const name = path.split("/").pop();
