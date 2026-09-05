@@ -3659,10 +3659,23 @@ walkthrough stills, `NVIDIA_VETTING_MODEL` the paperwork. Secrets are read at
 call time, so no redeploy is needed. `NVIDIA_VISION_MODEL` still moves all
 three at once if that is what you want.
 
-**Which model reads evidence is a decision, not a default.** The evidence
+**Decided 5 September 2026: the evidence review runs on
+`meta/llama-3.2-90b-vision-instruct`.** `NVIDIA_EVIDENCE_MODEL` is set to it on
+the project. Founder instruction, on being shown that the smallest model was
+reading the evidence by accident. The same id was already the live default for
+the sketch pack and the vetting read, so it is known good on this NVIDIA
+account rather than newly chosen. Watch the first few stages: 90b is slower
+than 11b, each photo has a 25 second timeout, and a timeout is retried once and
+then leaves the AI paragraph out of the client's report rather than delaying it.
+If timeouts show up in the logs, `mistral-medium-latest` is not an option here
+(it is the text provider), so the move would be back to a smaller vision model
+or on to a different provider through `VISION_MODEL_API`.
+
+**Why it needed deciding at all.** The evidence
 review defaulted to the 11b checkpoint while the other two defaulted to 90b,
 which nobody chose; it happened because all three shared one secret and had
-different fallbacks. The defaults were kept exactly as they were so this change
+different fallbacks, and `NVIDIA_VISION_MODEL` was never set on this project so
+every job sat on its own default. The defaults were kept exactly as they were so this change
 altered no behaviour on the day it landed. Setting `NVIDIA_EVIDENCE_MODEL` is
 how that gets decided on purpose. This is the vision call standing closest to a
 stage approval, so it is worth deciding rather than inheriting.
