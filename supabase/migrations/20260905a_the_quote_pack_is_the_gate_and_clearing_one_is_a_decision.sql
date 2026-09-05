@@ -1,6 +1,6 @@
 -- The quote pack is the gate, and clearing one held draft is a decision.
 --
--- CORRECTING 20260904s, WHICH GOT THE SEQUENCE BACKWARDS. That migration
+-- CORRECTING 20260904u, WHICH GOT THE SEQUENCE BACKWARDS. That migration
 -- excluded quote_pack_drafts and kickoff_packs from desk_decisions and said
 -- they were "documents issued automatically after a human accepted a quote,
 -- not decisions anybody sat down and made". The second half was right about
