@@ -1339,7 +1339,11 @@ const VIEWS = [
     empty:["Nobody is waiting","Everyone who has written in has had an answer from a person."],
     cols:[
       {h:"Waiting", f:r => (r.breached ? chip_("crit", Math.round(r.hours_waiting/24*10)/10 + " days") : chip_("warn", Math.round(r.hours_waiting) + " hr"))},
-      {h:"Who", f:r => esc(r.who || "unknown") + sub_(r.contact || r.channel || "")},
+      {h:"Who", f:r => esc(r.who || "unknown") + (r.contact
+        ? sub_((r.kind === "thread" ? "left: " : "") + r.contact)
+        : (r.kind === "thread" && r.channel === "web"
+            ? sub_("anonymous, no way to reach them off this page")
+            : sub_(r.channel || "")))},
       {h:"Where it came from", f:r => r.kind === "enquiry"
         ? chip_("mute","contact form") + sub_("yaadly.co.uk/contact, emailed to you")
         : r.channel === "web" ? chip_("ok","website chat") + sub_("the widget on yaadly.co.uk")
