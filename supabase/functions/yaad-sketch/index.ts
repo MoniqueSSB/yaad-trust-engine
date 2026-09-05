@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, visionAttrs } from "./visionmodel.ts";
 
 // yaad-sketch
 //
@@ -37,12 +38,15 @@ import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmode
 // returns HTTP 410. Verified working replacement, checked against a real still
 // on the day: it described the shot correctly and refused to call a phone in
 // somebody's hand a room, which is the behaviour that matters here.
-// Override with the NVIDIA_VISION_MODEL secret; that same secret is read by
-// yaad-vision, so setting it fixes both at once.
-const VISION_MODEL = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-90b-vision-instruct";
-const VISION_API = "https://integrate.api.nvidia.com/v1/chat/completions";
-// The text model and its endpoint come from _shared/textmodel.ts. The vision
-// model above is a different job and stays where it is.
+// Which vision model, and the endpoint it lives on, now come from
+// _shared/visionmodel.ts, the same way the text model comes from
+// _shared/textmodel.ts. Set NVIDIA_SKETCH_MODEL to move this job on its own,
+// or NVIDIA_VISION_MODEL to move every vision job together as before.
+//
+// Named here for the record the assemble step writes. The frames were
+// described in an earlier request, so this repeats that request's resolution
+// rather than making a second decision.
+const sketchVisionModel = () => pickVisionProvider("sketch")?.model ?? "not configured";
 
 const FRAME_PROMPT = `You are looking at stills taken from a walkthrough video of a property in Jamaica, in the order they were filmed. You are recording what is visibly there, for a project manager who will read it later. You are not a surveyor, an engineer or a valuer.
 
@@ -359,8 +363,8 @@ Deno.serve(async (req) => {
 
     // ------------------------------------------------------------- frames
     if (action === "frames") {
-      const key = Deno.env.get("NVIDIA_API_KEY");
-      if (!key) return fail("NVIDIA_API_KEY is not set on this project, so the vision model cannot be reached.", 500);
+      const vprov = pickVisionProvider("sketch");
+      if (!vprov) return fail(NO_VISION_PROVIDER_MESSAGE, 500);
 
       const images: string[] = Array.isArray(body.images) ? body.images.slice(0, 6) : [];
       const startAt = Number(body.start_at) || 1;
@@ -372,19 +376,16 @@ Deno.serve(async (req) => {
       }];
       for (const img of images) content.push({ type: "image_url", image_url: { url: img } });
 
-      const raw = await trace.span(`chat ${VISION_MODEL}`, SpanKind.CLIENT, {
-        "gen_ai.system": "nvidia_nim",
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.model": VISION_MODEL,
+      const raw = await trace.span(`chat ${vprov.model}`, SpanKind.CLIENT, {
+        ...visionAttrs(vprov),
         "gen_ai.request.temperature": 0.2,
-        "server.address": "integrate.api.nvidia.com",
         "yaadly.sketch.batch_size": images.length,
       }, async (s) => {
-        const r = await fetch(VISION_API, {
+        const r = await fetch(vprov.api, {
           method: "POST",
-          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${vprov.key}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: VISION_MODEL,
+            model: vprov.model,
             messages: [{ role: "system", content: FRAME_PROMPT }, { role: "user", content }],
             max_tokens: 1800, temperature: 0.2,
           }),
@@ -562,8 +563,8 @@ Deno.serve(async (req) => {
           rooms,
           frames: described.map((f: any) => ({ n: f.n, caption: f.visible, room: f.room, source: "video" })),
           sketch_svg: svg,
-          model: `${VISION_MODEL} + ${prov.model}`,
-          model_note: `Frames described by ${VISION_MODEL}, assembled by ${prov.model}. Sketch geometry generated in code, not by a model. ${hits.length} measurement phrase(s) scrubbed. Not checked by a human yet.`,
+          model: `${sketchVisionModel()} + ${prov.model}`,
+          model_note: `Frames described by ${sketchVisionModel()}, assembled by ${prov.model}. Sketch geometry generated in code, not by a model. ${hits.length} measurement phrase(s) scrubbed. Not checked by a human yet.`,
         }),
       });
       if (!ins.ok) return fail(`could not store the pack: ${await ins.text()}`, 502);

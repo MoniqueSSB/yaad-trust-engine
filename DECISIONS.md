@@ -2161,3 +2161,48 @@ worker handed in would spend the credibility of the checked thing on the
 unchecked one.
 
 `20260905b_a_worker_gets_a_face_a_voice_and_work_to_show.sql`.
+
+## The vision provider moved into `_shared`, 5 September 2026
+
+`textmodel.ts` exists because the text provider was a property of eight files
+rather than a decision. The vision provider was still in exactly the state that
+file was written to fix: `https://integrate.api.nvidia.com/v1/chat/completions`
+typed out in `yaad-notify-client`, `yaad-sketch` and `yaad-vetting-review`. So
+the question "which country do site photographs, a walkthrough of somebody's
+house and a worker's proof of address travel to" was answerable only by
+grepping, and changing the answer meant editing three files and deploying three
+functions. The CI rule that was meant to prevent precisely this watched only
+the text endpoints, so it stood green over the more sensitive half of the
+estate, which is worse than no rule because it reads as covered.
+
+`_shared/visionmodel.ts` now resolves the provider, the key and the model for
+all three, in the same shape as `textmodel.ts`: an explicit
+`VISION_MODEL_KEY`/`VISION_MODEL_API` override first, then NVIDIA, then null.
+There is deliberately no third branch and no fallback, for the reason
+`textmodel.ts` gives: a provider that is no longer the choice is a silent route
+to a country nobody chose, waiting on one missing secret. The CI rule now
+covers the vision endpoint too, which it could not do while three functions
+still held the string.
+
+Two things changed beyond the move. Each vision job got its own model secret,
+because all three read `NVIDIA_VISION_MODEL` while defaulting to different
+models, so with the secret unset they diverged by accident and with it set they
+moved together whether or not that was intended. Reading a client's evidence
+photographs, describing rooms, and reading dates off a utility bill have
+different tolerances for being wrong, and the evidence review, which is the
+vision call closest to a stage approval, was the one running the smallest
+default. The per-job defaults reproduce exactly what each call site resolved to
+before, so the move altered no behaviour on the day it landed; deciding what
+the evidence review should actually run on is a founder call, recorded in
+RUNBOOK.
+
+Second, every vision span now carries `yaadly.model.region`. The text spans
+already did. The one class of call that sends actual photographs was the class
+that could not be traced to a country, which is the wrong way round.
+
+None of this touches what the vision agents are allowed to do. The evidence
+review still describes what is visible and hands it to a person; it does not
+grade evidence as sufficient and it does not gate a stage. `yaad-vetting-review`
+keeps its consent gate inside `review()` and keeps `IDENTITY_DOCS` withheld
+before download. A better model is a more accurate description in front of the
+named human, never a decision made further from them.
