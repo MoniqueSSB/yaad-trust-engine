@@ -2657,8 +2657,8 @@ The rule is stated in three places and they must not drift apart: `docs/terms.ht
 
 Two things to keep true while you edit them:
 
-1. **The card half is not switched on yet.** No Stripe links exist (see the payment links entry above), so today every job is invoiced whatever its size. All three pages say so. Delete that sentence only when the links are actually live, and not before.
-2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job. That is why the sentence is scoped to "at or under £500" everywhere it appears. Sweep it with:
+1. **The card half is live, as of 5 September 2026.** The eight Stripe links exist and are wired to the booking confirmation. The "not switched on yet" sentence came off all three pages, plus `docs/privacy.html` and `docs/cancellation.html`, in that change. Do not put it back: it now tells a client the opposite of what the page does. An invoice by bank transfer stays available on request at any size, and the pages say that instead.
+2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job, and it is **false on the Oversight Retainer**, which is a monthly subscription that bills immediately. `docs/services.html` keeps `SUBSCRIPTION_SERVICES` for exactly that reason: it picks which of the two sentences the confirmation shows. That is why the hold sentence is scoped to "at or under £500" and away from the retainer everywhere it appears. Sweep it with:
 
 ```bash
 grep -rn "not charged until\|authorised at booking" docs/*.html
@@ -2718,7 +2718,7 @@ Founder's instruction, 3 September 2026: legal sign-off and insurance are in han
 
 **Two things this did not switch on.**
 
-1. **Card payment.** No Stripe links exist yet, so every job is still invoiced and paid by bank transfer. `docs/terms.html`, `docs/payments.html` and `docs/services.html` all still say so, correctly. That sentence comes out when the links are created, not before.
+1. **Card payment.** This was true when written. It stopped being true on 5 September 2026: the links were created, the caveat came off every page, and the booking confirmation now carries a pay button. See "Making the card path visible" below.
 2. **CLAUDE.md section 9** still lists "payment integration of any kind, before the legal review lands" as deliberately not being built. That is now stale. **Monique owns that file and a session must not rewrite it**, so it needs her edit, not ours.
 
 **Redeploy after any change to the assistant's facts.** `faq.ts` and `price-figures.ts` live in `yaad-inbound`, not `_shared`, so `sync-shared.sh` does not copy them. Deploy from disk:
@@ -2740,28 +2740,52 @@ The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. When
 
 Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
 
-## Pasting the Stripe payment links in
+## Making the card path visible
 
-The site is wired and waiting. One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
+**Done 5 September 2026.** All eight links are live and each of the six bookable services offers one. Founder's report was that she could not book a service by card at all, and she was right: the link only appeared as small text inside a sentence after the form was submitted, and the grey box directly under the form still said card was not switched on. What changed:
+
+- The booking panel says up front that card is available, and the confirmation now carries a full width **Pay for &lt;service&gt;** button rather than an inline link.
+- The caveat came off `services.html`, `payments.html`, `terms.html`, `privacy.html`, `cancellation.html` and `docs/COPY-GUIDELINES.md`.
+- **Two dead options were removed from the booking dropdown.** Project Setup Pack and Document Pack Check were deactivated in the catalogue on 3 Sep and are not in the function's `BOOKABLE` allowlist, so choosing either returned "Pick one of the services on this page." They were unbookable on the live site for two days.
+- **Property Care was booking the wrong tier.** The form always posted `care`, so a villa was recorded at the standard £45 while the pay button asked for £95. It now posts `care`, `care-large` or `care-villa`, matching `BOOKABLE`, and `PAYMENT_LINKS` was rekeyed to the same strings so one service means one key on both sides.
+- **The retainer is a subscription, not a hold**, and the confirmation now says so. It was telling retainer clients their card was authorised and not charged, which was false: it bills the first month immediately and monthly after.
+
+## Changing the Stripe payment links
+
+One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
 
 ```js
 const PAYMENT_LINKS = {
-  deposit:   "https://buy.stripe.com/...",
-  visual:    "",
-  condition: "",
-  signoff:   "",
-  care:      "",
-  retainer:  ""
+  deposit:      "https://buy.stripe.com/...",
+  visual:       "https://buy.stripe.com/...",
+  condition:    "https://buy.stripe.com/...",
+  signoff:      "https://buy.stripe.com/...",
+  care:         "https://buy.stripe.com/...",
+  "care-large": "https://buy.stripe.com/...",
+  "care-villa": "https://buy.stripe.com/...",
+  retainer:     "https://buy.stripe.com/..."
 };
 ```
 
-Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads exactly as it does today, so there is never a dead button or a half wired payment. The keys are the booking form's own service values, not the catalogue ids.
+Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads as it did before, with no button, so there is never a dead button or a half wired payment. **The keys are the service values the form posts, which are the same strings `yaad-book-service`'s own `BOOKABLE` allowlist uses.** They are not the catalogue ids, and they used to be a third set again on the Property Care tiers, which is how the tier bug above happened. If you add a service, add it in both places with the same string.
+
+Add a new subscription link to `SUBSCRIPTION_SERVICES` in the same file, directly below, or its confirmation will tell the client their card is only authorised when it is being charged.
+
+**To check the wiring without writing to the live database**, serve `docs/` and stub the endpoint in the console before submitting the form:
+
+```js
+const real = fetch; window.fetch = async (u,o) => String(u).includes('yaad-book-service')
+  ? new Response(JSON.stringify({ok:true,ref:'SVC-TEST01',emailGiven:true}),{status:200})
+  : real(u,o);
+```
+
+Then book each service in turn and confirm the posted `service` value and the button's `href` agree. Submitting for real creates a `services` row and pushes to the founder's phone, so do not test that way.
 
 **Why the pay link is after the booking and not on the service card.** The card buttons are already claimed by the page's own script, which routes them into the booking form. That form is where the client's name, contact and property go on record, where the reference is minted, and where the cancellation information has to reach them. A card button pointing straight at Stripe would skip all of it, and a client would have paid before Yaadly knew who they were or had given them their 14 day cancellation notice. So the link appears on the confirmation, once the booking exists.
 
 Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
 
-**Still missing before a link should go live:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker.
+**Still open, and now more exposed than it was:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker. This was written as "missing before a link should go live". The links went live anyway and the card path was made prominent on 5 September 2026, so the gap is now load bearing rather than theoretical: every card booking taken before the checkbox exists carries it. Fixing it is a Stripe Dashboard change on each of the eight links, not a code change here, and it was flagged to the founder on the day.
 
 ---
 
