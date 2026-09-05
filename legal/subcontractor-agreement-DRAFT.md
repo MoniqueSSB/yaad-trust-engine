@@ -14,11 +14,17 @@ paragraph nobody has checked.** There are seven marked boxes. They are collected
 at the end as well as appearing in place. Written wording over an open point
 would read exactly like checked wording, which is worse than a visible gap.
 
-**Three clauses need an adviser before this goes to anybody:** clause 5
-(substitution), clause 16 (not going around Yaadly) and clause 24 (governing
-law). Each is marked. The rest is a description of how Yaadly already works,
-written down, and an adviser tightening it is a different job from an adviser
-deciding it.
+**Four clauses need an adviser before this goes to anybody:** clause 5
+(substitution), clause 11 (whether the shortfall day rate is an unenforceable
+penalty), clause 16 (not going around Yaadly) and clause 24 (governing law).
+Each is marked. The rest is a description of how Yaadly already works, written
+down, and an adviser tightening it is a different job from an adviser deciding
+it.
+
+**One box, at clause 11, is arithmetic rather than law, and it is the one to
+read first.** Two figures set on 5 September 2026 contradict each other and
+contradict Yaadly's own published day rate research. The draft departs from the
+instruction there and says exactly where and why.
 
 **It is written to be read by the person signing it.** A tradesperson in
 Portmore on a phone. Short sentences, second person, no defined-term
@@ -50,11 +56,18 @@ Part 2 governs.
   after, and a walk-round at the end. A stage without its evidence does not
   close and does not pay.
 - **If the site is not what the client described, you can walk away** and you
-  are still paid for turning up. That protection is yours, not only the
+  are still paid £25 for turning up. That protection is yours, not only the
   client's.
 - **If work is wrong, you come back and put it right at your own cost.** Yaadly
   carries the client's claim, and Yaadly carries the money, but the making good
   is yours.
+- **If a review finds the job is not finished to the agreed scope, you are told
+  first and you get the chance to go back.** Go back and finish it and you are
+  paid the full agreed price. Only if you will not go back, or it cannot be put
+  right, are you paid a day rate for the days you actually worked instead. That
+  day rate is on your engagement note before you start, and it is a floor: you
+  are never paid less than it for a day you worked. Your materials are paid at
+  cost either way.
 - **Your Yaad Score is built only from finished jobs a named person approved.**
   No software ever moves it. You can see it and you can challenge it.
 - **Either of us can end this** on notice. Jobs already started get finished.
@@ -233,24 +246,26 @@ from another job or another day ends this agreement immediately under clause
 If you arrive and the site is materially different from what the client
 described, tell Yaadly before starting. Photograph what you found.
 
-**You may decline the job, and you are paid an attendance fee for turning up.**
+**You may decline the job, and you are paid an attendance fee of £25 for turning
+up.** It is paid to you in Jamaican dollars, at the rate stated on your
+engagement note, so you are not carrying the exchange rate on it.
+
 You are not held to a price quoted against a description that turned out to be
 wrong, and you are not asked to absorb somebody else's mis-description.
 
 Yaadly then either re-scopes and re-prices the job with you, in writing, or
 cancels it.
 
-> **Open point 4: the attendance fee amount.** Not set. It needs a figure that
-> covers a wasted half day and travel in a Jamaican parish, and the founder
-> sets it, not the adviser and not a session.
+*Founder decision of 5 September 2026. See the marked box at clause 11: the
+figure is settled, how it sits against the shortfall day rate is not.*
 
-### 11. Your work, and putting it right
+### 11. Your work, putting it right, and work that is not finished properly
 
-You carry out the work with the skill and care of a competent tradesperson in
-your trade, to the scope agreed, using materials fit for the purpose, and in
-compliance with any applicable Jamaican building requirements.
+**The standard.** You carry out the work with the skill and care of a competent
+tradesperson in your trade, to the scope agreed, using materials fit for the
+purpose, and in compliance with any applicable Jamaican building requirements.
 
-If the work is defective, you return and put it right at your own cost,
+**If the work is defective, you return and put it right at your own cost,**
 including your own labour and your own materials.
 
 Yaadly answers to the client for the work. That is what being the principal
@@ -258,14 +273,78 @@ means, and it is why the client comes to Yaadly and not to you. It does not
 move your obligation under this clause: as between you and Yaadly, defective
 work is yours to make good.
 
-> **Open point 5, for the adviser: how long the making-good obligation lasts,
-> and the cap.** `docs/terms.html` correctly refuses to promise a workmanship
-> guarantee to clients before it is insured, and insurance quotes are not in.
-> This clause cannot sensibly run longer than whatever Yaadly promises the
-> client, and it should not run shorter. The three UK principals checked all
-> give twelve months in their own name. The period here, and whether your
-> liability to Yaadly is capped at the job value or is uncapped, should be
-> settled with the insurance, in one decision, not two.
+**If a review finds the work is not completed to the agreed scope.** Yaadly
+reviews the finished work against the scope on your engagement note. That
+review decides what you are paid, so it runs in this order and no other:
+
+1. **A named person carries out the review.** Never software, and never
+   automatically on a timer or a score.
+2. **You are told what is wrong and shown the evidence, before any decision
+   about money is taken.** You may put your side, and it is recorded.
+3. **You get the chance to go back and finish it.** If you do, and it then
+   meets the agreed scope, **you are paid the full agreed price.** Going back
+   costs you nothing beyond your own time and materials, and the full price is
+   never lost by returning.
+4. Only if you decline to go back, or the work cannot be brought to the agreed
+   scope, are you paid **the day rate for your trade for the days you actually
+   worked**, instead of the agreed price.
+5. **The day rate for your trade is stated on your engagement note before you
+   start**, so the fallback is a number you saw and accepted, never one
+   produced after the argument started.
+6. Days actually worked are counted from your Arrival Log and your Midnight
+   Work-Log. That is the evidence you already file, and it is why filing it
+   protects you.
+7. **You are never paid less than the day rate for days you actually worked.**
+   That is a floor, not a target.
+8. A named person decides, in writing, with the reason given. You may challenge
+   it under clause 19, and the challenge is heard by a person.
+
+Materials you bought and filed receipts for are paid at cost either way. They
+are not part of this and are never withheld.
+
+> **Open point 4, for the founder, and this one is arithmetic before it is law.**
+> Two figures were set on 5 September 2026 and they do not sit together. Against
+> `JMD_PER_GBP = 210.0` in `yaad/benchmarks.py`, the £25 attendance fee at clause
+> 10 is **5,250 JMD**. The shortfall day rate proposed alongside it was **3,000
+> JMD**. So turning round at a mis-sold gate pays 75% more than working a full
+> day, which is a standing reason to find a site mis-sold, and the mis-sold
+> finding is made by the worker who benefits from it.
+>
+> The second half is worse. `DAY_RATES_JMD` in the same file puts **general
+> labourer at 3,000 to 3,500** and **every skilled trade at 7,000 to 12,000**,
+> and those bands are published on `yaadly.co.uk/prices.html` as Yaadly's own
+> research. A 3,000 flat shortfall rate therefore pays a skilled mason below the
+> labourer floor Yaadly itself published, on Yaadly's own judgment, in Yaadly's
+> own financial favour. That is the Farrin price argument turned around and
+> pointed at the worker, and it is the one screenshot this business cannot
+> afford.
+>
+> This draft therefore writes the shortfall rate as **the day rate for that
+> trade, stated on the engagement note**, rather than a flat 3,000. That is a
+> deliberate departure from the instruction, made because the instruction
+> collides with the founder's own published data, and it is hers to reverse.
+> What still needs her: whether the attendance fee stays at £25 once the
+> shortfall rate rises above it, or whether a wasted journey is deliberately
+> worth more than a disputed day.
+
+> **Open point 5, for the adviser, two questions in one clause.**
+> First: how long the making-good obligation lasts, and whether liability is
+> capped at the job value or uncapped. `docs/terms.html` correctly refuses to
+> promise a workmanship guarantee to clients before it is insured, and quotes
+> are not in. This clause cannot run longer than what Yaadly promises the
+> client, and should not run shorter. The three UK principals checked all give
+> twelve months in their own name. Settle it with the insurance, in one
+> decision.
+>
+> Second, and new: **the shortfall mechanism at paragraphs 1 to 8 needs
+> testing as a possible penalty.** It replaces an agreed contract price with a
+> lower sum on the judgment of the party that saves the money. A clause like
+> that is at real risk of being unenforceable unless the substituted figure is
+> a genuine reflection of the value actually received rather than a sanction.
+> The structure above is built to survive that test: a real day rate for real
+> days, a route back to the full price, notice and a hearing first, and a named
+> person deciding. Whether it does survive is the adviser's call, not this
+> draft's.
 
 ### 12. Health and safety
 
@@ -474,6 +553,8 @@ current version.
 | Scope of work | What the finished result must be |
 | Your labour price | The figure you set |
 | **What Yaadly pays you** | Your price less 12%, or less 10% on remote digital work. Stated as a number, not a percentage |
+| **The day rate for your trade** | Per clause 11. What you are paid per day worked if the job is reviewed as not finished to scope and you do not go back. Stated as a number, before you start, never after |
+| **The attendance fee** | £25 in Jamaican dollars, per clause 10, if the site is not as described |
 | Materials | Expected list, bought by you, paid at cost against receipt, no fee |
 | Nominated materials store | Per clause 8, set before anything is bought |
 | Stages | What each covers and what it pays |
@@ -496,9 +577,15 @@ For the adviser brief, and for the founder where marked.
 3. **Payment days, and insolvency** (clause 7). A figure that will be honoured.
    And what the tradesperson's position is if Yaadly cannot pay. Founder for
    the number, adviser for the disclosure.
-4. **The attendance fee** (clause 10). A figure. Founder.
-5. **Making good: how long, and capped or not** (clause 11). Settle with the
-   insurance, in one decision. Founder and adviser together.
+4. **The two money figures collide** (clauses 10 and 11). The £25 attendance fee
+   is 5,250 JMD at the rate in `yaad/benchmarks.py`, and a 3,000 JMD shortfall
+   day rate is both below that and below the labourer floor Yaadly published.
+   This draft writes the shortfall as the trade's own published day rate
+   instead, which is a departure from the instruction and is hers to reverse.
+   Founder.
+5. **Making good: how long, capped or not, and is the shortfall a penalty**
+   (clause 11). The first two settle with the insurance, in one decision. The
+   third is new and is the adviser's. Founder and adviser together.
 6. **The tradesperson's insurance** (clause 13). What level, whether it is
    actually purchasable in Jamaica, or whether Yaadly carries it for the panel.
    Founder, with a cost attached.
