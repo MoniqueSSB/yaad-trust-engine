@@ -146,7 +146,7 @@ export const ACCESS = [
  * in the quote confirmation, not on the first screen of a public form.
  */
 export const MATERIALS = [
-  { value: "Included in the quote" },
+  { value: "To be included in quote" },
   { value: "I am supplying them" },
 ] as const;
 

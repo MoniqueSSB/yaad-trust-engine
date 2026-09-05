@@ -92,7 +92,7 @@ const STORE_TYPE: Record<string, string> = {
  *  'yaadly' would silently commit a client to buying materials through
  *  Yaadly because their browser had an old copy of a page. */
 const MATERIALS_BY: Record<string, string> = {
-  "included in the quote": "yaadly",
+  "to be included in quote": "yaadly",
   "i am supplying them": "client",
 };
 

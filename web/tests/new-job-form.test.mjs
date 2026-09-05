@@ -49,7 +49,7 @@ const full = () => ({
   desc: "Zinc lifted off the back roof and water is coming in",
   urgency: "Urgent, within 48 hours",
   accessType: "No inside access needed, outside work only",
-  materialsBy: "Included in the quote",
+  materialsBy: "To be included in quote",
   name: "Test Client",
   contact: "test@example.com",
 });
@@ -299,7 +299,7 @@ describe("restoring only ever offers values the lists still have", () => {
  */
 describe("the materials wording maps to a route", () => {
   const MAPPED = {
-    "included in the quote": "yaadly",
+    "to be included in quote": "yaadly",
     "i am supplying them": "client",
   };
 
@@ -319,7 +319,7 @@ describe("the materials wording maps to a route", () => {
     }
   });
 
-  test("included in the quote is first, the normal way a job runs", () => {
+  test("to be included in quote is first, the normal way a job runs", () => {
     assert.equal(MAPPED[m.MATERIALS[0].value.toLowerCase()], "yaadly");
   });
 
@@ -361,7 +361,7 @@ describe("a saved draft keeps the materials answer", () => {
   test("it survives a serialise and parse round trip", () => {
     const raw = m.serialiseDraft("JOB-1", full(), Date.now());
     const back = m.parseDraft(raw, Date.now());
-    assert.equal(back.fields.materialsBy, "Included in the quote");
+    assert.equal(back.fields.materialsBy, "To be included in quote");
   });
 
   test("a retired option is dropped on restore rather than posted", () => {
