@@ -4,7 +4,7 @@
 -- and removes them again.
 --
 -- WHAT IS BEING PROVED. terms.html promises the client a before photograph and
--- an after photograph on every stage. 20260905c added the column that records
+-- an after photograph on every stage. 20260906000500 added the column that records
 -- which is which. Three things have to hold for that column to be worth
 -- anything, and each is a test below:
 --

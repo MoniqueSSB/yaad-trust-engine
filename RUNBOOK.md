@@ -150,28 +150,64 @@ This is the Python engine only. The live Edge Functions are step 9.
 
 ## 9. Switching the text model to the EU
 
-The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set.
+The nine live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`, `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack` and `yaad-sketch`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set. (`yaad-kickoff` also has a provider picker of its own, which checks OpenRouter and NVIDIA first and otherwise falls through to the shared one.)
+
+**Done on 4 September 2026, all three steps.** The switch is live, the MiniMax branch is gone, and there is no fallback provider any more. This section is kept as the record of how it was done and as the procedure for the next provider change, not as outstanding work.
 
 **MiniMax is the current choice, deliberately.** Founder decision, 30 August 2026: the data flowing through these functions today is synthetic, and a China transfer of invented job cards is not what the DPIA is about. **The trigger for this step is real client and worker data, which arrives with the December pilot.** Do it before then, not after.
 
-**Step one, set the secret.** One command, and every function picks it up on its next invocation. No redeploy needed, because it is read at call time.
+**Step one, set TWO secrets, not one.** Every function picks them up on its next invocation. No redeploy needed, because they are read at call time.
 
 ```bash
 supabase secrets set MISTRAL_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
 ```
 
-**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose, and it is the same attribute that answers "where is our data going" today.
+```bash
+supabase secrets set MISTRAL_MODEL=mistral-small-latest --project-ref leffyisvfvjwzilydlwf
+```
 
-**Step three, remove the MiniMax branch.** Once step two is confirmed, delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again.
+**The model id is not optional and it is the step that goes wrong.** The default in `textmodel.ts` was `mistral-large-latest`, which Mistral no longer serves, so setting only the key sends every agent into its holding reply. Learned the hard way on 4 September 2026, twice: once on the dead default, and once on `mistral-medium-3-5-26-04`, which is the model's NAME in Mistral's overview table and not its API id. The id form is `mistral-small-latest`, `mistral-medium-latest`, or a dated snapshot such as `mistral-medium-2604`.
 
-**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. Model names move. Confirm the current one on Mistral's model page and set it without touching code:
+`mistral-small-latest` is the current choice. It resolves to Mistral Small 4, its reasoning is off unless a request passes `reasoning_effort: high`, so it does not burn the token budget thinking, and unlike `mistral-medium` it is not scheduled for deprecation inside the pilot window.
+
+**Step two, prove it switched.**
+
+This step used to say: look at the span attribute `yaadly.model.region`, which reads `eu` when it worked. That is still true and it is still the right answer **once tracing is on**. It was not on. `OTEL_EXPORTER_OTLP_ENDPOINT` has never been set on this project, so the tracer is completely inert and there are no spans to read. A proof method that needs infrastructure nobody has set up is not a proof method. Rewritten 4 September 2026 to say what actually worked.
+
+Post a synthetic job through `yaad-post-job` in draft mode. It is public, it calls the model, and it hands the model's own answer straight back in the `read` field:
 
 ```bash
-supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzilydlwf
+curl -s -X POST "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-post-job" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Content-Type: application/json" -d '{"mode":"draft","assist":true,"desc":"Di pipe unda mi kitchen sink a leak bad since Tuesday and di cupboard bottom gone soft. One storey house inna Portmore. Mi cousin Winston have di key from 8 inna di morning."}'
 ```
+
+`"read": null` means the model did not answer. A filled-in card with `"trade": "Plumbing"` means it did, and since `mistral-small-latest` is a Mistral model id that MiniMax would reject outright, an answer is itself the proof the call went to `api.mistral.ai` in the EU.
+
+It leaves a draft job in the desk. Delete it when you are done.
+
+When `read` comes back null, the reason is now in the logs rather than nowhere. Look for a line naming the provider and the status:
+
+```bash
+supabase functions logs yaad-post-job --project-ref leffyisvfvjwzilydlwf
+```
+
+Turning on a real OTLP endpoint is still worth doing and would make this a one-query answer across all nine functions instead of one function at a time. It is not a prerequisite for the switch.
+
+**Step three, remove the MiniMax branch. Done, 4 September 2026.** The branch is out of `_shared/textmodel.ts`, `sync-shared.sh` has pushed the change into all nine copies, all nine are redeployed, and the `MINIMAX_API_KEY` secret has been unset. `docs/privacy.html` now names Mistral in the European Union, and the table row and both dates on that page moved with it.
+
+There is deliberately no fallback provider now. With no Mistral key configured, `pickTextProvider()` returns null and every caller gets `NO_PROVIDER_MESSAGE`, which is a loud failure rather than a quiet reroute to China. Do not add a fallback back in. If a provider ever needs changing again, use the four `TEXT_MODEL_*` secrets, which take priority over everything and need no deploy.
+
+**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. See step one, which is where that goes wrong.
 
 **To point at something else entirely**, no code change: set `TEXT_MODEL_KEY`, `TEXT_MODEL_API`, `TEXT_MODEL_NAME` and `TEXT_MODEL_REGION`. Those take priority over everything. A new hard-coded provider in that file is a new country receiving personal data, so it is a founder decision and a line in the data inventory before it is a code change.
 
+**Deploying the nine**, from disk only, never by pasting file contents.
+
+The loop that used to be here was wrong in three ways and the third was dangerous. It said eight functions when there are nine. It named `yaad-whatsapp-webhook`, deleted on 1 September 2026, so it errored partway. And it applied `--no-verify-jwt` to every function in the list, which is exactly the blanket form CLAUDE.md §12 exists to forbid: running it would have stripped platform authentication from six functions that require it, silently, with the deploy still reporting success. Corrected 4 September 2026.
+
+**Six require a JWT. Deploy these WITHOUT the flag:**
+
+```bash
+for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-quote-pack yaad-sketch; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf; done
 **Deploying them**, from disk only, never by pasting file contents.
 
 **Do not paste the loop that used to be here.** It ran `--no-verify-jwt` across eight functions at once, including `yaad-whatsapp-webhook`, which no longer exists, and including `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff` and `yaad-sketch`, which all run with `verify_jwt = true`. Pasting it would have silently stripped platform authentication from five admin-only endpoints, the deploy would have succeeded, and nothing would have said so. That is exactly the failure CLAUDE.md section 12 describes when it says the flag is per function and never a blanket. Corrected 4 September 2026.
@@ -189,6 +225,20 @@ for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-sketch; do su
 ```bash
 for f in yaad-inbound yaad-post-job yaad-notify-client; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
 ```
+
+**Three carry their own authentication and keep the flag:**
+
+```bash
+for f in yaad-inbound yaad-notify-client yaad-post-job; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+```
+
+Read the live settings before trusting the split above, the same way §12 says to. It was true on 4 September 2026 and it is a list, which means it will go stale:
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+Then check `verify_jwt` still reads the same after deploying. A deploy that silently flipped it succeeds and says nothing.
 
 ---
 
@@ -674,6 +724,197 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## Creating TWILIO_CONTENT_SID_DESK_REPLY
+
+**What it is for.** You reply from the desk to somebody who last wrote more
+than 24 hours ago. WhatsApp will not carry free text that far, so
+`yaad-desk-reply` saves your words in `pending_desk_replies` and sends an
+approved template instead saying a reply is waiting. The moment they write
+back, the window reopens and `yaad-inbound` flushes your real words in full.
+
+**Without it your reply is still saved, and they are never told to write
+back**, so it sits there until they happen to message. That is the whole cost
+of not having it.
+
+**Your words never go in the template.** A template's variable slots are
+approved for one specific sentence, and reusing one to carry different text is
+how a sender gets flagged.
+
+### The template
+
+One variable, `{{1}}`, which `yaad-desk-reply` fills with the job code, or with
+the literal words "your job" when the thread has no job yet. So the sentence
+has to read correctly both ways.
+
+```
+Hi, this is Yaadly. There is a reply waiting for you about {{1}}. WhatsApp only lets us send it after you message us, so send us anything back and it will come through straight away.
+```
+
+Checked against `_shared/guardrails.ts`: no banned language, no dashes, reads
+correctly with a job code and with "your job".
+
+### Steps
+
+1. Twilio Console, **Messaging, Content Template Builder, Create new**.
+2. Name it `yaadly_desk_reply_waiting`, language English. The name is internal.
+3. Content type **Text**.
+4. Paste the body above. Give `{{1}}` a sample value, `JOB-WEB-1788281626906`.
+5. Save, then **Submit for WhatsApp approval**, category **Utility**. It is
+   utility because it is about an enquiry the person already started. Choosing
+   Marketing invites a slower review and a stricter bar for no benefit.
+6. Wait for Meta. Usually minutes, sometimes a day. It is out of your hands.
+7. When approved, copy the Content SID. It starts `HX`.
+8. Set it:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_DESK_REPLY=HXyour_sid_here --project-ref leffyisvfvjwzilydlwf
+```
+
+**No redeploy is needed.** The function reads it with `Deno.env.get` at send
+time, so the next send picks it up.
+
+### Checking it worked
+
+Send a desk reply to a number that last wrote more than 24 hours ago. The
+response says a short approved message has gone, rather than the sentence about
+the secret not being configured. Then:
+
+```sql
+select to_addr, job_id, created_at, sent_at from public.pending_desk_replies order by created_at desc limit 5;
+```
+
+Your words should be sitting there unsent, and they go out on their own the
+moment that number replies.
+
+---
+
+## A quote pack held on a phrase that was not the phrase the rule is for
+
+**What happened, 5 September 2026.** A quote pack draft on the test job
+`JOB-WEB-1788281626906` was held. The banned-language rule caught **"fully
+covered"**, and it was right to look: that phrase is on the list because "your
+job is fully covered" is a promise about money and cover that Yaadly must never
+make.
+
+The pack said: *"First coat applied evenly over all railings, surface fully
+covered"*. Paint, on a railing. Nothing to do with cover at all.
+
+**No client was waiting.** Every job in this database is a test job
+(`CLAUDE.md` §12), so the elapsed time meant nothing. The reason to write this
+down is what it predicts, not what it cost: with a real painting job the same
+phrase blocks it the same way, and there is no route out.
+
+**The real defect was not the false positive.** It was that a flagged draft had
+exactly one action on the desk, Approve, and `approve_quote_pack_draft()`
+refuses outright on any flag with no override, correctly. So there was no route
+from "this flag is wrong" to "this job can move". On a real job that is a dead
+stop.
+
+### Correcting a held pack, from 5 September 2026
+
+The Quote Pack Drafts view has a second action, **"Correct the wording"**. It
+loads the whole pack into a box, you fix the words, and it goes to
+`yaad-quote-pack-rescan`.
+
+**It clears nothing.** The corrected text goes through
+`_shared/quote-pack-verdict.ts`, which is the identical function the drafter
+uses, not a second opinion. A correction that is still dirty stays dirty, the
+desk tells you which words tripped it, and `approve_quote_pack_draft()` still
+refuses. `status` is never touched, so a named human still presses Approve
+afterwards.
+
+**The whole pack is in the box, not just the flagged line**, because a flag can
+be in any section and showing one sentence invites fixing it while a second
+copy of the phrase sits in another.
+
+**No model is called.** This is your edit being re-checked, not a redraft, so
+there is no pause switch to honour. Redrafting from the brief is
+`yaad-quote-pack`'s separate job.
+
+The row keeps `rescanned_by`, `rescanned_at`, `rescan_note` and
+`previous_banned_samples` in its `guardrail`, so what was flagged before a
+correction is still readable afterwards.
+
+**Why the banned pattern was not narrowed instead.** "fully covered" is on the
+list because "your job is fully covered" is a promise about money. Telling that
+apart from paint coverage by regex is not something to attempt under time
+pressure, and a loosened rule is permanent and applies to every future client
+while a stuck draft is one row. `CLAUDE.md` §3. Widen what the desk can do,
+never the rule.
+
+**How this one was corrected, and the rule to follow next time.** The wording
+was changed to "complete coverage with no bare metal showing", then re-scanned
+by running `_shared/guardrails.ts` itself over the corrected text: original
+flagged `["fully covered"]`, corrected flagged nothing, price check found
+nothing. **The flag was recomputed by the real scanner, never cleared by
+hand.** `guardrail.rescan_note` on the row records exactly that. The draft
+stayed at `ready`, so a named human still presses Approve.
+
+**Never clear `banned_language_detected` by editing the JSON to false.** That
+is the one move that turns this table from a record into a decoration. Change
+the wording, run the scanner, write what the scanner says.
+
+**Expect this phrase again.** Painting and decorating is a large share of the
+trade list and "fully covered" is ordinary language for paint coverage. The
+banned pattern was deliberately left alone: narrowing a guardrail so a job can
+proceed is exactly the change `CLAUDE.md` §3 exists to refuse, and telling the
+financial sense from the decorating sense by regex is not something to attempt
+under time pressure on a live job. Widening the desk's options is the right
+fix; loosening the rule is not.
+
+---
+
+## The 5 September 2026 deploy, and what is still not wired
+
+Three functions went to production on 5 September: `yaad-message-status`
+(`--no-verify-jwt`), `yaad-phone-check` and `yaad-vision` (both without the
+flag, platform auth on). `scripts/check-deploy-drift.sh` then reported no drift
+in either direction.
+
+**Verified by probe, not by reading the deploy output**, because a successful
+upload says nothing about whether the flag landed:
+
+```bash
+B=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-message-status" \
+  -H "Content-Type: application/x-www-form-urlencoded" --data "MessageSid=SMtest&MessageStatus=failed"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-phone-check" \
+  -H "Content-Type: application/json" --data '{"phone":"+18765551234"}'
+```
+
+Correct answers are **403** ("Signature check failed.") and **401** ("Missing
+authorization header"). A 200 from the first means the signature check is not
+running and anybody can write delivery statuses; a 200 from the second means
+the flag was passed by mistake and Lookup, which costs money per call, is open.
+
+**Delivery reporting was then wired across every send, not just one.**
+`TWILIO_STATUS_CALLBACK_URL` is set to the function's own URL, and seven
+functions send over Twilio: `yaad-desk-reply`, `yaad-notify-client`,
+`yaad-portal-code`, `yaad-inbound`, `yaad-job-health`, `yaad-daily-checkin`,
+`yaad-enquiry`. Only the first attached a status callback, so setting the
+secret alone would have left six paths silent while the Overview reported zero
+failures. `_shared/twilio-status.ts` now does it in one place and all seven
+call it.
+
+It is inert with the variable unset, which is what made it safe to put in front
+of the portal sign-in code and a client's own notifications in one change.
+
+```sql
+select status, count(*) from public.message_deliveries group by status;
+```
+
+**If that stays empty after a real send**, check the secret is set, then check
+the function is reachable (`curl` the URL, expect 403 not 404), then read
+Twilio's own error log: Twilio silently drops a callback to a URL it cannot
+reach, and nothing on this side would know.
+
+**Still unset: `TWILIO_CONTENT_SID_DESK_REPLY`**, unrelated to this deploy. It
+needs a Utility template created in Twilio and approved by Meta, which is
+account work rather than a repository change. `TWILIO_CONTENT_SID_APPROVE` was
+set on 4 September.
+
+---
+
 ## Passing or blocking an applicant, and why the buttons changed
 
 **Deciding whether somebody can earn on this platform is a §2 decision, and
@@ -734,10 +975,13 @@ which is correct behaviour: `approve_quote_pack_draft()` is admin only and
 refuses outright on any flag rather than offering an override. What was missing
 was anybody being told.
 
-**Found live on 5 September 2026**: `JOB-WEB-1788281626906`, Painting and
-Decorating in Kingston, pack drafted 2 September, held 78 hours, flagged for
-the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The
-guardrail did its job perfectly and the job sat for three days.
+**Found on 5 September 2026 on a TEST job**: `JOB-WEB-1788281626906`, drafted
+2 September, flagged for the phrase "fully covered", which is on the banned
+list in `CLAUDE.md` §8. Nothing in this database is a real client, worker or
+job (`CLAUDE.md` §12), so no one was actually waiting; the elapsed time is just
+how long a test row sat. What is real is the shape: the phrase appeared as
+"surface fully covered", about paint on a railing, and painting is a large part
+of the trade list.
 
 ```sql
 select * from public.packs_awaiting_a_person;
@@ -783,7 +1027,7 @@ content was clean, not a person sitting down to a decision. The exclusion is a
 join the count. Tests 4 and 5 in the rig are the guard.
 
 **A pack a person actually cleared does count**, and getting that wrong is the
-correction in `20260905a`. `approve_quote_pack_draft()` is admin only, refuses
+correction in `20260905c`. `approve_quote_pack_draft()` is admin only, refuses
 outright on any guardrail flag rather than offering an override, and attributes
 the approval to the signed-in admin so the row can prove a named human
 confirmed it. That is a desk decision by any definition, and excluding the
@@ -2657,8 +2901,8 @@ The rule is stated in three places and they must not drift apart: `docs/terms.ht
 
 Two things to keep true while you edit them:
 
-1. **The card half is not switched on yet.** No Stripe links exist (see the payment links entry above), so today every job is invoiced whatever its size. All three pages say so. Delete that sentence only when the links are actually live, and not before.
-2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job. That is why the sentence is scoped to "at or under £500" everywhere it appears. Sweep it with:
+1. **The card half is live, as of 5 September 2026.** The eight Stripe links exist and are wired to the booking confirmation. The "not switched on yet" sentence came off all three pages, plus `docs/privacy.html` and `docs/cancellation.html`, in that change. Do not put it back: it now tells a client the opposite of what the page does. An invoice by bank transfer stays available on request at any size, and the pages say that instead.
+2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job, and it is **false on the Oversight Retainer**, which is a monthly subscription that bills immediately. `docs/services.html` keeps `SUBSCRIPTION_SERVICES` for exactly that reason: it picks which of the two sentences the confirmation shows. That is why the hold sentence is scoped to "at or under £500" and away from the retainer everywhere it appears. Sweep it with:
 
 ```bash
 grep -rn "not charged until\|authorised at booking" docs/*.html
@@ -2718,7 +2962,7 @@ Founder's instruction, 3 September 2026: legal sign-off and insurance are in han
 
 **Two things this did not switch on.**
 
-1. **Card payment.** No Stripe links exist yet, so every job is still invoiced and paid by bank transfer. `docs/terms.html`, `docs/payments.html` and `docs/services.html` all still say so, correctly. That sentence comes out when the links are created, not before.
+1. **Card payment.** This was true when written. It stopped being true on 5 September 2026: the links were created, the caveat came off every page, and the booking confirmation now carries a pay button. See "Making the card path visible" below.
 2. **CLAUDE.md section 9** still lists "payment integration of any kind, before the legal review lands" as deliberately not being built. That is now stale. **Monique owns that file and a session must not rewrite it**, so it needs her edit, not ours.
 
 **Redeploy after any change to the assistant's facts.** `faq.ts` and `price-figures.ts` live in `yaad-inbound`, not `_shared`, so `sync-shared.sh` does not copy them. Deploy from disk:
@@ -2740,28 +2984,79 @@ The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. When
 
 Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
 
-## Pasting the Stripe payment links in
+## Making the card path visible
 
-The site is wired and waiting. One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
+**Done 5 September 2026.** All eight links are live and each of the six bookable services offers one. Founder's report was that she could not book a service by card at all, and she was right: the link only appeared as small text inside a sentence after the form was submitted, and the grey box directly under the form still said card was not switched on. What changed:
+
+- The booking panel says up front that card is available, and the confirmation now carries a full width **Pay for &lt;service&gt;** button rather than an inline link.
+- The caveat came off `services.html`, `payments.html`, `terms.html`, `privacy.html`, `cancellation.html` and `docs/COPY-GUIDELINES.md`.
+- **Two dead options were removed from the booking dropdown.** Project Setup Pack and Document Pack Check were deactivated in the catalogue on 3 Sep and are not in the function's `BOOKABLE` allowlist, so choosing either returned "Pick one of the services on this page." They were unbookable on the live site for two days.
+- **Property Care was booking the wrong tier.** The form always posted `care`, so a villa was recorded at the standard £45 while the pay button asked for £95. It now posts `care`, `care-large` or `care-villa`, matching `BOOKABLE`, and `PAYMENT_LINKS` was rekeyed to the same strings so one service means one key on both sides.
+- **The retainer is a subscription, not a hold**, and the confirmation now says so. It was telling retainer clients their card was authorised and not charged, which was false: it bills the first month immediately and monthly after.
+
+## Changing the Stripe payment links
+
+One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
 
 ```js
 const PAYMENT_LINKS = {
-  deposit:   "https://buy.stripe.com/...",
-  visual:    "",
-  condition: "",
-  signoff:   "",
-  care:      "",
-  retainer:  ""
+  deposit:      "https://buy.stripe.com/...",
+  visual:       "https://buy.stripe.com/...",
+  condition:    "https://buy.stripe.com/...",
+  signoff:      "https://buy.stripe.com/...",
+  care:         "https://buy.stripe.com/...",
+  "care-large": "https://buy.stripe.com/...",
+  "care-villa": "https://buy.stripe.com/...",
+  retainer:     "https://buy.stripe.com/..."
 };
 ```
 
-Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads exactly as it does today, so there is never a dead button or a half wired payment. The keys are the booking form's own service values, not the catalogue ids.
+Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads as it did before, with no button, so there is never a dead button or a half wired payment. **The keys are the service values the form posts, which are the same strings `yaad-book-service`'s own `BOOKABLE` allowlist uses.** They are not the catalogue ids, and they used to be a third set again on the Property Care tiers, which is how the tier bug above happened. If you add a service, add it in both places with the same string.
+
+Add a new subscription link to `SUBSCRIPTION_SERVICES` in the same file, directly below, or its confirmation will tell the client their card is only authorised when it is being charged.
+
+**To check the wiring without writing to the live database**, serve `docs/` and stub the endpoint in the console before submitting the form:
+
+```js
+const real = fetch; window.fetch = async (u,o) => String(u).includes('yaad-book-service')
+  ? new Response(JSON.stringify({ok:true,ref:'SVC-TEST01',emailGiven:true}),{status:200})
+  : real(u,o);
+```
+
+Then book each service in turn and confirm the posted `service` value and the button's `href` agree. Submitting for real creates a `services` row and pushes to the founder's phone, so do not test that way.
 
 **Why the pay link is after the booking and not on the service card.** The card buttons are already claimed by the page's own script, which routes them into the booking form. That form is where the client's name, contact and property go on record, where the reference is minted, and where the cancellation information has to reach them. A card button pointing straight at Stripe would skip all of it, and a client would have paid before Yaadly knew who they were or had given them their 14 day cancellation notice. So the link appears on the confirmation, once the booking exists.
 
 Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
 
-**Still missing before a link should go live:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker.
+**Closed on the booking side, 5 September 2026, and still open on the Stripe side.** The express request to start work inside the client's 14 day cancellation period is now asked for and recorded at booking, which is where `docs/cancellation.html` always said it would be: "we will ask you for that in writing at booking".
+
+**How it works.** An unticked checkbox in the booking panel on `docs/services.html`. Ticking it posts `startNow`, `startNowVersion` and the exact sentence shown, and `yaad-book-service` writes all three into the booking's `notes`, so the record of who asked, and of what they were actually shown, survives the browser. Not ticking is a valid and recorded answer: the note then reads "NO request to start inside the 14 days. Do not begin work, and do not take payment, before the cancellation period has run out."
+
+**The checkbox is deliberately not required.** A tick nobody can decline is not a request anybody made, and a client who does not want an early start is entitled to have the 14 days run. If they leave it alone, the confirmation says so and **no pay button is offered at all**: a card authorisation lasts seven days and the wait is fourteen, so a hold taken then is guaranteed to expire before the job can begin.
+
+**`START_NOW_VERSION` and the wording move together**, same rule as `AI_CONSENT_VERSION` in the apply flow. Reword the checkbox without bumping the version and you silently reinterpret every answer already given. Both live at the top of the script block in `docs/services.html`, next to each other for that reason.
+
+**Stripe checkout now carries its own equivalent, added later the same day**, for the client who is sent a payment link directly and never passes the booking form. It is the section immediately below. The booking form remains the primary route and the only one that covers invoice jobs over £500.
+
+**The express request to start inside the 14 days: done 5 September 2026, on all eight live links.** It was written here as a Dashboard job on each link. It is not: the Stripe API does it in one call per link, and that is how it was done, so there is no eight rounds of clicking.
+
+Each link now carries two separate controls, and the separation is the point.
+
+- **A required dropdown, "When should we start?"**, with no pre-selected answer. Option one is "Start now. I ask you to begin inside the 14 days." Option two is "Wait the full 14 days. The hold may expire and we will contact you.", or on the retainer "Wait the full 14 days before any work starts.", because the retainer is a subscription and holds nothing. This is the express request. It arrives on the Checkout Session as custom field key `starttiming`, with values `startnow` and `waitfourteen`. **Change the labels freely, never the values**, or the answers stop reconciling with the ones already taken.
+
+  The second option names the hold expiring on purpose. The booking form solves the same problem by offering no pay button at all when the client has not asked for an early start, since a card authorisation lasts seven days and the wait is fourteen. A payment link cannot do that: the client is already on the pay page and the dropdown cannot gate the button. So the link says plainly what will happen instead of quietly taking a hold that is certain to die. A client who picks option two on a link should be treated as not yet paid, and contacted.
+- **A required terms acceptance tickbox**, carrying the cancellation wording. Seven links share one message; the Oversight Retainer has its own, because it charges the first month immediately rather than holding, and the shared wording would be false on it.
+
+They are two controls rather than one because bundling the express request into the terms tickbox makes an early start a condition of paying at all. A consumer who wants to wait the full 14 days could then not buy, and an express request that is forced is a weaker instrument than one freely given. Do not merge them back into a single tickbox to save a line on the page.
+
+**Two things are still not finished. Neither is a link change.**
+
+*The account has no Terms of service URL.* Set it at Settings, Public details, in the Stripe Dashboard. Stripe accepts `consent_collection[terms_of_service] = required` over the API without one and renders the tickbox anyway, linked to nothing: checked on the live checkout page on 5 September 2026, the only three links on it are Stripe's own "Powered by", "Terms" and "Privacy". Until the URL is set, the tickbox is an acceptance of a document the client cannot open. The wording was written around that, naming `yaadly.co.uk/cancellation` in plain text rather than claiming a link that is not there, so nothing on the page is untrue in the meantime. `https://yaadly.co.uk/terms.html` is the right target: it is what the tickbox says it is, and it already links to `cancellation.html` twice. Once it is set, reload a live link and confirm a Yaadly link renders beside the tickbox.
+
+*Nothing in this repository reads the answer back.* `starttiming` is captured by Stripe on the Checkout Session and nowhere else. The `services` row is created by `yaad-book-service` before payment and has no column for it, so today the only way to see what a client chose is the Checkout Session in the Stripe Dashboard. That is workable for the pilot and it is a real gap for anything past it.
+
+**To change any of this**, use the payment link API rather than the Dashboard, the same way the links themselves were made: `POST /v1/payment_links/{id}` with `consent_collection`, `custom_text.terms_of_service_acceptance` and `custom_fields`. The eight ids are recoverable with `GET /v1/payment_links`, and each carries `metadata.yaadly_service_id` so you can tell which service it is without matching URLs by eye. Five older links are inactive and deliberately untouched.
 
 ---
 
@@ -2778,6 +3073,73 @@ Read this with the section above, which covers a visitor who cannot ask at all. 
 **To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
 
 ---
+
+## 20. The evidence gap list is wrong, or nobody is getting it
+
+The completeness checks run in `yaad-notify-client` when evidence lands on a stage, debounced 90 seconds so a burst of photographs makes one check. They are deterministic, in `supabase/functions/_shared/evidence-checks.ts`, and they read only hard columns. No model is involved.
+
+**They never block anything.** They assemble a list. `approve_stage()` still requires a named human and is still the only door. If a change ever proposes letting these gate a stage or a payment, that is the request CLAUDE.md §3 exists to refuse.
+
+**The worker gets the gaps, the desk gets a push only when there are gaps.** Founder decision, 4 September 2026. A worker still on site can fix a gap in two minutes; the desk cannot.
+
+**If the gap list looks wrong, check in this order:**
+
+1. **Does the job have an approved Kickoff Pack?** The checklist check reads `kickoff_packs.docs.evidence_checklist` where `status = 'approved'`. No pack means no checklist claim, and the check says so to the desk rather than inventing a count.
+2. **Is the stage number right?** The checklist is a list and stage N reads entry N-1, the same convention `stageLabel()` uses. A pack with fewer entries than the job has stages returns nothing for the later ones.
+3. **Is it the clip check?** It reads `evidence.mime`, not the label. A video uploaded with a wrong mime reads as a photograph. That is deliberate: reading the label instead would mean trusting text the worker typed.
+4. **Is it the site note?** That one is desk-only and never reaches a worker. It fires on `arrival_log.far_from_site`, which is 30km from a parish centroid, and a materials run or a bad GPS fix raises it exactly as loudly as a wrong site. It is a glance, not a finding.
+
+**Nobody getting the push at all:** `app_settings.ntfy_topic` is where it goes. Unset, and `ntfyPush()` returns silently by design, because a missing notification must never break the report it rides on.
+
+**The location pin.** A worker sharing a location on WhatsApp lands in `work_log_pins` via `yaad-inbound`. Twilio delivers `Latitude`, `Longitude`, `Address` and `Label` as ordinary inbound parameters; nothing is installed for this. The worker is asked which job it belongs to and the code is always checked, the same rule the evidence lane follows: nothing lands on a job until the worker names it.
+
+**A missing pin is never a gap.** It is a note, and the test suite enforces that. `arrival_log`'s own migration sets the rule, that GPS strengthens the record and never gates it, and it holds here without exception. If a change ever proposes making a pin required, that turns a voluntary thing into an obligation and a worker starts being judged for declining. Refuse it.
+
+**A pin is not a photo geotag and never can be.** WhatsApp re-encodes images on send and discards EXIF, GPS included, and this project's own portal upload path strips location deliberately. There was never a photo geotag to read. Anyone proposing to recover one is proposing something that does not work.
+
+**Two checks remain absent** and should not be added by guessing. "Is this clip long enough" needs a duration column, which does not exist. "Receipts geolocated" needs lat/lon on `evidence` rows, which only `arrival_log` and `work_log_pins` have. Both are schema changes and both are decisions.
+
+---
+
+## 21. A pack is not reaching a client or a worker
+
+Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean draft was approved by a cron and went straight out. Roadmap item 7 of the agent audit removed that, because the guardrail is a banned-word scan and a currency regex, and a clean scan was standing in for a judgement it never made.
+
+**Kickoff Pack.** Built and linked automatically, then waits at `draft`. Approve it in the desk under **Kickoff packs**. Read **Notes for you** first: it is the model's own list of what a project manager must personally verify, and it now renders at the top of the pack for that reason. Payment stages render third because the model picks those percentages and they are Yaadly's commercial terms on the job.
+
+**This one blocks a booking, on the jobs that use it.** `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides, and neither side can confirm a pack nobody has approved. If a client is stuck at "waiting to be booked", check here first. `yaad-kickoff-check` pushes to your phone on every poll where any pack is waiting.
+
+**Since 4 September 2026 most jobs will not have a Kickoff Pack at all.** Accepting a price in the portal calls `agree_quote_as_me` and books on `quote_confirmed`, with no pack anywhere. A pack is ordered only when a client presses "Ask for full project documentation first". So if a job is stuck waiting on a pack, check the client actually asked for one: on the ordinary route the pack queue is irrelevant.
+
+**Quote Pack.** Waits at `ready` in **Quote Pack Drafts**. RLS keeps an unapproved draft off a worker's screen (20260901r), so until you approve it a worker sees no scoping document. He can still quote without one, so this delays a courtesy rather than stalling the board.
+
+**No push arriving?** Both use `app_settings.ntfy_topic`. Unset, and the helper returns silently by design, because a notification must never break a scheduled run.
+
+**Do not restore auto-issue.** If a change proposes it, or proposes approving on a guardrail pass, that is roadmap item 7 being undone. The guardrail cannot read whether a scope is right or a risk register is honest, and the model chooses the payment staging.
+
+---
+
+## 22. A price check looks wrong, or a band has changed
+
+The Price check view in the desk reads bands generated from `yaad/benchmarks.py`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+
+**To change a band:** edit `yaad/benchmarks.py`, then run
+
+```bash
+python3 scripts/gen_price_benchmarks.py
+```
+
+That rewrites the generated block inside `concierge/concierge.html`. Copy the file into `concierge-deploy/public/index.html` and deploy the desk. `tests/test_price_benchmarks.py` fails if the page has drifted from the engine, so a hand edit to the page is caught rather than shipped.
+
+**"No public price exists in Jamaica for this work" is a correct answer**, not a missing row. Painting, masonry, septic and general repair are deliberately empty: four-agent research on 1 August 2026 found no public prices for them anywhere in the country, and that gap is the reason the product exists. Do not fill them with a guess. A test asserts those four stay empty.
+
+**The verdict thresholds** are ported verbatim from `review_quote()`: over 2x the top of the band is a red flag, over 1.3x is worth asking about, under half the bottom is suspiciously low. Coarse on purpose. Six cases are checked against the Python source directly.
+
+**A trade with no band family** simply is not offered in the dropdown. Nine of the eighteen taxonomy trades map onto seeded families; the rest have no benchmark at all, and offering them would imply a lookup that cannot happen. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and checking a fence against it is a wrong reference dressed as a right one.
+
+**Three outcomes, not two, and the difference matters.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. Those report **"say which kind of job"** and list the variants. They must never report "no public price exists", which is the third outcome and is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. A test asserts no mapped trade can fall into the wrong one.
+
+**Nothing here is ever shown to a client or a worker.** `quote_reviews` is admin-only in RLS, deliberately with no party read policy. A band beside somebody's price reads as an estimate, and estimating is QS work, which is the one thing Yaadly does not guarantee.
 
 ## Changing anything a customer reads about money, checks or prices
 
@@ -3063,3 +3425,88 @@ Run the rig, which proves a phase declared after a sign-off cannot improve it:
 ```
 
 Nine checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-client` and `yaad-evidence-video`, which all write or read the column.
+
+The rig reports through `raise notice`, which psql shows and the Supabase MCP does not. To run it through the MCP instead, replace the temp table `t` with a real one, select from it at the end, and drop it. That is how it was run on 5 September 2026.
+
+**Applied to production 5 September 2026**, as `20260906000500_a_photograph_says_which_section_of_the_job_it_belongs_to.sql`, in three parts: the column and its constraint, the snapshot in `_do_approve_stage`, then the two views. All nine checks passed against live and the rig left no rows behind.
+
+---
+
+## A client asked for a worker by name and nothing seems to have happened
+
+The button on a worker profile records the request on the job row and holds
+the job off the open board for 48 hours so only that worker can price it. Work
+through it in this order.
+
+1. **Is it on the row at all?** In the desk, Jobs, find the job. The Worker
+   column shows an amber "asked, held for them" chip with the worker's address
+   under it while the hold is live. If it says nothing, the request never
+   landed: either the client did not arrive through a profile page, or the
+   slug did not resolve to an ACTIVE worker profile. `yaad-post-job` drops a
+   request it cannot resolve rather than recording a name nobody vetted.
+2. **Did the worker get told?** The message fires when the job goes LIVE, not
+   when the draft is saved, so a job still sitting as a draft has correctly
+   told nobody. There is no per-notification log on this path:
+   `yaad-notify-client` does not write `message_deliveries`, only
+   `yaad-desk-reply` does, so do not go looking for a row that was never
+   written. Check two things instead. First, does the worker have a phone
+   number on their profile: without one there is nobody to send to and the
+   function stops quietly. Second, the Supabase logs for `yaad-notify-client`
+   around the time the job went live, which is the only place this send leaves
+   a trace.
+3. **The worker cannot find the job.** It is deliberately NOT on the open
+   board while the hold is live. It appears at the top of app.yaadly.co.uk/jobs
+   for that worker only, in a gold panel, and only when they are signed in and
+   count as an approved worker (published profile plus a signed Worker
+   Guidelines). If they are signed in and see nothing, check those two things
+   first: the panel reads `my_requested_jobs`, which matches on their own
+   signed-in email.
+4. **Another worker says they cannot quote it.** That is the hold working. The
+   refusal message names the date and time it opens up.
+5. **The client needs it opened now.** Either ask the worker to press "Pass on
+   this job", or at the desk set `request_state` to `declined` on the job row.
+   Either opens it to the board immediately; the desk route does not message
+   the client, the worker's own route does.
+
+The window is 48 hours and it lives in ONE place: `public.request_is_live` in
+`20260905a`. Change the interval there and every gate follows. Nothing has to
+run for a hold to lapse, so there is no cron job here to check.
+
+## Putting a worker's photograph, video and work on their public profile
+
+Nothing is published automatically, ever. Order matters.
+
+1. **Ask them, and record the answer.** Applicants answer on the last screen
+   of /apply. For anybody who joined before that question existed, ask them
+   yourself, then in the desk, Workers, open the row and use "Record their
+   answer about a public profile". The Public profile column shows "never
+   asked" until you do. Do not record granted on somebody you have not asked.
+2. **Look at the files.** Open the worker's row in the drawer. Under "public
+   profile" each candidate file has an "open it" link, signed for an hour,
+   pointing at the private original. Opening one publishes nothing.
+3. **Publish.** "Put their photograph, video and work up" copies each file
+   into the public showcase bucket and records your address against it. It
+   refuses if consent is not granted, and it refuses if it cannot tell who is
+   signed in, because the record of who published it is the point.
+4. **Check it.** Open `app.yaadly.co.uk/workers/<slug>`. The photograph
+   replaces the initials block, the video appears as "<name>, in thirty
+   seconds", and the work photos appear as "Work <name> showed us", above the
+   evidence portfolio and labelled as not carrying the evidence trail.
+
+**To take it down.** If they ask you to remove it, do BOTH: "Take their public
+profile down", which deletes the copies and the rows, AND record their answer
+as declined. Recording declined alone empties the profile immediately (the
+view re-tests consent on every read) but leaves the files sitting in a public
+bucket. Deleting alone leaves their answer saying granted, so the next publish
+would put it all straight back.
+
+**Why a copy and not a link.** The vetting originals are destroyed ninety days
+after they arrive, which is what the applicant was promised. A profile served
+out of that bucket would work for three months and then go blank. The published
+copy is a separate file in a separate bucket and is not on that clock.
+
+**What can never be published.** Only three doc types are eligible:
+`profile_photo`, `intro_video`, `portfolio`. The photo ID, the selfie, the face
+turn, proof of address, the TRN, the CV and the certificates are vetting papers
+and are not even fetched by the desk's preview. Widening that list is a legal
+decision, not a tidy-up.

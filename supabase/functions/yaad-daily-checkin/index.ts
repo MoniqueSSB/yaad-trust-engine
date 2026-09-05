@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 
 // The daily worker prompt. Founder's own instruction, 1 Sep 2026: "when a
 // job is live and has been accepted by a worker, there should be a ping
@@ -70,9 +71,9 @@ async function sendTwilioTemplate(to: string, vars: Record<string, string>, trac
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
+        body: withStatusCallback(new URLSearchParams({
           To: `whatsapp:+${digits}`, From: from, ContentSid: CONTENT_SID, ContentVariables: JSON.stringify(vars),
-        }),
+        })),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });

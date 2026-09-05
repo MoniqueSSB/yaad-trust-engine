@@ -73,6 +73,23 @@ function jobToIntake(j: Job): Record<string, string> {
   return out;
 }
 
+/** One push to Monique's phone. A local helper rather than a shared module,
+ *  matching this repository's house style for small per-function helpers
+ *  (yaad-portal-code's header calls that out as deliberate). Never throws: a
+ *  notification must never break the poll it rides on. */
+async function pingDesk(admin: any, title: string, body: string): Promise<void> {
+  try {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: title.slice(0, 120), Priority: "high", Tags: "eyes" },
+      body,
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (_) { /* never let a notification break a scheduled run */ }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -235,7 +252,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── Phase 2: a finished, guardrail-clean draft becomes that quote's own
-    // pack, issued directly at 'approved'. A dirty one is left for a human.
+    // pack, built and linked but left at 'draft' for a person to approve.
     // Keyed by quote_id throughout, same reason as phase 1. ──────────────
     const { data: readyDrafts } = await admin.from("kickoff_drafts")
       .select("id,job_id,quote_id,intake,docs,model,guardrail")
@@ -275,20 +292,30 @@ Deno.serve(async (req: Request) => {
       });
       if (insErr) { console.error(`yaad-kickoff-check: link failed for draft ${d.id}: ${insErr.message}`); linkFailed++; continue; }
 
-      const { error: updErr } = await admin.from("kickoff_packs").update({
-        status: "approved",
-        approved_by: "system: auto-issued, guardrail-clean",
-        approved_at: new Date().toISOString(),
-      }).eq("id", packId);
-      if (updErr) { console.error(`yaad-kickoff-check: approve failed for pack ${packId}: ${updErr.message}`); linkFailed++; }
-      else { linked++; hasPack.add(d.quote_id); }
+      // THE PACK IS NOT APPROVED HERE. Removed 4 September 2026, roadmap
+      // item 7 of the agent audit. It used to be updated straight to
+      // 'approved' with approved_by "system: auto-issued, guardrail-clean",
+      // and that string is the whole problem in six words: the guardrail is
+      // a banned-word scan, a currency regex and a CJK check. It cannot read
+      // whether the scope is right, whether the risk register is honest, or
+      // whether the payment stages are weighted sensibly, and the model
+      // CHOOSES those stage percentages, which are Yaadly's commercial terms
+      // on this job. The pack also asks the model to write human_review_notes,
+      // "specific things the project manager must personally verify", and
+      // nothing made anybody read them.
+      //
+      // The pack is still built and still linked to the quote, which is the
+      // plumbing and saves the time. It now waits at 'draft' in the desk,
+      // where the Approve action already exists. trg_notify_kickoff_pack_ready
+      // fires on the transition into 'approved', so the worker is told when a
+      // person approves it and not before, which is the correct order.
+      linked++; hasPack.add(d.quote_id);
     }
 
-    // ── Phase 2b: same auto-issue for a finished service draft. Clean →
-    // the booking's own pack straight at 'approved' (the pack-ready
-    // trigger is job-only, so nothing fires a worker message here); dirty
-    // → left in the desk's Kickoff Drafts view for a human, linkable with
-    // link_kickoff_draft_to_service once fixed. ──────────────────────────
+    // ── Phase 2b: the same for a finished service draft. The booking's
+    // pack is built and left at 'draft' for a person to approve; a dirty
+    // draft never gets that far and stays in the desk's Kickoff Drafts
+    // view, linkable with link_kickoff_draft_to_service once fixed. ──────
     const { data: readySvcDrafts } = await admin.from("kickoff_drafts")
       .select("id,service_id,intake,docs,model,guardrail")
       .not("service_id", "is", null).eq("status", "ready");
@@ -324,18 +351,28 @@ Deno.serve(async (req: Request) => {
       if (insErr) { console.error(`yaad-kickoff-check: service link failed for draft ${d.id}: ${insErr.message}`); linkFailed++; continue; }
       svcHasPack.add(d.service_id);
 
-      const { error: updErr } = await admin.from("kickoff_packs").update({
-        status: "approved",
-        approved_by: "system: auto-issued, guardrail-clean",
-        approved_at: new Date().toISOString(),
-      }).eq("id", packId);
-      if (updErr) { console.error(`yaad-kickoff-check: service approve failed for pack ${packId}: ${updErr.message}`); heldForReview++; }
-      else svcLinked++;
+      // Not approved here either, same reason as the job path above.
+      svcLinked++;
+    }
+
+    // Kickoff packs waiting on a click BLOCK A BOOKING: choose_worker()
+    // refuses until the chosen quote's pack is confirmed by both sides, and
+    // both sides cannot confirm a pack nobody has approved. So this push is
+    // load bearing rather than courteous, and it says what is stuck.
+    const { count: awaitingApproval } = await admin.from("kickoff_packs")
+      .select("id", { count: "exact", head: true }).eq("status", "draft");
+    if ((awaitingApproval ?? 0) > 0) {
+      await pingDesk(admin,
+        `${awaitingApproval} kickoff pack${awaitingApproval === 1 ? "" : "s"} waiting on you`,
+        `${awaitingApproval} pack${awaitingApproval === 1 ? " is" : "s are"} drafted and waiting for you to approve. `
+          + `Until you do, the job cannot be booked: choose_worker() needs the pack confirmed by both sides first. `
+          + `Read human_review_notes at the top. Desk, Kickoff packs.`);
     }
 
     root.setAttributes({
       "yaadly.kickoff_check.requested": requested,
       "yaadly.kickoff_check.linked": linked,
+      "yaadly.kickoff_check.awaiting_approval": awaitingApproval ?? 0,
       "yaadly.kickoff_check.held_for_review": heldForReview,
       "yaadly.kickoff_check.service_requested": svcRequested,
       "yaadly.kickoff_check.service_linked": svcLinked,

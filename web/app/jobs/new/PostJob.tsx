@@ -70,7 +70,7 @@ import {
 const POST_JOB_FN = "yaad-post-job";
 const ENQUIRY_FN = "yaad-enquiry";
 
-export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: string; requestedWorker?: string }) {
+export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: { initialTrade?: string; requestedWorker?: string; requestedWorkerSlug?: string }) {
   const [stage, setStage] = useState(0);
   const [f, setF] = useState<Fields>(() => ({
     ...EMPTY_FIELDS,
@@ -204,6 +204,11 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
            enforce_vetted_worker_on_quote. See lib/jobs/new-form.ts. */
         urgency: f.urgency,
         accessType: f.accessType,
+        /* Who they asked for, as a slug. The function resolves it to an
+           active worker itself and holds the job for that person for 48
+           hours, which is the difference between the sentence on the
+           confirmation screen and something the system actually does. */
+        requestedWorker: requestedWorkerSlug,
       });
       if (d.jobId) setJobId(String(d.jobId));
       if (d.portalCode) setPortalCode(String(d.portalCode));
@@ -292,8 +297,10 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
         {requestedWorker && (
           <p className="mt-5 max-w-[62ch] text-[14.5px] leading-relaxed text-mute">
             We are taking this to <b className="text-goldb">{requestedWorker}</b> first,
-            as you asked. If they cannot take it on, we will say so and come back
-            with who else can.
+            as you asked. They have it to themselves for 48 hours and no other
+            worker can price it in that time. If they pass on it we will tell you and
+            it goes to the rest of the network the same day. If the two days
+            run out with no word, it opens to everybody automatically.
           </p>
         )}
         {/* This used to be the end of the road: the wizard told the client

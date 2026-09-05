@@ -33,7 +33,7 @@ export type EvidenceItem = {
   stage: number | null;
   /** Which section of the job this belongs to, as declared by whoever filed
       it, or null if nobody said. Never inferred from the label: see
-      20260905c. */
+      20260906000500. */
   phase?: string | null;
   /** 'materials' is its own section and carries no phase. See 20260828c. */
   kind?: string | null;
@@ -79,7 +79,7 @@ export function EvidenceLedger({
      urgent fact than which stage number the job happens to be on. */
   const headline = awaitingApproval
     ? role === "client"
-      ? "Photos are in and waiting on you. Money moves when you approve them."
+      ? "Photos are in and waiting on you. This stage closes when you approve them."
       : "Photos are in. The client has been asked to approve them."
     : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."

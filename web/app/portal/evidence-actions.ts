@@ -108,7 +108,7 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
   const kind = kindRaw === "materials" ? "materials" : "work";
 
   // Which section of the job this belongs to, declared in answer to a direct
-  // question on the form and never read out of the label. See 20260905c.
+  // question on the form and never read out of the label. See 20260906000500.
   // Anything that is not one of the four words is null, which means nobody
   // said, and is not the same as no. Materials evidence carries no phase at
   // all: it is a section in its own right on evidence.kind, and the constraint

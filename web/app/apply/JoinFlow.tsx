@@ -125,6 +125,13 @@ const WA_JOIN =
    list changes, this sentence and this version change with it. */
 const AI_CONSENT_VERSION = "ai-review-v4";
 
+/* The wording that earns the showcase consent, versioned for the same reason
+   AI_CONSENT_VERSION is: a consent is worth exactly what the sentence on
+   screen said, so the copy in ShowcaseConsent below and this string move in
+   the same commit. Change one without the other and every answer already on
+   file quietly starts meaning something nobody agreed to. */
+const SHOWCASE_CONSENT_VERSION = "showcase-v1";
+
 const PERSONA_TEMPLATE_ID = process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID ?? "";
 const PERSONA_ENVIRONMENT_ID = process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID ?? "";
 const PERSONA_CONFIGURED = PERSONA_TEMPLATE_ID.length > 0 && PERSONA_ENVIRONMENT_ID.length > 0;
@@ -386,6 +393,7 @@ export function JoinFlow() {
      separately so the sent screen reports the answer that actually went, not
      whatever the box says afterwards. */
   const [aiConsent, setAiConsent] = useState<"" | "granted" | "declined">("");
+  const [showcaseConsent, setShowcaseConsent] = useState<"" | "granted" | "declined">("");
   const [sentConsent, setSentConsent] = useState<"granted" | "declined">("declined");
 
   // Step 2
@@ -479,6 +487,9 @@ export function JoinFlow() {
         setYears(v.form.years ?? "");
         setTrn(v.form.trn ?? ""); setWork(v.form.work ?? "");
         setLinks(v.form.links ?? []);
+        if (v.form.showcaseConsent === "granted" || v.form.showcaseConsent === "declined") {
+          setShowcaseConsent(v.form.showcaseConsent);
+        }
         if (v.form.aiConsent === "granted" || v.form.aiConsent === "declined") {
           setAiConsent(v.form.aiConsent);
         }
@@ -523,11 +534,11 @@ export function JoinFlow() {
     sentConsent,
     form: {
       trades, parishes, tradeOther, name, phone, email, years, work, links, trn,
-      refs, signed, signedName, aiConsent,
+      refs, signed, signedName, aiConsent, showcaseConsent,
     },
   }), [step, continuing, sentRef, sentConsent, trades, parishes, tradeOther,
        name, phone, email, years, work, links, trn, refs, signed, signedName,
-       aiConsent]);
+       aiConsent, showcaseConsent]);
 
   const remember = useCallback(
     (next: Partial<{
@@ -821,6 +832,13 @@ export function JoinFlow() {
            removing the other. */
         aiReviewConsent: aiConsent || "declined",
         aiReviewConsentVersion: AI_CONSENT_VERSION,
+        /* Same rule and the same trap as the line above: unanswered travels as
+           the word "declined" so the row records a decision rather than a gap,
+           and removing this field without removing the question would record a
+           refusal nobody made. Nothing appears on a public profile until this
+           says granted, and the check is in the view, not here. */
+        showcaseConsent: showcaseConsent || "declined",
+        showcaseConsentVersion: SHOWCASE_CONSENT_VERSION,
       });
       setSentConsent(aiConsent || "declined");
       setSentRef(c.reference);
@@ -1421,8 +1439,10 @@ export function JoinFlow() {
                   <p className="mt-2 text-[12px] leading-relaxed text-dim">
                     Held the same way as your ID: a private store no browser can
                     reach, <b className="text-mute">never sent to an AI
-                    model</b>, and destroyed ninety days after you send it. This
-                    page does not publish it anywhere.
+                    model</b>, and destroyed ninety days after you send it.{" "}
+                    <b className="text-mute">Nothing here goes on your public
+                    profile unless you say so</b>, and there is a question
+                    about exactly that near the end.
                   </p>
                 </div>
 
@@ -1519,6 +1539,13 @@ export function JoinFlow() {
                   <LiveCapture kind="video" label="A short introduction" seconds={30}
                     doc="intro_video" docs={docs} onFile={upload} />
                 </div>
+
+                {/* Directly under the video, and the last question before the
+                    send, because this is the one screen where the photograph,
+                    the introduction and the work photos are all in mind at
+                    once. See ShowcaseConsent for why it is a second question
+                    rather than a line added to the first. */}
+                <ShowcaseConsent value={showcaseConsent} onChange={setShowcaseConsent} />
 
                 {personaActive ? (
                   <div className={"upl" + (persona.state === "done" ? " done" : persona.state === "error" ? " bad" : "")}>
@@ -2113,6 +2140,101 @@ export function JoinFlow() {
  * Neither option is pre-selected. A consent that arrived ticked is not a
  * consent, and a passport is not the document to be casual with.
  */
+/**
+ * "May we put this on your public profile?"
+ *
+ * A SECOND consent, and it exists because the first one said the opposite.
+ * The photograph row on the papers screen has always ended with "This page
+ * does not publish it anywhere", and that sentence was true and was read by
+ * everybody who has applied so far. Publishing their face on the strength of
+ * it would be answering a question nobody was asked.
+ *
+ * So: its own question, its own version (SHOWCASE_CONSENT_VERSION), neither
+ * option pre-selected, and unanswered read as no. A profile shows nothing
+ * until public_worker_showcase sees the word granted, and that test lives in
+ * the database view rather than in any page, so no future screen can forget
+ * it.
+ *
+ * WHAT IT COVERS, exactly, and nothing else: the photograph of themselves,
+ * the thirty second introduction, and the portfolio or photos of finished
+ * work. Not the ID, not the selfie, not the face turn, not the proof of
+ * address, the TRN, the CV or the certificates. Those are vetting papers and
+ * they stay where they are.
+ *
+ * WHAT IS PUBLISHED IS A COPY. The consented file is copied into a separate
+ * public store; the original stays in the private vetting bucket and is still
+ * destroyed on the ninety day clock the applicant was promised. That is why
+ * the copy below can say the vetting papers are still deleted on time without
+ * that being two claims fighting each other.
+ *
+ * Placed on the ID screen, under the introduction video, because that is the
+ * last screen before sending and it is the only screen where all three of the
+ * things being asked about are on the page at once.
+ */
+function ShowcaseConsent({
+  value, onChange,
+}: {
+  value: "" | "granted" | "declined";
+  onChange: (v: "granted" | "declined") => void;
+}) {
+  return (
+    <div className="rounded-xl border border-line bg-bg px-4 py-4">
+      <label className="fl" id="lbl-showcase-consent">
+        Your public profile{" "}
+        <span className={value ? "src ok" : "src opt"}>
+          {value ? "Answered" : "Your choice, either way"}
+        </span>
+      </label>
+
+      <p className="mt-1 text-[12.5px] leading-relaxed text-mute">
+        Every worker on Yaadly has a page a client can read before they choose
+        anybody. Yours has your trade, your parish, what was checked and, once
+        you have done jobs through us, the evidence from them.{" "}
+        <b className="text-ink">What it cannot show yet is you.</b>
+      </p>
+
+      <p className="mt-2.5 text-[12.5px] leading-relaxed text-mute">
+        We can put three things you have already given us on that page: your
+        photograph, your thirty second introduction, and your portfolio or
+        photos of finished work. A person at Yaadly looks at each one first and
+        decides whether it goes up.{" "}
+        <b className="text-ink">Nothing else ever does.</b> Your ID, your
+        selfie, your face turn, your proof of address, your TRN, your CV and
+        your certificates are vetting papers, they stay private, and they are
+        still destroyed ninety days after you send them.
+      </p>
+
+      <div className="mt-3 grid gap-2.5" role="radiogroup" aria-labelledby="lbl-showcase-consent">
+        {([
+          ["granted",
+            "Yes, put my photograph, my introduction and my work on my profile",
+            "A copy of each goes on a page anyone can open, once somebody at Yaadly has looked at it. Tell us any time to take it down and it comes down."],
+          ["declined",
+            "No, keep all of it private",
+            "Your profile still shows your trade, your parish and everything that was checked. It counts against you in no way at all."],
+        ] as const).map(([v, title, sub]) => (
+          <label key={v}
+            className={"flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition "
+              + (value === v ? "border-teal bg-soft" : "border-line bg-panel hover:border-line2")}>
+            <input type="radio" name="showcaseconsent" className="mt-0.5 size-5 shrink-0 accent-teal"
+              checked={value === v} onChange={() => onChange(v)} />
+            <span>
+              <b className="block text-[13.5px] leading-snug">{title}</b>
+              <span className="mt-1 block text-[12px] leading-relaxed text-dim">{sub}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
+        Neither is ticked for you. Send your application without choosing and{" "}
+        <b className="text-mute">we read that as no</b>, and your profile shows
+        none of it.
+      </p>
+    </div>
+  );
+}
+
 function AiConsent({
   value, onChange,
 }: {

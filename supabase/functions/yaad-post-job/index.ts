@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { fetchModel, pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { TRADES } from "./trades.ts";
 
 // The six-step "Post a job" wizard on yaadly.co.uk posts here twice.
 //
@@ -118,13 +119,10 @@ function cardCols(b: Record<string, unknown>) {
 
 // The 18 trades are the routing key: workers subscribe by trade and the board
 // filters on it, so this list is not free text and never has been.
-const TRADES = [
-  "Plumbing", "Roofing", "Electrical", "Tiling", "Masonry & Concrete",
-  "Painting & Decorating", "Grille & Gate Welding", "Air Conditioning",
-  "Landscaping", "General Handyman", "Solar Install", "Water Tank & Pump",
-  "Locks & Security Doors", "Windows & Glazing", "Carpentry & Joinery",
-  "Drainage & Septic", "Fencing", "CCTV & Alarms",
-];
+// TRADES now comes from _shared/trades.ts, generated from
+// data/job-taxonomy.js and drift-checked in CI. It used to be an
+// 18 item copy here, which happened to agree with yaad-inbound's own
+// copy and disagreed with app_settings.trade_list by eight trades.
 
 // Every other list the model may answer from is sent up by the page, because
 // the taxonomy lives in one place (data/job-taxonomy.js) and a second copy
@@ -158,7 +156,10 @@ function cleanLists(raw: unknown): Lists {
  *  case-insensitively and handed back in the list's own spelling. Anything
  *  else is dropped rather than corrected: a blank the client fills herself is
  *  worth more than a value nothing downstream recognises. */
-function fromList(value: unknown, list: string[] | undefined): string {
+// readonly because the shared TRADES list is readonly, and it should stay
+// that way: this function only reads, and a shared source of truth nobody can
+// splice is the point of moving it out of here in the first place.
+function fromList(value: unknown, list: readonly string[] | undefined): string {
   const v = s(value);
   if (!v || !list?.length) return "";
   return list.find((o) => o.toLowerCase() === v.toLowerCase()) ?? "";
@@ -206,13 +207,14 @@ type Read = {
 
 async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Read | null> {
   const prov = pickTextProvider();
-  if (!prov || text.length < 12) return null;
+  if (!prov) { console.error("readTheJob: no text provider configured"); return null; }
+  if (text.length < 12) return null;
   try {
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
     }, async (sp) => {
-      const r = await fetch(prov.api, {
+      const r = await fetchModel(prov.api, {
         method: "POST",
         headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -222,18 +224,33 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
             { role: "user", content: text.slice(0, 6000) },
           ],
         }),
-        signal: AbortSignal.timeout(20000),
-      });
+      }, { timeoutMs: 20000 });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { sp.recordError(`${prov.name} http ${r.status}`); return null; }
+      // Every return null below used to be silent: recorded on the span only,
+      // which does not surface in function_logs. With no OTLP endpoint set,
+      // that means a failed read leaves NOTHING anywhere, and the client just
+      // gets a form the agent did not fill in. Found live 4 Sep 2026 during
+      // the Mistral switch: a wrong model id failed here in total silence and
+      // there was no way to tell it from the hourly model cap. Same treatment
+      // yaad-inbound's own readTheJob got on 1 Sep, for the same reason.
+      if (!r.ok) {
+        const msg = `readTheJob: ${prov.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        sp.recordError(msg); console.error(msg); return null;
+      }
       let j: any = {};
-      try { j = JSON.parse(raw); } catch (_) { return null; }
+      try { j = JSON.parse(raw); } catch (e) {
+        console.error("readTheJob: response body was not JSON:", String(e).slice(0, 200)); return null;
+      }
       const content = j?.choices?.[0]?.message?.content ?? "";
       const m = String(content).match(/\{[\s\S]*\}/);
-      if (!m) return null;
+      if (!m) {
+        console.error("readTheJob: no JSON object in model content:", String(content).slice(0, 300)); return null;
+      }
       let out: any;
-      try { out = JSON.parse(m[0]); } catch (_) { return null; }
+      try { out = JSON.parse(m[0]); } catch (e) {
+        console.error("readTheJob: matched text was not valid JSON:", String(e).slice(0, 200), m[0].slice(0, 300)); return null;
+      }
       return {
         title: s(out.title).slice(0, 120),
         scope: s(out.scope).slice(0, 2000),
@@ -251,7 +268,9 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
           : [],
       };
     });
-  } catch (_) { return null; }
+  } catch (e) {
+    console.error("readTheJob: threw:", String(e).slice(0, 300)); return null;
+  }
 }
 
 // ───────────────────────── throttle ─────────────────────────
@@ -384,6 +403,27 @@ Deno.serve(async (req: Request) => {
     // ───────────────────────── draft ─────────────────────────
     if (mode === "draft") {
       const existing = s(b.jobId);
+
+      /* The client tapped "Book <name> for a job" on a worker's profile.
+         The browser sends the public SLUG, never an email, and it is
+         resolved here against an ACTIVE profile for two reasons: a
+         hand-typed slug cannot put a request on somebody nobody vetted, and
+         the page the client is standing on never learns a worker's email
+         address. Left out of the row entirely when it does not resolve, so
+         re-saving a draft without the slug cannot wipe a request that was
+         already recorded. What happens next is the 48 hour first-refusal
+         hold in 20260905a; this function only records who was asked. */
+      let request: Record<string, string> = {};
+      const wantSlug = s(b.requestedWorker);
+      if (wantSlug) {
+        const { data: w } = await admin.from("worker_profiles")
+          .select("worker_email").eq("slug", wantSlug).eq("active", true).maybeSingle();
+        if (w?.worker_email) {
+          request = { requested_worker_email: String(w.worker_email), request_state: "pending" };
+          root.setAttributes({ "yaadly.post.requested_worker": wantSlug });
+        }
+      }
+
       const row = {
         title: s(b.workType) ? `${s(b.workType)} job, ${parish || "Jamaica"}` : "Job request",
         parish, descr: buildDescr(b), addr, access_contact: access,
@@ -397,6 +437,7 @@ Deno.serve(async (req: Request) => {
         // fact a column can carry is how ids stop being ids.
         source: "form",
         ...cardCols(b), stage: 0, open: false,
+        ...request,
       };
 
       if (existing) {
