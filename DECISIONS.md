@@ -6,6 +6,30 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Migrations are named to sort last, and the check tests that rather than the format
+
+**Four collisions in one day is a scheme problem, not four mistakes.** Migrations were named `<date><letter>`. Parallel sessions share this repository and cannot see each other's branches, so two sessions both take the next free letter and both are correct at the time. On 5 September `20260904k` through `n` were claimed twice, then `20260905a` and `b` were claimed twice more. It never surfaces as a git conflict, because the filenames differ, so both sets merge quietly into a directory whose entire purpose is applying things in order.
+
+**The check tests "sorts last", not "is a timestamp", and that distinction is the whole value.** A 14-digit stamp created today sorts *before* the same day's letter files, because `0` sorts before `a`. A format check would pass that file and it would still run out of order. Proved in all three directions before wiring it in: a letter-suffixed name fails, a correctly formatted name that sorts too early fails and says what it sorts before, a later timestamp passes.
+
+**It reads the index and untracked files as well as commits.** CI only ever sees committed additions, but a check that says "nothing to see" while the new file sits in your index is one nobody runs before pushing, and it then only ever fails in CI, which is the slowest place to learn.
+
+**The 182 existing letter-named files stay.** They are applied history; renaming them would be a worse problem than the one being fixed.
+
+---
+
+## 2026-09-05 · A guardrail fired correctly on a phrase that meant something else, and the fix was the desk, not the rule
+
+**"fully covered" is on the banned list because "your job is fully covered" is a promise about money.** A quote pack said "First coat applied evenly over all railings, surface fully covered". Paint on a railing. The job sat held for 80 hours.
+
+**The tempting fix was to narrow the pattern, and that is precisely what §3 exists to refuse.** Distinguishing the financial sense from the decorating sense by regex is not a thing to attempt under time pressure on a live job, and a loosened banned-language rule is permanent while the stuck job is temporary. The pattern was left exactly as it is.
+
+**What was actually broken was the desk.** A flagged draft has one action, Approve, and `approve_quote_pack_draft()` refuses on any flag with no override, correctly. So there was no route at all from "this flag is a false positive" to "this job can move", and nothing surfaced that a job had stopped. The missing thing is a correction path, not a weaker rule.
+
+**How the one live pack was cleared sets the precedent.** The wording was changed, then `_shared/guardrails.ts` was run over the corrected text and its verdict written down: original flagged, corrected clean, price check clean. The flag was recomputed by the real scanner rather than edited to `false` by hand, and `guardrail.rescan_note` records that. The draft stayed at `ready`, so a named human still approves it. Editing the flag directly is the move that would turn that column from a record into a decoration.
+
+---
+
 ## 2026-09-05 · Delivery reporting is one shared line, not six copies of two lines
 
 **Setting the secret would have been the wrong-sized fix.** `yaad-message-status` was built to catch the case where Twilio returns 201 and no phone ever receives anything, and it only ever hears about a message whose send asked it to. Seven functions in this repository send over Twilio, each with its own inline call, and exactly one attached a status callback. So switching the secret on would have lit up the desk's "Messages that failed" tile with a number that read "none failed" and meant "one of seven paths is being watched", which is worse than the tile not existing.
