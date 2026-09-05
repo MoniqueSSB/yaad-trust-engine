@@ -757,7 +757,7 @@ Deno.serve(async (req: Request) => {
       // account yet; the join page is the door and the code is the key.
       subject = `We have your booking: ${svc.type}`;
       line = `Your ${svc.type} booking with Yaadly is in, reference ${svc.id}. ` +
-        `It is held while Monique agrees the scope and dates with you: nothing is charged and nothing starts until you hear from us that it is confirmed. ` +
+        `It is held while Yaadly agrees the scope and dates with you: nothing is charged and nothing starts until you hear from us that it is confirmed. ` +
         `When you want to see it online, set up your portal with the code ${svc.portal_code}: ${codeLink}`;
     } else if (kind === "service_confirmed") {
       // Fires when the founder clicks "Confirm the work": the booking is now
@@ -1014,7 +1014,7 @@ Deno.serve(async (req: Request) => {
         line += `\n\nOne more thing, now that this is off your list. Want ${workerName} to keep an eye on the place going forward, without you having to ask again? ` +
           `It's called the Yaad Report: a monthly WhatsApp update, 6 to 10 timestamped photos, a short walkthrough video, three lines on the property's condition, and what's changed since last time. ` +
           `Founding rate is £350 a month, or one 12 month term instead of twelve separate decisions.\n\n` +
-          `Reply INTERESTED and Monique will follow up with how it works.`;
+          `Reply INTERESTED and Yaadly will follow up with how it works.`;
       }
     } else if (kind === "worker_on_site") {
       const { data: arrival } = await admin.from("arrival_log")

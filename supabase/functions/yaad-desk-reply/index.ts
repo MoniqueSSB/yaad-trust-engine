@@ -256,7 +256,7 @@ Deno.serve(async (req: Request) => {
         // Recorded on the transcript and the thread claimed, exactly as a
         // delivered reply would be: she said it, it is going, and the
         // assistant must not start answering this number in the meantime.
-        const heldTranscript = `${String(thread.transcript ?? "")}\n\nMonique (from the desk, waiting to send): ${text}`.slice(-8000);
+        const heldTranscript = `${String(thread.transcript ?? "")}\n\nYaadly (from the desk, waiting to send): ${text}`.slice(-8000);
         await db(
           req,
           `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}`,
@@ -277,7 +277,7 @@ Deno.serve(async (req: Request) => {
 
     // Sent, so it is part of the record. Labelled as hers, and the thread is
     // hers now too: yaad-inbound stands down until the desk hands it back.
-    const transcript = `${String(thread.transcript ?? "")}\n\nMonique (from the desk): ${text}`.slice(-8000);
+    const transcript = `${String(thread.transcript ?? "")}\n\nYaadly (from the desk): ${text}`.slice(-8000);
     // The site says "a person replies within one working day", and until 4
     // September 2026 nothing recorded when that happened. Written ONCE and
     // never overwritten: the promise is about the first reply, not the most

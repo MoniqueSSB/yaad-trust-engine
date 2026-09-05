@@ -276,7 +276,7 @@ What you wrote
 --------------
 ${message}
 
-Monique reads these herself and comes back within 24 hours, usually sooner.
+Every one of these is read by a person at Yaadly, and answered within 24 hours, usually sooner.
 Nothing is charged and nothing is booked by sending this.
 
 If it is urgent, WhatsApp is faster: https://wa.me/447878877567
@@ -290,7 +290,7 @@ with this address. If that was not you, ignore it. Nothing else happens.`;
     const html =
 `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
 <p style="margin:0 0 18px">Thank you, ${esc(name)}. <b>Your message reached us.</b></p>
-<p style="margin:0 0 18px">Monique reads these herself and comes back within 24 hours, usually sooner. Nothing is charged and nothing is booked by sending it.</p>
+<p style="margin:0 0 18px">Every one of these is read by a person at Yaadly, and answered within 24 hours, usually sooner. Nothing is charged and nothing is booked by sending it.</p>
 <div style="margin:0 0 20px;padding:14px 16px;border-radius:12px;background:#f2f7f5;border:1px solid #dbe7e3">
   <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#67807a">What you sent us</p>
   <p style="margin:0 0 10px;font-size:13.5px;color:#67807a">About: ${esc(topic || "not said")}<br>Sent: ${esc(when)}</p>
@@ -426,7 +426,7 @@ Answer within 24 hours, that is what the page promises.`;
       // and works today.
       const digits = email ? "" : contact.replace(/\D/g, "");
       const waText = encodeURIComponent(
-        `Hello ${name}, this is Monique from Yaadly. Thank you for your enquiry, I am picking it up now.`,
+        `Hello ${name}, this is Yaadly. Thank you for your enquiry, we are picking it up now.`,
       );
       const answerBlock = email
         ? `<p style="margin:0 0 18px;font-size:13px;color:#67807a">Reply to this email and it goes straight to them.</p>`
