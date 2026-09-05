@@ -3319,15 +3319,19 @@ Use it when a client disputes something, when you want to know why a job took ni
 
 ## Publishing a change to the How We Use AI page
 
-`docs/how-we-use-ai.html` is linked from the footer of all twelve public pages and from the business page. It makes three specific, checkable claims:
+`docs/how-we-use-ai.html` is linked from the footer of all twelve public pages and from the business page. It makes five specific, checkable claims. The function that would falsify each one is named beside it, because that is the point of the list:
 
-1. The invoicing model has no field for an amount.
-2. The sketch packs cannot state a measurement, stopped in three places.
-3. Identity documents are held back before the file is fetched, with no setting to override.
+1. The invoicing model has no field for an amount. `yaad-invoice`.
+2. The sketch packs cannot state a measurement, stopped in three places. `yaad-sketch`, plus `has_measurement()`.
+3. The report drafter cannot rate a finding or write a verdict, and a report cannot be issued while either is missing. `yaad-report`, plus `report_guard_issue()` in `20260904n_the_report_drafter.sql`.
+4. Identity documents are held back before the file is fetched, with no setting to override. `IDENTITY_DOCS` in `yaad-vetting-review`.
+5. The vision model's severity word and its escalation sentence are kept out of the client's automatic message and sent to the desk instead. `summariseFindings` and `pingDeskOnEscalation` in `yaad-notify-client`.
 
-**If any of those three stops being true, that page becomes a false claim to clients**, which is worse than never having made it. Before changing anything in `yaad-invoice`, `yaad-sketch` or `yaad-vetting-review`'s `IDENTITY_DOCS`, read that page and decide which sentence has to change with it.
+**If any of those five stops being true, that page becomes a false claim to clients**, which is worse than never having made it. Before changing any of the code named above, read that page and decide which sentence has to change with it.
 
-The provider list is deliberately not repeated there. It lives on `privacy.html`, and that is the one to update when a provider changes.
+Claim 5 is the one with a live exception on the page, and the exception is load bearing. A sketch pack *does* carry the severity and the "worth a qualified person looking at this in person" line, and the page says so. What makes that honest is that `yaad-sketch` is admin only end to end, so a pack reaches a client only after a person opened it, read it and released it. **If the sketch pack ever gains a path that reaches a client without `is_admin()` in front of it, that paragraph becomes untrue** and has to be rewritten before the path ships.
+
+The full provider list is still not repeated on that page. It lives on `privacy.html`, and that is the one to update when a provider changes. What the page now does carry is the three that a client would otherwise have to go and find: Mistral in the European Union for text, NVIDIA in the United States for photographs and video, and Cloudflare with United States failover for voice notes. Those three sentences must agree with the table on `privacy.html`; changing a provider means changing both.
 
 ---
 
