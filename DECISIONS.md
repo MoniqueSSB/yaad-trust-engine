@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The site promised to ask for something and never asked
+
+**`docs/cancellation.html` has said this all along, in its own words: "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking."** Nothing anywhere asked. The booking form collected a name, a contact, a parish and a free text note, and then the work started. So the page described a control that did not exist, which is worse than not having the control, because it reads as covered.
+
+**What that is worth in money.** A Condition Report is £249. Client books Monday, pays Monday, checker attends Wednesday, Yaadly pays the checker. Client cancels on day ten. Without a recorded express request they owe nothing and Yaadly has paid the checker out of its own pocket. The 14 day right comes from the Consumer Contracts Regulations 2013 and cannot be signed away, but a client who genuinely asked for an early start owes a proportionate amount for work done. The whole difference between those two outcomes is whether anyone asked, and kept the answer.
+
+**Where it was fixed matters more than the fix.** The obvious place was the Stripe checkout, and that is where the runbook had it filed. Wrong place. Stripe only sees card jobs, so every invoice job over £500 would still have been exposed, and those are the big ones. The booking form sees everything. It is also, word for word, where the published page already said the ask would happen. Fixing it there closed the gap and made the site honest in one change; a Stripe-only fix would have done neither.
+
+**The checkbox is not required, and that was the actual decision.** Requiring it is the tempting version: everyone waives, the exposure goes to zero, and the number on the dashboard looks perfect. It is also worthless. A consent nobody can decline is not a request anybody made, and a regulator reading a form where the box could not be left unticked would treat it as exactly that. So it is optional, an unticked box is a recorded answer with its own note on the booking, and the client who leaves it alone gets their full 14 days before anything starts. The Mirror Rule cuts the same way here as anywhere else: the client's right to wait is as real as Yaadly's need to start.
+
+**A consequence that fell out of it, and is the better half of the change.** If the client has not asked to start early, **no pay button is offered at all**. A card authorisation lasts seven days on every brand and the wait is fourteen, so a hold taken at that moment is guaranteed to expire before the job can legally begin. Offering it would have produced a client who believed they had paid, an authorisation that quietly died on day seven, and a job nobody could start. Nobody asked for this rule; it is what the seven and the fourteen do when put next to each other.
+
+**`START_NOW_VERSION` ships with the wording**, copying `AI_CONSENT_VERSION` from the apply flow for the reason given in CLAUDE.md §6: a consent is only worth what the sentence that earned it said. The sentence is stored on the booking rather than reconstructed later, because only the page can say what was actually in front of that client on that day.
+
+**Not closed: Stripe checkout still carries no tickbox.** It needs the account, and the account was not reachable from the session that did this work. The remaining exposure is narrower than it was rather than gone, and the runbook says so in those terms rather than being marked done.
+
+---
+
 ## 2026-09-05 · Delivery reporting is one shared line, not six copies of two lines
 
 **Setting the secret would have been the wrong-sized fix.** `yaad-message-status` was built to catch the case where Twilio returns 201 and no phone ever receives anything, and it only ever hears about a message whose send asked it to. Seven functions in this repository send over Twilio, each with its own inline call, and exactly one attached a status callback. So switching the secret on would have lit up the desk's "Messages that failed" tile with a number that read "none failed" and meant "one of seven paths is being watched", which is worse than the tile not existing.
@@ -15,6 +33,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **CI's Deno job gained `--allow-env`, and finding that was the point of running the suite with CI's exact flags.** The module's whole behaviour is "do nothing unless configured", so the test that matters is the one proving the unset case changes no send, and that test cannot be written without setting and clearing the variable. Locally the looser flags passed; under CI's flags all three failed. Caught before pushing rather than as a red build.
 
 **Six functions were redeployed and four of them run without platform auth.** Each was deployed with its own live `verify_jwt` read back first, which is the trap §12 exists for: a blanket redeploy would have silently added a token check to `yaad-inbound`, `yaad-enquiry`, `yaad-portal-code` and `yaad-notify-client` and broken Twilio intake, the contact form and the portal sign-in at once. Verified afterwards that all four still answer with their own refusal rather than a platform 401, and that the list of eleven is unchanged.
+
+---
+
 ## 2026-09-05 · The card path existed and nobody could find it
 
 **Founder's report: "I cannot book each service directly with Stripe, I should be able to."** She was right, and the reason is worth keeping, because the code was not broken. All eight Stripe payment links existed, were live, and were correctly wired. The page simply never offered them. The link appeared only after the booking form was submitted, as a few words of ordinary text inside a longer sentence, and the grey box directly beneath the form still said "Card payment is not switched on yet, so for now everything is invoiced." A client following the page as written would never have looked for a card. **A feature that is built, deployed and invisible is not shipped**, and the thing that made it invisible was stale copy sitting next to it contradicting it.
