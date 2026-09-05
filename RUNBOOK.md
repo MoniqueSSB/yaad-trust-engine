@@ -242,6 +242,55 @@ Then check `verify_jwt` still reads the same after deploying. A deploy that sile
 
 ---
 
+## 9a. Mistral says 429, and the two account questions behind it
+
+Two separate things, both in Mistral's console and neither of them in this
+repository. They are written here because they keep being described as done.
+
+**The 429s.** On 4 September 2026 the retry was watched firing, waiting its
+fixed 1200ms, and getting 429 again, which rules out a burst from a test loop
+and points at a quota or a sustained throttle. Which of the two it is can only
+be read from the account.
+
+1. Mistral console, **Admin, then Limits**. Read the requests per second and
+   the monthly token allowance for the key in use, and whether the workspace is
+   on the free tier. The free tier is roughly one request per second, and nine
+   Edge Functions share one key.
+2. If it is the free tier, the question is whether to pay for throughput. That
+   is a spending decision and it is Monique's.
+3. What the code now does about it, since 5 September 2026:
+   `fetchModel` reads `Retry-After`. If the wait fits inside
+   `MAX_RETRY_WAIT_MS` (4 seconds, sized against the roughly fifteen a Twilio
+   webhook gets) it waits exactly that and retries. If the server asks for
+   longer, **it does not retry at all**, because spending the caller's budget
+   to reach the same refusal is worse than failing now with time left to send
+   the person a real reply. Before this it always waited 1200ms and never read
+   the header.
+4. Watching it: the failures print to the function logs with `fetchModel:` at
+   the front. `console.error` is deliberate, because these used to go only to
+   OpenTelemetry spans that were never exported, so a rate limit looked
+   identical to no traffic at all.
+
+**Training on your data, and the DPA. Not answered, and the privacy page does
+not currently mention it.** `docs/privacy.html` says where the model runs, the
+European Union, and that is true. It says nothing about whether Mistral trains
+on the text sent to it, and on the free tier the default is that it does,
+unless the workspace opts out.
+
+1. Mistral console, **Admin, then Privacy**, the setting about anonymous
+   improvement data. Read what it is actually set to. Do not assume.
+2. Ask Mistral for the data processing agreement, which is the document that
+   makes the EU processing a commitment rather than a location.
+3. Then, and only then, add a sentence to the "Two things we will not soften"
+   box on `docs/privacy.html`. Nothing has been written there yet on purpose:
+   a privacy page that claims an opt-out nobody has verified is worse than one
+   that is silent, and CLAUDE.md forbids the overclaim either way.
+4. This is a **December pilot blocker**, not a nice-to-have. The trigger named
+   in section 9 above is real client and worker data, and the same trigger
+   applies here: a client's job description going to a model that may train on
+   it is a data protection question, not a technical one.
+
+
 ## 10. A client got a holding reply instead of an answer
 
 The banned-language screen fired. `yaad-inbound` composed a reply, the screen found language Yaadly never uses, and the reply was not sent. The client received the short holding message from `SAFE_FALLBACK` saying a person will come back to them, and a phone notification went out titled **Reply held back**.
@@ -2828,6 +2877,18 @@ Two rules that hold when editing these pages. The consent and provider facts on 
 
 ```bash
 grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|removes all fraud|fully covered" docs/*.html
+```
+
+Read the hits, do not just clear them. A DENIAL is the correct use and
+must stay: "Yaadly does not operate an escrow service and does not hold
+money on your behalf" appears on faq, payments, terms and services, and
+deleting it to make the sweep quiet would remove the sentence that makes
+the structure clear to a client. A CLAIM is the fault. As at 5 September
+2026 all six hits in `docs/` are denials and these pages are clean: the
+wrong copy was in CLAUDE.md §8 and in the Reporting agent's prompt, not
+here.
+
+```bash
 grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
 ```
 
@@ -3357,6 +3418,81 @@ The desk says **offered WhatsApp** on those rows, and `nothing sent, they must t
 
 **Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
 
+---
+
+## The evidence sections
+
+**What they are.** Since 5 September 2026 a job's evidence is read in five sections rather than as one pile: **before**, **during the work**, **problems found**, **after**, and **materials on site**.
+
+The first four are on `evidence.phase`, set by the person filing the item in answer to a direct question. Nothing infers it from the caption. The fifth is not a phase at all: materials has lived on `evidence.kind` since 20260828c, because filing it is what moves the risk in the materials to the client, and the database refuses a phase on it. The words are defined once, in `web/lib/portal/evidence-sections.ts`, so the client page, the Completion Report and the upload forms cannot drift into three different vocabularies.
+
+**Where a worker answers it.**
+
+- *Portal, photo:* a Before / During the work / A problem found / After dropdown next to the label, defaulting to Not marked.
+- *Portal, video:* the same dropdown on the video upload form.
+- *WhatsApp:* after the job code and the "what does this show" question, the worker is asked `Which is this? Reply B for before, D for during the work, A for after, or P for a problem you found. Reply N if it is none of those.` Only that reply is read as the answer. The parser accepts the full words too, and takes I or "issue" as well as P.
+
+**It never blocks anything.** An answer that is none of them files the evidence unmarked and tells the worker so. Nothing is refused, no stage is held, and a stage can still be approved with no before on file. That is deliberate: whether a missing before should ever stop an approval is a decision for Monique, not a default.
+
+**A problem found is not a quality score and must never be reported as one.** A worker who photographs rot behind a panel is doing the job properly. The desk tile counts them and is deliberately left uncoloured, because a green tick on a low number is an instruction to stop reporting them. What the count is actually for is spotting a stage carrying several, which is a stage where the job has stopped being the job that was quoted.
+
+**Where to see it.** Client portal, grouped under headings on the job page, with a badge on each card and a line in "Show the record for this stage". Completion Report, on the evidence index line. Client's WhatsApp report, in the `Items:` line as `A1 (before), A2 (problem found), A3 (after)`. Admin desk Overview, the **Before and after on record** and **Problems found on site** tiles.
+
+### If the Before and after tile reads 0% and you think that is wrong
+
+It is almost certainly right. The tile reads `evidence_completeness.with_before_and_after`, which reads `evidence_at_signoff`, which reads the **snapshot taken at approval time**, not the evidence table. So:
+
+1. Nothing signed off before 5 September 2026 can ever count. No phase was declared then, and backfilling one would be inventing history. Expect a low number for a while.
+2. A phase declared on a photograph **after** its stage was approved does not count towards that approval, on purpose. Same rule as the item count and the arrival log.
+
+Check what a given sign-off actually holds:
+
+```sql
+select job_id, stage, items, has_before, has_during, has_after, issues, before_and_after
+  from public.evidence_at_signoff order by approved_at desc limit 20;
+```
+
+### If a worker says the database refused their upload
+
+The only phase-related refusal is a **phase on materials evidence**, which the constraint `evidence_phase_chk` rejects. Materials is a custody record and a section in its own right, not a part of the work. Both portal forms disable the dropdown when Materials is chosen, and both server paths drop the value, so this should only ever be reachable by a direct API call. Note that a materials upload on a job where the client has never named a store is refused for a different reason entirely, by `trg_evidence_materials_needs_store`, and that message says so in words worth reading. Check with:
+
+```sql
+select id, job_id, kind, phase from public.evidence where phase is not null and kind = 'materials';
+```
+
+That should always return nothing.
+
+### One known consequence: abandoned uploads leave files behind
+
+A worker who sends photographs over WhatsApp and then never answers the
+questions leaves those files staged in the evidence bucket under `_pending/`.
+The session is dropped after 48 hours and the files are not. This predates the
+before/after step, which adds one more place a worker can walk away mid-flow.
+Nothing cleans `_pending/` on a schedule yet. It is storage cost and clutter
+rather than a data protection problem, since the bucket is private and nothing
+outside it links to those objects, but it should be swept eventually. Look at
+what is sitting there with:
+
+```bash
+supabase storage ls ss:///evidence/_pending --project-ref leffyisvfvjwzilydlwf
+```
+
+### After changing anything in this area
+
+Run the rig, which proves a phase declared after a sign-off cannot improve it:
+
+```sql
+\i supabase/tests/evidence_phase_guards.sql
+```
+
+Nine checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-client` and `yaad-evidence-video`, which all write or read the column.
+
+The rig reports through `raise notice`, which psql shows and the Supabase MCP does not. To run it through the MCP instead, replace the temp table `t` with a real one, select from it at the end, and drop it. That is how it was run on 5 September 2026.
+
+**Applied to production 5 September 2026**, as `20260906000700_a_photograph_says_which_section_of_the_job_it_belongs_to.sql`, in three parts: the column and its constraint, the snapshot in `_do_approve_stage`, then the two views. All nine checks passed against live and the rig left no rows behind.
+
+---
+
 ## A client asked for a worker by name and nothing seems to have happened
 
 The button on a worker profile records the request on the job row and holds
@@ -3448,3 +3584,70 @@ The service booking receipt carries a single-use sign-in token (`?t=` on the `/p
 4. **Never test a real token twice.** Spending it is the point. To retest, have the desk re-send the receipt, which mints a new one.
 
 The token is deliberately removed from the address bar on arrival, so it will not be in the client's history or in a screenshot they send you. Ask for the email instead, not the link.
+
+---
+
+## Checking the database and the repository still describe the same thing
+
+Symptom you are trying to avoid: the repository looks complete, and a rebuild
+from it produces a database that is missing something nobody noticed was only
+ever in production. It has happened three times, on 3, 4 and 5 September 2026,
+the last time to `is_admin()` and to the event trigger that switches row level
+security on for new tables.
+
+The cause is not carelessness. SQL applied through the Supabase MCP goes
+straight to the database and writes no file, and nothing afterwards reconciles
+the two. `scripts/check-deploy-drift.sh` does this job for Edge Functions.
+There is no equivalent for the schema, so it is done by hand.
+
+**1. The offline half, no credentials needed, catches the worst cases.** Every
+function a migration calls should be defined in a migration:
+
+```bash
+grep -rhoiE 'create table (if not exists )?(public\.)?[a-z_]+' supabase/migrations/ \
+  | grep -oiE '[a-z_]+$' | sort -u > /tmp/tables.txt
+grep -rhoE '\bpublic\.[a-z_]+\(' supabase/migrations/ | sed 's/public\.//; s/(//' | sort -u > /tmp/called.txt
+comm -23 /tmp/called.txt /tmp/tables.txt | while read -r fn; do
+  grep -rqiE "function[[:space:]]+(public\.)?${fn}[[:space:]]*\(" supabase/migrations/ \
+    || echo "called but never defined: $fn"
+done
+```
+
+The table subtraction matters: without it the check reports every table a
+migration writes to and nobody reads it twice. `is_admin` printed here for
+weeks and nobody ran it.
+
+Read what it prints carefully, because it catches two different faults. A
+FUNCTION name is the case above. A TABLE name means that table is written to
+by a migration and created by none, which is the same drift one level up and
+is the state this repository is in: on 5 September 2026 `jobs`, `evidence`,
+`job_quotes`, `applications`, `app_settings`, `kickoff_drafts` and
+`kickoff_packs` all printed. See DECISIONS.md.
+
+**2. The live half, needs the MCP or the SQL editor.** List every function in
+`public` and compare against the same grep. In the SQL editor:
+
+```sql
+select string_agg(p.proname, ',' order by p.proname)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prokind = 'f';
+```
+
+**What to do with a gap.** Read the definition back out and commit it as a
+recovery migration, transcribed rather than rewritten, saying in the header
+that it is transcribed and untested because production already has it:
+
+```sql
+select pg_get_functiondef(p.oid)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname = 'the_function_name';
+```
+
+Grants have to be read separately, with `has_function_privilege`, because
+`pg_get_functiondef` does not include them. A recovered function with no grant
+line is a function nobody can call after a rebuild.
+
+**Do not run a recovery migration against production.** It is written to be a
+no-op there and it should stay unrun, because an event trigger recovery has to
+drop and recreate the trigger, and there is no reason to open that window on a
+live database to prove a file you can read.

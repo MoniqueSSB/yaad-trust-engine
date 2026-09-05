@@ -36,7 +36,7 @@
 
   var OPENER = 'Hi. I can answer questions about how Yaadly works, or take down a job for a property in Jamaica. What do you need?';
   var OPENER_NOTE = 'I do not quote prices. Vetted workers quote against a written scope, so nobody is marking up their own estimate.';
-  var PRIVACY = 'Read by an automated assistant and by Monique. Please do not put ID documents or card details in here.';
+  var PRIVACY = 'Read by an automated assistant and by a person at Yaadly. Please do not put ID documents or card details in here.';
 
   /* ---------- state, kept in this browser only ---------- */
   var state = { visitor: '', msgs: [], ref: '', handoff: false, lastReply: 0 };
@@ -152,7 +152,7 @@
   panel.setAttribute('aria-label', 'Chat with Yaadly');
   panel.innerHTML = ''
     + '<div class="yc-head"><div class="yc-mark">Y</div>'
-    + '<div class="yc-title"><b>Yaadly</b><span>Assistant here. Monique on WhatsApp.</span></div>'
+    + '<div class="yc-title"><b>Yaadly</b><span>Assistant here. A person on WhatsApp.</span></div>'
     + '<button type="button" class="yc-close" aria-label="Close chat" title="Close">&rsaquo;</button></div>'
     + '<div class="yc-log" id="yc-log" aria-live="polite"></div>'
     + '<form class="yc-form" id="yc-form"><textarea id="yc-in" rows="1" maxlength="1500" placeholder="Type here" aria-label="Your message"></textarea>'
@@ -186,7 +186,7 @@
   function human(text) {
     var d = document.createElement('div');
     d.className = 'yc-m human';
-    var tag = document.createElement('i'); tag.textContent = 'Monique';
+    var tag = document.createElement('i'); tag.textContent = 'Yaadly';
     d.appendChild(tag);
     d.appendChild(document.createTextNode(text));
     log.appendChild(d);
@@ -197,7 +197,7 @@
     if (old) old.remove();
     var d = document.createElement('div');
     d.className = 'yc-wa';
-    d.innerHTML = '<p>Monique will answer here when she picks this up. Leaving the page? Carry on on WhatsApp instead; everything you wrote here comes with you.</p>'
+    d.innerHTML = '<p>Someone at Yaadly will answer here when they pick this up. Leaving the page? Carry on on WhatsApp instead; everything you wrote here comes with you.</p>'
       + '<a href="' + waLink(ref) + '" target="_blank" rel="noopener">' + WA_ICON + 'Continue on WhatsApp</a>'
       + (ref ? '<small>Your reference is ' + esc(ref) + '. It is already in the message.</small>' : '');
     log.appendChild(d);
@@ -215,7 +215,7 @@
     if (state.handoff) waCard(state.ref);
   }
 
-  /* ---------- Monique's replies, fetched while the panel is open ---------- */
+  /* ---------- the desk's replies, fetched while the panel is open ---------- */
   var pollTimer = null;
   function poll() {
     if (!open || !state.ref) return;

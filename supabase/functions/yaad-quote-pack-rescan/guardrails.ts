@@ -21,8 +21,13 @@
 
 export type Finding = { term: string; guidance: string };
 
+const ESCROW_GUIDANCE =
+  "Yaadly is principal: the client buys the job from Yaadly at one agreed price. Say that, never 'escrow' and never that money is held for anybody.";
+const HELD_GUIDANCE =
+  "Yaadly holds nobody's money. The client buys the job from Yaadly and Yaadly engages and pays the tradesperson under its own agreement.";
+
 const BANNED: [RegExp, string][] = [
-  [/\bescrow(ed|s)?\b/gi, "Use 'held safely with a licensed payment provider', never 'escrow'."],
+  [/\bescrow(ed|s)?\b/gi, ESCROW_GUIDANCE],
   [/\b100\s?%/gi, "No absolute claims. Give the real figure or drop the claim."],
   [/\bzero (fraud|risk|conflicts?)\b/gi, "No absolute claims."],
   [/\bremoves? all fraud\b/gi, "No absolute claims."],
@@ -45,6 +50,23 @@ const BANNED: [RegExp, string][] = [
    "Yaadly is principal: the client buys the job from Yaadly. Never describe the client's money as held."],
   [/\bwe(?:'re|\s+are)\s+holding\s+(?:your|the|their)\s+(?:money|funds?)\b/gi,
    "Yaadly is principal: the client buys the job from Yaadly. Never say Yaadly is holding money."],
+  // Added 5 September 2026, on the founder's instruction to settle the question
+  // the 4 September note left open.
+  //
+  // "Held safely with a licensed payment provider" was the prescribed
+  // replacement for "escrow" and it is now the wrong advice, because it
+  // describes the arrangement the principal structure exists to avoid. It was
+  // also the one banned idea the screen could not see: no word in it is banned,
+  // so it walked straight through, and yaad/agents/reporting.py was instructing
+  // the model to write it. docs/COPY-GUIDELINES.md had already banned the
+  // phrase; CLAUDE.md section 8 still prescribed it, and the two disagreed for
+  // two days.
+  //
+  // Narrow on purpose. It catches the money claim and leaves ordinary
+  // safe-keeping language alone, because "your documents are held safely" is
+  // true and unobjectionable.
+  [/\bheld safely with a licensed\b/gi, HELD_GUIDANCE],
+  [/\b(?:money|funds?|payments?|deposits?)\s+(?:is|are|was|were|will be)\s+held safely\b/gi, HELD_GUIDANCE],
 ];
 
 /** Every banned-language hit in a block of outbound text. */

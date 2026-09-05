@@ -123,7 +123,11 @@ Precise vocabulary, built deliberately. Use these words exactly, in code, in cop
 - **The Mirror Rule** every protection has a named counterpart on the other side. If a rule protects only the client, it is not finished.
 - **Farrin price** the premium an overseas owner gets quoted for identical work. The thing this product exists to end.
 
-Say "held safely with a licensed payment provider". **Never say escrow.** Never say 100%, zero fraud, removes all fraud, or fully covered. `guardrails.scan` will catch these in engine output, but it does not read marketing copy, so the rule applies to you directly when you write page text.
+**Never say escrow, and never say money is held for anybody.** Say what is actually true: Yaadly is the principal contractor, the client buys the job from Yaadly at one agreed price, and Yaadly separately engages and pays the tradesperson. Never say 100%, zero fraud, removes all fraud, or fully covered.
+
+This paragraph used to prescribe "held safely with a licensed payment provider" as the replacement for "escrow", and that instruction was wrong from 3 September 2026, when the principal structure was settled and Yaadly stopped holding anybody's money. It was worse than a stale sentence. It was the one banned idea the screen could not see, because no individual word in it is banned, so it walked through `guardrails.scan` untouched; `docs/COPY-GUIDELINES.md` had already banned the phrase while this file still prescribed it; and `yaad/agents/reporting.py` was instructing the model to write it. Corrected 5 September 2026 on Monique's instruction, with the phrase added to the banned list in both runtimes and asserted by both test suites, so it cannot come back quietly.
+
+`guardrails.scan` catches these in engine output, but it does not read marketing copy, so the rule applies to you directly when you write page text. `RUNBOOK.md` carries the sweep command for `docs/`.
 
 ---
 

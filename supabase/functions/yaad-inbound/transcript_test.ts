@@ -43,8 +43,14 @@ Deno.test("both prompts are told there is more than one speaker", () => {
   const compose = src.slice(src.indexOf("const COMPOSE_SYSTEM"), src.indexOf("/** Writing only."));
   for (const [name, prompt] of [["classifier", classify], ["writer", compose]] as const) {
     assert(prompt.includes('"Yaadly:"'), `the ${name} is not told which lines are its own`);
+    // The literal, not a paraphrase, because this asserts the prompt names the
+    // exact string yaad-desk-reply writes into the transcript. Renamed from
+    // "Monique (from the desk)" on 5 September 2026, founder's instruction that
+    // the assistant speaks as Yaadly and never uses her name to a client. If
+    // this and yaad-desk-reply ever disagree, the model stops knowing a human
+    // spoke and starts reading her replies as the client's own words.
     assert(
-      prompt.includes("Monique (from the desk)"),
+      prompt.includes("Yaadly (from the desk)"),
       `the ${name} is not told which lines are a real person's`,
     );
   }

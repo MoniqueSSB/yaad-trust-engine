@@ -1379,7 +1379,11 @@ const VIEWS = [
     empty:["Nobody is waiting","Everyone who has written in has had an answer from a person."],
     cols:[
       {h:"Waiting", f:r => (r.breached ? chip_("crit", Math.round(r.hours_waiting/24*10)/10 + " days") : chip_("warn", Math.round(r.hours_waiting) + " hr"))},
-      {h:"Who", f:r => esc(r.who || "unknown") + sub_(r.contact || r.channel || "")},
+      {h:"Who", f:r => esc(r.who || "unknown") + (r.contact
+        ? sub_((r.kind === "thread" ? "left: " : "") + r.contact)
+        : (r.kind === "thread" && r.channel === "web"
+            ? sub_("anonymous, no way to reach them off this page")
+            : sub_(r.channel || "")))},
       {h:"Where it came from", f:r => r.kind === "enquiry"
         ? chip_("mute","contact form") + sub_("yaadly.co.uk/contact, emailed to you")
         : r.channel === "web" ? chip_("ok","website chat") + sub_("the widget on yaadly.co.uk")
@@ -1421,7 +1425,7 @@ const VIEWS = [
         says:r => `Opens WhatsApp on this machine with ${esc(r.contact)} and a first line ready. It sends nothing on its own and it does not go from the Yaadly number, it goes from you. When you have actually sent it, press I have answered this.`,
         call: async (row) => {
           const digits = String(row.contact || "").replace(/\D/g, "");
-          const text = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"}, this is Monique from Yaadly. Thank you for your enquiry, I am picking it up now.`);
+          const text = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"}, this is Yaadly. Thank you for your enquiry, we are picking it up now.`);
           window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
         } },
       { label:"Open an email to them", cls:"",
@@ -1429,9 +1433,29 @@ const VIEWS = [
         says:r => `Opens your mail app to ${esc(r.contact)}. The enquiry also arrived in your inbox with reply-to set to them, so answering there works just as well. Press I have answered this once you have.`,
         call: async (row) => {
           const subj = encodeURIComponent("Your enquiry to Yaadly");
-          const body = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"},\n\nThank you for your enquiry, I am picking it up now.\n\nMonique\nYaadly\n`);
+          const body = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"},\n\nThank you for your enquiry, we are picking it up now.\n\nYaadly\n`);
           window.open(`mailto:${encodeURIComponent(String(row.contact))}?subject=${subj}&body=${body}`, "_blank", "noopener");
         } },
+      // The button that keeps this queue worth opening.
+      //
+      // Every row in it on 5 September 2026 turned out to be a demo the founder
+      // had run herself, and twice I read one as a real client waiting on an
+      // urgent roof. She will keep demoing this daily for months, because that
+      // is what launching looks like, and a queue that fills with her own tests
+      // and can only be cleaned in SQL is a queue she stops opening. It is
+      // watching the promise on every page of the site.
+      //
+      // Nothing infers. A person presses it and the ledger records who.
+      { label:"That was me testing", cls:"g",
+        when:r => r.kind === "thread",
+        rpc:"mark_thread_test",
+        args:(r) => ({ p_channel:r.channel, p_from:r.from_addr }),
+        says:r => `Takes ${esc(r.ref)} off this queue as your own demo, so it stops counting against the one working day promise. The conversation, the job and any evidence stay exactly as they are. Recorded in the ledger as your decision.` },
+      { label:"That was me testing", cls:"g",
+        when:r => r.kind === "enquiry",
+        rpc:"mark_enquiry_test",
+        args:(r) => ({ p_enquiry:r.ref }),
+        says:r => `Takes this off the queue as your own test. It refuses if you have already marked it answered or converted, because those are handled, not noise.` },
       { label:"I have answered this", cls:"g",
         when:r => r.kind === "enquiry",
         rpc:"mark_enquiry_replied",
