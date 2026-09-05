@@ -3037,7 +3037,26 @@ Get the URLs by running `scripts/create-payment-links.mjs` with your own key, pe
 
 **`START_NOW_VERSION` and the wording move together**, same rule as `AI_CONSENT_VERSION` in the apply flow. Reword the checkbox without bumping the version and you silently reinterpret every answer already given. Both live at the top of the script block in `docs/services.html`, next to each other for that reason.
 
-**Still open: Stripe checkout carries no equivalent.** A client who reaches a payment link some other way, or who is sent one directly, still ticks nothing. Closing that is `consent_collection[terms_of_service]=required` plus `custom_text[terms_of_service_acceptance][message]` on each of the eight links, which is an update rather than a replacement, so the URLs do not change. It needs the Stripe account. The booking form now covers every booking that comes through the site, including the invoice jobs over £500 that never had a payment link to attach a tickbox to, so the remaining gap is narrower than it was.
+**Stripe checkout now carries its own equivalent, added later the same day**, for the client who is sent a payment link directly and never passes the booking form. It is the section immediately below. The booking form remains the primary route and the only one that covers invoice jobs over £500.
+
+**The express request to start inside the 14 days: done 5 September 2026, on all eight live links.** It was written here as a Dashboard job on each link. It is not: the Stripe API does it in one call per link, and that is how it was done, so there is no eight rounds of clicking.
+
+Each link now carries two separate controls, and the separation is the point.
+
+- **A required dropdown, "When should we start?"**, with no pre-selected answer. Option one is "Start now. I ask you to begin inside the 14 days." Option two is "Wait the full 14 days. The hold may expire and we will contact you.", or on the retainer "Wait the full 14 days before any work starts.", because the retainer is a subscription and holds nothing. This is the express request. It arrives on the Checkout Session as custom field key `starttiming`, with values `startnow` and `waitfourteen`. **Change the labels freely, never the values**, or the answers stop reconciling with the ones already taken.
+
+  The second option names the hold expiring on purpose. The booking form solves the same problem by offering no pay button at all when the client has not asked for an early start, since a card authorisation lasts seven days and the wait is fourteen. A payment link cannot do that: the client is already on the pay page and the dropdown cannot gate the button. So the link says plainly what will happen instead of quietly taking a hold that is certain to die. A client who picks option two on a link should be treated as not yet paid, and contacted.
+- **A required terms acceptance tickbox**, carrying the cancellation wording. Seven links share one message; the Oversight Retainer has its own, because it charges the first month immediately rather than holding, and the shared wording would be false on it.
+
+They are two controls rather than one because bundling the express request into the terms tickbox makes an early start a condition of paying at all. A consumer who wants to wait the full 14 days could then not buy, and an express request that is forced is a weaker instrument than one freely given. Do not merge them back into a single tickbox to save a line on the page.
+
+**Two things are still not finished. Neither is a link change.**
+
+*The account has no Terms of service URL.* Set it at Settings, Public details, in the Stripe Dashboard. Stripe accepts `consent_collection[terms_of_service] = required` over the API without one and renders the tickbox anyway, linked to nothing: checked on the live checkout page on 5 September 2026, the only three links on it are Stripe's own "Powered by", "Terms" and "Privacy". Until the URL is set, the tickbox is an acceptance of a document the client cannot open. The wording was written around that, naming `yaadly.co.uk/cancellation` in plain text rather than claiming a link that is not there, so nothing on the page is untrue in the meantime. `https://yaadly.co.uk/terms.html` is the right target: it is what the tickbox says it is, and it already links to `cancellation.html` twice. Once it is set, reload a live link and confirm a Yaadly link renders beside the tickbox.
+
+*Nothing in this repository reads the answer back.* `starttiming` is captured by Stripe on the Checkout Session and nowhere else. The `services` row is created by `yaad-book-service` before payment and has no column for it, so today the only way to see what a client chose is the Checkout Session in the Stripe Dashboard. That is workable for the pilot and it is a real gap for anything past it.
+
+**To change any of this**, use the payment link API rather than the Dashboard, the same way the links themselves were made: `POST /v1/payment_links/{id}` with `consent_collection`, `custom_text.terms_of_service_acceptance` and `custom_fields`. The eight ids are recoverable with `GET /v1/payment_links`, and each carries `metadata.yaadly_service_id` so you can tell which service it is without matching URLs by eye. Five older links are inactive and deliberately untouched.
 
 ---
 
