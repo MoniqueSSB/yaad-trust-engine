@@ -3228,6 +3228,24 @@ function pcReview(band, quoted){
 const PC_TONE = { "red flag":"crit", "high, ask questions":"warn", "suspiciously low":"warn",
                   "within the expected range":"ok", "no benchmark, judged on structure only":"mute" };
 
+/** Real quoted prices Yaadly has seen for this trade. Deliberately shows the
+ *  spread and the count rather than an average: four quotes is not a market,
+ *  and a mean of four numbers reads like an authority it has not earned. */
+function pcObservedHtml(obs){
+  if (!obs || !obs.length) {
+    return `<div class="dfield"><span class="dk">seen by Yaadly</span><span class="dv empty">no quotes recorded for this trade yet</span></div>`;
+  }
+  const nums = obs.map(o => Number(o.labour_jmd)).filter(n => n > 0).sort((a,b) => a - b);
+  if (!nums.length) return "";
+  const lo = nums[0], hi = nums[nums.length - 1], mid = nums[Math.floor(nums.length / 2)];
+  const span = lo === hi ? `J$${lo.toLocaleString()}` : `J$${lo.toLocaleString()} to J$${hi.toLocaleString()}`;
+  return `<div class="dfield"><span class="dk">seen by Yaadly</span><span class="dv">`
+    + `${nums.length} real quote${nums.length === 1 ? "" : "s"}, ${esc(span)} labour`
+    + `${nums.length > 2 ? `, middle one J$${mid.toLocaleString()}` : ""}`
+    + `<small>Observed, not researched. These are what workers actually asked for, and for the trades with no public price they are the only figures there are.</small>`
+    + `</span></div>`;
+}
+
 async function loadPriceCheck(){
   const trades = Object.keys(PRICE_BENCHMARKS.taxonomy_to_benchmark);
   const sel = $("pcTrade");
@@ -3249,6 +3267,16 @@ async function runPriceCheck(){
   const quoted = Number($("pcAmount").value);
   if (!(quoted > 0)) return say("pcMsg","err","Put in the figure the worker quoted, in J$.");
   say("pcMsg","ok","Looking it up.");
+
+  // What Yaadly has actually seen quoted for this trade. Observations, not
+  // judgements: every submitted quote lands in price_observations by trigger
+  // (20260905a). This is the half that closes the gap the bands admit to,
+  // because for painting, masonry, septic and general repair the researched
+  // answer is "no public price exists in Jamaica" and these are the only real
+  // figures there will ever be.
+  const { data: obs } = await sb.from("price_observations")
+    .select("labour_jmd,materials_jmd,days_estimate,parish,observed_at")
+    .eq("trade", trade).order("observed_at", { ascending: false }).limit(50);
 
   const look = pcLookup(trade, variant);
   if (look.state === "need_variant") {
@@ -3283,6 +3311,7 @@ async function runPriceCheck(){
       <div class="dfield"><span class="dk">source</span><span class="dv">${esc(band ? band.source : "no benchmark on file")}</span></div>
       ${band && band.note ? `<div class="dfield"><span class="dk">note</span><span class="dv">${esc(band.note)}</span></div>` : ""}
       <ul class="reqlist" style="margin-top:10px">${r.flags.map(f => `<li>${esc(f)}</li>`).join("")}</ul>
+      ${pcObservedHtml(obs)}
       <p class="note" style="margin-top:10px">${esc(PRICE_BENCHMARKS.market_context)}</p>
       <p class="note" style="margin-top:8px"><b>A reference, not an estimate.</b> Never show this to a client or a worker.</p>
       <button id="pcLog1" class="btn" type="button" style="margin-top:12px">Log this review</button>
