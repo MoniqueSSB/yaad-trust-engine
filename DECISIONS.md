@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The early start consent is a dropdown, not a tickbox, and the two are kept apart
+
+**The gap.** `docs/cancellation.html` says, in public, "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking, alongside this cancellation information." Nothing asked. The eight Stripe payment links went live on 5 September with no consent collection at all, so every card booking taken carried it: a client could cancel on day ten and owe nothing while Yaadly still owed the checker, and the site was describing a step that did not happen.
+
+**Why not one tickbox, which is what the runbook had proposed.** A single required terms tickbox would have bundled two different things: accepting the terms, and expressly requesting an early start. Bundled, the express request becomes a condition of paying. A consumer who genuinely wanted to wait the full 14 days could not buy at all, and a forced request is a weaker instrument under the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013 than a freely given one. So it is two controls: a required dropdown that records an actual answer (`starttiming`, `startnow` or `waitfourteen`), and the terms tickbox separately. The cost is one more field at checkout. The gain is that the record says what the client chose rather than that they had no choice.
+
+**Done over the API, not the Dashboard.** The runbook had this as "a Stripe Dashboard change on each of the eight links". It is one API call per link, which is also how the links were created, so the change is repeatable and reviewable instead of eight rounds of clicking that nobody can check afterwards.
+
+**Two things were left honestly unfinished rather than papered over.** The account has no Terms of service URL set at Settings, Public details, and that is Dashboard only: the Stripe connector exposes payment links but not account settings. Stripe accepts `terms_of_service = required` without one and renders a tickbox linked to nothing, which is the failure mode worth naming, because it reads as covered. The first wording said "the cancellation information linked above" and was therefore false on the live page; it was checked against the real checkout page, found wrong, and rewritten to name `yaadly.co.uk/cancellation` in plain text so that it is true either way. And nothing in this repository reads `starttiming` back: it lives on the Stripe Checkout Session and there is no column for it on `services`. Both are written up in `RUNBOOK.md` rather than left in a session that ends.
+
+---
+
 ## 2026-09-05 · Migrations are named to sort last, and the check tests that rather than the format
 
 **Four collisions in one day is a scheme problem, not four mistakes.** Migrations were named `<date><letter>`. Parallel sessions share this repository and cannot see each other's branches, so two sessions both take the next free letter and both are correct at the time. On 5 September `20260904k` through `n` were claimed twice, then `20260905a` and `b` were claimed twice more. It never surfaces as a git conflict, because the filenames differ, so both sets merge quietly into a directory whose entire purpose is applying things in order.

@@ -2924,7 +2924,22 @@ Then book each service in turn and confirm the posted `service` value and the bu
 
 Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
 
-**Still open, and now more exposed than it was:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker. This was written as "missing before a link should go live". The links went live anyway and the card path was made prominent on 5 September 2026, so the gap is now load bearing rather than theoretical: every card booking taken before the checkbox exists carries it. Fixing it is a Stripe Dashboard change on each of the eight links, not a code change here, and it was flagged to the founder on the day.
+**The express request to start inside the 14 days: done 5 September 2026, on all eight live links.** It was written here as a Dashboard job on each link. It is not: the Stripe API does it in one call per link, and that is how it was done, so there is no eight rounds of clicking.
+
+Each link now carries two separate controls, and the separation is the point.
+
+- **A required dropdown, "When should we start?"**, with no pre-selected answer and two options: "Start now. I ask you to begin inside the 14 days." and "Wait until the 14 days have passed." This is the express request. It arrives on the Checkout Session as custom field key `starttiming`, with values `startnow` and `waitfourteen`.
+- **A required terms acceptance tickbox**, carrying the cancellation wording. Seven links share one message; the Oversight Retainer has its own, because it charges the first month immediately rather than holding, and the shared wording would be false on it.
+
+They are two controls rather than one because bundling the express request into the terms tickbox makes an early start a condition of paying at all. A consumer who wants to wait the full 14 days could then not buy, and an express request that is forced is a weaker instrument than one freely given. Do not merge them back into a single tickbox to save a line on the page.
+
+**Two things are still not finished. Neither is a link change.**
+
+*The account has no Terms of service URL.* Set it at Settings, Public details, in the Stripe Dashboard. Stripe accepts `consent_collection[terms_of_service] = required` over the API without one and renders the tickbox anyway, linked to nothing: checked on the live checkout page on 5 September 2026, the only three links on it are Stripe's own "Powered by", "Terms" and "Privacy". Until the URL is set, the tickbox is an acceptance of a document the client cannot open. The wording was written around that, naming `yaadly.co.uk/cancellation` in plain text rather than claiming a link that is not there, so nothing on the page is untrue in the meantime. `https://yaadly.co.uk/terms.html` is the right target: it is what the tickbox says it is, and it already links to `cancellation.html` twice. Once it is set, reload a live link and confirm a Yaadly link renders beside the tickbox.
+
+*Nothing in this repository reads the answer back.* `starttiming` is captured by Stripe on the Checkout Session and nowhere else. The `services` row is created by `yaad-book-service` before payment and has no column for it, so today the only way to see what a client chose is the Checkout Session in the Stripe Dashboard. That is workable for the pilot and it is a real gap for anything past it.
+
+**To change any of this**, use the payment link API rather than the Dashboard, the same way the links themselves were made: `POST /v1/payment_links/{id}` with `consent_collection`, `custom_text.terms_of_service_acceptance` and `custom_fields`. The eight ids are recoverable with `GET /v1/payment_links`, and each carries `metadata.yaadly_service_id` so you can tell which service it is without matching URLs by eye. Five older links are inactive and deliberately untouched.
 
 ---
 
