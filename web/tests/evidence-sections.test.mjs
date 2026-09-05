@@ -52,10 +52,15 @@ const item = (id, phase, kind = "work") => ({
 
 describe("the evidence section vocabulary", () => {
   test("is the order of the work, not alphabetical", () => {
+    // 'new' added 5 Sep 2026 on the founder's instruction. This assertion
+    // encodes a product decision, and the decision changed: 'issue' was
+    // carrying both a problem with priced work and a discovery nobody had
+    // quoted, and the difference between those two is money.
     assert.deepEqual(sections.EVIDENCE_PHASES, [
       "before",
       "during",
       "issue",
+      "new",
       "after",
     ]);
   });
@@ -90,6 +95,17 @@ describe("the evidence section vocabulary", () => {
     // change to price or timeline is agreed with them first.
     assert.match(sections.PHASE_NOTE.issue, /writing/i);
     assert.match(sections.PHASE_NOTE.issue, /price|timeline/i);
+  });
+
+  test("a new find carries the same promise, and it is the one that costs money", () => {
+    // 'new' is the half of the old 'issue' that actually changes the price:
+    // work nobody quoted and nobody agreed. If either note were going to carry
+    // the promise about writing, it is this one, so both do.
+    assert.match(sections.PHASE_NOTE.new, /writing/i);
+    assert.match(sections.PHASE_NOTE.new, /price|timeline/i);
+    // And it must not read as a problem with the work already paid for.
+    assert.match(sections.PHASE_HEADING.new, /new/i);
+    assert.match(sections.PHASE_OPTION.new, /new/i);
   });
 
   test("the unmarked heading admits what it is", () => {

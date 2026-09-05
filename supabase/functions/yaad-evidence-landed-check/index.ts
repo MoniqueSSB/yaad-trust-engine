@@ -113,6 +113,7 @@ Deno.serve(async (req: Request) => {
 
     let fired = 0, notified = 0, stale = 0;
     for (const p of (due ?? []) as { id: string; job_id: string; stage: number; should_notify: boolean }[]) {
+      let sent = false;
       if (p.should_notify) {
         // Marked fired either way: a failed HTTP call here is the same
         // class of thing as a failed Twilio send elsewhere in this
@@ -121,6 +122,12 @@ Deno.serve(async (req: Request) => {
         // its own kind of stall.
         const ok = await fireEvidenceLanded(p.job_id, trace);
         if (ok) notified++;
+        // An ATTEMPT, deliberately, not a confirmed delivery. This is what
+        // stops the stage being emailed a second time (20260906015600), and
+        // it has to mean the same thing as fired_at does: we tried. A retry
+        // loop that keeps emailing a client until something returns 200 is
+        // worse than one email that may have failed.
+        sent = true;
       } else {
         // The stage moved on (approved, disputed, or a new stage started)
         // in the 90 seconds this timer was open. Cleared silently, the
@@ -128,7 +135,7 @@ Deno.serve(async (req: Request) => {
         // already answered whatever this timer was waiting to say.
         stale++;
       }
-      await admin.rpc("mark_evidence_landed_fired", { p_id: p.id });
+      await admin.rpc("mark_evidence_landed_fired", { p_id: p.id, p_notified: sent });
       fired++;
     }
 

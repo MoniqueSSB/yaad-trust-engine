@@ -2206,3 +2206,177 @@ grade evidence as sufficient and it does not gate a stage. `yaad-vetting-review`
 keeps its consent gate inside `review()` and keeps `IDENTITY_DOCS` withheld
 before download. A better model is a more accurate description in front of the
 named human, never a decision made further from them.
+
+## The staging prefix is swept on a clock, and the abandoned session goes with it (5 Sep 2026)
+
+`yaad-inbound` stages an inbound WhatsApp photo at `evidence/_pending/<uuid>`
+before it knows which job it belongs to, then moves it to `<job_id>/<uuid>`
+once the worker has answered the job code and the context question. A move is
+a rename, so anything left in that prefix is
+evidence nobody ever answered for. Nothing removed it.
+
+The prefix was checked before any of this was written, and it held zero
+objects. That is the honest number, and on its own it argues for doing nothing.
+It was still built and still scheduled, for two reasons. The leak is
+prospective rather than historical: abandonment is a December behaviour, not an
+August one, and the prefix is empty now precisely because almost nobody has
+used the lane yet. And a purge that exists but is never called is the exact
+failure `20260827f` was written to record, where every vetting document carried
+a deletion date that nothing acted on for a month. Writing the function without
+the schedule would have repeated it deliberately.
+
+So it follows `yaad-vetting-purge` rather than inventing a second pattern: an
+Edge Function with two doors, a signed-in admin or a secret checked against a
+SHA-256 hash in `app_settings`, called nightly by pg_cron through pg_net,
+because the job lives inside the database and cannot read the function's
+environment. Its own secret rather than the purge's, so rotating one does not
+silently break the other.
+
+Three things make a deletion safe, and the interesting one is not the age.
+72 hours clears the 48 the intake code already treats as stale, so it can never
+race a live conversation. No `public.evidence` row may claim the path, which
+structurally can never happen because finalising renames the object out of the
+prefix, and is there as a belt against a future writer that files a staged path
+directly. The load-bearing check is the third: no intake session touched in the
+last 72 hours may still name the path, whatever the object's own age says. That
+makes it safe by construction rather than safe by the margin between two
+numbers.
+
+It deletes the abandoned session row too, which looks like scope creep and is
+not. `yaad-inbound` intends to drop a stale evidence session at 48 hours, but
+that branch sits after the evidence branch and returns before reaching it, so
+for an evidence session it never runs and nothing else deletes the row. Had the
+sweep taken the files and left the row, a worker returning on day five would be
+asked what their photo shows, answer, and be told "Confirmed, but nothing saved
+properly", a failure the sweep would have introduced. Taking both means that
+worker is read fresh, which is what the 48 hour rule was written to do. Only
+the evidence lane; the other lanes hold no staged files.
+
+Nothing in it rules on anything. It deletes working state that the code already
+meant to discard, and touches no job, no filed evidence, no money and no Yaad
+Score.
+
+`supabase/functions/yaad-evidence-sweep/`,
+`20260906013700_the_staging_prefix_gets_a_sweep.sql`.
+## One evidence email per stage, and why fired_at could not answer it (5 Sep 2026)
+
+Founder's instruction, on seeing what tagging photographs would do: it should
+go to the email once, not twice.
+
+The existing debounce covered a burst. Every evidence insert reset a 90 second
+timer, so five photographs sent back to back produced one email. What it never
+covered was two batches an hour apart: the open-timer index is partial, so once
+a timer fires the next photograph opens a fresh one, and the stage is still
+status 'evidence' because nobody has approved it, so it fires again.
+
+That was occasional until today. Asking a worker which phase a photograph is
+(`20260906000700`) makes two batches per stage, a before and later an after,
+the ordinary shape of a job, so building that and leaving this would have been
+shipping the annoyance on purpose.
+
+The rule is now one evidence email per job and stage. Anything filed afterwards
+lands silently and the client sees it when they open the stage they have already
+been told to look at. The cost is real and is the right way round: a client who
+reads the email when the before lands is not pinged when the after arrives, and
+two emails carrying the same sentence about the same stage is how people learn
+to ignore both. The approval that releases money is something they come back to
+the portal for.
+
+The interesting part is why `fired_at` could not be used to answer "has this
+stage already been emailed". `yaad-evidence-landed-check` stamps it on both
+paths: one when it sends, and one when it clears a stale timer silently because
+the stage was approved, disputed or moved past inside the 90 seconds. Reading it
+as a delivered email would have treated a silently cleared timer as a
+notification and suppressed the real one. So `notified_at` was added and records
+only sends.
+
+`mark_evidence_landed_fired` was dropped and recreated with a defaulted second
+argument rather than overloaded, because a two-argument version alongside the
+one-argument version makes the call PostgREST already makes ambiguous, and that
+failure would land exactly when a notification was due. The default is false so
+the currently deployed edge function keeps behaving as it does today until it is
+redeployed: it records no sends and suppresses nothing. A change that decides
+whether a client hears from us at all should fail towards the old behaviour, not
+towards silence.
+
+`20260906015600_the_evidence_email_goes_once_per_stage.sql`,
+`supabase/functions/yaad-evidence-landed-check/index.ts`.
+
+## Two sessions built the same thing, and what survived (5 Sep 2026)
+
+Worth recording because the failure is procedural, not technical, and it will
+happen again.
+
+Two Claude sessions were asked for evidence sectioning on the same day and both
+built it. One shipped `evidence.phase` with before, during, after, issue, plus
+materials read off `kind`, and merged as PR #125. The other built
+`evidence.purpose` with before, after, issue, new, plus an explicit before-to-
+after pairing. Neither could see the other's branch. CLAUDE.md §12 warns about
+exactly this and the second session only used it for naming migration files,
+not for checking whether the work already existed.
+
+Founder's call on being shown both: `phase` survives, because it was merged
+first, is already in the stage approval snapshot, and unpicking it would be
+worse than unpicking the other. The duplicate column was dropped before it was
+ever applied. What was rebuilt on top of `phase` is the part `phase` did not
+have.
+
+The lesson for a future session is one line: fetch and read `origin/main`
+before building, not just before naming a file.
+
+## A new find is not a problem, and an after answers a named before (5 Sep 2026)
+
+Two things `20260906000700` did not have.
+
+**`new` as a fifth section.** `issue` was carrying two different things and the
+difference between them is money. A problem with work already in scope and
+already priced is included; putting it right changes nothing the client pays.
+Something discovered that was never in the job has been quoted by nobody and
+agreed by nobody, and it may change the price and the timeline. The tell that
+they had been conflated was in the copy: the client-facing note under `issue`
+read "not part of what was originally quoted", which was only ever true of half
+of what was filed there. That note now belongs to `new`, and `issue` keeps its
+own promise about writing so nothing a client reads lost it.
+
+The order test in `web/tests/evidence-sections.test.mjs` was updated to expect
+five. That is a test encoding a product decision, and the decision changed. It
+is not an assertion weakened to make a broken change pass, and the money promise
+it guards now has to hold on two notes instead of one.
+
+**The pairing.** An after names the before it answers, by `item_code`. That
+code already existed: `20260831zzzz2` added P1, P2, P3 so one WhatsApp reply
+could name one photograph instead of a whole stage, and this is the second
+thing it turned out to be for. The rules are enforced in a trigger rather than
+a CHECK, because every one of them is about another row: an after only,
+pointing at a before, on the same job, never at itself. `on delete set null`
+rather than cascade, because if a before ever goes, the after is still real
+evidence of real work.
+
+The comparison is shown inside the after's own card, as a thumbnail of the
+before, rather than by drawing the before as a second full card. A record that
+lists the same photograph twice is a worse record even when it looks better.
+
+**N moved from "none of those" to "new", and skipping became S.** A letter that
+already meant something else is a real cost, and the reason it moved anyway is
+that "N for new" is the mnemonic a worker will reach for, while skipping is the
+rare answer. A worker who replies N meaning to skip gets a new find, and the
+desk corrects it. Nothing about it blocks a filing either way.
+
+**The stage is named before anything is sent.** Founder's point, and it is
+about timing rather than information: a worker does not know which stage a job
+is on, the stages move while they are working, and finding out from the
+confirmation afterwards is too late to say otherwise. The proportion of the
+money a stage carries is stripped out of that sentence, because what a stage is
+worth is not a thing to put in front of somebody mid-job.
+
+**A correction cannot be anonymous.** `retag_evidence` refuses when it cannot
+tell who is signed in, and stamps `phase_set_by` and `phase_set_at`. A worker's
+answer is their claim about their own photograph, not a ruling, so the desk
+correcting a wrong one is ordinary and expected. Doing it silently would not be:
+this is evidence, and overwriting what somebody said with no trace of who
+changed it makes the record less trustworthy than leaving the mistake in. A
+correction never touches the image, the description or the fingerprint.
+
+`20260906020400_a_discovery_is_not_an_issue_and_an_after_answers_a_before.sql`,
+`web/lib/portal/evidence-sections.ts`, `supabase/functions/yaad-inbound/index.ts`,
+`concierge/concierge.html`.

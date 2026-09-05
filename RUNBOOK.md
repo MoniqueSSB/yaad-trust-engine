@@ -3719,3 +3719,194 @@ second answer, a request that ran past 35 seconds with nothing back, and a flat
 unparseable answer is not, because asking again does not fix it. Every vision
 span now carries `yaadly.model.region`, so which country a photograph went to
 is answerable from telemetry rather than from memory.
+
+## The staging prefix in the evidence bucket, and the sweep that empties it
+
+`yaad-inbound` puts an inbound WhatsApp photo or video into
+`evidence/_pending/<uuid>` the moment it arrives, before it knows which job it
+belongs to. When the worker answers the job code and the "what does this
+show" question, the file is MOVED to
+`<job_id>/<uuid>`. A move is a rename, so a filed item leaves nothing behind.
+
+Anything still under `_pending/` is a photo somebody sent and then never
+answered for. Until 5 September 2026 nothing removed those.
+
+### Look at what is there
+
+```bash
+supabase storage ls "ss:///evidence/_pending/" --experimental --project-ref leffyisvfvjwzilydlwf
+```
+
+`{"paths":[]}` means the prefix is empty, which is the normal state. Objects
+appear only while a conversation is mid-flight, or when one was abandoned.
+
+### Ask the sweep what it would delete, without deleting anything
+
+Signed in as an admin, from the desk's browser console, or with any admin
+session token:
+
+```bash
+curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-evidence-sweep -H "Content-Type: application/json" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer <your admin session token>" -d '{"dry_run": true}'
+```
+
+It answers with `staged` (everything in the prefix), `held_by_live_session`
+(paths a conversation touched in the last 72 hours still names, which are never
+touched), `would_delete`, `would_drop_sessions`, and a `sample` of up to ten
+paths. Drop `"dry_run": true` and it does it.
+
+### The schedule
+
+pg_cron runs it at 04:23 UTC daily, an hour clear of `yaad-vetting-purge` at
+03:17. Same secret-hash pattern: the job presents a secret and the function
+checks it against `app_settings.evidence_sweep_cron_secret_sha256`. See
+`20260906013700_the_staging_prefix_gets_a_sweep.sql`.
+
+Proof it is on:
+
+```sql
+select jobname, schedule, active from cron.job where jobname = 'yaad-evidence-sweep';
+select status_code, content, created from net._http_response order by created desc limit 5;
+```
+
+To rotate the secret, re-run the `do $do$ ... $do$;` block in that migration.
+It overwrites the hash and reschedules the job in one transaction.
+
+### What it will not delete
+
+An object goes only when it is older than 72 hours, no intake session updated
+in the last 72 hours still names it, and no `public.evidence` row carries it as
+`storage_path`. 72 rather than 48 so it can never race a live conversation.
+Nothing it touches is a job, a piece of filed evidence, money or a Yaad Score.
+
+It also deletes the abandoned evidence session row itself. That is not tidying.
+`yaad-inbound` means to drop a stale evidence session at 48 hours, but the
+branch that does it sits after the evidence branch and is never reached, so the
+row lives forever. If the files went and the row stayed, a worker coming back on
+day five would be asked what their photo shows, answer, and be told "Confirmed,
+but nothing saved properly". Removing both means they are simply read fresh.
+
+### If it starts finding hundreds of objects a night
+
+That is workers abandoning the evidence conversation, not a bug in the sweep.
+Read it as a product signal: the job code question or the "what does this
+show" question is losing people. The count is in the
+trace attribute `yaadly.sweep.deleted`.
+## The evidence email goes once per stage
+
+A client gets one "evidence has landed" email per job and per stage. Not one
+per photograph, and not one per batch.
+
+Two separate mechanisms do that, and they solve different problems:
+
+1. **The burst debounce** (`20260831zzzz6`). Every evidence insert resets a 90
+   second quiet timer. Five photos sent back to back over WhatsApp produce one
+   email, ninety seconds after the last of them.
+2. **Once per stage** (`20260906015600`). A second batch filed an hour later on
+   the same stage lands silently, because that stage has already been emailed
+   about. Added because tagging photographs by phase (`20260906000700`) makes
+   two batches per stage, a before and later an after, the ordinary shape of a
+   job rather than the exception.
+
+The cost, stated so nobody is surprised by it: a client who reads the email
+when the before lands and never looks again is not pinged when the after
+arrives. That is deliberate. Two emails carrying the same sentence about the
+same stage is how people learn to ignore both.
+
+### Checking it
+
+```sql
+select job_id, stage, created_at, fired_at, notified_at from public.evidence_landed_pending order by created_at desc limit 10;
+```
+
+Exactly one row per job and stage should have `notified_at` set. `fired_at` is
+stamped on every timer that gets dealt with, including ones cleared silently
+because the stage was approved or disputed inside the 90 seconds, so it is not
+the column that answers "was the client told".
+
+### If the client says they were emailed twice anyway
+
+Check that `yaad-evidence-landed-check` has actually been redeployed since
+5 September 2026. The suppression only works when it passes `p_notified` to
+`mark_evidence_landed_fired`. The older deployed copy passes only `p_id`, which
+defaults to false, records no sends, and therefore suppresses nothing. That
+fallback is deliberate: it fails towards the old behaviour rather than towards
+silence.
+
+## A new find is not a problem, and an after answers a named before
+
+Two additions to the five sections `20260906000700` put on every stage.
+
+### The fifth section: something new found
+
+`evidence.phase` now takes **`new`** as well as before, during, after and
+issue. The split matters because it is the difference between a problem and a
+bill:
+
+- **A problem with the work** is something wrong inside work that is already in
+  scope and already priced. Putting it right is included.
+- **Something new found** was never in the job at all. Nobody has quoted it and
+  nobody has agreed it, so it may change the price or the timeline, and that is
+  agreed with the client in writing first.
+
+Before this, `issue` carried both, and the client-facing note under it read
+"not part of what was originally quoted", which was only true of half the
+things filed there.
+
+On the desk a new find shows coral (blocked, because it stops until somebody
+decides) and a problem shows mango (held).
+
+### The after names the before it answers
+
+On WhatsApp the worker adds the code to the same reply: `A P3`. `P3` is the
+item code every evidence item already carries (`20260831zzzz2`). The question
+only offers this when the job actually has a before to point at, and it names
+the codes:
+
+> Which is this? Reply B for before, D for during the work, A for after, P for
+> a problem with the work, or N for something new you found that was not in the
+> job. Reply S to skip. If it is the after for one of the befores on this job
+> (P3, P5), put its code after the letter, like "A P3".
+
+**N used to mean "none of those" and now means "new". Skipping is S.** If a
+worker replies N expecting to skip, their photo is filed as a new find. Correct
+it from the desk. The letter moved because "N for new" is the mnemonic that
+matches the word, and skipping is the rarer answer.
+
+A code that names nothing on the job never blocks the filing. The evidence
+lands, and the reply says it could not find that code, so the desk can link it
+without the worker resending anything.
+
+In the portal, picking After on the upload form reveals a second dropdown
+listing that job's befores. If there are none it says so rather than silently
+filing an unpaired after.
+
+The client sees the comparison inside the After card: a thumbnail of the before
+it answers, captioned "Answers P3". The before is not drawn twice; it appears
+once in its own section and at thumbnail size here. A before that has an after
+against it says "Answered by P7" rather than looking like it is still waiting.
+
+### The WhatsApp message names the stage
+
+Every job in the "which job is this for" list carries the stage it is on, and
+the confirmation names the stage in full from the approved kickoff pack: "Got
+it, that's for JOB-1042 (Bathroom retile), stage 3, First fix. Anything you
+send now files against that stage."
+
+A worker on site does not know which stage the job is sitting on and the stages
+move while they are working. They should know where a photograph is going
+before they send it. The proportion of the money a stage carries is stripped
+out of that sentence on purpose.
+
+### Correcting a wrong answer
+
+Evidence view on the desk, "Correct which section this is". It changes the
+section and, for an after, which before it answers. It stamps your address and
+the time, and the row then reads "corrected by ...". The image, the description
+and the fingerprint are never touched.
+
+There is deliberately no way to change it without leaving your name on it. A
+worker's answer is their claim about their own photograph, not a ruling, so
+correcting one is ordinary. Doing it silently would not be.
+
+Materials is refused a section, here and everywhere: it is its own thing on
+`evidence.kind` and the database constraint will not take a phase on it.
