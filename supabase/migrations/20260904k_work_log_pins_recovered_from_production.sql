@@ -11,13 +11,26 @@
 -- recovered it; production already had it. It matters on a rebuild, where a
 -- latent error would surface rather than here.
 --
--- ONE THING TO KNOW BEFORE RELYING ON IT. record_work_log_pin() is called by
--- the yaad-inbound RUNNING IN PRODUCTION and by no yaad-inbound in this
--- repository. Production and main diverged: production files a pin from a
--- WhatsApp location share, main reads lat and lon and files nothing. Deploying
--- main's yaad-inbound over production silently ends pin filing, and this table
--- stops receiving rows with no error anywhere. That reconciliation belongs to
--- whoever owns that work.
+-- NOTHING WRITES TO THIS TABLE ANY MORE, AND NOTHING EVER DID. Resolved the
+-- same day the file was recovered, and the first version of this header
+-- overstated the problem twice over, so here is what is actually true.
+--
+-- Two versions of yaad-inbound existed, from the same session at different
+-- moments. One filed a WhatsApp location share here as a work log pin. The
+-- other, which is the one on main, files the same share as an ARRIVAL CHECK-IN
+-- into arrival_log, which is part of the evidence spine named in CLAUDE.md
+-- section 8, and refuses a second check-in the same day.
+--
+-- Production was running the first. It was replaced with main's on 4 September
+-- once the numbers settled the question: work_log_pins had zero rows and had
+-- never received one, arrival_log had three. So the divergence ended by
+-- deploying main, which lost nothing that had ever existed and gained arrival
+-- logging from a location share, which production did not have.
+--
+-- The table and record_work_log_pin() are left in place rather than dropped,
+-- because dropping live objects to tidy up is how you find out what depended
+-- on them. If nothing claims them, they are safe to remove later. If somebody
+-- wants pins as well as arrivals, this is the schema to build on.
 --
 -- It also depends on parish_centroid() and km_between(), which are likewise
 -- live and may not be in this repository either. Check before a rebuild.
