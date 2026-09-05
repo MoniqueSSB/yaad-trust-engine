@@ -129,23 +129,25 @@ export const ACCESS = [
  * Both are gone. A split job cannot say who is answerable when a wall fails,
  * because the workmanship obligation and the risk on the goods have to sit
  * with the same party. "Not sure" leaves it open at the exact moment quoting
- * starts, which is the thing being fixed. Somebody who genuinely does not
- * know wants the first option, which is why it is first and why it says so.
+ * starts, which is the thing being fixed.
  *
- * The second option carries what it costs, ON the option, not on the terms
- * page. It moves materials risk, programme risk and part of the guarantee
- * onto the client, and a client who picks it to save money without knowing
- * that will be angry later with good reason.
+ * TWO SHORT LABELS AND NO EXPLANATORY NOTES. Founder's instruction, 5 Sep
+ * 2026, after an earlier version put two large option cards on the screen
+ * with a paragraph under each: "I ASKED FOR A SMALLER ADDITION, JUST A SIMPLY
+ * LINE TO SAY THE MATERIAL WILL BE SUPPLIED OR INCLUDED IN THE QUOTE." So it
+ * is one line of chips, matching the urgency and access questions, and it is
+ * the smallest thing that still records the answer.
+ *
+ * WHERE THE CONSEQUENCE COPY WENT. The removed note under the second option
+ * said the tradesperson is not answerable for client-supplied materials being
+ * short, late or wrong, that dates move, and that the guarantee covers his
+ * work and not their materials. That is all still true and it is in clause 8
+ * of legal/subcontractor-agreement-DRAFT.md. It belongs on the terms page or
+ * in the quote confirmation, not on the first screen of a public form.
  */
 export const MATERIALS = [
-  {
-    value: "Yaadly buys the materials",
-    note: "They are part of the price and they are the first payment on the job. You see the receipt and photographs of them on your property before any labour is paid for.",
-  },
-  {
-    value: "I am supplying the materials myself",
-    note: "You buy and deliver them, and Yaadly is engaged for the labour only. The tradesperson tells you what the job needs. He is not answerable for materials being short, late or wrong, dates move if they are not there, and the guarantee covers his work and not your materials.",
-  },
+  { value: "Included in the quote" },
+  { value: "I am supplying them" },
 ] as const;
 
 /** True when the client is supplying the materials, so the job is labour only

@@ -92,8 +92,8 @@ const STORE_TYPE: Record<string, string> = {
  *  'yaadly' would silently commit a client to buying materials through
  *  Yaadly because their browser had an old copy of a page. */
 const MATERIALS_BY: Record<string, string> = {
-  "yaadly buys the materials": "yaadly",
-  "i am supplying the materials myself": "client",
+  "included in the quote": "yaadly",
+  "i am supplying them": "client",
 };
 
 /** Columns the job card maps onto one-for-one. */

@@ -515,45 +515,28 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                 </p>
               </div>
 
-              {/* Who buys the materials. Step 2 of the materials route spec.
-                  It is here, on the first stage, because it decides what the
-                  worker quotes, and asking it after quotes are in means every
-                  quote was priced against a guess. Two options only, and the
-                  second carries what it costs ON the option rather than on the
-                  terms page: it moves the materials risk, the programme risk
-                  and part of the guarantee onto the client. See the long note
-                  above MATERIALS in lib/jobs/new-form.ts for why there is no
-                  "not sure" and no "split it". */}
+              {/* Materials. One line of chips, the same shape as urgency and
+                  access. Founder's instruction after a bigger version: a
+                  simple line saying the materials are supplied or included in
+                  the quote, and nothing else. The reasoning, and where the
+                  consequence copy went, is above MATERIALS in
+                  lib/jobs/new-form.ts. */}
               <div className="fgroup" style={{ marginBottom: 0 }}>
                 <label className="fl" id="lbl-materials">
-                  Who is buying the materials{" "}
+                  Materials{" "}
                   <span className={"src " + (f.materialsBy ? "ok" : "req")}>
                     {f.materialsBy ? "Chosen" : "Required"}
                   </span>
                 </label>
-                <div className="grid gap-2" role="group" aria-labelledby="lbl-materials">
+                <div className="chips" role="group" aria-labelledby="lbl-materials">
                   {MATERIALS.map((m) => (
                     <button key={m.value} type="button" aria-pressed={f.materialsBy === m.value}
-                      onClick={() => set("materialsBy", f.materialsBy === m.value ? "" : m.value)}
-                      className={
-                        "rounded-xl border px-4 py-3 text-left transition " +
-                        (f.materialsBy === m.value
-                          ? "border-teal bg-soft"
-                          : "border-line bg-bg hover:border-teal")
-                      }>
-                      <b className={"block text-[13.5px] " + (f.materialsBy === m.value ? "text-tealb" : "text-ink")}>
-                        {m.value}
-                      </b>
-                      <span className="mt-0.5 block text-[12.5px] leading-relaxed text-dim">{m.note}</span>
+                      className={f.materialsBy === m.value ? "on" : ""}
+                      onClick={() => set("materialsBy", f.materialsBy === m.value ? "" : m.value)}>
+                      <span aria-hidden="true">{f.materialsBy === m.value ? "✓ " : "+ "}</span>{m.value}
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-                  Not sure? Pick the first one. That is the normal way a job
-                  runs, and <b className="text-mute">the tradesperson tells you
-                  what the job needs either way</b>, so you are never left
-                  guessing what to buy.
-                </p>
               </div>
             </div>
           )}

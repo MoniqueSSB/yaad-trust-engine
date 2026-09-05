@@ -49,7 +49,7 @@ const full = () => ({
   desc: "Zinc lifted off the back roof and water is coming in",
   urgency: "Urgent, within 48 hours",
   accessType: "No inside access needed, outside work only",
-  materialsBy: "Yaadly buys the materials",
+  materialsBy: "Included in the quote",
   name: "Test Client",
   contact: "test@example.com",
 });
@@ -299,8 +299,8 @@ describe("restoring only ever offers values the lists still have", () => {
  */
 describe("the materials wording maps to a route", () => {
   const MAPPED = {
-    "yaadly buys the materials": "yaadly",
-    "i am supplying the materials myself": "client",
+    "included in the quote": "yaadly",
+    "i am supplying them": "client",
   };
 
   test("there are exactly two options, and no not-sure escape hatch", () => {
@@ -319,14 +319,20 @@ describe("the materials wording maps to a route", () => {
     }
   });
 
-  test("Yaadly buying is first, because it is the answer for somebody unsure", () => {
+  test("included in the quote is first, the normal way a job runs", () => {
     assert.equal(MAPPED[m.MATERIALS[0].value.toLowerCase()], "yaadly");
   });
 
-  test("the client-supplied option says what it costs, on the option", () => {
-    const note = m.MATERIALS[1].note;
-    assert.match(note, /guarantee/i);
-    assert.match(note, /short|late|wrong/i);
+  /* Founder's instruction, 5 Sep 2026: a simple line, no explanatory notes.
+     The consequence copy that used to sit under the second option moved to
+     clause 8 of the subcontract draft and belongs on the terms page. This
+     asserts the labels stay SHORT, because the pressure on a form question is
+     always to grow another sentence. */
+  test("the labels stay short enough to be one line of chips", () => {
+    for (const o of m.MATERIALS) {
+      assert.ok(o.value.length <= 26, `"${o.value}" is ${o.value.length} chars`);
+      assert.equal(o.note, undefined, "options carry no explanatory note");
+    }
   });
 
   test("clientSuppliesMaterials is true only for the second option", () => {
@@ -355,7 +361,7 @@ describe("a saved draft keeps the materials answer", () => {
   test("it survives a serialise and parse round trip", () => {
     const raw = m.serialiseDraft("JOB-1", full(), Date.now());
     const back = m.parseDraft(raw, Date.now());
-    assert.equal(back.fields.materialsBy, "Yaadly buys the materials");
+    assert.equal(back.fields.materialsBy, "Included in the quote");
   });
 
   test("a retired option is dropped on restore rather than posted", () => {
