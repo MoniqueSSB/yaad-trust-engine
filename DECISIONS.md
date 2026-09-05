@@ -1909,3 +1909,46 @@ Score.
 
 `supabase/functions/yaad-evidence-sweep/`,
 `20260906013700_the_staging_prefix_gets_a_sweep.sql`.
+## One evidence email per stage, and why fired_at could not answer it (5 Sep 2026)
+
+Founder's instruction, on seeing what tagging photographs would do: it should
+go to the email once, not twice.
+
+The existing debounce covered a burst. Every evidence insert reset a 90 second
+timer, so five photographs sent back to back produced one email. What it never
+covered was two batches an hour apart: the open-timer index is partial, so once
+a timer fires the next photograph opens a fresh one, and the stage is still
+status 'evidence' because nobody has approved it, so it fires again.
+
+That was occasional until today. Asking a worker which phase a photograph is
+(`20260906000700`) makes two batches per stage, a before and later an after,
+the ordinary shape of a job, so building that and leaving this would have been
+shipping the annoyance on purpose.
+
+The rule is now one evidence email per job and stage. Anything filed afterwards
+lands silently and the client sees it when they open the stage they have already
+been told to look at. The cost is real and is the right way round: a client who
+reads the email when the before lands is not pinged when the after arrives, and
+two emails carrying the same sentence about the same stage is how people learn
+to ignore both. The approval that releases money is something they come back to
+the portal for.
+
+The interesting part is why `fired_at` could not be used to answer "has this
+stage already been emailed". `yaad-evidence-landed-check` stamps it on both
+paths: one when it sends, and one when it clears a stale timer silently because
+the stage was approved, disputed or moved past inside the 90 seconds. Reading it
+as a delivered email would have treated a silently cleared timer as a
+notification and suppressed the real one. So `notified_at` was added and records
+only sends.
+
+`mark_evidence_landed_fired` was dropped and recreated with a defaulted second
+argument rather than overloaded, because a two-argument version alongside the
+one-argument version makes the call PostgREST already makes ambiguous, and that
+failure would land exactly when a notification was due. The default is false so
+the currently deployed edge function keeps behaving as it does today until it is
+redeployed: it records no sends and suppresses nothing. A change that decides
+whether a client hears from us at all should fail towards the old behaviour, not
+towards silence.
+
+`20260906015600_the_evidence_email_goes_once_per_stage.sql`,
+`supabase/functions/yaad-evidence-landed-check/index.ts`.

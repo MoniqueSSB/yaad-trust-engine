@@ -3258,3 +3258,43 @@ That is workers abandoning the evidence conversation, not a bug in the sweep.
 Read it as a product signal: the job code question or the "what does this
 show" question is losing people. The count is in the
 trace attribute `yaadly.sweep.deleted`.
+## The evidence email goes once per stage
+
+A client gets one "evidence has landed" email per job and per stage. Not one
+per photograph, and not one per batch.
+
+Two separate mechanisms do that, and they solve different problems:
+
+1. **The burst debounce** (`20260831zzzz6`). Every evidence insert resets a 90
+   second quiet timer. Five photos sent back to back over WhatsApp produce one
+   email, ninety seconds after the last of them.
+2. **Once per stage** (`20260906015600`). A second batch filed an hour later on
+   the same stage lands silently, because that stage has already been emailed
+   about. Added because tagging photographs by phase (`20260906000700`) makes
+   two batches per stage, a before and later an after, the ordinary shape of a
+   job rather than the exception.
+
+The cost, stated so nobody is surprised by it: a client who reads the email
+when the before lands and never looks again is not pinged when the after
+arrives. That is deliberate. Two emails carrying the same sentence about the
+same stage is how people learn to ignore both.
+
+### Checking it
+
+```sql
+select job_id, stage, created_at, fired_at, notified_at from public.evidence_landed_pending order by created_at desc limit 10;
+```
+
+Exactly one row per job and stage should have `notified_at` set. `fired_at` is
+stamped on every timer that gets dealt with, including ones cleared silently
+because the stage was approved or disputed inside the 90 seconds, so it is not
+the column that answers "was the client told".
+
+### If the client says they were emailed twice anyway
+
+Check that `yaad-evidence-landed-check` has actually been redeployed since
+5 September 2026. The suppression only works when it passes `p_notified` to
+`mark_evidence_landed_fired`. The older deployed copy passes only `p_id`, which
+defaults to false, records no sends, and therefore suppresses nothing. That
+fallback is deliberate: it fails towards the old behaviour rather than towards
+silence.
