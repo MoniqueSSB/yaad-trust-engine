@@ -43,6 +43,13 @@ def client() -> LLMClient:
         # the only one there and this is the form the model actually writes.
         "Your money is held and released stage by stage.",
         "We are holding your money until the work is proven.",
+        # Added 5 Sep 2026. Until today this exact sentence was the PRESCRIBED
+        # replacement for "escrow" in CLAUDE.md section 8, in both guardrail
+        # runtimes' guidance strings, and in the Reporting agent's own prompt,
+        # so the screen was clean while the instructions handed the model the
+        # one claim the screen exists to stop.
+        "Money is held safely with a licensed payment provider.",
+        "Your payment is held safely until the work is signed off.",
     ],
 )
 def test_banned_language_is_caught(text: str) -> None:

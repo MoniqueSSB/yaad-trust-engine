@@ -6,6 +6,36 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The model retry ignored Retry-After, so it bought a second identical refusal
+
+**Observed rather than reasoned.** On 4 September the Mistral 429s were watched doing exactly this: the retry fired, waited its fixed 1200ms, and got 429 again. That is what ruled out a burst from a test loop and pointed at a quota or a sustained throttle instead. The retry was not helping; it was spending the caller's budget to reach the same answer.
+
+**The cause was a header nobody read.** `fetchModel` waited `retryDelayMs` regardless of what the server said. A provider that has told you how long to wait and been ignored will refuse a second time, so the retry was guaranteed to fail whenever the wait exceeded 1200ms, which on a rate limit it usually does.
+
+**The fix, and the part worth arguing about.** `fetchModel` now parses `Retry-After`, in both the delay-seconds and HTTP-date forms, and treats a missing, malformed, zero or past value as absent rather than as "retry immediately", because that instruction from a server that just rate limited us is not one to believe. If the wait fits inside `MAX_RETRY_WAIT_MS` it waits exactly that. **If it does not fit, it does not retry at all.** That is the deliberate half: the tightest caller is the Twilio inbound webhook with roughly fifteen seconds, and burning eleven of them to reach the same refusal is strictly worse than failing at once with time left to send the person a real reply. Four seconds leaves room for the retried call and for writing that reply.
+
+**This does not fix the 429s and is not meant to.** Whether the account is on the free tier, and whether to pay for throughput, are readable only from Mistral's console and the second is a spending decision. RUNBOOK section 9a carries both, alongside the other open Mistral question: the privacy page says where the model runs and says nothing about whether Mistral trains on the text sent to it. Nothing has been written on that page yet on purpose. A privacy page claiming an opt-out nobody has verified is worse than one that is silent, and both are December pilot items on the same trigger as the EU move itself, which is real client data.
+
+---
+
+## 2026-09-05 · The prescribed replacement for "escrow" was itself a banned claim, and it was in an agent's prompt
+
+**Settled on Monique's instruction**, closing the question the 4 September guardrail note left open and marked as hers.
+
+**What was wrong.** CLAUDE.md section 8 said: say "held safely with a licensed payment provider", never say escrow. That was right until 3 September 2026, when the principal structure was settled and Yaadly stopped holding anybody's money. After that date the prescribed replacement asserted the exact arrangement the structure exists to avoid, and it stayed prescribed for two days.
+
+**It was worse than a stale sentence, for three compounding reasons.** First, it was the one banned idea `guardrails.scan` could not see: no individual word in the phrase is on the list, so it passed both runtimes untouched, and a screen that is clean while the claim is present is worse than no screen because it reads as covered. Second, `docs/COPY-GUIDELINES.md` had already banned the phrase, so the two rulebooks contradicted each other and a session reading either one alone would have been confident and wrong. Third, and this is the one that mattered, `yaad/agents/reporting.py` carried it as a rule in the Reporting agent's own prompt: *"Never use the word escrow. Money is held safely with a licensed payment provider."* The instructions were handing the model the claim the screen exists to stop, which is the same defect found in the WhatsApp assistant's approved-facts list on 4 September and fixed there but not looked for anywhere else.
+
+**What changed.** The phrase is now banned in both runtimes, as two narrow patterns: the literal retired sentence, and a money-scoped passive. Both suites assert it, so the drift shows up red the way section 2 requires. The guidance strings for `escrow` and for the new patterns now name the principal structure instead of prescribing a replacement claim. The Reporting agent's prompt says what is true. CLAUDE.md section 8 carries the correction and the reason, rather than being quietly rewritten.
+
+**Deliberately narrow.** The patterns catch the money claim and leave ordinary safe-keeping language alone, because "your documents are held safely" is true and unobjectionable. Nothing was removed from the banned list; adding is allowed, removing is not.
+
+**`docs/` was already right and was not touched.** All six occurrences of "escrow" across faq, payments, terms and services are denials: "Yaadly does not operate an escrow service and does not hold money on your behalf." That is the correct use and the sentence a client needs. RUNBOOK now says so next to the sweep command, because a future session clearing hits to quieten a grep would delete the clearest statement of the structure on the site.
+
+**The general lesson, which is the reusable part.** A banned-terms list catches words. It cannot catch a claim assembled from permitted words, and the phrase most likely to be assembled that way is the one a rulebook tells people to use. When a business rule changes, the prescribed replacements have to be re-read as claims, not just the prohibitions.
+
+---
+
 ## 2026-09-05 · The early start consent is a dropdown, not a tickbox, and the two are kept apart
 
 **The gap.** `docs/cancellation.html` says, in public, "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking, alongside this cancellation information." Nothing asked. The eight Stripe payment links went live on 5 September with no consent collection at all, so every card booking taken carried it: a client could cancel on day ten and owe nothing while Yaadly still owed the checker, and the site was describing a step that did not happen.

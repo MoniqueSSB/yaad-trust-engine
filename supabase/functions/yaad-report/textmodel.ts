@@ -155,11 +155,69 @@ export async function fetchModel(
     // The body is read and discarded on purpose. Leaving it unread on a
     // response nobody will use leaks the connection in Deno.
     try { await res.text(); } catch (_) { /* nothing to do with it */ }
-    console.error(`fetchModel: http ${res.status}, retrying once in ${delay}ms`);
-    await new Promise((r) => setTimeout(r, delay));
+
+    // Retry-After, added 5 September 2026. Before this the retry always waited
+    // the same fixed 1200ms and never looked at the header. On 4 September the
+    // Mistral 429s were watched doing exactly that: fire, wait 1200ms, get 429
+    // again. A server that has told you how long to wait and been ignored will
+    // say no a second time, so the retry was spending the caller's budget to
+    // buy a second identical failure.
+    //
+    // Twilio gives an inbound webhook roughly fifteen seconds, so a long wait
+    // is not available to us even when it would work. The rule is therefore:
+    // wait what we are told if it fits, and if it does not fit, DO NOT RETRY.
+    // Failing immediately is the better answer, because it leaves time to send
+    // the person a real reply instead of timing out silently mid-wait.
+    const waitMs = retryAfterMs(res.headers.get("retry-after"));
+    if (waitMs !== null && waitMs > MAX_RETRY_WAIT_MS) {
+      console.error(
+        `fetchModel: http ${res.status}, Retry-After is ${Math.round(waitMs / 1000)}s, ` +
+        `longer than the ${MAX_RETRY_WAIT_MS}ms budget. Not retrying.`,
+      );
+      return res;
+    }
+    const pause = waitMs ?? delay;
+    console.error(
+      `fetchModel: http ${res.status}, retrying once in ${pause}ms` +
+      (waitMs !== null ? " (Retry-After)" : ""),
+    );
+    await new Promise((r) => setTimeout(r, pause));
     return await once();
   }
   return res;
+}
+
+/**
+ * The longest we will sit on a Retry-After before giving up instead.
+ *
+ * Sized against the tightest caller, the Twilio inbound webhook, which has
+ * about fifteen seconds in total and has already spent some of it. Four
+ * seconds leaves room for the retried call itself and for writing a reply.
+ */
+export const MAX_RETRY_WAIT_MS = 4000;
+
+/**
+ * Retry-After in milliseconds, or null when the header is absent or unusable.
+ *
+ * The header comes in two forms and providers use both: delay-seconds, and an
+ * HTTP date. A negative or nonsensical value is treated as absent rather than
+ * as zero, because "retry immediately" from a server that just rate limited us
+ * is not a thing to believe.
+ */
+export function retryAfterMs(header: string | null): number | null {
+  if (!header) return null;
+  const raw = header.trim();
+  if (raw === "") return null;
+
+  if (/^\d+$/.test(raw)) {
+    const ms = Number(raw) * 1000;
+    return Number.isFinite(ms) && ms > 0 ? ms : null;
+  }
+
+  const at = Date.parse(raw);
+  if (Number.isNaN(at)) return null;
+  const ms = at - Date.now();
+  return ms > 0 ? ms : null;
 }
 
 /** The error to return when no provider is configured at all. */
