@@ -21,6 +21,7 @@ export default async function NewJob({
      cannot put a name on an enquiry that nobody vetted. */
   const { trade, worker } = await searchParams;
   let requestedWorker: string | undefined;
+  let requestedWorkerSlug: string | undefined;
   if (worker) {
     const supabase = await createClient();
     const { data } = await supabase
@@ -28,7 +29,11 @@ export default async function NewJob({
       .select("name,trade")
       .eq("slug", worker)
       .maybeSingle();
-    if (data?.name) requestedWorker = data.name;
+    /* The NAME is for the client to read. The SLUG is what travels to
+       yaad-post-job, which resolves it to a worker on the server, so this
+       page never handles a worker's email and a request cannot be pinned on
+       somebody who is not an active vetted worker. */
+    if (data?.name) { requestedWorker = data.name; requestedWorkerSlug = worker; }
   }
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-10">
@@ -43,7 +48,7 @@ export default async function NewJob({
           </span>
         </div>
       )}
-      <PostJob initialTrade={trade} requestedWorker={requestedWorker} />
+      <PostJob initialTrade={trade} requestedWorker={requestedWorker} requestedWorkerSlug={requestedWorkerSlug} />
     </div>
   );
 }

@@ -20,6 +20,27 @@ export const dynamic = "force-dynamic";
  * worker's email to render their page.
  */
 
+/* What the worker themselves showed us, published on a granted consent by a
+   named human at the desk (20260905b in supabase/migrations). Deliberately a
+   separate list from `port` below: that one is built from the evidence on
+   completed Yaadly jobs and its whole claim is that it cannot be borrowed
+   from somebody else's work. This one is the worker's own account of
+   themselves. Two different kinds of true, and they are rendered in two
+   sections that say which is which, on purpose. */
+type Showcase = {
+  kind: "profile_photo" | "intro_video" | "work_file";
+  storage_path: string; mime: string | null; caption: string | null; position: number;
+};
+
+/* The showcase bucket is public, so its files have a plain durable URL and
+   need no signing. That is the difference between these and job photographs,
+   which are signed for five minutes because nobody outside the job should
+   ever see one. Everything in this bucket is there because somebody agreed it
+   could be seen by anyone. */
+const showcaseUrl = (path: string) =>
+  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/showcase/${path
+    .split("/").map(encodeURIComponent).join("/")}`;
+
 type Review = {
   id: string; stars: number; criteria: string[] | null; body: string | null;
   reply: string | null; created_at: string; author_first_name: string | null;
@@ -71,7 +92,7 @@ export default async function WorkerProfile({
     .maybeSingle();
   if (!wp) notFound();
 
-  const [{ data: score }, { data: checks }, { data: port }, { data: revs }, { data: own }] =
+  const [{ data: score }, { data: checks }, { data: port }, { data: revs }, { data: own }, { data: show }] =
     await Promise.all([
       supabase.from("worker_scores").select("score,reviews").eq("subject_slug", slug).maybeSingle(),
       supabase.from("public_worker_checks").select("label,passed,note,position").eq("subject_slug", slug).order("position"),
@@ -83,9 +104,20 @@ export default async function WorkerProfile({
       user?.email
         ? supabase.from("worker_profiles").select("slug").eq("worker_email", user.email.toLowerCase()).maybeSingle()
         : Promise.resolve({ data: null as { slug: string } | null }),
+      // public_worker_showcase, never worker_showcase: the view carries no
+      // email and, more to the point, it re-tests showcase_consent on every
+      // read. Withdraw the consent and this list is empty on the next page
+      // load, whether or not anybody has got round to deleting the files.
+      supabase.from("public_worker_showcase")
+        .select("kind,storage_path,mime,caption,position")
+        .eq("subject_slug", slug).order("position"),
     ]);
 
   const reviews = (revs ?? []) as Review[];
+  const showcase = (show ?? []) as Showcase[];
+  const face = showcase.find((x) => x.kind === "profile_photo");
+  const intro = showcase.find((x) => x.kind === "intro_video");
+  const works = showcase.filter((x) => x.kind === "work_file");
   const isSelf = own?.slug === slug;
   const firstName = wp.name?.split(" ")[0] ?? "This worker";
 
@@ -94,9 +126,26 @@ export default async function WorkerProfile({
       <Link href="/jobs?tab=workers" className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; The worker network</Link>
 
       <div className="mt-4 flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-panel p-5">
-        <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
-          {(wp.name ?? "W").split(" ").map((x: string) => x[0]).join("").slice(0, 2)}
-        </span>
+        {/* The initials block stays as the fallback rather than being replaced.
+            Most profiles will not have a photograph: the consent is opt in and
+            a worker who says no is not a worse worker, so the page has to look
+            finished either way.
+
+            eslint-disable and a plain img: next/image wants a configured remote
+            host, and this URL is built from an environment variable, so the
+            optimiser cannot be told about it at build time. loading="lazy" and
+            explicit dimensions are the two things the optimiser would have
+            given us that actually matter here. */}
+        {face ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={showcaseUrl(face.storage_path)} alt={`${wp.name}, ${wp.trade ?? "tradesperson"}`}
+            width={64} height={64} loading="lazy"
+            className="size-16 flex-none rounded-2xl object-cover" />
+        ) : (
+          <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
+            {(wp.name ?? "W").split(" ").map((x: string) => x[0]).join("").slice(0, 2)}
+          </span>
+        )}
         <span className="min-w-[220px] flex-1">
           <h1 className="font-display text-[clamp(24px,4vw,32px)] uppercase leading-none">{wp.name}</h1>
           <p className="mt-1.5 text-[13.5px] text-mute">
@@ -183,6 +232,63 @@ export default async function WorkerProfile({
         <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
           <h2 className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">In their own words</h2>
           <p className="text-[14.5px] leading-relaxed text-mute">{wp.about}</p>
+        </section>
+      )}
+
+      {/* THE WORKER'S OWN ACCOUNT OF THEMSELVES, and it sits ABOVE the
+          evidence portfolio and says plainly what it is. That labelling is the
+          whole design. The section below it earns its trust by being pulled
+          from the evidence record; borrowing that sentence for material a
+          worker handed in would spend the credibility of the checked thing on
+          the unchecked one. So: their words, their face, their video, their
+          photographs, marked as theirs. What Yaadly verified is the "What was
+          checked" block further up, and it is separate for the same reason. */}
+      {intro && (
+        <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">{firstName}, in thirty seconds</h2>
+          <p className="mb-3 text-[12px] text-dim">
+            Recorded by {firstName} when they applied. Their own words, not a
+            script from us.
+          </p>
+          <video
+            src={showcaseUrl(intro.storage_path)}
+            controls preload="none"
+            className="w-full max-w-[520px] rounded-xl border border-line bg-black"
+          >
+            Your browser cannot play this video.
+          </video>
+        </section>
+      )}
+
+      {works.length > 0 && (
+        <section className="mt-4 rounded-2xl border border-line bg-panel p-5">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Work {firstName} showed us</h2>
+          {/* The honest caveat, in the client's interest and in the worker's.
+              A person at Yaadly looked at these before they went up, which is
+              a real check and is worth saying. It is NOT the evidence chain,
+              and saying so here is what lets the section underneath keep its
+              stronger claim. */}
+          <p className="mb-3 text-[12px] text-dim">
+            {firstName}&apos;s own photographs of finished work, handed in with
+            their application. A person at Yaadly looked at them before they
+            went up. They are not from jobs booked through Yaadly, so they do
+            not carry the evidence trail the completed jobs below do.
+          </p>
+          <div className="grid gap-2.5 sm:grid-cols-3">
+            {works.map((w) => (
+              w.mime === "application/pdf" ? (
+                <a key={w.storage_path} href={showcaseUrl(w.storage_path)} target="_blank" rel="noreferrer"
+                  className="flex items-center justify-center rounded-xl border border-line bg-panel2 p-6 text-[13px] font-semibold text-tealb hover:border-teal">
+                  {w.caption ?? "Portfolio, PDF"}
+                </a>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img key={w.storage_path} src={showcaseUrl(w.storage_path)}
+                  alt={w.caption ?? `Work by ${wp.name}`} loading="lazy"
+                  className="aspect-4/3 w-full rounded-xl border border-line object-cover" />
+              )
+            ))}
+          </div>
         </section>
       )}
 
