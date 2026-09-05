@@ -61,7 +61,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
-  ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY,
+  ACCESS, DRAFT_KEY, EMPTY_FIELDS, MATERIALS, STAGES, URGENCY,
   draftFields, firstIncomplete, looksLikeEmail, looksLikePhone,
   parseDraft, restoreFields, serialiseDraft, stageComplete, worthKeeping,
   type Fields, type StageKey,
@@ -84,13 +84,6 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
   const [saveFailed, setSaveFailed] = useState(false);
   const [sent, setSent] = useState(false);
   const [restored, setRestored] = useState(false);
-  /* Narrows the trade chips as you type. Eighteen chips then fourteen more is
-     two full phone screens before the first question is answered, on the page
-     with the highest intent in the funnel. A filter is the fix that invents
-     nothing: the taxonomy carries no grouping, so any categories would be made
-     up here and would then disagree with every other list of trades in the
-     product. An empty box shows all eighteen, exactly as before. */
-  const [tradeFilter, setTradeFilter] = useState("");
 
   const set = <K extends keyof Fields>(k: K, v: Fields[K]) => setF((p) => ({ ...p, [k]: v }));
   const key = STAGES[stage].key;
@@ -204,6 +197,11 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
            enforce_vetted_worker_on_quote. See lib/jobs/new-form.ts. */
         urgency: f.urgency,
         accessType: f.accessType,
+        /* Who buys the materials. yaad-post-job maps this sentence onto
+           jobs.materials_by, the same way it maps the store types, so a
+           stale cached copy of this page cannot write a route the database
+           has never heard of. */
+        materialsBy: f.materialsBy,
       });
       if (d.jobId) setJobId(String(d.jobId));
       if (d.portalCode) setPortalCode(String(d.portalCode));
@@ -451,48 +449,50 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
           {key === "work" && (
             <div className="grid gap-4">
               <div className="fgroup">
-                {/* A group with a name, and buttons that say whether they are
-                    on. These were bare <button>s inside a plain <div>, so a
-                    screen reader heard eighteen unrelated buttons, could not
-                    tell which one was chosen, and never heard that the group
-                    was required. aria-pressed rather than a radiogroup because
-                    these really are toggles: tapping the chosen one clears it,
-                    which a radio cannot do. The tick and plus are decoration
-                    once the state is announced, so they are hidden. */}
-                <label className="fl" id="lbl-trade">
+                {/* A dropdown rather than eighteen chips. Founder's call,
+                    5 Sep 2026, to shorten the first screen.
+
+                    WHAT THIS REPLACED, so the reasoning is not lost. It was a
+                    chip grid with a filter box above it, and the filter existed
+                    because eighteen chips and then fourteen more is two full
+                    phone screens before the first question is answered, on the
+                    page with the highest intent in the funnel. The filter made
+                    the list shorter to READ; it did not make the page shorter,
+                    because the chips were still all there once the box was
+                    empty. A select is one row tall whatever the taxonomy does,
+                    so the whole stage now fits a phone screen, and it takes the
+                    filter with it: typing a letter inside an open native select
+                    jumps to the matching option already.
+
+                    NATIVE, not a custom combobox. It opens the phone's own
+                    picker, which a client in Croydon or Kingston already knows
+                    how to use, it is reachable by keyboard and screen reader
+                    with no aria work at all, and it cannot render a
+                    half-finished popup on a slow connection. The accessibility
+                    note that used to sit here, about eighteen bare buttons a
+                    screen reader could not group, stops applying: a labelled
+                    select announces its own name, state and value.
+
+                    The cost, stated: choosing is now tap, scroll, tap rather
+                    than one tap, and the options are not visible until it is
+                    opened. That is the trade for the page fitting a screen. */}
+                <label className="fl" htmlFor="trade">
                   What kind of work is it{" "}
                   <span className={"src " + (f.trade ? "ok" : "req")}>
                     {f.trade ? "Chosen" : "Required"}
                   </span>
                 </label>
-                <input
-                  type="search"
-                  value={tradeFilter}
-                  onChange={(e) => setTradeFilter(e.target.value)}
-                  placeholder="Start typing to narrow the list, e.g. roof"
-                  aria-label="Filter the trades"
-                  className="jf mb-2.5"
-                />
-                <div className="chips" role="group" aria-labelledby="lbl-trade">
-                  {TRADES.filter((t) =>
-                    t.toLowerCase().includes(tradeFilter.trim().toLowerCase()),
-                  ).map((t) => (
-                    <button key={t} type="button" aria-pressed={f.trade === t}
-                      className={f.trade === t ? "on" : ""}
-                      onClick={() => set("trade", f.trade === t ? "" : t)}>
-                      <span aria-hidden="true">{f.trade === t ? "✓ " : "+ "}</span>{t}
-                    </button>
+                <select
+                  id="trade"
+                  className="jf"
+                  value={f.trade}
+                  onChange={(e) => set("trade", e.target.value)}
+                >
+                  <option value="">Choose the closest trade</option>
+                  {TRADES.map((t) => (
+                    <option key={t} value={t}>{t}</option>
                   ))}
-                </div>
-                {/* Nothing matching is not an error and not a dead end: the
-                    next question is a free text box a person reads. */}
-                {tradeFilter.trim() !== "" &&
-                  !TRADES.some((t) => t.toLowerCase().includes(tradeFilter.trim().toLowerCase())) && (
-                    <p role="status" className="mt-2 text-[12.5px] leading-relaxed text-goldb">
-                      Nothing matches &ldquo;{tradeFilter.trim()}&rdquo;. Pick the closest
-                      trade, or clear the box and describe it in your own words below.
-                    </p>
-                  )}
+                </select>
                 <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                   Not sure which? Pick the closest. A person reads this and will
                   put it right if it needs changing.
@@ -514,6 +514,30 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                   the house, and how long it has been happening.
                 </p>
               </div>
+
+              {/* Materials. One line of chips, the same shape as urgency and
+                  access. Founder's instruction after a bigger version: a
+                  simple line saying the materials are supplied or included in
+                  the quote, and nothing else. The reasoning, and where the
+                  consequence copy went, is above MATERIALS in
+                  lib/jobs/new-form.ts. */}
+              <div className="fgroup" style={{ marginBottom: 0 }}>
+                <label className="fl" id="lbl-materials">
+                  Materials{" "}
+                  <span className={"src " + (f.materialsBy ? "ok" : "req")}>
+                    {f.materialsBy ? "Chosen" : "Required"}
+                  </span>
+                </label>
+                <div className="chips" role="group" aria-labelledby="lbl-materials">
+                  {MATERIALS.map((m) => (
+                    <button key={m.value} type="button" aria-pressed={f.materialsBy === m.value}
+                      className={f.materialsBy === m.value ? "on" : ""}
+                      onClick={() => set("materialsBy", f.materialsBy === m.value ? "" : m.value)}>
+                      <span aria-hidden="true">{f.materialsBy === m.value ? "✓ " : "+ "}</span>{m.value}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -521,44 +545,46 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
           {key === "property" && (
             <div className="grid gap-4">
               <div className="fgroup">
-                <label className="fl" id="lbl-parish">
+                <label className="fl" htmlFor="parish">
                   Which parish is the property in{" "}
                   <span className={"src " + (f.parish ? "ok" : "req")}>
                     {f.parish ? "Chosen" : "Required"}
                   </span>
                 </label>
-                {/* The three we actually work in, first, and labelled. The note
-                    underneath already said Kingston and Portmore come first,
-                    and the list under it was alphabetical, so a client read the
-                    sentence and then scanned fourteen parishes in an order that
-                    contradicted it. Same fourteen, all still pickable: posting
-                    from anywhere is deliberate and the note says what happens
-                    next. LAUNCH_PARISHES is shared with /apply so the two
-                    funnels cannot disagree about where the business operates. */}
-                <p className="mb-1.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.14em] text-dim">
-                  Where we work now
-                </p>
-                <div className="chips" role="group" aria-labelledby="lbl-parish">
-                  {LAUNCH_PARISHES.map((p) => (
-                    <button key={p} type="button" aria-pressed={f.parish === p}
-                      className={f.parish === p ? "on" : ""}
-                      onClick={() => set("parish", f.parish === p ? "" : p)}>
-                      <span aria-hidden="true">{f.parish === p ? "✓ " : "+ "}</span>{p}
-                    </button>
-                  ))}
-                </div>
-                <p className="mb-1.5 mt-3 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.14em] text-dim">
-                  Everywhere else
-                </p>
-                <div className="chips" role="group" aria-label="Other parishes">
-                  {PARISHES.filter((p) => !(LAUNCH_PARISHES as readonly string[]).includes(p)).map((p) => (
-                    <button key={p} type="button" aria-pressed={f.parish === p}
-                      className={f.parish === p ? "on" : ""}
-                      onClick={() => set("parish", f.parish === p ? "" : p)}>
-                      <span aria-hidden="true">{f.parish === p ? "✓ " : "+ "}</span>{p}
-                    </button>
-                  ))}
-                </div>
+                {/* A dropdown, for the same reason as the trade one above.
+                    Fourteen parishes in two labelled chip grids was most of a
+                    phone screen for a question with one right answer the person
+                    already knows.
+
+                    THE TWO GROUPS SURVIVE, as optgroups, and that is the point
+                    of using them rather than one flat list. The note underneath
+                    says Kingston and Portmore come first; an alphabetical list
+                    of fourteen contradicted that sentence the moment somebody
+                    read it. The optgroup headings keep the order and the
+                    meaning, and the OS renders them as non-selectable headings
+                    for free. Same fourteen, all still pickable: posting from
+                    anywhere is deliberate and the note says what happens next.
+
+                    LAUNCH_PARISHES is shared with /apply so the two funnels
+                    cannot disagree about where the business operates. */}
+                <select
+                  id="parish"
+                  className="jf"
+                  value={f.parish}
+                  onChange={(e) => set("parish", e.target.value)}
+                >
+                  <option value="">Choose a parish</option>
+                  <optgroup label="Where we work now">
+                    {LAUNCH_PARISHES.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Everywhere else">
+                    {PARISHES.filter((p) => !(LAUNCH_PARISHES as readonly string[]).includes(p)).map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </optgroup>
+                </select>
                 <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                   We are working in <b className="text-mute">Kingston and Portmore</b> first.
                   Post from anywhere in Jamaica anyway: we will tell you
@@ -737,6 +763,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                 {[
                   { k: "work" as StageKey, t: "The work", v: f.trade },
                   { k: "work" as StageKey, t: "What is happening", v: f.desc.trim(), wrap: true },
+                  { k: "work" as StageKey, t: "Who buys the materials", v: f.materialsBy },
                   { k: "property" as StageKey, t: "Parish", v: f.parish },
                   { k: "property" as StageKey, t: "Who lets a worker in", v: f.accessType },
                   { k: "urgency" as StageKey, t: "How soon", v: f.urgency },
@@ -816,7 +843,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
 
           {!canAdvance && (
             <p className="mt-3 text-[12.5px] text-dim">
-              {key === "work" && "Pick a trade and say what is happening, to carry on."}
+              {key === "work" && "Pick a trade, say what is happening, and say who buys the materials, to carry on."}
               {key === "property" && "Pick a parish and say who can let a worker in, to carry on."}
               {key === "urgency" && "Pick how soon you need it, to carry on."}
               {key === "reach" && "Your name and one way to reach you, to carry on."}

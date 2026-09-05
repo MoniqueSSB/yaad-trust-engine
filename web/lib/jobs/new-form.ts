@@ -112,6 +112,50 @@ export const ACCESS = [
   },
 ] as const;
 
+/* ── who buys the materials ───────────────────────────────────────────────
+ * Step 2 of specs/MATERIALS-ROUTE-FLOW-SPEC.md. Two answers and no others,
+ * mapped to jobs.materials_by ('yaadly' or 'client') server side in
+ * yaad-post-job, never posted as a code from here.
+ *
+ * WHY IT IS ASKED HERE AND NOT LATER. Before this, nobody asked the client at
+ * all: the route was decided by whether the WORKER typed a number into
+ * materials_jmd on his quote. Who buys the materials decides who carries the
+ * risk on the goods, which is the client's call, and it has to be made before
+ * anybody prices anything. Ask it after quotes are in and every quote on the
+ * job was priced against a guess.
+ *
+ * WHY THERE IS NO "NOT SURE" OPTION. The clickable prototype offered four,
+ * including "Not sure, worker to advise" and "Split, agree item by item".
+ * Both are gone. A split job cannot say who is answerable when a wall fails,
+ * because the workmanship obligation and the risk on the goods have to sit
+ * with the same party. "Not sure" leaves it open at the exact moment quoting
+ * starts, which is the thing being fixed.
+ *
+ * TWO SHORT LABELS AND NO EXPLANATORY NOTES. Founder's instruction, 5 Sep
+ * 2026, after an earlier version put two large option cards on the screen
+ * with a paragraph under each: "I ASKED FOR A SMALLER ADDITION, JUST A SIMPLY
+ * LINE TO SAY THE MATERIAL WILL BE SUPPLIED OR INCLUDED IN THE QUOTE." So it
+ * is one line of chips, matching the urgency and access questions, and it is
+ * the smallest thing that still records the answer.
+ *
+ * WHERE THE CONSEQUENCE COPY WENT. The removed note under the second option
+ * said the tradesperson is not answerable for client-supplied materials being
+ * short, late or wrong, that dates move, and that the guarantee covers his
+ * work and not their materials. That is all still true and it is in clause 8
+ * of legal/subcontractor-agreement-DRAFT.md. It belongs on the terms page or
+ * in the quote confirmation, not on the first screen of a public form.
+ */
+export const MATERIALS = [
+  { value: "To be included in quote" },
+  { value: "I am supplying them" },
+] as const;
+
+/** True when the client is supplying the materials, so the job is labour only
+ *  and no quote on it may carry a materials figure. Postgres is the real gate
+ *  (quote_materials_match_route, 20260905d); this is for the form. */
+export const clientSuppliesMaterials = (materialsBy: string) =>
+  materialsBy === MATERIALS[1].value;
+
 /** The two patterns from 20260831d, restated so the tests can prove the four
  *  sentences above still land on the right side of them. Kept here rather
  *  than in the test file so that anybody editing ACCESS sees them. */
@@ -145,12 +189,14 @@ export type Fields = {
   desc: string;
   urgency: string;
   accessType: string;
+  materialsBy: string;
   name: string;
   contact: string;
 };
 
 export const EMPTY_FIELDS: Fields = {
-  trade: "", parish: "", desc: "", urgency: "", accessType: "", name: "", contact: "",
+  trade: "", parish: "", desc: "", urgency: "", accessType: "", materialsBy: "",
+  name: "", contact: "",
 };
 
 /** Whether a stage has enough on it to move forward.
@@ -161,12 +207,22 @@ export const EMPTY_FIELDS: Fields = {
  *  urgency and no access answer is the job that needs a phone call before
  *  anybody can quote it, which is the whole thing this is trying to avoid.
  *
+ *  Who buys the materials is required for a harder reason, and it is why it
+ *  sits on the FIRST stage rather than being tucked in later. It decides what
+ *  the worker quotes: labour and materials, or labour alone. An unanswered
+ *  one does not produce a job needing a phone call, it produces a job where
+ *  every quote was priced against a guess about who is buying, and a client
+ *  accepting a number that should never have been on the page. Somebody who
+ *  does not know wants the first option, which is the managed job and the
+ *  normal answer, so there is no honest case for an escape hatch here.
+ *
  *  The photos stage takes no input at all, so it is always complete. It is a
  *  stage rather than a paragraph because what to photograph is worth its own
  *  screen, and because a step somebody reads is a step they remember. */
 export function stageComplete(key: StageKey, f: Fields): boolean {
   switch (key) {
-    case "work":     return f.trade !== "" && f.desc.trim().length >= MIN_DESC;
+    case "work":     return f.trade !== "" && f.desc.trim().length >= MIN_DESC
+                         && f.materialsBy !== "";
     case "property": return f.parish !== "" && f.accessType !== "";
     case "urgency":  return f.urgency !== "";
     case "evidence": return true;
@@ -210,12 +266,16 @@ export const DRAFT_KEY = "yaadly.job.new.v1";
  *  enough that a stranger on the same phone next month sees a clean form. */
 export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type DraftFields = Pick<Fields, "trade" | "parish" | "desc" | "urgency" | "accessType">;
+export type DraftFields =
+  Pick<Fields, "trade" | "parish" | "desc" | "urgency" | "accessType" | "materialsBy">;
 
 export type StoredDraft = { v: 1; jobId: string; at: number; fields: DraftFields };
 
 export function draftFields(f: Fields): DraftFields {
-  return { trade: f.trade, parish: f.parish, desc: f.desc, urgency: f.urgency, accessType: f.accessType };
+  return {
+    trade: f.trade, parish: f.parish, desc: f.desc, urgency: f.urgency,
+    accessType: f.accessType, materialsBy: f.materialsBy,
+  };
 }
 
 /** Something worth bringing back. A trade tapped by accident is not. */
@@ -244,6 +304,7 @@ export function parseDraft(raw: string | null, now: number): StoredDraft | null 
   const fields: DraftFields = {
     trade: str("trade"), parish: str("parish"), desc: str("desc"),
     urgency: str("urgency"), accessType: str("accessType"),
+    materialsBy: str("materialsBy"),
   };
   if (!worthKeeping(fields)) return null;
   return { v: 1, jobId: typeof d.jobId === "string" ? d.jobId : "", at, fields };
@@ -263,5 +324,6 @@ export function restoreFields(
     desc: d.fields.desc,
     urgency: inList(d.fields.urgency, URGENCY.map((u) => u.value)),
     accessType: inList(d.fields.accessType, ACCESS.map((a) => a.value)),
+    materialsBy: inList(d.fields.materialsBy, MATERIALS.map((m) => m.value)),
   };
 }

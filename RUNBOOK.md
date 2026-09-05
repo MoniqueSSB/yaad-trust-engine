@@ -2994,3 +2994,40 @@ The desk says **offered WhatsApp** on those rows, and `nothing sent, they must t
 **Do not reach for SMS instead.** `TWILIO_SMS_FROM` is unset, SMS bills per message, and wiring a paid send to a form open to the internet is an open relay that charges you. The throttle comment already in `yaad-enquiry` makes that argument about email; it is sharper for SMS.
 
 **Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
+
+## The weekly materials money check
+
+**Do this once a week. It is the one check nobody builds until after it has cost them.**
+
+Under the principal structure Yaadly holds no money on anybody's behalf, which is what keeps it trading rather than running a payment service. The other side of that is that nothing structural stops materials money for one job paying labour on another. That is how small contractors go under, and it does not announce itself: the first visible sign is blocks that never arrived on a job whose money went out three weeks ago.
+
+**The check is one query.**
+
+```sql
+select * from public.materials_open_releases;
+```
+
+Every row is materials money that has actually left the account with no receipt filed against it, oldest first, with `days_outstanding`. A fresh row is not a problem, a worker paid this morning has not reached the hardware store yet. **A row that stays is the problem.**
+
+For the position by job, including the number that matters:
+
+```sql
+select * from public.materials_reconciliation where open_jmd > 0 order by oldest_open_days desc;
+```
+
+`open_jmd` is money out of the account with nothing yet showing what it bought.
+
+**The threshold is a founder decision and it lives here, not in the database, so it can change without a migration.**
+
+> **Chase anything over `___` days. Not set yet.** Pick it from what actually happens on the first few jobs: how long a tranche genuinely takes to turn into a receipt in Kingston and Portmore, plus a margin. Setting it too tight makes the report noise and trains you to ignore it, which is worse than not having it. Setting it too loose means the gap is a month old before it shows.
+
+**What to do with a row that is over the threshold.**
+
+1. Ask the worker for the receipt. Most of the time that is the whole answer, he bought the materials and never sent the picture.
+2. If the materials were bought, get the receipt reference into `materials_releases.receipt_ref` and the custody evidence filed. The row clears itself.
+3. If the materials were not bought, that is a live problem on that job and it is a conversation, not a database fix. The money is out and the job cannot proceed on it.
+4. If the money never actually left, the row should not have had `released_at` set. Correct it, and note that a planned tranche with `released_at` null is deliberately invisible to both views.
+
+**Nothing here blocks a release, deliberately.** Releasing materials money is a named human moving money under §2 of CLAUDE.md. The answer to money going astray is a person seeing it, not a trigger deciding it.
+
+**Do not "fix" a stubborn row by putting something in `receipt_ref` to clear the report.** The report only works while it is uncomfortable. A reference with no receipt behind it is worse than an open row, because an open row is honest and a false reference reads as reconciled forever.
