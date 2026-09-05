@@ -6,6 +6,26 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Eighteen live database objects existed in no migration, and one of them was the security model
+
+**What was found.** A sweep of every function in the live `public` schema against every function defined in `supabase/migrations` found eighteen running with no definition in this repository: seventeen ordinary ones plus `price_spread_for_trade`, which the client's own quote page calls by name. They were applied straight to the database, mostly through the Supabase MCP, which assigns its own version number and writes no file. So the repository has been describing a database it cannot rebuild.
+
+**`is_admin()` is why this is urgent rather than untidy.** Sixty-four policies and functions across the existing migrations call it. It was defined in none of them. A rebuild from this repository fails on the first policy that names it, and CLAUDE.md section 6 puts it second in the three controls between the public internet and a worker's identity documents: Cloudflare Access, `is_admin()` and RLS, in that order. Two of the three were reproducible from the repository and one was not.
+
+**`rls_auto_enable` is the quieter half and possibly the worse one.** It is an event trigger that turns row level security on for every new table in `public`, which is what makes "every table has RLS" true by default rather than by anybody remembering. On a rebuilt database it would simply not be there, and the failure has no symptom: tables get created, everything works, and none of them has RLS. That is a data exposure that looks exactly like a working system. The trigger is recovered alongside the function, because recreating the function alone leaves the rule off.
+
+**Transcribed, not authored, and deliberately not run.** Every body came out of `pg_get_functiondef` and every grant out of `has_function_privilege`. Production already has all of it, so applying the file changes nothing; it matters on a rebuild, where a latent error surfaces instead of in a live database. Same posture as the Vault recovery on 3 September and `work_log_pins` on 4 September. The one edit made to the transcription was ordering: leaves first, then the functions that call them, so the file applies to an empty database.
+
+**One thing left for a person.** `mark_enquiry_test()` and `mark_thread_test()` are executable by `anon`. Both refuse a non-admin as their first statement, so it is not an open door, but a grant wider than the function's own rule is something to narrow deliberately rather than inside a transcription, so the grants are reproduced as they are and flagged in the file.
+
+**The same sweep found the bigger version of the problem, which is not fixed here.** Seven tables are written to by migrations and created by none: `jobs`, `evidence`, `job_quotes`, `applications`, `app_settings`, `kickoff_drafts` and `kickoff_packs`. Sixty-nine tables live in `public`; the migrations create forty-five. So the honest statement is that this repository has never been able to rebuild this database, and the function recovery above narrows that gap without closing it.
+
+**It is deliberately left open rather than half done.** The right fix is one command, `supabase db dump`, committed as a baseline migration that every later file builds on. It needs Docker, which is not installed on this machine, so it did not run. The alternative, reconstructing sixty-nine tables with their columns, constraints, indexes, policies and triggers by hand out of the catalogue, would produce a large file that looks authoritative and would be wrong in ways nobody could see. A schema baseline that is subtly incomplete is worse than a missing one, because the missing one is at least honest about it. This is a real open item, not a tidy-up.
+
+**This is the third catch of the same class in three days**, after the Vault migration and `work_log_pins`, and the first two were one object each. The pattern is not carelessness, it is that applying SQL through the MCP writes nothing to disk and nothing reconciles the two afterwards. `scripts/check-deploy-drift.sh` does this for Edge Functions and there is no equivalent for the schema. The cheap version needs no credentials: every function referenced in a migration should be defined in one, which is a grep, and it would have caught `is_admin` on the day it was written.
+
+---
+
 ## 2026-09-05 · The site promised to ask for something and never asked
 
 **`docs/cancellation.html` has said this all along, in its own words: "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking."** Nothing anywhere asked. The booking form collected a name, a contact, a parish and a free text note, and then the work started. So the page described a control that did not exist, which is worse than not having the control, because it reads as covered.
