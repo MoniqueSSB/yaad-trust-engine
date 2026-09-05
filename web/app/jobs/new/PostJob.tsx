@@ -562,44 +562,46 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
           {key === "property" && (
             <div className="grid gap-4">
               <div className="fgroup">
-                <label className="fl" id="lbl-parish">
+                <label className="fl" htmlFor="parish">
                   Which parish is the property in{" "}
                   <span className={"src " + (f.parish ? "ok" : "req")}>
                     {f.parish ? "Chosen" : "Required"}
                   </span>
                 </label>
-                {/* The three we actually work in, first, and labelled. The note
-                    underneath already said Kingston and Portmore come first,
-                    and the list under it was alphabetical, so a client read the
-                    sentence and then scanned fourteen parishes in an order that
-                    contradicted it. Same fourteen, all still pickable: posting
-                    from anywhere is deliberate and the note says what happens
-                    next. LAUNCH_PARISHES is shared with /apply so the two
-                    funnels cannot disagree about where the business operates. */}
-                <p className="mb-1.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.14em] text-dim">
-                  Where we work now
-                </p>
-                <div className="chips" role="group" aria-labelledby="lbl-parish">
-                  {LAUNCH_PARISHES.map((p) => (
-                    <button key={p} type="button" aria-pressed={f.parish === p}
-                      className={f.parish === p ? "on" : ""}
-                      onClick={() => set("parish", f.parish === p ? "" : p)}>
-                      <span aria-hidden="true">{f.parish === p ? "✓ " : "+ "}</span>{p}
-                    </button>
-                  ))}
-                </div>
-                <p className="mb-1.5 mt-3 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.14em] text-dim">
-                  Everywhere else
-                </p>
-                <div className="chips" role="group" aria-label="Other parishes">
-                  {PARISHES.filter((p) => !(LAUNCH_PARISHES as readonly string[]).includes(p)).map((p) => (
-                    <button key={p} type="button" aria-pressed={f.parish === p}
-                      className={f.parish === p ? "on" : ""}
-                      onClick={() => set("parish", f.parish === p ? "" : p)}>
-                      <span aria-hidden="true">{f.parish === p ? "✓ " : "+ "}</span>{p}
-                    </button>
-                  ))}
-                </div>
+                {/* A dropdown, for the same reason as the trade one above.
+                    Fourteen parishes in two labelled chip grids was most of a
+                    phone screen for a question with one right answer the person
+                    already knows.
+
+                    THE TWO GROUPS SURVIVE, as optgroups, and that is the point
+                    of using them rather than one flat list. The note underneath
+                    says Kingston and Portmore come first; an alphabetical list
+                    of fourteen contradicted that sentence the moment somebody
+                    read it. The optgroup headings keep the order and the
+                    meaning, and the OS renders them as non-selectable headings
+                    for free. Same fourteen, all still pickable: posting from
+                    anywhere is deliberate and the note says what happens next.
+
+                    LAUNCH_PARISHES is shared with /apply so the two funnels
+                    cannot disagree about where the business operates. */}
+                <select
+                  id="parish"
+                  className="jf"
+                  value={f.parish}
+                  onChange={(e) => set("parish", e.target.value)}
+                >
+                  <option value="">Choose a parish</option>
+                  <optgroup label="Where we work now">
+                    {LAUNCH_PARISHES.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Everywhere else">
+                    {PARISHES.filter((p) => !(LAUNCH_PARISHES as readonly string[]).includes(p)).map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </optgroup>
+                </select>
                 <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
                   We are working in <b className="text-mute">Kingston and Portmore</b> first.
                   Post from anywhere in Jamaica anyway: we will tell you

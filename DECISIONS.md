@@ -6,7 +6,7 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
-## 2026-09-05 · The trade picker is a dropdown, and it retires the filter box that was itself the fix for this
+## 2026-09-05 · The trade and parish pickers are dropdowns, and they retire the filter box that was itself the fix for this
 
 **Founder's call after seeing step 2 on a phone: the first screen was too long.** She was right, and the materials question added to it. Stage 1 now fits one phone screen with the button visible, where before the trade chips alone took most of a screen before the first real question.
 
@@ -14,7 +14,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Native select, not a custom combobox.** It opens the phone's own picker, which a client in Croydon or Kingston already knows; it is reachable by keyboard and screen reader with no aria work; and it cannot render a half-finished popup on a slow connection. It retires an accessibility fix as well: the chips carried a comment about a screen reader hearing eighteen ungrouped buttons and never being told the group was required, which needed `role="group"`, `aria-labelledby` and `aria-pressed` to solve. A labelled select announces its own name, state and value with none of that.
 
-**The cost, stated rather than glossed.** Choosing is now tap, scroll, tap instead of one tap, and the options are invisible until opened. That is the trade for the stage fitting a screen, and it is reversible in one commit if the funnel numbers say otherwise.
+**Parish went the same way straight after, and the two groups had to survive it.** Fourteen parishes in two labelled chip grids was most of stage 2. They are now one select with two `optgroup`s, "Where we work now" carrying the three launch parishes and "Everywhere else" the other eleven, in that order. A flat alphabetical list would have been the easy version and it would have broken the note underneath, which says Kingston and Portmore come first: that sentence was the reason the chips were split into two labelled groups in the first place, and an alphabetical fourteen contradicts it the moment somebody reads it. Optgroups keep the order and the meaning, and the OS draws the headings as non-selectable for free. All fourteen stay pickable, because posting from anywhere is deliberate. `LAUNCH_PARISHES` is still the shared list, so this funnel and `/apply` cannot disagree about where the business operates.
+
+**The cost, stated rather than glossed.** Choosing is now tap, scroll, tap instead of one tap, and the options are invisible until opened. That is the trade for the stages fitting a screen, and it is reversible in one commit if the funnel numbers say otherwise.
 
 **One CSS rule went with it, scoped deliberately.** `select.jf` sets `color-scheme: dark` and a fixed height. Without the first, the OS draws the option list white on a page that is dark everywhere else; on `:root` it would also restyle every scrollbar and input in the app, which is a bigger change than a dropdown needs. The height is pinned because selects do not match text input heights on their own across browsers.
 
