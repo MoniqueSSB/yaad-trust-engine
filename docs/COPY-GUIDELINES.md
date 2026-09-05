@@ -93,11 +93,13 @@ Describe it from Yaadly's side, not the client's:
 - "Yaadly's fee is invoiced separately."
 - "We attend, we record, and we write it up. We do not pay your contractor and we do not hold your money for the work."
 
-### How money actually reaches Yaadly, as at 4 September 2026
+### How money actually reaches Yaadly, as at 5 September 2026
 
-- Above £500 a job is invoiced, and the invoice is the record that you bought the job from Yaadly Ltd.
-- At or under £500 the card is authorised at booking and charged once the work is done and accepted. **Card is not switched on yet**, so until it is, everything is invoiced and paid by bank transfer in GBP, USD or CAD.
-- Any page that mentions cards must carry that "not switched on yet" caveat. Do not describe card as live anywhere, including in the privacy provider table and the cancellation timing page.
+- Above £500 a job is invoiced, and the invoice is the record that you bought the job from Yaadly Ltd. Paid by bank transfer in GBP, USD or CAD.
+- At or under £500 the card is authorised at booking and charged once the work is done and accepted.
+- **Card is live**, as of 5 September 2026. The "not switched on yet" caveat that used to be required on every page mentioning cards is gone, and must not be reintroduced: the eight Stripe payment links exist, they are wired to the booking confirmation on `docs/services.html`, and repeating the caveat now tells a client the opposite of what the page will do. It came off `services.html`, `payments.html`, `terms.html` and `privacy.html` in the same change.
+- **The Oversight Retainer is a subscription, not a hold, and the difference must be written.** The other seven links authorise the card and capture only when a named person accepts the work. The retainer bills the first month immediately and again every month until stopped. "Your card is authorised, not charged" is true of the seven and false of the retainer, so never let one sentence cover both.
+- An invoice paid by bank transfer stays available on any job at any size. Card is an option offered, never the only door.
 
 ### Fees, stated the same way everywhere
 
