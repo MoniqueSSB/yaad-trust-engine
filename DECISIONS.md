@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · A vetting decision now has to say who made it
+
+**The gap was flagged the day before and fixing it was the founder's call, because it changes what the desk writes rather than only what it reads.** Passing or blocking an application decides whether somebody can earn on this platform, which is squarely the "named human confirms every consequential step" of §2. A named human was confirming it. Nothing recorded that. The desk wrote `applications.status` through the generic action mechanism and no name went with it, so the rule was true in practice and unprovable afterwards, which is the state §2 exists to prevent.
+
+**RPC plus trigger, both, and the trigger is the point.** `decide_application()` is admin only and takes the actor from `auth.jwt()` rather than from a caller-supplied argument, so nobody can decide as somebody else; that is the `approve_quote_pack_draft()` shape. `trg_application_decision_attributed` then refuses any status change into a decided state that arrives without a name, which is the `kickoff_approval_attributed` shape. The RPC alone would be a convention that the next surface forgets. The trigger makes it hold for psql and for a script too. It also deliberately guards `approved` and `declined`, the legacy spellings still sitting in the data, because a guard listing only the three current words is walked round by using an old one.
+
+**The eleven historical rows are left NULL and that was the decision, not an oversight.** Nobody knows who decided them. Backfilling a plausible name puts a false attribution into the exact column that exists to be trustworthy, and backfilling `system` claims a machine ruled on a person. NULL reads as not recorded, which is true. The rig asserts they are still NULL, so a later tidy-up has to argue with a test.
+
+**One incidental fix, because these were the first actions to need both.** An action with a form skipped the confirm dialog, so its `says` text was dropped. No action had ever defined both, so nothing was being lost until now, and "this is a safety finding, not a tidy-up" is exactly the sentence that should be in front of somebody as they block a person. It is rendered above the fields.
+
+**Capacity stops undercounting**, which is how this gap was found: `desk_decisions` gains a vetting arm with no `job_id`, because a vetting decision is about a person rather than a job. Sending a gap back counts, since it is still the person's judgement and still their evening.
+
+---
+
 ## 2026-09-05 · The admin desk gets linted, with one rule rather than a style pass
 
 **Nothing in CI had ever read the desk.** `concierge/concierge.html` is one file with one very large inline script and twenty-plus views, and it is where the founder does the work. Two crashes have now shipped from it: the 17-18 August temporal dead zone that broke admin sign-in on a direct link, which the CI file's own header cites as the reason CI exists, and one found on 5 September where `owedOldest`, `enqBreached` and `enqOldest` were const-declared below the tile that read them. `loadOverview()` threw `ReferenceError` and rendered 13 tiles instead of 29, taking the whole assistant scoreboard and the entire alert list with it. Verified by serving the file on its own port and driving it with a stubbed client, after a first attempt tested the wrong file because a stale server was answering on the port I assumed was free.

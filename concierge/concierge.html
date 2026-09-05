@@ -1048,15 +1048,31 @@ const VIEWS = [
     ],
     // PASS, GAP and BLOCK, the words the join journey already uses. The agent
     // flags. A person decides. Nothing here auto-passes anybody.
+    //
+    // These go through decide_application() rather than writing status, and
+    // that is not a refactor. Deciding whether somebody can earn on this
+    // platform is a consequential step under CLAUDE.md section 2, and until
+    // 5 September 2026 it left no record of who decided it: the status changed
+    // and nobody's name was attached. The RPC takes the name from your session
+    // rather than from anything the page sends, and a trigger refuses the
+    // write outright if it arrives without one, so the rule holds for a script
+    // and for psql too and not only for this page.
+    //
+    // The note is asked for, not required. A block with no reason written down
+    // is the hardest thing to stand behind six months later, but a forced box
+    // gets filled with a full stop, so it is offered rather than demanded.
     actions:[
       { label:"Pass", cls:"", when:r => r.status !== "passed",
-        set:{ status:"passed" },
+        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "passed", p_note: v.note || null }),
+        ask:[{ k:"note", label:"What convinced you? (optional, kept on the record)", placeholder:"references checked, ID matches, 8 years verifiable" }],
         says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. Publishing their profile is a separate step and is what actually lets them quote.` },
       { label:"Send the gap back", cls:"g", when:r => r.status !== "gap",
-        set:{ status:"gap" },
+        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "gap", p_note: v.note || null }),
+        ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"proof of address, and the second reference never replied" }],
         says:() => "Marks it as waiting on a document. Name the document when you contact them, because a gap that is not named cannot be closed." },
       { label:"Block", cls:"d", when:r => r.status !== "blocked",
-        set:{ status:"blocked" },
+        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "blocked", p_note: v.note || null }),
+        ask:[{ k:"note", label:"Why? (optional, but this is the one worth writing down)", placeholder:"ID did not match the name on the certificate" }],
         says:r => `Blocks ${r.name || "this applicant"}. This is a safety finding, not a tidy-up, and it should be said to them plainly.` },
     ]},
 
@@ -2871,7 +2887,15 @@ function drawAsk(k, a, row, btn){
     return `<div data-askrow="${n}"><label>${esc(f.label)}</label>${control}</div>`;
   }).join("");
 
+  // An action with a form skips the confirm dialog, so anything the action had
+  // to say about what it means was being dropped on the floor. No action used
+  // both until the vetting decisions did, and "this is a safety finding, not a
+  // tidy-up" is exactly the sentence that should be in front of somebody as
+  // they block a person. Shown above the fields, not behind an OK button.
+  const preamble = a.says ? `<p class="mute" style="margin:0 0 12px">${esc(a.says(row))}</p>` : "";
+
   $("drwMsg").innerHTML = `<div class="card" style="margin-top:12px">
+      ${preamble}
       <div class="row" style="margin-bottom:0" id="askRow">${fields}</div>
       <div class="brow" style="margin-top:12px">
         <button class="btn" id="askGo">${esc(a.label)}</button>

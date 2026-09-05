@@ -674,6 +674,47 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## Passing or blocking an applicant, and why the buttons changed
+
+**Deciding whether somebody can earn on this platform is a §2 decision, and
+until 5 September 2026 it left no record of who made it.** The desk wrote
+`applications.status` directly through the generic action mechanism. The status
+changed and nobody's name went with it, so on the day somebody asks why a
+worker was blocked, the answer was a status string. `vetting_reviews` is the
+AI's read of the documents, never the person's ruling.
+
+**Pass, Send the gap back and Block now call `decide_application()`**, which is
+admin only and takes your name from your session rather than from anything the
+page sends. A trigger, `trg_application_decision_attributed`, refuses any
+status change into `passed`, `blocked`, `gap`, `approved` or `declined` that
+arrives without a name. So the rule holds for a script and for psql, not only
+for this page.
+
+**Each button now offers a note.** Optional on purpose: a forced box gets
+filled with a full stop. On Block it is the one worth writing, because it is
+the hardest decision to stand behind six months later.
+
+```sql
+select decided_at, decided_by, status, decision_note, name
+  from public.applications where decided_at is not null order by decided_at desc;
+```
+
+**If a button fails with "A vetting decision has to say who made it"**, the
+call went round the RPC and wrote `status` directly. That is the trigger
+working. Fix the caller; do not add `decided_by` to a direct update, because
+then the name is whatever the caller typed rather than whoever is signed in.
+
+**The eleven historical rows read NULL and stay that way.** Nobody knows who
+decided them. A plausible name backfilled into the column that exists to be
+trustworthy is worse than an empty one, and `system` would claim a machine did
+it. NULL means not recorded, which is the true statement.
+
+Rig: `supabase/tests/vetting_attribution_guards.sql`, six tests. Test 4 exists
+so the guard cannot pass by refusing everything, which is the easy way to look
+strict and break the desk.
+
+---
+
 ## A quote pack held at "ready", and why it stops a job dead
 
 **The quote pack draft becomes the client's quote.** It is one AI-drafted
