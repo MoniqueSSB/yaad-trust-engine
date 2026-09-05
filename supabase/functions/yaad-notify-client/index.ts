@@ -296,7 +296,7 @@ const MAX_PHOTOS_SENT_DIRECTLY = 5;
  *  page relies on for a signed-in client's own session: this is a
  *  server-to-server send, not a page render, and the URL it hands back is
  *  only good for five minutes and only ever reaches Twilio's own fetch. */
-type EvidencePhoto = { url: string; code: string | null; label: string | null };
+type EvidencePhoto = { url: string; code: string | null; label: string | null; phase: string | null };
 
 /** What a stage number actually means to the person reading the message.
  *  Founder's own correction, live, testing this for real: every message
@@ -320,9 +320,27 @@ async function stageLabel(admin: any, jobId: string, stageNum: number): Promise<
   return `stage ${stageNum}`;
 }
 
+// "A1 (before), A2 (problem found), A3 (after)". The worker's own answer to
+// which part of the job a photograph belongs to, put where the client already
+// looks for the codes, so a before, its after and anything found on the way can
+// be told apart without opening the portal. Silent when nobody said, which is
+// most photographs filed before 5 Sep 2026: see 20260906000700.
+const PHASE_IN_LIST: Record<string, string> = {
+  before: "before",
+  during: "during",
+  issue: "problem found",
+  after: "after",
+};
+
+function itemCode(p: EvidencePhoto): string {
+  const code = p.code ?? "?";
+  const said = p.phase ? PHASE_IN_LIST[p.phase] : null;
+  return said ? `${code} (${said})` : code;
+}
+
 async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<EvidencePhoto[]> {
   const { data: items } = await admin.from("evidence")
-    .select("storage_path, mime, item_code, label")
+    .select("storage_path, mime, item_code, label, phase")
     .eq("job_id", jobId).eq("stage", stage)
     .not("storage_path", "is", null)
     .like("mime", "image/%")
@@ -338,7 +356,7 @@ async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace
       if (error) { s.recordError(error.message); return []; }
       const byPath = new Map((data ?? []).map((r: any) => [r.path, r.signedUrl]));
       return rows
-        .map((e: any) => ({ url: byPath.get(e.storage_path), code: e.item_code ?? null, label: e.label ?? null }))
+        .map((e: any) => ({ url: byPath.get(e.storage_path), code: e.item_code ?? null, label: e.label ?? null, phase: e.phase ?? null }))
         .filter((p: EvidencePhoto) => p.url) as EvidencePhoto[];
     } catch (e) {
       s.recordError(String(e).slice(0, 200));
@@ -1054,7 +1072,7 @@ Deno.serve(async (req: Request) => {
       // Named once here, on more than one photo, so a reply naming a code
       // means something without repeating "Items: ..." on every line below.
       const itemsLine = photoUrls.length > 1
-        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}`
+        ? `Items: ${photoUrls.map(itemCode).join(", ")}`
         : null;
 
       // The report's own "Next:" line finally does something, rather than
@@ -1117,7 +1135,7 @@ Deno.serve(async (req: Request) => {
       const workerSays = overrideText || `Photos have come in for ${reportLabel} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
       const itemsLine = photoUrls.length > 1
-        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}. Mention a code if your comment is about one specific photo.`
+        ? `Items: ${photoUrls.map(itemCode).join(", ")}. Mention a code if your comment is about one specific photo.`
         : null;
       const actionHint = clientPhone
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`

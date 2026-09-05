@@ -3418,6 +3418,81 @@ The desk says **offered WhatsApp** on those rows, and `nothing sent, they must t
 
 **Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
 
+---
+
+## The evidence sections
+
+**What they are.** Since 5 September 2026 a job's evidence is read in five sections rather than as one pile: **before**, **during the work**, **problems found**, **after**, and **materials on site**.
+
+The first four are on `evidence.phase`, set by the person filing the item in answer to a direct question. Nothing infers it from the caption. The fifth is not a phase at all: materials has lived on `evidence.kind` since 20260828c, because filing it is what moves the risk in the materials to the client, and the database refuses a phase on it. The words are defined once, in `web/lib/portal/evidence-sections.ts`, so the client page, the Completion Report and the upload forms cannot drift into three different vocabularies.
+
+**Where a worker answers it.**
+
+- *Portal, photo:* a Before / During the work / A problem found / After dropdown next to the label, defaulting to Not marked.
+- *Portal, video:* the same dropdown on the video upload form.
+- *WhatsApp:* after the job code and the "what does this show" question, the worker is asked `Which is this? Reply B for before, D for during the work, A for after, or P for a problem you found. Reply N if it is none of those.` Only that reply is read as the answer. The parser accepts the full words too, and takes I or "issue" as well as P.
+
+**It never blocks anything.** An answer that is none of them files the evidence unmarked and tells the worker so. Nothing is refused, no stage is held, and a stage can still be approved with no before on file. That is deliberate: whether a missing before should ever stop an approval is a decision for Monique, not a default.
+
+**A problem found is not a quality score and must never be reported as one.** A worker who photographs rot behind a panel is doing the job properly. The desk tile counts them and is deliberately left uncoloured, because a green tick on a low number is an instruction to stop reporting them. What the count is actually for is spotting a stage carrying several, which is a stage where the job has stopped being the job that was quoted.
+
+**Where to see it.** Client portal, grouped under headings on the job page, with a badge on each card and a line in "Show the record for this stage". Completion Report, on the evidence index line. Client's WhatsApp report, in the `Items:` line as `A1 (before), A2 (problem found), A3 (after)`. Admin desk Overview, the **Before and after on record** and **Problems found on site** tiles.
+
+### If the Before and after tile reads 0% and you think that is wrong
+
+It is almost certainly right. The tile reads `evidence_completeness.with_before_and_after`, which reads `evidence_at_signoff`, which reads the **snapshot taken at approval time**, not the evidence table. So:
+
+1. Nothing signed off before 5 September 2026 can ever count. No phase was declared then, and backfilling one would be inventing history. Expect a low number for a while.
+2. A phase declared on a photograph **after** its stage was approved does not count towards that approval, on purpose. Same rule as the item count and the arrival log.
+
+Check what a given sign-off actually holds:
+
+```sql
+select job_id, stage, items, has_before, has_during, has_after, issues, before_and_after
+  from public.evidence_at_signoff order by approved_at desc limit 20;
+```
+
+### If a worker says the database refused their upload
+
+The only phase-related refusal is a **phase on materials evidence**, which the constraint `evidence_phase_chk` rejects. Materials is a custody record and a section in its own right, not a part of the work. Both portal forms disable the dropdown when Materials is chosen, and both server paths drop the value, so this should only ever be reachable by a direct API call. Note that a materials upload on a job where the client has never named a store is refused for a different reason entirely, by `trg_evidence_materials_needs_store`, and that message says so in words worth reading. Check with:
+
+```sql
+select id, job_id, kind, phase from public.evidence where phase is not null and kind = 'materials';
+```
+
+That should always return nothing.
+
+### One known consequence: abandoned uploads leave files behind
+
+A worker who sends photographs over WhatsApp and then never answers the
+questions leaves those files staged in the evidence bucket under `_pending/`.
+The session is dropped after 48 hours and the files are not. This predates the
+before/after step, which adds one more place a worker can walk away mid-flow.
+Nothing cleans `_pending/` on a schedule yet. It is storage cost and clutter
+rather than a data protection problem, since the bucket is private and nothing
+outside it links to those objects, but it should be swept eventually. Look at
+what is sitting there with:
+
+```bash
+supabase storage ls ss:///evidence/_pending --project-ref leffyisvfvjwzilydlwf
+```
+
+### After changing anything in this area
+
+Run the rig, which proves a phase declared after a sign-off cannot improve it:
+
+```sql
+\i supabase/tests/evidence_phase_guards.sql
+```
+
+Nine checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-client` and `yaad-evidence-video`, which all write or read the column.
+
+The rig reports through `raise notice`, which psql shows and the Supabase MCP does not. To run it through the MCP instead, replace the temp table `t` with a real one, select from it at the end, and drop it. That is how it was run on 5 September 2026.
+
+**Applied to production 5 September 2026**, as `20260906000700_a_photograph_says_which_section_of_the_job_it_belongs_to.sql`, in three parts: the column and its constraint, the snapshot in `_do_approve_stage`, then the two views. All nine checks passed against live and the rig left no rows behind.
+
+---
+
 ## A client asked for a worker by name and nothing seems to have happened
 
 The button on a worker profile records the request on the job row and holds

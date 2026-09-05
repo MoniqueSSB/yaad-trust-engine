@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { readCapturedAt, stripApp1 } from "@/lib/exif";
+import { isPhase } from "@/lib/portal/evidence-sections";
 
 /**
  * Evidence upload, PORTAL-SPEC 5.3. The fingerprint is computed HERE, on
@@ -106,6 +107,15 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
   const kindRaw = String(formData.get("kind") ?? "");
   const kind = kindRaw === "materials" ? "materials" : "work";
 
+  // Which section of the job this belongs to, declared in answer to a direct
+  // question on the form and never read out of the label. See 20260906000700.
+  // Anything that is not one of the four words is null, which means nobody
+  // said, and is not the same as no. Materials evidence carries no phase at
+  // all: it is a section in its own right on evidence.kind, and the constraint
+  // refuses it, so it is dropped here rather than sent to be rejected.
+  const phaseRaw = String(formData.get("phase") ?? "");
+  const phase = kind === "materials" ? null : isPhase(phaseRaw) ? phaseRaw : null;
+
   const stage = /^\d+$/.test(stageRaw) ? parseInt(stageRaw, 10) : null;
 
   const { error } = await supabase.from("evidence").insert({
@@ -116,6 +126,7 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
     bytes: size,
     mime,
     kind,
+    phase,
     stage,
     sha256,
     captured_at: capturedAt ? capturedAt.toISOString() : null,

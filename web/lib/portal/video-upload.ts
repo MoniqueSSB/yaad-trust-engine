@@ -70,6 +70,7 @@ export async function uploadQueuedVideo(
     label: item.label,
     stage: item.stage,
     kind: item.kind,
+    phase: item.phase ?? null,
   });
   if (!finish.ok) return finish;
 
