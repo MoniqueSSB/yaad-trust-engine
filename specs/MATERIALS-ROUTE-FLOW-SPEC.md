@@ -98,11 +98,30 @@ a real answer and puts the job on the drops fallback, which the worker prices in
 The route is on the job spec, so the worker sees which he is quoting before he
 opens it.
 
-### Stage 3. Worker quotes
+### Stage 3. Worker quotes, and says what the job needs
 
-- **Route A:** labour and materials, as today.
-- **Route B:** labour only. The materials field is **not shown**, so it cannot be
-  filled in by habit and a Route B quote cannot carry a materials number.
+**On both routes the worker lists the materials the job requires**, item by item,
+with quantities. This is not description and it is not optional dressing on the
+quote. It exists to stop the failure every site knows: the tradesperson travels
+to Portmore, and the blocks are not there.
+
+- **Route A:** labour, materials money, and the list. The list is what the
+  materials money is released against, and what the receipt is read against
+  afterwards.
+- **Route B:** labour only, and the list. The materials money field is **not
+  shown**, and a Route B quote carrying a materials figure is refused by
+  Postgres, not only by the form. Here **the list is the order the client
+  fills.** Without it, Route B tells a client they are supplying the materials
+  and gives them no way to know what to buy, which guarantees the wasted
+  journey rather than preventing it.
+
+**On Route B each line is ticked off as it arrives**, by the client, and an
+outstanding line is why a start date moves rather than the worker being at
+fault. The worker can see before he sets out whether the site is ready for him.
+
+There are deliberately **no prices on the list**. The money is `labour_jmd` and
+`materials_jmd` on the quote itself, and a second set of figures beside them is a
+second source of truth about the same job.
 
 ### Stage 4. Client accepts a quote
 
@@ -137,22 +156,41 @@ agreement with him.
 
 Listed so the size is visible before anything moves. Roughly smallest first.
 
-1. **Constrain `jobs.materials_by`.** A check constraint permitting two values,
-   `yaadly` and `client`, plus null for jobs posted before this. Migration.
-2. **Ask it on the post-a-job form**, as the two options above, with the Route B
-   consequences shown. `yaad-post-job` maps the answer, the way it already maps
-   the three store types, and refuses an unrecognised value rather than storing
-   free text.
-3. **Move the store question to posting on Route A.** It stays enforced in
-   Postgres by `materials_store_nominated()`; what changes is when it is asked.
-   The go-live gate in `gates.ts` becomes a catch for jobs that somehow reached
-   acceptance without it, rather than the normal path.
-4. **Hide the materials field on a Route B quote** and reject a Route B quote
-   carrying `materials_jmd > 0` server side, not only in the form.
-5. **Make materials stage one on Route A** in the invoicing path, payable before
-   the labour stages run.
-6. **Retire the four prototype options** in `preview/index.html` and replace them
-   with the two.
+**Step 1. The database, done 5 September 2026** (`20260905d`). The route becomes
+a constrained column, the materials list becomes a table hanging off the quote,
+a Route B quote carrying materials money is refused by a trigger, and the client
+ticks a line off through `mark_material_supplied()` rather than a broad update
+policy. Nothing visible moves yet, which is the point: the rules exist before
+any form relies on them. Guard tests in
+`supabase/tests/materials_route_guards.sql`.
+
+**Step 2. The post-a-job form asks the question.** The two options above, with
+the Route B consequence shown next to it. `yaad-post-job` maps the answer the
+way it already maps the three store types, and refuses an unrecognised value
+rather than storing free text.
+
+**Step 3. The store question moves to posting on Route A.** It stays enforced in
+Postgres by `materials_store_nominated()`; what changes is when it is asked. The
+go-live gate in `gates.ts` becomes a catch for jobs that reached acceptance
+without it, not the normal path.
+
+**Step 4. The quote form carries the materials list**, on both routes, and hides
+the materials money field on Route B. The trigger from step 1 is already behind
+it.
+
+**Step 5. The client sees the list, and on Route B ticks it off.** The worker
+sees what is outstanding before he travels.
+
+**Step 6. Materials becomes stage one on Route A** in the invoicing path,
+payable before the labour stages run.
+
+**Step 7. Retire the four prototype options** in `preview/index.html` and
+replace them with the two.
+
+**Legacy rows.** The check constraint on `materials_by` went in `NOT VALID`, so
+old free-text values survive and only new and updated rows are held to the two
+answers. Backfilling them is a data decision that belongs with step 2, once the
+form settles what a legacy job should become.
 
 **Not in this spec, and each is its own decision:** the client-facing copy on
 `docs/`, which still says materials are "passed through"; whether Route B is

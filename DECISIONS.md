@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Step 1 built: the route is a real column, and the materials list is an order rather than a note
+
+**Founder's go on the spec, plus one addition that closed a hole in it: the worker states the materials the job needs, so he does not travel to a site that cannot start.** That addition matters more than it first sounds. As written, Route B told a client they were supplying the materials and gave them no way to know what to buy, which guarantees the wasted journey rather than preventing it. Her instinct fixed the spec, not just the build.
+
+**`20260905d` is the database only, deliberately, so the rules exist before any form leans on them.** `jobs.materials_by` gets a check constraint permitting `yaadly`, `client` and null. `quote_materials` hangs off `job_quotes`, one row per line, with `supplied_at` and `supplied_by` for the client to tick a line off on Route B. A trigger refuses a quote carrying `materials_jmd > 0` on a client-supplied job, with a message telling the worker what to do instead rather than only refusing.
+
+**The list is a table and not another note on the quote, and the reason is the use rather than the shape.** `job_quotes` already carries `scope_summary`, `included_note` and `excluded_note`, so a paragraph was the obvious move. On Route B the list is not description, it is the order the client fills, and a paragraph cannot be ticked off item by item as it arrives. On Route A the same rows do the other job: what the materials money is released against, and what the receipt is read against later. No prices on it on purpose, because `labour_jmd` and `materials_jmd` are already on the quote and a second set of figures beside them is a second source of truth about one job.
+
+**The Route B guard is a trigger and not a hidden form field, and that distinction is the whole value of step 1.** Hiding the materials input on a Route B quote form is where a reasonable change would stop. A quote can also arrive from the desk, from a fixup, or from a form that regresses, and a hidden field is a suggestion. `supabase/tests/materials_route_guards.sql` pins it as test 3, alongside the constraint refusing the old free-text values and Route A being untouched.
+
+**`mark_material_supplied()` is an RPC rather than an update policy, for the reason `nominate_materials_store` was.** Row level security cannot say "these columns only", so a broad client update policy would let the person filling the order rewrite the item, the quantity or the note on a quote they are about to accept, which is the order changing under the worker. The function sets two fields on lines belonging to the caller's own job and nothing else.
+
+**The constraint went in `NOT VALID` on purpose.** Existing rows carry free text from the old form and the prototype, none of which survives the principal structure and none of which is read by anything. Validating them would have failed the migration in order to correct decoration. Backfilling belongs with step 2, once the form settles what a legacy job should become.
+
+**Not run.** These are hand-run SQL tests and the migration is not applied. Supabase MCP has been timing out this session.
+
+**Noticed while reading the quote RLS, and left alone: a shared secret sits in plaintext in `20260902c`**, used as the authentication for `yaad-notify-client`, which is one of the ten functions running without platform auth. §6 of `CLAUDE.md` says no secrets in committed files, and CI's key-shaped-string scan did not catch a 64 character hex literal. Rotating it means changing every trigger that carries it plus the function, so it is a change of its own and a founder decision, not a side effect of this one. Flagged to her directly.
+
 ## 2026-09-05 · The materials route belongs at posting, and today the worker decides it by accident
 
 **Founder's instruction was that the client answers the materials question at quote stage. Tracing where it actually sits found something worse than a missing field.** `specs/MATERIALS-ROUTE-FLOW-SPEC.md` is the written journey; this records the finding.
