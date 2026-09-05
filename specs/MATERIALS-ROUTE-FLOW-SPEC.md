@@ -88,10 +88,10 @@ Beneath Route B, in plain sight rather than in terms, what it changes:
 > short, late, wrong or not fit for the work, dates move if they are not there,
 > and the workmanship guarantee covers his work and not your materials.
 
-**On Route A the client also answers where materials are kept, here, at posting,
-not after acceptance.** It moves up for the reason the current gate already
-states: the worker cannot price the job honestly without it. `none_available` is
-a real answer and puts the job on the drops fallback, which the worker prices in.
+**Nothing else moves to posting.** Only the route question. Where materials are
+kept is asked after the client confirms the job, where it already is. Founder's
+decision, 5 September 2026, reversing an earlier draft of this spec that moved it
+up here. See step 3 below for why that was wrong.
 
 ### Stage 2. Board
 
@@ -169,26 +169,35 @@ the Route B consequence shown next to it. `yaad-post-job` maps the answer the
 way it already maps the three store types, and refuses an unrecognised value
 rather than storing free text.
 
-**Step 3. The store question moves to posting on Route A, done 5 September
-2026.** It stays enforced in Postgres by `materials_store_nominated()`; what
-changed is when it is asked. `STORES` and `storeAnswered()` in
-`web/lib/jobs/new-form.ts` mirror the three codes and the rule that the two
-named stores require a description; the server side already existed in
-`yaad-post-job`. The go-live gate in `gates.ts` is now a catch for jobs arriving
-by other doors, WhatsApp through `yaad-inbound`, the desk, and everything posted
-before the question existed, with a comment saying so, since a redundant-looking
-gate is one somebody deletes.
+**Step 3. REJECTED, 5 September 2026. The store question stays where it is.**
+It was built, reviewed and reverted the same evening.
 
-Route B does not ask, because the client is delivering their own materials, so
-there is no tranche for Postgres to refuse and no pricing question for the
-worker. A required question with no consequence is how a form teaches people to
-skip questions.
+The proposal was to move "where can materials be kept" to the post-a-job form on
+Route A, on the argument the go-live gate itself makes: a worker cannot price the
+job honestly without it. **Founder's ruling: the only thing the quote needs is
+the materials list. Everything else can be asked after the client confirms.**
 
-The free-text room description is deliberately kept OUT of the saved draft. Its
-type is kept, because "nowhere securable" is a fact the worker prices against
-and it names no room, while the description names where the valuable things are
-kept on a property that is often empty, and a draft sits in `localStorage` for a
-week on a phone other people use.
+Three reasons that is right, and the first is hers:
+
+1. **The quote needs the list, not the storage.** What stops a wasted journey is
+   knowing what the job requires. Where it is kept is logistics the tradesperson
+   handles inside his own price, and treating it as a pricing input overstates
+   how much it moves the number.
+2. **It cannot honestly be asked at posting anyway.** `/jobs/new` has no account,
+   and `nominate_materials_store()` requires a signed-in client for a stated
+   reason: naming the store is what moves the risk in the materials, "so it is
+   not the worker's to decide and not Yaadly's to assume". A risk-moving answer
+   typed into an anonymous form by nobody in particular is not the same fact, and
+   writing it through `yaad-post-job` walks around the function that exists to
+   guard it.
+3. **The client often does not know yet.** An owner in London may have to ring
+   a relative to find out whether the back room locks. That is a fine question
+   for somebody who has confirmed a job and a real one to put on the highest
+   drop-off screen in the funnel.
+
+**So the go-live gate stays the normal path**, unchanged, and it is the right
+place: by then the client has an account, has confirmed, and the question is
+asked by the function designed to record who answered it.
 
 **Step 4. The quote form carries the materials list**, on both routes, and hides
 the materials money field on Route B. The trigger from step 1 is already behind

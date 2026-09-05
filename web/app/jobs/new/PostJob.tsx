@@ -61,11 +61,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
-  ACCESS, DRAFT_KEY, EMPTY_FIELDS, MATERIALS, STAGES, STORES,
-  STORE_NONE_AVAILABLE, URGENCY,
+  ACCESS, DRAFT_KEY, EMPTY_FIELDS, MATERIALS, STAGES, URGENCY,
   draftFields, firstIncomplete, looksLikeEmail, looksLikePhone,
-  parseDraft, restoreFields, serialiseDraft, stageComplete, storeAnswered,
-  worthKeeping, yaadlyBuysMaterials,
+  parseDraft, restoreFields, serialiseDraft, stageComplete, worthKeeping,
   type Fields, type StageKey,
 } from "@/lib/jobs/new-form";
 
@@ -204,12 +202,6 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
            stale cached copy of this page cannot write a route the database
            has never heard of. */
         materialsBy: f.materialsBy,
-        /* Route A only. yaad-post-job maps materialsStore onto the three
-           codes jobs_materials_store_type_chk permits and withholds the free
-           text from the job board. Sent empty on Route B, which lands the
-           type null, exactly as a job posted before this question existed. */
-        materialsStore: f.materialsStore,
-        materialsStoreWhere: f.materialsStoreWhere,
       });
       if (d.jobId) setJobId(String(d.jobId));
       if (d.portalCode) setPortalCode(String(d.portalCode));
@@ -617,74 +609,6 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                 </p>
               </div>
 
-              {/* Where materials are kept. Step 3 of the materials route spec.
-                  ROUTE A ONLY: on Route B the client supplies and delivers the
-                  materials themselves, so there is no tranche for Postgres to
-                  refuse and no pricing question for the worker, and a required
-                  question with no consequence is how a form teaches people to
-                  skip questions.
-
-                  This used to be a go-live checklist item, asked after a quote
-                  had been accepted. Its own gate copy carried the argument for
-                  moving it: a worker cannot price the job honestly without it.
-                  That is true, and useless once the quotes are already in. */}
-              {yaadlyBuysMaterials(f.materialsBy) && (
-                <div className="fgroup" style={{ marginBottom: 0 }}>
-                  <label className="fl" htmlFor="mstore">
-                    Where can materials be kept on the property{" "}
-                    <span className={"src " + (storeAnswered(f.materialsStore, f.materialsStoreWhere) ? "ok" : "req")}>
-                      {storeAnswered(f.materialsStore, f.materialsStoreWhere) ? "Answered" : "Required"}
-                    </span>
-                  </label>
-                  <select
-                    id="mstore"
-                    className="jf"
-                    value={f.materialsStore}
-                    onChange={(e) => set("materialsStore", e.target.value)}
-                  >
-                    <option value="">Choose where they can go</option>
-                    {STORES.map((x) => (
-                      <option key={x.value} value={x.value}>{x.value}</option>
-                    ))}
-                  </select>
-                  {f.materialsStore !== "" && (
-                    <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-                      {STORES.find((x) => x.value === f.materialsStore)?.note}
-                    </p>
-                  )}
-
-                  {/* The other two answers need a place naming, because
-                      "indoors" is not somewhere a camera can be pointed and the
-                      worker has to film the materials in that exact spot.
-                      nominate_materials_store in Postgres refuses an empty one,
-                      so this mirrors a rule rather than inventing it. */}
-                  {f.materialsStore !== "" && f.materialsStore !== STORE_NONE_AVAILABLE && (
-                    <div className="mt-3">
-                      <label className="fl" htmlFor="mstorewhere">
-                        Which room or store{" "}
-                        <span className={"src " + (f.materialsStoreWhere.trim() ? "ok" : "req")}>
-                          {f.materialsStoreWhere.trim() ? "Answered" : "Required"}
-                        </span>
-                      </label>
-                      <input
-                        id="mstorewhere"
-                        className="jf"
-                        maxLength={160}
-                        placeholder="The back room off the veranda, key with my aunt"
-                        value={f.materialsStoreWhere}
-                        onChange={(e) => set("materialsStoreWhere", e.target.value)}
-                      />
-                      <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-                        In your own words. The worker films the materials in
-                        that exact place, so it has to be somewhere you could
-                        point at. <b className="text-mute">This one is never
-                        shown on the job board</b>, only the type above is.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* The third thing a job needs to be quotable without a phone
                   call. The WhatsApp route has always asked it; this form
                   never did. Deliberately NOT a name and a number: that is a
@@ -859,10 +783,6 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                   { k: "work" as StageKey, t: "Who buys the materials", v: f.materialsBy },
                   { k: "property" as StageKey, t: "Parish", v: f.parish },
                   { k: "property" as StageKey, t: "Who lets a worker in", v: f.accessType },
-                  ...(yaadlyBuysMaterials(f.materialsBy)
-                    ? [{ k: "property" as StageKey, t: "Where materials are kept",
-                         v: [f.materialsStore, f.materialsStoreWhere.trim()].filter(Boolean).join(", ") }]
-                    : []),
                   { k: "urgency" as StageKey, t: "How soon", v: f.urgency },
                   { k: "reach" as StageKey, t: "Your name", v: f.name.trim() },
                   { k: "reach" as StageKey, t: "Reach you on", v: f.contact.trim() },
@@ -941,9 +861,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
           {!canAdvance && (
             <p className="mt-3 text-[12.5px] text-dim">
               {key === "work" && "Pick a trade, say what is happening, and say who buys the materials, to carry on."}
-              {key === "property" && (yaadlyBuysMaterials(f.materialsBy)
-                ? "Pick a parish, say who can let a worker in, and say where materials can be kept, to carry on."
-                : "Pick a parish and say who can let a worker in, to carry on.")}
+              {key === "property" && "Pick a parish and say who can let a worker in, to carry on."}
               {key === "urgency" && "Pick how soon you need it, to carry on."}
               {key === "reach" && "Your name and one way to reach you, to carry on."}
               {key === "review" && "Something above is still needed. The rows in red say which."}

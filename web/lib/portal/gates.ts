@@ -98,17 +98,7 @@ export function jobGates({
       Postgres enforces the real rule (materials_store_nominated()); this
       only decides whether the CHECKLIST asks the question, and the two
       must agree or a client would see "nothing outstanding" while the
-      database still refuses to open the job.
-
-      SINCE 5 SEP 2026 THIS IS A CATCH, NOT THE NORMAL PATH. Step 3 of
-      specs/MATERIALS-ROUTE-FLOW-SPEC.md moved the question to /jobs/new,
-      asked at posting on Route A, because a worker cannot price the job
-      honestly without it and asking after a quote is accepted is too late
-      to change the number the client already agreed to. So on a job posted
-      through the form this row should already be done when the checklist
-      first renders. It still exists because jobs arrive by other doors:
-      WhatsApp through yaad-inbound, the desk, and every job posted before
-      the question existed. Do not delete it because it looks redundant. */
+      database still refuses to open the job. */
   hasAcceptedMaterials: boolean;
 }): Gate[] {
   const gates: Gate[] = [
