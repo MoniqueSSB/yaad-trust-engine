@@ -1,5 +1,7 @@
 "use client";
 
+import type { EvidencePhase } from "./evidence-sections";
+
 /**
  * The offline queue for worker video evidence, Stage 5.5.
  *
@@ -21,6 +23,10 @@ export type QueueItem = {
   jobId: string;
   stage: number;
   kind: "work" | "materials";
+  /** Which section of the job this belongs to, as declared on the form, or
+      null if nobody said. Optional so items queued before 5 Sep 2026, which
+      predate the field, still upload. */
+  phase?: EvidencePhase | null;
   label: string;
   mime: string;
   bytes: number;
