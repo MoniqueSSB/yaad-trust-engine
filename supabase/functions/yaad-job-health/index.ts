@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 
 // The daily stall check. Founder's own framing, 31 Aug 2026: "prompt to the
 // workers ensuring he does this so the client is updated... if there is
@@ -54,7 +55,7 @@ async function sendTwilioWhatsApp(to: string, body: string, trace: Trace) {
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body }),
+        body: withStatusCallback(new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body })),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });

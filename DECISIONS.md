@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Delivery reporting is one shared line, not six copies of two lines
+
+**Setting the secret would have been the wrong-sized fix.** `yaad-message-status` was built to catch the case where Twilio returns 201 and no phone ever receives anything, and it only ever hears about a message whose send asked it to. Seven functions in this repository send over Twilio, each with its own inline call, and exactly one attached a status callback. So switching the secret on would have lit up the desk's "Messages that failed" tile with a number that read "none failed" and meant "one of seven paths is being watched", which is worse than the tile not existing.
+
+**`_shared/twilio-status.ts` is deliberately trivial**, one function that adds a parameter when the variable is set. The value is not the logic, it is that six copies of two lines is precisely how the seventh copy gets forgotten, and this repository already has the shared-copy drift check in CI to keep one definition honest across bundles. It is inert with the variable unset, which is what made it safe to put in front of the portal sign-in code and a client's own job notifications in a single change.
+
+**CI's Deno job gained `--allow-env`, and finding that was the point of running the suite with CI's exact flags.** The module's whole behaviour is "do nothing unless configured", so the test that matters is the one proving the unset case changes no send, and that test cannot be written without setting and clearing the variable. Locally the looser flags passed; under CI's flags all three failed. Caught before pushing rather than as a red build.
+
+**Six functions were redeployed and four of them run without platform auth.** Each was deployed with its own live `verify_jwt` read back first, which is the trap §12 exists for: a blanket redeploy would have silently added a token check to `yaad-inbound`, `yaad-enquiry`, `yaad-portal-code` and `yaad-notify-client` and broken Twilio intake, the contact form and the portal sign-in at once. Verified afterwards that all four still answer with their own refusal rather than a platform 401, and that the list of eleven is unchanged.
+
+---
+
 ## 2026-09-05 · A vetting decision now has to say who made it
 
 **The gap was flagged the day before and fixing it was the founder's call, because it changes what the desk writes rather than only what it reads.** Passing or blocking an application decides whether somebody can earn on this platform, which is squarely the "named human confirms every consequential step" of §2. A named human was confirming it. Nothing recorded that. The desk wrote `applications.status` through the generic action mechanism and no name went with it, so the rule was true in practice and unprovable afterwards, which is the state §2 exists to prevent.

@@ -697,18 +697,31 @@ authorization header"). A 200 from the first means the signature check is not
 running and anybody can write delivery statuses; a 200 from the second means
 the flag was passed by mistake and Lookup, which costs money per call, is open.
 
-**`yaad-message-status` is deployed and not yet receiving anything.** Twilio
-only posts to it once `TWILIO_STATUS_CALLBACK_URL` is set as a secret and sends
-start quoting it, and that secret is not set. Until then `message_deliveries`
-stays empty and the Overview's "Messages that failed" tile reads zero because
-nothing is reporting, not because everything arrived. The value is:
+**Delivery reporting was then wired across every send, not just one.**
+`TWILIO_STATUS_CALLBACK_URL` is set to the function's own URL, and seven
+functions send over Twilio: `yaad-desk-reply`, `yaad-notify-client`,
+`yaad-portal-code`, `yaad-inbound`, `yaad-job-health`, `yaad-daily-checkin`,
+`yaad-enquiry`. Only the first attached a status callback, so setting the
+secret alone would have left six paths silent while the Overview reported zero
+failures. `_shared/twilio-status.ts` now does it in one place and all seven
+call it.
 
-```
-https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-message-status
+It is inert with the variable unset, which is what made it safe to put in front
+of the portal sign-in code and a client's own notifications in one change.
+
+```sql
+select status, count(*) from public.message_deliveries group by status;
 ```
 
-**`TWILIO_CONTENT_SID_DESK_REPLY` is still unset** and unrelated to this
-deploy. `TWILIO_CONTENT_SID_APPROVE` was set on 4 September.
+**If that stays empty after a real send**, check the secret is set, then check
+the function is reachable (`curl` the URL, expect 403 not 404), then read
+Twilio's own error log: Twilio silently drops a callback to a URL it cannot
+reach, and nothing on this side would know.
+
+**Still unset: `TWILIO_CONTENT_SID_DESK_REPLY`**, unrelated to this deploy. It
+needs a Utility template created in Twilio and approved by Meta, which is
+account work rather than a repository change. `TWILIO_CONTENT_SID_APPROVE` was
+set on 4 September.
 
 ---
 
