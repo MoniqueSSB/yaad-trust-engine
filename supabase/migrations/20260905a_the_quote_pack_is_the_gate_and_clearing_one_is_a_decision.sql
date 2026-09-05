@@ -7,17 +7,24 @@
 -- the 314 auto-issued rows and the first half was simply wrong, in a way that
 -- matters more than a comment usually does.
 --
--- The quote pack does not follow a quote. It is what a worker quotes AGAINST:
--- an approved draft is the thing RLS lets a worker read before pricing the
--- job, and 20260901r is explicit that 'approved' rather than 'ready' is the
--- gate the worker's own quote form reads. Founder's words, 4 September 2026:
--- the quote pack is the only thing that needs to approve a job. So the one
--- document I described as an afterthought is the document that decides whether
--- a job reaches anybody at all.
+-- The quote pack does not follow a quote. It BECOMES one. The table's own
+-- comment says it plainly: one AI-drafted overview per job, scope and rough
+-- timeline and payment-stage structure, no prices; a worker reviews it, edits
+-- it, adds their own price on job_quotes, and that edited copy is the quote
+-- the client sees. RLS only lets a worker read a draft at 'approved', which
+-- 20260901r made the gate the worker's own quote form reads.
 --
--- The kickoff pack is the one that follows, and it does not follow acceptance
--- either. Founder, same day: it is generated for jobs which have paid and
--- require it.
+-- So it is not an internal artefact and it is not an afterthought. Founder's
+-- words, 4 and 5 September 2026: the quote pack is the only thing that needs
+-- to approve a job, and it is what is generated on each quote for the client.
+-- A draft held at 'ready' therefore does not merely slow a job down. No worker
+-- can read it, so no quote gets built from it, so nothing reaches the client
+-- at all.
+--
+-- The kickoff pack comes after and is gated on money, not on acceptance.
+-- Founder, same day: you have to pay for it. There is one per quote
+-- (kickoff_packs_quote_id_unique) and both sides confirm a revision with a
+-- shared code in kickoff_pack_agreements.
 --
 -- WHAT CHANGES IN THE COUNT. The system:% exclusion stays exactly as it was
 -- and still keeps all 314 auto-issued rows out. What was wrong was excluding
@@ -84,6 +91,6 @@ with (security_invoker = true) as
    where qp.status = 'ready';
 
 comment on view public.packs_awaiting_a_person is
-  'Quote pack drafts held at ready because the guardrail flagged something, waiting for a named person to clear or redraft. A held quote pack stops the job reaching any worker, and until 5 September 2026 nothing on the Overview counted one.';
+  'Quote pack drafts held at ready because the guardrail flagged something, waiting for a named person to clear or redraft. The draft is what a worker edits and prices into the quote the client actually sees, so a held one means no quote reaches that client at all. Until 5 September 2026 nothing on the Overview counted one.';
 
 grant select on public.packs_awaiting_a_person to authenticated;

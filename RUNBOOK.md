@@ -640,13 +640,53 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## The desk script is linted now, and what to do when that job goes red
+
+**`scripts/check-desk-script.mjs`, CI job "Admin desk script".** It pulls the
+inline script out of `concierge/concierge.html` and runs one rule over it.
+Line numbers in the error are real line numbers in `concierge.html`, because
+the extraction blanks everything outside the script rather than removing it.
+
+**Why it exists.** Nothing in CI read a line of the desk until 5 September
+2026, and the same bug has now shipped from it twice: the 17-18 August
+temporal dead zone that broke admin sign-in on a direct link, and one found on
+5 September where three consts sat below the tile that read them, so
+`loadOverview()` threw and rendered 13 tiles instead of 29, losing the whole
+"what needs me today" alert list. Both were found by a person walking into
+them.
+
+**One rule, not a style pass, and that is the design.** The stock ESLint
+`no-use-before-define` reports 17 findings on this file and every one is safe:
+`tile`, `sb`, `ROWS`, `currentView` are read inside functions that run long
+after the module finishes. A job that cries wolf gets switched off, which is
+the same reasoning the secrets scanner's comment gives for filtering
+placeholders. The custom rule compares scopes, so it only fires on a read in
+the same scope as the `let` or `const`, before the declaration. That throws
+whenever the line runs, every time.
+
+**When it goes red**, move the declaration above its first use. Do not disable
+the rule and do not add an eslint-disable comment: the finding is not a style
+opinion, it is a line that throws.
+
+```bash
+node scripts/check-desk-script.mjs
+```
+
+---
+
 ## A quote pack held at "ready", and why it stops a job dead
 
-**An approved quote pack is what a worker reads before pricing a job.** RLS on
-`quote_pack_drafts` only lets a worker see a draft at status `approved`, so a
-draft held at `ready` means the job shows as `open_for_quotes`, shows as open
-on the board, and has nothing a worker can actually look at. The job is not
-slow. It is stopped, and nothing about its status says so.
+**The quote pack draft becomes the client's quote.** It is one AI-drafted
+overview per job, scope and rough timeline and payment stages, carrying no
+prices. A worker reads it, edits it, adds their own price on `job_quotes`, and
+that edited copy is what the client sees. RLS only lets a worker read a draft
+at status `approved`, so a draft held at `ready` means the job shows as
+`open_for_quotes`, shows as open on the board, and has nothing a worker can
+look at, which means no quote is ever built and nothing reaches the client.
+The job is not slow. It is stopped, and nothing about its status says so.
+
+The kickoff pack is the next document along and is gated on payment, one per
+quote, confirmed by both sides with a shared code.
 
 A clean draft auto-approves. A draft the guardrail flags is held on purpose,
 which is correct behaviour: `approve_quote_pack_draft()` is admin only and

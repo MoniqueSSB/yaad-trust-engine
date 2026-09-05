@@ -3235,9 +3235,10 @@ async function loadOverview(){
   // A session rolls over at 05:00 Jamaica time rather than midnight, so a
   // sign-off at half past midnight belongs to the evening that just happened.
   // Quote packs held for a person. This is a queue, not a score, and it is
-  // the one queue that stops a job dead: an approved quote pack is what RLS
-  // lets a worker read before pricing the job, so a held one means the job
-  // shows as open for quotes and no worker can actually see what to quote.
+  // the one queue that stops a job dead: the pack is what a worker edits and
+  // prices into the quote the client sees, and RLS only lets a worker read it
+  // at approved, so a held one means no quote is built and the client hears
+  // nothing, while the job still shows as open for quotes.
   // Nothing on this page counted these until 5 September 2026, and one had
   // been sitting for three days.
   const heldQ = await sb.from("packs_awaiting_a_person").select("kind,ref,job_id,hours_waiting");
@@ -3382,7 +3383,7 @@ async function loadOverview(){
     tile(heldHrs >= 24 ? "crit" : held.length ? "warn" : "ok",
       "Quote packs held", String(held.length),
       held.length
-        ? `Longest waiting ${Math.round(heldHrs)} hr, and its job cannot be quoted`
+        ? `Longest waiting ${Math.round(heldHrs)} hr, and that client gets no quote`
         : "Every pack is with the workers"),
   ].join("");
 
@@ -3397,7 +3398,7 @@ async function loadOverview(){
     "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
   if (held.length) needs.push(alertRow(heldHrs >= 24 ? "crit" : "warn", "!",
     held.length + (held.length === 1 ? " quote pack is held and its job cannot be quoted" : " quote packs are held and those jobs cannot be quoted"),
-    "The guardrail flagged wording in the pack and stopped it, which is correct. But an approved quote pack is what a worker reads before pricing, so until you clear or redraft it the job sits showing as open for quotes with nothing a worker can actually see. Longest held: " + Math.round(heldHrs) + " hours.",
+    "The guardrail flagged wording in the pack and stopped it, which is correct. But the pack is what a worker edits and prices into the quote the client sees, so until you clear or redraft it no worker can read it, no quote gets built, and nothing reaches that client at all. The job still shows as open for quotes. Longest held: " + Math.round(heldHrs) + " hours.",
     "Open the drafts", "qpd"));
   if (noEv) needs.push(alertRow("crit","!",
     noEv + (noEv === 1 ? " stage was signed off with no evidence on file at all" : " stages were signed off with no evidence on file at all"),
