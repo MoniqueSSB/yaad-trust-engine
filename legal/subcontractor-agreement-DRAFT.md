@@ -53,6 +53,11 @@ Part 2 governs.
 - **You are not waiting on a client abroad to press a button.** Yaadly checks
   your evidence against the agreed scope and pays you. Whether a client in
   London has opened WhatsApp is Yaadly's problem, not yours.
+- **You never fund the client's materials out of your own pocket.** On most jobs
+  materials are a stage the client has already paid Yaadly for, and Yaadly
+  releases that money to you before you buy. On some jobs the client supplies
+  the materials themselves and you are engaged for labour only. Your engagement
+  note says which, before you start.
 - **You file evidence at every stage.** Arrival, before, materials receipts,
   after, and a walk-round at the end. A stage without its evidence does not
   close and does not pay.
@@ -174,8 +179,9 @@ what the client pays Yaadly is not, and never was, your money. This is not a
 wording preference. It is the difference between ordinary trading and handling
 someone else's payments, and it is why nothing of yours passes through Yaadly.
 
-**Materials carry no fee.** Yaadly buys them from you at the price on your
-receipt, adds nothing and takes nothing off. See clause 8.
+**Materials carry no fee.** On Route A, Yaadly buys them from you at the price
+on your receipt, adds nothing and takes nothing off. On Route B you supply no
+materials and your price is your labour alone. See clause 8.
 
 **There are no other deductions and no other charges.** You pay nothing to
 join, nothing to quote, nothing for a lead you did not win, and there is no
@@ -208,17 +214,31 @@ paid to you are not clawed back.
 
 ### 8. Materials
 
+Every job runs on one of two routes, and **which one applies is written on your
+engagement note before you start.** They are not mixed on the same job.
+
+**Route A, Yaadly supplied. This is the normal route and most jobs are on it.**
+
+Materials are their own stage of the job Yaadly sold to the client, and the
+client pays Yaadly for that stage before anything is bought. **You are never
+asked to fund the client's materials out of your own pocket and then wait.**
+
+That stage payment is part of Yaadly's price for the job. It is not a pot of the
+client's money set aside for you, and there is no account with the client's
+materials money sitting in it. The client bought a job that includes materials;
+Yaadly then buys the materials. You are paid by Yaadly, as always.
+
 The client nominates where materials are stored before any are bought. If no
 suitable storage exists, that is recorded and the job is planned around it.
 
-**You supply the materials and Yaadly buys them from you**, at the price on your
-receipt, with nothing added and nothing taken off. They are part of what you
-supply to Yaadly on this job, and Yaadly then supplies them to the client as
-part of the job it sold. Yaadly makes nothing on them, by choice.
+Against the materials list on your engagement note, Yaadly releases the
+materials money to you, you buy them, and **Yaadly buys them from you** at the
+price on your receipt, with nothing added and nothing taken off. They are part
+of what you supply to Yaadly, and Yaadly supplies them on to the client as part
+of the job it sold. Yaadly makes nothing on them, by choice.
 
 This is not money of yours being refunded. It is a purchase, on the same footing
-as your labour, and it is why the materials are yours until Yaadly buys them and
-never the client's to begin with.
+as your labour.
 
 You then file the receipt, photographs, and a video of the materials in the
 nominated place. **Until that evidence is filed, the materials are at your
@@ -227,6 +247,36 @@ that job.
 
 Unfixed materials on site stay at your risk until they are built in. You keep
 them secure while they are in your custody.
+
+**Route B, client supplied. Labour only, and it changes what you are answerable
+for.**
+
+On some jobs the client buys and supplies the materials themselves, and Yaadly
+engages you for your labour only. Where your engagement note says Route B:
+
+- **You are not paid for materials, because you did not supply any.** Your price
+  is your labour, and clause 6 applies to that price as normal.
+- **On the day they arrive, you record what was delivered and what condition it
+  was in**, with photographs, before you build anything with it. That record is
+  what protects you, and it is the only thing that will.
+- **You are not answerable for materials you did not buy.** If they are short,
+  late, wrong, or not fit for the work, that is not your fault and not your
+  cost. Tell Yaadly, stop if you have to, and the programme moves. You are not
+  held to dates you could not meet because the materials were not there.
+- **You do not guarantee somebody else's materials.** Your obligation under
+  clause 11 is your workmanship. If the work fails because the blocks were poor
+  and you said so in writing at the time, that is not defective workmanship.
+- If you believe supplied materials are unsafe or not fit for purpose, **you say
+  so before you build with them.** Building anyway, having seen it, puts it back
+  on you.
+
+> **For the founder, on Route B.** As drafted this sits as labour only, and the
+> workmanship obligation is scoped to workmanship rather than to the finished
+> result. That is the honest position: a guarantee over a wall built from blocks
+> Yaadly neither chose nor bought is a promise about somebody else's goods. If
+> Route B is ever to sit inside a managed job with the full guarantee attached,
+> the client terms have to say plainly what the guarantee stops covering, and
+> that is a client-side copy and insurance decision, not a subcontract one.
 
 ### 9. The evidence you file
 
@@ -308,11 +358,12 @@ is how that is decided, not whether.
 8. A named person decides, in writing, with the reason given. You may challenge
    it under clause 19, and the challenge is heard by a person.
 
-**Materials you supplied and filed receipts for are bought from you at cost
-either way.** They are a separate supply from your labour, they are already in
-the client's building, and what a review decides about your workmanship does not
-unbuy them. Your labour price is what the review bites on, because your labour
-price is what the work was.
+**On Route A, materials you supplied and filed receipts for are bought from you
+at cost either way.** They are a separate supply from your labour, they are
+already in the client's building, and what a review decides about your
+workmanship does not unbuy them. Your labour price is what the review bites on,
+because your labour price is what the work was. On Route B the question does not
+arise, because you supplied no materials.
 
 > **Settled 5 September 2026, twice, and deliberately without a figure.** The
 > shortfall is the day rate for the trade, carried on the engagement note per
@@ -552,7 +603,9 @@ current version.
 | **What Yaadly pays you** | Your price less 12%, or less 10% on remote digital work. Stated as a number, not a percentage |
 | **The day rate for your trade** | Per clause 11. What you are paid per day worked if the job is reviewed as not finished to scope and you do not go back. Stated as a number, before you start, never after |
 | **The attendance fee** | £25 in Jamaican dollars, per clause 10, if the site is not as described |
-| Materials | Expected list. You supply them, Yaadly buys them from you at the receipted price, no fee either way |
+| **Materials route** | **A, Yaadly supplied, or B, client supplied. Per clause 8. Stated before you start, and never changed mid-job without a new version** |
+| Materials list and stage value (Route A) | What is expected, and what Yaadly releases to you to buy it. You supply, Yaadly buys from you at the receipted price, no fee either way |
+| Materials being supplied to you (Route B) | What the client is providing, and when. You record what arrives and its condition before building with it |
 | Nominated materials store | Per clause 8, set before anything is bought |
 | Stages | What each covers and what it pays |
 | Evidence required per stage | Per clause 9 |
