@@ -125,8 +125,15 @@ jobs:
       # naming convention, so widening the path runs the tests and never an
       # index.ts. Do not narrow this back to one directory: a test nobody runs
       # is documentation, not a control.
+      #
+      # --allow-env added 5 Sep 2026 for _shared/twilio-status.ts, whose entire
+      # behaviour is "do nothing unless TWILIO_STATUS_CALLBACK_URL is set", so
+      # the test that matters is the one proving the unset case changes no
+      # send. That test cannot be written without setting and clearing the
+      # variable. Caught before pushing by running the suite with CI's exact
+      # flags rather than the looser local ones.
       - name: Run the Deno guardrail and Edge Function tests
-        run: deno test --allow-read supabase/functions/
+        run: deno test --allow-read --allow-env supabase/functions/
 
       # The provider decision lives in _shared/textmodel.ts and nowhere else.
       # A hard-coded model endpoint in a function is how the estate ended up on

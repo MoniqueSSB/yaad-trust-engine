@@ -674,6 +674,57 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## The 5 September 2026 deploy, and what is still not wired
+
+Three functions went to production on 5 September: `yaad-message-status`
+(`--no-verify-jwt`), `yaad-phone-check` and `yaad-vision` (both without the
+flag, platform auth on). `scripts/check-deploy-drift.sh` then reported no drift
+in either direction.
+
+**Verified by probe, not by reading the deploy output**, because a successful
+upload says nothing about whether the flag landed:
+
+```bash
+B=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-message-status" \
+  -H "Content-Type: application/x-www-form-urlencoded" --data "MessageSid=SMtest&MessageStatus=failed"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-phone-check" \
+  -H "Content-Type: application/json" --data '{"phone":"+18765551234"}'
+```
+
+Correct answers are **403** ("Signature check failed.") and **401** ("Missing
+authorization header"). A 200 from the first means the signature check is not
+running and anybody can write delivery statuses; a 200 from the second means
+the flag was passed by mistake and Lookup, which costs money per call, is open.
+
+**Delivery reporting was then wired across every send, not just one.**
+`TWILIO_STATUS_CALLBACK_URL` is set to the function's own URL, and seven
+functions send over Twilio: `yaad-desk-reply`, `yaad-notify-client`,
+`yaad-portal-code`, `yaad-inbound`, `yaad-job-health`, `yaad-daily-checkin`,
+`yaad-enquiry`. Only the first attached a status callback, so setting the
+secret alone would have left six paths silent while the Overview reported zero
+failures. `_shared/twilio-status.ts` now does it in one place and all seven
+call it.
+
+It is inert with the variable unset, which is what made it safe to put in front
+of the portal sign-in code and a client's own notifications in one change.
+
+```sql
+select status, count(*) from public.message_deliveries group by status;
+```
+
+**If that stays empty after a real send**, check the secret is set, then check
+the function is reachable (`curl` the URL, expect 403 not 404), then read
+Twilio's own error log: Twilio silently drops a callback to a URL it cannot
+reach, and nothing on this side would know.
+
+**Still unset: `TWILIO_CONTENT_SID_DESK_REPLY`**, unrelated to this deploy. It
+needs a Utility template created in Twilio and approved by Meta, which is
+account work rather than a repository change. `TWILIO_CONTENT_SID_APPROVE` was
+set on 4 September.
+
+---
+
 ## Passing or blocking an applicant, and why the buttons changed
 
 **Deciding whether somebody can earn on this platform is a §2 decision, and
@@ -783,7 +834,7 @@ content was clean, not a person sitting down to a decision. The exclusion is a
 join the count. Tests 4 and 5 in the rig are the guard.
 
 **A pack a person actually cleared does count**, and getting that wrong is the
-correction in `20260905a`. `approve_quote_pack_draft()` is admin only, refuses
+correction in `20260905c`. `approve_quote_pack_draft()` is admin only, refuses
 outright on any guardrail flag rather than offering an override, and attributes
 the approval to the signed-in admin so the row can prove a named human
 confirmed it. That is a desk decision by any definition, and excluding the

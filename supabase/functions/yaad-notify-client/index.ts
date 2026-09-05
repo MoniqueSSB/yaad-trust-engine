@@ -50,6 +50,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -119,7 +120,7 @@ async function sendTwilio(
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: params,
+        body: withStatusCallback(params),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });

@@ -6,6 +6,15 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Delivery reporting is one shared line, not six copies of two lines
+
+**Setting the secret would have been the wrong-sized fix.** `yaad-message-status` was built to catch the case where Twilio returns 201 and no phone ever receives anything, and it only ever hears about a message whose send asked it to. Seven functions in this repository send over Twilio, each with its own inline call, and exactly one attached a status callback. So switching the secret on would have lit up the desk's "Messages that failed" tile with a number that read "none failed" and meant "one of seven paths is being watched", which is worse than the tile not existing.
+
+**`_shared/twilio-status.ts` is deliberately trivial**, one function that adds a parameter when the variable is set. The value is not the logic, it is that six copies of two lines is precisely how the seventh copy gets forgotten, and this repository already has the shared-copy drift check in CI to keep one definition honest across bundles. It is inert with the variable unset, which is what made it safe to put in front of the portal sign-in code and a client's own job notifications in a single change.
+
+**CI's Deno job gained `--allow-env`, and finding that was the point of running the suite with CI's exact flags.** The module's whole behaviour is "do nothing unless configured", so the test that matters is the one proving the unset case changes no send, and that test cannot be written without setting and clearing the variable. Locally the looser flags passed; under CI's flags all three failed. Caught before pushing rather than as a red build.
+
+**Six functions were redeployed and four of them run without platform auth.** Each was deployed with its own live `verify_jwt` read back first, which is the trap §12 exists for: a blanket redeploy would have silently added a token check to `yaad-inbound`, `yaad-enquiry`, `yaad-portal-code` and `yaad-notify-client` and broken Twilio intake, the contact form and the portal sign-in at once. Verified afterwards that all four still answer with their own refusal rather than a platform 401, and that the list of eleven is unchanged.
 ## 2026-09-05 · The card path existed and nobody could find it
 
 **Founder's report: "I cannot book each service directly with Stripe, I should be able to."** She was right, and the reason is worth keeping, because the code was not broken. All eight Stripe payment links existed, were live, and were correctly wired. The page simply never offered them. The link appeared only after the booking form was submitted, as a few words of ordinary text inside a longer sentence, and the grey box directly beneath the form still said "Card payment is not switched on yet, so for now everything is invoiced." A client following the page as written would never have looked for a card. **A feature that is built, deployed and invisible is not shipped**, and the thing that made it invisible was stale copy sitting next to it contradicting it.
