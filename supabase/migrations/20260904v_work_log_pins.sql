@@ -29,6 +29,41 @@
 -- and never delays a payment. The evidence checks report a missing pin the way
 -- they report anything else: as a line for a person to read.
 
+
+-- ── This file existed twice, and the copy was the one on main ──
+--
+-- Merged 5 September 2026. A parallel session found work_log_pins live in
+-- production and absent from every branch, read it back out of
+-- supabase_migrations.schema_migrations and committed the transcription as
+-- 20260904k_work_log_pins_recovered_from_production.sql. Correct instinct: the
+-- repository being the only place a live table is missing from is real drift.
+-- It was recovering this file, which was sitting unmerged on another branch.
+--
+-- The two are the same SQL. The transcription lost every inline comment, which
+-- is what a read-back out of the catalogue always loses, so this authored copy
+-- is the one that survives and that file is deleted. Keeping both would not
+-- have been merely untidy: create policy has no "if not exists" in Postgres,
+-- so the second of them fails on any rebuild.
+--
+-- Its history is worth keeping, so here it is. Two versions of yaad-inbound
+-- existed from the same session at different moments. One filed a WhatsApp
+-- location share here as a work log pin. The other, which reached main, filed
+-- the same share as an ARRIVAL CHECK-IN into arrival_log and refused a second
+-- check-in the same day. Production was running the first; it was replaced
+-- with main's on 4 September once the numbers settled it, work_log_pins at
+-- zero rows and arrival_log at three.
+--
+-- The merge kept both behaviours rather than choosing. A location share is an
+-- arrival check-in the FIRST time it lands on a stage on a given day, and a
+-- work log pin every time after that: "I am here", then "here is where I was
+-- when I filed this". arrival_log keeps the evidence spine named in CLAUDE.md
+-- section 8, this table keeps the rest, and neither is a second door onto the
+-- other. log_arrival_via_whatsapp already reported already_logged_today, so
+-- nothing new had to be trusted to tell the two apart.
+--
+-- One warning from the recovered copy is still live: record_work_log_pin()
+-- depends on parish_centroid() and km_between(), which are themselves live and
+-- may not be in this repository. Check before a rebuild.
 create table if not exists public.work_log_pins (
   id           uuid primary key default gen_random_uuid(),
   job_id       text not null references public.jobs(id) on delete cascade,

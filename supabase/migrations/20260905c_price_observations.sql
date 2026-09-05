@@ -2,7 +2,7 @@
 --
 -- ── Why this is not quote_reviews ──
 --
--- 20260904c_quote_reviews holds JUDGEMENTS: Monique looked at a figure, read
+-- 20260904x_quote_reviews holds JUDGEMENTS: Monique looked at a figure, read
 -- the band, and formed a view. Those are valuable and there will never be many
 -- of them, because they cost her attention.
 --

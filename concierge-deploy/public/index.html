@@ -1367,6 +1367,78 @@ const VIEWS = [
         says:() => "Removes it from the public board straight away. The photograph stays on the job for you, the client and the booked worker. Anybody already holding a signed link keeps it until it expires, which is within the hour." },
     ]},
 
+  // FIRST IN THE INBOX ON PURPOSE. Everything else in this group is a record
+  // you can browse. This is the only one that is a queue: it answers "who is
+  // owed a reply right now", which the desk knew and would not show.
+  { k:"owed", g:"Inbox", label:"Waiting on you", icon:"clock",
+    title:"Waiting on you", table:"v_waiting_on_you",
+    sub:"Everybody who has written in and not yet had a person answer, conversations and contact form enquiries in one list, oldest first. This is the promise on every page of the site: a person replies within one working day. A red row has already missed it. Reply to a WhatsApp, SMS or website chat row straight from here, exactly as you would under Conversations. An enquiry has no reply lane yet, so answer it on WhatsApp or by email and then mark it, which is what takes it off this list. Heard from us saying nothing at all means the automatic receipt never reached them either, usually because they left a phone number and not an email: answer that one first, they have had silence.",
+    select:"*",
+    order:"hours_waiting", asc:false,
+    search:["who","ref","transcript","channel"],
+    empty:["Nobody is waiting","Everyone who has written in has had an answer from a person."],
+    cols:[
+      {h:"Waiting", f:r => (r.breached ? chip_("crit", Math.round(r.hours_waiting/24*10)/10 + " days") : chip_("warn", Math.round(r.hours_waiting) + " hr"))},
+      {h:"Who", f:r => esc(r.who || "unknown") + sub_(r.contact || r.channel || "")},
+      {h:"Where it came from", f:r => r.kind === "enquiry"
+        ? chip_("mute","contact form") + sub_("yaadly.co.uk/contact, emailed to you")
+        : r.channel === "web" ? chip_("ok","website chat") + sub_("the widget on yaadly.co.uk")
+        : r.channel === "whatsapp" ? chip_("ok","WhatsApp") + sub_("the Yaadly number, via Twilio")
+        : r.channel === "sms" ? chip_("ok","SMS") + sub_("the Yaadly number")
+        : r.channel === "email" ? chip_("ok","email") + sub_("in.yaadly.co.uk")
+        : chip_("ok", r.channel || "chat")},
+      {h:"Reference", f:r => r.kind === "thread" ? id_(r.ref) : mute_("no job yet")},
+      {h:"Heard from us", f:r => r.kind === "enquiry"
+        ? (r.receipt === "no_email" || r.receipt === "no_contact" ? chip_("crit","nothing at all")
+          : r.receipt === "failed" ? chip_("crit","receipt failed")
+          : r.receipt === "wa_invited" ? chip_("warn","offered WhatsApp") + sub_("nothing sent, they must tap first")
+          : r.receipt === "wa_receipt" ? chip_("ok","WhatsApp receipt")
+          : r.receipt === "throttled" ? chip_("warn","throttled")
+          : r.receipt === "sent" ? chip_("ok","emailed")
+          : r.receipt ? chip_("ok", r.receipt) : mute_("not recorded"))
+        : chip_("ok","assistant answered")},
+      {h:"With you", f:r => r.handed_over ? chip_("warn","handed over") : mute_("no")},
+      {h:"What they said", f:r => said_(r.transcript)},
+    ],
+    actions:[
+      { label:"Reply from the Yaadly number",
+        when:r => r.kind === "thread" && (r.channel === "whatsapp" || r.channel === "sms"),
+        says:() => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending marks the thread as with you and stamps the reply clock, which is what takes this row off the list. WhatsApp only carries a typed reply within 24 hours of their last message; outside that your words are saved and go out the moment they write back.",
+        ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
+        call: deskReply },
+      { label:"Reply in their website chat",
+        when:r => r.kind === "thread" && r.channel === "web",
+        says:() => "Puts your words into the chat window on yaadly.co.uk, where they appear as you within a few seconds if the visitor still has the page open. If they have left they cannot see it, and the widget gave them a WhatsApp button with this reference, so expect them there. Either way this stamps the reply clock and clears the row.",
+        ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
+        call: deskReply },
+      // Not a send. It opens the right app with the first line written, which
+      // is the whole distance between "somebody is waiting" and "answered".
+      // An automatic send to a phone needs a Meta approved template or a paid
+      // SMS number, and both are decisions with a cost, so neither is
+      // pretended at here. See RUNBOOK.md.
+      { label:"Open WhatsApp to them", cls:"",
+        when:r => r.kind === "enquiry" && !!r.contact && !/@/.test(r.contact) && r.contact.replace(/\D/g,"").length >= 7,
+        says:r => `Opens WhatsApp on this machine with ${esc(r.contact)} and a first line ready. It sends nothing on its own and it does not go from the Yaadly number, it goes from you. When you have actually sent it, press I have answered this.`,
+        call: async (row) => {
+          const digits = String(row.contact || "").replace(/\D/g, "");
+          const text = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"}, this is Monique from Yaadly. Thank you for your enquiry, I am picking it up now.`);
+          window.open(`https://wa.me/${digits}?text=${text}`, "_blank", "noopener");
+        } },
+      { label:"Open an email to them", cls:"",
+        when:r => r.kind === "enquiry" && !!r.contact && /@/.test(r.contact),
+        says:r => `Opens your mail app to ${esc(r.contact)}. The enquiry also arrived in your inbox with reply-to set to them, so answering there works just as well. Press I have answered this once you have.`,
+        call: async (row) => {
+          const subj = encodeURIComponent("Your enquiry to Yaadly");
+          const body = encodeURIComponent(`Hello ${String(row.who || "").split(" ")[0] || "there"},\n\nThank you for your enquiry, I am picking it up now.\n\nMonique\nYaadly\n`);
+          window.open(`mailto:${encodeURIComponent(String(row.contact))}?subject=${subj}&body=${body}`, "_blank", "noopener");
+        } },
+      { label:"I have answered this", cls:"g",
+        when:r => r.kind === "enquiry",
+        rpc:"mark_enquiry_replied",
+        args:(r) => ({ p_enquiry:r.ref }),
+        says:r => `Takes ${esc(r.who || "this enquiry")} off the list and stamps the reply clock. It sends nothing: an enquiry is answered on WhatsApp or by email, and this records that you did it. Only press it once you actually have.` },
+    ]},
+
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
     sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back. Newest message is the last thing said, so you can triage without opening rows. Your notes are yours: the client never sees them and the assistant never reads them. To correct what the job itself says before workers see it, open the job under Jobs and use Correct what this job says.",
@@ -3710,18 +3782,20 @@ async function loadOverview(){
     tile(slaPct === null ? "" : slaPct >= 90 ? "ok" : slaPct >= 70 ? "warn" : "crit",
       "Replied within a working day", slaPct === null ? "n/a" : slaPct + "%",
       answered.length ? `${slaMet} of ${answered.length} conversations` : "Nobody has needed a person yet"),
-    tile(oldestWait >= 24 ? "crit" : oldestWait ? "warn" : "ok",
-      "Longest anyone is waiting", oldestWait ? Math.round(oldestWait) + " hr" : "0",
-      waitingNow.length ? `${waitingNow.length} waiting on a person` : "Nobody is waiting"),
+    // Counts the whole queue, conversations and contact form together. An
+    // enquiry waiting six days is not a smaller broken promise than a chat.
+    tile(owedOldest >= 24 ? "crit" : owedOldest ? "warn" : "ok",
+      "Longest anyone is waiting", owedOldest ? (owedOldest >= 48 ? Math.round(owedOldest / 24) + " days" : Math.round(owedOldest) + " hr") : "0",
+      CLOCK.length ? `${CLOCK.length} waiting on a person` : "Nobody is waiting"),
   ].join("");
 
   const needs = [];
   if (oldestWait >= 24) needs.push(alertRow("crit","!",
     "Somebody has been waiting " + Math.round(oldestWait) + " hours for a person",
-    "The site promises a person replies within one working day. This one is past that, and it is the most concrete promise Yaadly makes anywhere.", "Open conversations", "threads"));
+    "The site promises a person replies within one working day. This one is past that, and it is the most concrete promise Yaadly makes anywhere.", "Answer them", "owed"));
   else if (waitingNow.length) needs.push(alertRow("warn","?",
     waitingNow.length + (waitingNow.length === 1 ? " conversation is waiting on you" : " conversations are waiting on you"),
-    "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Open conversations", "threads"));
+    "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Answer them", "owed"));
   if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
     "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
   if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
@@ -3731,12 +3805,13 @@ async function loadOverview(){
   // The contact form, aged. sla_first_reply measures conversations and stops
   // there, and the business page sends companies to this form, so an enquiry
   // sitting for a week is the most expensive silence on the desk.
+  const owedOldest = CLOCK.reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
   const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
   const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
     .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
   if (enqBreached) needs.push(alertRow("crit","!",
     enqBreached + (enqBreached === 1 ? " enquiry is" : " enquiries are") + " past one working day",
-    "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Read them", "enq"));
+    "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Answer them", "owed"));
   else if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
     "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
   if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),

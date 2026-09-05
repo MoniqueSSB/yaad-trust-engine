@@ -6,6 +6,58 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The same table was written twice, and two migrations creating it would have failed the rebuild
+
+**The merge, not the branch, was where this appeared.** The agent audit branch created `work_log_pins`. A parallel session, on the same day, found that table live in production and absent from every branch, read it back out of `supabase_migrations.schema_migrations` and committed the transcription as a recovery migration. Both instincts were right and neither session could see the other. Git merged them cleanly, because they are different files, and a clean merge is exactly what makes this class of thing dangerous.
+
+**Two of them is not untidy, it is broken.** `create table if not exists` and `create or replace function` are both forgiving. `create policy` is not: Postgres has no `if not exists` for it, so the second file to run raises `policy "work_log_pins_party_read" already exists` and the rebuild stops. Nothing in CI would have said so, because CI never replays the migrations. The failure waits for the one occasion the chain is ever replayed end to end, which is a restore, which is the worst possible moment to discover it.
+
+**The authored copy survives and the transcription is deleted.** The SQL is identical. The difference is that a read-back out of the catalogue keeps the statements and loses the comments, so the recovered file had none of the reasoning: why a pin never gates a stage, why the address text is kept but never trusted, why `record_work_log_pin` is SECURITY DEFINER and callable by nobody from a browser. That reasoning is the reason the file is in a repository at all rather than only in the database. The recovery file's own history, the two divergent versions of `yaad-inbound` and how the numbers settled which was running, is folded into the header of the surviving file rather than lost with it.
+
+**The behaviour question underneath it was settled by keeping both halves.** One version filed a WhatsApp location share as a work log pin, the other as an arrival check-in, and the parallel session read the row counts and concluded the pins table was dead. It was not dead, it was unmerged. A location share is now an arrival check-in the first time it lands on a stage on a given day and a work log pin every time after: "I am here", then "here is where I was when I filed this". `arrival_log` keeps the evidence spine, `work_log_pins` keeps the rest, and `log_arrival_via_whatsapp` already returned `already_logged_today`, so nothing new had to be trusted to tell them apart.
+
+**Four migrations were re-lettered in the same pass**, for the fourth time in two days. Prefix letters are allocated by whoever writes the file first and neither session sees the other's until the merge. It costs a rename each time and it is not a real fix; the real fix is a prefix that cannot collide, which is a separate change and not one to make inside a merge.
+
+---
+
+## 2026-09-05 · A vetting decision now has to say who made it
+
+**The gap was flagged the day before and fixing it was the founder's call, because it changes what the desk writes rather than only what it reads.** Passing or blocking an application decides whether somebody can earn on this platform, which is squarely the "named human confirms every consequential step" of §2. A named human was confirming it. Nothing recorded that. The desk wrote `applications.status` through the generic action mechanism and no name went with it, so the rule was true in practice and unprovable afterwards, which is the state §2 exists to prevent.
+
+**RPC plus trigger, both, and the trigger is the point.** `decide_application()` is admin only and takes the actor from `auth.jwt()` rather than from a caller-supplied argument, so nobody can decide as somebody else; that is the `approve_quote_pack_draft()` shape. `trg_application_decision_attributed` then refuses any status change into a decided state that arrives without a name, which is the `kickoff_approval_attributed` shape. The RPC alone would be a convention that the next surface forgets. The trigger makes it hold for psql and for a script too. It also deliberately guards `approved` and `declined`, the legacy spellings still sitting in the data, because a guard listing only the three current words is walked round by using an old one.
+
+**The eleven historical rows are left NULL and that was the decision, not an oversight.** Nobody knows who decided them. Backfilling a plausible name puts a false attribution into the exact column that exists to be trustworthy, and backfilling `system` claims a machine ruled on a person. NULL reads as not recorded, which is true. The rig asserts they are still NULL, so a later tidy-up has to argue with a test.
+
+**One incidental fix, because these were the first actions to need both.** An action with a form skipped the confirm dialog, so its `says` text was dropped. No action had ever defined both, so nothing was being lost until now, and "this is a safety finding, not a tidy-up" is exactly the sentence that should be in front of somebody as they block a person. It is rendered above the fields.
+
+**Capacity stops undercounting**, which is how this gap was found: `desk_decisions` gains a vetting arm with no `job_id`, because a vetting decision is about a person rather than a job. Sending a gap back counts, since it is still the person's judgement and still their evening.
+
+---
+
+## 2026-09-05 · The admin desk gets linted, with one rule rather than a style pass
+
+**Nothing in CI had ever read the desk.** `concierge/concierge.html` is one file with one very large inline script and twenty-plus views, and it is where the founder does the work. Two crashes have now shipped from it: the 17-18 August temporal dead zone that broke admin sign-in on a direct link, which the CI file's own header cites as the reason CI exists, and one found on 5 September where `owedOldest`, `enqBreached` and `enqOldest` were const-declared below the tile that read them. `loadOverview()` threw `ReferenceError` and rendered 13 tiles instead of 29, taking the whole assistant scoreboard and the entire alert list with it. Verified by serving the file on its own port and driving it with a stubbed client, after a first attempt tested the wrong file because a stale server was answering on the port I assumed was free.
+
+**The rule is custom, and the stock one was rejected on purpose.** ESLint's `no-use-before-define` reports 17 findings here and all 17 are safe: `tile`, `sb`, `ROWS`, `currentView` are read inside functions that run long after initialisation. Shipping a job that fails on 17 correct lines means it gets disabled inside a week, which is the exact argument the secrets scanner's comment already makes about placeholders. So the rule compares scopes and fires only when a read sits in the same scope as its `let` or `const` and before the declaration. That is not a style opinion; it throws every time the line runs. Proved both directions before wiring it in: red on `origin/main` naming lines 3272 and 3273, green on this branch.
+
+**Deliberately narrow, and it should stay narrow.** The desk is written across many sessions and a full lint would be noise. If a second rule is ever added it should have to clear the same bar: does a violation break the page, or is it a preference.
+
+---
+
+## 2026-09-05 · The quote pack is the gate, and I described it as an afterthought
+
+**Correcting myself, because the error was load bearing.** `20260904u` excluded `quote_pack_drafts` and `kickoff_packs` from the capacity count and justified it by calling them "documents issued automatically after a human accepted a quote, not decisions anybody sat down and made". The quote pack does not follow a quote, it becomes one. The table's own comment says it: one AI-drafted overview per job, scope and timeline and payment stages, no prices, which a worker edits and prices on `job_quotes`, and that edited copy is the quote the client sees. RLS only lets a worker read a draft at `approved`. In the founder's words, it is the only thing that needs to approve a job, and it is what is generated on each quote for the client. The kickoff pack comes after and is gated on payment, one per quote, confirmed by both sides with a shared code.
+
+**My first correction was still half wrong, which is worth recording rather than tidying away.** I replaced "issued after a human accepted a quote" with "what a worker quotes against", which fixed the direction and still described it as an internal artefact. It is the client's quote in draft. That matters for how the held-pack alert is worded: a held pack does not slow a job, it means no quote reaches that client at all.
+
+**Excluding the auto-issued rows was right. Excluding the tables was not.** The `system:%` filter was doing the real work and still is: 314 auto-issued rows stay out, because a guardrail-clean pack issuing itself is the system deciding the content was clean, not a person deciding anything. But the same tables carry the human path, and `approve_quote_pack_draft()` is admin only, refuses outright on any guardrail flag rather than offering an override, and attributes the approval to the signed-in admin specifically so the row can prove a named human confirmed it. That is a desk decision by any definition and it was being thrown away. It changes no number today, because nobody has ever cleared one. It stops the first from going uncounted.
+
+**The correction surfaced a live problem, which is the part worth keeping.** Chasing the sequence turned up one draft held at `ready` for 78 hours: `JOB-WEB-1788281626906`, flagged for the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board, and no worker could see anything to quote, because the pack they read was held. Nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. `packs_awaiting_a_person` and a red tile now say it out loud.
+
+**The general shape of the mistake, worth naming.** I reasoned about what a table was for from its column names and its row counts rather than from the migration that created it, and wrote the conclusion into a comment as though it were established. The row counts were right and the story around them was invented. Reading `20260901r` first would have cost two minutes.
+
+---
+
 ## 2026-09-04 · The Pricing agent is reachable, and the log matters more than the panel
 
 **The gap.** `yaad/agents/pricing.py` has existed since the engine was written and ran nowhere but `run_demo.py` and the tests. Its `review_quote()` is the Deposit Protection Check in miniature, and the Deposit Protection Check is £149 on the published price list. The audit's roadmap item 9 was to make it reachable.
@@ -137,6 +189,41 @@ All three routes are gone: the silent NVIDIA fallback, the explicit `PROVIDER=nv
 **The privacy page is what decided the NVIDIA question.** It names NVIDIA for image analysis, in the United States, and that is true and disclosed: `yaad-sketch` and `yaad-notify-client` genuinely send photographs there, which is why `NVIDIA_API_KEY` stays set. Drafting a client's Kickoff Pack there is a different use of the same vendor and the page does not disclose it. Aligning the code to the page was the cheaper direction than widening the page to the code, and it costs nothing: Mistral drafts the packs.
 
 **What was given up.** The v12 model shootout of 24 August 2026, which let the desk draft one brief through several OpenRouter models and read the packs side by side. It was a good idea. It is recoverable from git, and if it returns it belongs on synthetic briefs rather than on a real client's intake, which is what a Kickoff Pack is drafted from.
+---
+
+## 2026-09-04 · Capacity counts only decisions a person made, and a worker vetting decision is not recorded at all
+
+**The capacity metric was one query away from being nonsense in the direction that flatters.** `kickoff_packs` and `quote_pack_drafts` both carry an `approved_by`, which reads as a human approval and is not one: every row of both reads `system: auto-issued, guardrail-clean`, 314 of them against 11 real decisions. A capacity view over "things with an approver" would have reported a desk getting through three hundred items and nobody would have had a reason to doubt it. `desk_decisions` therefore excludes anything whose approver matches `system:%`, as a pattern rather than a table list, so a future auto-issuer cannot quietly join the count.
+
+**A working session rolls over at 05:00 Jamaica time.** The person doing this work is a night owl. Grouping on the plain local date splits a real evening at midnight, reports two thin sessions where there was one, and halves the capacity figure while looking entirely reasonable. The rig pins the boundary at 23:10, 00:40, 04:50 and 05:10.
+
+**Built before the pilot on purpose.** December is the run that produces the first real capacity data, and a view added in January measures none of it. This is the same mistake the stall history had to be gone back and fixed for on the same day, which is why it was not repeated here.
+
+**The open gap, and it is a governance one rather than a metrics one.** Passing or failing a worker's application is a consequential decision under section 2, and nothing in the schema records who made it or when. `applications.status` moves and leaves no attributed row; `vetting_reviews` holds the AI's read, not the person's ruling. So the rule "a named human confirms every consequential step" is true in practice for vetting and cannot be evidenced after the fact. Capacity undercounts by however long vetting takes, which is the smaller half of the problem. Left as a flagged gap rather than fixed in passing, because adding attribution means changing what the desk writes when an application is decided, and that is worth doing deliberately.
+
+---
+
+## 2026-09-04 · Evidence completeness is measured from the snapshot, not from the evidence table
+
+**The obvious implementation is wrong in a way that flatters the business.** Counting rows in `evidence` per approved job gives a completeness figure that goes up when a worker files a photograph the day after sign-off. The measure is supposed to say what the named human had in front of them at the moment they decided, and that version says something closer to what eventually turned up. `stage_approvals.evidence` already holds the right thing: a snapshot written at approval time, each item carrying the sha256 of the exact bytes. Reading the snapshot makes the number structurally incapable of improving retrospectively, which is the property that matters, and a rig proves it by filing evidence and an arrival after an approval and confirming neither moves the row.
+
+**Three separate numbers rather than one completeness score.** The three gaps have unrelated causes: a sign-off with no evidence is a desk habit, a sign-off with an unfingerprinted item is plumbing, and a sign-off with no Arrival Log is a thing workers could not do from a phone until the location pin lane shipped the same day. A single composite would have read near zero on live data and implied workers were cutting corners, when the arrival leg had no usable route until now. Separate numbers say which one is actually open, and the arrival number is now the measure of whether the pin lane worked.
+
+**Before-and-after is not measured, and that is a refusal rather than an omission.** Nothing in the schema records which a photograph is. The labels say it in free text often enough that inferring it would work most of the time, and a check that works most of the time on evidence is worse than no check, because it reads as covered. Measuring it needs a field that says so, which is a product decision and hers.
+
+---
+
+## 2026-09-04 · A stall that resolves is written down before it is deleted
+
+**The system review asked for stall rate and time to unstall. Only the first was computable, and finding out why took reading the delete rather than the table.** `job_stall_state` holds one row per job that has gone quiet long enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes that row the moment the job moves again. So the table answers "what is stuck right now" perfectly and answers "how long do things stay stuck" not at all, because the evidence a stall ever happened leaves with the row. `worker_stall_history` sounds like the missing piece and is not: it is a view over the same live table, so it empties at the same instant.
+
+**The delete stays.** The comment on the table says the clock should genuinely reset rather than leave a stale flag lingering, and that is correct: a stall flag that outlives the stall is how a job gets chased twice and a worker gets a reputation from a row nobody cleared. The fix is one row written on the way out, not a change to the behaviour. `clear_resolved_job_stalls()` now inserts into `job_stall_resolved` and then deletes exactly as it did; nudging, escalating and clearing are untouched, and `yaad-job-health` needed no change at all because it already went through the RPC rather than deleting directly.
+
+**The clock is named for what it actually measures, and that was the real decision.** `hours_stalled` runs from when Yaadly *noticed* (`nudged_at`) to when the job moved again, not from when the job went quiet. The tempting version computes the earlier moment from `job_silence_hours()` at delete time and produces a bigger, more impressive-sounding number that nobody can point at a row for. The moment a job went quiet is not recorded anywhere in this system, so that number would be a reconstruction presented as a measurement. Time from noticing to moving is smaller, honest, and the half Yaadly can actually do something about.
+
+**It is not retrospective and the desk says so.** History starts the day the migration ran, so "Time to get moving again" reads n/a until stalls resolve after it, and the tile is uncoloured in that state rather than green. Same reasoning as draft acceptance below: a metric with no data underneath it should look empty, not look healthy.
+---
+
 ## 2026-09-04 · Tap-to-approve was built twice on the same day, and the simpler one won
 
 **Two sessions built the same feature, separately, hours apart.** Both reached "a Quick Reply button so a client does not have to type a thirteen digit job code on a phone to move money." They disagreed on one thing, and that one thing decided it.

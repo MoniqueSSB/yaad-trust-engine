@@ -105,11 +105,25 @@ const WA_JOIN =
    moved. That rule is CLAUDE.md §6 and it is not a formality: the whole point
    of a version is that somebody can later ask what a given yes actually said.
 
+   v4, 4 Sep 2026. ADDS NOTHING AND ASKS FOR NOTHING NEW. The only change is a
+   link, in the trailing note, to yaadly.co.uk/how-we-use-ai, a public page
+   published the same day that explains what the assistants do and what they
+   can never do. Not one word of either option changed, so v4 is identical in
+   substance to v3 and every v3 consent already covers everything done under
+   v4.
+
+   The version moves anyway, and that is the point of the rule rather than an
+   exception to it. CLAUDE.md §6 says the wording and the version move
+   together. If a link can be slipped in without a bump because it is "only a
+   link", then so can a clause, and the next person deciding what counts as
+   only a link is doing it without a rule. The cost of bumping for a hyperlink
+   is one line here. The cost of the precedent is the whole mechanism.
+
    The list in the copy is the real one. It is what survives IDENTITY_DOCS in
    supabase/functions/yaad-vetting-review/index.ts, which is checked before the
    download so a withheld file is never even fetched out of the bucket. If that
    list changes, this sentence and this version change with it. */
-const AI_CONSENT_VERSION = "ai-review-v3";
+const AI_CONSENT_VERSION = "ai-review-v4";
 
 const PERSONA_TEMPLATE_ID = process.env.NEXT_PUBLIC_PERSONA_TEMPLATE_ID ?? "";
 const PERSONA_ENVIRONMENT_ID = process.env.NEXT_PUBLIC_PERSONA_ENVIRONMENT_ID ?? "";
@@ -2164,7 +2178,11 @@ function AiConsent({
       <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
         Neither is ticked for you. If you send your application without
         choosing, <b className="text-mute">we read that as no</b> and a person
-        reads everything by hand.
+        reads everything by hand.{" "}
+        <a href="https://yaadly.co.uk/how-we-use-ai" target="_blank" rel="noreferrer"
+           className="underline underline-offset-2 hover:text-mute">
+          How we use AI at Yaadly
+        </a>, if you want the whole picture first.
       </p>
     </div>
   );

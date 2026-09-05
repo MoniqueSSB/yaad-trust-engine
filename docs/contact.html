@@ -171,7 +171,28 @@ async function sendEnquiry(){
     if(!res.ok){
       say("bad", (body.error || "That did not send.") + fallback);
     } else {
-      say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly, and a copy has gone to " + esc(e.contact) + " if that looked like an email address. Monique replies within one working day.");
+      /* THE PHONE-ONLY CASE, fixed 4 September 2026.
+         Somebody who leaves a phone number cannot be sent a receipt: WhatsApp
+         refuses free text to a number that has never written to us, and that
+         needs a Meta approved template, and SMS costs money per message on a
+         form open to the internet. So the acknowledgement was nothing at all,
+         and a real person waited a day and a half on an urgent roof having
+         heard from nobody.
+         The way out is not to message them. It is to let THEM open the
+         conversation with one tap: the moment they message the Yaadly number,
+         the 24 hour window opens and a person can answer freely from then on,
+         with no template and no cost. Their name goes in the prefilled text so
+         the message can be matched to this enquiry on the desk. */
+      var looksEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.contact);
+      if (looksEmail) {
+        say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly and a copy has gone to " + esc(e.contact) + ". Monique replies within one working day.");
+      } else {
+        var pre = encodeURIComponent("Hello Yaadly, I just sent an enquiry through the website. My name is " + e.name + ".");
+        say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly and Monique replies within one working day."
+          + "<br><br><b>You left a phone number rather than an email</b>, so there is nowhere to send you a copy."
+          + ' <a href="https://wa.me/447878877567?text=' + pre + '" target="_blank" rel="noopener"><b>Open WhatsApp and say hello</b></a>'
+          + " so we can answer you there. One tap, and your message is already written.");
+      }
       $("ct-name").value = ""; $("ct-contact").value = ""; $("ct-msg").value = "";
     }
   } catch(_){
