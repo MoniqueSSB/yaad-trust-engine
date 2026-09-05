@@ -166,7 +166,7 @@ export default async function JobRoom({
     await Promise.all([
       supabase
         .from("evidence")
-        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage")
+        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage,phase")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase

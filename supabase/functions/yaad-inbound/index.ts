@@ -262,12 +262,31 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// The worker's answer to "is this a before or an after", read from a reply
+// sent in answer to exactly that question and nothing else. Deliberately not
+// applied to captions: a caption saying "the joint before work" is a sentence
+// about a before, not a declaration that this photograph is one, and
+// 20260905c refuses to record a guess as a declaration. Returns undefined for
+// a reply that answers neither way, which the caller treats as "nobody said".
+// One short question, in the words a worker would use. Kept as a constant
+// because it goes out from three places in the evidence lane and they must not
+// drift into three slightly different questions.
+const PHASE_QUESTION =
+  'Is this the BEFORE or the AFTER? Reply B for before, A for after, or N if it is neither.';
+
+function readPhaseAnswer(text: string): "before" | "after" | undefined {
+  const t = text.trim().toLowerCase().replace(/[.!,]+$/, "");
+  if (/^(b|before|bfore|befor|the before|before pic|before photo|before shot)$/.test(t)) return "before";
+  if (/^(a|after|afta|the after|after pic|after photo|after shot|done|finished)$/.test(t)) return "after";
+  return undefined;
+}
+
 // hasCaption is the record of whether a worker actually said what this is,
 // separate from label itself: label always holds something displayable
 // ("Sent on WhatsApp" when nothing was said), but that fallback text is not
 // context, and the dispatch loop needs to tell the two apart to know
 // whether to ask.
-type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean };
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean; phase?: "before" | "after" | null };
 
 // Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
 // a straight download rather than a two-step lookup: fetchMedia() above
@@ -300,6 +319,9 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
   const { error: insErr } = await admin.from("evidence").insert({
     job_id: jobId, label: item.label, img: null, storage_path: finalPath,
     bytes: item.bytes, mime: item.mime, kind: "work", stage,
+    // null when the worker did not answer the before/after question, which is
+    // an honest third answer and never blocks the filing. See 20260905c.
+    phase: item.phase ?? null,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });
   if (insErr) {
@@ -1750,18 +1772,69 @@ Deno.serve(async (req: Request) => {
         // free text that was never meant to answer that question.
         const confirmedJob: { id: string; stage: number } | null =
           answers.confirmed_job ? { id: answers.confirmed_job, stage: answers.confirmed_stage } : null;
+        // Set the moment the before/after question goes out, so the next plain
+        // reply is read as the answer to it rather than as another caption.
+        const awaitingPhase: boolean = !!answers.awaiting_phase;
         const media = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
 
         if (media.length) {
           const items = (await Promise.all(media.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text, deadline)))).filter(Boolean) as PendingEvidence[];
           const next = [...pending, ...items];
+          // A photograph arriving after the before/after question has gone out,
+          // with nothing said about it, still needs the context question it
+          // would have got had it come in with the others. So the batch steps
+          // back rather than sweeping the new one up under an answer that was
+          // never about it. With a caption on it there is nothing to ask and
+          // the batch stays where it was.
+          const stepBack = awaitingPhase && items.some((i) => !i.hasCaption);
           await supabase.from("wa_intake_sessions")
-            .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
+            .update({
+              answers: stepBack
+                ? { ...answers, pending: next, awaiting_phase: false }
+                : { ...answers, pending: next },
+              photo_count: next.length,
+              updated_at: new Date().toISOString(),
+            })
             .eq("wa_id", msg.from);
-          const prompt = confirmedJob ? "What do these show?" : codePrompt(choices);
+          const prompt = stepBack
+            ? "What do these show?"
+            : awaitingPhase ? PHASE_QUESTION : confirmedJob ? "What do these show?" : codePrompt(choices);
           return twiml(items.length
             ? `Got that too, ${next.length} so far. ${prompt}`
             : `That one did not come through. ${prompt}`);
+        }
+
+        // ── the before/after answer ──────────────────────────────────────
+        //
+        // terms.html promises the client a before photograph and an after
+        // photograph on every stage. Until 5 Sep 2026 nothing in the system
+        // recorded which was which, so the promise could not be shown to have
+        // been kept, only asserted. This is where a worker says so, in answer
+        // to a question asked for that purpose and nothing else.
+        //
+        // It never blocks. An answer that is neither word files the evidence
+        // with no phase on it and says as much, rather than asking again and
+        // standing between a worker and their own work log. Whether a stage
+        // may be approved without a before is a separate question, and a
+        // human's, not this webhook's.
+        if (awaitingPhase && confirmedJob) {
+          const phase = readPhaseAnswer(msg.text) ?? null;
+          const stamped = pending.map((item) => ({ ...item, phase }));
+          let filed = 0;
+          for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({
+            "yaadly.evidence_intake.outcome": filed ? "filed_after_phase" : "phase_but_nothing_filed",
+            "yaadly.evidence_intake.phase": phase ?? "none",
+          });
+          if (!filed) return twiml("Nothing saved properly there. Try sending the photo again.");
+          const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
+          let body = phase
+            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as the ${phase}. Keep them coming.`
+            : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell from that whether it was a before or an after, so it is on record as neither. Keep them coming.`;
+          const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
+          if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
+          return twiml(body);
         }
 
         // The job is already confirmed and this reply is standing in for
@@ -1774,16 +1847,14 @@ Deno.serve(async (req: Request) => {
           const described = context
             ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
             : pending;
-          let filed = 0;
-          for (const item of described) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
-          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
-          root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_after_context" : "context_but_nothing_filed" });
-          if (!filed) return twiml("Confirmed, but nothing saved properly. Try sending the photo again.");
-          const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
-          let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. Keep them coming.`;
-          const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
-          if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
-          return twiml(body);
+          // The context is held on the session rather than filed, because the
+          // before/after question still has to go out and the answer belongs
+          // on the same rows. Nothing is written to evidence until it does.
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...answers, pending: described, awaiting_phase: true }, updated_at: new Date().toISOString() })
+            .eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.evidence_intake.outcome": "context_taken_asked_phase" });
+          return twiml(`Got it. ${PHASE_QUESTION}`);
         }
 
         const pick = pickJobChoice(msg.text, choices);
@@ -1801,15 +1872,18 @@ Deno.serve(async (req: Request) => {
           return twiml(`Got it, that's for ${pick.id}. What does this show? A line on what was done helps the client understand it faster.`);
         }
 
-        let filed = 0;
-        for (const item of pending) if (await finalizeEvidenceItem(supabase, pick.id, pick.stage, workerEmail, item)) filed++;
-        await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
-        root.setAttributes({ "yaadly.evidence_intake.outcome": filed ? "filed_after_confirm" : "confirm_but_nothing_filed" });
-        if (!filed) return twiml("Confirmed, but nothing saved properly. Try sending the photo again.");
-        let body = `Filed ${filed} item${filed === 1 ? "" : "s"} against ${pick.id} (${pick.title}), stage ${pick.stage}. Keep them coming.`;
-        const link = await mintPortalUploadLink(supabase, workerEmail, pick.id);
-        if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
-        return twiml(body);
+        // Everything already carries a caption, so no context question is
+        // needed, but the before/after one still is: a worker who captioned
+        // their photograph has said what it shows, not which half of the pair
+        // it is. Same single question, same session, same never-blocking rule.
+        await supabase.from("wa_intake_sessions")
+          .update({
+            answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage, awaiting_phase: true },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("wa_id", msg.from);
+        root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
+        return twiml(`Got it, that's for ${pick.id} (${pick.title}), stage ${pick.stage}. ${PHASE_QUESTION}`);
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {

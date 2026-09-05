@@ -43,7 +43,7 @@ export default async function Completion({ params }: { params: Promise<{ id: str
 
   const { data: evidence } = await supabase
     .from("evidence")
-    .select("label,created_at,sha256,stage,ok")
+    .select("label,created_at,sha256,stage,ok,phase")
     .eq("job_id", id).order("created_at");
 
   const { data: approvals } = await supabase
@@ -88,6 +88,13 @@ export default async function Completion({ params }: { params: Promise<{ id: str
           {ev.map((e, i) => (
             <li key={i} className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[12.5px] text-mute">
               <b className="text-ink">{e.label}</b>
+              {/* The worker's own declaration of which half of the pair this
+                  is, printed on the record the client keeps. Absent on items
+                  filed before 5 Sep 2026 and on anything nobody marked, which
+                  is the honest reading: not marked, rather than not a before. */}
+              {(e.phase === "before" || e.phase === "after") && (
+                <span className="text-ink"> · the {e.phase}</span>
+              )}
               {e.stage != null && <span> · Stage {e.stage}</span>}
               <span> · {String(e.created_at).slice(0, 16).replace("T", " ")}</span>
               {e.sha256 && <span className="mt-1 block break-all font-mono text-[9px] text-dim">sha256 · {e.sha256}</span>}

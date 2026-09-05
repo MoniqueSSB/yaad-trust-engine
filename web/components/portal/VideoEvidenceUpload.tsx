@@ -55,6 +55,7 @@ export function VideoEvidenceUpload({
   const [items, setItems] = useState<QueueItem[]>([]);
   const [label, setLabel] = useState("");
   const [kind, setKind] = useState<"work" | "materials">("work");
+  const [phase, setPhase] = useState<"" | "before" | "after">("");
   const [stage, setStage] = useState(1);
   const [pickError, setPickError] = useState("");
   const processingRef = useRef(false);
@@ -135,6 +136,7 @@ export function VideoEvidenceUpload({
       jobId,
       stage,
       kind,
+      phase: kind === "materials" || phase === "" ? null : phase,
       label: label.trim().slice(0, 140),
       mime,
       bytes: file.size,
@@ -167,7 +169,7 @@ export function VideoEvidenceUpload({
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_120px_auto]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_140px_120px_auto]">
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -184,6 +186,25 @@ export function VideoEvidenceUpload({
           <option value="materials" disabled={!storeType}>
             {storeType ? "Materials on site" : "Materials (no store named)"}
           </option>
+        </select>
+        {/* Declared, never read out of the label. A walk-round at the end of a
+            stage is the ordinary "after"; the video taken before anything was
+            touched is the ordinary "before". Neither is a real answer. */}
+        <select
+          value={kind === "materials" ? "" : phase}
+          disabled={kind === "materials"}
+          onChange={(e) => setPhase(e.target.value as "" | "before" | "after")}
+          className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40"
+        >
+          {kind === "materials" ? (
+            <option value="">Not a before or after</option>
+          ) : (
+            <>
+              <option value="">Neither</option>
+              <option value="before">Before</option>
+              <option value="after">After</option>
+            </>
+          )}
         </select>
         <select
           value={stage}

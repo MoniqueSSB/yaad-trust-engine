@@ -30,6 +30,9 @@ export type EvidenceItem = {
   created_at: string | null;
   sha256: string | null;
   stage: number | null;
+  /** 'before' or 'after' as declared by whoever filed it, or null for neither.
+      Never inferred from the label: see 20260905c. */
+  phase?: string | null;
 };
 
 type StageState = "done" | "now" | "todo";
@@ -206,6 +209,15 @@ export function EvidenceLedger({
                         <div className="p-3">
                           <div className="flex items-start justify-between gap-2">
                             <b className="text-[13px] leading-snug">
+                              {/* The worker's own answer to "is this a before
+                                  or an after", shown ahead of their words so a
+                                  client scanning a stage can find the pair
+                                  without reading every caption. */}
+                              {(e.phase === "before" || e.phase === "after") && (
+                                <span className="mr-1.5 rounded-full bg-tealb/15 px-1.5 py-0.5 align-middle text-[9.5px] font-bold uppercase tracking-wide text-tealb">
+                                  {e.phase}
+                                </span>
+                              )}
                               {e.label ?? "Evidence"}
                             </b>
                             {e.ok != null && (
@@ -256,6 +268,9 @@ export function EvidenceLedger({
                       {mine.map((e) => (
                         <li key={e.id} className="text-[11px] text-dim">
                           <b className="text-mute">{e.label ?? "Evidence"}</b>
+                          {e.phase === "before" || e.phase === "after"
+                            ? " · filed as the " + e.phase
+                            : ""}
                           {e.created_at ? " · " + stamp(e.created_at) : ""}
                           {e.sha256 ? (
                             <span className="mt-0.5 block break-all font-mono text-[9.5px] leading-relaxed">

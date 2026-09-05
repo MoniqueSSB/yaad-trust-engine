@@ -3286,6 +3286,11 @@ async function loadOverview(){
   const withEv = pctOf(ec.with_any_evidence);
   const withFp = pctOf(ec.fully_fingerprinted);
   const withArr = pctOf(ec.with_arrival);
+  // Before and after, added 5 Sep 2026. Reads 0% on everything signed off
+  // before that date, and correctly so: nothing filed then declared which it
+  // was, so the honest answer is that we cannot show the pair, not that there
+  // was not one. See 20260905c.
+  const withBA = pctOf(ec.with_before_and_after);
   const noEv = signoffs - Number(ec.with_any_evidence || 0);
   const noFp = Number(ec.with_any_evidence || 0) - Number(ec.fully_fingerprinted || 0);
 
@@ -3397,6 +3402,14 @@ async function loadOverview(){
     tile(withArr === null ? "" : withArr >= 80 ? "ok" : "warn",
       "Arrival logged first", withArr === null ? "n/a" : withArr + "%",
       signoffs ? `${ec.with_arrival} of ${signoffs} had the worker on site on record` : "Nothing signed off yet"),
+    // Never coloured red. The site promises a before and an after, and until
+    // 5 Sep nothing could record which was which, so a low number here is a
+    // measure that has only just started rather than workers failing at it.
+    tile(withBA === null ? "" : withBA >= 80 ? "ok" : "warn",
+      "Before and after on record", withBA === null ? "n/a" : withBA + "%",
+      signoffs
+        ? `${ec.with_before_and_after} of ${signoffs} had both. ${ec.with_before} marked a before, ${ec.with_after} an after`
+        : "Nothing signed off yet"),
     // Never coloured. This is a capacity reading, not a target: a low evening
     // is a quiet week, not a bad one, and a green tick on it would invite
     // treating throughput as the thing to maximise.

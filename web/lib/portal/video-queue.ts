@@ -21,6 +21,9 @@ export type QueueItem = {
   jobId: string;
   stage: number;
   kind: "work" | "materials";
+  /** 'before' or 'after' as declared on the form, or null for neither.
+      Optional so items queued before 5 Sep 2026 still upload. */
+  phase?: "before" | "after" | null;
   label: string;
   mime: string;
   bytes: number;

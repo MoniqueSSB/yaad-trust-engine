@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · A photograph says whether it is the before or the after
+
+**The website was ahead of the system on the one claim the business rests on.** `terms.html` has promised, since it was written, that every stage is documented with "arrival on site, before photographs, materials receipts, after photographs, and a walk-round video at the end", and `faq.html` promises the Completion Report shows the before and after. Four of those five were recorded. Before and after were not. `20260904t` said so in its own comment and deliberately left it: "nothing in the schema records that... reading it out of the labels would be a guess dressed as a check... that is a product decision, not a view." Founder instruction, 5 September, was that the system is the half that moves.
+
+**Declared, never inferred, and that is the whole design.** `evidence.phase` is set because a person answered a direct question: a select on the portal upload form, a one-word reply to "Is this the BEFORE or the AFTER?" on WhatsApp. Nothing reads it out of the label. The same reasoning `evidence.kind` used in `20260828c`: a rule that turns on somebody typing a particular word is not a rule. "Before I started I had to move the tank" is a sentence about a before; it is not a declaration that the photograph is one. The tempting version of this feature is a regex over existing labels, which would have backfilled a number that looked like history and was actually a guess.
+
+**Null is an honest third answer.** It means nobody said, and it must never read as "no". Every row filed before today carries it, and a worker who answers with something that is neither word still gets their evidence filed, with a reply saying it went on record as neither. Nothing about this column blocks anything: it records and it reports. Whether a stage may ever be approved without a before on file is a separate decision and the founder's, not this migration's, because §10 puts what counts as verified on her side of the line.
+
+**It goes into the approval snapshot, not just the table.** `_do_approve_stage` writes `phase` alongside the `sha256` into `stage_approvals.evidence`, and `evidence_at_signoff` reads the snapshot. Without that, a worker marking last week's photograph as the before, today, would improve last week's approval, which is the exact failure `20260904t` and `supabase/tests/signoff_snapshot_guards.sql` exist to prevent, one column along. `supabase/tests/evidence_phase_guards.sql` asserts it in both directions.
+
+**One extra WhatsApp exchange, accepted on purpose.** The worker lane now asks the before/after question as its own step rather than reading it out of the caption, so filing a photo is one message longer than it was. That was weighed against merging the question into the "what does this show?" prompt and parsing the first word. The dedicated question was chosen because the answer is unambiguous, it matches how the job code is already handled (always asked, always checked, never assumed), and a wrong before/after is worse than a slow one. If it proves to be friction the workers actually feel, merging the two prompts is a small change.
+
+**Materials evidence carries no phase, and the constraint refuses it.** Materials is a custody record: the receipt and the film of the materials in the place the client nominated, which is what moves the risk in them. A before on it would be counted by the measure and mean nothing.
+
+**The desk gets a tile, never coloured red.** Before-and-after reads near zero for a while, and correctly so: nothing filed before 5 September declared either way. A red tile there would blame workers for a measure that had only just started.
+
+---
+
 ## 2026-09-05 · A vetting decision now has to say who made it
 
 **The gap was flagged the day before and fixing it was the founder's call, because it changes what the desk writes rather than only what it reads.** Passing or blocking an application decides whether somebody can earn on this platform, which is squarely the "named human confirms every consequential step" of §2. A named human was confirming it. Nothing recorded that. The desk wrote `applications.status` through the generic action mechanism and no name went with it, so the rule was true in practice and unprovable afterwards, which is the state §2 exists to prevent.
