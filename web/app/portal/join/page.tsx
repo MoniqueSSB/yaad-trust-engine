@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -68,6 +68,20 @@ const label =
 const labelRow = "mb-1.5 flex items-baseline justify-between";
 const required = "text-[10px] font-bold uppercase tracking-[.1em] text-coral";
 
+type Stage = "email" | "code" | "link";
+
+/* Takes the sign-in token out of a query string and leaves everything else
+   exactly as it was. Everything else matters: `code`, `job`, `quote`, `want`
+   and `next` all still steer where this page sends somebody, and a blunter
+   "clear the whole query string" would strand a one-tap arrival that came
+   from a quote button. */
+function stripToken(search: string): string {
+  const q = new URLSearchParams(search);
+  q.delete("t");
+  const rest = q.toString();
+  return rest ? `?${rest}` : "";
+}
+
 function JoinForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -88,14 +102,41 @@ function JoinForm() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
 
+  /* ONE TAP, founder's decision 5 Sep 2026, on reading her own booking email:
+     "why does it email when I was already sent the key".
+
+     She was right. The booking email goes to a mailbox, and then the join
+     page emailed the SAME mailbox a second time to prove it was hers. In the
+     ordinary case, somebody tapping the link from the inbox it landed in, the
+     second email proved nothing the first had not.
+
+     So the booking email now carries a single-use sign-in token of its own
+     (minted by yaad-notify-client, see its oneTapJoinLink) and this page
+     spends it on arrival. One email, one tap, no code box.
+
+     THE TRADE, stated plainly because it is a real one and it was hers to
+     make: while that token is unspent, the booking email IS the login.
+     Forward it and the person you forwarded it to is you. Before this, a
+     forwarded email handed over the job key but never the account. What
+     limits the damage is that the token is single use and short lived, and
+     that it is off the address bar before anything else on this page runs. */
+  const [token] = useState(() => params.get("t") ?? "");
+  const spent = useRef(false);
+  const [signedIn, setSignedIn] = useState(false);
+
   /* The one thing driving which fields show. "email" asks for an address
      (and the job code too, only when it did not arrive on the link) and
      sends the sign-in code. "code" asks for that code and signs them in.
      Moving to "code" only ever happens after sendCode has confirmed
      something was actually delivered, never before: a hidden stage nobody
      asked to be in is the exact bug the 31 Aug version fixed, and moving the
-     stage boundary must not bring that back. */
-  const [stage, setStage] = useState<"email" | "code">("email");
+     stage boundary must not bring that back.
+
+     "link" is the one-tap arrival (5 Sep 2026): the booking email carried a
+     single-use token, so there is nothing to type and nothing to ask for. It
+     is chosen at first render rather than switched to, so a tapped link never
+     flashes a form the person is not going to fill in. */
+  const [stage, setStage] = useState<Stage>(() => (params.get("t") ? "link" : "email"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,62 +199,135 @@ function JoinForm() {
         );
       }
 
-      // Signed in and confirmed in one step. Now bind the job.
-      const { data: claimed } = await supabase.rpc("claim_code_as_me", { p_code: jobCode.trim() });
-      if (claimed !== true) {
-        throw new Error(
-          "You are signed in, but that job code would not attach to your account. Check it against the message Yaadly sent you, or message Yaadly.",
-        );
-      }
-
-      /* Arriving here from a quote means the account WAS the step that
-         pressing that button needed. Finish what they pressed rather than
-         landing them in a portal and making them find the quote again.
-         Postgres still decides in both cases, and still refuses anybody who
-         is not this job's client. Neither books anyone.
-
-         `want` says WHICH button it was. It arrived on 4 Sep 2026, when the
-         Kickoff Pack came out of the default flow: before that there was one
-         button and this could assume it. Anything other than "pack" confirms
-         the price, which is the ordinary route, so an old link with no `want`
-         on it still does the safe, smaller thing rather than silently
-         ordering a project pack nobody asked for. */
-      const quote = params.get("quote");
-      if (quote) {
-        const wantsPack = params.get("want") === "pack";
-        const { error: requestErr } = wantsPack
-          ? await supabase.rpc("request_kickoff_as_me", { p_quote: quote })
-          : await supabase.rpc("agree_quote_as_me", { p_quote: quote });
-        if (requestErr) {
-          throw new Error(
-            "Your account is ready and you are signed in, but the request did not go through: " +
-              requestErr.message +
-              " Open your quotes again and press the button.",
-          );
-        }
-      }
-
-      /* next=photos comes off the confirmation screen of /jobs/new, which
-         has just told somebody that photographs are the single thing that
-         turns a guess into a quote. Landing them in the portal and making
-         them find the job, find the board preview and press "Add a photo"
-         is three steps of hunting for the thing they came here to do. Only
-         this one value is honoured, and only alongside a job: everything
-         else, WhatsApp arrivals included, still lands on /portal exactly as
-         before. */
-      const next = params.get("next");
-      if (next === "photos" && job) {
-        router.replace(`/portal/jobs/${encodeURIComponent(job)}?photos=1`);
-        router.refresh();
-        return;
-      }
-
-      router.replace("/portal");
-      router.refresh();
+      await finishSignIn(supabase);
     } catch (err) {
       setError(err instanceof Error ? err.message : "That did not work.");
     }
   }
+
+  /* Everything after the mailbox is proved: bind the job to the account and
+     land them where they were going.
+
+     Lifted out of verifyCode on 5 Sep 2026, when the booking email started
+     carrying a one-tap link. There are now TWO ways to prove a mailbox, a
+     typed code and a tapped link, and they have to end identically. A second
+     copy of this would drift, and the half that drifts is the half that binds
+     the job to the account, which is the half nobody notices until a client
+     is signed in and staring at an empty portal. */
+  async function finishSignIn(supabase: ReturnType<typeof createClient>) {
+    // Signed in and confirmed in one step. Now bind the job.
+    const { data: claimed } = await supabase.rpc("claim_code_as_me", { p_code: jobCode.trim() });
+    if (claimed !== true) {
+      throw new Error(
+        "You are signed in, but that job code would not attach to your account. Check it against the message Yaadly sent you, or message Yaadly.",
+      );
+    }
+
+    /* Arriving here from a quote means the account WAS the step that
+       pressing that button needed. Finish what they pressed rather than
+       landing them in a portal and making them find the quote again.
+       Postgres still decides in both cases, and still refuses anybody who
+       is not this job's client. Neither books anyone.
+
+       `want` says WHICH button it was. It arrived on 4 Sep 2026, when the
+       Kickoff Pack came out of the default flow: before that there was one
+       button and this could assume it. Anything other than "pack" confirms
+       the price, which is the ordinary route, so an old link with no `want`
+       on it still does the safe, smaller thing rather than silently
+       ordering a project pack nobody asked for. */
+    const quote = params.get("quote");
+    if (quote) {
+      const wantsPack = params.get("want") === "pack";
+      const { error: requestErr } = wantsPack
+        ? await supabase.rpc("request_kickoff_as_me", { p_quote: quote })
+        : await supabase.rpc("agree_quote_as_me", { p_quote: quote });
+      if (requestErr) {
+        throw new Error(
+          "Your account is ready and you are signed in, but the request did not go through: " +
+            requestErr.message +
+            " Open your quotes again and press the button.",
+        );
+      }
+    }
+
+    /* next=photos comes off the confirmation screen of /jobs/new, which
+       has just told somebody that photographs are the single thing that
+       turns a guess into a quote. Landing them in the portal and making
+       them find the job, find the board preview and press "Add a photo"
+       is three steps of hunting for the thing they came here to do. Only
+       this one value is honoured, and only alongside a job: everything
+       else, WhatsApp arrivals included, still lands on /portal exactly as
+       before. */
+    const next = params.get("next");
+    if (next === "photos" && job) {
+      router.replace(`/portal/jobs/${encodeURIComponent(job)}?photos=1`);
+      router.refresh();
+      return;
+    }
+
+    router.replace("/portal");
+    router.refresh();
+  }
+
+  /* Sits here, below finishSignIn and below every piece of state it touches,
+     because the lint rule that catches "used before declared" is right: an
+     effect reaching upward for a setter is how you end up holding a stale
+     one. */
+  useEffect(() => {
+    if (!token || spent.current) return;
+    // Guarded, not because React is being awkward, but because a single-use
+    // token really is spent by the first call. A development double-render
+    // would otherwise show every tester an "expired link" screen on a link
+    // that worked perfectly.
+    spent.current = true;
+
+    /* Off the address bar before anything else. An unspent sign-in token in
+       a query string is a live credential: it goes into browser history, it
+       is what a Referer header hands to the next site, and it is what gets
+       pasted into a chat window by somebody asking for help. Verifying it
+       does not need it to stay visible. */
+    window.history.replaceState(null, "", window.location.pathname + stripToken(window.location.search));
+
+    (async () => {
+      setBusy(true);
+      try {
+        const supabase = createClient();
+
+        /* Both types tried, in this order, and the order is not arbitrary.
+           The file already records that this project's tokens verify as
+           "email" (founder's own sign-in, 30 Aug 2026, one call, no retry).
+           "magiclink" is the type these are MINTED as, and GoTrue returns
+           the identical "expired or invalid" for a type mismatch as for a
+           wrong token, so a failure here cannot tell us which it was. A
+           failed verify does not consume the token, so trying the second
+           costs nothing and removes a whole class of silent lockout. */
+        let ok = false;
+        for (const type of ["email", "magiclink"] as const) {
+          const { error: e } = await supabase.auth.verifyOtp({ token_hash: token, type });
+          if (!e) { ok = true; break; }
+        }
+
+        if (!ok) {
+          // Expired, already used, or simply old. Not a dead end: the typed
+          // code still works and is one button away, so say what happened
+          // and put them in front of it.
+          setStage("email");
+          setError(
+            "That link has expired, or it has already been used. Type your email below and we will send you a fresh sign-in code.",
+          );
+          return;
+        }
+
+        setSignedIn(true);
+        await finishSignIn(supabase);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "That did not work.");
+      } finally {
+        setBusy(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -245,8 +359,48 @@ function JoinForm() {
         </p>
       )}
 
-      {stage === "email" ? (
+      {stage === "link" ? (
+        /* Nothing to fill in. Either it is working, or it failed and the
+           person needs to know which, in a sentence that says what to do
+           next rather than what went wrong. */
+        error ? (
+          <>
+            <p role="alert" className="mb-4 rounded-xl border border-coral/30 bg-coral/10 px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+              {error}
+            </p>
+            {signedIn && (
+              <Link
+                href="/portal"
+                className="block w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-center text-[14.5px] font-bold text-onbrand transition hover:brightness-110"
+              >
+                Open your portal
+              </Link>
+            )}
+          </>
+        ) : (
+          <p role="status" className="rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+            Signing you in from your booking email. One moment.
+          </p>
+        )
+      ) : stage === "email" ? (
         <>
+          {/* Said out loud because the alternative is what happened on
+              5 Sep 2026: the booking email named the reference as "the
+              code", the page then offered to send "a code", and the two
+              read as the same thing, so being asked for an email looked
+              like being asked to request something already in hand. The
+              page HAS the reference, out of ?code=, which is exactly why
+              there is no box for it. Silence about that is what made it
+              look broken. Only shown when it really did arrive on the
+              link: when it did not, the field below asks for it and this
+              sentence would be a lie. */}
+          {jobCodeKnown && (
+            <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
+              Your booking reference is already in this link. The only thing
+              we need from you is an email.
+            </p>
+          )}
+
           <div className={labelRow}>
             <label htmlFor="join-email" className={label}>Email</label>
             <span className={required}>Required</span>
@@ -264,8 +418,8 @@ function JoinForm() {
           />
           <p className="-mt-2 mb-4 text-[12px] text-dim">
             <b className="text-mute">No password to choose and none to remember.</b>{" "}
-            Type your email and we will send you a code to finish setting up
-            your job, here and on WhatsApp if we have your number.
+            Type your email and we will send you a one-time sign-in code, here
+            and on WhatsApp if we have your number.
           </p>
 
           {!jobCodeKnown && (
@@ -301,7 +455,7 @@ function JoinForm() {
             disabled={busy}
             className="w-full rounded-full bg-linear-to-r from-teal to-mango py-3.5 text-[14.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40"
           >
-            {busy ? "Sending your code..." : "Send me a code"}
+            {busy ? "Sending your code..." : "Email me a sign-in code"}
           </button>
         </>
       ) : (
@@ -313,7 +467,7 @@ function JoinForm() {
           </p>
 
           <div className={labelRow}>
-            <label htmlFor="join-otp" className={label}>The code we sent you</label>
+            <label htmlFor="join-otp" className={label}>The sign-in code we sent you</label>
             <span className={required}>Required</span>
           </div>
           <input

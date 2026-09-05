@@ -320,6 +320,77 @@ async function stageLabel(admin: any, jobId: string, stageNum: number): Promise<
   return `stage ${stageNum}`;
 }
 
+/* ── One tap into the portal ───────────────────────────────────────────────
+ *
+ * The booking email is the first thing a service client ever gets from us,
+ * and until 5 Sep 2026 it sent them to a page that emailed the SAME mailbox
+ * a second time before letting them in. The founder read her own receipt and
+ * asked the obvious question: why email me again when you already sent me
+ * the key. In the ordinary case, somebody tapping the link from the inbox it
+ * arrived in, the second email proves nothing the first one did not.
+ *
+ * So this mints a single-use sign-in token and hangs it on the link. The
+ * join page spends it on arrival and the client is in, one tap, no code box.
+ *
+ * WHAT THIS TRADES, and it was the founder's call, not a technical one: an
+ * unspent token makes the booking email itself the login. Forward it and the
+ * person you forwarded it to is you, until it is used or it expires. Before
+ * this, a forwarded email handed over the job key but never the account.
+ * Single use and a short life are what keep that bounded.
+ *
+ * NOT the gate on anything that matters. Signing in is not approving: the
+ * Client Guidelines still have to be signed, and every release of money is
+ * still a named human's decision on the desk. This changes who can open a
+ * portal, and nothing at all about what can happen inside one.
+ *
+ * FAILS SOFT, always. Anything that goes wrong here returns the plain join
+ * link, which is exactly the journey that worked yesterday: type an email,
+ * get a code. A receipt that does not arrive because a token could not be
+ * minted would be a far worse bug than one extra step.
+ */
+async function oneTapJoinLink(
+  admin: any, email: string, portalCode: string, trace: Trace,
+): Promise<string> {
+  const plain = `${APP_URL}/portal/join?code=${encodeURIComponent(portalCode)}`;
+  const addr = String(email ?? "").trim().toLowerCase();
+  if (!addr || !portalCode) return plain;
+
+  return await trace.span("auth.one_tap_link", SpanKind.CLIENT, {
+    "server.address": "supabase.auth", "yaadly.portal.code": portalCode,
+  }, async (sp) => {
+    try {
+      /* The account has to exist before a link can be minted for it. Public
+         signup is off on this project on purpose, and an admin create is the
+         intended way round that: it is the same call yaad-portal-code makes
+         when somebody types their address, and it sets no password, because
+         there is no password anywhere in this flow to set. */
+      const { error: createErr } = await admin.auth.admin.createUser({ email: addr, email_confirm: false });
+      if (createErr && !/already|registered|exists/i.test(String(createErr.message))) {
+        sp.recordError(createErr.message);
+        return plain;
+      }
+
+      const { data: link, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: addr });
+      const hashed = link?.properties?.hashed_token;
+      if (error || !hashed) {
+        sp.recordError(error?.message ?? "no hashed_token returned");
+        return plain;
+      }
+
+      /* Our own URL, not the action_link GoTrue hands back. The action_link
+         goes to Supabase first and bounces through redirect_to, which has to
+         be allowlisted in Auth settings and is one more thing to get wrong in
+         a place nobody looks. The hashed token verifies from any browser, so
+         the classic magic-link failure, opening the link somewhere other than
+         where you started, is not a failure here. */
+      return `${plain}&t=${encodeURIComponent(String(hashed))}`;
+    } catch (e) {
+      sp.recordError(String(e).slice(0, 160));
+      return plain;
+    }
+  });
+}
+
 // "A1 (before), A2 (problem found), A3 (after)". The worker's own answer to
 // which part of the job a photograph belongs to, put where the client already
 // looks for the codes, so a before, its after and anything found on the way can
@@ -852,7 +923,7 @@ Deno.serve(async (req: Request) => {
     const roomLink = isService
       ? `${APP_URL}/portal/services/${encodeURIComponent(svc.id)}`
       : `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`;
-    const codeLink = isService
+    let codeLink = isService
       ? (svc.portal_code
         ? `${APP_URL}/portal/join?code=${encodeURIComponent(svc.portal_code)}`
         : roomLink)
@@ -883,10 +954,29 @@ Deno.serve(async (req: Request) => {
       // the founder's confirm is the next thing that happens. The portal
       // code rides in this first message because a service client has no
       // account yet; the join page is the door and the code is the key.
+      //
+      // The code is no longer printed as a number to type, and there is no
+      // second email either (5 Sep 2026, founder's own report from her
+      // inbox). Two different things used to be called "a code" here: the
+      // booking reference, which the join page reads out of ?code= and never
+      // asks for, and the sign-in code that page emailed once you typed your
+      // address. Being told to "set up your portal with the code 08A0A130"
+      // and then shown a page offering to send you a code reads as being
+      // asked for something you are holding. Both are gone from the wording:
+      // oneTapJoinLink puts a single-use sign-in token in the link, and the
+      // sentence below promises one tap. If that promise and the join page
+      // ever disagree, the join page is what the client actually meets, so
+      // they move together.
+      // One tap, from here. Falls back to the plain join link on its own if
+      // the token cannot be minted, so this line can never cost a receipt.
+      if (svc.portal_code) {
+        codeLink = await oneTapJoinLink(admin, String(svc.client_email ?? ""), String(svc.portal_code), trace);
+      }
       subject = `We have your booking: ${svc.type}`;
       line = `Your ${svc.type} booking with Yaadly is in, reference ${svc.id}. ` +
         `It is held while Yaadly agrees the scope and dates with you: nothing is charged and nothing starts until you hear from us that it is confirmed. ` +
-        `When you want to see it online, set up your portal with the code ${svc.portal_code}: ${codeLink}`;
+        `See it online here, and that link signs you straight in: ${codeLink} ` +
+        `It is for you alone and it works once, so do not forward it. If it stops working, open it anyway and we will email you a fresh sign-in code.`;
     } else if (kind === "service_confirmed") {
       // Fires when the founder clicks "Confirm the work": the booking is now
       // real, the invoice exists, and payment is the one thing between here
