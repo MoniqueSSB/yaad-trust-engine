@@ -61,7 +61,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
-  ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY,
+  ACCESS, DRAFT_KEY, EMPTY_FIELDS, MATERIALS, STAGES, URGENCY,
   draftFields, firstIncomplete, looksLikeEmail, looksLikePhone,
   parseDraft, restoreFields, serialiseDraft, stageComplete, worthKeeping,
   type Fields, type StageKey,
@@ -204,6 +204,11 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
            enforce_vetted_worker_on_quote. See lib/jobs/new-form.ts. */
         urgency: f.urgency,
         accessType: f.accessType,
+        /* Who buys the materials. yaad-post-job maps this sentence onto
+           jobs.materials_by, the same way it maps the store types, so a
+           stale cached copy of this page cannot write a route the database
+           has never heard of. */
+        materialsBy: f.materialsBy,
       });
       if (d.jobId) setJobId(String(d.jobId));
       if (d.portalCode) setPortalCode(String(d.portalCode));
@@ -514,6 +519,47 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                   the house, and how long it has been happening.
                 </p>
               </div>
+
+              {/* Who buys the materials. Step 2 of the materials route spec.
+                  It is here, on the first stage, because it decides what the
+                  worker quotes, and asking it after quotes are in means every
+                  quote was priced against a guess. Two options only, and the
+                  second carries what it costs ON the option rather than on the
+                  terms page: it moves the materials risk, the programme risk
+                  and part of the guarantee onto the client. See the long note
+                  above MATERIALS in lib/jobs/new-form.ts for why there is no
+                  "not sure" and no "split it". */}
+              <div className="fgroup" style={{ marginBottom: 0 }}>
+                <label className="fl" id="lbl-materials">
+                  Who is buying the materials{" "}
+                  <span className={"src " + (f.materialsBy ? "ok" : "req")}>
+                    {f.materialsBy ? "Chosen" : "Required"}
+                  </span>
+                </label>
+                <div className="grid gap-2" role="group" aria-labelledby="lbl-materials">
+                  {MATERIALS.map((m) => (
+                    <button key={m.value} type="button" aria-pressed={f.materialsBy === m.value}
+                      onClick={() => set("materialsBy", f.materialsBy === m.value ? "" : m.value)}
+                      className={
+                        "rounded-xl border px-4 py-3 text-left transition " +
+                        (f.materialsBy === m.value
+                          ? "border-teal bg-soft"
+                          : "border-line bg-bg hover:border-teal")
+                      }>
+                      <b className={"block text-[13.5px] " + (f.materialsBy === m.value ? "text-tealb" : "text-ink")}>
+                        {m.value}
+                      </b>
+                      <span className="mt-0.5 block text-[12.5px] leading-relaxed text-dim">{m.note}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
+                  Not sure? Pick the first one. That is the normal way a job
+                  runs, and <b className="text-mute">the tradesperson tells you
+                  what the job needs either way</b>, so you are never left
+                  guessing what to buy.
+                </p>
+              </div>
             </div>
           )}
 
@@ -737,6 +783,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
                 {[
                   { k: "work" as StageKey, t: "The work", v: f.trade },
                   { k: "work" as StageKey, t: "What is happening", v: f.desc.trim(), wrap: true },
+                  { k: "work" as StageKey, t: "Who buys the materials", v: f.materialsBy },
                   { k: "property" as StageKey, t: "Parish", v: f.parish },
                   { k: "property" as StageKey, t: "Who lets a worker in", v: f.accessType },
                   { k: "urgency" as StageKey, t: "How soon", v: f.urgency },
@@ -816,7 +863,7 @@ export function PostJob({ initialTrade, requestedWorker }: { initialTrade?: stri
 
           {!canAdvance && (
             <p className="mt-3 text-[12.5px] text-dim">
-              {key === "work" && "Pick a trade and say what is happening, to carry on."}
+              {key === "work" && "Pick a trade, say what is happening, and say who buys the materials, to carry on."}
               {key === "property" && "Pick a parish and say who can let a worker in, to carry on."}
               {key === "urgency" && "Pick how soon you need it, to carry on."}
               {key === "reach" && "Your name and one way to reach you, to carry on."}

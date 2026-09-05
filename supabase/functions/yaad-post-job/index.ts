@@ -77,6 +77,25 @@ const STORE_TYPE: Record<string, string> = {
   "nowhere securable, buy in drops": "none_available",
 };
 
+/** Who buys the materials, mapped to the two codes jobs_materials_by_chk
+ *  permits. Step 2 of specs/MATERIALS-ROUTE-FLOW-SPEC.md.
+ *
+ *  Mapped HERE for the same reason STORE_TYPE is, and it matters more: this
+ *  column decides whether a quote on the job may carry a materials figure at
+ *  all (quote_materials_match_route, 20260905d). A stale cached copy of the
+ *  page posting a sentence the database has never heard of must not become a
+ *  route, so anything unrecognised is null.
+ *
+ *  Null is the fail-closed answer and it is honest: it is what every job
+ *  posted before this question existed carries, and it means "not asked"
+ *  rather than "Yaadly buys them". Defaulting an unreadable answer to
+ *  'yaadly' would silently commit a client to buying materials through
+ *  Yaadly because their browser had an old copy of a page. */
+const MATERIALS_BY: Record<string, string> = {
+  "yaadly buys the materials": "yaadly",
+  "i am supplying the materials myself": "client",
+};
+
 /** Columns the job card maps onto one-for-one. */
 function cardCols(b: Record<string, unknown>) {
   const storeType = STORE_TYPE[s(b.materialsStore).toLowerCase()] ?? null;
@@ -86,7 +105,7 @@ function cardCols(b: Record<string, unknown>) {
     job_type: s(b.jobType) || null,
     size_band: s(b.sizeBand) || null,
     access_type: s(b.accessType) || null,
-    materials_by: s(b.materialsBy) || null,
+    materials_by: MATERIALS_BY[s(b.materialsBy).toLowerCase()] ?? null,
     // Free text, and it names where the valuable things are kept on a property
     // that is often empty. open_jobs publishes the type and withholds this.
     materials_store: storeType === "none_available"

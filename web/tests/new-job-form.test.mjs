@@ -49,6 +49,7 @@ const full = () => ({
   desc: "Zinc lifted off the back roof and water is coming in",
   urgency: "Urgent, within 48 hours",
   accessType: "No inside access needed, outside work only",
+  materialsBy: "Yaadly buys the materials",
   name: "Test Client",
   contact: "test@example.com",
 });
@@ -186,12 +187,18 @@ describe("a stage is complete or it is not", () => {
 describe("the saved draft keeps the work and none of the person", () => {
   const NOW = 1_760_000_000_000;
 
+  /* The key list is an allowlist, not a description. It fails whenever the
+     draft shape changes, which is the point: a new field on Fields that
+     happens to be personal would land in localStorage silently otherwise.
+     materialsBy was added on 5 September 2026 and is the client's answer to
+     who buys the materials, which is about the job and not about the person.
+     The two doesNotMatch lines above are the guard that never moves. */
   test("a name, a contact detail and a portal code are never written", () => {
     const raw = m.serialiseDraft("JOB-WEB-1", full(), NOW);
     assert.doesNotMatch(raw, /Test Client/);
     assert.doesNotMatch(raw, /test@example\.com/);
     assert.deepEqual(Object.keys(JSON.parse(raw).fields).sort(),
-      ["accessType", "desc", "parish", "trade", "urgency"]);
+      ["accessType", "desc", "materialsBy", "parish", "trade", "urgency"]);
   });
 
   test("what is written comes back", () => {
@@ -268,5 +275,95 @@ describe("restoring only ever offers values the lists still have", () => {
       { trades: ["Roofing"], parishes: ["Kingston"] });
     assert.equal(r.urgency, "Urgent, within 48 hours");
     assert.equal(r.accessType, "No inside access needed, outside work only");
+  });
+});
+
+/* ── who buys the materials ───────────────────────────────────────────────
+ *
+ * Step 2 of specs/MATERIALS-ROUTE-FLOW-SPEC.md, and these sentences are load
+ * bearing in the same way the access ones are, for a different reason.
+ *
+ * yaad-post-job maps them onto jobs.materials_by by matching the lowercased
+ * sentence, so a copy edit here that is not made there stops mapping and the
+ * route silently becomes null. Null means "not asked", the job carries no
+ * route, and the client is never asked again. Nothing goes red.
+ *
+ * The MATERIALS_BY map in supabase/functions/yaad-post-job/index.ts is:
+ *
+ *     "yaadly buys the materials"          -> yaadly
+ *     "i am supplying the materials myself" -> client
+ *
+ * Those two strings are restated below and asserted against the option list.
+ * Change a word in either place without the other and this file fails, naming
+ * the option. That is the whole point of the test.
+ */
+describe("the materials wording maps to a route", () => {
+  const MAPPED = {
+    "yaadly buys the materials": "yaadly",
+    "i am supplying the materials myself": "client",
+  };
+
+  test("there are exactly two options, and no not-sure escape hatch", () => {
+    assert.equal(m.MATERIALS.length, 2);
+    for (const o of m.MATERIALS) {
+      assert.doesNotMatch(o.value, /not sure|split|advise/i, o.value);
+    }
+  });
+
+  test("every option still maps to a route in yaad-post-job", () => {
+    for (const o of m.MATERIALS) {
+      assert.ok(
+        MAPPED[o.value.toLowerCase()],
+        `"${o.value}" does not match MATERIALS_BY in yaad-post-job, so it would post as null`,
+      );
+    }
+  });
+
+  test("Yaadly buying is first, because it is the answer for somebody unsure", () => {
+    assert.equal(MAPPED[m.MATERIALS[0].value.toLowerCase()], "yaadly");
+  });
+
+  test("the client-supplied option says what it costs, on the option", () => {
+    const note = m.MATERIALS[1].note;
+    assert.match(note, /guarantee/i);
+    assert.match(note, /short|late|wrong/i);
+  });
+
+  test("clientSuppliesMaterials is true only for the second option", () => {
+    assert.equal(m.clientSuppliesMaterials(m.MATERIALS[1].value), true);
+    assert.equal(m.clientSuppliesMaterials(m.MATERIALS[0].value), false);
+    assert.equal(m.clientSuppliesMaterials(""), false);
+  });
+});
+
+describe("the materials answer is required to leave the first stage", () => {
+  test("a job with no materials answer cannot advance", () => {
+    const f = { ...full(), materialsBy: "" };
+    assert.equal(m.stageComplete("work", f), false);
+  });
+
+  test("with it answered, the work stage completes", () => {
+    assert.equal(m.stageComplete("work", full()), true);
+  });
+
+  test("firstIncomplete points at the work stage when only materials is missing", () => {
+    assert.equal(m.firstIncomplete({ ...full(), materialsBy: "" }), "work");
+  });
+});
+
+describe("a saved draft keeps the materials answer", () => {
+  test("it survives a serialise and parse round trip", () => {
+    const raw = m.serialiseDraft("JOB-1", full(), Date.now());
+    const back = m.parseDraft(raw, Date.now());
+    assert.equal(back.fields.materialsBy, "Yaadly buys the materials");
+  });
+
+  test("a retired option is dropped on restore rather than posted", () => {
+    const d = {
+      v: 1, jobId: "JOB-1", at: Date.now(),
+      fields: { ...full(), materialsBy: "Split, agree item by item" },
+    };
+    const kept = m.restoreFields(d, { trades: ["Roofing"], parishes: ["Kingston"] });
+    assert.equal(kept.materialsBy, "");
   });
 });
