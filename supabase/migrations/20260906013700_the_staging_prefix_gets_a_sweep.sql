@@ -2,8 +2,8 @@
 --
 -- yaad-inbound stages an inbound WhatsApp photo at evidence/_pending/<uuid>
 -- before it knows which job it belongs to, and MOVES it to <job_id>/<uuid>
--- once the worker has answered the job code, the "what does this show"
--- question and the before/after question. A move is a rename, so anything
+-- once the worker has answered the job code and the "what does this show"
+-- question. A move is a rename, so anything
 -- left under _pending/ is evidence nobody ever answered for. Nothing removed
 -- those. No row pointed at them and nothing swept the prefix.
 --

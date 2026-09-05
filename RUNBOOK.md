@@ -3191,8 +3191,8 @@ decision, not a tidy-up.
 
 `yaad-inbound` puts an inbound WhatsApp photo or video into
 `evidence/_pending/<uuid>` the moment it arrives, before it knows which job it
-belongs to. When the worker answers the job code, the "what does this show"
-question and the before/after question, the file is MOVED to
+belongs to. When the worker answers the job code and the "what does this
+show" question, the file is MOVED to
 `<job_id>/<uuid>`. A move is a rename, so a filed item leaves nothing behind.
 
 Anything still under `_pending/` is a photo somebody sent and then never
@@ -3255,6 +3255,6 @@ but nothing saved properly". Removing both means they are simply read fresh.
 ### If it starts finding hundreds of objects a night
 
 That is workers abandoning the evidence conversation, not a bug in the sweep.
-Read it as a product signal: the job code question, the "what does this show"
-question or the before/after question is losing people. The count is in the
+Read it as a product signal: the job code question or the "what does this
+show" question is losing people. The count is in the
 trace attribute `yaadly.sweep.deleted`.

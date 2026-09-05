@@ -1862,8 +1862,8 @@ unchecked one.
 
 `yaad-inbound` stages an inbound WhatsApp photo at `evidence/_pending/<uuid>`
 before it knows which job it belongs to, then moves it to `<job_id>/<uuid>`
-once the worker has answered the job code, the context question and the
-before/after question. A move is a rename, so anything left in that prefix is
+once the worker has answered the job code and the context question. A move is
+a rename, so anything left in that prefix is
 evidence nobody ever answered for. Nothing removed it.
 
 The prefix was checked before any of this was written, and it held zero

@@ -7,9 +7,9 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 // yaad-inbound stages an inbound WhatsApp photo or video at
 // evidence/_pending/<uuid>.<ext> the moment it arrives, before it is known
 // which job it belongs to. finalizeEvidenceItem MOVES it to
-// <job_id>/<uuid>.<ext> once the worker has answered the job code, the "what
-// does this show" question and the before/after question. A move is a rename,
-// so a finalised item leaves no copy behind: anything still sitting under
+// <job_id>/<uuid>.<ext> once the worker has answered the job code and the
+// "what does this show" question. A move is a rename, so a finalised item
+// leaves no copy behind: anything still sitting under
 // _pending/ is, by definition, evidence nobody ever answered for.
 //
 // Nothing removed those. No database row points at them, the bucket is
