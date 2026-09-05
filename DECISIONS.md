@@ -1637,3 +1637,90 @@ First, `supabase/functions/_shared/guardrails.ts` bans the token "escrow" and it
 Second, the price alignment (Deposit Protection Check to £149 against a standard £249, Visual Check to £95 against £125) is a money decision under `CLAUDE.md` section 10. It was taken in the conservative direction, adopting figures already published to customers on the homepage and in the FAQ rather than inventing any, because leaving a founding rate identical to its standard rate was the larger risk of the two. If either standard figure is wrong, that is hers to correct, and `RUNBOOK.md` now lists all seven places a price has to change together.
 
 **A guardrail caught a mistake in this change and was obeyed.** The first version of the assistant's facts in `supabase/functions/yaad-inbound/faq.ts` said "Yaadly does not operate an escrow service", copying the sentence added to the marketing pages. `price-figures_test.ts` failed, because the screen bans the token regardless of the sentence around it, and that is correct: putting the word in front of a client over WhatsApp is what ledger guardrail 1 forbids, denial or not. The copy was changed, not the assertion. The marketing pages keep the explicit sentence, because `guardrails.scan` does not read them and the founder asked for it by name; outbound assistant text says the same thing without the word. This asymmetry is deliberate and is now noted in the copy guidelines.
+
+## A client can ask for one worker by name, and gets first refusal, not a booking (5 Sep 2026)
+
+The "Book <name> for a job" button on a worker profile has existed since the
+marketplace was built and did almost nothing. It carried `?worker=<slug>` into
+the job wizard, printed the name on the confirmation screen, and added one
+line of free text to the enquiry email. Nothing reached the job row. The job
+went onto the open board like any other, every worker in that trade could
+quote it, the worker who had been asked for was never told, and the only trace
+of the client's choice was a sentence somebody had to read and act on by hand.
+The screen said "we will take this to them first" and no part of the system
+knew that promise had been made.
+
+Three shapes were put to the founder: hold the job for that worker until they
+answer, hold it for a fixed window, or name the request but leave the job on
+the open board from the start. She chose the middle one. The job is held off
+the board for 48 hours, only the requested worker can quote it, and the hold
+ends the moment any of three things happens: they quote, they decline, or the
+clock runs out. Holding it until they answer would have left a client waiting
+indefinitely behind somebody who was simply busy; leaving it open from the
+start would have made the button a label rather than a promise.
+
+Three things worth writing down about the shape. There is no "accept" state:
+accepting without quoting changes nothing for the client, and a state that
+changes nothing is one more thing to teach, so the worker's yes IS their
+quote. There is no stored "expired" state either, only a computed one, which
+means no scheduled job has to run for a hold to lapse and no cron failure can
+quietly hold a job shut forever. And none of this books anybody: `worker_email`
+on a job is still written in one place, `_do_choose_worker`, when the CLIENT
+accepts a quote. This holds a door open for one person for two days.
+
+The client hears when the worker declines and does not hear when the window
+simply lapses. That asymmetry is deliberate. A decline is something the worker
+said; a lapse is silence, and turning silence into "your worker did not answer"
+would be Yaadly reporting on somebody's reliability off a two day clock, which
+is close to a reputation judgement and is not a trigger's to make. The wizard's
+confirmation copy says exactly this, so the promise and the code agree.
+
+`20260905a_a_client_asks_for_one_worker_and_that_worker_hears_about_it.sql`.
+
+## A worker's own face, voice and work go on their profile, on a second consent, as a copy (5 Sep 2026)
+
+/apply has collected a photograph of the tradesperson, a thirty second
+introduction video and a portfolio file since 3 September. All three land in
+the private vetting bucket, on the ninety day purge clock, and no client has
+ever seen one. The public profile's Portfolio section is a different thing: it
+is built from completed Yaadly jobs, and at launch every worker's is empty. So
+a client choosing who to let onto their mother's roof was looking at a trade,
+a parish and a list of checks, and nothing of the person.
+
+Asked whether to build a new upload or publish what /apply already collects,
+the founder chose the second. Two things stood in the way, and neither is
+solved by pointing the page at the private bucket.
+
+The first is consent. The photograph row on /apply ends with the sentence
+"This page does not publish it anywhere", and that sentence was true and was
+read by everybody who has applied so far. Publishing on the strength of it
+would be answering a question nobody was asked. So there is a second consent,
+with its own version (`SHOWCASE_CONSENT_VERSION`, `showcase-v1`), neither
+option pre-selected, unanswered read as no, and the test lives in the database
+view rather than at any call site, so no future page can forget it. Withdrawing
+consent empties a profile on the next page load, before any file is deleted.
+
+The second is the purge. `yaad-vetting-purge` destroys the file ninety days
+after it arrives. A profile video served out of that bucket would have worked
+for three months and then quietly gone missing. So the consented file is
+COPIED into a separate public bucket and the vetting original keeps its clock
+and is destroyed on time, exactly as the applicant was told. Nothing about the
+private bucket, its policies or its purge changed, which was the point: the ID
+rules in CLAUDE.md section 6 are the last thing that should move to make a
+profile page look better.
+
+Publishing is a button at the desk, never automatic, and `published_by`
+records the person who pressed it. The desk signs the private originals for an
+hour so that person can look at each file before deciding, because publishing
+somebody's face on the open internet is a decision and a decision made without
+looking is not one.
+
+The self-supplied showcase renders in its own sections, above the evidence
+portfolio and labelled "Work they showed us", saying plainly that it is not
+from jobs booked through Yaadly and does not carry the evidence trail. That
+labelling is the whole design. The section below it earns its trust by being
+pulled from the evidence record, and borrowing that sentence for material a
+worker handed in would spend the credibility of the checked thing on the
+unchecked one.
+
+`20260905b_a_worker_gets_a_face_a_voice_and_work_to_show.sql`.

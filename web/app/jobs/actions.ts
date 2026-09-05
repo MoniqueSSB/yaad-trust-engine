@@ -58,3 +58,31 @@ export async function submitQuote(formData: FormData): Promise<void> {
 
   revalidatePath("/jobs");
 }
+
+/**
+ * The requested worker passes on a job they were asked for by name.
+ *
+ * Thin, same as submitQuote above: worker_decline_job_request in Postgres is
+ * the gate. It matches the request against the caller's own JWT email, so a
+ * job id on its own decides nothing and this file cannot decline somebody
+ * else's request even if it tried.
+ *
+ * Declining opens the job to the board immediately. That is the point: the
+ * client asked for one person, and the fastest honest answer to "they cannot"
+ * is the other quotes.
+ */
+export async function declineJobRequest(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 200);
+  if (!jobId) return;
+
+  const supabase = await createClient();
+  await supabase.rpc("worker_decline_job_request", {
+    p_job: jobId,
+    p_reason: reason || null,
+  });
+
+  revalidatePath("/jobs");
+  revalidatePath("/portal/worker");
+}

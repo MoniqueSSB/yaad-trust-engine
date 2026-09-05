@@ -66,7 +66,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -657,7 +657,7 @@ Deno.serve(async (req: Request) => {
       svc = data;
     } else {
       const { data } = await admin.from("jobs")
-        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
+        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email, requested_worker_email")
         .eq("id", jobId).maybeSingle();
       if (!data) return json({ error: "No such job." }, 404);
       job = data;
@@ -692,6 +692,15 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
+    // worker_requested goes to the one worker a client asked for by name.
+    // Read off jobs.requested_worker_email, not worker_email, which is still
+    // blank: nobody is booked. Same "read it off the right column, not the
+    // job's own worker" shape as kickoff_pack_ready above.
+    if (kind === "worker_requested" && job?.requested_worker_email) {
+      const { data: worker } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", job.requested_worker_email).maybeSingle();
+      workerPhone = String(worker?.phone ?? "").trim();
+    }
     if (kind === "kickoff_pack_ready" && kickoffWorkerEmail) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", kickoffWorkerEmail).maybeSingle();
@@ -711,7 +720,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker" || kind === "worker_requested") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -855,6 +864,27 @@ Deno.serve(async (req: Request) => {
         `Reply with the code ${job.id} to confirm it. ` +
         `The client is being asked to confirm the same price; once you have both replied, ` +
         `they can book you straight away, or ask for a fuller Kickoff Pack first if they want one.`;
+    } else if (kind === "request_declined") {
+      // The other half of the promise on the job wizard's confirmation
+      // screen. Goes to the CLIENT, so it is not in the worker-recipient
+      // list above. Says the job is moving, not that the worker let them
+      // down: a tradesperson with a full diary is not a failure and Yaadly
+      // is not in the business of reporting on one to the other side.
+      subject = `${job.title} is going out to more workers`;
+      line = `The worker you asked for on ${job.id} (${job.title}) cannot take it on right now, so it has gone out to the rest of the vetted network in ${job.parish ?? "your parish"} today. ` +
+        `Prices will start reaching you the same way. Nothing about your job has changed and you have not lost your place.`;
+    } else if (kind === "worker_requested") {
+      // A client read this worker's profile and asked for them by name. The
+      // whole point of the message is the clock: they have first refusal for
+      // 48 hours and then it goes to the board, so a message that does not
+      // say so is worse than none. Free text, no approved template, and the
+      // job id doubles as the reference, the same shape as every other
+      // WhatsApp-reply kind. Deliberately does not say "you have the job":
+      // nobody is booked until the client accepts a price.
+      subject = `A client asked for you: ${job.title}`;
+      line = `A client picked you off your Yaadly profile and asked for you by name on ${job.id} (${job.title}) in ${job.parish ?? "Jamaica"}. ` +
+        `It is yours to price first: nobody else can quote it for the next 48 hours. After that it goes onto the open board. ` +
+        `Open your Yaadly portal to read it and put your price in, or say you cannot take it on and we will find the client somebody else straight away.`;
     } else if (kind === "stage_released_worker") {
       // Founder's own correction, 2 Sep 2026: stage_released only ever told
       // the client. Nothing told the worker their own work had been
