@@ -242,6 +242,55 @@ Then check `verify_jwt` still reads the same after deploying. A deploy that sile
 
 ---
 
+## 9a. Mistral says 429, and the two account questions behind it
+
+Two separate things, both in Mistral's console and neither of them in this
+repository. They are written here because they keep being described as done.
+
+**The 429s.** On 4 September 2026 the retry was watched firing, waiting its
+fixed 1200ms, and getting 429 again, which rules out a burst from a test loop
+and points at a quota or a sustained throttle. Which of the two it is can only
+be read from the account.
+
+1. Mistral console, **Admin, then Limits**. Read the requests per second and
+   the monthly token allowance for the key in use, and whether the workspace is
+   on the free tier. The free tier is roughly one request per second, and nine
+   Edge Functions share one key.
+2. If it is the free tier, the question is whether to pay for throughput. That
+   is a spending decision and it is Monique's.
+3. What the code now does about it, since 5 September 2026:
+   `fetchModel` reads `Retry-After`. If the wait fits inside
+   `MAX_RETRY_WAIT_MS` (4 seconds, sized against the roughly fifteen a Twilio
+   webhook gets) it waits exactly that and retries. If the server asks for
+   longer, **it does not retry at all**, because spending the caller's budget
+   to reach the same refusal is worse than failing now with time left to send
+   the person a real reply. Before this it always waited 1200ms and never read
+   the header.
+4. Watching it: the failures print to the function logs with `fetchModel:` at
+   the front. `console.error` is deliberate, because these used to go only to
+   OpenTelemetry spans that were never exported, so a rate limit looked
+   identical to no traffic at all.
+
+**Training on your data, and the DPA. Not answered, and the privacy page does
+not currently mention it.** `docs/privacy.html` says where the model runs, the
+European Union, and that is true. It says nothing about whether Mistral trains
+on the text sent to it, and on the free tier the default is that it does,
+unless the workspace opts out.
+
+1. Mistral console, **Admin, then Privacy**, the setting about anonymous
+   improvement data. Read what it is actually set to. Do not assume.
+2. Ask Mistral for the data processing agreement, which is the document that
+   makes the EU processing a commitment rather than a location.
+3. Then, and only then, add a sentence to the "Two things we will not soften"
+   box on `docs/privacy.html`. Nothing has been written there yet on purpose:
+   a privacy page that claims an opt-out nobody has verified is worse than one
+   that is silent, and CLAUDE.md forbids the overclaim either way.
+4. This is a **December pilot blocker**, not a nice-to-have. The trigger named
+   in section 9 above is real client and worker data, and the same trigger
+   applies here: a client's job description going to a model that may train on
+   it is a data protection question, not a technical one.
+
+
 ## 10. A client got a holding reply instead of an answer
 
 The banned-language screen fired. `yaad-inbound` composed a reply, the screen found language Yaadly never uses, and the reply was not sent. The client received the short holding message from `SAFE_FALLBACK` saying a person will come back to them, and a phone notification went out titled **Reply held back**.
@@ -2828,6 +2877,18 @@ Two rules that hold when editing these pages. The consent and provider facts on 
 
 ```bash
 grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|removes all fraud|fully covered" docs/*.html
+```
+
+Read the hits, do not just clear them. A DENIAL is the correct use and
+must stay: "Yaadly does not operate an escrow service and does not hold
+money on your behalf" appears on faq, payments, terms and services, and
+deleting it to make the sweep quiet would remove the sentence that makes
+the structure clear to a client. A CLAIM is the fault. As at 5 September
+2026 all six hits in `docs/` are denials and these pages are clean: the
+wrong copy was in CLAUDE.md §8 and in the Reporting agent's prompt, not
+here.
+
+```bash
 grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
 ```
 
@@ -3510,3 +3571,68 @@ copy is a separate file in a separate bucket and is not on that clock.
 turn, proof of address, the TRN, the CV and the certificates are vetting papers
 and are not even fetched by the desk's preview. Widening that list is a legal
 decision, not a tidy-up.
+
+## Checking the database and the repository still describe the same thing
+
+Symptom you are trying to avoid: the repository looks complete, and a rebuild
+from it produces a database that is missing something nobody noticed was only
+ever in production. It has happened three times, on 3, 4 and 5 September 2026,
+the last time to `is_admin()` and to the event trigger that switches row level
+security on for new tables.
+
+The cause is not carelessness. SQL applied through the Supabase MCP goes
+straight to the database and writes no file, and nothing afterwards reconciles
+the two. `scripts/check-deploy-drift.sh` does this job for Edge Functions.
+There is no equivalent for the schema, so it is done by hand.
+
+**1. The offline half, no credentials needed, catches the worst cases.** Every
+function a migration calls should be defined in a migration:
+
+```bash
+grep -rhoiE 'create table (if not exists )?(public\.)?[a-z_]+' supabase/migrations/ \
+  | grep -oiE '[a-z_]+$' | sort -u > /tmp/tables.txt
+grep -rhoE '\bpublic\.[a-z_]+\(' supabase/migrations/ | sed 's/public\.//; s/(//' | sort -u > /tmp/called.txt
+comm -23 /tmp/called.txt /tmp/tables.txt | while read -r fn; do
+  grep -rqiE "function[[:space:]]+(public\.)?${fn}[[:space:]]*\(" supabase/migrations/ \
+    || echo "called but never defined: $fn"
+done
+```
+
+The table subtraction matters: without it the check reports every table a
+migration writes to and nobody reads it twice. `is_admin` printed here for
+weeks and nobody ran it.
+
+Read what it prints carefully, because it catches two different faults. A
+FUNCTION name is the case above. A TABLE name means that table is written to
+by a migration and created by none, which is the same drift one level up and
+is the state this repository is in: on 5 September 2026 `jobs`, `evidence`,
+`job_quotes`, `applications`, `app_settings`, `kickoff_drafts` and
+`kickoff_packs` all printed. See DECISIONS.md.
+
+**2. The live half, needs the MCP or the SQL editor.** List every function in
+`public` and compare against the same grep. In the SQL editor:
+
+```sql
+select string_agg(p.proname, ',' order by p.proname)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prokind = 'f';
+```
+
+**What to do with a gap.** Read the definition back out and commit it as a
+recovery migration, transcribed rather than rewritten, saying in the header
+that it is transcribed and untested because production already has it:
+
+```sql
+select pg_get_functiondef(p.oid)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname = 'the_function_name';
+```
+
+Grants have to be read separately, with `has_function_privilege`, because
+`pg_get_functiondef` does not include them. A recovered function with no grant
+line is a function nobody can call after a rebuild.
+
+**Do not run a recovery migration against production.** It is written to be a
+no-op there and it should stay unrun, because an event trigger recovery has to
+drop and recreate the trigger, and there is no reason to open that window on a
+live database to prove a file you can read.
