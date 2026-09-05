@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
       const kind = s(b.kind) === "materials" ? "materials" : "work";
       // Which section of the job this belongs to, declared on the upload form.
       // Materials is its own section and carries no phase: the constraint in
-      // 20260906000500 refuses it, so it is dropped here rather than sent to be
+      // 20260906000700 refuses it, so it is dropped here rather than sent to be
       // rejected. Anything else is null, meaning nobody said.
       const phaseIn = s(b.phase);
       const phase = kind === "materials" ? null

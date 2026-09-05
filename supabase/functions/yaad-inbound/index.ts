@@ -268,7 +268,7 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
 // read from a reply sent in answer to exactly that question and nothing else.
 // Deliberately not applied to captions: a caption saying "the joint before
 // work" is a sentence about a before, not a declaration that this photograph
-// is one, and 20260906000500 refuses to record a guess as a declaration. Returns
+// is one, and 20260906000700 refuses to record a guess as a declaration. Returns
 // undefined for a reply that answers none of them, which the caller treats as
 // "nobody said" and files anyway.
 //
@@ -341,7 +341,7 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
     job_id: jobId, label: item.label, img: null, storage_path: finalPath,
     bytes: item.bytes, mime: item.mime, kind: "work", stage,
     // null when the worker did not answer the section question, which is an
-    // honest answer in itself and never blocks the filing. See 20260906000500.
+    // honest answer in itself and never blocks the filing. See 20260906000700.
     phase: item.phase ?? null,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });

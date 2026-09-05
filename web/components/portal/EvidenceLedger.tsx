@@ -33,7 +33,7 @@ export type EvidenceItem = {
   stage: number | null;
   /** Which section of the job this belongs to, as declared by whoever filed
       it, or null if nobody said. Never inferred from the label: see
-      20260906000500. */
+      20260906000700. */
   phase?: string | null;
   /** 'materials' is its own section and carries no phase. See 20260828c. */
   kind?: string | null;

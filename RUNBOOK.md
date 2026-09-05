@@ -3428,7 +3428,7 @@ Nine checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-cl
 
 The rig reports through `raise notice`, which psql shows and the Supabase MCP does not. To run it through the MCP instead, replace the temp table `t` with a real one, select from it at the end, and drop it. That is how it was run on 5 September 2026.
 
-**Applied to production 5 September 2026**, as `20260906000500_a_photograph_says_which_section_of_the_job_it_belongs_to.sql`, in three parts: the column and its constraint, the snapshot in `_do_approve_stage`, then the two views. All nine checks passed against live and the rig left no rows behind.
+**Applied to production 5 September 2026**, as `20260906000700_a_photograph_says_which_section_of_the_job_it_belongs_to.sql`, in three parts: the column and its constraint, the snapshot in `_do_approve_stage`, then the two views. All nine checks passed against live and the rig left no rows behind.
 
 ---
 

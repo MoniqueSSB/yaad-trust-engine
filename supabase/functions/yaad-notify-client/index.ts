@@ -324,7 +324,7 @@ async function stageLabel(admin: any, jobId: string, stageNum: number): Promise<
 // which part of the job a photograph belongs to, put where the client already
 // looks for the codes, so a before, its after and anything found on the way can
 // be told apart without opening the portal. Silent when nobody said, which is
-// most photographs filed before 5 Sep 2026: see 20260906000500.
+// most photographs filed before 5 Sep 2026: see 20260906000700.
 const PHASE_IN_LIST: Record<string, string> = {
   before: "before",
   during: "during",
