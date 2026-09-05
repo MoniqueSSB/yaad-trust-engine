@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
+import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";
 import {
   jobGates,
   stillWaiting,
@@ -50,7 +51,7 @@ export default async function ClientPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type",
+      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type",
     )
     .order("updated_at", { ascending: false });
 
@@ -83,6 +84,13 @@ export default async function ClientPortal() {
     .ilike("signer_email", email)
     .limit(1)
     .maybeSingle();
+
+  /* The portfolio link, shown only to somebody who actually has more than one
+     property. A client with one house does not need a page that groups their
+     one house, and an always-visible link to a one-row list is the clutter
+     that makes a portal feel like admin rather than reassurance. */
+  const properties = groupIntoProperties(jobs as unknown as PropertyJob[]);
+  const hasPortfolio = properties.length > 1;
 
   const emailConfirmed = !!user.email_confirmed_at;
   const signed = !!cgSig;
@@ -262,6 +270,17 @@ export default async function ClientPortal() {
         Within each group the recency order is kept, because among live jobs
         the most recently moved genuinely is the most interesting one.
       */}
+      {hasPortfolio && (
+        <Link
+          href="/portal/properties"
+          className="mt-6 flex flex-wrap items-baseline gap-x-2 rounded-2xl border border-line bg-panel px-5 py-4 transition hover:border-line2"
+        >
+          <b className="text-[14px] text-ink">See all {properties.length} of your properties</b>
+          <span className="text-[12.5px] text-dim">every job on each one, in one place</span>
+          <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
+        </Link>
+      )}
+
       <JobList
         title={closed.length > 0 ? "Live jobs" : "Your jobs"}
         jobs={live}
