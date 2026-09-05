@@ -49,6 +49,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { withStatusCallback } from "./twilio-status.ts";
@@ -429,14 +430,14 @@ type VisionFinding = {
 // is NVIDIA answering and answering badly, which asking again is unlikely
 // to fix and isn't tried a second time.
 async function attemptVisionReview(
-  model: string, key: string, userContent: Record<string, unknown>[], s: { setAttributes: (a: Record<string, AttrValue>) => unknown },
+  prov: VisionProvider, userContent: Record<string, unknown>[], s: { setAttributes: (a: Record<string, AttrValue>) => unknown },
 ): Promise<{ ok: true; findings: VisionFinding[] } | { ok: false; retryable: boolean }> {
   try {
-    const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    const r = await fetch(prov.api, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model, temperature: 0.2, max_tokens: 1200,
+        model: prov.model, temperature: 0.2, max_tokens: 1200,
         messages: [{ role: "system", content: VISION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
       }),
       signal: AbortSignal.timeout(25000),
@@ -527,11 +528,10 @@ async function shrinkForReview(url: string): Promise<string | null> {
 }
 
 async function reviewOnePhoto(
-  model: string, key: string, photo: EvidencePhoto, jobTitle: string, trace: Trace,
+  prov: VisionProvider, photo: EvidencePhoto, jobTitle: string, trace: Trace,
 ): Promise<VisionFinding[] | null> {
-  return await trace.span(`chat ${model}`, SpanKind.CLIENT, {
-    "gen_ai.system": "nvidia_nim", "gen_ai.operation.name": "chat", "gen_ai.request.model": model,
-    "server.address": "integrate.api.nvidia.com", "yaadly.agent.name": "photo_review",
+  return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+    ...visionAttrs(prov),
     "yaadly.vision.photo_code": photo.code ?? "",
   }, async (s) => {
     const shrunk = await shrinkForReview(photo.url);
@@ -540,10 +540,10 @@ async function reviewOnePhoto(
       { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview this photo and return findings as instructed.` },
       { type: "image_url", image_url: { url: shrunk ?? photo.url } },
     ];
-    let result = await attemptVisionReview(model, key, userContent, s);
+    let result = await attemptVisionReview(prov, userContent, s);
     let attempts = 1;
     if (!result.ok && result.retryable) {
-      result = await attemptVisionReview(model, key, userContent, s);
+      result = await attemptVisionReview(prov, userContent, s);
       attempts = 2;
     }
     s.setAttributes({ "yaadly.vision.attempts": attempts });
@@ -566,13 +566,17 @@ async function reviewOnePhoto(
  *  returns the findings that did, rather than discarding a partial result
  *  because one photo out of several had a bad moment. */
 async function reviewEvidencePhotos(images: EvidencePhoto[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
-  const key = Deno.env.get("NVIDIA_API_KEY");
-  if (!key) { console.error("yaad-vision: NVIDIA_API_KEY is not set"); return null; }
+  // The evidence review has its own model setting (NVIDIA_EVIDENCE_MODEL) as
+  // of 5 September 2026. It is the vision call standing closest to a stage
+  // approval, and it used to share one dial with the sketch pack and the
+  // vetting read while defaulting to a smaller model than either. See
+  // _shared/visionmodel.ts.
+  const prov = pickVisionProvider("evidence");
+  if (!prov) { console.error(`yaad-vision: ${NO_VISION_PROVIDER_MESSAGE}`); return null; }
   if (!images.length) { console.error("yaad-vision: no image URLs to review"); return null; }
-  const model = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-11b-vision-instruct";
 
   const perPhoto = await Promise.all(
-    images.slice(0, 6).map((p) => reviewOnePhoto(model, key, p, jobTitle, trace)),
+    images.slice(0, 6).map((p) => reviewOnePhoto(prov, p, jobTitle, trace)),
   );
   const reviewed = perPhoto.filter((r): r is VisionFinding[] => r !== null);
   if (!reviewed.length) return null;

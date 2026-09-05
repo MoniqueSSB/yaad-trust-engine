@@ -3435,3 +3435,58 @@ copy is a separate file in a separate bucket and is not on that clock.
 turn, proof of address, the TRN, the CV and the certificates are vetting papers
 and are not even fetched by the desk's preview. Widening that list is a legal
 decision, not a tidy-up.
+
+## Changing which vision model reads photographs, and where it runs
+
+Three functions send images to a model: `yaad-notify-client` (the evidence
+photo review, `photo_review` in telemetry), `yaad-sketch` (walkthrough stills)
+and `yaad-vetting-review` (an applicant's supporting paperwork, never their
+identity documents). Since 5 September 2026 all three resolve the provider,
+the key and the model through `supabase/functions/_shared/visionmodel.ts`, the
+same way text goes through `textmodel.ts`. No function types the endpoint out
+itself, and CI fails one that does.
+
+**Move one job without touching the others.** Each has its own secret, read
+first, falling back to the shared `NVIDIA_VISION_MODEL` and then to a default:
+
+```bash
+supabase secrets set NVIDIA_EVIDENCE_MODEL=meta/llama-3.2-90b-vision-instruct --project-ref leffyisvfvjwzilydlwf
+```
+
+`NVIDIA_EVIDENCE_MODEL` is the evidence review, `NVIDIA_SKETCH_MODEL` the
+walkthrough stills, `NVIDIA_VETTING_MODEL` the paperwork. Secrets are read at
+call time, so no redeploy is needed. `NVIDIA_VISION_MODEL` still moves all
+three at once if that is what you want.
+
+**Which model reads evidence is a decision, not a default.** The evidence
+review defaulted to the 11b checkpoint while the other two defaulted to 90b,
+which nobody chose; it happened because all three shared one secret and had
+different fallbacks. The defaults were kept exactly as they were so this change
+altered no behaviour on the day it landed. Setting `NVIDIA_EVIDENCE_MODEL` is
+how that gets decided on purpose. This is the vision call standing closest to a
+stage approval, so it is worth deciding rather than inheriting.
+
+**Moving off NVIDIA entirely, to a provider in another country.** Set
+`VISION_MODEL_KEY` and `VISION_MODEL_API` (any OpenAI-compatible vision
+endpoint), plus `VISION_MODEL_PROVIDER` and `VISION_MODEL_REGION` so telemetry
+records where the images actually went. Those take priority over everything
+else and need no deploy. Do not add a branch to `visionmodel.ts` instead: a new
+hard-coded provider is a new country receiving personal data, which is a
+founder decision and a line in the data inventory before it is a code change.
+
+**To check what is set now:**
+
+```bash
+supabase secrets list --project-ref leffyisvfvjwzilydlwf
+```
+
+**If reviews stop appearing.** With no provider configured the callers now fail
+loudly rather than silently skipping: the evidence review logs
+`yaad-vision: No vision model is configured`, and the sketch and vetting
+endpoints return that sentence with a 500. NVIDIA's hosting is also uneven,
+confirmed live on 3 September 2026 across three calls in a row: a clean 15
+second answer, a request that ran past 35 seconds with nothing back, and a flat
+500 immediately after. A timeout or a 5xx is retried once. A refusal or an
+unparseable answer is not, because asking again does not fix it. Every vision
+span now carries `yaadly.model.region`, so which country a photograph went to
+is answerable from telemetry rather than from memory.
