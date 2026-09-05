@@ -6,6 +6,390 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The model retry ignored Retry-After, so it bought a second identical refusal
+
+**Observed rather than reasoned.** On 4 September the Mistral 429s were watched doing exactly this: the retry fired, waited its fixed 1200ms, and got 429 again. That is what ruled out a burst from a test loop and pointed at a quota or a sustained throttle instead. The retry was not helping; it was spending the caller's budget to reach the same answer.
+
+**The cause was a header nobody read.** `fetchModel` waited `retryDelayMs` regardless of what the server said. A provider that has told you how long to wait and been ignored will refuse a second time, so the retry was guaranteed to fail whenever the wait exceeded 1200ms, which on a rate limit it usually does.
+
+**The fix, and the part worth arguing about.** `fetchModel` now parses `Retry-After`, in both the delay-seconds and HTTP-date forms, and treats a missing, malformed, zero or past value as absent rather than as "retry immediately", because that instruction from a server that just rate limited us is not one to believe. If the wait fits inside `MAX_RETRY_WAIT_MS` it waits exactly that. **If it does not fit, it does not retry at all.** That is the deliberate half: the tightest caller is the Twilio inbound webhook with roughly fifteen seconds, and burning eleven of them to reach the same refusal is strictly worse than failing at once with time left to send the person a real reply. Four seconds leaves room for the retried call and for writing that reply.
+
+**This does not fix the 429s and is not meant to.** Whether the account is on the free tier, and whether to pay for throughput, are readable only from Mistral's console and the second is a spending decision. RUNBOOK section 9a carries both, alongside the other open Mistral question: the privacy page says where the model runs and says nothing about whether Mistral trains on the text sent to it. Nothing has been written on that page yet on purpose. A privacy page claiming an opt-out nobody has verified is worse than one that is silent, and both are December pilot items on the same trigger as the EU move itself, which is real client data.
+
+---
+
+## 2026-09-05 · The prescribed replacement for "escrow" was itself a banned claim, and it was in an agent's prompt
+
+**Settled on Monique's instruction**, closing the question the 4 September guardrail note left open and marked as hers.
+
+**What was wrong.** CLAUDE.md section 8 said: say "held safely with a licensed payment provider", never say escrow. That was right until 3 September 2026, when the principal structure was settled and Yaadly stopped holding anybody's money. After that date the prescribed replacement asserted the exact arrangement the structure exists to avoid, and it stayed prescribed for two days.
+
+**It was worse than a stale sentence, for three compounding reasons.** First, it was the one banned idea `guardrails.scan` could not see: no individual word in the phrase is on the list, so it passed both runtimes untouched, and a screen that is clean while the claim is present is worse than no screen because it reads as covered. Second, `docs/COPY-GUIDELINES.md` had already banned the phrase, so the two rulebooks contradicted each other and a session reading either one alone would have been confident and wrong. Third, and this is the one that mattered, `yaad/agents/reporting.py` carried it as a rule in the Reporting agent's own prompt: *"Never use the word escrow. Money is held safely with a licensed payment provider."* The instructions were handing the model the claim the screen exists to stop, which is the same defect found in the WhatsApp assistant's approved-facts list on 4 September and fixed there but not looked for anywhere else.
+
+**What changed.** The phrase is now banned in both runtimes, as two narrow patterns: the literal retired sentence, and a money-scoped passive. Both suites assert it, so the drift shows up red the way section 2 requires. The guidance strings for `escrow` and for the new patterns now name the principal structure instead of prescribing a replacement claim. The Reporting agent's prompt says what is true. CLAUDE.md section 8 carries the correction and the reason, rather than being quietly rewritten.
+
+**Deliberately narrow.** The patterns catch the money claim and leave ordinary safe-keeping language alone, because "your documents are held safely" is true and unobjectionable. Nothing was removed from the banned list; adding is allowed, removing is not.
+
+**`docs/` was already right and was not touched.** All six occurrences of "escrow" across faq, payments, terms and services are denials: "Yaadly does not operate an escrow service and does not hold money on your behalf." That is the correct use and the sentence a client needs. RUNBOOK now says so next to the sweep command, because a future session clearing hits to quieten a grep would delete the clearest statement of the structure on the site.
+
+**The general lesson, which is the reusable part.** A banned-terms list catches words. It cannot catch a claim assembled from permitted words, and the phrase most likely to be assembled that way is the one a rulebook tells people to use. When a business rule changes, the prescribed replacements have to be re-read as claims, not just the prohibitions.
+
+---
+
+## 2026-09-05 · The early start consent is a dropdown, not a tickbox, and the two are kept apart
+
+**The gap.** `docs/cancellation.html` says, in public, "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking, alongside this cancellation information." Nothing asked. The eight Stripe payment links went live on 5 September with no consent collection at all, so every card booking taken carried it: a client could cancel on day ten and owe nothing while Yaadly still owed the checker, and the site was describing a step that did not happen.
+
+**Why not one tickbox, which is what the runbook had proposed.** A single required terms tickbox would have bundled two different things: accepting the terms, and expressly requesting an early start. Bundled, the express request becomes a condition of paying. A consumer who genuinely wanted to wait the full 14 days could not buy at all, and a forced request is a weaker instrument under the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013 than a freely given one. So it is two controls: a required dropdown that records an actual answer (`starttiming`, `startnow` or `waitfourteen`), and the terms tickbox separately. The cost is one more field at checkout. The gain is that the record says what the client chose rather than that they had no choice.
+
+**Done over the API, not the Dashboard.** The runbook had this as "a Stripe Dashboard change on each of the eight links". It is one API call per link, which is also how the links were created, so the change is repeatable and reviewable instead of eight rounds of clicking that nobody can check afterwards.
+
+**The booking form landed the same day, from a parallel session, and its reasoning found a defect in this one.** That change offers no pay button at all when the client has not asked for an early start, because a card authorisation lasts seven days and the cancellation wait is fourteen, so the hold is guaranteed to expire before work can begin. A payment link cannot reproduce that: the client is already on the pay page and a dropdown cannot gate the Pay button. Rather than drop the option and force the early start, the second option now names the consequence, "Wait the full 14 days. The hold may expire and we will contact you." The booking form remains the primary route and the only one covering invoice jobs over £500. These links are the fallback for a client sent one directly.
+
+**Two things were left honestly unfinished rather than papered over.** The account has no Terms of service URL set at Settings, Public details, and that is Dashboard only: the Stripe connector exposes payment links but not account settings. Stripe accepts `terms_of_service = required` without one and renders a tickbox linked to nothing, which is the failure mode worth naming, because it reads as covered. The first wording said "the cancellation information linked above" and was therefore false on the live page; it was checked against the real checkout page, found wrong, and rewritten to name `yaadly.co.uk/cancellation` in plain text so that it is true either way. And nothing in this repository reads `starttiming` back: it lives on the Stripe Checkout Session and there is no column for it on `services`. Both are written up in `RUNBOOK.md` rather than left in a session that ends.
+
+---
+
+## 2026-09-05 · The way out of a false positive is a wider desk, not a narrower rule
+
+**The problem was never the flag.** `approve_quote_pack_draft()` refuses a flagged draft outright with no override, which is right: nobody should be able to wave flagged content through to a client. But Approve was the only action, so a draft the guardrail caught for the wrong reason had no route forward at all. The job stopped and nothing said so.
+
+**The tempting fix was to narrow the pattern so paint stopped matching.** That is exactly what §3 exists to refuse. A loosened banned-language rule is permanent and applies to every future client; a stuck draft is one row. And separating "your job is fully covered" from "surface fully covered" by regex is not a thing to get right under pressure.
+
+**So the desk gained an action and the rule did not move.** `yaad-quote-pack-rescan` takes a corrected pack from a signed-in admin, runs it through the same verdict function the drafter uses, and writes what that function says. It never touches `status`, so it cannot approve anything, and a correction that is still dirty stays dirty and is still refused by Postgres.
+
+**The verdict itself moved into `_shared/quote-pack-verdict.ts`, and that is the load-bearing part.** Two things now decide whether a pack is clean. If they ever computed it differently, a correction could clear a flag the drafter would still have raised, and the flag would stop meaning anything. One function, both callers, seven tests including the exact painting case that started this.
+
+**The scanner is passed into it as an argument rather than imported.** `sync-shared.sh` and the CI drift check both decide what to copy by reading which shared files an `index.ts` imports, so a shared file importing another shared file would have the second deleted as an orphan. Taking `scan` as a parameter keeps both imports visible where the tooling looks.
+
+**Probed after deploying**: no token gives a platform 401, the publishable key alone gives "Not signed in.", and `is_admin()` was confirmed to take no arguments and be executable by `authenticated`, so a real admin is not refused by the check meant to let them through. The write path itself is not exercised end to end, because that needs a signed-in admin session; the logic it depends on is unit tested.
+
+---
+
+## 2026-09-05 · Eighteen live database objects existed in no migration, and one of them was the security model
+
+**What was found.** A sweep of every function in the live `public` schema against every function defined in `supabase/migrations` found eighteen running with no definition in this repository: seventeen ordinary ones plus `price_spread_for_trade`, which the client's own quote page calls by name. They were applied straight to the database, mostly through the Supabase MCP, which assigns its own version number and writes no file. So the repository has been describing a database it cannot rebuild.
+
+**`is_admin()` is why this is urgent rather than untidy.** Sixty-four policies and functions across the existing migrations call it. It was defined in none of them. A rebuild from this repository fails on the first policy that names it, and CLAUDE.md section 6 puts it second in the three controls between the public internet and a worker's identity documents: Cloudflare Access, `is_admin()` and RLS, in that order. Two of the three were reproducible from the repository and one was not.
+
+**`rls_auto_enable` is the quieter half and possibly the worse one.** It is an event trigger that turns row level security on for every new table in `public`, which is what makes "every table has RLS" true by default rather than by anybody remembering. On a rebuilt database it would simply not be there, and the failure has no symptom: tables get created, everything works, and none of them has RLS. That is a data exposure that looks exactly like a working system. The trigger is recovered alongside the function, because recreating the function alone leaves the rule off.
+
+**Transcribed, not authored, and deliberately not run.** Every body came out of `pg_get_functiondef` and every grant out of `has_function_privilege`. Production already has all of it, so applying the file changes nothing; it matters on a rebuild, where a latent error surfaces instead of in a live database. Same posture as the Vault recovery on 3 September and `work_log_pins` on 4 September. The one edit made to the transcription was ordering: leaves first, then the functions that call them, so the file applies to an empty database.
+
+**One thing left for a person.** `mark_enquiry_test()` and `mark_thread_test()` are executable by `anon`. Both refuse a non-admin as their first statement, so it is not an open door, but a grant wider than the function's own rule is something to narrow deliberately rather than inside a transcription, so the grants are reproduced as they are and flagged in the file.
+
+**The same sweep found the bigger version of the problem, which is not fixed here.** Seven tables are written to by migrations and created by none: `jobs`, `evidence`, `job_quotes`, `applications`, `app_settings`, `kickoff_drafts` and `kickoff_packs`. Sixty-nine tables live in `public`; the migrations create forty-five. So the honest statement is that this repository has never been able to rebuild this database, and the function recovery above narrows that gap without closing it.
+
+**It is deliberately left open rather than half done.** The right fix is one command, `supabase db dump`, committed as a baseline migration that every later file builds on. It needs Docker, which is not installed on this machine, so it did not run. The alternative, reconstructing sixty-nine tables with their columns, constraints, indexes, policies and triggers by hand out of the catalogue, would produce a large file that looks authoritative and would be wrong in ways nobody could see. A schema baseline that is subtly incomplete is worse than a missing one, because the missing one is at least honest about it. This is a real open item, not a tidy-up.
+
+**This is the third catch of the same class in three days**, after the Vault migration and `work_log_pins`, and the first two were one object each. The pattern is not carelessness, it is that applying SQL through the MCP writes nothing to disk and nothing reconciles the two afterwards. `scripts/check-deploy-drift.sh` does this for Edge Functions and there is no equivalent for the schema. The cheap version needs no credentials: every function referenced in a migration should be defined in one, which is a grep, and it would have caught `is_admin` on the day it was written.
+
+---
+
+## 2026-09-05 · The site promised to ask for something and never asked
+
+**`docs/cancellation.html` has said this all along, in its own words: "We can only do that if you expressly ask us to, and we will ask you for that in writing at booking."** Nothing anywhere asked. The booking form collected a name, a contact, a parish and a free text note, and then the work started. So the page described a control that did not exist, which is worse than not having the control, because it reads as covered.
+
+**What that is worth in money.** A Condition Report is £249. Client books Monday, pays Monday, checker attends Wednesday, Yaadly pays the checker. Client cancels on day ten. Without a recorded express request they owe nothing and Yaadly has paid the checker out of its own pocket. The 14 day right comes from the Consumer Contracts Regulations 2013 and cannot be signed away, but a client who genuinely asked for an early start owes a proportionate amount for work done. The whole difference between those two outcomes is whether anyone asked, and kept the answer.
+
+**Where it was fixed matters more than the fix.** The obvious place was the Stripe checkout, and that is where the runbook had it filed. Wrong place. Stripe only sees card jobs, so every invoice job over £500 would still have been exposed, and those are the big ones. The booking form sees everything. It is also, word for word, where the published page already said the ask would happen. Fixing it there closed the gap and made the site honest in one change; a Stripe-only fix would have done neither.
+
+**The checkbox is not required, and that was the actual decision.** Requiring it is the tempting version: everyone waives, the exposure goes to zero, and the number on the dashboard looks perfect. It is also worthless. A consent nobody can decline is not a request anybody made, and a regulator reading a form where the box could not be left unticked would treat it as exactly that. So it is optional, an unticked box is a recorded answer with its own note on the booking, and the client who leaves it alone gets their full 14 days before anything starts. The Mirror Rule cuts the same way here as anywhere else: the client's right to wait is as real as Yaadly's need to start.
+
+**A consequence that fell out of it, and is the better half of the change.** If the client has not asked to start early, **no pay button is offered at all**. A card authorisation lasts seven days on every brand and the wait is fourteen, so a hold taken at that moment is guaranteed to expire before the job can legally begin. Offering it would have produced a client who believed they had paid, an authorisation that quietly died on day seven, and a job nobody could start. Nobody asked for this rule; it is what the seven and the fourteen do when put next to each other.
+
+**`START_NOW_VERSION` ships with the wording**, copying `AI_CONSENT_VERSION` from the apply flow for the reason given in CLAUDE.md §6: a consent is only worth what the sentence that earned it said. The sentence is stored on the booking rather than reconstructed later, because only the page can say what was actually in front of that client on that day.
+
+**Not closed: Stripe checkout still carries no tickbox.** It needs the account, and the account was not reachable from the session that did this work. The remaining exposure is narrower than it was rather than gone, and the runbook says so in those terms rather than being marked done.
+
+---
+
+## 2026-09-05 · Migrations are named to sort last, and the check tests that rather than the format
+
+**Four collisions in one day is a scheme problem, not four mistakes.** Migrations were named `<date><letter>`. Parallel sessions share this repository and cannot see each other's branches, so two sessions both take the next free letter and both are correct at the time. On 5 September `20260904k` through `n` were claimed twice, then `20260905a` and `b` were claimed twice more. It never surfaces as a git conflict, because the filenames differ, so both sets merge quietly into a directory whose entire purpose is applying things in order.
+
+**The check tests "sorts last", not "is a timestamp", and that distinction is the whole value.** A 14-digit stamp created today sorts *before* the same day's letter files, because `0` sorts before `a`. A format check would pass that file and it would still run out of order. Proved in all three directions before wiring it in: a letter-suffixed name fails, a correctly formatted name that sorts too early fails and says what it sorts before, a later timestamp passes.
+
+**It reads the index and untracked files as well as commits.** CI only ever sees committed additions, but a check that says "nothing to see" while the new file sits in your index is one nobody runs before pushing, and it then only ever fails in CI, which is the slowest place to learn.
+
+**The 182 existing letter-named files stay.** They are applied history; renaming them would be a worse problem than the one being fixed.
+
+---
+
+## 2026-09-05 · A guardrail fired correctly on a phrase that meant something else, and the fix was the desk, not the rule
+
+**"fully covered" is on the banned list because "your job is fully covered" is a promise about money.** A quote pack said "First coat applied evenly over all railings, surface fully covered". Paint on a railing, so the rule fired on the decorating sense of a phrase it exists to catch in the financial sense. This was a TEST job: every job in this database is (`CLAUDE.md` §12), so nobody was waiting and the elapsed time meant nothing. Recorded for what it predicts rather than what it cost, because painting is a large share of the trade list and the same phrase will block a real job the same way.
+
+**The tempting fix was to narrow the pattern, and that is precisely what §3 exists to refuse.** Distinguishing the financial sense from the decorating sense by regex is not a thing to attempt under time pressure on a live job, and a loosened banned-language rule is permanent while the stuck job is temporary. The pattern was left exactly as it is.
+
+**What was actually broken was the desk.** A flagged draft has one action, Approve, and `approve_quote_pack_draft()` refuses on any flag with no override, correctly. So there was no route at all from "this flag is a false positive" to "this job can move", and nothing surfaced that a job had stopped. The missing thing is a correction path, not a weaker rule.
+
+**How the one live pack was cleared sets the precedent.** The wording was changed, then `_shared/guardrails.ts` was run over the corrected text and its verdict written down: original flagged, corrected clean, price check clean. The flag was recomputed by the real scanner rather than edited to `false` by hand, and `guardrail.rescan_note` records that. The draft stayed at `ready`, so a named human still approves it. Editing the flag directly is the move that would turn that column from a record into a decoration.
+
+---
+
+
+---
+
+## 2026-09-05 · Delivery reporting is one shared line, not six copies of two lines
+
+**Setting the secret would have been the wrong-sized fix.** `yaad-message-status` was built to catch the case where Twilio returns 201 and no phone ever receives anything, and it only ever hears about a message whose send asked it to. Seven functions in this repository send over Twilio, each with its own inline call, and exactly one attached a status callback. So switching the secret on would have lit up the desk's "Messages that failed" tile with a number that read "none failed" and meant "one of seven paths is being watched", which is worse than the tile not existing.
+
+**`_shared/twilio-status.ts` is deliberately trivial**, one function that adds a parameter when the variable is set. The value is not the logic, it is that six copies of two lines is precisely how the seventh copy gets forgotten, and this repository already has the shared-copy drift check in CI to keep one definition honest across bundles. It is inert with the variable unset, which is what made it safe to put in front of the portal sign-in code and a client's own job notifications in a single change.
+
+**CI's Deno job gained `--allow-env`, and finding that was the point of running the suite with CI's exact flags.** The module's whole behaviour is "do nothing unless configured", so the test that matters is the one proving the unset case changes no send, and that test cannot be written without setting and clearing the variable. Locally the looser flags passed; under CI's flags all three failed. Caught before pushing rather than as a red build.
+
+**Six functions were redeployed and four of them run without platform auth.** Each was deployed with its own live `verify_jwt` read back first, which is the trap §12 exists for: a blanket redeploy would have silently added a token check to `yaad-inbound`, `yaad-enquiry`, `yaad-portal-code` and `yaad-notify-client` and broken Twilio intake, the contact form and the portal sign-in at once. Verified afterwards that all four still answer with their own refusal rather than a platform 401, and that the list of eleven is unchanged.
+
+---
+
+## 2026-09-05 · The card path existed and nobody could find it
+
+**Founder's report: "I cannot book each service directly with Stripe, I should be able to."** She was right, and the reason is worth keeping, because the code was not broken. All eight Stripe payment links existed, were live, and were correctly wired. The page simply never offered them. The link appeared only after the booking form was submitted, as a few words of ordinary text inside a longer sentence, and the grey box directly beneath the form still said "Card payment is not switched on yet, so for now everything is invoiced." A client following the page as written would never have looked for a card. **A feature that is built, deployed and invisible is not shipped**, and the thing that made it invisible was stale copy sitting next to it contradicting it.
+
+**Three real defects surfaced underneath, none of which anybody had reported.** The booking dropdown still offered Project Setup Pack and Document Pack Check, both deactivated in `service_catalogue` on 3 September and neither in `yaad-book-service`'s `BOOKABLE` allowlist, so choosing either returned "Pick one of the services on this page." Property Care always posted the bare key `care`, so a client selecting the villa tier was recorded against the £45 standard row while being handed the £95 villa payment link: the record and the payment disagreed on price, silently, in the client's favour on the invoice and against it on the card. And the confirmation told every client "your card is authorised, not charged", which is true of the seven holds and **false of the Oversight Retainer**, a monthly subscription that bills on the spot. That last one is a false statement about somebody's money, made by the page, to their face.
+
+**Root cause of two of the three: one service had three different key spellings.** The catalogue used `care-standard`, the Edge Function's allowlist used `care` / `care-large` / `care-villa`, and `PAYMENT_LINKS` on the page used `care_standard` / `care_large` / `care_villa`. Three sets of strings for one product, with a hand-written translation between them at each hop, and the villa mismatch fell out of exactly that. The page and the function now use the same strings, and the runbook says so where the links are edited. The catalogue keeps its own ids on purpose, because that is a database identity, but there is now one translation instead of two.
+
+**The structural decision, put to the founder and confirmed rather than assumed: the pay button stays after the booking, not on the service card.** Making it a card CTA is the obvious reading of "book directly with Stripe" and it was declined. The booking form is where the client's name, contact and property are recorded, where the SVC reference and portal code are minted, and where the 14 day cancellation notice reaches them. A card button pointing at Stripe skips all of it, and Yaadly would be taking money from someone it cannot identify who has not been given a statutory notice. That is a consumer law exposure, not a missing database row. So the answer to "I cannot pay by card" was to make the card path **loud**, not to make it **shorter**: the panel announces it up front, and the confirmation carries a full width button instead of four words of link text. Same number of gates, one of them now legible. This is the same shape as the §3 refusal in CLAUDE.md, arrived at from the other direction: the ask was genuine and worth doing, and doing it properly meant better information in front of the person rather than one fewer step.
+
+**Left open and flagged, not quietly absorbed.** RUNBOOK recorded an express request to start work inside the 14 days as "still missing before a link should go live". The links went live before it was built. Making the card path prominent does not create that gap but it does widen it, so the runbook entry was rewritten from a precondition into a live open item and raised with the founder the same day. It is a checkbox on each of the eight links in the Stripe Dashboard, which no session can do from here.
+
+---
+
+## 2026-09-05 · The business page stopped claiming independence, because sometimes the trades are ours
+
+**The business page claimed, in six places, that Yaadly is independent of every contractor on the job.** The credential strip put it most plainly: "Never pricing, supplying or managing the trade being assessed." The founder read it and said it is untrue, because on some engagements the people on site are working under her and she supplied them. She is right, and the claim was not a slip of wording: Full Project Management and Property Care both put a Yaadly tradesperson on the property, so the sentence describes the oversight lane and quietly denies the existence of the other one.
+
+**It was also the most attackable sentence on the page.** The audience is agents, developers, insurers and lenders. Doc 03 on that same page promised "never a contractor marking their own work" while Doc 04 offered a review by the firm that, on a managed job, supplied the contractor. The first risk person to read both would have found it.
+
+**Three replacements were put to the founder and she chose the narrower, harder claim.** Not "independent unless I supply the trade", which keeps the strong word and buries the exception, and not "no commission from any trade", which would have needed checking against the 12% on the managed side. She chose: **the person who assesses is never the person who did the work, and both are named on the report.** When the tradesperson is Yaadly's, a different Yaadly assessor reviews it. Weaker word, true on both lanes, and it cannot be broken by the business growing into the managed lane.
+
+**It commits operations, not just copy.** The report has to name the person who did the work and the person who assessed it, and they cannot be the same person. On a small job where the founder is the only Yaadly person on the ground, either somebody else attends the review or the report says the work is Yaadly's own. That is the cost of the claim and it was accepted with the claim.
+
+Changed on `docs/business.html`: the credential cell, the hero, the case file stamp, Doc 03, Doc 04 and its title, plus the meta description, `og:title`, `og:description` and `og:image:alt`, because the claim was in the Google and social preview text too. The rule is written up in `docs/COPY-GUIDELINES.md` §4. **`docs/services.html` still carries the same claim** in its hero and meta description, "You cannot be there. Someone independent should be.", and Full Project Management is on that page. Not fixed, deliberately: the founder scoped this change to the business page.
+---
+
+## 2026-09-05 · The same table was written twice, and two migrations creating it would have failed the rebuild
+
+**The merge, not the branch, was where this appeared.** The agent audit branch created `work_log_pins`. A parallel session, on the same day, found that table live in production and absent from every branch, read it back out of `supabase_migrations.schema_migrations` and committed the transcription as a recovery migration. Both instincts were right and neither session could see the other. Git merged them cleanly, because they are different files, and a clean merge is exactly what makes this class of thing dangerous.
+
+**Two of them is not untidy, it is broken.** `create table if not exists` and `create or replace function` are both forgiving. `create policy` is not: Postgres has no `if not exists` for it, so the second file to run raises `policy "work_log_pins_party_read" already exists` and the rebuild stops. Nothing in CI would have said so, because CI never replays the migrations. The failure waits for the one occasion the chain is ever replayed end to end, which is a restore, which is the worst possible moment to discover it.
+
+**The authored copy survives and the transcription is deleted.** The SQL is identical. The difference is that a read-back out of the catalogue keeps the statements and loses the comments, so the recovered file had none of the reasoning: why a pin never gates a stage, why the address text is kept but never trusted, why `record_work_log_pin` is SECURITY DEFINER and callable by nobody from a browser. That reasoning is the reason the file is in a repository at all rather than only in the database. The recovery file's own history, the two divergent versions of `yaad-inbound` and how the numbers settled which was running, is folded into the header of the surviving file rather than lost with it.
+
+**The behaviour question underneath it was settled by keeping both halves.** One version filed a WhatsApp location share as a work log pin, the other as an arrival check-in, and the parallel session read the row counts and concluded the pins table was dead. It was not dead, it was unmerged. A location share is now an arrival check-in the first time it lands on a stage on a given day and a work log pin every time after: "I am here", then "here is where I was when I filed this". `arrival_log` keeps the evidence spine, `work_log_pins` keeps the rest, and `log_arrival_via_whatsapp` already returned `already_logged_today`, so nothing new had to be trusted to tell them apart.
+
+**Four migrations were re-lettered in the same pass**, for the fourth time in two days. Prefix letters are allocated by whoever writes the file first and neither session sees the other's until the merge. It costs a rename each time and it is not a real fix; the real fix is a prefix that cannot collide, which is a separate change and not one to make inside a merge.
+
+---
+
+## 2026-09-05 · A vetting decision now has to say who made it
+
+**The gap was flagged the day before and fixing it was the founder's call, because it changes what the desk writes rather than only what it reads.** Passing or blocking an application decides whether somebody can earn on this platform, which is squarely the "named human confirms every consequential step" of §2. A named human was confirming it. Nothing recorded that. The desk wrote `applications.status` through the generic action mechanism and no name went with it, so the rule was true in practice and unprovable afterwards, which is the state §2 exists to prevent.
+
+**RPC plus trigger, both, and the trigger is the point.** `decide_application()` is admin only and takes the actor from `auth.jwt()` rather than from a caller-supplied argument, so nobody can decide as somebody else; that is the `approve_quote_pack_draft()` shape. `trg_application_decision_attributed` then refuses any status change into a decided state that arrives without a name, which is the `kickoff_approval_attributed` shape. The RPC alone would be a convention that the next surface forgets. The trigger makes it hold for psql and for a script too. It also deliberately guards `approved` and `declined`, the legacy spellings still sitting in the data, because a guard listing only the three current words is walked round by using an old one.
+
+**The eleven historical rows are left NULL and that was the decision, not an oversight.** Nobody knows who decided them. Backfilling a plausible name puts a false attribution into the exact column that exists to be trustworthy, and backfilling `system` claims a machine ruled on a person. NULL reads as not recorded, which is true. The rig asserts they are still NULL, so a later tidy-up has to argue with a test.
+
+**One incidental fix, because these were the first actions to need both.** An action with a form skipped the confirm dialog, so its `says` text was dropped. No action had ever defined both, so nothing was being lost until now, and "this is a safety finding, not a tidy-up" is exactly the sentence that should be in front of somebody as they block a person. It is rendered above the fields.
+
+**Capacity stops undercounting**, which is how this gap was found: `desk_decisions` gains a vetting arm with no `job_id`, because a vetting decision is about a person rather than a job. Sending a gap back counts, since it is still the person's judgement and still their evening.
+
+---
+
+## 2026-09-05 · The admin desk gets linted, with one rule rather than a style pass
+
+**Nothing in CI had ever read the desk.** `concierge/concierge.html` is one file with one very large inline script and twenty-plus views, and it is where the founder does the work. Two crashes have now shipped from it: the 17-18 August temporal dead zone that broke admin sign-in on a direct link, which the CI file's own header cites as the reason CI exists, and one found on 5 September where `owedOldest`, `enqBreached` and `enqOldest` were const-declared below the tile that read them. `loadOverview()` threw `ReferenceError` and rendered 13 tiles instead of 29, taking the whole assistant scoreboard and the entire alert list with it. Verified by serving the file on its own port and driving it with a stubbed client, after a first attempt tested the wrong file because a stale server was answering on the port I assumed was free.
+
+**The rule is custom, and the stock one was rejected on purpose.** ESLint's `no-use-before-define` reports 17 findings here and all 17 are safe: `tile`, `sb`, `ROWS`, `currentView` are read inside functions that run long after initialisation. Shipping a job that fails on 17 correct lines means it gets disabled inside a week, which is the exact argument the secrets scanner's comment already makes about placeholders. So the rule compares scopes and fires only when a read sits in the same scope as its `let` or `const` and before the declaration. That is not a style opinion; it throws every time the line runs. Proved both directions before wiring it in: red on `origin/main` naming lines 3272 and 3273, green on this branch.
+
+**Deliberately narrow, and it should stay narrow.** The desk is written across many sessions and a full lint would be noise. If a second rule is ever added it should have to clear the same bar: does a violation break the page, or is it a preference.
+
+---
+
+## 2026-09-05 · The quote pack is the gate, and I described it as an afterthought
+
+**Correcting myself, because the error was load bearing.** `20260904u` excluded `quote_pack_drafts` and `kickoff_packs` from the capacity count and justified it by calling them "documents issued automatically after a human accepted a quote, not decisions anybody sat down and made". The quote pack does not follow a quote, it becomes one. The table's own comment says it: one AI-drafted overview per job, scope and timeline and payment stages, no prices, which a worker edits and prices on `job_quotes`, and that edited copy is the quote the client sees. RLS only lets a worker read a draft at `approved`. In the founder's words, it is the only thing that needs to approve a job, and it is what is generated on each quote for the client. The kickoff pack comes after and is gated on payment, one per quote, confirmed by both sides with a shared code.
+
+**My first correction was still half wrong, which is worth recording rather than tidying away.** I replaced "issued after a human accepted a quote" with "what a worker quotes against", which fixed the direction and still described it as an internal artefact. It is the client's quote in draft. That matters for how the held-pack alert is worded: a held pack does not slow a job, it means no quote reaches that client at all.
+
+**Excluding the auto-issued rows was right. Excluding the tables was not.** The `system:%` filter was doing the real work and still is: 314 auto-issued rows stay out, because a guardrail-clean pack issuing itself is the system deciding the content was clean, not a person deciding anything. But the same tables carry the human path, and `approve_quote_pack_draft()` is admin only, refuses outright on any guardrail flag rather than offering an override, and attributes the approval to the signed-in admin specifically so the row can prove a named human confirmed it. That is a desk decision by any definition and it was being thrown away. It changes no number today, because nobody has ever cleared one. It stops the first from going uncounted.
+
+**The correction surfaced a real gap, on a test row.** Chasing the sequence turned up a draft held at `ready`: `JOB-WEB-1788281626906`, flagged for "fully covered", which is on the banned list in `CLAUDE.md` §8. The guardrail behaved perfectly. The job showed as `open_for_quotes` and open on the board while no worker could see anything to quote, because the pack they read was held, and nothing on the Overview counted a held pack, so a stopped job looked exactly like a quiet one. Every job here is a test job, so nothing was actually lost; the gap in the desk is real regardless of what the row was. `packs_awaiting_a_person` and a red tile now say it out loud.
+
+**The general shape of the mistake, worth naming.** I reasoned about what a table was for from its column names and its row counts rather than from the migration that created it, and wrote the conclusion into a comment as though it were established. The row counts were right and the story around them was invented. Reading `20260901r` first would have cost two minutes.
+
+---
+
+## 2026-09-04 · The Pricing agent is reachable, and the log matters more than the panel
+
+**The gap.** `yaad/agents/pricing.py` has existed since the engine was written and ran nowhere but `run_demo.py` and the tests. Its `review_quote()` is the Deposit Protection Check in miniature, and the Deposit Protection Check is £149 on the published price list. The audit's roadmap item 9 was to make it reachable.
+
+**No model, and the file says so in several places.** CLAUDE.md §5 is unusually emphatic: pricing is a lookup, a hallucinated band breaks precisely the thing the business exists to fix, and "no public price exists in Jamaica for this work" is a correct and complete answer rather than a gap to fill. The desk panel is a lookup and a few thresholds. A test asserts the four honest gaps (painting, masonry, septic, general repair) stay empty after generation, because a silently dropped null band would show as "not looked up" instead of "there is no such price", which is a much weaker statement and the opposite of the point.
+
+**Generated, not copied.** The desk is a static page with no server behind it, so it needs the numbers in the file. A second hand-typed table is a second set of numbers the moment anybody edits one, so `scripts/gen_price_benchmarks.py` writes them into a marked block in `concierge.html` from `yaad/benchmarks.py`, and `tests/test_price_benchmarks.py` re-runs the generator and fails if the page has drifted. Same pattern as the trades list earlier the same day, same reason.
+
+**The thresholds were ported verbatim and then checked against the source**, not eyeballed. Six cases through the JavaScript in a browser and the same six through `review_quote()` in Python: dead centre, over 2x, under half, 1.27x just inside the band, an honest gap, and a real mid-band figure. All six agree.
+
+**One mapping had to be invented and it is in the open.** The benchmarks were seeded against the engine's own short vocabulary (roofing, metalwork, grounds) and the desk speaks the 18 taxonomy trades. `TAXONOMY_TO_BENCHMARK` maps ten of them; the other eight have no seeded family and are simply not offered, because a dropdown entry that cannot be looked up implies a lookup that will not happen. A test asserts every mapped trade lands on a family that actually has bands.
+
+**`quote_reviews` is the part that compounds.** The panel answers one question; the table is the proprietary price database the plan describes as both a future product feature and an investor asset, and it starts empty. It stores the band AS IT READ AT THE TIME rather than referencing the benchmark, because benchmarks get revised and a past judgement has to stay readable against the numbers somebody actually saw. It also carries a free-text note, because a quote is high due to bad access or a changed spec or somebody trying it on, and only a person knows which.
+
+**Admin only, deliberately with no party read policy.** The audit flagged the risk as a copy risk rather than a code one: a band shown beside a worker's price reads as an estimate, and estimating is quantity surveying, which is the one thing Yaadly explicitly does not guarantee. It stays internal until the founder settles that wording.
+
+---
+
+## 2026-09-04 · The Kickoff Pack becomes an addition, and it turns out it was only ever mandatory by accident
+
+**Founder's instruction:** take the Kickoff Pack out of the flow, offer it where a client wants project documentation, leave the Quote Pack as it now is.
+
+**The first finding was that the database already agreed with her.** `_do_choose_worker` books a job on either of two conditions: the quote is `quote_confirmed`, meaning both sides agreed the PRICE and there is no pack anywhere, or it is `kickoff_requested` and the pack is confirmed by both sides. A no-pack route has existed the whole time. Nothing about the booking gate needed changing, and ripping one out would have broken the path a client who genuinely wants documentation takes.
+
+**It was mandatory in practice because of one missing function.** The only thing that produces `quote_confirmed` is `agree_quote_via_whatsapp`, which identifies people by the last nine digits of a phone number. A client in the portal has a session and an email and no phone match, so the Accept button had exactly one RPC it could call, `request_kickoff_as_me`. Accepting a price therefore always ordered a ten section project pack with a risk register and a document schedule, on a £300 leaking pipe as readily as on a renovation. The pack was optional in Postgres and compulsory in the product, and nobody had noticed because the two facts lived in different files.
+
+**So the fix is a door, not a demolition.** `agree_quote_as_me` is the portal twin of the WhatsApp function: same table, same dual agreement rows, same resulting status, identified by the session's own email. The Accept button now confirms the price, and a second, quieter control underneath asks for full project documentation. An old link arriving at `/portal/join` with no `want` parameter takes the price route, deliberately: the safe fallback is the smaller thing, never silently ordering a project pack nobody asked for.
+
+**A consequence in the other direction, fixed in the same commit.** The evidence completeness checks built hours earlier use the Kickoff Pack's `evidence_checklist` as their spine. If most jobs stop having a pack, that check goes quiet on most jobs, and the biggest gap the audit closed would have half reopened the same day. The Quote Pack carries one `evidence_note` per payment stage, so it now stands in when there is no Kickoff Pack. It is a thinner source than a per-item checklist, and a thinner source is worth much more here than none. The check says which document it read the requirement from, so nobody is left guessing why a stage asks for one thing rather than five.
+
+**Open, and it is a solicitor question rather than a code one.** On the pack route the dual confirmed artefact is the Kickoff Pack. On the price route it is the accepted quote and its Quote Pack: scope, inclusions, exclusions, rough timeline and payment stages. That is a narrower document, it is very probably the right one for a small repair, and it is a real change in what a client has signed up to. It belongs in the solicitor brief. Flagged here, not decided here.
+
+---
+
+## 2026-09-04 · Neither pack issues itself any more, and the string that gave it away was six words long
+
+**What was happening.** A cron approved any Kickoff Pack or Quote Pack whose guardrail came back clean and sent it to a client or a worker. The row it wrote said `approved_by: "system: auto-issued, guardrail-clean"`, which states the whole defect in six words. The guardrail is a banned-word scan, a currency regex and a CJK check. It knows whether the draft said "escrow" or wrote a price. It cannot know whether the scope is right, whether the exclusions protect the trade, whether the risk register is honest, or whether the payment stages run in the order the building actually demands. A clean scan was standing in for a judgement it had never made.
+
+**The sharpest part is the payment staging.** The Kickoff prompt asks the model for five to seven stages with whole-number percentages summing to 100, and the model picks them, then explains its own weighting to the client in a covering note. Those are Yaadly's commercial terms on a specific job, drafted by a model and issued by a cron. The pack also asks the model to write `human_review_notes`, "specific things the project manager must personally verify or correct before issuing this to the client", and nothing in the pipeline required anybody to read them. The instruction to a human existed and the door past it was open.
+
+**The founder's own correction of 1 September was already pointing here**, live: "I never saw when the small pack was issued for review." A review step was added in response, and then phase 2 approved anything clean, so a clean pack still went out unread. The review step existed and the auto-issue reached past it.
+
+**What changed, and what deliberately did not.** The drafting is untouched: both packs are still written by the model within a poll, which is the part that saves the time. The Kickoff Pack is still built and still linked to its quote, because that is plumbing. Only the approval moved to a person. `trg_notify_kickoff_pack_ready` fires on the transition into `approved`, so a worker now hears about a pack when a human approves it and not before, which is the right order and was previously the wrong one by accident.
+
+**The bottleneck this creates is real and is handled rather than denied.** The audit flagged it when the item was written: a queue can become the new problem. An unapproved Kickoff Pack BLOCKS A BOOKING, because `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides and neither side can confirm what nobody has approved. So `yaad-kickoff-check` now pushes to the founder's phone on any poll where a pack is waiting, and says in the message that a booking is stuck behind it. The Quote Pack is gentler: RLS hides an unapproved draft from workers, but a worker can still quote without one, so that delays a courtesy rather than stalling the board.
+
+**One desk change came with it.** `human_review_notes` and `open_questions` now render FIRST in a pack, and payment stages third. They were ninth and eighth. While packs approved themselves the order barely mattered because mostly nobody was reading them; now every pack waits on somebody reading that page, so the model's own list of what a human must verify is the first thing on it.
+
+---
+
+## 2026-09-04 · The geotag check comes back as a WhatsApp location share, which is a better thing than the one it replaces
+
+**Founder's instruction, on being told the check could not be ported: do it through Twilio, "as this might be better".** It is better, and the reasoning is worth keeping because the obvious alternative is a dead end that looks alive.
+
+**There was never a photo geotag to read.** The Python engine's "live pin on work log" reads a geotag off a photograph. WhatsApp re-encodes images on send and discards the EXIF block, GPS included, and this repository's own portal upload path strips location on purpose. So the check could not have been ported by trying harder at the photo; the data has never existed on either route in. Anybody proposing to recover it later is proposing something that does not work, which is now written into RUNBOOK §20 so the next person does not spend a day on it.
+
+**A location share is a different signal and a stronger one.** Twilio delivers `Latitude`, `Longitude`, `Address` and `Label` as ordinary inbound webhook parameters, with nothing to buy or install, so the founder's "they have a plugin for this" was right about the capability and generously wrong about the cost. Two properties make it better than EXIF rather than merely equivalent. It cannot be back-dated: a photograph's metadata can come from a picture taken last week at a different house, while a share is an act performed now. And it is consent rather than covert extraction, which matters a great deal when the person being located is a tradesperson working for you rather than a suspect.
+
+**The rule it inherits, and the test that keeps it.** `arrival_log`'s migration says GPS "strengthens the record, it never gates it", and that declining, having no fix, or having no geolocation at all never blocks a check-in. That holds here without exception: a missing pin is a NOTE and never a gap, it never reaches the gap list, and a test asserts both. The wording of the ask is tested too, that it says what a pin buys the worker and contains none of "must", "required", "need to", "failed" or "missing". The reason for testing copy, which is unusual: the moment a missing pin reads as a failing, a voluntary thing has become an obligation and a worker is being judged for declining, and that drift would happen one careless word at a time.
+
+**Which job it belongs to is always asked.** The evidence lane's own rule, quoted from its comment: never filed on the strength of a single option alone, even when there is only one job it could possibly be. Pins follow it exactly, through the same session shape and the same `pickJobChoice` matcher.
+
+**`work_log_pins` is a new table rather than a column on `arrival_log`.** An arrival and a work-log pin are different events: one says somebody turned up, the other says somebody was standing there when the work was recorded. Merging them would have made both harder to reason about and would have let an arrival stand in for a work log. RLS mirrors `arrival_log` exactly, party read plus admin, and writes go only through a SECURITY DEFINER function that no browser can call, because the pin arrives over a Twilio webhook rather than from a signed-in session and the worker is identified by the number the signature check already authenticated.
+
+**The privacy page now says all of this**, on the founder's own instruction and before the feature was finished rather than after. It names both moments a location can be read, says both are optional every time, says plainly that declining blocks nothing, and states that Yaadly does not track anyone: no continuous location, no live location, nothing read at any moment other than the tap or the share. The WhatsApp Business API does not carry Live Location at all, so that last sentence is true by construction as well as by policy.
+
+---
+
+## 2026-09-04 · The evidence checks are live, and three of the audit's own seven were wrong
+
+**The gap this closes.** `yaad/agents/verification.py` has checked an evidence chain since the engine was written, and CLAUDE.md §10 calls those gates the moat: they come out of seven years of construction project management and they are the one part an agent cannot supply. The agent audit found they were imported by exactly two files, `run_demo.py` and `tests/`, and ran on no live job at all. What ran instead was a vision model describing photographs, which by construction cannot notice what is ABSENT. That is the whole point of a completeness check and it was the thing not running.
+
+**The hard rule, and it shaped every decision below.** The checks assemble a pack and decide nothing. Nothing blocks a stage, writes `evidence.ok` or touches `stage_approvals`; `approve_stage()` still requires a named human and is still the only door. A completeness check that could block is a machine standing between a worker and getting paid, which is exactly the shape §3 exists to refuse. A test asserts the shape of a `Check` object so no field carrying an instruction to act can be added quietly.
+
+**Worker first, desk on gaps.** Founder's decision when it was put to her. A worker still on site can fix a missing clip in two minutes and the desk cannot, so the gap list rides in the draft he already gets before the client is told anything, and Monique is pushed only when something actually is missing. It is the Mirror Rule read properly: the same check that gives the client a complete pack keeps the worker off the hook for one he could have finished before leaving.
+
+**Three of the seven checks proposed did not survive her reading, and she was right on all three.**
+
+*Before and after was dropped outright.* It read `evidence.label`, which is text the worker types, and the word "after" in a caption is not proof of an after shot. It misfires in both directions. Where a job genuinely needs a before and an after, the approved Kickoff Pack says so and the checklist check covers it. Her point, and it is the general one: a check nobody can trust is worse than no check, because it spends the attention the real findings need.
+
+*The site check became desk-only and reports a distance rather than a verdict.* `far_from_site` means 30km from a parish centroid, and the migration that added it says in as many words that a materials run, a parish border and a bad GPS fix all raise it exactly as loudly as a wrong site would. Putting that in front of a tradesperson reads as an accusation the data cannot support. It now goes to the desk alone, saying what else produces the same flag, and a test asserts it can never appear in a worker's list.
+
+*The checklist check became the spine*, because it is the only one that knows what THIS job actually agreed: it reads the `evidence_checklist` out of the Kickoff Pack both sides confirmed. It counts and lists what the pack asks for, and deliberately does NOT claim to know which item is missing, because matching a filed photograph to a checklist line means guessing from a free-text label, which is the same unreliable move as the dropped check. A test enforces that it never names a specific missing item.
+
+**One of the three objections was mine and was wrong.** I told her the clip check also read label text. It reads `evidence.mime`, which comes off the uploaded file rather than off anything typed, so it is one of the reliable ones. Corrected before building rather than after.
+
+**What could not be ported, and is not faked.** Two Python checks have no live data behind them: evidence rows carry no lat/lon, only the arrival tap does, so "is this photograph geotagged" is unanswerable; and there is no duration column, so "is this clip long enough to be usable" is unanswerable. Both need a schema change and both are decisions, not details to smuggle into a port. They are named in RUNBOOK §20 so the next person does not add them by guessing.
+
+---
+
+## 2026-09-04 · The principal-contractor sweep finally reached the agent prompts, which the 3 September pass had missed
+
+**On 3 September eleven public places stopped saying "nobody is paid until you approve". The prompts were not in that pass, and prompts are where copy comes from.** So the two documents a client and a tradesperson actually sign, the Kickoff Pack and the Quote Kickoff Pack, were still being generated from instructions describing money held and released against evidence. That is the escrow shape the principal structure exists to avoid, being manufactured fresh on every draft, a day after the marketing pages stopped saying it. Fixing pages and leaving the generator is the shape of defect worth naming: the page is the output, the prompt is the press.
+
+**Ten places, not the six the audit counted.** The audit found six. Sweeping properly turned up four more: the Kickoff prompt's rule 1 as well as its rule 4, `EvidenceLedger.tsx` telling a client "money moves when you approve them", `PackStageProgress.tsx` rendering "releases on approval", and four rows of the prototype's own tables labelled "Held ... Releases on approval". The lesson for the next sweep is that grepping the phrase the audit noticed finds the instances the audit already found; grepping the *shape* finds the rest.
+
+**What the replacement copy says, and why it is the same sentence on both sides.** A stage closes when the client has seen that stage's evidence and agreed the work is right, and the balance for it becomes due to Yaadly. The tradesperson is engaged and paid by Yaadly under a separate agreement and never waits on the client. Both halves are stated in both packs on purpose. It is the Mirror Rule: the client's protection is that nothing closes without evidence, the worker's protection is that his money does not hang on a stranger abroad opening WhatsApp, and each one reads better when the other is on the page next to it. For the worker-facing Quote Pack the prompt now says to state it plainly where it helps, because it is the strongest line in the recruitment pitch.
+
+**`release_condition` keeps its name, deliberately.** The obvious move was to rename the JSON key to something honest like `sign_off_evidence`. It is read in six places and, more to the point, it is a key inside Kickoff Packs already stored in the database, so renaming it would leave every pack issued before today rendering a blank where its condition used to be. The key stays, the prompt now tells the model what kind of sentence belongs in it, and the schema line says in as many words that the name is legacy. The labels around it moved instead: the desk now reads "Signed off on" rather than "Releases on", on both the concierge copy and the deployed one.
+
+**One thing changed that nothing renders.** `PackStageProgress.tsx` is imported by nothing as at 4 September 2026. Its copy was swept anyway and a note added saying so. Wrong copy sitting in an unused component is not harmless, it is a trap primed for whoever wires it up, and it costs two lines to defuse now against an incident later.
+
+**Flagged, not changed.** The prototype shows a client approval window of five days that then "auto-approves". That is a client response deadline rather than a payment releasing on a timer, so it is not the thing CLAUDE.md §3 forbids, but it sits close enough to it to be a founder decision rather than a copy fix. It is untouched and it is hers.
+
+---
+
+## 2026-09-04 · The text model is in the EU, and the reason the switch was hard to land is that model failures were invisible
+
+**The move itself was one secret, as designed.** `MISTRAL_API_KEY` and `MISTRAL_MODEL` were set on the Supabase project and every one of the nine functions that calls a text model picked Mistral up on its next invocation, with no redeploy, because `_shared/textmodel.ts` reads the provider at call time. That part of the 30 August design held exactly as intended. Client and worker text now goes to `api.mistral.ai` in the EU rather than to MiniMax in China, ahead of the December pilot and ahead of any real client data existing. The database was already in eu-west-3, so the text model was the last part of the system outside the EU.
+
+**Two attempts failed first, and both were model ids rather than keys.** The default baked into `textmodel.ts` was `mistral-large-latest`, which Mistral no longer serves. The replacement first tried was `mistral-medium-3-5-26-04`, which is the model's NAME in Mistral's overview table and not an API id at all. The working id is `mistral-small-latest`. It was chosen over `mistral-medium-latest` for two reasons beyond price: its reasoning is off unless a request passes `reasoning_effort: high`, so it cannot repeat MiniMax's habit of spending an entire token budget inside a `<think>` block and never reaching the answer, and `mistral-medium` is scheduled for deprecation inside the pilot window, which would have meant a working switch that died in December.
+
+**The real defect this exposed is that a failed model call left no trace anywhere.** `yaad-post-job`, `yaad-agent`, `yaad-invoice` and `yaad-sketch` reported model failures only through `sp.recordError()`, which lands on an OpenTelemetry span. `OTEL_EXPORTER_OTLP_ENDPOINT` has never been set on this project, so the tracer is inert and those spans go nowhere. A dead model id therefore produced a completely silent failure: the client got a form the agent had not filled in, and there was nothing in `function_logs` to say why, or even to distinguish it from the hourly model cap having been reached. `yaad-inbound` had exactly this defect and it was fixed on 1 September 2026, after a client got silence and there was nothing to read; the same fix was never applied to the other four. It is now, and it is the same shape: `console.error` alongside the span on every path where the model call gives up, naming the provider and the status. Verified by breaking the model id on purpose and reading `readTheJob: mistral http 400: Invalid model` out of the logs, then restoring it.
+
+**The wider point, recorded because it will come up again.** Instrumentation that is built but not switched on reads as coverage and is not. Every model call in this system carries full GenAI-convention span attributes including `yaadly.model.region`, which is precisely the attribute that answers "which country received this client's message", and none of it is reachable. RUNBOOK §9 step two told a future reader to prove the EU switch by reading that attribute, which was unrunnable advice. It now describes the method that actually worked, a synthetic job posted through `yaad-post-job` in draft mode, whose response hands the model's own answer straight back. Turning on a real OTLP endpoint remains worth doing and is not a prerequisite for anything.
+
+**Also corrected in RUNBOOK §9, and more serious than the rest.** Its deploy loop named eight functions when there are nine, included `yaad-whatsapp-webhook` which was deleted on 1 September 2026, and applied `--no-verify-jwt` to every function in the list. That is the exact blanket form CLAUDE.md §12 exists to forbid: running it as written would have stripped platform authentication from the six of the nine that require it, silently, with the deploy still reporting success. The loop is now split in two, six without the flag and three with it, with an instruction to read the live settings first and to check them again afterwards.
+
+**Step three followed the same day, and the reasoning is worth keeping.** The MiniMax branch is out of `_shared/textmodel.ts`, synced to all nine copies, all nine redeployed, and `MINIMAX_API_KEY` unset. The argument for removing it rather than leaving it as a safety net is that it stopped being a safety net the moment Mistral became the choice: a second provider you are not using is not a fallback, it is a silent route to a country the privacy page says you do not use, waiting on one missing secret. There is now no third branch at all, so an absent Mistral key produces `NO_PROVIDER_MESSAGE` and a visible failure. That is the correct failure. A quiet reroute to China would not be.
+
+**`docs/privacy.html` moved in the same change, and it did not simply get better news.** That page carried a section headed "Two things we will not soften", the first of which disclosed MiniMax in China and said in terms that the sentence stays until the switch is made. Replacing it with "we are in the EU now" would have softened exactly what that section exists not to soften, because it is not true of everything: photographs still go to NVIDIA in the United States and voice notes are transcribed by Cloudflare with United States providers behind it. So the item now names the move, names the date, keeps the record that it used to be China, and then says plainly what still leaves the European Union. The provider table row and both dates on the page moved with it.
+
+**Two things deliberately not claimed on that page.** Whether Mistral's training opt-out has been applied to this workspace, because that is a console setting nobody has confirmed to me and an unverified privacy claim is worse than a missing one. And whether a signed data processing agreement is in place, which is still open and may depend on the plan tier. Both belong on the page once they are settled, and neither should be written before.
+
+**`yaad-kickoff` had three ways out of the EU and they came out the same day, after a wrong call about them.** That function kept a provider picker of its own, and it was first reported here and to the founder as inert on the grounds that neither key was set. That was wrong. `NVIDIA_API_KEY` **is** set on this project, and the ordinary path ended `return pickTextProvider() ?? nvidia()`, so a silent fallback to the United States was armed the entire time. It never fired only because Mistral resolved first, which is an accident of ordering and not a control. It is the identical pattern removed from `textmodel.ts` an hour earlier, and leaving it while calling it safe was the worse error of the two.
+
+All three routes are gone: the silent NVIDIA fallback, the explicit `PROVIDER=nvidia` switch, and the per-draft OpenRouter model override that carried region `unstated`. `yaad-kickoff` now calls `pickTextProvider()` and nothing else, like the other eight. The override is refused with a plain message rather than ignored, so a caller still sending `model` is told instead of quietly receiving a pack drafted by something else.
+
+**The privacy page is what decided the NVIDIA question.** It names NVIDIA for image analysis, in the United States, and that is true and disclosed: `yaad-sketch` and `yaad-notify-client` genuinely send photographs there, which is why `NVIDIA_API_KEY` stays set. Drafting a client's Kickoff Pack there is a different use of the same vendor and the page does not disclose it. Aligning the code to the page was the cheaper direction than widening the page to the code, and it costs nothing: Mistral drafts the packs.
+
+**What was given up.** The v12 model shootout of 24 August 2026, which let the desk draft one brief through several OpenRouter models and read the packs side by side. It was a good idea. It is recoverable from git, and if it returns it belongs on synthetic briefs rather than on a real client's intake, which is what a Kickoff Pack is drafted from.
+
+---
+
+## 2026-09-04 · Capacity counts only decisions a person made, and a worker vetting decision is not recorded at all
+
+**The capacity metric was one query away from being nonsense in the direction that flatters.** `kickoff_packs` and `quote_pack_drafts` both carry an `approved_by`, which reads as a human approval and is not one: every row of both reads `system: auto-issued, guardrail-clean`, 314 of them against 11 real decisions. A capacity view over "things with an approver" would have reported a desk getting through three hundred items and nobody would have had a reason to doubt it. `desk_decisions` therefore excludes anything whose approver matches `system:%`, as a pattern rather than a table list, so a future auto-issuer cannot quietly join the count.
+
+**A working session rolls over at 05:00 Jamaica time.** The person doing this work is a night owl. Grouping on the plain local date splits a real evening at midnight, reports two thin sessions where there was one, and halves the capacity figure while looking entirely reasonable. The rig pins the boundary at 23:10, 00:40, 04:50 and 05:10.
+
+**Built before the pilot on purpose.** December is the run that produces the first real capacity data, and a view added in January measures none of it. This is the same mistake the stall history had to be gone back and fixed for on the same day, which is why it was not repeated here.
+
+**The open gap, and it is a governance one rather than a metrics one.** Passing or failing a worker's application is a consequential decision under section 2, and nothing in the schema records who made it or when. `applications.status` moves and leaves no attributed row; `vetting_reviews` holds the AI's read, not the person's ruling. So the rule "a named human confirms every consequential step" is true in practice for vetting and cannot be evidenced after the fact. Capacity undercounts by however long vetting takes, which is the smaller half of the problem. Left as a flagged gap rather than fixed in passing, because adding attribution means changing what the desk writes when an application is decided, and that is worth doing deliberately.
+
+---
+
+## 2026-09-04 · Evidence completeness is measured from the snapshot, not from the evidence table
+
+**The obvious implementation is wrong in a way that flatters the business.** Counting rows in `evidence` per approved job gives a completeness figure that goes up when a worker files a photograph the day after sign-off. The measure is supposed to say what the named human had in front of them at the moment they decided, and that version says something closer to what eventually turned up. `stage_approvals.evidence` already holds the right thing: a snapshot written at approval time, each item carrying the sha256 of the exact bytes. Reading the snapshot makes the number structurally incapable of improving retrospectively, which is the property that matters, and a rig proves it by filing evidence and an arrival after an approval and confirming neither moves the row.
+
+**Three separate numbers rather than one completeness score.** The three gaps have unrelated causes: a sign-off with no evidence is a desk habit, a sign-off with an unfingerprinted item is plumbing, and a sign-off with no Arrival Log is a thing workers could not do from a phone until the location pin lane shipped the same day. A single composite would have read near zero on live data and implied workers were cutting corners, when the arrival leg had no usable route until now. Separate numbers say which one is actually open, and the arrival number is now the measure of whether the pin lane worked.
+
+**Before-and-after is not measured, and that is a refusal rather than an omission.** Nothing in the schema records which a photograph is. The labels say it in free text often enough that inferring it would work most of the time, and a check that works most of the time on evidence is worse than no check, because it reads as covered. Measuring it needs a field that says so, which is a product decision and hers.
+
+---
+
+## 2026-09-04 · A stall that resolves is written down before it is deleted
+
+**The system review asked for stall rate and time to unstall. Only the first was computable, and finding out why took reading the delete rather than the table.** `job_stall_state` holds one row per job that has gone quiet long enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes that row the moment the job moves again. So the table answers "what is stuck right now" perfectly and answers "how long do things stay stuck" not at all, because the evidence a stall ever happened leaves with the row. `worker_stall_history` sounds like the missing piece and is not: it is a view over the same live table, so it empties at the same instant.
+
+**The delete stays.** The comment on the table says the clock should genuinely reset rather than leave a stale flag lingering, and that is correct: a stall flag that outlives the stall is how a job gets chased twice and a worker gets a reputation from a row nobody cleared. The fix is one row written on the way out, not a change to the behaviour. `clear_resolved_job_stalls()` now inserts into `job_stall_resolved` and then deletes exactly as it did; nudging, escalating and clearing are untouched, and `yaad-job-health` needed no change at all because it already went through the RPC rather than deleting directly.
+
+**The clock is named for what it actually measures, and that was the real decision.** `hours_stalled` runs from when Yaadly *noticed* (`nudged_at`) to when the job moved again, not from when the job went quiet. The tempting version computes the earlier moment from `job_silence_hours()` at delete time and produces a bigger, more impressive-sounding number that nobody can point at a row for. The moment a job went quiet is not recorded anywhere in this system, so that number would be a reconstruction presented as a measurement. Time from noticing to moving is smaller, honest, and the half Yaadly can actually do something about.
+
+**It is not retrospective and the desk says so.** History starts the day the migration ran, so "Time to get moving again" reads n/a until stalls resolve after it, and the tile is uncoloured in that state rather than green. Same reasoning as draft acceptance below: a metric with no data underneath it should look empty, not look healthy.
+
+---
+
 ## 2026-09-04 · Tap-to-approve was built twice on the same day, and the simpler one won
 
 **Two sessions built the same feature, separately, hours apart.** Both reached "a Quick Reply button so a client does not have to type a thirteen digit job code on a phone to move money." They disagreed on one thing, and that one thing decided it.
@@ -1637,3 +2021,90 @@ First, `supabase/functions/_shared/guardrails.ts` bans the token "escrow" and it
 Second, the price alignment (Deposit Protection Check to £149 against a standard £249, Visual Check to £95 against £125) is a money decision under `CLAUDE.md` section 10. It was taken in the conservative direction, adopting figures already published to customers on the homepage and in the FAQ rather than inventing any, because leaving a founding rate identical to its standard rate was the larger risk of the two. If either standard figure is wrong, that is hers to correct, and `RUNBOOK.md` now lists all seven places a price has to change together.
 
 **A guardrail caught a mistake in this change and was obeyed.** The first version of the assistant's facts in `supabase/functions/yaad-inbound/faq.ts` said "Yaadly does not operate an escrow service", copying the sentence added to the marketing pages. `price-figures_test.ts` failed, because the screen bans the token regardless of the sentence around it, and that is correct: putting the word in front of a client over WhatsApp is what ledger guardrail 1 forbids, denial or not. The copy was changed, not the assertion. The marketing pages keep the explicit sentence, because `guardrails.scan` does not read them and the founder asked for it by name; outbound assistant text says the same thing without the word. This asymmetry is deliberate and is now noted in the copy guidelines.
+
+## A client can ask for one worker by name, and gets first refusal, not a booking (5 Sep 2026)
+
+The "Book <name> for a job" button on a worker profile has existed since the
+marketplace was built and did almost nothing. It carried `?worker=<slug>` into
+the job wizard, printed the name on the confirmation screen, and added one
+line of free text to the enquiry email. Nothing reached the job row. The job
+went onto the open board like any other, every worker in that trade could
+quote it, the worker who had been asked for was never told, and the only trace
+of the client's choice was a sentence somebody had to read and act on by hand.
+The screen said "we will take this to them first" and no part of the system
+knew that promise had been made.
+
+Three shapes were put to the founder: hold the job for that worker until they
+answer, hold it for a fixed window, or name the request but leave the job on
+the open board from the start. She chose the middle one. The job is held off
+the board for 48 hours, only the requested worker can quote it, and the hold
+ends the moment any of three things happens: they quote, they decline, or the
+clock runs out. Holding it until they answer would have left a client waiting
+indefinitely behind somebody who was simply busy; leaving it open from the
+start would have made the button a label rather than a promise.
+
+Three things worth writing down about the shape. There is no "accept" state:
+accepting without quoting changes nothing for the client, and a state that
+changes nothing is one more thing to teach, so the worker's yes IS their
+quote. There is no stored "expired" state either, only a computed one, which
+means no scheduled job has to run for a hold to lapse and no cron failure can
+quietly hold a job shut forever. And none of this books anybody: `worker_email`
+on a job is still written in one place, `_do_choose_worker`, when the CLIENT
+accepts a quote. This holds a door open for one person for two days.
+
+The client hears when the worker declines and does not hear when the window
+simply lapses. That asymmetry is deliberate. A decline is something the worker
+said; a lapse is silence, and turning silence into "your worker did not answer"
+would be Yaadly reporting on somebody's reliability off a two day clock, which
+is close to a reputation judgement and is not a trigger's to make. The wizard's
+confirmation copy says exactly this, so the promise and the code agree.
+
+`20260905a_a_client_asks_for_one_worker_and_that_worker_hears_about_it.sql`.
+
+## A worker's own face, voice and work go on their profile, on a second consent, as a copy (5 Sep 2026)
+
+/apply has collected a photograph of the tradesperson, a thirty second
+introduction video and a portfolio file since 3 September. All three land in
+the private vetting bucket, on the ninety day purge clock, and no client has
+ever seen one. The public profile's Portfolio section is a different thing: it
+is built from completed Yaadly jobs, and at launch every worker's is empty. So
+a client choosing who to let onto their mother's roof was looking at a trade,
+a parish and a list of checks, and nothing of the person.
+
+Asked whether to build a new upload or publish what /apply already collects,
+the founder chose the second. Two things stood in the way, and neither is
+solved by pointing the page at the private bucket.
+
+The first is consent. The photograph row on /apply ends with the sentence
+"This page does not publish it anywhere", and that sentence was true and was
+read by everybody who has applied so far. Publishing on the strength of it
+would be answering a question nobody was asked. So there is a second consent,
+with its own version (`SHOWCASE_CONSENT_VERSION`, `showcase-v1`), neither
+option pre-selected, unanswered read as no, and the test lives in the database
+view rather than at any call site, so no future page can forget it. Withdrawing
+consent empties a profile on the next page load, before any file is deleted.
+
+The second is the purge. `yaad-vetting-purge` destroys the file ninety days
+after it arrives. A profile video served out of that bucket would have worked
+for three months and then quietly gone missing. So the consented file is
+COPIED into a separate public bucket and the vetting original keeps its clock
+and is destroyed on time, exactly as the applicant was told. Nothing about the
+private bucket, its policies or its purge changed, which was the point: the ID
+rules in CLAUDE.md section 6 are the last thing that should move to make a
+profile page look better.
+
+Publishing is a button at the desk, never automatic, and `published_by`
+records the person who pressed it. The desk signs the private originals for an
+hour so that person can look at each file before deciding, because publishing
+somebody's face on the open internet is a decision and a decision made without
+looking is not one.
+
+The self-supplied showcase renders in its own sections, above the evidence
+portfolio and labelled "Work they showed us", saying plainly that it is not
+from jobs booked through Yaadly and does not carry the evidence trail. That
+labelling is the whole design. The section below it earns its trust by being
+pulled from the evidence record, and borrowing that sentence for material a
+worker handed in would spend the credibility of the checked thing on the
+unchecked one.
+
+`20260905b_a_worker_gets_a_face_a_voice_and_work_to_show.sql`.

@@ -480,6 +480,16 @@ h2.heading em {
 }
 .payment-note svg { width:20px; height:20px; stroke:var(--purple); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; margin-top:2px; }
 .payment-note p { font-size:14px; color:var(--mute); line-height:1.6; }
+.bk-consent {
+  display:flex; align-items:flex-start; gap:11px; cursor:pointer;
+  margin:18px 0 6px; padding:13px 15px; border-radius:10px;
+  background:var(--panel2); border:1px solid var(--line);
+  font-size:13.5px; color:var(--mute); line-height:1.6;
+}
+.bk-consent:hover { border-color:rgba(155,115,245,0.4); }
+.bk-consent input { width:17px; height:17px; margin:2px 0 0; flex-shrink:0; accent-color:var(--purple); cursor:pointer; }
+.bk-consent b { color:var(--ink); }
+.bk-consent-note { font-size:12.5px; color:var(--mute); opacity:.85; margin:0 0 14px; padding-left:2px; line-height:1.55; }
 .payment-note b { color:var(--ink); }
 .payment-note a { color:var(--purple); }
 
@@ -945,7 +955,7 @@ footer {
          confirms the scope and the exact price in writing. The card CTAs
          above jump here with the service preselected. -->
     <div class="payment-note rv" id="book" style="display:block">
-      <p style="margin:0 0 4px"><b>Book a service, nothing charged now.</b> The booking is held while Monique confirms the scope and the exact price with you in writing. The invoice comes by email after that, and you can cancel any time before you pay.</p>
+      <p style="margin:0 0 4px"><b>Book a service, nothing charged now.</b> Every fixed-fee service on this page can be paid by card, and the card button appears here the moment your booking is registered. Nothing is taken at that point: on a one-off service your card is authorised and only charged once the work is done and you have accepted it. You have 14 days to <a href="/cancellation">cancel</a>.</p>
       <div class="form-row" style="margin-top:14px">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
@@ -955,8 +965,6 @@ footer {
             <option value="signoff">Technical Sign-off</option>
             <option value="retainer">Oversight Retainer</option>
             <option value="care">Property Care</option>
-            <option value="setup">Project Setup Pack</option>
-            <option value="docs">Document Pack Check</option>
           </select>
         </div>
         <div class="fgroup" id="bk-care-tier-row" style="display:none">
@@ -977,6 +985,17 @@ footer {
         <div class="fgroup"><label for="bk-parish">Where is the property? Parish or town</label><input id="bk-parish" placeholder="Portmore"></div>
         <div class="fgroup"><label for="bk-msg">Anything we should know</label><input id="bk-msg" placeholder="Optional"></div>
       </div>
+      <!-- THE EXPRESS REQUEST TO START EARLY. cancellation.html says, in
+           its own words, "we will ask you for that in writing at booking".
+           This is that ask, and it is where the promise said it would be.
+           Deliberately NOT required: a client who leaves it alone has not
+           asked, and waiting the 14 days is the correct outcome for them.
+           A tick nobody can decline is not a request anybody made. -->
+      <label class="bk-consent" for="bk-start-now">
+        <input type="checkbox" id="bk-start-now">
+        <span><b>Start before my 14 days are up.</b> I am asking Yaadly to begin inside my cancellation period. If I cancel after the work has started, I pay a fair share of what has already been done, and no more. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</span>
+      </label>
+      <div class="bk-consent-note">Leave this unticked and nothing starts until your 14 days have run out. Your right to cancel lasts the full 14 days either way.</div>
       <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
       <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
     </div>
@@ -984,7 +1003,7 @@ footer {
     <!-- PAYMENT NOTE — replaces old split rule -->
     <div class="payment-note rv">
       <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-      <p><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced; at or under £500 your card is authorised at booking and charged once the work is done and accepted. Card payment is not switched on yet, so for now everything is invoiced, by bank transfer in GBP, USD or CAD. Retainers are invoiced monthly with 30 days notice to stop. You have 14 days to <a href="/cancellation">cancel</a>. <b>Yaadly does not operate an escrow service and does not hold money on your behalf.</b> <a href="/payments">Full payment terms.</a></p>
+      <p><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every fixed-fee service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. You have 14 days to <a href="/cancellation">cancel</a>. <b>Yaadly does not operate an escrow service and does not hold money on your behalf.</b> <a href="/payments">Full payment terms.</a></p>
     </div>
 
     <!-- SCOPE NOTICE -->
@@ -1103,30 +1122,63 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
    never charged, until Monique confirms scope and price in writing. A card
    whose service has no bookable catalogue entry keeps its WhatsApp link. */
 const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-book-service";
-/* Stripe payment links, keyed by the booking form's own service values.
-   Paste the https://buy.stripe.com/... URL against a service and a pay
-   button appears on that service's booking confirmation. Leave it empty and
-   the confirmation reads exactly as it does now, so there is never a dead
-   button or a half wired payment on the page.
+/* Stripe payment links, live since 5 Sep 2026. The keys are the service
+   values this form actually posts, which are the same strings the booking
+   function's own BOOKABLE allowlist uses, so one service means one key in
+   both places. They used to be keyed care_standard / care_large / care_villa
+   here and 'care' everywhere else, which is how a villa came to be recorded
+   at the standard price while being asked for the villa one.
 
-   These are holds, not charges: the card is authorised and captured only
-   when a named person approves the work. Every service here is under GBP
-   500, which is the rule that makes them holds at all. Anything at or above
-   GBP 500 is invoiced and must never be given a link.
+   Leave a URL empty and that service's confirmation simply reads as it did
+   before, with no button. There is never a dead button or a half wired
+   payment on the page.
+
+   All but the retainer are holds, not charges: the card is authorised and
+   captured only when a named person accepts the work. The retainer is a
+   monthly subscription and bills immediately, hence SUBSCRIPTION_SERVICES
+   below. Every service here is under GBP 500, which is the rule that makes
+   a hold possible at all. Anything at or above GBP 500 is invoiced and must
+   never be given a link.
 
    Deliberately after the booking, not instead of it. The button on a service
    card opens the booking form, which is where the client's name, contact and
    property go on record, and where the cancellation information has to
-   reach them. A card CTA pointing straight at Stripe would skip all of it. */
+   reach them. A card CTA pointing straight at Stripe would skip all of it.
+   Confirmed again by the founder on 5 Sep 2026 when the card path was made
+   visible: more prominent, still after the record, never instead of it. */
 const PAYMENT_LINKS = {
-  deposit:       "https://buy.stripe.com/cNicMYb3CgKVdSIdU19Zm09",
-  visual:        "https://buy.stripe.com/8x214ggnW7al8yo5nv9Zm08",
-  condition:     "https://buy.stripe.com/14A9AM9Zy3Y93e4bLT9Zm0b",
-  signoff:       "https://buy.stripe.com/fZu5kwdbK52dg0QaHP9Zm0a",
-  care_standard: "https://buy.stripe.com/eVqbIU1t20LX7uk6rz9Zm05",
-  care_large:    "https://buy.stripe.com/6oUbIUgnW8ep9Cs2bj9Zm06",
-  care_villa:    "https://buy.stripe.com/3cI6oA6Nm0LX7uk2bj9Zm07",
-  retainer:      "https://buy.stripe.com/28E6oAgnWeCN4i8cPX9Zm0c"
+  deposit:        "https://buy.stripe.com/cNicMYb3CgKVdSIdU19Zm09",
+  visual:         "https://buy.stripe.com/8x214ggnW7al8yo5nv9Zm08",
+  condition:      "https://buy.stripe.com/14A9AM9Zy3Y93e4bLT9Zm0b",
+  signoff:        "https://buy.stripe.com/fZu5kwdbK52dg0QaHP9Zm0a",
+  care:           "https://buy.stripe.com/eVqbIU1t20LX7uk6rz9Zm05",
+  "care-large":   "https://buy.stripe.com/6oUbIUgnW8ep9Cs2bj9Zm06",
+  "care-villa":   "https://buy.stripe.com/3cI6oA6Nm0LX7uk2bj9Zm07",
+  retainer:       "https://buy.stripe.com/28E6oAgnWeCN4i8cPX9Zm0c"
+};
+
+/* The retainer link is a monthly subscription, so it bills on the spot and
+   keeps billing. Every other link is a hold. Saying "authorised, not
+   charged" over a subscription would be a false statement about somebody's
+   money, so the two are worded separately and this set is what decides. */
+const SUBSCRIPTION_SERVICES = new Set(["retainer"]);
+
+/* The three Property Care tiers, as the booking function's own allowlist
+   spells them and as the prices on the card read. */
+/* The express request to start inside the 14 day cancellation period, and
+   the exact sentence the client agreed to when they gave it. Versioned for
+   the same reason AI_CONSENT_VERSION is in the apply flow: a consent is only
+   worth what the sentence that earned it said, so rewording the tickbox
+   without bumping this silently reinterprets everybody's existing answer.
+   Change the copy in the form and this string together, in one commit. */
+const START_NOW_VERSION = "start-now-v1";
+const START_NOW_WORDING = "Start before my 14 days are up. I am asking Yaadly to begin inside my cancellation period. If I cancel after the work has started, I pay a fair share of what has already been done, and no more.";
+
+const CARE_KEYS = { standard: "care", large: "care-large", villa: "care-villa" };
+const CARE_LABELS = {
+  standard: "Property Care, standard home, £45 a visit",
+  large:    "Property Care, large or rental, £70 a visit",
+  villa:    "Property Care, villa, £95 a visit"
 };
 
 const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
@@ -1150,12 +1202,26 @@ document.querySelectorAll(".svc-cta").forEach(el => {
 async function sendBooking(){
   const g = i => ($id(i).value||"").trim();
   const status = $id("bk-status"), btn = $id("bk-send");
-  const say = (tone, html) => { status.innerHTML = '<span style="color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</span>'; };
+  /* block, not inline: the confirmation now carries a full width pay button */
+  const say = (tone, html) => { status.innerHTML = '<span style="display:block;color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</span>'; };
   const fallback = ' Book it on <a href="https://wa.me/447878877567" target="_blank" rel="noopener">WhatsApp</a> instead, or email <a href="mailto:'+SVC_EMAIL+'">'+esc(SVC_EMAIL)+'</a>.';
   const sel = $id("bk-svc");
-  const b = { service: sel.value, label: sel.dataset.label || sel.options[sel.selectedIndex].text,
+  /* Property Care is three separately priced services behind one option, so
+     the tier has to travel with the booking. It did not, which meant a villa
+     was recorded at the standard £45 while the pay button asked for £95. The
+     tier picks the catalogue row, the pay link and the label, all from here. */
+  const tier = $id("bk-care-tier").value || "standard";
+  const service = sel.value === "care" ? CARE_KEYS[tier] : sel.value;
+  const label = sel.value === "care"
+    ? CARE_LABELS[tier]
+    : (sel.dataset.label || sel.options[sel.selectedIndex].text);
+  const startNow = $id("bk-start-now").checked;
+  const b = { service, label,
               name: g("bk-name"), email: g("bk-email"), phone: g("bk-phone"),
-              parish: g("bk-parish"), message: g("bk-msg") };
+              parish: g("bk-parish"), message: g("bk-msg"),
+              startNow,
+              startNowVersion: startNow ? START_NOW_VERSION : "",
+              startNowWording: startNow ? START_NOW_WORDING : "" };
   if(!b.name || (!b.email && !b.phone)){
     say("bad", "<b>Nearly.</b> We need your name and an email or WhatsApp number, so the booking has somebody to belong to.");
     return;
@@ -1178,11 +1244,24 @@ async function sendBooking(){
   }
   btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
   const channel = j.phoneGiven ? "WhatsApp" : "email";
-  const payKey = b.service === "care" ? "care_" + ($id("bk-care-tier").value || "standard") : b.service;
-  const payUrl = PAYMENT_LINKS[payKey] || "";
+  /* No express request to start early means the work waits out the 14 days,
+     and a card authorisation only lasts seven. Offering the button anyway
+     would take a hold that is guaranteed to expire before the job can begin,
+     so the card path is offered only to a client who actually asked. */
+  const payUrl = startNow ? (PAYMENT_LINKS[b.service] || "") : "";
+  const subs = SUBSCRIPTION_SERVICES.has(b.service);
+  const terms = subs
+    ? ' This one is a monthly subscription, so the first month is charged when you pay and it bills again each month until you stop it. Thirty days notice to stop, and you have 14 days to <a href="/cancellation">cancel</a>.'
+    : ' Your card is authorised, not charged. It is only taken once the work is done and you have accepted it, and you have 14 days to <a href="/cancellation">cancel</a>.';
   const tail = payUrl
-    ? ' Nothing is charged yet. You can secure it now: <a href="' + payUrl + '" target="_blank" rel="noopener"><b>pay for ' + esc(b.label) + '</b></a>. Your card is authorised, not charged, and it is only taken once the work is done and you have approved it. You have 14 days to <a href="/cancellation">cancel</a>.'
-    : ' Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.';
+    ? ' Nothing has been charged.' + terms
+      + '<a class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center" href="'
+      + payUrl + '" target="_blank" rel="noopener">Pay for ' + esc(b.label)
+      + '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></a>'
+      + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe. Yaadly never sees or stores your card number. Prefer an invoice or a bank transfer? Reply to your receipt and say so.</div>'
+    : (startNow
+        ? ' Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.'
+        : ' <b>You have not asked us to start inside your 14 days</b>, so nothing begins until they have run out, and there is nothing to pay before then. Monique will confirm the scope and the exact price with you in writing in the meantime. If you change your mind and want it started sooner, say so in your reply and we will take that as the request.');
   say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal." + tail);
   ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
 }

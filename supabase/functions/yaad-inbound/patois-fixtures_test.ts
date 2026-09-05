@@ -9,32 +9,29 @@
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { PATOIS_FIXTURES } from "./patois-fixtures.ts";
-
-// The prompt is assembled from two files since 4 September 2026: index.ts holds
-// the wording, and trades.ts holds the trade list, generated from
-// data/job-taxonomy.js so four prompts stop keeping three different copies of
-// it. This test reads BOTH, because what it is actually asserting is "the
-// assistant is still offered this trade", and that is true wherever the list
-// physically sits.
-//
-// NOT a weakening. Reading only index.ts after the list moved would have made
-// this pass or fail on where a string lives rather than on whether a trade
-// exists, which is the drift it was written to catch. Caught by this test
-// going red on a merge, which is the test doing its job.
-const promptSource = (await Promise.all(
-  ["./index.ts", "./trades.ts"].map(async (f) => {
-    try { return await Deno.readTextFile(new URL(f, import.meta.url)); }
-    catch { return ""; }   // trades.ts is absent on older revisions
-  }),
-)).join("\n");
+import { TRADES } from "./trades.ts";
 
 Deno.test("every trade a fixture expects is still a trade the prompt offers", () => {
-  // The prompt's trade list is the one copied from data/job-taxonomy.js, the
-  // generated source of truth for every dropdown in the product.
+  // Reads the trade list itself rather than scanning index.ts for the words.
+  //
+  // Until 4 September 2026 the prompt carried its own copy of the eighteen
+  // trades and this test searched that copy as text. The agent audit found
+  // three different trade lists across four job-reading prompts, one of them
+  // eight trades short, so the list moved into _shared/trades.ts, generated
+  // from data/job-taxonomy.js and drift-checked against it. The prompt now
+  // interpolates TRADES_PROMPT_LINE, so there is no longer a literal
+  // "Roofing" in index.ts to find, and this test failed on a change that had
+  // dropped nothing at all.
+  //
+  // Checking the source is what the test always meant. Its own comment said
+  // the prompt's list "is the one copied from data/job-taxonomy.js", and the
+  // copy is what moved; the intent, catching a fixture that expects a trade
+  // the product no longer offers, is unchanged and now cannot be fooled by
+  // the word happening to appear elsewhere in a 3,000 line file.
   for (const f of PATOIS_FIXTURES) {
     if (!f.trade) continue;
     assert(
-      promptSource.includes(f.trade),
+      (TRADES as readonly string[]).includes(f.trade),
       `the fixture expects the trade "${f.trade}" and the intake prompt no longer offers it. `
       + `Either the taxonomy changed and this fixture needs updating, or a trade was dropped by accident.`,
     );

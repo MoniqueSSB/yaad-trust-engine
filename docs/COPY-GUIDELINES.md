@@ -93,11 +93,13 @@ Describe it from Yaadly's side, not the client's:
 - "Yaadly's fee is invoiced separately."
 - "We attend, we record, and we write it up. We do not pay your contractor and we do not hold your money for the work."
 
-### How money actually reaches Yaadly, as at 4 September 2026
+### How money actually reaches Yaadly, as at 5 September 2026
 
-- Above £500 a job is invoiced, and the invoice is the record that you bought the job from Yaadly Ltd.
-- At or under £500 the card is authorised at booking and charged once the work is done and accepted. **Card is not switched on yet**, so until it is, everything is invoiced and paid by bank transfer in GBP, USD or CAD.
-- Any page that mentions cards must carry that "not switched on yet" caveat. Do not describe card as live anywhere, including in the privacy provider table and the cancellation timing page.
+- Above £500 a job is invoiced, and the invoice is the record that you bought the job from Yaadly Ltd. Paid by bank transfer in GBP, USD or CAD.
+- At or under £500 the card is authorised at booking and charged once the work is done and accepted.
+- **Card is live**, as of 5 September 2026. The "not switched on yet" caveat that used to be required on every page mentioning cards is gone, and must not be reintroduced: the eight Stripe payment links exist, they are wired to the booking confirmation on `docs/services.html`, and repeating the caveat now tells a client the opposite of what the page will do. It came off `services.html`, `payments.html`, `terms.html` and `privacy.html` in the same change.
+- **The Oversight Retainer is a subscription, not a hold, and the difference must be written.** The other seven links authorise the card and capture only when a named person accepts the work. The retainer bills the first month immediately and again every month until stopped. "Your card is authorised, not charged" is true of the seven and false of the retainer, so never let one sentence cover both.
+- An invoice paid by bank transfer stays available on any job at any size. Card is an option offered, never the only door.
 
 ### Fees, stated the same way everywhere
 
@@ -126,6 +128,18 @@ One definition, used identically everywhere. Where a page needs the short form, 
 - Yaadly only continues sending work to people who meet the evidence standard.
 
 **Do not write** "references called" or "references checked" without the £500 qualifier. It is not true below that line, and the audit found it published on the marketplace page.
+
+### Independence, and why the site does not claim it
+
+**Never claim Yaadly is independent of the contractor.** Not "independent of every contractor on the job", not "never pricing, supplying or managing the trade being assessed", not "never a contractor marking their own work". Those were published on the business page and were wrong: on a managed job, and on Property Care, the person doing the work IS Yaadly's, so a blanket independence claim describes only one of the two lanes and gets caught the moment an insurer's risk team reads the other one.
+
+**Claim the separation instead, because it is true on both lanes.** Founder decision, 5 September 2026:
+
+> The person who assesses the work is never the person who did it. Both are named on the report.
+
+When the tradesperson is Yaadly's, a different Yaadly assessor reviews the work. That is an operational commitment, not a form of words: if the only Yaadly person available on the ground is the one who did the work, somebody else attends the review, or the report says plainly that the work is Yaadly's own and has not had a second pair of eyes on it.
+
+Corrected on the business page 5 September 2026, in six places including the meta description and the social preview text. **`docs/services.html` still carries "Someone independent should be" in its hero and meta description**, and Full Project Management sits on that same page, so it has the same problem and has not been fixed.
 
 ### Claims
 

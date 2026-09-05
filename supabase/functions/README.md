@@ -1,15 +1,48 @@
 # Yaadly Edge Functions
 
-The four Supabase Edge Functions that make up the live platform behind
+The Supabase Edge Functions that make up the live platform behind
 yaadly.co.uk. Until 20 August 2026 this code existed only inside Supabase and
 was not in the repository at all, which meant OllyGarden's instrumentation
-review — which reads the GitHub repo — could not see the part of the system
+review, which reads the GitHub repo, could not see the part of the system
 that actually serves real users. That is why these files are here.
+
+**This file opened by saying there were four of them until 4 September 2026.
+There are 29.** It had said four since the day it was written and the table
+below it listed nine, which is the failure mode CLAUDE.md §11 warns about: a
+document that describes what got built rather than a rule goes stale, and a
+stale inventory reads as a current one. Corrected by the agent audit.
+
+**Never trust the counts in this file. Read them live:**
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+As at 4 September 2026: **29 functions in this directory, 30 deployed.** The
+extra one is `yaad-nim-probe`, which has no source in this repository, is
+mentioned in no document, has had no traffic, and was deployed 42 times in
+late August. It looks like a leftover NVIDIA NIM connectivity probe. It runs
+with `verify_jwt = true`, so it is not publicly reachable. It has been left
+alone rather than deleted, because deleting a deployed endpoint nobody can
+read the source of is not a tidy-up, it is a guess. Decide it deliberately.
+
+**Nine of the 29 call a text model**, all of them through
+`_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`,
+`yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`,
+`yaad-quote-pack` and `yaad-sketch`. Two more call a vision model directly
+(`yaad-sketch` again, and `yaad-notify-client`'s ported photo review), and
+`yaad-transcribe` calls speech-to-text. Everything else has no model in it.
+
+(`yaad-vision` was deleted on 4 September 2026. It had existed since 17 August
+and nothing ever called it: its logic was ported into `yaad-notify-client` on
+31 August because a server-to-server caller had no session to present, leaving
+two copies of one prompt with only one of them maintained.)
 
 | Function | verify_jwt | What it does |
 |---|---|---|
-| `yaad-agent` | true | Intake and Reporting agents (MiniMax-M2.7), admin session only |
+| `yaad-agent` | true | Intake, trade classifier and Reporting agents. Model comes from `_shared/textmodel.ts`, which has been Mistral in the EU since 4 Sep 2026. Admin session only |
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
+| `yaad-quote-pack-rescan` | true | An admin corrects a held quote pack's wording; the same verdict function the drafter uses decides again. Approves nothing, never touches `status`, calls no model. |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |
 | `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
@@ -20,11 +53,19 @@ that actually serves real users. That is why these files are here.
 | `yaad-phone-check` | true | Twilio Lookup on a number a worker typed: is it real, is it a mobile, and what is it in E.164. Called from the portal's link-your-number form before the number is saved. Holds no service-role key and touches no table; it reports and the caller decides. `verify_jwt` stays true because Lookup costs money per call |
 | `yaad-desk-reply` | true | Monique's typed reply to a Conversations thread, sent from the Yaadly Twilio number, or into `web_chat_replies` for a website chat thread. No model call anywhere in it; `is_admin()` checked inside as well. A send marks the thread `human_handling`, so `yaad-inbound` stands down until the desk hands it back |
 
-`verify_jwt` matters. The three public endpoints must stay `false`, because
-Meta and an anonymous website visitor have no Supabase session, and they carry
-their own authentication instead (HMAC signature verification, and field
-validation plus a service-role write and a throttle). Do not "fix" these to
-`true`.
+`verify_jwt` matters, and the count in this paragraph was wrong too. It said
+three public endpoints. As at 4 September 2026 **ten** run with `verify_jwt =
+false`: `yaad-book-service`, `yaad-enquiry`, `yaad-inbound`,
+`yaad-notify-client`, `yaad-portal-code`, `yaad-post-job`, `yaad-quote-landed`,
+`yaad-vetting-review`, `yaad-vetting-upload` and `yaad-website-intake`. Each
+carries its own authentication instead: a signature check, an origin check, a
+throttle, or a shared secret. An anonymous website visitor has no Supabase
+session, so these cannot be "fixed" to `true`.
+
+Read that list live before acting on it, exactly as CLAUDE.md §12 says. This
+line has now been wrong twice, and it is the control.
+
+`yaad-vision` used to have a row in the table above. It is gone, see the note further up.
 
 `yaad-enquiry` sends mail to an address the caller types in, so its throttle is
 load-bearing rather than housekeeping: without the per-recipient cap it is an
