@@ -3572,6 +3572,21 @@ turn, proof of address, the TRN, the CV and the certificates are vetting papers
 and are not even fetched by the desk's preview. Widening that list is a legal
 decision, not a tidy-up.
 
+---
+
+## The one-tap link in a booking email did not sign somebody in
+
+The service booking receipt carries a single-use sign-in token (`?t=` on the `/portal/join` link, minted by `oneTapJoinLink()` in `yaad-notify-client`). Symptoms and what each one means:
+
+1. **"That link has expired, or it has already been used."** Normal and expected. The token is single use and short lived, so a link tapped days later, or tapped twice, lands here. Nothing is broken: the email form on that same screen sends a fresh sign-in code and that path is unchanged. Tell the client to type their email on the page they are already looking at.
+2. **The receipt has no `&t=` on its link at all.** Token minting failed and the function fell back to the plain join link on purpose, so the receipt still went. Look for the `auth.one_tap_link` span on that request; it records the actual reason. Everything still works, with one extra step.
+3. **"You are signed in, but that job code would not attach to your account."** Auth worked and `claim_code_as_me()` refused. Usually the booking already carries a different `client_email`, or the rate limiter in `portal_code_attempts` has tripped after five failures in fifteen minutes. Check `services.client_email` against the address the receipt went to.
+4. **Never test a real token twice.** Spending it is the point. To retest, have the desk re-send the receipt, which mints a new one.
+
+The token is deliberately removed from the address bar on arrival, so it will not be in the client's history or in a screenshot they send you. Ask for the email instead, not the link.
+
+---
+
 ## Checking the database and the repository still describe the same thing
 
 Symptom you are trying to avoid: the repository looks complete, and a rebuild
@@ -3636,6 +3651,74 @@ line is a function nobody can call after a rebuild.
 no-op there and it should stay unrun, because an event trigger recovery has to
 drop and recreate the trigger, and there is no reason to open that window on a
 live database to prove a file you can read.
+
+## Changing which vision model reads photographs, and where it runs
+
+Three functions send images to a model: `yaad-notify-client` (the evidence
+photo review, `photo_review` in telemetry), `yaad-sketch` (walkthrough stills)
+and `yaad-vetting-review` (an applicant's supporting paperwork, never their
+identity documents). Since 5 September 2026 all three resolve the provider,
+the key and the model through `supabase/functions/_shared/visionmodel.ts`, the
+same way text goes through `textmodel.ts`. No function types the endpoint out
+itself, and CI fails one that does.
+
+**Move one job without touching the others.** Each has its own secret, read
+first, falling back to the shared `NVIDIA_VISION_MODEL` and then to a default:
+
+```bash
+supabase secrets set NVIDIA_EVIDENCE_MODEL=meta/llama-3.2-90b-vision-instruct --project-ref leffyisvfvjwzilydlwf
+```
+
+`NVIDIA_EVIDENCE_MODEL` is the evidence review, `NVIDIA_SKETCH_MODEL` the
+walkthrough stills, `NVIDIA_VETTING_MODEL` the paperwork. Secrets are read at
+call time, so no redeploy is needed. `NVIDIA_VISION_MODEL` still moves all
+three at once if that is what you want.
+
+**Decided 5 September 2026: the evidence review runs on
+`meta/llama-3.2-90b-vision-instruct`.** `NVIDIA_EVIDENCE_MODEL` is set to it on
+the project. Founder instruction, on being shown that the smallest model was
+reading the evidence by accident. The same id was already the live default for
+the sketch pack and the vetting read, so it is known good on this NVIDIA
+account rather than newly chosen. Watch the first few stages: 90b is slower
+than 11b, each photo has a 25 second timeout, and a timeout is retried once and
+then leaves the AI paragraph out of the client's report rather than delaying it.
+If timeouts show up in the logs, `mistral-medium-latest` is not an option here
+(it is the text provider), so the move would be back to a smaller vision model
+or on to a different provider through `VISION_MODEL_API`.
+
+**Why it needed deciding at all.** The evidence
+review defaulted to the 11b checkpoint while the other two defaulted to 90b,
+which nobody chose; it happened because all three shared one secret and had
+different fallbacks, and `NVIDIA_VISION_MODEL` was never set on this project so
+every job sat on its own default. The defaults were kept exactly as they were so this change
+altered no behaviour on the day it landed. Setting `NVIDIA_EVIDENCE_MODEL` is
+how that gets decided on purpose. This is the vision call standing closest to a
+stage approval, so it is worth deciding rather than inheriting.
+
+**Moving off NVIDIA entirely, to a provider in another country.** Set
+`VISION_MODEL_KEY` and `VISION_MODEL_API` (any OpenAI-compatible vision
+endpoint), plus `VISION_MODEL_PROVIDER` and `VISION_MODEL_REGION` so telemetry
+records where the images actually went. Those take priority over everything
+else and need no deploy. Do not add a branch to `visionmodel.ts` instead: a new
+hard-coded provider is a new country receiving personal data, which is a
+founder decision and a line in the data inventory before it is a code change.
+
+**To check what is set now:**
+
+```bash
+supabase secrets list --project-ref leffyisvfvjwzilydlwf
+```
+
+**If reviews stop appearing.** With no provider configured the callers now fail
+loudly rather than silently skipping: the evidence review logs
+`yaad-vision: No vision model is configured`, and the sketch and vetting
+endpoints return that sentence with a 500. NVIDIA's hosting is also uneven,
+confirmed live on 3 September 2026 across three calls in a row: a clean 15
+second answer, a request that ran past 35 seconds with nothing back, and a flat
+500 immediately after. A timeout or a 5xx is retried once. A refusal or an
+unparseable answer is not, because asking again does not fix it. Every vision
+span now carries `yaadly.model.region`, so which country a photograph went to
+is answerable from telemetry rather than from memory.
 
 ## The staging prefix in the evidence bucket, and the sweep that empties it
 

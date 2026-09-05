@@ -138,17 +138,26 @@ jobs:
       # The provider decision lives in _shared/textmodel.ts and nowhere else.
       # A hard-coded model endpoint in a function is how the estate ended up on
       # eight copies of the same China URL, and how it would quietly drift back.
+      #
+      # VISION ADDED 5 Sep 2026, and it is the more important half. This job was
+      # written for the text move and watched only the text endpoints, so while
+      # it stood green the NVIDIA vision URL sat typed out in three functions:
+      # yaad-notify-client, yaad-sketch and yaad-vetting-review. Site photos, a
+      # walkthrough of somebody's house and a worker's proof of address are more
+      # sensitive than the job text this rule was protecting, and a control
+      # pointed at the safer half of the estate reads as cover it does not give.
+      # Both endpoints now resolve in _shared, so both are checked here.
       - name: No function hard-codes a model endpoint
         run: |
           set -e
-          hits=$(grep -rnE 'https://(api\.minimax\.io|api\.mistral\.ai)' \
+          hits=$(grep -rnE 'https://(api\.minimax\.io|api\.mistral\.ai|integrate\.api\.nvidia\.com)' \
             supabase/functions/yaad-*/index.ts || true)
           if [ -n "$hits" ]; then
             echo "$hits"
-            echo "::error::A text model endpoint is hard-coded in a function. Use pickTextProvider() from _shared/textmodel.ts."
+            echo "::error::A model endpoint is hard-coded in a function. Use pickTextProvider() from _shared/textmodel.ts or pickVisionProvider() from _shared/visionmodel.ts."
             exit 1
           fi
-          echo "No hard-coded text model endpoints."
+          echo "No hard-coded model endpoints, text or vision."
 
   web:
     name: Web app (typecheck and tests)

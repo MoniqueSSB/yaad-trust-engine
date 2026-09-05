@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · The booking email signs you in, one tap, and the sign-in code becomes the fallback
+
+**What was wrong, found by the founder in her own inbox.** The service booking receipt said "set up your portal with the code 08A0A130" and linked to `/portal/join`. That page then asked for an email address and offered to send a code. Two different things were both called "a code": the booking reference, which is a job key that the join page already reads out of `?code=` and never asks anybody to type, and the sign-in code, which proves a mailbox. Her words: "it doesn't make sense to ask me to request a code when i already have it." Read as a wording problem it was one. Read properly it was worse: we emailed a mailbox, then emailed the same mailbox again to prove it was hers, and in the ordinary case, somebody tapping the link from the inbox it landed in, the second email proved nothing the first one had not.
+
+**What was built.** `oneTapJoinLink()` in `yaad-notify-client` mints a single-use GoTrue token at booking time and hangs it on the join link as `?t=`. `web/app/portal/join/page.tsx` spends it on arrival, in a third stage that renders no form at all, then binds the job through the same `claim_code_as_me()` the typed-code path uses. Sign-in and job binding were pulled out into one `finishSignIn()` so the two routes cannot drift; the half that drifts would be the half that binds the job, and a client signed in to an empty portal is the failure nobody notices.
+
+**The trade, which was the founder's call and not a technical one.** While the token is unspent, the booking email IS the login: forward it and the person you forwarded it to is you. Before this, a forwarded email handed over the job key but never the account. What bounds it is that the token is single use, short lived, and taken off the address bar by `history.replaceState` before anything else on the page runs, so it does not sit in browser history or leave in a Referer header. She was given the plain trade and three options, and chose one tap with the typed code kept underneath.
+
+**What it deliberately does not change.** Signing in is not approving. The Client Guidelines still have to be signed, `enforce_signed_before_open` still gates `jobs.open`, and every release of money is still a named human's decision on the desk, per CLAUDE.md §2. This changes who can open a portal and nothing about what can happen inside one. It also fails soft in both directions: if the token cannot be minted the receipt carries the plain join link and yesterday's journey, and if the token is expired or already spent the page says so in a sentence and puts the person in front of the email form. `yaad-portal-code` is untouched, and its own header still explains why a typed code, not a link, is the right thing for the WhatsApp rail.
+
+**One thing knowingly reversed.** That header argued against magic links because "a link opened in a different browser than the one they started in is the classic way magic links strand somebody". That is true of the PKCE `action_link` and not of a hashed token verified from the page, which is why this uses our own URL with `token_hash` rather than GoTrue's `action_link`: no `redirect_to` allowlist to maintain, and no browser to get back to.
+
+---
+
 ## 2026-09-05 · The recruitment page was still selling the venue, and framing the 12% as the worker's money
 
 **`web/app/trades/page.tsx` is the page a tradesperson reads before deciding whether to hand over a passport, and two sentences on it described a business that stopped existing on 3 September.** "You quote against the jobs you want; the client chooses who they engage" and "Yaadly is a marketplace, not an employer". Under the principal structure the client does not engage the tradesperson at all: the client buys the job from Yaadly, and Yaadly engages him as its subcontractor. `docs/terms.html` and `docs/COPY-GUIDELINES.md` had both said so for two days. This page had not, which is the drift pattern this log keeps recording: the correction lands on the client-facing surfaces and the worker-facing one is found later.
@@ -2147,6 +2161,51 @@ worker handed in would spend the credibility of the checked thing on the
 unchecked one.
 
 `20260905b_a_worker_gets_a_face_a_voice_and_work_to_show.sql`.
+
+## The vision provider moved into `_shared`, 5 September 2026
+
+`textmodel.ts` exists because the text provider was a property of eight files
+rather than a decision. The vision provider was still in exactly the state that
+file was written to fix: `https://integrate.api.nvidia.com/v1/chat/completions`
+typed out in `yaad-notify-client`, `yaad-sketch` and `yaad-vetting-review`. So
+the question "which country do site photographs, a walkthrough of somebody's
+house and a worker's proof of address travel to" was answerable only by
+grepping, and changing the answer meant editing three files and deploying three
+functions. The CI rule that was meant to prevent precisely this watched only
+the text endpoints, so it stood green over the more sensitive half of the
+estate, which is worse than no rule because it reads as covered.
+
+`_shared/visionmodel.ts` now resolves the provider, the key and the model for
+all three, in the same shape as `textmodel.ts`: an explicit
+`VISION_MODEL_KEY`/`VISION_MODEL_API` override first, then NVIDIA, then null.
+There is deliberately no third branch and no fallback, for the reason
+`textmodel.ts` gives: a provider that is no longer the choice is a silent route
+to a country nobody chose, waiting on one missing secret. The CI rule now
+covers the vision endpoint too, which it could not do while three functions
+still held the string.
+
+Two things changed beyond the move. Each vision job got its own model secret,
+because all three read `NVIDIA_VISION_MODEL` while defaulting to different
+models, so with the secret unset they diverged by accident and with it set they
+moved together whether or not that was intended. Reading a client's evidence
+photographs, describing rooms, and reading dates off a utility bill have
+different tolerances for being wrong, and the evidence review, which is the
+vision call closest to a stage approval, was the one running the smallest
+default. The per-job defaults reproduce exactly what each call site resolved to
+before, so the move altered no behaviour on the day it landed; deciding what
+the evidence review should actually run on is a founder call, recorded in
+RUNBOOK.
+
+Second, every vision span now carries `yaadly.model.region`. The text spans
+already did. The one class of call that sends actual photographs was the class
+that could not be traced to a country, which is the wrong way round.
+
+None of this touches what the vision agents are allowed to do. The evidence
+review still describes what is visible and hands it to a person; it does not
+grade evidence as sufficient and it does not gate a stage. `yaad-vetting-review`
+keeps its consent gate inside `review()` and keeps `IDENTITY_DOCS` withheld
+before download. A better model is a more accurate description in front of the
+named human, never a decision made further from them.
 
 ## The staging prefix is swept on a clock, and the abandoned session goes with it (5 Sep 2026)
 
