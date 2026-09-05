@@ -67,8 +67,8 @@ Part 2 governs.
   paid the full agreed price. Only if you will not go back, or it cannot be put
   right, are you paid a day rate for the days you actually worked instead. That
   day rate is on your engagement note before you start, and it is a floor: you
-  are never paid less than it for a day you worked. Your materials are paid at
-  cost either way.
+  are never paid less than it for a day you worked. Yaadly buys your materials
+  at the receipted price either way.
 - **Your Yaad Score is built only from finished jobs a named person approved.**
   No software ever moves it. You can see it and you can challenge it.
 - **Either of us can end this** on notice. Jobs already started get finished.
@@ -174,8 +174,8 @@ what the client pays Yaadly is not, and never was, your money. This is not a
 wording preference. It is the difference between ordinary trading and handling
 someone else's payments, and it is why nothing of yours passes through Yaadly.
 
-**Materials carry no fee.** They are paid to you at cost against a receipt, and
-Yaadly adds nothing to them and takes nothing off them.
+**Materials carry no fee.** Yaadly buys them from you at the price on your
+receipt, adds nothing and takes nothing off. See clause 8.
 
 **There are no other deductions and no other charges.** You pay nothing to
 join, nothing to quote, nothing for a lead you did not win, and there is no
@@ -211,7 +211,14 @@ paid to you are not clawed back.
 The client nominates where materials are stored before any are bought. If no
 suitable storage exists, that is recorded and the job is planned around it.
 
-You buy the materials and Yaadly pays you for them at cost against your receipt.
+**You supply the materials and Yaadly buys them from you**, at the price on your
+receipt, with nothing added and nothing taken off. They are part of what you
+supply to Yaadly on this job, and Yaadly then supplies them to the client as
+part of the job it sold. Yaadly makes nothing on them, by choice.
+
+This is not money of yours being refunded. It is a purchase, on the same footing
+as your labour, and it is why the materials are yours until Yaadly buys them and
+never the client's to begin with.
 
 You then file the receipt, photographs, and a video of the materials in the
 nominated place. **Until that evidence is filed, the materials are at your
@@ -301,9 +308,11 @@ is how that is decided, not whether.
 8. A named person decides, in writing, with the reason given. You may challenge
    it under clause 19, and the challenge is heard by a person.
 
-**Materials you bought and filed receipts for are paid at cost either way.**
-That is money out of your own pocket for the client's job, not your profit on
-it, and it is never withheld.
+**Materials you supplied and filed receipts for are bought from you at cost
+either way.** They are a separate supply from your labour, they are already in
+the client's building, and what a review decides about your workmanship does not
+unbuy them. Your labour price is what the review bites on, because your labour
+price is what the work was.
 
 > **Settled 5 September 2026, twice, and deliberately without a figure.** The
 > shortfall is the day rate for the trade, carried on the engagement note per
@@ -543,7 +552,7 @@ current version.
 | **What Yaadly pays you** | Your price less 12%, or less 10% on remote digital work. Stated as a number, not a percentage |
 | **The day rate for your trade** | Per clause 11. What you are paid per day worked if the job is reviewed as not finished to scope and you do not go back. Stated as a number, before you start, never after |
 | **The attendance fee** | £25 in Jamaican dollars, per clause 10, if the site is not as described |
-| Materials | Expected list, bought by you, paid at cost against receipt, no fee |
+| Materials | Expected list. You supply them, Yaadly buys them from you at the receipted price, no fee either way |
 | Nominated materials store | Per clause 8, set before anything is bought |
 | Stages | What each covers and what it pays |
 | Evidence required per stage | Per clause 9 |
