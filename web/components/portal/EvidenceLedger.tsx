@@ -37,6 +37,10 @@ export type EvidenceItem = {
   phase?: string | null;
   /** 'materials' is its own section and carries no phase. See 20260828c. */
   kind?: string | null;
+  /** The before this after answers, by id. See 20260906020400. */
+  pairs_with?: string | null;
+  /** P1, P2, P3: the short per-job code. */
+  item_code?: string | null;
 };
 
 type StageState = "done" | "now" | "todo";
@@ -65,6 +69,14 @@ export function EvidenceLedger({
   jobId?: string;
 }) {
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
+  /* Every item on the job, by id, so an after can show the before it answers
+     even when that before was filed on an earlier stage. */
+  const byId = new Map(items.map((e) => [e.id, e]));
+  /* The befores that have an after against them, so a before can say it has
+     been answered instead of looking like it is still waiting. */
+  const answered = new Map(
+    items.filter((e) => e.pairs_with).map((e) => [e.pairs_with as string, e]),
+  );
   const filed = items.length;
   const checked = items.filter((e) => e.ok === true).length;
 
@@ -205,6 +217,8 @@ export function EvidenceLedger({
                           <EvidenceCard
                             key={e.id}
                             e={e}
+                            answers={e.pairs_with ? byId.get(e.pairs_with) : undefined}
+                            answeredBy={answered.get(e.id)}
                             role={role}
                             jobId={jobId}
                           />
@@ -264,10 +278,16 @@ export function EvidenceLedger({
  */
 function EvidenceCard({
   e,
+  answers,
+  answeredBy,
   role,
   jobId,
 }: {
   e: EvidenceItem;
+  /** The before this after answers, if it names one. */
+  answers?: EvidenceItem;
+  /** The after that answers this before, if one has been filed. */
+  answeredBy?: EvidenceItem;
   role: "client" | "worker";
   jobId?: string;
 }) {
@@ -303,9 +323,11 @@ function EvidenceCard({
               <span
                 className={
                   "mr-1.5 rounded-full px-1.5 py-0.5 align-middle text-[9.5px] font-bold uppercase tracking-wide " +
-                  (e.phase === "issue"
+                  (e.phase === "new"
                     ? "bg-coral/15 text-coral"
-                    : "bg-tealb/15 text-tealb")
+                    : e.phase === "issue"
+                      ? "bg-mango/15 text-mango"
+                      : "bg-tealb/15 text-tealb")
                 }
               >
                 {badge}
@@ -324,6 +346,31 @@ function EvidenceCard({
             </span>
           )}
         </div>
+        {/* The comparison, shown rather than described. An after carries a
+            thumbnail of the before it answers, so a client sees the two
+            together without leaving the section; a before that has been
+            answered says so instead of looking like it is still waiting. The
+            before is not drawn as a second full card anywhere: it appears once
+            in its own section, and here at thumbnail size. */}
+        {answers && (
+          <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-softline bg-soft p-1.5">
+            {answers.img ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={answers.img} alt={answers.label ?? "The before"} className="h-9 w-12 flex-none rounded object-cover" />
+            ) : (
+              <span className="grid h-9 w-12 flex-none place-items-center rounded bg-panel2 text-[9px] text-dim">no image</span>
+            )}
+            <span className="text-[11px] leading-snug text-mute">
+              Answers {answers.item_code ?? "the before"}
+              {answers.label ? ", " + answers.label : ""}
+            </span>
+          </div>
+        )}
+        {!answers && answeredBy && (
+          <p className="mt-1 text-[11px] text-tealb">
+            Answered by {answeredBy.item_code ?? "an after"}
+          </p>
+        )}
         {e.created_at && (
           <p className="mt-0.5 text-[11px] text-dim">{stamp(e.created_at)}</p>
         )}

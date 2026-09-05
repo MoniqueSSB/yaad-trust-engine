@@ -1134,9 +1134,53 @@ const VIEWS = [
           ? `<div class="dfield"><span class="dk">file</span><video controls preload="metadata" src="${esc(r.img)}" style="max-width:100%;border-radius:10px"></video></div>`
           : `<div class="dfield"><span class="dk">file</span><a href="${esc(r.img)}" target="_blank" rel="noopener"><img src="${esc(r.img)}" alt="${esc(r.label || "evidence")}" style="max-width:100%;border-radius:10px"></a></div>`)
       : `<div class="dfield"><span class="dk">file</span><span class="dv empty">${r.storage_path ? "could not sign a link to this file just now, reopen the row to try again" : "no file recorded against this row"}</span></div>`,
+    actions:[
+      // A worker's answer is their claim about their own photograph, not a
+      // ruling, and a wrong one puts it in the wrong section of the client's
+      // record. This corrects it and stamps your address against the change.
+      // Nothing else on the row moves: not the image, not the fingerprint,
+      // not what they wrote. Materials is refused, because it is its own
+      // section on kind and the database will not take a phase on it.
+      { label:"Correct which section this is", cls:"g",
+        rpc:"retag_evidence",
+        ask:[
+          { k:"phase", label:"Which section it actually belongs to",
+            from:r => r.phase || "",
+            options:[
+              ["before","Before, how it was before anybody touched it"],
+              ["during","During the work"],
+              ["after","After, how it was when the stage finished"],
+              ["issue","A problem with work already in scope and priced"],
+              ["new","Something new found, never in the job as agreed"],
+            ] },
+          { k:"answers", label:"For an after, the code of the before it answers", type:"text",
+            placeholder:"P3",
+            hideWhen:v => v.phase !== "after" },
+        ],
+        args:(r, v) => ({ p_id:r.id, p_phase:v.phase, p_answers:v.answers || null }),
+        says:r => r.phase
+          ? `Changes this from "${r.phase}" to what you pick, on ${r.job_id}. Your address is stamped against the change and the client's portal moves the photograph into its new section. The image, the description and the fingerprint are untouched.`
+          : `Says which section this photograph belongs to on ${r.job_id}. Nobody answered when it was filed, so it is sitting under "Not marked" in the client's record. Your address is stamped against it; the image, the description and the fingerprint are untouched.` },
+    ],
     cols:[
       {h:"Job", f:r => id_(r.job_id) + sub_("stage " + (r.stage ?? "none"))},
-      {h:"Item", f:r => esc(r.label || "unlabelled") + sub_(r.mime || "")},
+      {h:"Item", f:r => esc(r.label || "unlabelled") + sub_((r.item_code ? r.item_code + " · " : "") + (r.mime || ""))},
+      // Which section it lands in, and whether anybody has corrected the
+      // person who filed it. Colours follow concierge/README.md: teal proven,
+      // mango held, coral blocked. A new find is coral because it is work
+      // nobody has quoted or agreed and it genuinely stops until somebody
+      // decides; a problem is mango because it sits inside work already paid
+      // for.
+      {h:"Section", f:r => (
+        r.kind === "materials" ? chip_("ok","materials")
+        : r.phase === "before" ? chip_("ok","before")
+        : r.phase === "during" ? chip_("ok","during")
+        : r.phase === "after" ? chip_("ok","after")
+        : r.phase === "issue" ? chip_("warn","a problem")
+        : r.phase === "new" ? chip_("crit","new find")
+        : chip_("mute","not marked"))
+        + (r.pairs_with ? sub_("answers a before") : "")
+        + (r.phase_set_by ? sub_("corrected by " + esc(r.phase_set_by)) : "")},
       {h:"Uploaded by", f:r => esc(r.uploaded_by || "unknown")},
       {h:"Checked", f:r => r.ok ? chip_("ok","signed off") : chip_("warn","waiting on you")},
       {h:"Fingerprint", f:r => r.sha256 ? `<span class="mono" style="color:var(--dim)">${esc(String(r.sha256).slice(0,16))}&hellip;</span>` : mute_("none")},

@@ -2242,3 +2242,82 @@ towards silence.
 
 `20260906015600_the_evidence_email_goes_once_per_stage.sql`,
 `supabase/functions/yaad-evidence-landed-check/index.ts`.
+
+## Two sessions built the same thing, and what survived (5 Sep 2026)
+
+Worth recording because the failure is procedural, not technical, and it will
+happen again.
+
+Two Claude sessions were asked for evidence sectioning on the same day and both
+built it. One shipped `evidence.phase` with before, during, after, issue, plus
+materials read off `kind`, and merged as PR #125. The other built
+`evidence.purpose` with before, after, issue, new, plus an explicit before-to-
+after pairing. Neither could see the other's branch. CLAUDE.md §12 warns about
+exactly this and the second session only used it for naming migration files,
+not for checking whether the work already existed.
+
+Founder's call on being shown both: `phase` survives, because it was merged
+first, is already in the stage approval snapshot, and unpicking it would be
+worse than unpicking the other. The duplicate column was dropped before it was
+ever applied. What was rebuilt on top of `phase` is the part `phase` did not
+have.
+
+The lesson for a future session is one line: fetch and read `origin/main`
+before building, not just before naming a file.
+
+## A new find is not a problem, and an after answers a named before (5 Sep 2026)
+
+Two things `20260906000700` did not have.
+
+**`new` as a fifth section.** `issue` was carrying two different things and the
+difference between them is money. A problem with work already in scope and
+already priced is included; putting it right changes nothing the client pays.
+Something discovered that was never in the job has been quoted by nobody and
+agreed by nobody, and it may change the price and the timeline. The tell that
+they had been conflated was in the copy: the client-facing note under `issue`
+read "not part of what was originally quoted", which was only ever true of half
+of what was filed there. That note now belongs to `new`, and `issue` keeps its
+own promise about writing so nothing a client reads lost it.
+
+The order test in `web/tests/evidence-sections.test.mjs` was updated to expect
+five. That is a test encoding a product decision, and the decision changed. It
+is not an assertion weakened to make a broken change pass, and the money promise
+it guards now has to hold on two notes instead of one.
+
+**The pairing.** An after names the before it answers, by `item_code`. That
+code already existed: `20260831zzzz2` added P1, P2, P3 so one WhatsApp reply
+could name one photograph instead of a whole stage, and this is the second
+thing it turned out to be for. The rules are enforced in a trigger rather than
+a CHECK, because every one of them is about another row: an after only,
+pointing at a before, on the same job, never at itself. `on delete set null`
+rather than cascade, because if a before ever goes, the after is still real
+evidence of real work.
+
+The comparison is shown inside the after's own card, as a thumbnail of the
+before, rather than by drawing the before as a second full card. A record that
+lists the same photograph twice is a worse record even when it looks better.
+
+**N moved from "none of those" to "new", and skipping became S.** A letter that
+already meant something else is a real cost, and the reason it moved anyway is
+that "N for new" is the mnemonic a worker will reach for, while skipping is the
+rare answer. A worker who replies N meaning to skip gets a new find, and the
+desk corrects it. Nothing about it blocks a filing either way.
+
+**The stage is named before anything is sent.** Founder's point, and it is
+about timing rather than information: a worker does not know which stage a job
+is on, the stages move while they are working, and finding out from the
+confirmation afterwards is too late to say otherwise. The proportion of the
+money a stage carries is stripped out of that sentence, because what a stage is
+worth is not a thing to put in front of somebody mid-job.
+
+**A correction cannot be anonymous.** `retag_evidence` refuses when it cannot
+tell who is signed in, and stamps `phase_set_by` and `phase_set_at`. A worker's
+answer is their claim about their own photograph, not a ruling, so the desk
+correcting a wrong one is ordinary and expected. Doing it silently would not be:
+this is evidence, and overwriting what somebody said with no trace of who
+changed it makes the record less trustworthy than leaving the mistake in. A
+correction never touches the image, the description or the fingerprint.
+
+`20260906020400_a_discovery_is_not_an_issue_and_an_after_answers_a_before.sql`,
+`web/lib/portal/evidence-sections.ts`, `supabase/functions/yaad-inbound/index.ts`,
+`concierge/concierge.html`.

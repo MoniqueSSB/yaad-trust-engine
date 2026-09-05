@@ -72,6 +72,14 @@ type Evidence = {
   uploaded_by: string | null;
   sha256: string | null;
   stage: number | null;
+  /* The before this after answers, by id. Null on everything else. */
+  pairs_with: string | null;
+  /* P1, P2, P3: the short per-job code a worker types to name one item. */
+  item_code: string | null;
+  /* Which section of the job this belongs to. Null means nobody said. */
+  phase: string | null;
+  /* 'materials' is its own section and carries no phase. */
+  kind: string | null;
 };
 
 type Quote = {
@@ -198,7 +206,7 @@ export default async function JobRoom({
     await Promise.all([
       supabase
         .from("evidence")
-        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage,phase,kind")
+        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage,phase,kind,pairs_with,item_code")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase
@@ -1527,6 +1535,11 @@ export default async function JobRoom({
           maxStage={stages.length}
           storeType={job.materials_store_type ?? null}
           store={job.materials_store ?? null}
+          /* Every before already on this job, so an after can name the one it
+             answers. Already loaded above; not a second query. */
+          befores={ev
+            .filter((e) => e.phase === "before")
+            .map((e) => ({ id: e.id, item_code: e.item_code ?? null, label: e.label }))}
         />
       )}
       {/* Video is a worker thing. A stage walkthrough is the worker proving

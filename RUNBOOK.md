@@ -3748,3 +3748,82 @@ Check that `yaad-evidence-landed-check` has actually been redeployed since
 defaults to false, records no sends, and therefore suppresses nothing. That
 fallback is deliberate: it fails towards the old behaviour rather than towards
 silence.
+
+## A new find is not a problem, and an after answers a named before
+
+Two additions to the five sections `20260906000700` put on every stage.
+
+### The fifth section: something new found
+
+`evidence.phase` now takes **`new`** as well as before, during, after and
+issue. The split matters because it is the difference between a problem and a
+bill:
+
+- **A problem with the work** is something wrong inside work that is already in
+  scope and already priced. Putting it right is included.
+- **Something new found** was never in the job at all. Nobody has quoted it and
+  nobody has agreed it, so it may change the price or the timeline, and that is
+  agreed with the client in writing first.
+
+Before this, `issue` carried both, and the client-facing note under it read
+"not part of what was originally quoted", which was only true of half the
+things filed there.
+
+On the desk a new find shows coral (blocked, because it stops until somebody
+decides) and a problem shows mango (held).
+
+### The after names the before it answers
+
+On WhatsApp the worker adds the code to the same reply: `A P3`. `P3` is the
+item code every evidence item already carries (`20260831zzzz2`). The question
+only offers this when the job actually has a before to point at, and it names
+the codes:
+
+> Which is this? Reply B for before, D for during the work, A for after, P for
+> a problem with the work, or N for something new you found that was not in the
+> job. Reply S to skip. If it is the after for one of the befores on this job
+> (P3, P5), put its code after the letter, like "A P3".
+
+**N used to mean "none of those" and now means "new". Skipping is S.** If a
+worker replies N expecting to skip, their photo is filed as a new find. Correct
+it from the desk. The letter moved because "N for new" is the mnemonic that
+matches the word, and skipping is the rarer answer.
+
+A code that names nothing on the job never blocks the filing. The evidence
+lands, and the reply says it could not find that code, so the desk can link it
+without the worker resending anything.
+
+In the portal, picking After on the upload form reveals a second dropdown
+listing that job's befores. If there are none it says so rather than silently
+filing an unpaired after.
+
+The client sees the comparison inside the After card: a thumbnail of the before
+it answers, captioned "Answers P3". The before is not drawn twice; it appears
+once in its own section and at thumbnail size here. A before that has an after
+against it says "Answered by P7" rather than looking like it is still waiting.
+
+### The WhatsApp message names the stage
+
+Every job in the "which job is this for" list carries the stage it is on, and
+the confirmation names the stage in full from the approved kickoff pack: "Got
+it, that's for JOB-1042 (Bathroom retile), stage 3, First fix. Anything you
+send now files against that stage."
+
+A worker on site does not know which stage the job is sitting on and the stages
+move while they are working. They should know where a photograph is going
+before they send it. The proportion of the money a stage carries is stripped
+out of that sentence on purpose.
+
+### Correcting a wrong answer
+
+Evidence view on the desk, "Correct which section this is". It changes the
+section and, for an after, which before it answers. It stamps your address and
+the time, and the row then reads "corrected by ...". The image, the description
+and the fingerprint are never touched.
+
+There is deliberately no way to change it without leaving your name on it. A
+worker's answer is their claim about their own photograph, not a ruling, so
+correcting one is ordinary. Doing it silently would not be.
+
+Materials is refused a section, here and everywhere: it is its own thing on
+`evidence.kind` and the database constraint will not take a phase on it.

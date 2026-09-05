@@ -275,22 +275,63 @@ async function evidenceSha256(buf: ArrayBuffer): Promise<string> {
 // PROBLEM rather than ISSUE as the word offered, because that is what a worker
 // on site actually says, and P does not collide with B, D or A. Both words are
 // accepted here regardless of which one was asked for.
-type PhaseAnswer = "before" | "during" | "after" | "issue";
+type PhaseAnswer = "before" | "during" | "after" | "issue" | "new";
 
+// "new" added 5 Sep 2026 on the founder's instruction. "issue" was carrying
+// two different things and the difference between them is money: a problem
+// with work already in scope and already priced, and something discovered that
+// was never in the job at all. See 20260906020400.
+//
+// N was "none of those" and is now "new". Skipping moved to S, because "N for
+// new" is the mnemonic that matches the word a worker would use, and skipping
+// is the rarer answer. Nothing here blocks either way: an unrecognised reply
+// still files the evidence unmarked.
+//
+// An after may name the before it answers on the same reply, "A P3", so the
+// code is stripped before the word is read.
 function readPhaseAnswer(text: string): PhaseAnswer | undefined {
-  const t = text.trim().toLowerCase().replace(/[.!,]+$/, "");
+  const t = text.trim().toLowerCase().replace(/\s+p\d+\b/, "").replace(/[.!,]+$/, "").trim();
   if (/^(b|before|bfore|befor|the before|before pic|before photo|before shot)$/.test(t)) return "before";
   if (/^(d|during|dur|in progress|progress|working|mid|midway)$/.test(t)) return "during";
   if (/^(a|after|afta|the after|after pic|after photo|after shot|done|finished)$/.test(t)) return "after";
   if (/^(p|i|problem|problems|issue|issues|a problem|fault|damage|snag)$/.test(t)) return "issue";
+  if (/^(n|new|newfind|new find|found|found something|something new|extra|discovered)$/.test(t)) return "new";
   return undefined;
+}
+
+// The item code an after names, if it named one: "A P3", "after P3", "P3".
+function readPairCode(text: string): string | null {
+  const m = /\bP(\d+)\b/i.exec(text.trim());
+  return m ? `P${m[1]}` : null;
+}
+
+type BeforeShot = { id: string; item_code: string | null; label: string | null };
+
+// The befores already on this job, so an after can name one. Capped, because
+// this gets read back in a text message and a list of forty codes is not a
+// list anybody uses.
+async function beforesOnJob(admin: { from: (t: string) => any }, jobId: string): Promise<BeforeShot[]> {
+  const { data } = await admin.from("evidence")
+    .select("id, item_code, label")
+    .eq("job_id", jobId).eq("phase", "before")
+    .order("created_at", { ascending: false }).limit(8);
+  return (data ?? []) as BeforeShot[];
+}
+
+// Added to the section question only when there is a before to point at. A
+// worker who photographed the finished work first has done nothing wrong and
+// should not be offered a code list with nothing in it.
+function pairHint(befores: BeforeShot[]): string {
+  if (!befores.length) return "";
+  const codes = befores.map((b) => b.item_code).filter(Boolean).join(", ");
+  return ` If it is the after for one of the befores on this job (${codes}), put its code after the letter, like "A ${befores[0].item_code}".`;
 }
 
 // One short question, in the words a worker would use. Kept as a constant
 // because it goes out from three places in the evidence lane and they must not
 // drift into three slightly different questions.
 const PHASE_QUESTION =
-  'Which is this? Reply B for before, D for during the work, A for after, or P for a problem you found. Reply N if it is none of those.';
+  'Which is this? Reply B for before, D for during the work, A for after, P for a problem with the work, or N for something new you found that was not in the job. Reply S to skip.';
 
 // What the worker is told it went down as. "the before" reads naturally, "the
 // issue" does not, and a worker who has just reported rot behind a panel
@@ -299,7 +340,8 @@ const PHASE_SAID: Record<PhaseAnswer, string> = {
   before: "the before",
   during: "during the work",
   after: "the after",
-  issue: "a problem found on site",
+  issue: "a problem with the work",
+  new: "something new found",
 };
 
 // hasCaption is the record of whether a worker actually said what this is,
@@ -307,7 +349,7 @@ const PHASE_SAID: Record<PhaseAnswer, string> = {
 // ("Sent on WhatsApp" when nothing was said), but that fallback text is not
 // context, and the dispatch loop needs to tell the two apart to know
 // whether to ask.
-type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean; phase?: PhaseAnswer | null };
+type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean; phase?: PhaseAnswer | null; pairsWith?: string | null };
 
 // Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
 // a straight download rather than a two-step lookup: fetchMedia() above
@@ -343,6 +385,7 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
     // null when the worker did not answer the section question, which is an
     // honest answer in itself and never blocks the filing. See 20260906000700.
     phase: item.phase ?? null,
+    pairs_with: item.pairsWith ?? null,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });
   if (insErr) {
@@ -350,6 +393,21 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
     return false;
   }
   return true;
+}
+
+// The stage, in words a worker recognises, without the money in it.
+//
+// Founder's point, 5 September 2026: a worker on site does not know which
+// stage the job is sitting on, and stages move while they are working. So the
+// message names it before they send anything, rather than leaving them to find
+// out from the confirmation afterwards, when it is too late to say otherwise.
+// stageLabel already resolves the name from the approved kickoff pack; this
+// drops the "(30% of the total)" it carries, because what proportion of the
+// money a stage is worth is not a thing to put in front of somebody mid-job.
+async function stageSaid(supabase: { from: (t: string) => any }, jobId: string, stageNum: number): Promise<string> {
+  const full = await stageLabel(supabase, jobId, stageNum);
+  const name = full.replace(/\s*\(\d+% of the total\)\s*$/, "").trim();
+  return /^stage \d+$/i.test(name) ? name.toLowerCase() : `stage ${stageNum}, ${name}`;
 }
 
 async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ id: string; title: string; stage: number }[]> {
@@ -1899,7 +1957,18 @@ Deno.serve(async (req: Request) => {
         // this webhook's.
         if (awaitingPhase && confirmedJob) {
           const phase = readPhaseAnswer(msg.text) ?? null;
-          const stamped = pending.map((item) => ({ ...item, phase }));
+
+          // An after may name the before it answers on the same reply, "A P3".
+          // A code that names nothing on this job is worse than no code: it
+          // would file an after claiming to answer something that is not
+          // there. So it is checked, and a wrong one is said out loud rather
+          // than dropped, but it still never blocks the filing.
+          const code = phase === "after" ? readPairCode(msg.text) : null;
+          const befores = code ? await beforesOnJob(supabase, confirmedJob.id) : [];
+          const named = code ? befores.find((b) => (b.item_code ?? "").toUpperCase() === code) : undefined;
+          const pairsWith = named?.id ?? null;
+
+          const stamped = pending.map((item) => ({ ...item, phase, pairsWith }));
           let filed = 0;
           for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
@@ -1909,9 +1978,14 @@ Deno.serve(async (req: Request) => {
           });
           if (!filed) return twiml("Nothing saved properly there. Try sending the photo again.");
           const filedLabel = await stageLabel(supabase, confirmedJob.id, confirmedJob.stage);
+          const answering = named ? `, answering ${named.item_code}` : "";
           let body = phase
-            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}. Keep them coming.`
+            ? `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}, marked as ${PHASE_SAID[phase]}${answering}. Keep them coming.`
             : `Filed ${filed} item${filed === 1 ? "" : "s"} against ${confirmedJob.id}, ${filedLabel}. I could not tell which part of the job that was, so it is on record unmarked. Keep them coming.`;
+          // Said, not silently swallowed. The evidence is filed either way;
+          // what is missing is only the link between the two photographs, and
+          // the desk can put that right without the worker resending anything.
+          if (code && !named) body += ` I could not find ${code} on this job, so it is filed without being linked to a before.`;
           const link = await mintPortalUploadLink(supabase, workerEmail, confirmedJob.id);
           if (link) body += ` For a longer video the portal takes a bigger file: ${link}`;
           return twiml(body);
@@ -1934,7 +2008,7 @@ Deno.serve(async (req: Request) => {
             .update({ answers: { ...answers, pending: described, awaiting_phase: true }, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.evidence_intake.outcome": "context_taken_asked_phase" });
-          return twiml(`Got it. ${PHASE_QUESTION}`);
+          return twiml(`Got it, going on ${confirmedJob.id}, ${await stageSaid(supabase, confirmedJob.id, confirmedJob.stage)}. ${PHASE_QUESTION}${pairHint(await beforesOnJob(supabase, confirmedJob.id))}`);
         }
 
         const pick = pickJobChoice(msg.text, choices);
@@ -1949,7 +2023,7 @@ Deno.serve(async (req: Request) => {
           await supabase.from("wa_intake_sessions")
             .update({ answers: { ...answers, confirmed_job: pick.id, confirmed_stage: pick.stage }, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
-          return twiml(`Got it, that's for ${pick.id}. What does this show? A line on what was done helps the client understand it faster. ${UNFILED_NOTICE_SHORT}`);
+          return twiml(`Got it, that's for ${pick.id}, ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage. What does this show? A line on what was done helps the client understand it faster. ${UNFILED_NOTICE_SHORT}`);
         }
 
         // Everything already carries a caption, so no context question is
@@ -1964,7 +2038,7 @@ Deno.serve(async (req: Request) => {
           })
           .eq("wa_id", msg.from);
         root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
-        return twiml(`Got it, that's for ${pick.id} (${pick.title}), stage ${pick.stage}. ${PHASE_QUESTION}`);
+        return twiml(`Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage. ${PHASE_QUESTION}${pairHint(await beforesOnJob(supabase, pick.id))}`);
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
