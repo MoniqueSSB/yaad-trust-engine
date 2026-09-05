@@ -50,6 +50,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
 import { pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -119,7 +121,7 @@ async function sendTwilio(
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: params,
+        body: withStatusCallback(params),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
@@ -583,8 +585,28 @@ async function reviewEvidencePhotos(images: EvidencePhoto[], jobTitle: string, t
  *  Prefixes each note with its photo's code, but only when there is more
  *  than one photo to tell apart: on a single-photo stage, "P1:" in front
  *  of every sentence is noise nobody needs to disambiguate anything. */
-function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): string {
-  if (!findings.length) return "Nothing of concern visible in what was sent.";
+/** Two summaries from one set of findings, and the split is the point.
+ *
+ *  Until 4 September 2026 there was one string and it went to everybody. It
+ *  carried the model's severity word and, where a finding set
+ *  recommend_professional, the sentence "Worth a professional look in person."
+ *  That reached an overseas client attached to the worker's confirmed report,
+ *  with nobody at Yaadly having read it. A machine telling somebody their
+ *  house may have a structural problem is a quasi-diagnosis, it is the exact
+ *  register yaad-completion's prompt forbids ("Describe, never certify"), and
+ *  Yaadly guarantees project management judgment rather than survey findings.
+ *
+ *  So: the CLIENT gets what is visible, in plain words, and nothing else. The
+ *  severity, the category and the escalation flag stay on the desk side, where
+ *  a named human decides whether any of it is worth telling the client and in
+ *  what words. That is the governing rule applied to a sentence rather than to
+ *  a payment: the machine observes, a person judges.
+ */
+type FindingSummary = { desk: string; client: string; escalate: boolean; worst: string };
+
+function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): FindingSummary {
+  const none = "Nothing of concern visible in what was sent.";
+  if (!findings.length) return { desk: none, client: none, escalate: false, worst: "none" };
   const worst = findings.some((f) => f.severity === "high") ? "high"
     : findings.some((f) => f.severity === "medium") ? "medium" : "low";
   const escalate = findings.some((f) => f.recommend_professional);
@@ -595,9 +617,88 @@ function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): 
     const code = multi ? findingLabel(f, images) : "";
     return code ? `${code}: ${text}` : text;
   }).filter(Boolean).join(" ");
-  const tail = escalate ? " Worth a professional look in person." : "";
   const more = findings.length > 3 ? ` (${findings.length - 3} more noted on the job.)` : "";
-  return `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
+  const tail = escalate ? " Worth a professional look in person." : "";
+
+  // The desk keeps everything, including the fallback that names a severity
+  // when no finding carried usable words.
+  const desk = `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
+
+  // The client gets observations only. No severity word, no escalation
+  // sentence, and if there were no usable words at all it says nothing rather
+  // than reporting a bare count with a severity attached to it.
+  const client = `${items}${more}`.trim();
+
+  return { desk, client, escalate, worst };
+}
+
+/** Tell the desk when the model saw something it wants a professional to look
+ *  at. Without this, "kept internal" means "written to a column nobody reads",
+ *  which is not a human in the loop, it is a human out of it. Same ntfy shape
+ *  yaad-inbound already uses, and it never breaks the notification it rides on. */
+async function pingDeskOnEscalation(
+  admin: any, jobId: string, jobTitle: string, summary: FindingSummary,
+): Promise<void> {
+  if (!summary.escalate && summary.worst !== "high") return;
+  await ntfyPush(admin, `Photo review flagged: ${jobTitle}`,
+    `${jobId}: the photo review flagged something (severity ${summary.worst}`
+      + `${summary.escalate ? ", professional look suggested" : ""}). The client has NOT been told this. `
+      + `Your call whether to say anything. What it saw: ${summary.desk.slice(0, 400)}`,
+    "warning");
+}
+
+/** One push to Monique's phone. Extracted 4 Sep 2026 when the evidence checks
+ *  needed the same thing; it never throws, because a notification must never
+ *  break the report it rides on. */
+async function ntfyPush(admin: any, title: string, body: string, tags: string): Promise<void> {
+  try {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: title.slice(0, 120), Priority: "high", Tags: tags },
+      body,
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (_) { /* never let a notification break a report */ }
+}
+
+/** Fetch what the checks need and run them. Everything it reads is a hard
+ *  column; nothing here calls a model, and nothing it returns can act. */
+async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) {
+  try {
+    const [{ data: ev }, { data: arr }, { data: job }, { data: pack }] = await Promise.all([
+      admin.from("evidence").select("label, mime, captured_at, created_at, kind, item_code")
+        .eq("job_id", jobId).eq("stage", stage).order("created_at", { ascending: true }),
+      admin.from("arrival_log").select("arrived_at, arrived_on, lat, far_from_site")
+        .eq("job_id", jobId).eq("stage", stage).order("arrived_at", { ascending: true }),
+      admin.from("jobs").select("parish").eq("id", jobId).maybeSingle(),
+      admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    // The quote pack stands in for the checklist when there is no Kickoff
+    // Pack, which since 4 Sep 2026 is the ordinary case.
+    const { data: qp } = await admin.from("quote_pack_drafts")
+      .select("docs").eq("job_id", jobId).eq("status", "approved")
+      .order("approved_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: pins } = await admin.from("work_log_pins")
+      .select("shared_at, far_from_site, address")
+      .eq("job_id", jobId).eq("stage", stage).order("shared_at", { ascending: false });
+    return runEvidenceChecks({
+      stage,
+      evidence: ev ?? [],
+      arrivals: arr ?? [],
+      checklist: pack?.docs?.evidence_checklist ?? null,
+      quoteStages: qp?.docs?.payment_stages ?? null,
+      pins: pins ?? [],
+      parish: job?.parish ?? null,
+    });
+  } catch (e) {
+    // A failed check must never stop the report. Say so in the logs, which as
+    // of 4 Sep 2026 is where a failure in this function is actually readable.
+    console.error("assembleEvidenceChecks failed:", String(e).slice(0, 300));
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -920,7 +1021,36 @@ Deno.serve(async (req: Request) => {
       const evLandedLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const draftText = composed?.message
         || `Photos have come in for ${evLandedLabel}, with no description from you yet.`;
-      const aiSummary = findings ? summariseFindings(findings, photoUrls) : "";
+      // Two summaries, deliberately. The worker sees the desk one, severity
+      // and escalation included, because they are standing in front of the
+      // thing and can look again. What gets STORED is the client-safe one,
+      // because that is the string that later rides out to the client through
+      // relay_confirmed_report(). Storing only the safe version means no
+      // change is needed in yaad-inbound or the RPC to keep a machine's
+      // severity judgement away from a client.
+      const aiSummaries = findings ? summariseFindings(findings, photoUrls) : null;
+      const aiSummary = aiSummaries?.client ?? "";
+      if (aiSummaries) await pingDeskOnEscalation(admin, jobId, job.title, aiSummaries);
+
+      // The evidence completeness checks, live at last (roadmap item 6). They
+      // are deterministic, they read only hard columns, and they decide
+      // nothing: the worker sees the short list of what is missing while he is
+      // still on site and can fix it, and the desk is told only when something
+      // actually is. Founder's own call, 4 Sep 2026: worker first, desk on
+      // gaps. That is the Mirror Rule, because the same check that gives the
+      // client a complete pack keeps the worker off the hook for one he could
+      // have finished in two minutes.
+      const evChecks = await assembleEvidenceChecks(admin, jobId, job.stage ?? 1);
+      const gaps = workerGaps(evChecks);
+      // Notes are offers, not demands, and are carried separately so the
+      // location-pin ask can never read as one more thing he has to do.
+      const notes = workerNotes(evChecks);
+      if (gaps.length) {
+        await ntfyPush(admin, `Evidence gaps: ${job.title}`,
+          `${jobId} stage ${job.stage ?? 1}: ${gaps.length} thing${gaps.length === 1 ? "" : "s"} missing. `
+            + `The worker has been told and can still fix it.\n\n${deskPack(evChecks)}`.slice(0, 900),
+          "clipboard");
+      }
       // Named once here, on more than one photo, so a reply naming a code
       // means something without repeating "Items: ..." on every line below.
       const itemsLine = photoUrls.length > 1
@@ -953,7 +1083,13 @@ Deno.serve(async (req: Request) => {
       line = [
         `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
         `"${draftText}"`,
-        aiSummary ? `AI noticed: ${aiSummary}` : null,
+        aiSummaries?.desk ? `AI noticed: ${aiSummaries.desk}` : null,
+        // The gaps sit BELOW the draft and ABOVE the reply instruction, so a
+        // worker reads what the client would be told, then what is missing,
+        // then what to do. Nothing here stops him replying 1: the choice is
+        // still his, and a stage is never blocked by this.
+        gaps.length ? `Still missing on this stage:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
+        notes.length ? notes.join("\n\n") : null,
         itemsLine,
         `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
       ].filter(Boolean).join("\n\n");
@@ -962,6 +1098,7 @@ Deno.serve(async (req: Request) => {
         "yaadly.notify.ai_review_ran": findings !== null,
         "yaadly.notify.ai_finding_count": findings?.length ?? 0,
         "yaadly.notify.draft_sent_to_worker": !!workerPhone,
+        ...checkAttrs(evChecks),
       });
     } else if (kind === "evidence_report_confirmed") {
       // The other half of evidence_landed's new shape: fired only once the

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { fetchModel, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
@@ -10,12 +10,14 @@ import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import { FAQ_FACTS } from "./faq.ts";
 import { priceFigureGuard } from "./price-figures.ts";
+import { TRADES_PROMPT_LINE } from "./trades.ts";
 import { stripPromises, unkeepableSentences } from "./promises.ts";
 import { shouldEscapeLane, wantsAPerson } from "./escape-hatch.ts";
 import { samePhone } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
 import { replyFromCard } from "./reply-from-card.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -333,6 +335,46 @@ async function lookupActiveJobsForWorker(admin: any, email: string): Promise<{ i
 // duplicate can never shadow the profile that matters. Returns null only
 // when NONE of the matches have active work, same meaning the old function's
 // null already carried.
+/** A pin that is not an arrival is a work-log pin.
+ *
+ *  ── Why both exist ──
+ *
+ *  Two parallel sessions built "a worker sends a WhatsApp location" on
+ *  4 September 2026 and built different things. One logs an ARRIVAL, the stage
+ *  event that says he turned up. The other files a WORK-LOG PIN, evidence of
+ *  where he was standing when the work went on record. Both are right and they
+ *  are genuinely different events, which is why work_log_pins is its own table
+ *  and not a column on arrival_log.
+ *
+ *  But a worker only ever does one thing: he sends a location. So something
+ *  has to decide which it means, and it cannot be another question, because he
+ *  is on a phone mid-job.
+ *
+ *  The rule: the FIRST pin on a stage each day is the arrival, every later one
+ *  is a work-log pin. "I am here", then "and here is where I was when I filed
+ *  this". log_arrival_via_whatsapp already reports already_logged_today, so the
+ *  signal was there before this needed it.
+ *
+ *  Never blocks and never throws. arrival_log's own migration says GPS
+ *  strengthens the record and never gates it, and that holds for this too.
+ */
+async function fileWorkLogPin(
+  supabase: any, jobId: string, phone: string, lat: number, lon: number, place: string, root: any,
+): Promise<boolean> {
+  try {
+    const { error } = await supabase.rpc("record_work_log_pin", {
+      p_job: jobId, p_phone: phone, p_lat: lat, p_lon: lon,
+      p_accuracy_m: null, p_address: place || null, p_label: null,
+    });
+    if (error) { console.error("record_work_log_pin failed:", error.message); return false; }
+    root.setAttributes({ "yaadly.work_log_pin.job": jobId });
+    return true;
+  } catch (e) {
+    console.error("record_work_log_pin threw:", String(e).slice(0, 200));
+    return false;
+  }
+}
+
 async function lookupWorkerWithActiveJobs(
   admin: any,
   from: string,
@@ -384,7 +426,7 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<b
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body }),
+        body: withStatusCallback(new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body })),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
@@ -606,11 +648,7 @@ access_note: who can let a worker in, gate codes, dogs, whether anyone lives
 there.
 questions: at most two, the things a worker would refuse to quote without.
 
-trade: one of Plumbing, Roofing, Electrical, Tiling, Masonry & Concrete,
-Painting & Decorating, Grille & Gate Welding, Air Conditioning, Landscaping,
-General Handyman, Solar Install, Water Tank & Pump, Locks & Security Doors,
-Windows & Glazing, Carpentry & Joinery, Drainage & Septic, Fencing,
-CCTV & Alarms. Empty if unclear.
+trade: ${TRADES_PROMPT_LINE}
 
 "enough" is true only when you know all three of: what the work is, which
 parish the property is in, and who can let a worker in. A greeting, "I have a
@@ -661,7 +699,7 @@ async function classifyTheJob(
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "classify",
     }, async (sp) => {
-      const r = await fetch(prov.api, {
+      const r = await fetchModel(prov.api, {
         method: "POST",
         headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -677,7 +715,7 @@ async function classifyTheJob(
           ],
         }),
         signal: sig,
-      });
+      }, { timeoutMs: 25000 });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
       if (!r.ok) {
@@ -837,7 +875,7 @@ async function composeReply(
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "compose",
     }, async (sp) => {
-      const r = await fetch(prov.api, {
+      const r = await fetchModel(prov.api, {
         method: "POST",
         headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -859,7 +897,7 @@ ${transcript.slice(0, 6000)}` },
           ],
         }),
         signal: sig,
-      });
+      }, { timeoutMs: 25000 });
       const raw = await r.text();
       sp.setAttributes({ "http.response.status_code": r.status });
       if (!r.ok) {
@@ -1719,9 +1757,13 @@ Deno.serve(async (req: Request) => {
         const row = Array.isArray(logged) ? logged[0] : logged;
         root.setAttributes({ "yaadly.arrival.job": pick.id, "yaadly.arrival.outcome": error ? "refused" : "logged_after_confirm" });
         if (error) return twiml(`That did not save: ${error.message}`);
-        return twiml(row?.already_logged_today
-          ? `You are already checked in on ${pick.id} (${pick.title}) today, so nothing changed.`
-          : `Checked in on ${pick.id} (${pick.title}). That is on the Arrival Log now.`);
+        if (row?.already_logged_today) {
+          const filed = await fileWorkLogPin(supabase, pick.id, msg.from, Number(a.lat), Number(a.lon), String(a.place ?? ""), root);
+          return twiml(filed
+            ? `Already checked in on ${pick.id} (${pick.title}) today, so I have put this on the job as where you were. It strengthens the record and nothing waits on it.`
+            : `You are already checked in on ${pick.id} (${pick.title}) today, so nothing changed.`);
+        }
+        return twiml(`Checked in on ${pick.id} (${pick.title}). That is on the Arrival Log now.`);
       }
 
       if (!deskHasThisNumber && textUpdateSession && !msg.media.length && msg.text.trim()) {
@@ -1853,9 +1895,13 @@ Deno.serve(async (req: Request) => {
               "yaadly.arrival.outcome": error ? "refused" : (row?.already_logged_today ? "already_today" : "logged"),
             });
             if (error) return twiml(`That did not save: ${error.message}`);
-            return twiml(row?.already_logged_today
-              ? `You are already checked in on ${job.id} (${job.title}) today, so nothing changed.`
-              : `Checked in on ${job.id} (${job.title})${where}. That is on the Arrival Log now.`);
+            if (row?.already_logged_today) {
+              const filed = await fileWorkLogPin(supabase, job.id, msg.from, msg.lat!, msg.lon!, msg.place ?? "", root);
+              return twiml(filed
+                ? `Already checked in on ${job.id} (${job.title}) today, so I have put this on the job as where you were${where}. It strengthens the record and nothing waits on it.`
+                : `You are already checked in on ${job.id} (${job.title}) today, so nothing changed.`);
+            }
+            return twiml(`Checked in on ${job.id} (${job.title})${where}. That is on the Arrival Log now.`);
           }
           if (found.jobs.length > 1) {
             await supabase.from("wa_intake_sessions").upsert({

@@ -13,7 +13,25 @@ Rules: never invent facts; if a field is not in the message use "". Extract name
 Return STRICT JSON only, no markdown fences, exactly this shape:
 {"trade":"one value copied EXACTLY from the TRADES list","confidence":"high|medium|low","second_choice":"another value from TRADES, or empty string","reason":"one short sentence, max 15 words, naming the words in the description that decided it"}
 Rules. The value of "trade" MUST be copied character for character from the TRADES list you are given. Never invent a trade, never return a plural, never return a trade that is not on the list. If the job clearly needs more than one trade, return the one that must happen FIRST and put the other in second_choice. If the description is too vague to tell, return "handyman" with confidence "low". Never estimate a price. Never comment on the client.`,
-  report: `You are the Reporting Agent for Yaadly. Draft a short, warm WhatsApp update from Yaadly to the client using ONLY the facts given. Plain text, no markdown. Never promise dates or amounts that are not in the facts. Never mention percentages or fees. End with one clear next step for the client. Sign off as Yaadly.`
+  report: `You are the Reporting Agent for Yaadly. Draft a short, warm WhatsApp update from Yaadly to the client using ONLY the facts given. Plain text, no markdown. Never promise dates or amounts that are not in the facts. Never mention percentages or fees. End with one clear next step for the client. Sign off as Yaadly.`,
+
+  // Added 4 September 2026, roadmap item 5 from the agent audit. A job's descr
+  // column grows by concatenation across every turn of a WhatsApp or web chat
+  // thread, so by the time somebody has written in five times the desk is
+  // reading a wall of text to find out what they actually want. This is three
+  // sentences for one person, Monique, and it is NEVER sent to anybody.
+  summarise: `You are summarising one conversation for the person who runs Yaadly, so she can pick up a job thread in ten seconds instead of reading it all. She is the only reader. Nothing you write is ever sent to the client or to a tradesperson.
+
+Return STRICT JSON only, no markdown fences, exactly this shape:
+{"wants":"one sentence, what this person actually wants done, in their own nouns","unknown":"one sentence naming what is still missing that a worker would need before quoting, or empty string if nothing is","worried":"one sentence on what they seem anxious or annoyed about if anything comes through clearly, or empty string","flag":"one short phrase ONLY if something needs a person today (they asked for a person, they are upset, they mentioned a leak or anything unsafe, they have written several times with no answer), otherwise empty string"}
+
+Rules:
+- Use ONLY what is in the conversation. Never infer a budget, a timescale, a trade you were not told, or a mood you cannot point at a sentence for.
+- Understand Patois perfectly. Write the summary in plain standard English.
+- Never state or estimate a price, and never repeat a figure the client guessed at as though it were real.
+- "worried" is for something they actually expressed. An ordinary request has an empty "worried". Do not invent anxiety to fill the field.
+- Do not recommend what to do about it. She decides that. You are describing, not advising.
+- Keep every sentence under 25 words.`
 };
 
 // Who is calling, asked of Supabase rather than read off the token.
@@ -155,7 +173,15 @@ Deno.serve(async (req) => {
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
+      // recordError alone lands on the span and nowhere in function_logs, so
+      // with no OTLP endpoint configured a failed model call left no trace at
+      // all. Found 4 Sep 2026 during the Mistral switch: a wrong model id
+      // produced a silent failure across four functions and there was nothing
+      // to read. console.error alongside the span, same as yaad-inbound.
+      if (!r.ok) {
+        const msg = `yaad-agent: ${prov.name} http ${r.status}: ${JSON.stringify(j).slice(0, 200)}`;
+        s.recordError(msg); console.error(msg);
+      }
       return j?.choices?.[0]?.message?.content ?? JSON.stringify(j);
     });
 
