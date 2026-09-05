@@ -640,6 +640,296 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## The desk script is linted now, and what to do when that job goes red
+
+**`scripts/check-desk-script.mjs`, CI job "Admin desk script".** It pulls the
+inline script out of `concierge/concierge.html` and runs one rule over it.
+Line numbers in the error are real line numbers in `concierge.html`, because
+the extraction blanks everything outside the script rather than removing it.
+
+**Why it exists.** Nothing in CI read a line of the desk until 5 September
+2026, and the same bug has now shipped from it twice: the 17-18 August
+temporal dead zone that broke admin sign-in on a direct link, and one found on
+5 September where three consts sat below the tile that read them, so
+`loadOverview()` threw and rendered 13 tiles instead of 29, losing the whole
+"what needs me today" alert list. Both were found by a person walking into
+them.
+
+**One rule, not a style pass, and that is the design.** The stock ESLint
+`no-use-before-define` reports 17 findings on this file and every one is safe:
+`tile`, `sb`, `ROWS`, `currentView` are read inside functions that run long
+after the module finishes. A job that cries wolf gets switched off, which is
+the same reasoning the secrets scanner's comment gives for filtering
+placeholders. The custom rule compares scopes, so it only fires on a read in
+the same scope as the `let` or `const`, before the declaration. That throws
+whenever the line runs, every time.
+
+**When it goes red**, move the declaration above its first use. Do not disable
+the rule and do not add an eslint-disable comment: the finding is not a style
+opinion, it is a line that throws.
+
+```bash
+node scripts/check-desk-script.mjs
+```
+
+---
+
+## Passing or blocking an applicant, and why the buttons changed
+
+**Deciding whether somebody can earn on this platform is a §2 decision, and
+until 5 September 2026 it left no record of who made it.** The desk wrote
+`applications.status` directly through the generic action mechanism. The status
+changed and nobody's name went with it, so on the day somebody asks why a
+worker was blocked, the answer was a status string. `vetting_reviews` is the
+AI's read of the documents, never the person's ruling.
+
+**Pass, Send the gap back and Block now call `decide_application()`**, which is
+admin only and takes your name from your session rather than from anything the
+page sends. A trigger, `trg_application_decision_attributed`, refuses any
+status change into `passed`, `blocked`, `gap`, `approved` or `declined` that
+arrives without a name. So the rule holds for a script and for psql, not only
+for this page.
+
+**Each button now offers a note.** Optional on purpose: a forced box gets
+filled with a full stop. On Block it is the one worth writing, because it is
+the hardest decision to stand behind six months later.
+
+```sql
+select decided_at, decided_by, status, decision_note, name
+  from public.applications where decided_at is not null order by decided_at desc;
+```
+
+**If a button fails with "A vetting decision has to say who made it"**, the
+call went round the RPC and wrote `status` directly. That is the trigger
+working. Fix the caller; do not add `decided_by` to a direct update, because
+then the name is whatever the caller typed rather than whoever is signed in.
+
+**The eleven historical rows read NULL and stay that way.** Nobody knows who
+decided them. A plausible name backfilled into the column that exists to be
+trustworthy is worse than an empty one, and `system` would claim a machine did
+it. NULL means not recorded, which is the true statement.
+
+Rig: `supabase/tests/vetting_attribution_guards.sql`, six tests. Test 4 exists
+so the guard cannot pass by refusing everything, which is the easy way to look
+strict and break the desk.
+
+---
+
+## A quote pack held at "ready", and why it stops a job dead
+
+**The quote pack draft becomes the client's quote.** It is one AI-drafted
+overview per job, scope and rough timeline and payment stages, carrying no
+prices. A worker reads it, edits it, adds their own price on `job_quotes`, and
+that edited copy is what the client sees. RLS only lets a worker read a draft
+at status `approved`, so a draft held at `ready` means the job shows as
+`open_for_quotes`, shows as open on the board, and has nothing a worker can
+look at, which means no quote is ever built and nothing reaches the client.
+The job is not slow. It is stopped, and nothing about its status says so.
+
+The kickoff pack is the next document along and is gated on payment, one per
+quote, confirmed by both sides with a shared code.
+
+A clean draft auto-approves. A draft the guardrail flags is held on purpose,
+which is correct behaviour: `approve_quote_pack_draft()` is admin only and
+refuses outright on any flag rather than offering an override. What was missing
+was anybody being told.
+
+**Found live on 5 September 2026**: `JOB-WEB-1788281626906`, Painting and
+Decorating in Kingston, pack drafted 2 September, held 78 hours, flagged for
+the phrase "fully covered", which is on the banned list in `CLAUDE.md` §8. The
+guardrail did its job perfectly and the job sat for three days.
+
+```sql
+select * from public.packs_awaiting_a_person;
+select job_id, status, guardrail from public.quote_pack_drafts where status = 'ready';
+```
+
+**On the Overview**: "Quote packs held", amber at one, red once anything has
+been waiting a day, plus an alert row naming the wait. Opens the Quote Pack
+Drafts view.
+
+**To clear one**, read the pack, fix the flagged wording or redraft it, then
+approve it from that view. The flag itself tells you what tripped it, in
+`guardrail.banned_samples`. Never clear one by editing the guardrail.
+
+---
+
+## Desk capacity, how much gets through in an evening
+
+**The question behind it.** The product is that a named human confirms every
+consequential step, so "can this scale" is really "how many of those
+confirmations fit in an evening". Built before the December pilot rather than
+after, because the pilot is the run that produces the first real numbers and a
+view added in January measures nothing that already happened.
+
+```sql
+select * from public.desk_capacity;
+select * from public.desk_sessions order by session_date desc;
+select * from public.desk_decisions order by at desc limit 30;
+```
+
+**A session runs 05:00 to 05:00 Jamaica time, not midnight to midnight.**
+Grouping on the plain date splits a normal evening in half and reports two thin
+sessions where there was one, which halves the figure while looking perfectly
+reasonable. `supabase/tests/desk_capacity_guards.sql` pins the boundary at
+23:10, 00:40, 04:50 and 05:10.
+
+**Only rows naming a real person count.** `kickoff_packs` and
+`quote_pack_drafts` carry an `approved_by` that reads `system: auto-issued,
+guardrail-clean`, and on 4 September 2026 there were 314 of those against 11
+real decisions. An auto-issued guardrail-clean pack is the system deciding the
+content was clean, not a person sitting down to a decision. The exclusion is a
+`system:%` pattern rather than a table list, so a new auto-issuer cannot quietly
+join the count. Tests 4 and 5 in the rig are the guard.
+
+**A pack a person actually cleared does count**, and getting that wrong is the
+correction in `20260905a`. `approve_quote_pack_draft()` is admin only, refuses
+outright on any guardrail flag rather than offering an override, and attributes
+the approval to the signed-in admin so the row can prove a named human
+confirmed it. That is a desk decision by any definition, and excluding the
+whole table rather than the auto-issued rows threw it away.
+
+**The tile is never coloured, and that is deliberate.** A quiet evening is a
+quiet week, not a bad one. Colouring throughput invites treating it as the
+thing to maximise, and the thing to maximise here is not how many sign-offs
+happen per hour.
+
+**It undercounts, and by a known amount.** Passing or failing a worker's
+application is a human decision and nothing records who made it or when:
+`applications.status` moves and leaves no attributed row, and `vetting_reviews`
+is the AI's read rather than the person's ruling. So the evening is longer than
+this says by however much vetting took. Logged in `DECISIONS.md` as an open
+governance gap.
+
+---
+
+## Evidence completeness at sign-off
+
+**The question is what you had in front of you when you decided, not what is
+on the job now.** Counting rows in `evidence` per job answers the weaker
+version, because a photograph filed the day after an approval counts towards it
+identically. `stage_approvals.evidence` is a snapshot taken at approval time,
+each item carrying the sha256 of the exact bytes, so that is what these views
+read. Nothing filed afterwards can improve the number, and there is a rig
+proving both halves of that: `supabase/tests/signoff_snapshot_guards.sql`,
+five tests, all passing on 4 September 2026. Test 4 exists so tests 2 and 3
+cannot pass by being vacuous.
+
+```sql
+select * from public.evidence_completeness;
+select * from public.evidence_at_signoff order by approved_at desc limit 20;
+```
+
+**Three numbers, not one score, and that is on purpose.** The gaps have
+different causes and one percentage would hide which is open:
+
+- **Signed off with evidence.** Red at anything under 100%. An approval with
+  nothing behind it is the product missing.
+- **Bound to the exact files.** Every item in the snapshot carries a sha256. An
+  item without one means the approval is attached to a label rather than to the
+  bytes, so a file swapped later goes unnoticed.
+- **Arrival logged first.** The worker was on site, on record, before the stage
+  was approved. **Expect this one to read low for now and do not read it as
+  workers cutting corners**: until the location pin lane shipped (`20260904h`)
+  the only way to log arrival was to sign into the portal mid-job, which
+  `CLAUDE.md` §9 says outright is not a thing a worker in Portmore will do.
+  This number is the measure of whether the pin lane fixed it.
+
+**What is deliberately not measured: whether there is a before and an after.**
+Nothing in the schema records which a photograph is. The labels usually say so
+in free text, and reading it out of them would be a guess presented as a check.
+Measuring it needs a field that says so, which is a product decision.
+
+**`located` and `flagged_far_from_site` are in `evidence_at_signoff` but not on
+the Overview.** Both are about the pin lane, which has no real traffic yet.
+Promote them once it does.
+
+---
+
+## Stall rate, and how long a stall lasts
+
+**Two different questions, and until 4 September 2026 only one of them had an
+answer.** `job_stall_state` holds one row per job that has gone quiet long
+enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes
+that row the moment the job moves again. The delete is right: the clock should
+genuinely reset rather than leave a stale flag lingering. But it also threw away
+the only evidence the stall ever happened, so "how many are stuck right now"
+was answerable and "how long do they stay stuck" was not answerable at all.
+
+**What changed.** `clear_resolved_job_stalls()` now writes one
+`job_stall_resolved` row on its way out, then deletes exactly as before.
+Nudging, escalating and clearing all behave identically; the only difference is
+that the stall leaves a record. Nothing about this is retrospective: the
+history starts on the day the migration ran, so the time-to-unstall number is
+empty until stalls resolve after it.
+
+**What the clock measures, and it matters that this is said plainly.** It runs
+from **when Yaadly noticed** (`nudged_at`) to when the job moved again. Not
+from when the job actually went quiet. That earlier moment is not recorded
+anywhere, and back-computing it from `job_silence_hours()` at delete time would
+be inventing a figure nobody can point at a row for. Time from noticing to
+moving is also the more useful half, because it is the part Yaadly controls.
+
+**On the Overview**: "Jobs gone quiet" is the rate right now, stalled over live
+jobs, amber when anything is stalled and red once anything has escalated.
+"Time to get moving again" is the 30 day average, green under a day, amber
+under three, red past that.
+
+```sql
+select * from public.stall_metrics;
+select job_id, nudged_at, resolved_at, hours_stalled
+  from public.job_stall_resolved order by resolved_at desc limit 20;
+```
+
+**If the time figure reads n/a and stalls have definitely resolved**, check the
+cron is calling `clear_resolved_job_stalls()` rather than deleting from
+`job_stall_state` directly. A direct delete still clears the flag and writes no
+history, which is exactly the state this section exists to have fixed.
+
+---
+
+## Draft acceptance, the headline metric
+
+**Why this one and not "percentage resolved without a human".** The product is
+that a named person decided. A metric that improves when the person is removed
+argues against the thing being sold. Draft acceptance is the honest inverse: it
+measures whether the AI saved somebody time, and it can only go up by the
+drafting getting better.
+
+**Where it comes from.** When a worker sends an update, the assistant drafts
+the client-facing report and sends it to that worker with a choice: reply `1`
+to send it as written, or type their own version. That reply is the only moment
+anybody says whether the draft was good enough. Until 4 September 2026 it went
+to a trace span and nowhere else, which is off entirely unless an OTLP endpoint
+is configured, so in practice the number did not exist.
+
+`yaad-inbound` now writes a `draft_decisions` row at that moment, and only when
+the relay itself worked: a decision that never reached the client is not a
+decision.
+
+**On the Overview**: "Drafts sent as written". Deliberately not coloured until
+there are at least five decisions, because a sample of one reading 100% is not
+good news, it is no news, and colouring it invites trusting it too early.
+
+**The number to act on is roughly 60%.** Below that the drafter is costing time
+rather than saving it and should be paused rather than tuned indefinitely.
+
+```sql
+select * from public.draft_acceptance;
+```
+
+**`kind` exists from the start** so the report drafter writes the same rows when
+it is built. One table answering "how often is a draft good enough" across every
+drafter beats one table per agent.
+
+**Why the row is not written inside `relay_confirmed_report()`.** `yaad-inbound`
+resolves `1` into the stored draft text before calling that RPC, so by the time
+it runs, an accepted draft and a rewrite are the same argument. Only the code
+that read the worker's reply knows which happened.
+
+---
+
+
 ## The one working day promise, and how it is measured
 
 yaadly.co.uk says "a person replies within one working day" on the services
