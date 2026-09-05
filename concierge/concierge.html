@@ -717,6 +717,131 @@ async function deskEditDescr(row, vals){
   if (error) throw new Error(error.message);
 }
 
+/* ── A worker's public profile: the face, the voice and the work ───────────
+ *
+ * /apply has collected a photograph, a thirty second introduction and a
+ * portfolio file since 3 Sep 2026. All three sit in the PRIVATE vetting
+ * bucket and no client has ever seen one. 20260905b makes them publishable,
+ * and these three functions are the only way anything gets published.
+ *
+ * WHY IT IS A BUTTON HERE AND NOT AN AUTOMATIC STEP. Putting somebody's face
+ * and voice on the open internet is a decision, and the rule this whole
+ * product runs on is that a named human takes those. published_by records
+ * who. There is deliberately no path that publishes on approval, on a score,
+ * or on a nightly job.
+ *
+ * TWO GATES, and neither is in this file, on purpose:
+ *   the consent   public_worker_showcase tests showcase_consent = 'granted'
+ *                 on EVERY read, so a withdrawal empties a profile on the
+ *                 next page load whether or not the files are gone yet.
+ *                 deskPublishShowcase checks it too, so a mistake here is a
+ *                 refusal rather than a publication.
+ *   who may write storage policy "admins write the showcase bucket" plus RLS
+ *                 on worker_showcase. This page holds the publishable key
+ *                 like every other view; the database is what says no.
+ *
+ * THE FILE IS COPIED, NOT LINKED. The vetting original keeps its ninety day
+ * purge clock and is destroyed on time, which is what the applicant was told
+ * would happen. Serving a public profile straight out of that bucket would
+ * have meant a video that worked for three months and then vanished, and it
+ * would have meant a private bucket with a public door in it.
+ */
+
+// Which vetting documents may ever become public. Everything absent from this
+// list is a vetting paper and stays private: the photo ID, the selfie, the
+// face turn, proof of address, the TRN, the CV, the certificates. Adding to
+// this list is a legal decision, not a tidy-up. See CLAUDE.md section 6.
+const SHOWCASE_FROM = { profile_photo: "profile_photo", intro_video: "intro_video", portfolio: "work_file" };
+
+async function deskSetShowcaseConsent(row, vals){
+  const answer = String(vals.answer || "");
+  if (answer !== "granted" && answer !== "declined") throw new Error("Choose granted or declined. A blank is not an answer and would read as one.");
+  const { error } = await sb.from("worker_profiles").update({
+    showcase_consent: answer,
+    showcase_consent_at: new Date().toISOString(),
+    // The wording that earned it. Matches SHOWCASE_CONSENT_VERSION in
+    // web/app/apply/JoinFlow.tsx, and the two move together or every answer
+    // on file quietly starts meaning something nobody agreed to.
+    showcase_consent_version: String(vals.version || "showcase-v1").slice(0, 40),
+  }).eq("worker_email", row.worker_email);
+  if (error) throw new Error(error.message);
+}
+
+async function deskPublishShowcase(row){
+  // published_by is NOT NULL and is the record of who decided. If the session
+  // email is somehow missing, refusing is the right answer: a published file
+  // with nobody's name against it is worse than an unpublished one.
+  if (!SESSION_EMAIL) throw new Error("Cannot tell who is signed in, and this has to record who published it. Sign out and back in.");
+  if (String(row.showcase_consent || "") !== "granted") {
+    throw new Error("This worker has not agreed to a public profile. Record their answer first. Nothing is published on a blank.");
+  }
+  const cands = row._showcase_candidates || [];
+  if (!cands.length) throw new Error("There is nothing publishable on file: no photograph, no introduction video and no portfolio, or the ninety day purge has already destroyed them.");
+
+  const liveRows = row._showcase_live || [];
+  const live = new Set(liveRows.map(x => x.source_document));
+  let done = 0;
+  for (const d of cands) {
+    if (live.has(d.id)) continue;                    // already up, leave it
+    const kind = SHOWCASE_FROM[d.doc_type];
+    if (!kind) continue;
+
+    /* There is one face and one voice per worker, enforced by a partial
+       unique index. So a NEWER photograph or introduction replaces the older
+       one rather than colliding with it: the old file goes, then the old row,
+       then the new one is written below. Work photos are not in this branch
+       because a worker may have several. */
+    if (kind === "profile_photo" || kind === "intro_video") {
+      const old = liveRows.filter(x => x.kind === kind);
+      if (old.length) {
+        const rm = await sb.storage.from("showcase").remove(old.map(x => x.storage_path));
+        if (rm.error) throw new Error("Could not remove the previous " + kind + ": " + rm.error.message);
+        const { error } = await sb.from("worker_showcase").delete().in("id", old.map(x => x.id));
+        if (error) throw new Error(error.message);
+      }
+    }
+
+    // Copy, never move and never link. Read out of the private bucket with
+    // this desk's own admin grant, write into the public one.
+    const got = await sb.storage.from("vetting").download(d.storage_path);
+    if (got.error) throw new Error("Could not read " + d.doc_type + " out of the vetting bucket: " + got.error.message);
+
+    const ext = (d.storage_path.split(".").pop() || "bin").toLowerCase().slice(0, 5);
+    const path = `${row.worker_user || row.slug}/${kind}-${d.id}.${ext}`;
+    const put = await sb.storage.from("showcase").upload(path, got.data, {
+      contentType: d.mime || got.data.type || "application/octet-stream",
+      upsert: true,
+    });
+    if (put.error) throw new Error("Could not write " + d.doc_type + " to the showcase bucket: " + put.error.message);
+
+    const { error } = await sb.from("worker_showcase").insert({
+      worker_email: row.worker_email,
+      kind,
+      storage_path: path,
+      mime: d.mime || null,
+      bytes: d.bytes || null,
+      source_document: d.id,
+      position: kind === "profile_photo" ? 0 : kind === "intro_video" ? 1 : 2 + done,
+      published_by: SESSION_EMAIL,
+    });
+    if (error) throw new Error(error.message);
+    done++;
+  }
+  if (!done) throw new Error("Everything publishable is already on their profile. Nothing to do.");
+}
+
+async function deskUnpublishShowcase(row){
+  const live = row._showcase_live || [];
+  if (!live.length) throw new Error("Nothing of theirs is published, so there is nothing to take down.");
+  // Files first, then rows. The other order would leave a public URL alive
+  // with nothing in the database pointing at it, which is the one state
+  // nobody would ever go looking for.
+  const rm = await sb.storage.from("showcase").remove(live.map(x => x.storage_path));
+  if (rm.error) throw new Error(rm.error.message);
+  const { error } = await sb.from("worker_showcase").delete().eq("worker_email", row.worker_email);
+  if (error) throw new Error(error.message);
+}
+
 const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
 const money = (p) => "£" + (p / 100).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -930,15 +1055,15 @@ const VIEWS = [
     // Every column except budget_band, named one by one on purpose. "*" plus a
     // hide list would still fetch the client's private figure into this page
     // and merely decline to draw it. The rule is that it never arrives.
-    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency",
-    order:"updated_at", search:["id","title","parish","client_name","client_phone","worker_name","trade","descr"],
+    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency,requested_worker_email,requested_at,request_state",
+    order:"updated_at", search:["id","title","parish","client_name","client_phone","worker_name","trade","descr","requested_worker_email"],
     empty:["No jobs yet","A job appears here once somebody writes in by WhatsApp, email or the website form."],
     cols:[
       {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
       {h:"Where", f:r => esc(r.parish || "") + sub_(r.trade || "")},
       {h:"Client", f:r => esc(r.client_name || "none") + sub_(r.client_phone || r.client_email || "no way to reply")},
       {h:"In their own words", f:r => ownWords(r.descr)},
-      {h:"Worker", f:r => r.worker_name ? esc(r.worker_name) : mute_("not chosen")},
+      {h:"Worker", f:r => r.worker_name ? esc(r.worker_name) : (r.requested_worker_email ? requestChip(r) : mute_("not chosen"))},
       {h:"Materials store", f:r => matStore(r)},
       {h:"Stage", f:r => stageBar(r.stage)},
       {h:"Owed", n:true, f:r => r.owed ? jmd(r.owed) : mute_("none")},
@@ -1117,17 +1242,42 @@ const VIEWS = [
 
   { k:"workers", g:"People", label:"Workers", icon:"tools",
     title:"Workers", table:"worker_profiles",
-    sub:"A published profile is what lets somebody quote. The trigger checks it on every insert, so publishing is the switch, not a label.",
+    sub:"A published profile is what lets somebody quote. The trigger checks it on every insert, so publishing is the switch, not a label. Public profile is a separate thing and a separate consent: their own photograph, their thirty second introduction and their work photos, copied out of the private vetting store onto a page anyone can open, only if they agreed and only when you press the button. Open the row to look at each file first.",
     select:"*",
     order:"updated_at", search:["name","worker_email","trade","parish"],
     empty:["No published workers","Publishing an application puts a worker here and lets them quote."],
+    pre: preWorkers,
+    // The candidate files, with links to open them. Publishing somebody's
+    // face is a decision, and a decision needs to be made looking at the
+    // thing, so the links are here rather than a button firing blind.
+    detailExtra: showcaseDetail,
     cols:[
       {h:"Worker", f:r => esc(r.name || "no name") + sub_(r.worker_email || "")},
       {h:"Trade & area", f:r => esc(r.trade || "") + sub_(r.parish || "")},
       {h:"Lane", f:r => r.lane ? chip_("mute", r.lane) : mute_("none")},
       {h:"Jobs done", n:true, f:r => String(r.jobs_completed ?? 0)},
       {h:"Guidelines", f:r => guidelinesChip(r.worker_email, "worker_guidelines", "WG")},
+      {h:"Public profile", f:r => showcaseCell(r)},
       {h:"State", f:r => r.active ? chip_("ok","active") : chip_("warn","cannot quote")},
+    ],
+    actions:[
+      { label:"Record their answer about a public profile", cls:"g",
+        says:() => "Writes down whether this worker agreed that their photograph, their introduction video and their work photos may go on a page anyone can open. It publishes nothing by itself. Set it to declined and their profile empties on the next page load, before any file has been deleted. Applicants answer this on the last screen of /apply; use this for the workers who joined before the question existed, and only after you have actually asked them.",
+        ask:[
+          { k:"answer", label:"What did they say", options:[["granted","They agreed"],["declined","They said no"]],
+            from:r => r.showcase_consent || "" },
+          { k:"version", label:"Which wording they answered", from:r => r.showcase_consent_version || "showcase-v1" },
+        ],
+        call: deskSetShowcaseConsent },
+
+      { label:"Put their photograph, video and work up", cls:"",
+        says:r => "Copies their photograph, their thirty second introduction and their portfolio out of the private vetting store onto their public profile, where anyone with the link can see them. Look at each one first, using the links in this drawer. Refused unless they have agreed. The originals keep their ninety day clock and are still destroyed on time. Your address is recorded against each file as the person who published it."
+              + (String(r.showcase_consent || "") === "granted" ? "" : " THEY HAVE NOT AGREED YET, so this will refuse."),
+        call: deskPublishShowcase },
+
+      { label:"Take their public profile down", cls:"d",
+        says:() => "Deletes the published copies and the rows behind them. Their profile goes back to trade, parish and what was checked. Their vetting documents are untouched, and this does not change their answer about consent: if you are taking this down because they asked you to, record that answer as declined too.",
+        call: deskUnpublishShowcase },
     ]},
 
   { k:"clients", g:"People", label:"Clients", icon:"home",
@@ -1947,6 +2097,27 @@ const MAT_STORE = {
   indoors:       ["ok",   "indoors"],
   none_available:["warn", "nowhere securable"],
 };
+// A client asked for one worker off their profile page (20260905a). Nobody is
+// booked by that, so this sits in the Worker column only while worker_name is
+// still empty: the moment somebody is actually chosen, the real name wins.
+//
+// The three states say different things to the desk. Held is a job the board
+// cannot see, so it should be watched: if that worker goes quiet the client
+// waits two days for nothing and a person may want to ring them. Priced and
+// passed both mean the hold is over and the board has it, which needs no
+// action at all.
+function requestChip(r){
+  const who = String(r.requested_worker_email || "").trim();
+  const st  = String(r.request_state || "");
+  const live = st === "pending" && r.requested_at
+    && (Date.now() - new Date(r.requested_at).getTime()) < 48 * 3600 * 1000;
+  const chip = st === "declined" ? chip_("mute", "asked, passed on it")
+             : st === "quoted"   ? chip_("ok",   "asked, priced it")
+             : live              ? chip_("warn", "asked, held for them")
+             :                     chip_("mute", "asked, window ran out");
+  return chip + sub_(who);
+}
+
 function matStore(r){
   const m = MAT_STORE[String(r.materials_store_type || "")];
   if (!m) return chip_("crit", "not nominated") + sub_("no materials release possible");
@@ -2158,6 +2329,92 @@ async function preJobPhotos(rows){
     const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
     for (const r of items) r.img = byPath.get(r.storage_path) || null;
   } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
+/* ---- Workers: what could go on their public profile, and what already has.
+ *
+ * Three publishable doc types out of the private vetting bucket (the photo,
+ * the introduction, the portfolio), signed for an hour so the person deciding
+ * can actually LOOK at each one before pressing publish. Everything else in
+ * that bucket is a vetting paper and is not fetched here at all.
+ *
+ * Joined on worker_user, not email: that is the key vetting_documents carries,
+ * and it is a uuid rather than an address somebody controls. A worker with no
+ * worker_user (an older row, published before storage existed) simply has no
+ * candidates, which is the correct answer rather than an error.
+ */
+const SHOWCASE_DOC_TYPES = ["profile_photo", "intro_video", "portfolio"];
+
+async function preWorkers(rows){
+  const list = rows || [];
+  for (const r of list) { r._showcase_candidates = []; r._showcase_live = []; }
+  if (!list.length) return;
+
+  const byUser = new Map(list.filter(r => r.worker_user).map(r => [r.worker_user, r]));
+  const emails = list.map(r => String(r.worker_email || "").toLowerCase()).filter(Boolean);
+
+  try {
+    if (byUser.size) {
+      const { data } = await sb.from("vetting_documents")
+        .select("id,worker_user,doc_type,storage_path,mime,bytes,created_at")
+        .in("worker_user", [...byUser.keys()])
+        .in("doc_type", SHOWCASE_DOC_TYPES)
+        .is("purged_at", null)
+        .not("storage_path", "is", null);
+      const docs = data || [];
+      if (docs.length) {
+        const signed = await sb.storage.from("vetting").createSignedUrls(docs.map(d => d.storage_path), 3600);
+        const byPath = new Map((signed.data || []).map(d => [d.path, d.signedUrl]));
+        for (const d of docs) {
+          d.look = byPath.get(d.storage_path) || null;
+          const r = byUser.get(d.worker_user);
+          if (r) r._showcase_candidates.push(d);
+        }
+      }
+    }
+
+    if (emails.length) {
+      const { data } = await sb.from("worker_showcase")
+        .select("id,worker_email,kind,storage_path,source_document,published_by,published_at")
+        .in("worker_email", emails);
+      const byEmail = new Map(list.map(r => [String(r.worker_email || "").toLowerCase(), r]));
+      for (const w of data || []) {
+        const r = byEmail.get(String(w.worker_email || "").toLowerCase());
+        if (r) r._showcase_live.push(w);
+      }
+    }
+  } catch (_) { /* a profile nobody can preview is a gap to show, not a crash */ }
+}
+
+const SHOWCASE_LABEL = { profile_photo: "photograph", intro_video: "introduction video", portfolio: "portfolio or work photos" };
+
+function showcaseCell(r){
+  const consent = String(r.showcase_consent || "");
+  const live = (r._showcase_live || []).length;
+  const cands = (r._showcase_candidates || []).length;
+  if (consent === "declined") return chip_("mute", "said no") + sub_(live ? live + " still published, take it down" : "profile shows checks only");
+  if (consent !== "granted")  return chip_("warn", "never asked") + sub_(cands ? cands + " file" + (cands === 1 ? "" : "s") + " waiting on an answer" : "nothing on file anyway");
+  if (live) return chip_("ok", live + " published") + sub_(cands > live ? (cands - live) + " more could go up" : "all of it is up");
+  return chip_("warn", "agreed, nothing up") + sub_(cands ? cands + " file" + (cands === 1 ? "" : "s") + " ready to publish" : "nothing on file to publish");
+}
+
+function showcaseDetail(r){
+  const cands = r._showcase_candidates || [];
+  const live = new Set((r._showcase_live || []).map(x => x.source_document));
+  if (!cands.length) {
+    return `<div class="dfield"><span class="dk">public profile</span><div>${mute_("No photograph, introduction video or portfolio on file, or the ninety day purge has already destroyed them.")}</div></div>`;
+  }
+  const items = cands.map(d => {
+    const up = live.has(d.id) ? chip_("ok", "published") : chip_("mute", "not up");
+    const look = d.look
+      ? `<a href="${esc(d.look)}" target="_blank" rel="noreferrer">open it</a>`
+      : mute_("could not sign a link");
+    return `<div>${esc(SHOWCASE_LABEL[d.doc_type] || d.doc_type)} &middot; ${look} ${up}</div>`;
+  }).join("");
+  // The link is signed for an hour and points at the PRIVATE original, not at
+  // anything published. Looking is not publishing.
+  return `<div class="dfield"><span class="dk">public profile</span><div class="reqlist" style="margin-top:0">${items}`
+       + `<div style="margin-top:6px">${mute_("Links open the private originals, signed for an hour. Opening one publishes nothing.")}</div></div></div>`;
 }
 
 // A picture, or an honest word about why there is not one. A row with no
@@ -3585,11 +3842,18 @@ async function signOut(){ if (sb) await sb.auth.signOut(); location.reload(); }
 
 const initials = (s) => String(s || "").replace(/@.*/,"").split(/[.\s_-]+/).filter(Boolean).slice(0,2).map(w => w[0].toUpperCase()).join("") || "Y";
 
+/* Who is at the desk. Set once at boot, after is_admin() has already agreed,
+   and read by anything that has to record a NAMED HUMAN against a decision.
+   worker_showcase.published_by is the first such column: "the desk" is not a
+   person and would defeat the point of writing it down. */
+let SESSION_EMAIL = "";
+
 async function boot(){
   if (!startClient()) return;
   const { data } = await sb.auth.getSession();
   if (!data?.session) { show("gate",true); show("desk",false); return; }
   const who = data.session.user.email;
+  SESSION_EMAIL = who || "";
 
   // is_admin() is the same predicate row level security uses, so this asks the
   // database the question rather than trusting the page. RLS still refuses the

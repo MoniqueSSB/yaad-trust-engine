@@ -724,6 +724,57 @@ node scripts/check-desk-script.mjs
 
 ---
 
+## The 5 September 2026 deploy, and what is still not wired
+
+Three functions went to production on 5 September: `yaad-message-status`
+(`--no-verify-jwt`), `yaad-phone-check` and `yaad-vision` (both without the
+flag, platform auth on). `scripts/check-deploy-drift.sh` then reported no drift
+in either direction.
+
+**Verified by probe, not by reading the deploy output**, because a successful
+upload says nothing about whether the flag landed:
+
+```bash
+B=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-message-status" \
+  -H "Content-Type: application/x-www-form-urlencoded" --data "MessageSid=SMtest&MessageStatus=failed"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-phone-check" \
+  -H "Content-Type: application/json" --data '{"phone":"+18765551234"}'
+```
+
+Correct answers are **403** ("Signature check failed.") and **401** ("Missing
+authorization header"). A 200 from the first means the signature check is not
+running and anybody can write delivery statuses; a 200 from the second means
+the flag was passed by mistake and Lookup, which costs money per call, is open.
+
+**Delivery reporting was then wired across every send, not just one.**
+`TWILIO_STATUS_CALLBACK_URL` is set to the function's own URL, and seven
+functions send over Twilio: `yaad-desk-reply`, `yaad-notify-client`,
+`yaad-portal-code`, `yaad-inbound`, `yaad-job-health`, `yaad-daily-checkin`,
+`yaad-enquiry`. Only the first attached a status callback, so setting the
+secret alone would have left six paths silent while the Overview reported zero
+failures. `_shared/twilio-status.ts` now does it in one place and all seven
+call it.
+
+It is inert with the variable unset, which is what made it safe to put in front
+of the portal sign-in code and a client's own notifications in one change.
+
+```sql
+select status, count(*) from public.message_deliveries group by status;
+```
+
+**If that stays empty after a real send**, check the secret is set, then check
+the function is reachable (`curl` the URL, expect 403 not 404), then read
+Twilio's own error log: Twilio silently drops a callback to a URL it cannot
+reach, and nothing on this side would know.
+
+**Still unset: `TWILIO_CONTENT_SID_DESK_REPLY`**, unrelated to this deploy. It
+needs a Utility template created in Twilio and approved by Meta, which is
+account work rather than a repository change. `TWILIO_CONTENT_SID_APPROVE` was
+set on 4 September.
+
+---
+
 ## Passing or blocking an applicant, and why the buttons changed
 
 **Deciding whether somebody can earn on this platform is a §2 decision, and
@@ -833,7 +884,7 @@ content was clean, not a person sitting down to a decision. The exclusion is a
 join the count. Tests 4 and 5 in the rig are the guard.
 
 **A pack a person actually cleared does count**, and getting that wrong is the
-correction in `20260905a`. `approve_quote_pack_draft()` is admin only, refuses
+correction in `20260905c`. `approve_quote_pack_draft()` is admin only, refuses
 outright on any guardrail flag rather than offering an override, and attributes
 the approval to the signed-in admin so the row can prove a named human
 confirmed it. That is a desk decision by any definition, and excluding the
@@ -2707,8 +2758,8 @@ The rule is stated in three places and they must not drift apart: `docs/terms.ht
 
 Two things to keep true while you edit them:
 
-1. **The card half is not switched on yet.** No Stripe links exist (see the payment links entry above), so today every job is invoiced whatever its size. All three pages say so. Delete that sentence only when the links are actually live, and not before.
-2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job. That is why the sentence is scoped to "at or under £500" everywhere it appears. Sweep it with:
+1. **The card half is live, as of 5 September 2026.** The eight Stripe links exist and are wired to the booking confirmation. The "not switched on yet" sentence came off all three pages, plus `docs/privacy.html` and `docs/cancellation.html`, in that change. Do not put it back: it now tells a client the opposite of what the page does. An invoice by bank transfer stays available on request at any size, and the pages say that instead.
+2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job, and it is **false on the Oversight Retainer**, which is a monthly subscription that bills immediately. `docs/services.html` keeps `SUBSCRIPTION_SERVICES` for exactly that reason: it picks which of the two sentences the confirmation shows. That is why the hold sentence is scoped to "at or under £500" and away from the retainer everywhere it appears. Sweep it with:
 
 ```bash
 grep -rn "not charged until\|authorised at booking" docs/*.html
@@ -2768,7 +2819,7 @@ Founder's instruction, 3 September 2026: legal sign-off and insurance are in han
 
 **Two things this did not switch on.**
 
-1. **Card payment.** No Stripe links exist yet, so every job is still invoiced and paid by bank transfer. `docs/terms.html`, `docs/payments.html` and `docs/services.html` all still say so, correctly. That sentence comes out when the links are created, not before.
+1. **Card payment.** This was true when written. It stopped being true on 5 September 2026: the links were created, the caveat came off every page, and the booking confirmation now carries a pay button. See "Making the card path visible" below.
 2. **CLAUDE.md section 9** still lists "payment integration of any kind, before the legal review lands" as deliberately not being built. That is now stale. **Monique owns that file and a session must not rewrite it**, so it needs her edit, not ours.
 
 **Redeploy after any change to the assistant's facts.** `faq.ts` and `price-figures.ts` live in `yaad-inbound`, not `_shared`, so `sync-shared.sh` does not copy them. Deploy from disk:
@@ -2790,28 +2841,52 @@ The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. When
 
 Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
 
-## Pasting the Stripe payment links in
+## Making the card path visible
 
-The site is wired and waiting. One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
+**Done 5 September 2026.** All eight links are live and each of the six bookable services offers one. Founder's report was that she could not book a service by card at all, and she was right: the link only appeared as small text inside a sentence after the form was submitted, and the grey box directly under the form still said card was not switched on. What changed:
+
+- The booking panel says up front that card is available, and the confirmation now carries a full width **Pay for &lt;service&gt;** button rather than an inline link.
+- The caveat came off `services.html`, `payments.html`, `terms.html`, `privacy.html`, `cancellation.html` and `docs/COPY-GUIDELINES.md`.
+- **Two dead options were removed from the booking dropdown.** Project Setup Pack and Document Pack Check were deactivated in the catalogue on 3 Sep and are not in the function's `BOOKABLE` allowlist, so choosing either returned "Pick one of the services on this page." They were unbookable on the live site for two days.
+- **Property Care was booking the wrong tier.** The form always posted `care`, so a villa was recorded at the standard £45 while the pay button asked for £95. It now posts `care`, `care-large` or `care-villa`, matching `BOOKABLE`, and `PAYMENT_LINKS` was rekeyed to the same strings so one service means one key on both sides.
+- **The retainer is a subscription, not a hold**, and the confirmation now says so. It was telling retainer clients their card was authorised and not charged, which was false: it bills the first month immediately and monthly after.
+
+## Changing the Stripe payment links
+
+One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
 
 ```js
 const PAYMENT_LINKS = {
-  deposit:   "https://buy.stripe.com/...",
-  visual:    "",
-  condition: "",
-  signoff:   "",
-  care:      "",
-  retainer:  ""
+  deposit:      "https://buy.stripe.com/...",
+  visual:       "https://buy.stripe.com/...",
+  condition:    "https://buy.stripe.com/...",
+  signoff:      "https://buy.stripe.com/...",
+  care:         "https://buy.stripe.com/...",
+  "care-large": "https://buy.stripe.com/...",
+  "care-villa": "https://buy.stripe.com/...",
+  retainer:     "https://buy.stripe.com/..."
 };
 ```
 
-Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads exactly as it does today, so there is never a dead button or a half wired payment. The keys are the booking form's own service values, not the catalogue ids.
+Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads as it did before, with no button, so there is never a dead button or a half wired payment. **The keys are the service values the form posts, which are the same strings `yaad-book-service`'s own `BOOKABLE` allowlist uses.** They are not the catalogue ids, and they used to be a third set again on the Property Care tiers, which is how the tier bug above happened. If you add a service, add it in both places with the same string.
+
+Add a new subscription link to `SUBSCRIPTION_SERVICES` in the same file, directly below, or its confirmation will tell the client their card is only authorised when it is being charged.
+
+**To check the wiring without writing to the live database**, serve `docs/` and stub the endpoint in the console before submitting the form:
+
+```js
+const real = fetch; window.fetch = async (u,o) => String(u).includes('yaad-book-service')
+  ? new Response(JSON.stringify({ok:true,ref:'SVC-TEST01',emailGiven:true}),{status:200})
+  : real(u,o);
+```
+
+Then book each service in turn and confirm the posted `service` value and the button's `href` agree. Submitting for real creates a `services` row and pushes to the founder's phone, so do not test that way.
 
 **Why the pay link is after the booking and not on the service card.** The card buttons are already claimed by the page's own script, which routes them into the booking form. That form is where the client's name, contact and property go on record, where the reference is minted, and where the cancellation information has to reach them. A card button pointing straight at Stripe would skip all of it, and a client would have paid before Yaadly knew who they were or had given them their 14 day cancellation notice. So the link appears on the confirmation, once the booking exists.
 
 Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
 
-**Still missing before a link should go live:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker.
+**Still open, and now more exposed than it was:** the express request to start work inside the 14 days, recorded at booking. Stripe Payment Links can carry a required acceptance checkbox at checkout, pointed at `docs/cancellation.html`. Without it a client can cancel on day ten and owe nothing while Yaadly still owes the checker. This was written as "missing before a link should go live". The links went live anyway and the card path was made prominent on 5 September 2026, so the gap is now load bearing rather than theoretical: every card booking taken before the checkbox exists carries it. Fixing it is a Stripe Dashboard change on each of the eight links, not a code change here, and it was flagged to the founder on the day.
 
 ---
 
@@ -3111,3 +3186,82 @@ The desk says **offered WhatsApp** on those rows, and `nothing sent, they must t
 **Do not reach for SMS instead.** `TWILIO_SMS_FROM` is unset, SMS bills per message, and wiring a paid send to a form open to the internet is an open relay that charges you. The throttle comment already in `yaad-enquiry` makes that argument about email; it is sharper for SMS.
 
 **Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
+
+## A client asked for a worker by name and nothing seems to have happened
+
+The button on a worker profile records the request on the job row and holds
+the job off the open board for 48 hours so only that worker can price it. Work
+through it in this order.
+
+1. **Is it on the row at all?** In the desk, Jobs, find the job. The Worker
+   column shows an amber "asked, held for them" chip with the worker's address
+   under it while the hold is live. If it says nothing, the request never
+   landed: either the client did not arrive through a profile page, or the
+   slug did not resolve to an ACTIVE worker profile. `yaad-post-job` drops a
+   request it cannot resolve rather than recording a name nobody vetted.
+2. **Did the worker get told?** The message fires when the job goes LIVE, not
+   when the draft is saved, so a job still sitting as a draft has correctly
+   told nobody. There is no per-notification log on this path:
+   `yaad-notify-client` does not write `message_deliveries`, only
+   `yaad-desk-reply` does, so do not go looking for a row that was never
+   written. Check two things instead. First, does the worker have a phone
+   number on their profile: without one there is nobody to send to and the
+   function stops quietly. Second, the Supabase logs for `yaad-notify-client`
+   around the time the job went live, which is the only place this send leaves
+   a trace.
+3. **The worker cannot find the job.** It is deliberately NOT on the open
+   board while the hold is live. It appears at the top of app.yaadly.co.uk/jobs
+   for that worker only, in a gold panel, and only when they are signed in and
+   count as an approved worker (published profile plus a signed Worker
+   Guidelines). If they are signed in and see nothing, check those two things
+   first: the panel reads `my_requested_jobs`, which matches on their own
+   signed-in email.
+4. **Another worker says they cannot quote it.** That is the hold working. The
+   refusal message names the date and time it opens up.
+5. **The client needs it opened now.** Either ask the worker to press "Pass on
+   this job", or at the desk set `request_state` to `declined` on the job row.
+   Either opens it to the board immediately; the desk route does not message
+   the client, the worker's own route does.
+
+The window is 48 hours and it lives in ONE place: `public.request_is_live` in
+`20260905a`. Change the interval there and every gate follows. Nothing has to
+run for a hold to lapse, so there is no cron job here to check.
+
+## Putting a worker's photograph, video and work on their public profile
+
+Nothing is published automatically, ever. Order matters.
+
+1. **Ask them, and record the answer.** Applicants answer on the last screen
+   of /apply. For anybody who joined before that question existed, ask them
+   yourself, then in the desk, Workers, open the row and use "Record their
+   answer about a public profile". The Public profile column shows "never
+   asked" until you do. Do not record granted on somebody you have not asked.
+2. **Look at the files.** Open the worker's row in the drawer. Under "public
+   profile" each candidate file has an "open it" link, signed for an hour,
+   pointing at the private original. Opening one publishes nothing.
+3. **Publish.** "Put their photograph, video and work up" copies each file
+   into the public showcase bucket and records your address against it. It
+   refuses if consent is not granted, and it refuses if it cannot tell who is
+   signed in, because the record of who published it is the point.
+4. **Check it.** Open `app.yaadly.co.uk/workers/<slug>`. The photograph
+   replaces the initials block, the video appears as "<name>, in thirty
+   seconds", and the work photos appear as "Work <name> showed us", above the
+   evidence portfolio and labelled as not carrying the evidence trail.
+
+**To take it down.** If they ask you to remove it, do BOTH: "Take their public
+profile down", which deletes the copies and the rows, AND record their answer
+as declined. Recording declined alone empties the profile immediately (the
+view re-tests consent on every read) but leaves the files sitting in a public
+bucket. Deleting alone leaves their answer saying granted, so the next publish
+would put it all straight back.
+
+**Why a copy and not a link.** The vetting originals are destroyed ninety days
+after they arrive, which is what the applicant was promised. A profile served
+out of that bucket would work for three months and then go blank. The published
+copy is a separate file in a separate bucket and is not on that clock.
+
+**What can never be published.** Only three doc types are eligible:
+`profile_photo`, `intro_video`, `portfolio`. The photo ID, the selfie, the face
+turn, proof of address, the TRN, the CV and the certificates are vetting papers
+and are not even fetched by the desk's preview. Widening that list is a legal
+decision, not a tidy-up.

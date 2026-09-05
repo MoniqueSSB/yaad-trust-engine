@@ -17,6 +17,7 @@ import { samePhone } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
 import { replyFromCard } from "./reply-from-card.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -425,7 +426,7 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<b
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body }),
+        body: withStatusCallback(new URLSearchParams({ To: `whatsapp:+${digits}`, From: from, Body: body })),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });

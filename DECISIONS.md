@@ -6,6 +6,42 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-05 · Delivery reporting is one shared line, not six copies of two lines
+
+**Setting the secret would have been the wrong-sized fix.** `yaad-message-status` was built to catch the case where Twilio returns 201 and no phone ever receives anything, and it only ever hears about a message whose send asked it to. Seven functions in this repository send over Twilio, each with its own inline call, and exactly one attached a status callback. So switching the secret on would have lit up the desk's "Messages that failed" tile with a number that read "none failed" and meant "one of seven paths is being watched", which is worse than the tile not existing.
+
+**`_shared/twilio-status.ts` is deliberately trivial**, one function that adds a parameter when the variable is set. The value is not the logic, it is that six copies of two lines is precisely how the seventh copy gets forgotten, and this repository already has the shared-copy drift check in CI to keep one definition honest across bundles. It is inert with the variable unset, which is what made it safe to put in front of the portal sign-in code and a client's own job notifications in a single change.
+
+**CI's Deno job gained `--allow-env`, and finding that was the point of running the suite with CI's exact flags.** The module's whole behaviour is "do nothing unless configured", so the test that matters is the one proving the unset case changes no send, and that test cannot be written without setting and clearing the variable. Locally the looser flags passed; under CI's flags all three failed. Caught before pushing rather than as a red build.
+
+**Six functions were redeployed and four of them run without platform auth.** Each was deployed with its own live `verify_jwt` read back first, which is the trap §12 exists for: a blanket redeploy would have silently added a token check to `yaad-inbound`, `yaad-enquiry`, `yaad-portal-code` and `yaad-notify-client` and broken Twilio intake, the contact form and the portal sign-in at once. Verified afterwards that all four still answer with their own refusal rather than a platform 401, and that the list of eleven is unchanged.
+## 2026-09-05 · The card path existed and nobody could find it
+
+**Founder's report: "I cannot book each service directly with Stripe, I should be able to."** She was right, and the reason is worth keeping, because the code was not broken. All eight Stripe payment links existed, were live, and were correctly wired. The page simply never offered them. The link appeared only after the booking form was submitted, as a few words of ordinary text inside a longer sentence, and the grey box directly beneath the form still said "Card payment is not switched on yet, so for now everything is invoiced." A client following the page as written would never have looked for a card. **A feature that is built, deployed and invisible is not shipped**, and the thing that made it invisible was stale copy sitting next to it contradicting it.
+
+**Three real defects surfaced underneath, none of which anybody had reported.** The booking dropdown still offered Project Setup Pack and Document Pack Check, both deactivated in `service_catalogue` on 3 September and neither in `yaad-book-service`'s `BOOKABLE` allowlist, so choosing either returned "Pick one of the services on this page." Property Care always posted the bare key `care`, so a client selecting the villa tier was recorded against the £45 standard row while being handed the £95 villa payment link: the record and the payment disagreed on price, silently, in the client's favour on the invoice and against it on the card. And the confirmation told every client "your card is authorised, not charged", which is true of the seven holds and **false of the Oversight Retainer**, a monthly subscription that bills on the spot. That last one is a false statement about somebody's money, made by the page, to their face.
+
+**Root cause of two of the three: one service had three different key spellings.** The catalogue used `care-standard`, the Edge Function's allowlist used `care` / `care-large` / `care-villa`, and `PAYMENT_LINKS` on the page used `care_standard` / `care_large` / `care_villa`. Three sets of strings for one product, with a hand-written translation between them at each hop, and the villa mismatch fell out of exactly that. The page and the function now use the same strings, and the runbook says so where the links are edited. The catalogue keeps its own ids on purpose, because that is a database identity, but there is now one translation instead of two.
+
+**The structural decision, put to the founder and confirmed rather than assumed: the pay button stays after the booking, not on the service card.** Making it a card CTA is the obvious reading of "book directly with Stripe" and it was declined. The booking form is where the client's name, contact and property are recorded, where the SVC reference and portal code are minted, and where the 14 day cancellation notice reaches them. A card button pointing at Stripe skips all of it, and Yaadly would be taking money from someone it cannot identify who has not been given a statutory notice. That is a consumer law exposure, not a missing database row. So the answer to "I cannot pay by card" was to make the card path **loud**, not to make it **shorter**: the panel announces it up front, and the confirmation carries a full width button instead of four words of link text. Same number of gates, one of them now legible. This is the same shape as the §3 refusal in CLAUDE.md, arrived at from the other direction: the ask was genuine and worth doing, and doing it properly meant better information in front of the person rather than one fewer step.
+
+**Left open and flagged, not quietly absorbed.** RUNBOOK recorded an express request to start work inside the 14 days as "still missing before a link should go live". The links went live before it was built. Making the card path prominent does not create that gap but it does widen it, so the runbook entry was rewritten from a precondition into a live open item and raised with the founder the same day. It is a checkbox on each of the eight links in the Stripe Dashboard, which no session can do from here.
+
+---
+
+## 2026-09-05 · The business page stopped claiming independence, because sometimes the trades are ours
+
+**The business page claimed, in six places, that Yaadly is independent of every contractor on the job.** The credential strip put it most plainly: "Never pricing, supplying or managing the trade being assessed." The founder read it and said it is untrue, because on some engagements the people on site are working under her and she supplied them. She is right, and the claim was not a slip of wording: Full Project Management and Property Care both put a Yaadly tradesperson on the property, so the sentence describes the oversight lane and quietly denies the existence of the other one.
+
+**It was also the most attackable sentence on the page.** The audience is agents, developers, insurers and lenders. Doc 03 on that same page promised "never a contractor marking their own work" while Doc 04 offered a review by the firm that, on a managed job, supplied the contractor. The first risk person to read both would have found it.
+
+**Three replacements were put to the founder and she chose the narrower, harder claim.** Not "independent unless I supply the trade", which keeps the strong word and buries the exception, and not "no commission from any trade", which would have needed checking against the 12% on the managed side. She chose: **the person who assesses is never the person who did the work, and both are named on the report.** When the tradesperson is Yaadly's, a different Yaadly assessor reviews it. Weaker word, true on both lanes, and it cannot be broken by the business growing into the managed lane.
+
+**It commits operations, not just copy.** The report has to name the person who did the work and the person who assessed it, and they cannot be the same person. On a small job where the founder is the only Yaadly person on the ground, either somebody else attends the review or the report says the work is Yaadly's own. That is the cost of the claim and it was accepted with the claim.
+
+Changed on `docs/business.html`: the credential cell, the hero, the case file stamp, Doc 03, Doc 04 and its title, plus the meta description, `og:title`, `og:description` and `og:image:alt`, because the claim was in the Google and social preview text too. The rule is written up in `docs/COPY-GUIDELINES.md` §4. **`docs/services.html` still carries the same claim** in its hero and meta description, "You cannot be there. Someone independent should be.", and Full Project Management is on that page. Not fixed, deliberately: the founder scoped this change to the business page.
+---
+
 ## 2026-09-05 · The same table was written twice, and two migrations creating it would have failed the rebuild
 
 **The merge, not the branch, was where this appeared.** The agent audit branch created `work_log_pins`. A parallel session, on the same day, found that table live in production and absent from every branch, read it back out of `supabase_migrations.schema_migrations` and committed the transcription as a recovery migration. Both instincts were right and neither session could see the other. Git merged them cleanly, because they are different files, and a clean merge is exactly what makes this class of thing dangerous.
@@ -189,6 +225,7 @@ All three routes are gone: the silent NVIDIA fallback, the explicit `PROVIDER=nv
 **The privacy page is what decided the NVIDIA question.** It names NVIDIA for image analysis, in the United States, and that is true and disclosed: `yaad-sketch` and `yaad-notify-client` genuinely send photographs there, which is why `NVIDIA_API_KEY` stays set. Drafting a client's Kickoff Pack there is a different use of the same vendor and the page does not disclose it. Aligning the code to the page was the cheaper direction than widening the page to the code, and it costs nothing: Mistral drafts the packs.
 
 **What was given up.** The v12 model shootout of 24 August 2026, which let the desk draft one brief through several OpenRouter models and read the packs side by side. It was a good idea. It is recoverable from git, and if it returns it belongs on synthetic briefs rather than on a real client's intake, which is what a Kickoff Pack is drafted from.
+
 ---
 
 ## 2026-09-04 · Capacity counts only decisions a person made, and a worker vetting decision is not recorded at all
@@ -222,6 +259,7 @@ All three routes are gone: the silent NVIDIA fallback, the explicit `PROVIDER=nv
 **The clock is named for what it actually measures, and that was the real decision.** `hours_stalled` runs from when Yaadly *noticed* (`nudged_at`) to when the job moved again, not from when the job went quiet. The tempting version computes the earlier moment from `job_silence_hours()` at delete time and produces a bigger, more impressive-sounding number that nobody can point at a row for. The moment a job went quiet is not recorded anywhere in this system, so that number would be a reconstruction presented as a measurement. Time from noticing to moving is smaller, honest, and the half Yaadly can actually do something about.
 
 **It is not retrospective and the desk says so.** History starts the day the migration ran, so "Time to get moving again" reads n/a until stalls resolve after it, and the tile is uncoloured in that state rather than green. Same reasoning as draft acceptance below: a metric with no data underneath it should look empty, not look healthy.
+
 ---
 
 ## 2026-09-04 · Tap-to-approve was built twice on the same day, and the simpler one won
@@ -1855,3 +1893,90 @@ First, `supabase/functions/_shared/guardrails.ts` bans the token "escrow" and it
 Second, the price alignment (Deposit Protection Check to £149 against a standard £249, Visual Check to £95 against £125) is a money decision under `CLAUDE.md` section 10. It was taken in the conservative direction, adopting figures already published to customers on the homepage and in the FAQ rather than inventing any, because leaving a founding rate identical to its standard rate was the larger risk of the two. If either standard figure is wrong, that is hers to correct, and `RUNBOOK.md` now lists all seven places a price has to change together.
 
 **A guardrail caught a mistake in this change and was obeyed.** The first version of the assistant's facts in `supabase/functions/yaad-inbound/faq.ts` said "Yaadly does not operate an escrow service", copying the sentence added to the marketing pages. `price-figures_test.ts` failed, because the screen bans the token regardless of the sentence around it, and that is correct: putting the word in front of a client over WhatsApp is what ledger guardrail 1 forbids, denial or not. The copy was changed, not the assertion. The marketing pages keep the explicit sentence, because `guardrails.scan` does not read them and the founder asked for it by name; outbound assistant text says the same thing without the word. This asymmetry is deliberate and is now noted in the copy guidelines.
+
+## A client can ask for one worker by name, and gets first refusal, not a booking (5 Sep 2026)
+
+The "Book <name> for a job" button on a worker profile has existed since the
+marketplace was built and did almost nothing. It carried `?worker=<slug>` into
+the job wizard, printed the name on the confirmation screen, and added one
+line of free text to the enquiry email. Nothing reached the job row. The job
+went onto the open board like any other, every worker in that trade could
+quote it, the worker who had been asked for was never told, and the only trace
+of the client's choice was a sentence somebody had to read and act on by hand.
+The screen said "we will take this to them first" and no part of the system
+knew that promise had been made.
+
+Three shapes were put to the founder: hold the job for that worker until they
+answer, hold it for a fixed window, or name the request but leave the job on
+the open board from the start. She chose the middle one. The job is held off
+the board for 48 hours, only the requested worker can quote it, and the hold
+ends the moment any of three things happens: they quote, they decline, or the
+clock runs out. Holding it until they answer would have left a client waiting
+indefinitely behind somebody who was simply busy; leaving it open from the
+start would have made the button a label rather than a promise.
+
+Three things worth writing down about the shape. There is no "accept" state:
+accepting without quoting changes nothing for the client, and a state that
+changes nothing is one more thing to teach, so the worker's yes IS their
+quote. There is no stored "expired" state either, only a computed one, which
+means no scheduled job has to run for a hold to lapse and no cron failure can
+quietly hold a job shut forever. And none of this books anybody: `worker_email`
+on a job is still written in one place, `_do_choose_worker`, when the CLIENT
+accepts a quote. This holds a door open for one person for two days.
+
+The client hears when the worker declines and does not hear when the window
+simply lapses. That asymmetry is deliberate. A decline is something the worker
+said; a lapse is silence, and turning silence into "your worker did not answer"
+would be Yaadly reporting on somebody's reliability off a two day clock, which
+is close to a reputation judgement and is not a trigger's to make. The wizard's
+confirmation copy says exactly this, so the promise and the code agree.
+
+`20260905a_a_client_asks_for_one_worker_and_that_worker_hears_about_it.sql`.
+
+## A worker's own face, voice and work go on their profile, on a second consent, as a copy (5 Sep 2026)
+
+/apply has collected a photograph of the tradesperson, a thirty second
+introduction video and a portfolio file since 3 September. All three land in
+the private vetting bucket, on the ninety day purge clock, and no client has
+ever seen one. The public profile's Portfolio section is a different thing: it
+is built from completed Yaadly jobs, and at launch every worker's is empty. So
+a client choosing who to let onto their mother's roof was looking at a trade,
+a parish and a list of checks, and nothing of the person.
+
+Asked whether to build a new upload or publish what /apply already collects,
+the founder chose the second. Two things stood in the way, and neither is
+solved by pointing the page at the private bucket.
+
+The first is consent. The photograph row on /apply ends with the sentence
+"This page does not publish it anywhere", and that sentence was true and was
+read by everybody who has applied so far. Publishing on the strength of it
+would be answering a question nobody was asked. So there is a second consent,
+with its own version (`SHOWCASE_CONSENT_VERSION`, `showcase-v1`), neither
+option pre-selected, unanswered read as no, and the test lives in the database
+view rather than at any call site, so no future page can forget it. Withdrawing
+consent empties a profile on the next page load, before any file is deleted.
+
+The second is the purge. `yaad-vetting-purge` destroys the file ninety days
+after it arrives. A profile video served out of that bucket would have worked
+for three months and then quietly gone missing. So the consented file is
+COPIED into a separate public bucket and the vetting original keeps its clock
+and is destroyed on time, exactly as the applicant was told. Nothing about the
+private bucket, its policies or its purge changed, which was the point: the ID
+rules in CLAUDE.md section 6 are the last thing that should move to make a
+profile page look better.
+
+Publishing is a button at the desk, never automatic, and `published_by`
+records the person who pressed it. The desk signs the private originals for an
+hour so that person can look at each file before deciding, because publishing
+somebody's face on the open internet is a decision and a decision made without
+looking is not one.
+
+The self-supplied showcase renders in its own sections, above the evidence
+portfolio and labelled "Work they showed us", saying plainly that it is not
+from jobs booked through Yaadly and does not carry the evidence trail. That
+labelling is the whole design. The section below it earns its trust by being
+pulled from the evidence record, and borrowing that sentence for material a
+worker handed in would spend the credibility of the checked thing on the
+unchecked one.
+
+`20260905b_a_worker_gets_a_face_a_voice_and_work_to_show.sql`.

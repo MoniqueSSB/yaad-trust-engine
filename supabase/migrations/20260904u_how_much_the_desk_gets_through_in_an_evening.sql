@@ -18,7 +18,7 @@
 -- three hundred items and would have been nonsense in the direction that
 -- flatters the business.
 --
--- CORRECTED BY 20260905a, READ THAT ONE TOO. This comment originally called
+-- CORRECTED BY 20260905c, READ THAT ONE TOO. This comment originally called
 -- them "documents issued automatically after a human accepted a quote", which
 -- is wrong and wrong in a way that matters. The quote pack does not follow a
 -- quote, it is what a worker quotes AGAINST, and it is the gate on whether a
@@ -64,7 +64,7 @@ with (security_invoker = true) as
        and mr.released_by not like 'system:%';
 
 comment on view public.desk_decisions is
-  'Every consequential step a named person actually took, with when. Rows whose approver reads system:* are excluded on purpose: an auto-issued guardrail-clean pack is the system deciding the content was clean, not a person sitting down to a decision. Superseded by 20260905a, which adds back the human path on the pack tables.';
+  'Every consequential step a named person actually took, with when. Rows whose approver reads system:* are excluded on purpose: an auto-issued guardrail-clean pack is the system deciding the content was clean, not a person sitting down to a decision. Superseded by 20260905c, which adds back the human path on the pack tables.';
 
 grant select on public.desk_decisions to authenticated;
 
