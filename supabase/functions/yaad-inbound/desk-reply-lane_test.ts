@@ -103,8 +103,14 @@ Deno.test("her words go out exactly as typed", () => {
   // Same promise the desk's own reply button makes. No model touches them:
   // they are her words going to a client under Yaadly's name.
   const body = lane();
-  assert(body.includes("await sendWhatsAppTo(t.from_addr, body, trace)"),
-    "her reply is no longer sent verbatim, or is no longer sent at all");
+  // `outgoing` is her message verbatim plus, at most, one appended sentence
+  // about photographs she cannot see, which she is told about. Nothing
+  // rewrites or edits what she typed.
+  assert(body.includes("await sendWhatsAppTo(t.from_addr, outgoing, trace)"),
+    "her reply is no longer sent, or is being sent as something other than " +
+    "what she typed plus the appended note");
+  assert(body.includes("const outgoing = body + photoNote;"),
+    "her message is no longer the whole of what goes out before the note");
   for (const model of ["composeReply", "classifyTheJob", "chatWithFailover"]) {
     assert(!body.includes(model),
       `the desk lane now runs ${model} over her own words before they reach a client`);
@@ -146,4 +152,66 @@ Deno.test("the lane carries text only, and says so", () => {
   assert(body.includes("This lane carries text only"),
     "the lane stopped telling her that media is not carried, so a photo she " +
     "sends will look sent and will not be");
+});
+
+// ── the photographs she cannot see ───────────────────────────────────────
+//
+// Founder, 6 September 2026: "Add this as a note so the person is also aware i
+// am unable to see photo before i started this conversation, if they want me
+// to see photos they will have to send it to me when i respond to them."
+//
+// She answers from a phone, out of an alert that carries text. The client's
+// photographs are in the bucket and on the job, where a worker and the desk
+// can see them and she cannot, and nobody inside the conversation has any way
+// of knowing that.
+
+Deno.test("the client is told once that she cannot see earlier photos", () => {
+  const body = lane();
+  assert(body.includes("I cannot see any photos you sent before now"),
+    "the note telling the client to resend photographs is gone");
+  assert(body.includes("if (!thread.first_human_reply_at && thread.job_id)"),
+    "the note is no longer limited to her first reply on a thread, so it will " +
+    "repeat on every message and read as a system talking over her");
+  assert(body.includes('from("job_photos")') && body.includes('{ count: "exact", head: true }'),
+    "the note no longer checks whether photographs actually exist, so it will " +
+    "tell a client to resend photos they never sent");
+});
+
+Deno.test("the note is appended, and she is told it was", () => {
+  // Her words go out exactly as typed. A guard that silently edits the named
+  // human's own message is worse than no guard.
+  const body = lane();
+  assert(body.includes("const outgoing = body + photoNote;"),
+    "the note is being woven into her message rather than appended after it");
+  assert(body.includes("I added a line telling them you cannot see photos"),
+    "she is no longer told that a sentence was added to her message");
+});
+
+Deno.test("what is recorded is what actually went", () => {
+  // Four paths carry the message: the send, the queue for outside the 24 hour
+  // window, the website chat, and the transcript. A transcript missing the
+  // appended sentence would leave a client quoting something with no trace.
+  // Comments stripped first: the transcript line carries a comment explaining
+  // why it uses `outgoing`, and a plain count reads the explanation too.
+  const code = lane().split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  assertEquals(code.match(/\boutgoing\b/g)?.length, 5,
+    "one of the paths that carries her message is back on `body`, so the " +
+    "client and the record no longer agree on what was said. Five: the " +
+    "declaration, the send, the queue for outside the 24 hour window, the " +
+    "website chat, and the transcript");
+  assert(!/body: body,|, body,/.test(code),
+    "a send or a record is using the raw message instead of what went out");
+});
+
+Deno.test("a photograph is never filed against a job that does not exist", () => {
+  // job_photos has no foreign key to jobs. A photo sent during a question
+  // conversation was filed under the job id minted for that turn, which was
+  // never written, and a fresh one is minted every turn of a jobless thread.
+  // The bytes reached the bucket and the rows pointed at nothing.
+  assert(src.includes("const sentPhotos = msg.media.some((m) => !m.mime.startsWith(\"audio/\"));"),
+    "nothing checks whether real photographs came with the message");
+  assert(/const justAsking = card\?\.asking === true && !enough && !sentPhotos &&/.test(src),
+    "a message carrying a photograph can be filed as a question again, which " +
+    "writes no job row and orphans the photograph under an id that was never " +
+    "written. Somebody who photographs a wall is showing you a property");
 });

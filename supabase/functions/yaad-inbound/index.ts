@@ -2011,19 +2011,54 @@ Deno.serve(async (req: Request) => {
           .eq("channel", t.channel).eq("from_addr", t.from_addr).maybeSingle();
         if (!thread) return twiml(`That conversation is not here any more. Open the desk.`);
 
+        // ── the photographs she cannot see ───────────────────────────────
+        //
+        // Founder's instruction, 6 September 2026: "Add this as a note so the
+        // person is also aware i am unable to see photo before i started this
+        // conversation, if they want me to see photos they will have to send
+        // it to me when i respond to them."
+        //
+        // She is answering from a phone, out of an alert that carries text.
+        // The photographs the client sent are in the bucket and on the job,
+        // where a worker and the desk can see them, and she cannot, and
+        // neither the client nor she has any way of knowing that from inside
+        // the conversation. So the client is told, in her voice, once.
+        //
+        // ONCE, on her first reply on this thread, and only when photographs
+        // actually exist. first_human_reply_at is exactly "has a person
+        // answered here before", and it is read a few lines down for the
+        // reply clock, so this is the same fact asked twice rather than a new
+        // piece of state. Repeating it every message would read as a system
+        // talking over her.
+        //
+        // APPENDED, NOT WOVEN IN. Her words go out exactly as typed and this
+        // is a separate sentence after them, and she is told in the
+        // confirmation that it was added. A guard that silently edits the
+        // named human's own message is worse than no guard.
+        let photoNote = "";
+        if (!thread.first_human_reply_at && thread.job_id) {
+          const { count } = await supabase.from("job_photos")
+            .select("id", { count: "exact", head: true }).eq("job_id", thread.job_id);
+          if ((count ?? 0) > 0) {
+            photoNote = " I should say, I cannot see any photos you sent before now, "
+              + "so if there is something you want me to look at, send it again here.";
+          }
+        }
+        const outgoing = body + photoNote;
+
         // Sent exactly as typed. No model touches it, the same promise the
         // desk's own reply button makes, because these are her words going to
         // a client under Yaadly's name.
         let delivered = false;
         let note = "";
         if (t.channel === "whatsapp") {
-          delivered = await sendWhatsAppTo(t.from_addr, body, trace);
+          delivered = await sendWhatsAppTo(t.from_addr, outgoing, trace);
           if (!delivered) {
             // Meta's 24 hour window, almost always. Queued rather than lost,
             // into the same table the desk uses, and flushed by the lane at
             // the top of this function the moment they write back.
             const { error: qErr } = await supabase.from("pending_desk_replies").insert({
-              channel: t.channel, to_addr: t.from_addr, job_id: thread.job_id ?? "", body,
+              channel: t.channel, to_addr: t.from_addr, job_id: thread.job_id ?? "", body: outgoing,
             });
             note = qErr
               ? " It could not be queued either, so it is not saved. Send it from the desk."
@@ -2031,7 +2066,7 @@ Deno.serve(async (req: Request) => {
           }
         } else if (t.channel === "web") {
           const { error: wErr } = await supabase.from("web_chat_replies").insert({
-            visitor_key: t.from_addr, job_id: thread.job_id ?? null, body,
+            visitor_key: t.from_addr, job_id: thread.job_id ?? null, body: outgoing,
           });
           delivered = !wErr;
           note = delivered ? " They see it while that page is open." : " It would not save. Send it from the desk.";
@@ -2044,7 +2079,9 @@ Deno.serve(async (req: Request) => {
         // reply clock stamped once and never overwritten.
         const firstReply = thread.first_human_reply_at ? {} : { first_human_reply_at: new Date().toISOString() };
         await supabase.from("intake_threads").update({
-          transcript: `${String(thread.transcript ?? "")}\n\nYaadly (from the desk): ${body}`.slice(-8000),
+          // outgoing, not body: the record has to be what actually went, or a
+          // client quoting the photo sentence back would find no trace of it.
+          transcript: `${String(thread.transcript ?? "")}\n\nYaadly (from the desk): ${outgoing}`.slice(-8000),
           human_handling: true,
           last_at: new Date().toISOString(),
           awaiting_human_since: null,
@@ -2057,7 +2094,7 @@ Deno.serve(async (req: Request) => {
           "yaadly.job.id": String(thread.job_id ?? ""),
         });
         return twiml(delivered
-          ? `Sent to ${t.from_addr}.${note} They are yours now, the assistant will not answer them until you hand it back on the desk.`
+          ? `Sent to ${t.from_addr}.${note}${photoNote ? " I added a line telling them you cannot see photos sent before now and to send them again here." : ""} They are yours now, the assistant will not answer them until you hand it back on the desk.`
           : `Not sent.${note}`);
       }
     }
@@ -3265,7 +3302,21 @@ Deno.serve(async (req: Request) => {
     // never fire on a guess. A null card, a failed classification or any hint
     // of actual work all fall back to exactly the behaviour that was here
     // before, which is the one that already works for a job.
-    const justAsking = card?.asking === true && !enough &&
+    // A PHOTOGRAPH IS NEVER JUST A QUESTION, added 6 September 2026 after
+    // finding what the rest of this rule did to one. job_photos has no foreign
+    // key to jobs, so a photo sent during a question conversation was filed
+    // under the job id minted for that turn, which was never written, and a
+    // fresh one is minted on every turn of a jobless thread. The bytes reached
+    // the bucket and the rows pointed at nothing, scattered across as many ids
+    // as there were turns. Nothing failed and nothing said so.
+    //
+    // Forcing a job is the right fix rather than the convenient one.
+    // Somebody who photographs a wall is showing you a property, not asking
+    // how the service works, and the single most useful thing a client can
+    // hand a worker is that photograph. Audio is excluded because a voice note
+    // is how a question arrives, not evidence of one.
+    const sentPhotos = msg.media.some((m) => !m.mime.startsWith("audio/"));
+    const justAsking = card?.asking === true && !enough && !sentPhotos &&
       !s(card?.scope) && !s(card?.trade) && !s(card?.parish);
     // What the WRITER is told, which is not always what the THREAD records.
     // intake_threads.stage has a check constraint of gathering, confirming or

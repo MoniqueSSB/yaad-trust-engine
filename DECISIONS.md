@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The client is told she cannot see their photographs, and a photograph is never just a question
+
+**Founder:** *"Add this as a note so the person is also aware i am unable to see photo before i started this conversation, if they want me to see photos they will have to send it to me when i respond to them."*
+
+**The gap she is describing is real and invisible from inside the conversation.** She answers from a phone, out of an alert that carries text. The client's photographs are in the `intake` bucket and on the job, where the desk and a worker can see them and she cannot. Neither she nor the client has any way of knowing that, so a client who sent a photo of a cracked wall reasonably assumes the person now replying has looked at it.
+
+**One sentence, in her voice, on her first reply, and only when photographs exist.** `first_human_reply_at` is already read two lines further down for the reply clock, so "has a person answered here before" is the same fact asked twice rather than new state. Repeating it on every message would read as a system talking over her.
+
+**Appended, never woven in, and she is told.** Her words go out exactly as typed; the note is a separate sentence after them and the confirmation says it was added. A guard that silently edits the named human's own message is worse than no guard, and this codebase has already paid for one silent editor.
+
+**All four paths carry the same words**, asserted by a test: the send, the queue for outside Meta's 24 hour window, the website chat insert, and the transcript. A transcript missing the appended sentence would leave a client quoting something back with no trace of it, which is the exact failure the transcript recording was built to prevent.
+
+**A photograph is never just a question, found while building the above.** `job_photos` has no foreign key to `jobs`. This afternoon's rule wrote no job row for a conversation the classifier read as a question, and `keepMedia` still ran with the job id minted for that turn, which was never written, and a fresh id is minted on every turn of a jobless thread. So a photo sent during a question conversation reached the bucket and its row pointed at nothing, scattered across as many ids as there were turns. Nothing failed, nothing logged, and the photo was simply unfindable.
+
+The fix is to force a job when real photographs arrive, rather than to patch the orphan afterwards, because it is also the right answer on its own terms: somebody who photographs a wall is showing you a property, not asking how the service works, and a photograph is the single most useful thing a client can hand a worker. Audio is excluded, because a voice note is how a question arrives rather than evidence of one.
+
+---
+
 ## 2026-09-06 · She answers a client from her own WhatsApp, and that lane may only send a message
 
 **Founder:** *"make everything in whatsapp."* The alert already reached her WhatsApp with the client's own words in it. This is the other half: she replies in the same thread, on the same phone, and it goes to the client from the Yaadly number.

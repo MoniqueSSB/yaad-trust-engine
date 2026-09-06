@@ -477,7 +477,9 @@ Reply to a Yaadly alert in WhatsApp and your words go to the client from the Yaa
 
 **What you get back.** A one line confirmation from the Yaadly number saying it went, and that the thread is yours now, so the assistant will not answer over the top of you. Hand it back from the desk when you are done.
 
-**Text only.** Photographs and voice notes are not carried. Sending a client a photo from a lane with no preview is a different decision and it has not been taken. Send those from the desk.
+**Text only, in both directions, and the client is told.** Photographs and voice notes are not carried out, and the ones the client already sent are not shown to you: they are in the bucket and on the job, where the desk and a worker can see them. So on your **first** reply on a conversation, if that conversation has photographs, one sentence is appended to your message in your voice: *"I should say, I cannot see any photos you sent before now, so if there is something you want me to look at, send it again here."* Your confirmation tells you when it was added. It is appended after your words, never woven into them, and never repeated on later messages.
+
+To send a photo to a client, use the desk.
 
 **Outside WhatsApp's 24 hour window**, your words are saved rather than lost and go the moment the client writes back, using the same queue the desk's reply button uses. You are told which of the two happened.
 
