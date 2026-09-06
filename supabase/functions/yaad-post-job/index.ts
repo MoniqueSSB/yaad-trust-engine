@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { fetchModel, pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import { TRADES } from "./trades.ts";
 
 // The six-step "Post a job" wizard on yaadly.co.uk posts here twice.
@@ -214,19 +214,16 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
       ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
     }, async (sp) => {
-      const r = await fetchModel(prov.api, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: prov.model, temperature: 0.2, max_tokens: 900,
-          messages: [
-            { role: "system", content: agentPrompt(lists) },
-            { role: "user", content: text.slice(0, 6000) },
-          ],
-        }),
+      // Retry, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0.2, max_tokens: 900,
+        messages: [
+          { role: "system", content: agentPrompt(lists) },
+          { role: "user", content: text.slice(0, 6000) },
+        ],
       }, { timeoutMs: 20000 });
       const raw = await r.text();
-      sp.setAttributes({ "http.response.status_code": r.status });
+      sp.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
       // Every return null below used to be silent: recorded on the span only,
       // which does not surface in function_logs. With no OTLP endpoint set,
       // that means a failed read leaves NOTHING anywhere, and the client just
@@ -235,7 +232,7 @@ async function readTheJob(text: string, lists: Lists, trace: Trace): Promise<Rea
       // there was no way to tell it from the hourly model cap. Same treatment
       // yaad-inbound's own readTheJob got on 1 Sep, for the same reason.
       if (!r.ok) {
-        const msg = `readTheJob: ${prov.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        const msg = `readTheJob: ${provider.name} http ${r.status}: ${raw.slice(0, 200)}`;
         sp.recordError(msg); console.error(msg); return null;
       }
       let j: any = {};

@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 
 // Completion Report narrative agent.
@@ -139,18 +139,16 @@ Deno.serve(async (req: Request) => {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat",
       "gen_ai.request.temperature": 0.3, "yaadly.agent.name": "completion",
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model, temperature: 0.3, max_tokens: 8000,
-          messages: [ { role: "system", content: SYSTEM }, { role: "user", content: userPrompt } ],
-        }),
-      });
-      const j = await r.json();
-      s.setAttributes({ "http.response.status_code": r.status,
+      // Retries, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0.3, max_tokens: 8000,
+        messages: [ { role: "system", content: SYSTEM }, { role: "user", content: userPrompt } ],
+      }, { timeoutMs: 120_000, retries: 2, maxRetryWaitMs: 15_000 });
+      let j: any = {};
+      try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
+      s.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status,
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens, "gen_ai.usage.output_tokens": j?.usage?.completion_tokens });
-      if (!r.ok) { console.error("completion: model http", r.status, JSON.stringify(j).slice(0, 300)); s.recordError(`${prov.name} http ${r.status}`); throw new Error(`Model call failed (${r.status})`); }
+      if (!r.ok) { console.error("completion: model http", r.status, JSON.stringify(j).slice(0, 300)); s.recordError(`${provider.name} http ${r.status}`); throw new Error(`Model call failed (${r.status})`); }
       finishReason = j?.choices?.[0]?.finish_reason ?? "";
       return j?.choices?.[0]?.message?.content ?? "";
     });

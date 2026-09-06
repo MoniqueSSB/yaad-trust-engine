@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, answerText, firstJsonObject, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { measurementRegExp } from "./measurements.ts";
 
 // yaad-report
 //
@@ -29,10 +30,11 @@ import * as guardrails from "./guardrails.ts";
 //     the verdict is empty (report_guard_issue, 20260904c)
 //   * rating a finding requires a signed-in admin and stamps who did it
 //
-// MEASUREMENTS. Same three layers as yaad-sketch, and deliberately the same
-// regex, because two copies of that rule would drift. The prompt forbids a
-// dimension, MEASUREMENT_RE below removes any that arrive anyway and reports
-// every one to the desk rather than hiding it, and has_measurement() in
+// MEASUREMENTS. Same three layers as yaad-sketch, and now literally the same
+// pattern: _shared/measurements.ts, imported by both. Writing "deliberately the
+// same regex" and then typing it out a second time is how it drifted. The
+// prompt forbids a dimension, the scrubber removes any that arrive anyway and
+// reports every one to the desk rather than hiding it, and has_measurement() in
 // Postgres refuses to let a report carrying one be issued. A phone photograph
 // carries no scale, and measured work for reward is regulated in Jamaica.
 //
@@ -58,16 +60,18 @@ Rules, all of them absolute:
 
 You draft. A named person rates every finding, writes the verdict and signs. You do not decide how serious anything is.`;
 
-// Same rule as yaad-sketch's own MEASUREMENT_RE. A bare "in" is deliberately
-// excluded as a unit, because "1 in 5 tiles is cracked" is ordinary English.
-const MEASUREMENT_RE =
-  /(^|[^a-z0-9])\d+([.,]\d+)?\s*(mm|cm|m|m2|m²|metre|meter|metres|meters|ft|foot|feet|yard|yards|inch|inches|sq\.?\s*(m|ft|metre|metres|foot|feet)|square\s+(metre|metres|meter|meters|foot|feet))([^a-z0-9]|$)|\d\s*('|")(\s|$|[.,;)])/gi;
+// One rule, from _shared/measurements.ts. This was a second hand-typed copy of
+// the sketch pack's pattern until 5 September 2026, and the two were equivalent
+// only because nobody had touched either since August. A bare "in" is still
+// deliberately not a unit, because "1 in 5 tiles is cracked" is ordinary
+// English. A fresh regex each call, because a global one carries lastIndex.
+const measurementRe = () => measurementRegExp("gi");
 
 type Scrub = { where: string; text: string };
 
 function scrub(text: string, where: string, found: Scrub[]): string {
   if (!text) return text;
-  const out = text.replace(MEASUREMENT_RE, (m) => {
+  const out = text.replace(measurementRe(), (m) => {
     found.push({ where, text: m.trim() });
     return " [size removed] ";
   });
@@ -169,39 +173,48 @@ Deno.serve(async (req: Request) => {
       captions.length ? `PHOTOGRAPH CAPTIONS:\n${captions.map((c, i) => `${i + 1}. ${c}`).join("\n")}` : "",
     ].filter(Boolean).join("\n\n");
 
+    // A desk call, not a webhook: the person drafting can wait for the file.
+    // Two retries with up to fifteen seconds of Retry-After honoured, and then
+    // the failover in chatWithFailover if a fallback provider is configured.
+    // Until 6 September 2026 this was a bare fetch, so a single 429 from
+    // Mistral was a 502 to the desk and no report.
     const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov),
       "gen_ai.operation.name": "chat",
       "gen_ai.request.temperature": 0,
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model,
-          temperature: 0,
-          messages: [
-            { role: "system", content: SYSTEM },
-            { role: "user", content: userBlock },
-          ],
-        }),
-      });
-      const j = await r.json();
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0,
+        // Room for a reasoning model to think and then still answer.
+        max_tokens: 6000,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: userBlock },
+        ],
+      }, { timeoutMs: 60_000, retries: 2, maxRetryWaitMs: 15_000 });
+      let j: any = {};
+      try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
       s.setAttributes({
+        ...providerAttrs(provider),
         "http.response.status_code": r.status,
         "gen_ai.response.model": j?.model,
         "gen_ai.response.finish_reasons": j?.choices?.[0]?.finish_reason,
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
+      if (!r.ok) {
+        const msg = `yaad-report draft: ${provider.name} http ${r.status}`;
+        s.recordError(msg); console.error(msg);
+      }
       return j?.choices?.[0]?.message?.content ?? "";
     });
 
-    let parsed: Record<string, any> = {};
-    try {
-      parsed = JSON.parse(String(raw).replace(/^```(json)?/i, "").replace(/```$/, "").trim());
-    } catch (_) {
+    // Thinking stripped and the first JSON object taken, since 6 September
+    // 2026: MiniMax reasons in a <think> block first, and the old parse read
+    // that block as the draft and refused it.
+    const parsed: Record<string, any> | null = firstJsonObject(raw);
+    if (!parsed) {
+      console.error(`yaad-report draft: answer was not JSON: ${answerText(raw).slice(0, 300)}`);
       return fail("The agent did not return a usable draft. Try again, or write the notes more plainly.", 502);
     }
 

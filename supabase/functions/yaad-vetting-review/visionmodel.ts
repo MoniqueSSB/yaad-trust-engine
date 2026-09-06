@@ -80,7 +80,13 @@ const JOBS: Record<VisionJob, { modelEnv: string; fallbackModel: string; agent: 
   },
   sketch: {
     modelEnv: "NVIDIA_SKETCH_MODEL",
-    fallbackModel: "meta/llama-3.2-90b-vision-instruct",
+    // 11b, not 90b, since 6 September 2026. On the first real walkthrough the
+    // 90b endpoint took three stills and answered nothing in forty seconds,
+    // twice in a row, and the desk sat on "Looking at stills 1 to 3" with no
+    // pack. The 11b is the same provider in the same country, answers in
+    // seconds, and a room described a little less richly beats a room never
+    // described. Set NVIDIA_SKETCH_MODEL to move it back without a deploy.
+    fallbackModel: "meta/llama-3.2-11b-vision-instruct",
     agent: "sketch_frames",
   },
   vetting: {

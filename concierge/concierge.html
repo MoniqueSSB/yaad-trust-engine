@@ -293,10 +293,33 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
 .pthumb{position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--bg)}
 .pthumb.out{opacity:.28}
-.pthumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+.pthumb.sel{outline:3px solid var(--teal);outline-offset:-3px}
+.pthumb.sel .n{background:#fff}
+.pthumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover;cursor:pointer}
 .pthumb .n{position:absolute;top:5px;left:5px;background:var(--teal);color:#160B2E;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px;font-family:var(--mono)}
 .pthumb .x{position:absolute;top:5px;right:5px;background:rgba(7,7,26,.82);color:#fff;border-radius:100px;width:22px;height:22px;font-size:13px;line-height:1}
 .pthumb .cap{padding:6px 8px;font-size:10.5px;color:var(--mute);line-height:1.35}
+.pthumb .roomedit{width:100%;font:600 11.5px var(--sans,inherit);color:var(--ink,inherit);background:transparent;border:0;border-bottom:1px dashed var(--line);padding:2px 0 3px;margin-bottom:3px;outline:none}
+.pthumb .roomedit:focus{border-bottom-color:var(--teal)}
+#skEdit .redit{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin:12px 0}
+#skEdit .rhead{display:flex;gap:9px;align-items:center;margin-bottom:9px}
+#skEdit .rhead input{flex:1;font-weight:700}
+#skEdit .rhead select{width:auto}
+#skEdit .rhead .cnt{color:var(--dim);font-size:11.5px;white-space:nowrap}
+#skEdit .rooombs{margin-bottom:12px}
+#skEdit .pedit{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+#skEdit .pedit .pic{position:relative;width:190px;flex:0 0 190px}
+#skEdit .pedit .pic img{width:100%;display:block;border-radius:8px}
+#skEdit .pedit .noimg{background:var(--bg);color:var(--dim);font-size:11px;text-align:center;padding:34px 8px;border-radius:8px}
+#skEdit .pedit .pn{position:absolute;top:5px;left:5px;background:var(--teal);color:#160B2E;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px}
+#skEdit .pedit .txt{flex:1;min-width:0}
+#skEdit .obs{border-left:2px solid var(--line);padding-left:9px;margin:7px 0}
+#skEdit .obsrow{display:flex;gap:7px;align-items:center;margin-top:4px;flex-wrap:wrap}
+#skEdit .obsrow select{width:auto;font-size:12px;padding:3px 6px}
+#skEdit .obsrow .pro{font-size:11.5px;color:var(--dim);display:flex;gap:4px;align-items:center;white-space:nowrap}
+#skEdit .btn.sm{font-size:11.5px;padding:4px 9px}
+#skEdit textarea{width:100%;font-size:13px}
+#skEdit label{font-size:11px}
 
 /* ---------- gate ---------- */
 .gate{min-height:100vh;display:grid;place-items:center;padding:22px}
@@ -502,15 +525,15 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   <p class="vsub">A record of what was filmed, never a survey. No measurement goes in one, and the database refuses to approve any that slips through. If a client needs dimensions, they need a surveyor.</p>
 
   <div class="card">
-    <div class="chd"><h3>Site Sketch Pack</h3><span class="chip warn dot">Indicative only</span></div>
+    <div class="chd"><h3>Site Inspection Report</h3><span class="chip warn dot">Indicative only</span></div>
     <div id="skMsg"></div>
 
-    <label>Walkthrough video</label>
-    <input id="skVideo" type="file" accept="video/*">
-    <p class="hint">The video stays on this machine. Only the stills you keep are ever sent anywhere.</p>
+    <label>Walkthrough videos (MP4 only) and photographs (JPG or PNG). Pick several at once, or add more later.</label>
+    <input id="skVideo" type="file" accept="video/mp4,.mp4,image/jpeg,image/png,.jpg,.jpeg,.png" multiple>
+    <p class="hint">Videos must be MP4: an iPhone .mov will not open in every browser, so send it to yourself on WhatsApp and use the copy it sends back. Each Pull adds to the stills already on the page, numbered on from the last one, so one report can hold several videos and photographs. Nothing leaves this machine until you click Describe, and then only the stills.</p>
 
     <div class="row" style="margin-top:13px">
-      <div><label>How many stills</label><input id="skCount" type="number" min="4" max="36" value="12"></div>
+      <div><label>How many stills, at most</label><input id="skCount" type="number" min="4" max="16" value="8" title="Never more than one still every three seconds of video, and never more than 16. A short video gets fewer."></div>
       <div><label>Property label, no address</label><input id="skLabel" placeholder="The Portmore house"></div>
     </div>
     <div class="row">
@@ -520,18 +543,32 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
     <div class="row">
       <div><label>Date filmed</label><input id="skDate" type="date"></div>
       <div><label>Walked by</label><input id="skWho" placeholder="Who was on site"></div>
+      <div><label>Conditions on the day</label><input id="skConditions" placeholder="Sunny, dry, after rain overnight"></div>
+      <div><label>Job reference, optional</label><input id="skJobRef" placeholder="JOB-2026-014"></div>
+      <div><label>Contractor, if one is appointed</label><input id="skContractor" placeholder="Nobody appointed yet"></div>
     </div>
     <div class="row">
       <div><label>Anything the reader should know, optional</label><input id="skContext" placeholder="Back bedroom was locked, could not get in"></div>
     </div>
-    <div class="brow"><button class="btn" id="skPull">Pull the stills</button></div>
+    <div class="row">
+      <div style="flex:1"><label>Site condition on the day, in your own words. One point per line, and they print as a list.</label><textarea id="skVisitNotes" rows="4" placeholder="Roof looked sound from the ground, no missing sheets visible.&#10;Back bedroom ceiling stained, worse in the corner by the window.&#10;Told the client a roofer should look at it in person."></textarea></div>
+    </div>
+    <div class="brow"><button class="btn" id="skPull">Pull the stills</button><button class="btn g" id="skClear">Start again</button></div>
     <p class="conseq">Pulling reads the video here, in this browser. <b>Nothing is uploaded at this step.</b></p>
   </div>
 
   <div class="card hidden" id="skFramesCard">
     <div class="chd"><h3 id="skFramesTitle">Stills</h3></div>
-    <p class="hint" style="margin:0 0 12px">Drop anything blurred, dark or pointing at nothing. Fewer good stills beat more bad ones.</p>
+    <p class="hint" style="margin:0 0 12px">Drop anything blurred, dark or pointing at nothing. Fewer good stills beat more bad ones. After Describe, the room name under each still can be typed over, and what you type is what the pack uses.</p>
     <div id="skThumbs" class="pgrid"></div>
+    <div class="hidden" id="skOneRoomRow" style="margin-top:12px">
+      <p class="hint" style="margin:0 0 8px">More than one room in the video? <b>Click the stills that belong to a room</b> to select them, type the room's name, Apply. Then select the next room's stills and do it again. With nothing selected, the name goes on every still.</p>
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1"><label id="skOneRoomLabel">Name every still</label><input id="skOneRoom" placeholder="Front bedroom"></div>
+        <div><button class="btn g" id="skOneRoomApply">Apply</button></div>
+      </div>
+      <p class="conseq" id="skApplied" style="min-height:1.4em;margin:6px 0 0"></p>
+    </div>
     <div class="brow" style="margin-top:15px">
       <button class="btn" id="skDescribe">Describe what is in them</button>
       <button class="btn g" id="skAssemble" disabled>Build the pack</button>
@@ -5273,6 +5310,7 @@ async function deskRescanPack(row, vals){
 const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
 let SK_FRAMES = [];     // [{n, t, data, keep}]
 let SK_DESCRIBED = [];  // what the vision model said
+let SK_SELECTED = new Set(); // still numbers the person has clicked, for naming a room
 let SK_PACK = null;
 
 async function skFn(payload){
@@ -5298,7 +5336,11 @@ const mmss = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padSta
 async function skExtract(file, count){
   const url = URL.createObjectURL(file);
   const v = document.createElement("video");
-  v.preload = "auto"; v.muted = true; v.playsInline = true; v.src = url;
+  // "metadata", not "auto", since 6 September 2026. We only ever seek to a
+  // dozen moments, and "auto" asked Chrome to pull a whole phone video into
+  // memory first. A long 4K walkthrough is over a gigabyte, and the tab went
+  // white on the first real one before a single still was drawn.
+  v.preload = "metadata"; v.muted = true; v.playsInline = true; v.src = url;
   try {
     await new Promise((res, rej) => {
       v.onloadedmetadata = res;
@@ -5307,6 +5349,9 @@ async function skExtract(file, count){
     });
     let dur = v.duration;
     if (!isFinite(dur) || dur <= 0) throw new Error("That video has no readable length, so stills cannot be spaced through it.");
+    // Never closer together than one still every three seconds. A seven second
+    // clip gets four stills, not twelve copies of the same wall.
+    count = Math.max(4, Math.min(count, Math.ceil(dur / 3)));
 
     const canvas = document.createElement("canvas");
     const scale = Math.min(1, 960 / Math.max(v.videoWidth || 960, v.videoHeight || 720));
@@ -5315,6 +5360,7 @@ async function skExtract(file, count){
     const ctx = canvas.getContext("2d");
 
     const out = [];
+    let black = 0;
     for (let i = 0; i < count; i++) {
       const t = dur * (i + 0.5) / count;
       await new Promise((res, rej) => {
@@ -5324,8 +5370,15 @@ async function skExtract(file, count){
         v.currentTime = t;
       });
       ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      if (skIsBlack(ctx, canvas)) black++;
       out.push({ n: i + 1, t, data: canvas.toDataURL("image/jpeg", 0.72), keep: true });
       $("skProgress").textContent = `Pulling still ${i + 1} of ${count}.`;
+    }
+    // A video Chrome can open but cannot decode draws every still as a black
+    // square and says nothing. iPhones record HEVC by default, and that is the
+    // usual reason. Say so, with the two ways round it that actually work.
+    if (black === out.length) {
+      throw new Error("Every still came out black: this browser cannot decode this video. MP4 only. Send the video to yourself on WhatsApp and use the copy it sends back, which is an MP4.");
     }
     return out;
   } finally {
@@ -5333,75 +5386,186 @@ async function skExtract(file, count){
   }
 }
 
+// True when a drawn still is black or near it: a 32 by 32 sample of the canvas
+// with almost no light in it. Cheap enough to run on every still.
+function skIsBlack(ctx, canvas){
+  try {
+    const sx = Math.max(1, Math.floor(canvas.width / 32)), sy = Math.max(1, Math.floor(canvas.height / 32));
+    let sum = 0, n = 0;
+    for (let y = 0; y < canvas.height; y += sy) {
+      const row = ctx.getImageData(0, y, canvas.width, 1).data;
+      for (let x = 0; x < canvas.width; x += sx) { sum += row[x * 4] + row[x * 4 + 1] + row[x * 4 + 2]; n += 3; }
+    }
+    return n > 0 && (sum / n) < 6;
+  } catch (_) { return false; }
+}
+
 function skRenderThumbs(){
-  const kept = SK_FRAMES.filter(f => f.keep).length;
-  $("skFramesTitle").textContent = `Stills, ${kept} kept of ${SK_FRAMES.length}`;
+  // The cross removes the still outright, since 6 September 2026. It used to
+  // grey it out with a plus to put it back, and a greyed still that is still
+  // on the page reads as "still in the pack". Gone is gone; pull the stills
+  // again if one was dropped by mistake.
+  $("skFramesTitle").textContent = `${SK_FRAMES.length} still${SK_FRAMES.length === 1 ? "" : "s"}`;
   $("skThumbs").innerHTML = SK_FRAMES.map(f => {
     const d = SK_DESCRIBED.find(x => x.n === f.n);
-    return `<div class="pthumb ${f.keep ? "" : "out"}" data-n="${f.n}">
+    return `<div class="pthumb ${SK_SELECTED.has(f.n) ? "sel" : ""}" data-n="${f.n}">
       <span class="n">${f.n}</span>
-      <button class="x" title="${f.keep ? "drop this one" : "put it back"}">${f.keep ? "×" : "+"}</button>
-      <img src="${f.data}" alt="still ${f.n}">
-      <div class="cap">${esc(d ? (d.room || "") : mmss(f.t))}${d && d.visible ? "<br>" + esc(d.visible.slice(0, 90)) : ""}</div>
+      <button class="x" title="remove this still">×</button>
+      <img src="${f.data}" alt="still ${f.n}" title="click to select this still for naming">
+      <div class="cap">${d
+        ? `<input class="roomedit" data-n="${f.n}" value="${esc(d.room || "")}" placeholder="which room?" title="Type the room this still is in. The pack uses what you type.">`
+        : esc(mmss(f.t))}${d && d.visible ? "<br>" + esc(d.visible.slice(0, 90)) : ""}</div>
     </div>`;
   }).join("");
+  // What she types is the truth about the room; the model's guess was only
+  // ever a starting point. Written straight into the described entry, so the
+  // assembler sees her name and not the model's.
+  $("skThumbs").querySelectorAll(".roomedit").forEach(inp => inp.addEventListener("input", (e) => {
+    const n = Number(e.target.dataset.n);
+    const d = SK_DESCRIBED.find(x => x.n === n);
+    if (d) { d.room = e.target.value.trim(); d.room_confidence = "high"; }
+  }));
+  // Click a still to select it for naming. The cross and the name box keep
+  // their own jobs; only the picture toggles selection.
+  $("skThumbs").querySelectorAll(".pthumb img").forEach(img => img.addEventListener("click", (e) => {
+    const n = Number(e.target.closest(".pthumb").dataset.n);
+    if (SK_SELECTED.has(n)) SK_SELECTED.delete(n); else SK_SELECTED.add(n);
+    e.target.closest(".pthumb").classList.toggle("sel", SK_SELECTED.has(n));
+    skUpdateNameLabel();
+  }));
+  skUpdateNameLabel();
+  show("skOneRoomRow", SK_DESCRIBED.length > 0);
   $("skThumbs").querySelectorAll(".x").forEach(b => b.addEventListener("click", (e) => {
     const n = Number(e.target.closest(".pthumb").dataset.n);
-    const f = SK_FRAMES.find(x => x.n === n);
-    f.keep = !f.keep;
+    SK_FRAMES = SK_FRAMES.filter(x => x.n !== n);
+    SK_DESCRIBED = SK_DESCRIBED.filter(x => x.n !== n);
+    if (!SK_FRAMES.length) { show("skFramesCard", false); $("skAssemble").disabled = true; return say("skMsg","warn","Every still has been removed. Pull the stills again."); }
     skRenderThumbs();
   }));
 }
 
-$("skPull").addEventListener("click", async () => {
-  const file = $("skVideo").files[0];
-  if (!file) return say("skMsg","err","Choose the walkthrough video first.");
-  if (!$("skLabel").value.trim()) return say("skMsg","err","Give the property a label. Not the address: something like 'The Portmore house'.");
-  const count = Math.max(4, Math.min(36, Number($("skCount").value) || 12));
-  $("skPull").disabled = true;
-  say("skMsg","ok","Reading the video. It is not being uploaded.");
+// A photograph becomes one still, downscaled the same way a video frame is.
+async function skFromImage(file){
+  const url = URL.createObjectURL(file);
   try {
-    SK_FRAMES = await skExtract(file, count);
-    SK_DESCRIBED = []; SK_PACK = null;
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(`${file.name} could not be read as an image.`)); i.src = url; });
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 960 / Math.max(img.naturalWidth || 960, img.naturalHeight || 720));
+    canvas.width = Math.round((img.naturalWidth || 960) * scale);
+    canvas.height = Math.round((img.naturalHeight || 720) * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    return { t: 0, data: canvas.toDataURL("image/jpeg", 0.72), keep: true, source: file.name };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+const SK_MAX_STILLS = 30;
+
+// Several files, one report, since 6 September 2026. Each Pull ADDS to the
+// stills already on the page, numbered on from the last, so a walkthrough of
+// three videos and a handful of photographs comes out as one document. Start
+// again clears the lot.
+$("skPull").addEventListener("click", async () => {
+  const files = [...$("skVideo").files];
+  if (!files.length) return say("skMsg","err","Choose a video or some photographs first.");
+  if (!$("skLabel").value.trim()) return say("skMsg","err","Give the property a label, something like 'The Portmore house'.");
+  const isVideo = (f) => /\.mp4$/i.test(f.name) || f.type === "video/mp4";
+  const isImage = (f) => /\.(jpe?g|png)$/i.test(f.name) || /^image\/(jpeg|png)$/.test(f.type);
+  const bad = files.find(f => !isVideo(f) && !isImage(f));
+  if (bad) return say("skMsg","err",`${bad.name} is not an MP4 video or a JPG or PNG photograph. Videos must be MP4: send it to yourself on WhatsApp and use the copy it sends back.`);
+  // Sixteen per video at most, eight by default, since 6 September 2026.
+  // Thirty-six stills of one bedroom is thirty-six near-identical pictures
+  // for the model to reconcile, and it invented a second room out of them.
+  const perVideo = Math.max(4, Math.min(16, Number($("skCount").value) || 8));
+  $("skPull").disabled = true;
+  try {
+    const added = [];
+    for (const file of files) {
+      if (SK_FRAMES.length + added.length >= SK_MAX_STILLS) { say("skMsg","warn",`Stopped at ${SK_MAX_STILLS} stills. That is enough for one report; build it, or Start again.`); break; }
+      const mb = Math.round(file.size / 1048576);
+      say("skMsg","ok", `Reading ${file.name}${mb > 400 ? `, ${mb} MB, which can take a minute to open` : ""}. It is not being uploaded.`);
+      if (isVideo(file)) {
+        const room = SK_MAX_STILLS - SK_FRAMES.length - added.length;
+        const stills = await skExtract(file, Math.min(perVideo, Math.max(1, room)));
+        stills.forEach(s => added.push({ ...s, source: file.name }));
+      } else {
+        added.push(await skFromImage(file));
+      }
+    }
+    let n = SK_FRAMES.length;
+    added.forEach(s => { s.n = ++n; });
+    SK_FRAMES = [...SK_FRAMES, ...added];
+    SK_SELECTED.clear(); $("skApplied").textContent = "";
+    SK_PACK = null;
     show("skFramesCard", true); show("skPackCard", false); show("skPreviewCard", false);
     $("skProgress").textContent = "";
     $("skAssemble").disabled = true;
+    $("skVideo").value = "";
     skRenderThumbs();
-    say("skMsg","ok",`${SK_FRAMES.length} stills pulled from ${mmss(SK_FRAMES[SK_FRAMES.length-1].t)} of footage. Nothing has left this machine.`);
+    const undescribed = SK_FRAMES.filter(f => !SK_DESCRIBED.some(d => d.n === f.n)).length;
+    say("skMsg","ok",`${added.length} still${added.length === 1 ? "" : "s"} added from ${files.length} file${files.length === 1 ? "" : "s"}, ${SK_FRAMES.length} on the page. Nothing has left this machine.${undescribed && SK_DESCRIBED.length ? ` ${undescribed} still${undescribed === 1 ? " is" : "s are"} not described yet; Describe runs only those.` : ""}`);
   } catch (e) {
     say("skMsg","err", e.message);
   }
   $("skPull").disabled = false;
 });
 
+$("skClear").addEventListener("click", () => {
+  if (SK_FRAMES.length && !confirm("Remove every still on the page and start again?")) return;
+  SK_FRAMES = []; SK_DESCRIBED = []; SK_SELECTED.clear(); SK_PACK = null;
+  $("skVideo").value = ""; $("skApplied").textContent = ""; $("skProgress").textContent = "";
+  show("skFramesCard", false); show("skPackCard", false); show("skPreviewCard", false);
+  say("skMsg","ok","Cleared. Pick the files for the next report.");
+});
+
 $("skDescribe").addEventListener("click", async () => {
-  const kept = SK_FRAMES.filter(f => f.keep);
-  if (!kept.length) return say("skMsg","err","Every still is dropped. Keep at least one.");
+  // Only the stills not yet described, so adding a second video does not
+  // re-run, and re-name, the first.
+  const kept = SK_FRAMES.filter(f => f.keep && !SK_DESCRIBED.some(d => d.n === f.n));
+  if (!kept.length) return say("skMsg", SK_FRAMES.length ? "ok" : "err", SK_FRAMES.length ? "Every still on the page is already described. Name the rooms, then build the pack." : "Pull some stills first.");
   $("skDescribe").disabled = true;
-  SK_DESCRIBED = [];
   const scrubs = [];
   try {
-    // Six at a time. The batching is not politeness, it is what keeps each
-    // call inside the edge function's timeout.
-    for (let i = 0; i < kept.length; i += 6) {
-      const batch = kept.slice(i, i + 6);
-      $("skProgress").textContent = `Looking at stills ${batch[0].n} to ${batch[batch.length-1].n}, ${i + batch.length} of ${kept.length}.`;
-      const out = await skFn({
-        action: "frames",
-        images: batch.map(b => b.data),
-        start_at: batch[0].n,
-        context: $("skContext").value.trim(),
-      });
+    // One at a time. The batching is not politeness, it is what keeps each
+    // call inside the edge function's timeout. It was six until 6 September
+    // 2026, then three, and three stills at 960px was still enough for NVIDIA
+    // to answer nothing in forty seconds on the first real walkthrough. One
+    // still is a call the model answers in seconds, and twelve short calls
+    // beat one long one that dies.
+    // A still the model fumbles must not stop the eleven after it. Since
+    // 6 September 2026 a failure is noted against that still and the loop
+    // carries on; the failed ones get one more go at the end; and whatever is
+    // still missing is written into the pack as "not described", which the
+    // "what this pack does not cover" section is for.
+    const failed = [];
+    const describeOne = async (f) => {
+      const out = await skFn({ action: "frames", images: [f.data], start_at: f.n, context: $("skContext").value.trim() });
       SK_DESCRIBED.push(...(out.frames || []));
       scrubs.push(...(out.scrubbed || []));
+    };
+    for (let i = 0; i < kept.length; i += 1) {
+      $("skProgress").textContent = `Looking at still ${kept[i].n}, ${i + 1} of ${kept.length}.`;
+      try { await describeOne(kept[i]); } catch (e) { failed.push({ f: kept[i], why: e.message }); }
       skRenderThumbs();
     }
+    const secondGo = failed.splice(0);
+    for (const { f } of secondGo) {
+      $("skProgress").textContent = `Trying still ${f.n} once more.`;
+      try { await describeOne(f); } catch (e) { failed.push({ f, why: e.message }); }
+      skRenderThumbs();
+    }
+    for (const { f } of failed) {
+      SK_DESCRIBED.push({ n: f.n, room: "", room_confidence: "low", same_room_as_previous: false, visible: "Not described: the vision model did not give a usable answer for this still.", doors_to: [], observations: [] });
+    }
+    SK_DESCRIBED.sort((a, b) => a.n - b.n);
+    skRenderThumbs();
     $("skProgress").textContent = "";
     $("skAssemble").disabled = false;
-    say("skMsg", scrubs.length ? "warn" : "ok",
+    const described = kept.length - failed.length;
+    const tail = failed.length ? ` ${failed.length} still${failed.length > 1 ? "s" : ""} (${failed.map(x => x.f.n).join(", ")}) could not be read after two tries and will show as not described.` : "";
+    say("skMsg", scrubs.length || failed.length ? "warn" : "ok",
       scrubs.length
-        ? `${SK_DESCRIBED.length} stills described. ${scrubs.length} measurement phrase${scrubs.length > 1 ? "s were" : " was"} removed: the model tried to state a size it cannot know. That is the guard doing its job.`
-        : `${SK_DESCRIBED.length} stills described, no measurements attempted. Now build the pack.`);
+        ? `${described} of ${kept.length} stills described. ${scrubs.length} measurement phrase${scrubs.length > 1 ? "s were" : " was"} removed: the model tried to state a size it cannot know. That is the guard doing its job.${tail}`
+        : `${described} of ${kept.length} stills described, no measurements attempted.${tail} Now build the pack.`);
   } catch (e) {
     $("skProgress").textContent = "";
     say("skMsg","err", /NVIDIA_API_KEY/i.test(e.message)
@@ -5411,19 +5575,60 @@ $("skDescribe").addEventListener("click", async () => {
   $("skDescribe").disabled = false;
 });
 
+function skUpdateNameLabel(){
+  const live = [...SK_SELECTED].filter(n => SK_FRAMES.some(f => f.n === n));
+  $("skOneRoomLabel").textContent = live.length
+    ? `Name the ${live.length} selected still${live.length === 1 ? "" : "s"} (${live.sort((a, b) => a - b).join(", ")})`
+    : "Name every still";
+}
+
+// Naming rooms by hand. The commonest correction is a short video of one room
+// that the model read as two because the angle changed; the next commonest is
+// a real walkthrough of several rooms where the model's names drift. Select
+// the stills for a room, name it, Apply, repeat. Nothing selected means all.
+$("skOneRoomApply").addEventListener("click", () => {
+  const name = $("skOneRoom").value.trim();
+  if (!name) { $("skApplied").textContent = "Type the room's name first."; return say("skMsg","err","Type the room's name first."); }
+  const chosen = [...SK_SELECTED].filter(n => SK_FRAMES.some(f => f.n === n));
+  const targets = chosen.length ? SK_DESCRIBED.filter(d => chosen.includes(d.n)) : SK_DESCRIBED;
+  if (!targets.length) return say("skMsg","err","Describe the stills first, then name them.");
+  targets.forEach((d) => { d.room = name; d.room_confidence = "high"; d.doors_to = []; });
+  // same_room_as_previous follows the names now, still by still, in order.
+  SK_DESCRIBED.sort((a, b) => a.n - b.n).forEach((d, i, arr) => { d.same_room_as_previous = i > 0 && String(arr[i - 1].room || "").trim().toLowerCase() === String(d.room || "").trim().toLowerCase(); });
+  const which = chosen.length ? `still${chosen.length === 1 ? "" : "s"} ${chosen.sort((a, b) => a - b).join(", ")}` : `every still`;
+  SK_SELECTED.clear();
+  skRenderThumbs();
+  // Say it three ways: on the button, under the box, and in the card message.
+  const btn = $("skOneRoomApply"); const was = btn.textContent;
+  btn.textContent = "Applied"; btn.disabled = true;
+  setTimeout(() => { btn.textContent = was; btn.disabled = false; }, 1800);
+  $("skApplied").textContent = `"${name}" is now on ${which}.`;
+  const rooms = [...new Set(SK_DESCRIBED.map(d => String(d.room || "").trim()).filter(Boolean))];
+  say("skMsg","ok",`"${name}" applied to ${which}. The pack will have ${rooms.length} room${rooms.length === 1 ? "" : "s"}: ${rooms.join(", ")}.`);
+  $("skOneRoom").value = ""; $("skOneRoom").focus();
+});
+
 $("skAssemble").addEventListener("click", async () => {
   if (!SK_DESCRIBED.length) return say("skMsg","err","Describe the stills first.");
   $("skAssemble").disabled = true;
   say("skMsg","ok","Working out the rooms and drawing the sketch.");
   try {
+    // The stills go with their descriptions now, so the report can print the
+    // photograph beside the words. Only the ones still on the page.
+    const images = Object.fromEntries(SK_FRAMES.filter(f => SK_DESCRIBED.some(d => d.n === f.n)).map(f => [String(f.n), f.data]));
     const out = await skFn({
       action: "assemble",
-      frames: SK_DESCRIBED,
+      frames: SK_DESCRIBED.filter(d => SK_FRAMES.some(f => f.n === d.n)),
+      images,
       property_label: $("skLabel").value.trim(),
       client_name: $("skClient").value.trim(),
       parish: $("skParish").value.trim(),
       visit_date: $("skDate").value || null,
       captured_by: $("skWho").value.trim(),
+      conditions: $("skConditions").value.trim(),
+      job_ref: $("skJobRef").value.trim(),
+      contractor: $("skContractor").value.trim(),
+      visit_notes: $("skVisitNotes").value.trim(),
     });
     SK_PACK = out.pack;
     skRenderPack(out);
@@ -5471,6 +5676,93 @@ function safeSvg(raw){
   }
 }
 
+// The measurement rule, the desk's copy. Mirrors has_measurement() in the
+// database and MEASUREMENT_PATTERN in supabase/functions/_shared. Here so a
+// person typing "the crack is about 2 metres" into the report is told at the
+// moment they save it, rather than at the moment they try to approve it. The
+// database still refuses the approval either way: this is courtesy, not the
+// control. If the rule changes, change it in all three.
+const SK_MEASUREMENT = /(^|[^a-z0-9])[0-9]+([.,][0-9]+)?\s*[-]?\s*(mm|cm|m|m2|m²|km|metre|metres|meter|meters|ft|ft2|foot|feet|yd|yds|yard|yards|inch|inches|acre|acres|sq\.?\s*(m|ft|yd|metre|metres|meter|meters|foot|feet|yard|yards)|square\s+(metre|metres|meter|meters|foot|feet|yard|yards))([^a-z0-9]|$)|(^|[^a-z0-9])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|half|quarter)(\s+and)?(\s+a)?(\s+(half|quarter))?[\s-]+(metre|metres|foot|feet|inch|inches|yard|yards)([^a-z0-9]|$)|[0-9]+\s*(['"])(\s*[0-9]+([.,][0-9]+)?\s*")?(\s|$|[.,;)])/i;
+
+const SK_CATS = ["cosmetic","maintenance","safety","structural","scope_mismatch"];
+const SK_SEVS = ["low","medium","high"];
+
+/**
+ * The draft, editable, before anybody sees it.
+ *
+ * Everything a client reads can be corrected here: the room names, the words
+ * beside every photograph, the notes, and the detail block. The model wrote a
+ * first draft and a named person decides what the document actually says,
+ * which is the governing rule wearing an ordinary form. Only a draft is
+ * editable; approving freezes it, and reopening clears the approval.
+ */
+function skEditor(p){
+  const rooms = p.rooms || [];
+  const frames = p.frames || [];
+  const byN = new Map(frames.map(f => [Number(f.n), f]));
+  const placed = new Set();
+  const isImg = (s) => /^data:image\/(png|jpeg|jpg);base64,/.test(String(s || ""));
+
+  const obsBlock = (path, o, i) => `
+    <div class="obs" data-path="${path}" data-i="${i}">
+      <textarea data-f="note" rows="2" placeholder="What is visible, in one sentence">${esc(o.note || "")}</textarea>
+      <div class="obsrow">
+        <select data-f="category">${SK_CATS.map(c => `<option value="${c}"${o.category === c ? " selected" : ""}>${c.replace("_"," ")}</option>`).join("")}</select>
+        <select data-f="severity">${SK_SEVS.map(s => `<option value="${s}"${o.severity === s ? " selected" : ""}>${s}</option>`).join("")}</select>
+        <label class="pro"><input type="checkbox" data-f="recommend_professional"${o.recommend_professional ? " checked" : ""}> qualified eye</label>
+        <button class="btn d sm" data-act="delobs">Remove</button>
+      </div>
+    </div>`;
+
+  const photoBlock = (n) => {
+    const f = byN.get(n) || { n }; placed.add(n);
+    return `<div class="pedit" data-n="${n}">
+      <div class="pic">${isImg(f.image) ? `<img src="${f.image}" alt="Photograph ${n}">` : `<div class="noimg">Photograph ${n}</div>`}<div class="pn">${n}</div></div>
+      <div class="txt">
+        <label>What this photograph shows</label>
+        <textarea data-f="caption" rows="2" placeholder="One sentence on what the photograph shows">${esc(f.caption || "")}</textarea>
+        <div class="obslist">${(f.observations || []).map((o, i) => obsBlock(`frame:${n}`, o, i)).join("")}</div>
+        <button class="btn g sm" data-act="addobs" data-path="frame:${n}">Add a finding to this photograph</button>
+      </div>
+    </div>`;
+  };
+
+  const roomBlocks = rooms.map((r, ri) => {
+    const ns = (r.frames || []).map(Number).filter(n => byN.has(n));
+    return `<section class="redit" data-ri="${ri}">
+      <div class="rhead">
+        <input data-f="roomname" value="${esc(r.name || "")}" placeholder="Room name">
+        <select data-f="level">${["ground","upper","outside","roof"].map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${l}</option>`).join("")}</select>
+        <span class="cnt">${ns.length} photograph${ns.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="rooombs"><label>Findings for the room as a whole</label>
+        <div class="obslist">${(r.observations || []).map((o, i) => obsBlock(`room:${ri}`, o, i)).join("")}</div>
+        <button class="btn g sm" data-act="addobs" data-path="room:${ri}">Add a finding to this room</button>
+      </div>
+      ${ns.map(photoBlock).join("")}
+    </section>`;
+  }).join("");
+
+  const loose = frames.map(f => Number(f.n)).filter(n => !placed.has(n)).sort((a,b) => a-b);
+
+  return `<div id="skEdit">
+    <p class="hint" style="margin:0 0 10px">This is the draft. <b>Everything here is what the client will read</b>, so correct it now. Nothing is sent until you approve and then issue it.</p>
+    <div class="row">
+      <div style="flex:1"><label>Job reference</label><input id="skEJobRef" value="${esc(p.job_ref || "")}" placeholder="The client's own reference"></div>
+      <div style="flex:1"><label>Contractor</label><input id="skEContractor" value="${esc(p.contractor || "")}" placeholder="Who is doing the work, if anyone yet"></div>
+      <div style="flex:1"><label>Conditions on the day</label><input id="skEConditions" value="${esc(p.conditions || "")}" placeholder="Sunny, dry, after rain overnight"></div>
+    </div>
+    <label style="margin-top:10px">Your own notes from the visit, one per line</label>
+    <textarea id="skEVisitNotes" rows="4" placeholder="What you saw, in your own words. One line each.">${esc(p.visit_notes || "")}</textarea>
+    ${roomBlocks || '<p class="hint">No rooms in this pack.</p>'}
+    ${loose.length ? `<section class="redit"><div class="rhead"><b>Photographs not in a room</b></div>${loose.map(photoBlock).join("")}</section>` : ""}
+    <div class="brow" style="margin-top:14px">
+      <button class="btn" id="skSaveBtn">Save the changes</button>
+      <span id="skSaveMsg" style="color:var(--dim);font-size:12px;align-self:center"></span>
+    </div>
+  </div>`;
+}
+
 function skRenderPack(extra){
   const p = SK_PACK;
   if (!p) return show("skPackCard", false);
@@ -5483,8 +5775,13 @@ function skRenderPack(extra){
 
   $("skPackBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}${p.parish ? " &middot; " + esc(p.parish) : ""}</p>
+    <div class="row" style="align-items:flex-end;margin-bottom:12px">
+      <div style="flex:1"><label>Property address, printed on the report with a map</label><input id="skAddress" value="${esc(p.address || "")}" placeholder="12 Hope Road, Kingston 6" ${draft ? "" : "disabled"}></div>
+      ${draft ? `<div><button class="btn g" id="skMapBtn">${p.map_image ? "Update the map" : "Add the map"}</button></div>` : ""}
+    </div>
+    ${p.map_image && /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(p.map_image) ? `<div class="sketchbox" style="margin-bottom:12px"><img src="${p.map_image}" alt="Map of the property" style="width:100%;display:block;border-radius:8px"></div>` : ""}
     ${p.sketch_svg ? `<div class="sketchbox">${safeSvg(p.sketch_svg)}</div>` : ""}
-    <div class="tw"><table>
+    ${draft ? skEditor(p) : `<div class="tw"><table>
       <thead><tr><th>Room</th><th>Photos</th><th>What was seen</th></tr></thead>
       <tbody>${rooms.map(r => `
         <tr>
@@ -5496,7 +5793,7 @@ function skRenderPack(extra){
              ${o.recommend_professional ? '<span style="color:var(--coral)"> Needs a qualified eye.</span>' : ""}</div>`).join("")
             : '<span style="color:var(--dim)">Nothing notable visible.</span>'}</td>
         </tr>`).join("")}</tbody>
-    </table></div>
+    </table></div>`}
     ${(extra?.scrubbed || []).length ? `<div class="alert warn"><span class="ic">!</span><div><b>${extra.scrubbed.length} measurement phrase${extra.scrubbed.length > 1 ? "s" : ""} removed before this was saved</b><p>What the model tried to say: ${esc(extra.scrubbed.slice(0,3).join(" · "))}</p></div></div>` : ""}
     ${(extra?.gaps || []).length ? `<div class="qs"><h4>What this pack does not cover</h4><ul>${extra.gaps.map(g => "<li>" + esc(g) + "</li>").join("")}</ul></div>` : ""}
     <div class="brow" style="margin-top:16px">
@@ -5510,6 +5807,107 @@ function skRenderPack(extra){
     ${p.status === "approved" ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>` : ""}`;
 
   show("skPackCard", true);
+
+  // ── Editing the draft ──
+  //
+  // Reads every field back out of the form into the same shape the pack is
+  // stored in, checks it for a measurement the way the database will, and
+  // writes it. Only drafts have this form; the freeze trigger refuses content
+  // changes on anything approved or issued, which is the real control.
+  const editEl = $("skEdit");
+  if (editEl) {
+    const collect = () => {
+      const rooms = [...editEl.querySelectorAll(".redit[data-ri]")].map(sec => {
+        const ri = Number(sec.dataset.ri);
+        const base = (p.rooms || [])[ri] || {};
+        const obs = [...sec.querySelectorAll(`.rooombs .obs`)].map(readObs).filter(o => o.note);
+        return { ...base,
+          name: sec.querySelector('[data-f="roomname"]').value.trim() || base.name || `Room ${ri + 1}`,
+          level: sec.querySelector('[data-f="level"]').value,
+          observations: obs };
+      });
+      const frames = (p.frames || []).map(f => {
+        const el = editEl.querySelector(`.pedit[data-n="${f.n}"]`);
+        if (!el) return f;
+        return { ...f,
+          caption: el.querySelector('[data-f="caption"]').value.trim(),
+          observations: [...el.querySelectorAll(".obs")].map(readObs).filter(o => o.note) };
+      });
+      return { rooms, frames,
+        job_ref: $("skEJobRef").value.trim(),
+        contractor: $("skEContractor").value.trim(),
+        conditions: $("skEConditions").value.trim(),
+        visit_notes: $("skEVisitNotes").value.trim() };
+    };
+    const readObs = (el) => ({
+      note: el.querySelector('[data-f="note"]').value.trim(),
+      category: el.querySelector('[data-f="category"]').value,
+      severity: el.querySelector('[data-f="severity"]').value,
+      recommend_professional: el.querySelector('[data-f="recommend_professional"]').checked,
+    });
+
+    // Add and remove a finding, without a save in between.
+    editEl.addEventListener("click", (e) => {
+      const add = e.target.closest('[data-act="addobs"]');
+      const del = e.target.closest('[data-act="delobs"]');
+      if (!add && !del) return;
+      e.preventDefault();
+      if (del) { const o = del.closest(".obs"); const list = o.parentElement; o.remove(); if (!list.children.length) list.innerHTML = ""; return; }
+      const list = add.previousElementSibling;
+      const i = list.children.length;
+      const div = document.createElement("div");
+      div.innerHTML = `<div class="obs" data-path="${add.dataset.path}" data-i="${i}">
+        <textarea data-f="note" rows="2" placeholder="What is visible, in one sentence"></textarea>
+        <div class="obsrow">
+          <select data-f="category">${SK_CATS.map(c => `<option value="${c}"${c === "maintenance" ? " selected" : ""}>${c.replace("_"," ")}</option>`).join("")}</select>
+          <select data-f="severity">${SK_SEVS.map(s => `<option value="${s}">${s}</option>`).join("")}</select>
+          <label class="pro"><input type="checkbox" data-f="recommend_professional"> qualified eye</label>
+          <button class="btn d sm" data-act="delobs">Remove</button>
+        </div></div>`;
+      list.appendChild(div.firstElementChild);
+      list.lastElementChild.querySelector("textarea").focus();
+    });
+
+    $("skSaveBtn").addEventListener("click", async () => {
+      const patch = collect();
+      // The same rule the database enforces, checked here so she is told now
+      // rather than when the approval is refused.
+      const texts = [
+        ...patch.rooms.flatMap(r => [r.name, ...(r.observations || []).map(o => o.note)]),
+        ...patch.frames.flatMap(f => [f.caption, ...(f.observations || []).map(o => o.note)]),
+        patch.visit_notes, patch.job_ref, patch.contractor,
+      ].filter(Boolean);
+      const bad = texts.find(t => SK_MEASUREMENT.test(t));
+      if (bad) return say("skPackMsg","err",`That states a measurement, and this report may not: "${bad.slice(0,120)}". A photograph carries no scale, so the number was invented. Say it in words instead, for example a full height crack.`);
+
+      $("skSaveBtn").disabled = true; $("skSaveMsg").textContent = "Saving.";
+      const { error } = await sb.from("sketch_packs").update(patch).eq("id", p.id);
+      $("skSaveBtn").disabled = false;
+      if (error) { $("skSaveMsg").textContent = ""; return say("skPackMsg","err", error.message); }
+      $("skSaveMsg").textContent = "Saved.";
+      say("skPackMsg","ok","Saved. Preview it to see what the client will read.");
+      setTimeout(() => { const m = $("skSaveMsg"); if (m) m.textContent = ""; }, 2500);
+      SK_PACK = { ...p, ...patch };
+    });
+  }
+
+  // The map. The address goes to Google once, the image comes back and is
+  // stored on the pack, and the report prints both. Founder instruction,
+  // 6 September 2026.
+  const mapBtn = $("skMapBtn");
+  if (mapBtn) mapBtn.addEventListener("click", async () => {
+    const address = $("skAddress").value.trim();
+    if (!address) return say("skPackMsg","err","Type the property address first.");
+    mapBtn.disabled = true; mapBtn.textContent = "Asking Google for the map";
+    try {
+      await skFn({ action: "map", pack_id: p.id, address });
+      say("skPackMsg","ok","Map added. It prints on the report under the address.");
+      await skReload(p.id);
+    } catch (e) {
+      say("skPackMsg","err", e.message);
+      mapBtn.disabled = false; mapBtn.textContent = p.map_image ? "Update the map" : "Add the map";
+    }
+  });
 
   $("skPreviewBtn").addEventListener("click", async () => {
     try {

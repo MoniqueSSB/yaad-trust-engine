@@ -48,7 +48,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
-import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.ts";
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
@@ -250,18 +250,14 @@ async function composeEvidenceReport(
     const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.agent.name": "reporting",
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model, temperature: 0.3, max_tokens: 600,
-          messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
-        }),
-        signal: AbortSignal.timeout(25000),
-      });
+      // Retry, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0.3, max_tokens: 600,
+        messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
+      }, { timeoutMs: 25000 });
       const j = await r.json().catch(() => ({}));
-      s.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { s.recordError(`${prov.name} http ${r.status}`); return ""; }
+      s.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
+      if (!r.ok) { s.recordError(`${provider.name} http ${r.status}`); return ""; }
       return j?.choices?.[0]?.message?.content ?? "";
     });
 

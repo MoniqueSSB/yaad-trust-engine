@@ -194,7 +194,25 @@ Turning on a real OTLP endpoint is still worth doing and would make this a one-q
 
 **Step three, remove the MiniMax branch. Done, 4 September 2026.** The branch is out of `_shared/textmodel.ts`, `sync-shared.sh` has pushed the change into all nine copies, all nine are redeployed, and the `MINIMAX_API_KEY` secret has been unset. `docs/privacy.html` now names Mistral in the European Union, and the table row and both dates on that page moved with it.
 
-There is deliberately no fallback provider now. With no Mistral key configured, `pickTextProvider()` returns null and every caller gets `NO_PROVIDER_MESSAGE`, which is a loud failure rather than a quiet reroute to China. Do not add a fallback back in. If a provider ever needs changing again, use the four `TEXT_MODEL_*` secrets, which take priority over everything and need no deploy.
+**The MiniMax fallback came back on 5 September 2026**, on Monique's reaffirmed instruction, after being told what it means. The paragraph that used to sit here said "do not add a fallback back in"; that was the right default and she overrode it, which is her call to make. What is back is narrower than what was removed:
+
+- `pickTextProvider()` reaches it only when `MISTRAL_API_KEY` is not set at all. A wrong model id or a 400 never falls through: that is bad everywhere
+- **a refused key does, since 6 September 2026.** The Mistral key on the project started coming back `401 Invalid API Key` on the night of the 5th, and the instruction was "use the MiniMax key when Mistral fails". So `chatWithFailover()` also hands a 401 or a 403 to MiniMax, without retrying it first, because a refused key is refused the same way every time. That covered the two file makers first, and then, later the same morning, after "didn't I say to use MiniMax to solve this", **every text caller**: `yaad-agent`, `yaad-completion`, `yaad-inbound` (classify and compose, with the webhook's own deadline still attached), `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack`, `yaad-report`, `yaad-sketch`. All ten go through `chatWithFailover()` and all ten were redeployed with their existing `verify_jwt` setting. Desk callers retry twice with up to fifteen seconds of Retry-After; webhook callers retry once with the four second budget; then MiniMax, if its key is set. The log line is the same in every function
+- **a rate limit can, since 6 September 2026.** Monique's words: "I want my file to be produced even when the limit is used on Mistral." So the two desk callers that make a file, `yaad-report` (the draft) and `yaad-sketch` (assemble), now go through `chatWithFailover()`: Mistral first, two retries with `Retry-After` honoured up to fifteen seconds, and only if it is STILL a 429 or a 5xx, one call to MiniMax. Per call, logged as `mistral http 429 after retries, falling back to MiniMax (China)`. The webhook callers keep one retry and no failover, because a webhook has fifteen seconds in total and a client message is not a file
+- **with `MINIMAX_API_KEY` unset, which is the state today, none of that reroutes anything.** The retries still happen, so a short rate limit now produces the file on Mistral alone where yesterday it produced a 502. A rate limit that outlasts the retries is still a loud failure
+- it is opt-in: with `MINIMAX_API_KEY` unset there is still no third branch
+- it announces itself: every call it is chosen for writes `falling back to MiniMax (China)` to the function log, so `supabase functions logs <fn>` answers "did any of this go to China, and when"
+- `docs/privacy.html` says so, in the paragraph and in the table
+
+To arm it, set the secret. It was unset on 4 September, so until this is run the fallback exists in code and does nothing:
+
+```bash
+supabase secrets set MINIMAX_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
+```
+
+To disarm it, unset the secret. No deploy either way. A function only carries the fallback once it has been redeployed with the new `textmodel.ts` copy: `yaad-sketch` and `yaad-report` were, on 5 September; the other seven text callers run the no-fallback copy until they are.
+
+If a provider ever needs changing again, use the four `TEXT_MODEL_*` secrets, which take priority over everything and need no deploy.
 
 **If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. See step one, which is where that goes wrong.
 
@@ -3914,3 +3932,108 @@ correcting one is ordinary. Doing it silently would not be.
 
 Materials is refused a section, here and everywhere: it is its own thing on
 `evidence.kind` and the database constraint will not take a phase on it.
+
+## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
+
+The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
+It is imported by `yaad-sketch` and `yaad-report`, and the identical text sits
+inside `has_measurement()` in the database. The refusal message quotes the
+sentence it objected to. Read that sentence against what the rule catches:
+
+- a number in digits, with or without a hyphen, followed by a unit of length
+  or area: m, cm, mm, km, metre(s), meter(s), ft, ft2, foot, feet, yd(s),
+  yard(s), inch(es), acre(s), sq ft, sq m, square metres, m2, m²
+- a number written as a word (one to ninety, half, quarter, "two and a half")
+  followed by metre(s), foot, feet, inch(es), yard(s)
+- a feet or inch mark after a digit: 6', 8", 6'6"
+
+Not caught, on purpose: a bare "in" ("1 in 5 tiles"), and "meter" or
+"meters" after a number WORD, because "two meters on the outside wall" is the
+electricity meter. Digits still catch "3 meters".
+
+If the sentence is a real measurement, reword it in words ("a full height
+crack", "most of the ceiling") or refer it to a surveyor. If it is a false
+positive, do not widen the exception by hand. Add the sentence to the case
+list in `measurements_test.ts` as a clean case, watch the test go red, and
+then change the pattern in `measurements.ts`. The same string then has to go
+into a new migration inside `$re$` dollar quotes, because the test reads the
+newest migration that defines `has_measurement()` and fails if the two differ
+by one character. That is the point of it. Then run
+`supabase/functions/sync-shared.sh` and redeploy `yaad-sketch` and
+`yaad-report`, or the thing you tested is not the thing that is running.
+
+Verify the live database is on the repo's pattern without reading it by eye:
+
+```bash
+md5 -q <(deno eval 'import {MEASUREMENT_PATTERN as A} from "./supabase/functions/_shared/measurements.ts"; Deno.stdout.writeSync(new TextEncoder().encode(A))')
+```
+
+and compare with `select md5(split_part(pg_get_functiondef('public.has_measurement(text)'::regprocedure), '$re$', 2))`. Same hash, same rule. Set 5 September 2026, the day the rule was tested by hand for the first time and let "a 2-metre crack" through every layer.
+
+## Describe the stills hangs, then the desk says 504 or nothing at all
+
+Seen on the first real walkthrough, 5 September 2026 at 23:22 and 23:40. The
+edge log showed a 504 and then a 546 for `yaad-sketch`, and the function log
+showed nothing from the function itself, because NVIDIA took the request and
+never answered it and the fetch had no deadline, so the platform killed the
+function before the code got control back.
+
+Fixed 6 September 2026, two halves:
+
+- `yaad-sketch` "frames" now gives NVIDIA forty seconds, tries once more on a
+  timeout or a 5xx, and logs `yaad-sketch frame: nvidia gave no answer in 40s`
+  when it happens. Two goes fit inside the platform limit with room to answer.
+- The desk sends three stills per call instead of six. Same twelve stills,
+  four calls instead of two, each one well inside the deadline. Deployed with
+  `npm run deploy --prefix concierge-deploy` after copying the source in.
+
+If it still hangs: the log line above tells you it is NVIDIA and not us. Drop
+the still count to eight, or try again in a minute. The stills are still on
+the machine; nothing has to be pulled again.
+
+**What to film so the pack comes out right.** Twelve stills spaced evenly
+through the video is what the desk pulls, so the video has to be the kind
+twelve evenly spaced stills can describe: one slow walk, every room entered,
+a few seconds standing in each, phone held level and landscape, lights on,
+doorways in shot as you pass through them, because "connects to" is read from
+what is visible. Do not film the house number, any paperwork or anybody's
+face; the prompt is told to refuse those and the frame is wasted. A shaky
+thirty second sprint gives twelve blurred stills and a pack of "too blurred to
+judge".
+
+## The text model says 401 Invalid API Key
+
+Seen 5 September 2026 at 23:23 and again 6 September at 07:03, on
+`yaad-inbound` and on the RUNBOOK §9 proof call. Every text agent is out
+while this is true: every WhatsApp reply, every draft, every report. It is
+not a rate limit, and no retry or fallback helps: a 401 is refused the same
+way every time and the failover deliberately does not catch it.
+
+```bash
+supabase functions logs
+```
+
+is not a command in this CLI version. Read the log with the Supabase MCP
+`query_logs` tool or the dashboard, filter `function_logs` for
+`mistral http 401`.
+
+The fix is the key, nothing else: a live key from the Mistral console, set as
+`MISTRAL_API_KEY`, then the §9 proof call until `read` stops being null.
+Yaadly never sees the key value in chat, so this step is Monique's.
+
+## 25. The site inspection report will not build
+
+The desk flow is Pull the stills, Describe, name the rooms, Build the pack, Add the map. Each step fails in its own way, and the log names which. Read it with the function id for `yaad-sketch`, or `supabase functions logs yaad-sketch --project-ref leffyisvfvjwzilydlwf`.
+
+- **Pull the stills says MP4 only, or every still is black.** The video is an iPhone .mov (HEVC). Send it to yourself on WhatsApp and use the copy that comes back, which is an MP4. No code is involved.
+- **Describe stops on one still, or says N of 12 described.** The log line `yaad-sketch frame:` says what the model answered. "not in JSON, asking once more strictly" is normal and self-healing. "not in JSON, twice" on many stills means the model has changed behaviour; check `NVIDIA_SKETCH_MODEL` and the default in `_shared/visionmodel.ts`. "gave no answer in 40s" twice means NVIDIA is not answering; there is no second vision provider, so wait.
+- **The pack has the wrong rooms.** Not a bug: name them. Click the stills for a room, type the name, Apply, repeat. The server merges same-named rooms and will not split a name you gave.
+- **Build the pack says not in JSON.** The text model's answer had no JSON object after its thinking. The log line `yaad-sketch assemble:` shows the start of the answer. If the provider was MiniMax, `answerText()` should have stripped the `<think>` block; if the block has changed shape, that helper in `_shared/textmodel.ts` is the place.
+- **Add the map.** No key is needed. With no `GOOGLE_MAPS_API_KEY` set, the map comes from OpenStreetMap: the address is geocoded by Nominatim, a three by three grid of tiles is fetched, and they are assembled into one SVG with a marker. Both services are the OpenStreetMap Foundation's, in the EU, free, no account. If it says no map could be made, Nominatim did not recognise the address: try it more plainly, with the parish, for example "Hope Road, Kingston, Jamaica".
+- **To use Google's aerial imagery instead**, which is better for showing a roof, set a key and the function switches to it on its next call, no deploy. Google's free monthly credit covers this volume many times over, but a card must be on the account before it will serve anything. **Claude cannot do this step: it needs the founder's own Google account and card.** In Google Cloud Console: create a project, APIs and Services then Library then enable **Maps Static API**, Credentials then Create credentials then API key, restrict that key to the Maps Static API, and Billing then link a payment account. Then:
+
+```bash
+supabase secrets set GOOGLE_MAPS_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
+```
+
+  "Google would not give a map for that address" means the key is restricted away from the Maps Static API or has no billing account behind it. Unset the secret and the free OpenStreetMap map comes back.

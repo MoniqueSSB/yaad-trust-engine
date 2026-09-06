@@ -82,7 +82,7 @@
   <div class="sec">
     <h2 class="hx">Two things we will not soften</h2>
     <div class="gapcard">
-      <p><b>One. Our text drafting model is Mistral, in the European Union, since 4 September 2026.</b> Text you send us, meaning job descriptions, messages and voice note transcripts, is processed there when a draft is produced. Until that date this model was MiniMax, in China, and this page said so plainly rather than burying it. It is named here now for the same reason: you are entitled to know where your words went, including after it changes. <b>Not everything is in the European Union.</b> Photographs of your property are analysed by NVIDIA in the United States, and voice notes are transcribed by Cloudflare with providers in the United States standing behind it. The table below is the full list, and it is the honest one.</p>
+      <p><b>One. Our text drafting model is Mistral, in the European Union, since 4 September 2026.</b> Text you send us, meaning job descriptions, messages and voice note transcripts, is processed there when a draft is produced. Until that date this model was MiniMax, in China, and this page said so plainly rather than burying it. It is named here now for the same reason: you are entitled to know where your words went, including after it changes. <b>MiniMax is kept as a fallback.</b> If our Mistral access is ever not configured, or if Mistral refuses a request, whether with a rate limit after we have retried it or by rejecting our access key, that drafting call goes to MiniMax in China, and every such call is written to our own logs so we can say afterwards which messages went there. It is not used while Mistral is configured and answering. Reinstated 5 September 2026, and disclosed here on the same day. <b>Not everything is in the European Union.</b> Photographs of your property are analysed by NVIDIA in the United States, and voice notes are transcribed by Cloudflare with providers in the United States standing behind it. The table below is the full list, and it is the honest one.</p>
       <p style="margin-top:12px"><b>Two. Identity documents are never sent to any artificial intelligence model.</b> The government photo identity document, the live selfie and the face video are blocked in our code before they are even downloaded from storage. There is no setting that turns this off. Persona holds the identity check. The supporting paperwork, meaning proof of address, TRN, certificates, CV and portfolio, is reviewed by a model <b>only</b> where the applicant granted consent, and an unanswered question counts as a refusal.</p>
     </div>
   </div>
@@ -104,6 +104,9 @@
         <tr><td>OpenAI, Deepgram, ElevenLabs Scribe, AssemblyAI</td><td>Voice note transcription, used as failover behind Cloudflare</td><td>United States</td></tr>
         <tr><td>NVIDIA</td><td>Image analysis of job photographs</td><td>United States</td></tr>
         <tr><td>Mistral</td><td>Text drafting</td><td>European Union</td></tr>
+        <tr><td>MiniMax</td><td>Text drafting, fallback only, when Mistral is not configured or refuses the request</td><td>China</td></tr>
+        <tr><td>OpenStreetMap</td><td>The map on a site inspection report. Only the property address is sent, only when a map is requested for that report</td><td>European Union</td></tr>
+        <tr><td>Google Maps</td><td>The same map, only if we have configured a Google key in place of OpenStreetMap. Not in use by default</td><td>United States</td></tr>
         <tr><td>GitHub Pages</td><td>This website</td><td>United States</td></tr>
       </tbody>
     </table></div>

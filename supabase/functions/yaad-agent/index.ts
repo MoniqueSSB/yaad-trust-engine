@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 
 // Model and endpoint come from _shared/textmodel.ts. See that file for why.
 
@@ -153,20 +153,18 @@ Deno.serve(async (req) => {
       "gen_ai.operation.name": "chat",
       "gen_ai.request.temperature": resolvedMode === "classify" ? 0 : 0.2,
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model,
-          messages: [
-            { role: "system", content: sys },
-            { role: "user", content: String(text || "").slice(0, 6000) }
-          ],
-          temperature: resolvedMode === "classify" ? 0 : 0.2
-        })
-      });
-      const j = await r.json();
+      // Retries, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        messages: [
+          { role: "system", content: sys },
+          { role: "user", content: String(text || "").slice(0, 6000) }
+        ],
+        temperature: resolvedMode === "classify" ? 0 : 0.2
+      }, { timeoutMs: 60_000, retries: 2, maxRetryWaitMs: 15_000 });
+      let j: any = {};
+      try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
       s.setAttributes({
+        ...providerAttrs(provider),
         "http.response.status_code": r.status,
         "gen_ai.response.model": j?.model,
         "gen_ai.response.finish_reasons": j?.choices?.[0]?.finish_reason,
@@ -179,7 +177,7 @@ Deno.serve(async (req) => {
       // produced a silent failure across four functions and there was nothing
       // to read. console.error alongside the span, same as yaad-inbound.
       if (!r.ok) {
-        const msg = `yaad-agent: ${prov.name} http ${r.status}: ${JSON.stringify(j).slice(0, 200)}`;
+        const msg = `yaad-agent: ${provider.name} http ${r.status}: ${JSON.stringify(j).slice(0, 200)}`;
         s.recordError(msg); console.error(msg);
       }
       return j?.choices?.[0]?.message?.content ?? JSON.stringify(j);
