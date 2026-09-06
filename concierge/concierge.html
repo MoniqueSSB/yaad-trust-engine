@@ -3226,7 +3226,8 @@ const SETTING_META = {
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
   ntfy_topic:           ["Where intake alerts go", "yaad-inbound pushes to this topic. Reference, trade and parish only, never personal data.", false],
-  desk_url:             ["This desk's address", "Written into the links the functions send you.", false],
+  desk_url:             ["This desk's address", "Written into the links the functions send you, and set as the tap target on every phone notification. Store it bare, with no quote marks: it sat here as <span class=\"mono\">&quot;https://concierge.yaadly.co.uk&quot;</span> until 6 Sep 2026, quotes included, which this view stripped for display while the functions read it raw and built broken links from it.", false],
+  desk_sms:             ["Your own mobile, for the ones that need you", "When a conversation needs a person, Twilio texts this number with what the client actually said, so you can act without opening the desk. Only the ones that need you: handovers, a held thread writing again, a reply held back, a job that would not save. Not every message, because that is how a phone gets muted. Needs an SMS capable Twilio number in TWILIO_SMS_FROM or nothing sends, see RUNBOOK 10e. Leave empty to switch texts off.", false],
   admin_email:          ["The address this desk answers to", "is_admin() is what actually gates the data. This row is for the functions to write to.", false],
   sketch_stamp:         ["The stamp on every sketch pack", "sketch_guard_approval puts this on the document and refuses to approve a pack carrying a measurement.", false],
   purge_cron_secret_sha256: ["Deletion clock secret, hashed", "A SHA-256, never the secret itself. yaad-vetting-purge compares against it so a caller cannot run the deletion clock without the real value.", false],
@@ -3235,6 +3236,7 @@ const SETTING_GROUP = {
   agents_paused:"Agents", trade_list:"Agents",
   worker_guidelines_version:"Documents in force", client_guidelines_version:"Documents in force", sketch_stamp:"Documents in force",
   ntfy_topic:"Notifications and addresses", desk_url:"Notifications and addresses", admin_email:"Notifications and addresses",
+  desk_sms:"Notifications and addresses",
 };
 
 const isBool = (v) => /^"?(true|false)"?$/i.test(String(v));

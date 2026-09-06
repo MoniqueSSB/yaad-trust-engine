@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The words reach her phone by text, and only when she has to act
+
+**Founder:** *"a message needs to reach me on my phone than in the desk. But I'm not on the desk all the time."*
+
+**The push told her something was waiting and never what it was**, so every notification still ended at a laptop, which is the same complaint as the missing `Click` header one layer up. Four routes were real and she picked between them knowing the trade, because this is a data protection decision and not a technical one.
+
+**SMS, because Twilio already carries every one of these messages.** Texting her adds no new company holding a client's words. Putting the words into the ntfy push would have, and that is why the push still carries a reference and a reason and never a client's sentence: ntfy.sh is a public relay and the 39 character topic name is the only thing standing between a stranger and every message Yaadly has ever received. WhatsApp to her own number reads better, carries photographs, plays voice notes, and would have gone quiet most of the time, because Meta's 24 hour customer service window applies to her exactly as it applies to a client and she is not messaging the Yaadly number daily; making it reliable means a Meta approved template, which is an approval queue, not an afternoon. Email adds nobody either and is the easiest thing in the world to lose at 11pm.
+
+**Only five notifications text her, and that is the half of the decision that will age best.** Handed to a person, a held thread writing again, a job that would not save, a reply held back by the language screen, and a web chat moving to WhatsApp. Every message from every stranger is how a phone gets muted, and a muted phone loses a real job later. The push still fires for everything, so nothing is hidden; the text is reserved for the cases where she is the only one who can act. The rule lives at each call site as `alsoText`, not as a condition inside `pushToDesk`, so adding a notification means deciding this on purpose rather than inheriting it.
+
+**One of the five deliberately carries no client words.** A reply held back by the guardrail screen is a blocked *draft*, which the model wrote, and `alertDeskBlocked` has always sent only the fixed closed set of guidance strings. The client is still waiting, so she is still texted; what she is not sent is a sentence Yaadly refused to say.
+
+**It is inert until a number exists, and it says so.** `TWILIO_SMS_FROM` was not set when this was written, checked against the live secret list, and the WhatsApp sender cannot send a plain text. So `textTheDesk` logs, in as many words, that `desk_sms` is set and the Twilio number is not. A silent no-op would have been the worst outcome available: a number typed into the desk, an expectation of texts, and nothing ever arriving. `RUNBOOK.md` §10e carries the two steps and the Twilio error codes.
+
+**The text and the push cannot take each other down.** They fail for different reasons, a missing topic and a missing Twilio number, and `yaad-enquiry`'s own comment records making exactly this mistake in the other direction: its push was fetched first and returned early when no topic was configured, which took its email with it. The text is sent before the no-topic bail out, and a test asserts that ordering.
+
+---
+
 ## 2026-09-06 · Every phone push opens the desk, and an urgent one says why
 
 **Founder, the same evening:** *"how am I being informed people need help, I should get a notification on my phone stating to check the dashboard."*

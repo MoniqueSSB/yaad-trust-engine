@@ -144,7 +144,7 @@ Deno.test("a question does not arrive in her inbox dressed as a job", () => {
   assert(src.includes("worthTelling && !justAsking ? notifyAdmin("),
     "the job brief email fires for questions again");
   // The phone push still fires. Knowing somebody wrote in is worth a buzz.
-  const push = src.slice(src.indexOf("const pushToPhone"), src.indexOf("const pushToPhone") + 1800);
+  const push = src.slice(src.indexOf("const pushToPhone"), src.indexOf("const pushToPhone") + 2600);
   assert(push.includes("justAsking ? `A question on"),
     "the phone push no longer tells her a question is a question");
   assert(!/justAsking\s*\n?\s*\?\s*`\$\{jobId\}/.test(push),
@@ -189,8 +189,8 @@ Deno.test("there is one push path, and it carries the link", () => {
   assert(body.includes('headers.Click = cfg.desk_url'),
     "the push no longer sets ntfy's Click header, so tapping the notification " +
     "does nothing, which is the entire complaint this was built for");
-  assert(/readSettings\(supabase, \["ntfy_topic", "desk_url"\]\)/.test(body),
-    "pushToDesk is no longer reading desk_url alongside the topic");
+  assert(/readSettings\(supabase, \["ntfy_topic", "desk_url", "desk_sms"\]\)/.test(body),
+    "pushToDesk is no longer reading desk_url and desk_sms alongside the topic");
   assert(body.includes("if (!cfg.ntfy_topic) return;"),
     "pushToDesk no longer bails out when no topic is configured");
 });
@@ -276,4 +276,83 @@ Deno.test("a setting is not trusted to have been written cleanly", () => {
   assertEquals(src.match(/from\("app_settings"\)\s*\n?\s*\.select\("key,value"\)/g)?.length, 1,
     "app_settings is being read outside readSettings, so one of the readers " +
     "will trust a value the other one knows better than to trust");
+});
+
+// ── 6 September 2026, the words reach her phone ──────────────────────────
+//
+// Founder: "a message needs to reach me on my phone than in the desk. But I'm
+// not on the desk all the time."
+//
+// The push told her something was waiting. It never told her what was said, so
+// every notification still ended at a laptop. She chose a text message over
+// the other three routes: Twilio already carries every one of these messages
+// so it adds no new company holding client words, where ntfy.sh is a public
+// relay whose topic name is the only thing between a stranger and everything.
+
+Deno.test("only the notifications she must act on carry the client's words", () => {
+  // The rule lives at the call sites, not in a condition inside pushToDesk,
+  // so adding a notification means deciding this on purpose.
+  const texted = src.match(/alsoText:/g) ?? [];
+  assertEquals(texted.length, 5,
+    "the set of notifications that text her has changed. Five are meant to: " +
+    "handed over, they wrote again on a held thread, a job did not save, a " +
+    "reply was held back, and a web chat moved to WhatsApp. Every message from " +
+    "every stranger is how a phone gets muted");
+  // The informational ones must stay silent. If this catches, someone has
+  // started texting her about greetings.
+  const push = src.slice(src.indexOf("const pushToPhone"), src.indexOf("const pushToPhone") + 2600);
+  assert(/alsoText: handingOver\s*\n?\s*\?/.test(push),
+    "the main push texts her whether or not the thread was handed over, so " +
+    "she now gets a text for every first message from every stranger");
+});
+
+Deno.test("a text carries what they actually said", () => {
+  // The whole point. A notification that says something is waiting and not
+  // what it is still ends at a laptop.
+  const at = src.indexOf("const said = msg.text.trim().slice(0, 700);");
+  assert(at > 0, "the client's own words are no longer quoted into the text");
+  assert(src.includes('They said:\\n"${said}"'),
+    "the handover text no longer quotes them");
+});
+
+Deno.test("a blocked reply texts her without quoting anything a model wrote", () => {
+  // What was blocked is the DRAFT. The guidance strings are a fixed closed
+  // set, which is the rule alertDeskBlocked has always followed for its push.
+  const at = src.indexOf("async function alertDeskBlocked(");
+  assert(at > 0, "alertDeskBlocked is gone");
+  const body = src.slice(at, at + 1400);
+  assert(body.includes("alsoText:"), "a held back reply no longer texts her, and the client is waiting");
+  assert(!/alsoText[\s\S]{0,400}msg\.text/.test(body),
+    "the blocked reply text is quoting the message, where the thing that was " +
+    "blocked is the model's own draft");
+});
+
+Deno.test("the text is bounded, and says so when it cannot send", () => {
+  const at = src.indexOf("async function textTheDesk(");
+  assert(at > 0, "textTheDesk is gone");
+  const body = src.slice(at, at + 2200);
+  assert(body.includes("body.slice(0, 1500)"),
+    "the text is unbounded, so a long voice note transcript is rejected by " +
+    "Twilio rather than trimmed");
+  assert(body.includes('Deno.env.get("TWILIO_SMS_FROM")'),
+    "textTheDesk is no longer reading the SMS number");
+  assert(/console\.error\(\s*\n?\s*"textTheDesk: desk_sms is set but /.test(body),
+    "a missing Twilio number now fails silently, which from her side is a " +
+    "number set on the desk and no texts ever arriving");
+  assert(body.includes('if (!to) return;'),
+    "textTheDesk no longer treats an empty desk_sms as switched off");
+});
+
+Deno.test("the text and the push cannot take each other down", () => {
+  // yaad-enquiry's own comment records making this mistake: the push was
+  // fetched first and returned early when no topic was configured, which took
+  // the email with it. They fail for different reasons.
+  const at = src.indexOf("async function pushToDesk(");
+  const body = src.slice(at, at + 2600);
+  const textAt = body.indexOf("await textTheDesk(");
+  const bailAt = body.indexOf("if (!cfg.ntfy_topic) return;");
+  assert(textAt > 0 && bailAt > 0, "one of the two notification paths is gone");
+  assert(textAt < bailAt,
+    "the text is sent after the no-topic bail out, so not configuring ntfy " +
+    "silently switches off her text messages too");
 });

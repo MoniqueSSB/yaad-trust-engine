@@ -1297,6 +1297,71 @@ async function readSettings(supabase: SettingsReader, keys: string[]): Promise<R
     [r.key, String(r.value ?? "").trim().replace(/^"(.*)"$/, "$1")]));
 }
 
+/** Text the desk's own phone, with the client's actual words in it.
+ *
+ *  Founder, 6 September 2026: "a message needs to reach me on my phone than in
+ *  the desk. But I'm not on the desk all the time."
+ *
+ *  The ntfy push tells her something is waiting. It does not tell her what was
+ *  said, so every notification still ended at a laptop. This carries the words.
+ *
+ *  WHY SMS AND NOT THE OTHER THREE. She chose it, given the trade. Twilio
+ *  already carries every one of these messages, so texting her adds no new
+ *  company holding client words: ntfy.sh would have, and it is a public relay
+ *  whose topic name is the only thing standing between a stranger and every
+ *  message. WhatsApp to her own number reads better and would have gone quiet
+ *  most of the time, because Meta's 24 hour window applies to her as much as to
+ *  a client and she is not messaging the Yaadly number daily. Email adds
+ *  nobody either but is the easiest thing in the world to lose at 11pm.
+ *
+ *  ONLY WHEN SHE MUST ACT. Also her decision, and the important half of it.
+ *  Every message from every stranger is how a phone gets muted, and a muted
+ *  phone loses a real job later. Callers opt in per notification by passing
+ *  `alsoText`, so the rule is visible at the call site rather than hidden in a
+ *  condition here.
+ *
+ *  It needs an SMS capable Twilio number in TWILIO_SMS_FROM. That was NOT set
+ *  when this was written, checked against the live secret list, so this stays
+ *  inert and says so in the log rather than failing quietly. RUNBOOK.md §10e. */
+async function textTheDesk(cfg: Record<string, string>, body: string, trace: Trace): Promise<void> {
+  const to = (cfg.desk_sms ?? "").replace(/[^\d+]/g, "");
+  if (!to) return;
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const from = Deno.env.get("TWILIO_SMS_FROM") ?? "";
+  if (!sid || !tok || !from) {
+    // Loud, because the failure is invisible from her side: she set a number
+    // on the desk, she is expecting texts, and nothing arrives.
+    console.error(
+      "textTheDesk: desk_sms is set but " +
+      (!from ? "TWILIO_SMS_FROM is not" : "the Twilio credentials are not") +
+      ". No text was sent. Buy an SMS capable Twilio number and set the secret, see RUNBOOK.md 10e.",
+    );
+    return;
+  }
+  try {
+    await trace.span("twilio.send.sms.desk", SpanKind.CLIENT, {
+      "server.address": "api.twilio.com", "messaging.system": "twilio",
+    }, async (sp) => {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
+        // 1500, inside Twilio's 1600 character ceiling for a concatenated
+        // message, so a long voice note transcript is trimmed rather than
+        // rejected outright. The whole thing is on the thread either way.
+        body: new URLSearchParams({ To: to, From: from, Body: body.slice(0, 1500) }),
+        signal: AbortSignal.timeout(4000),
+      });
+      sp.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) console.error(`textTheDesk: twilio ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    });
+  } catch (e) {
+    // Same rule as every other notification here: it must never cost somebody
+    // their message.
+    console.error("textTheDesk: threw:", String(e).slice(0, 200));
+  }
+}
+
 /** Every phone push goes through here, and every one of them opens the desk.
  *
  *  Founder, 6 September 2026: "how am I being informed people need help, I
@@ -1319,11 +1384,23 @@ async function readSettings(supabase: SettingsReader, keys: string[]): Promise<R
  *  will not send must never cost somebody their message. */
 async function pushToDesk(
   supabase: SettingsReader,
-  note: { title: string; body: string; priority?: "default" | "high" | "urgent"; tags?: string },
+  note: {
+    title: string; body: string;
+    priority?: "default" | "high" | "urgent"; tags?: string;
+    /** The full text to send to her own phone, WITH the client's own words in
+     *  it. Present only on notifications she has to act on. Absent means the
+     *  push is informational and no text goes. See textTheDesk. */
+    alsoText?: string;
+  },
   trace: Trace,
 ): Promise<void> {
   try {
-    const cfg = await readSettings(supabase, ["ntfy_topic", "desk_url"]);
+    const cfg = await readSettings(supabase, ["ntfy_topic", "desk_url", "desk_sms"]);
+    // The text goes first and independently of the push. They fail for
+    // different reasons (a missing topic, a missing Twilio number) and neither
+    // should be able to take the other down with it, which is the mistake
+    // yaad-enquiry's own comment records making with its push and its email.
+    if (note.alsoText) await textTheDesk(cfg, note.alsoText, trace);
     if (!cfg.ntfy_topic) return;
     await trace.span("ntfy.push", SpanKind.CLIENT, {
       "server.address": "ntfy.sh", "yaadly.push.linked": !!cfg.desk_url,
@@ -1550,6 +1627,12 @@ async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace, 
         + "holding message and is waiting on a person. Reason: "
         + [...new Set(findings.map((f) => f.guidance))].join(" ")
         + " The draft is in the yaad-inbound function log.",
+      // No client words here, and that is not an oversight. What was blocked
+      // is the DRAFT, which the model wrote, and the guidance strings are a
+      // fixed closed set. The client is still waiting, so she is still texted.
+      alsoText: `Yaadly, a ${where} reply was held back and not sent. The client got a holding message and is waiting on a person. Reason: `
+        + [...new Set(findings.map((f) => f.guidance))].join(" ")
+        + " Open the desk to answer them.",
     }, trace);
   } catch (e) {
     // A failed notification must never become a failed reply. The block itself
@@ -2826,6 +2909,9 @@ Deno.serve(async (req: Request) => {
         priority: "high",
         tags: "raising_hand",
         body: `${heldJobId ? `${heldJobId}: ` : ""}waiting on you. The assistant is standing down until the desk hands the thread back.`,
+        // Always texted. This thread is already hers: the assistant is silent
+        // on this number, so if she does not read it nobody does.
+        alsoText: `Yaadly, they wrote again${heldJobId ? ` on ${heldJobId}` : ""}.\n\nThey said:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown sender"} on ${msg.channel}. The assistant is standing down until you hand it back.`,
       }, trace);
       root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
       if (isTwilio) {
@@ -2907,6 +2993,7 @@ Deno.serve(async (req: Request) => {
               priority: "high",
               tags: "raising_hand",
               body: `${ref}: the person you were replying to on the website has carried on by WhatsApp. The whole conversation is on the thread, held for you.`,
+              alsoText: `Yaadly, ${ref} moved to WhatsApp.\n\nThe person you were replying to on the website has carried on from ${msg.from || "an unknown number"}. The whole conversation came with them and is held for you.`,
             }, trace);
             return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Someone at Yaadly was already on this one and will come back to you on this number.`);
           }
@@ -3290,6 +3377,9 @@ Deno.serve(async (req: Request) => {
         priority: "urgent",
         tags: "rotating_light",
         body: `${jobId}: somebody wrote in on ${msg.channel} and the job row would not write. The conversation is kept and they have been told you will pick it up. Nothing else will chase this.`,
+        // The one failure nobody else notices. Their words go in the text
+        // because the row that would have held them does not exist.
+        alsoText: `Yaadly, urgent. ${jobId} would not save.\n\nThey said:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown sender"} on ${msg.channel}. The conversation is kept and they were told you will pick it up. Nothing else chases this.`,
       }, trace);
 
       const sorry = "Thanks, I have got your message and I have kept it. Something went wrong writing it up at our end, "
@@ -3413,7 +3503,15 @@ Deno.serve(async (req: Request) => {
       : agentsPaused ? `${jobId}: the assistant is paused at the desk, so this one is yours.`
       : `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`;
 
+      // Her own phone, with their words in it, only when she has to act.
+      // said() is the quote; everything around it is what she needs to act
+      // from a bus stop: who, where, and the one link that opens the thread.
+      const said = msg.text.trim().slice(0, 700);
+      const who = msg.channel === "web" ? "the website chat" : (msg.from || "an unknown sender");
       await pushToDesk(supabase as unknown as SettingsReader, {
+        alsoText: handingOver
+          ? `Yaadly needs you.\n\n${waiting}\n\nThey said:\n"${said}"\n\nFrom ${who} on ${msg.channel}. Reply in the desk, it goes back from the Yaadly number.`
+          : undefined,
         title: stage === "done"
           ? `New ${msg.channel} job`
           : handingOver ? `Needs you: ${msg.channel}`

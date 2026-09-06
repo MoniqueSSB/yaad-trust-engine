@@ -412,6 +412,40 @@ Both must be set. `ntfy_topic` is the private topic name, `desk_url` is `https:/
 
 ---
 
+## 10e. You are not getting the texts
+
+When a conversation needs a person, Twilio texts `app_settings.desk_sms` with what the client actually said, so you can act without opening the desk. It needs two things and **the second one was not set when this was built**.
+
+1. **Your number, on the desk.** Settings, "Your own mobile, for the ones that need you". Full international form, `+447...`. Empty switches texts off entirely.
+2. **An SMS capable Twilio number, in `TWILIO_SMS_FROM`.** Buy one in the Twilio console (Phone Numbers, Buy a number, tick SMS), then:
+
+```bash
+supabase secrets set TWILIO_SMS_FROM="+44..." --project-ref leffyisvfvjwzilydlwf
+```
+
+Then redeploy anything that reads it:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+The WhatsApp number will not work here. WhatsApp and SMS are different Twilio products and a WhatsApp sender cannot send a plain text.
+
+**If your number is set and nothing arrives**, the function log says so in as many words. Look for `textTheDesk:` in the `yaad-inbound` logs:
+
+- `desk_sms is set but TWILIO_SMS_FROM is not`. Step 2 above.
+- `twilio 21606` or `21659`. The From number is not SMS capable, or not yours. Buy a proper one.
+- `twilio 21408`. Your Twilio account is not permitted to send to that country. Enable the UK in Twilio's Geo Permissions.
+- Nothing at all in the log, so no notification fired. That means the conversation was not one that needs you. Only five do: handed to a person, a held thread writing again, a job that would not save, a reply held back by the language screen, and a web chat moving to WhatsApp. Everything else is push only, on purpose.
+
+**Why only those five.** Every message from every stranger is how a phone gets muted, and a muted phone loses a real job later. The push still fires for all of them, so nothing is hidden; the text is reserved for the ones where you are the only one who can act.
+
+**What is in a text.** The reason, the client's own words up to 700 characters, which number and channel it came from, and nothing else. It is trimmed to 1500 characters because Twilio rejects more. The full thread is always on the desk.
+
+**Why SMS rather than the alternatives**, so nobody re-litigates it in six months. Twilio already carries every one of these messages, so texting adds no new company holding client words. Putting the words in the ntfy push would have: ntfy.sh is a public relay and the topic name is the only thing between a stranger and every message, which is why that push still carries a reference and a reason and never a client's sentence. WhatsApp to your own number reads better and would go quiet most of the time, because Meta's 24 hour window applies to you exactly as it applies to a client. Email adds nobody either and is the easiest thing in the world to lose at 11pm.
+
+---
+
 ## Publishing a worker profile
 
 **The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.
