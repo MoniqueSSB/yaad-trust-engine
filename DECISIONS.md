@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The homepage leads with the crew and the gate, and the two doors go back to being lit
+
+**Implemented from the founder's own Claude Design file, "Yaadly Home - Crew".** The design was read off the design project rather than rebuilt from a screenshot, so the colours, radii, timings and copy below are hers, not an interpretation. Three things landed: a new hero, a band showing the four assistants running a wire into a gold gate, and a restyle of the two doors. The `_ds_bundle.js` and `support.js` the file imports were checked and deliberately not brought across. The bundle's manifest declares no tokens and no global CSS, so it contributes nothing to how the page looks, and `support.js` is the design canvas runtime that interprets `<x-dc>`, `<sc-if>` and `style-hover`. Those became ordinary markup and real `:hover` rules here.
+
+**The hero now says the governing rule instead of the service.** "Four assistants draft. One named person decides." is CLAUDE.md §2 as a headline, and the crew band under it is the same sentence drawn: four purple badges, a wire with three pips travelling it, then a gold bar and a Y that the wire stops at. Naming the assistants Scope, Papers, Evidence and Chase is new on the marketing site, but it is a wrapper over what `/how-we-use-ai` already publishes as M1 to M7, not a new claim, and each one's line was taken from that page's own wording. It carries a hidden `h2` because the band has no visible heading and the page still needs one heading per section.
+
+**The doors are lit again, which reverses a note from three days earlier.** On 3 September the doors were flattened to an editorial card on founder feedback that pill badges, rounded corners, watermark glows and hover lift read as playful. This design puts all four back. That is a reversal made by the person who made the original call, on a page whose hero and crew band are both now lit, so the flat card was the odd one out rather than the restrained one. The old note is kept in the CSS comment above `.doors` so the argument survives the change.
+
+**Three things in the design were not copied, and each has a reason.** Its nav is a simplified five-item row; the site nav is one shared file across twelve pages by deliberate decision (`docs/nav.css`), so it was left alone and only the page inside it changed. Its `--mute` and `--dim` are `#7878A8` and `#44446A`, the values retired on 3 September for failing AA against `--bg` at 4.8:1 and 2.2:1; the repo's accessible values were kept, and the design's supporting copy sits on them at 7.8:1. And its hero copy, "a named person signs off before you pay", was rewritten to "a named person at Yaadly reviews the finished work before you accept it", because `docs/COPY-GUIDELINES.md` §3 bans making the client's payment the trigger that moves a subcontractor's pay. The rewritten sentence is the one already in the page's own meta description.
+
+**The "What Yaadly does today, and what is coming" section came off the homepage, on the founder's instruction during the same change.** Its CSS comment asked that the Planned column be moved rather than deleted when something ships, which is about honesty over a roadmap and not about this page keeping the section forever. What left the homepage with it: the six Live now lines, the two Planned lines, and the paragraph explaining that you pay Yaadly and Yaadly pays the tradesperson. All of that is still published on `/marketplace`, `/payments` and `/faq`, and the footer links to each. If the homepage is ever the only page a reader sees, that paragraph is the one to bring back first.
+
+**Two things came out because nothing used them any more.** The mouse-tracking parallax orbs, replaced by two fixed radials behind the headline, and with them the only JavaScript on the page other than `chat.js`. And the baseline strip of five small claims under the doors, which the crew band now says once instead of twice.
+
+---
+
 ## 2026-09-05 · A voice note is transcribed once, above the worker/client fork, and the words are put on the message
 
 **Found by the founder sending one real voice note to the Yaadly number and getting the fixed opener back.** It asked her to describe the job, name the parish and say who can let a worker in, which is exactly what she had just said out loud. The thread recorded her message as `[message with no readable text, review manually]`.
