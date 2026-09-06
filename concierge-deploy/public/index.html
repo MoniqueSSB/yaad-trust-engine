@@ -293,10 +293,33 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
 .pthumb{position:relative;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--bg)}
 .pthumb.out{opacity:.28}
-.pthumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover}
+.pthumb.sel{outline:3px solid var(--teal);outline-offset:-3px}
+.pthumb.sel .n{background:#fff}
+.pthumb img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover;cursor:pointer}
 .pthumb .n{position:absolute;top:5px;left:5px;background:var(--teal);color:#160B2E;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px;font-family:var(--mono)}
 .pthumb .x{position:absolute;top:5px;right:5px;background:rgba(7,7,26,.82);color:#fff;border-radius:100px;width:22px;height:22px;font-size:13px;line-height:1}
 .pthumb .cap{padding:6px 8px;font-size:10.5px;color:var(--mute);line-height:1.35}
+.pthumb .roomedit{width:100%;font:600 11.5px var(--sans,inherit);color:var(--ink,inherit);background:transparent;border:0;border-bottom:1px dashed var(--line);padding:2px 0 3px;margin-bottom:3px;outline:none}
+.pthumb .roomedit:focus{border-bottom-color:var(--teal)}
+#skEdit .redit{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin:12px 0}
+#skEdit .rhead{display:flex;gap:9px;align-items:center;margin-bottom:9px}
+#skEdit .rhead input{flex:1;font-weight:700}
+#skEdit .rhead select{width:auto}
+#skEdit .rhead .cnt{color:var(--dim);font-size:11.5px;white-space:nowrap}
+#skEdit .rooombs{margin-bottom:12px}
+#skEdit .pedit{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+#skEdit .pedit .pic{position:relative;width:190px;flex:0 0 190px}
+#skEdit .pedit .pic img{width:100%;display:block;border-radius:8px}
+#skEdit .pedit .noimg{background:var(--bg);color:var(--dim);font-size:11px;text-align:center;padding:34px 8px;border-radius:8px}
+#skEdit .pedit .pn{position:absolute;top:5px;left:5px;background:var(--teal);color:#160B2E;font-size:10px;font-weight:700;border-radius:100px;padding:1px 8px}
+#skEdit .pedit .txt{flex:1;min-width:0}
+#skEdit .obs{border-left:2px solid var(--line);padding-left:9px;margin:7px 0}
+#skEdit .obsrow{display:flex;gap:7px;align-items:center;margin-top:4px;flex-wrap:wrap}
+#skEdit .obsrow select{width:auto;font-size:12px;padding:3px 6px}
+#skEdit .obsrow .pro{font-size:11.5px;color:var(--dim);display:flex;gap:4px;align-items:center;white-space:nowrap}
+#skEdit .btn.sm{font-size:11.5px;padding:4px 9px}
+#skEdit textarea{width:100%;font-size:13px}
+#skEdit label{font-size:11px}
 
 /* ---------- gate ---------- */
 .gate{min-height:100vh;display:grid;place-items:center;padding:22px}
@@ -502,15 +525,15 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   <p class="vsub">A record of what was filmed, never a survey. No measurement goes in one, and the database refuses to approve any that slips through. If a client needs dimensions, they need a surveyor.</p>
 
   <div class="card">
-    <div class="chd"><h3>Site Sketch Pack</h3><span class="chip warn dot">Indicative only</span></div>
+    <div class="chd"><h3>Site Inspection Report</h3><span class="chip warn dot">Indicative only</span></div>
     <div id="skMsg"></div>
 
-    <label>Walkthrough video</label>
-    <input id="skVideo" type="file" accept="video/*">
-    <p class="hint">The video stays on this machine. Only the stills you keep are ever sent anywhere.</p>
+    <label>Walkthrough videos (MP4 only) and photographs (JPG or PNG). Pick several at once, or add more later.</label>
+    <input id="skVideo" type="file" accept="video/mp4,.mp4,image/jpeg,image/png,.jpg,.jpeg,.png" multiple>
+    <p class="hint">Videos must be MP4: an iPhone .mov will not open in every browser, so send it to yourself on WhatsApp and use the copy it sends back. Each Pull adds to the stills already on the page, numbered on from the last one, so one report can hold several videos and photographs. Nothing leaves this machine until you click Describe, and then only the stills.</p>
 
     <div class="row" style="margin-top:13px">
-      <div><label>How many stills</label><input id="skCount" type="number" min="4" max="36" value="12"></div>
+      <div><label>How many stills, at most</label><input id="skCount" type="number" min="4" max="16" value="8" title="Never more than one still every three seconds of video, and never more than 16. A short video gets fewer."></div>
       <div><label>Property label, no address</label><input id="skLabel" placeholder="The Portmore house"></div>
     </div>
     <div class="row">
@@ -520,18 +543,32 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
     <div class="row">
       <div><label>Date filmed</label><input id="skDate" type="date"></div>
       <div><label>Walked by</label><input id="skWho" placeholder="Who was on site"></div>
+      <div><label>Conditions on the day</label><input id="skConditions" placeholder="Sunny, dry, after rain overnight"></div>
+      <div><label>Job reference, optional</label><input id="skJobRef" placeholder="JOB-2026-014"></div>
+      <div><label>Contractor, if one is appointed</label><input id="skContractor" placeholder="Nobody appointed yet"></div>
     </div>
     <div class="row">
       <div><label>Anything the reader should know, optional</label><input id="skContext" placeholder="Back bedroom was locked, could not get in"></div>
     </div>
-    <div class="brow"><button class="btn" id="skPull">Pull the stills</button></div>
+    <div class="row">
+      <div style="flex:1"><label>Site condition on the day, in your own words. One point per line, and they print as a list.</label><textarea id="skVisitNotes" rows="4" placeholder="Roof looked sound from the ground, no missing sheets visible.&#10;Back bedroom ceiling stained, worse in the corner by the window.&#10;Told the client a roofer should look at it in person."></textarea></div>
+    </div>
+    <div class="brow"><button class="btn" id="skPull">Pull the stills</button><button class="btn g" id="skClear">Start again</button></div>
     <p class="conseq">Pulling reads the video here, in this browser. <b>Nothing is uploaded at this step.</b></p>
   </div>
 
   <div class="card hidden" id="skFramesCard">
     <div class="chd"><h3 id="skFramesTitle">Stills</h3></div>
-    <p class="hint" style="margin:0 0 12px">Drop anything blurred, dark or pointing at nothing. Fewer good stills beat more bad ones.</p>
+    <p class="hint" style="margin:0 0 12px">Drop anything blurred, dark or pointing at nothing. Fewer good stills beat more bad ones. After Describe, the room name under each still can be typed over, and what you type is what the pack uses.</p>
     <div id="skThumbs" class="pgrid"></div>
+    <div class="hidden" id="skOneRoomRow" style="margin-top:12px">
+      <p class="hint" style="margin:0 0 8px">More than one room in the video? <b>Click the stills that belong to a room</b> to select them, type the room's name, Apply. Then select the next room's stills and do it again. With nothing selected, the name goes on every still.</p>
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1"><label id="skOneRoomLabel">Name every still</label><input id="skOneRoom" placeholder="Front bedroom"></div>
+        <div><button class="btn g" id="skOneRoomApply">Apply</button></div>
+      </div>
+      <p class="conseq" id="skApplied" style="min-height:1.4em;margin:6px 0 0"></p>
+    </div>
     <div class="brow" style="margin-top:15px">
       <button class="btn" id="skDescribe">Describe what is in them</button>
       <button class="btn g" id="skAssemble" disabled>Build the pack</button>
@@ -714,6 +751,131 @@ async function deskEditDescr(row, vals){
   const text = String(vals.descr || "").trim();
   if (!text) throw new Error("An empty description would lose what the client said. Leave it, or write the correction.");
   const { error } = await sb.from("jobs").update({ descr: text.slice(0, 8000) }).eq("id", row.id);
+  if (error) throw new Error(error.message);
+}
+
+/* ── A worker's public profile: the face, the voice and the work ───────────
+ *
+ * /apply has collected a photograph, a thirty second introduction and a
+ * portfolio file since 3 Sep 2026. All three sit in the PRIVATE vetting
+ * bucket and no client has ever seen one. 20260905b makes them publishable,
+ * and these three functions are the only way anything gets published.
+ *
+ * WHY IT IS A BUTTON HERE AND NOT AN AUTOMATIC STEP. Putting somebody's face
+ * and voice on the open internet is a decision, and the rule this whole
+ * product runs on is that a named human takes those. published_by records
+ * who. There is deliberately no path that publishes on approval, on a score,
+ * or on a nightly job.
+ *
+ * TWO GATES, and neither is in this file, on purpose:
+ *   the consent   public_worker_showcase tests showcase_consent = 'granted'
+ *                 on EVERY read, so a withdrawal empties a profile on the
+ *                 next page load whether or not the files are gone yet.
+ *                 deskPublishShowcase checks it too, so a mistake here is a
+ *                 refusal rather than a publication.
+ *   who may write storage policy "admins write the showcase bucket" plus RLS
+ *                 on worker_showcase. This page holds the publishable key
+ *                 like every other view; the database is what says no.
+ *
+ * THE FILE IS COPIED, NOT LINKED. The vetting original keeps its ninety day
+ * purge clock and is destroyed on time, which is what the applicant was told
+ * would happen. Serving a public profile straight out of that bucket would
+ * have meant a video that worked for three months and then vanished, and it
+ * would have meant a private bucket with a public door in it.
+ */
+
+// Which vetting documents may ever become public. Everything absent from this
+// list is a vetting paper and stays private: the photo ID, the selfie, the
+// face turn, proof of address, the TRN, the CV, the certificates. Adding to
+// this list is a legal decision, not a tidy-up. See CLAUDE.md section 6.
+const SHOWCASE_FROM = { profile_photo: "profile_photo", intro_video: "intro_video", portfolio: "work_file" };
+
+async function deskSetShowcaseConsent(row, vals){
+  const answer = String(vals.answer || "");
+  if (answer !== "granted" && answer !== "declined") throw new Error("Choose granted or declined. A blank is not an answer and would read as one.");
+  const { error } = await sb.from("worker_profiles").update({
+    showcase_consent: answer,
+    showcase_consent_at: new Date().toISOString(),
+    // The wording that earned it. Matches SHOWCASE_CONSENT_VERSION in
+    // web/app/apply/JoinFlow.tsx, and the two move together or every answer
+    // on file quietly starts meaning something nobody agreed to.
+    showcase_consent_version: String(vals.version || "showcase-v1").slice(0, 40),
+  }).eq("worker_email", row.worker_email);
+  if (error) throw new Error(error.message);
+}
+
+async function deskPublishShowcase(row){
+  // published_by is NOT NULL and is the record of who decided. If the session
+  // email is somehow missing, refusing is the right answer: a published file
+  // with nobody's name against it is worse than an unpublished one.
+  if (!SESSION_EMAIL) throw new Error("Cannot tell who is signed in, and this has to record who published it. Sign out and back in.");
+  if (String(row.showcase_consent || "") !== "granted") {
+    throw new Error("This worker has not agreed to a public profile. Record their answer first. Nothing is published on a blank.");
+  }
+  const cands = row._showcase_candidates || [];
+  if (!cands.length) throw new Error("There is nothing publishable on file: no photograph, no introduction video and no portfolio, or the ninety day purge has already destroyed them.");
+
+  const liveRows = row._showcase_live || [];
+  const live = new Set(liveRows.map(x => x.source_document));
+  let done = 0;
+  for (const d of cands) {
+    if (live.has(d.id)) continue;                    // already up, leave it
+    const kind = SHOWCASE_FROM[d.doc_type];
+    if (!kind) continue;
+
+    /* There is one face and one voice per worker, enforced by a partial
+       unique index. So a NEWER photograph or introduction replaces the older
+       one rather than colliding with it: the old file goes, then the old row,
+       then the new one is written below. Work photos are not in this branch
+       because a worker may have several. */
+    if (kind === "profile_photo" || kind === "intro_video") {
+      const old = liveRows.filter(x => x.kind === kind);
+      if (old.length) {
+        const rm = await sb.storage.from("showcase").remove(old.map(x => x.storage_path));
+        if (rm.error) throw new Error("Could not remove the previous " + kind + ": " + rm.error.message);
+        const { error } = await sb.from("worker_showcase").delete().in("id", old.map(x => x.id));
+        if (error) throw new Error(error.message);
+      }
+    }
+
+    // Copy, never move and never link. Read out of the private bucket with
+    // this desk's own admin grant, write into the public one.
+    const got = await sb.storage.from("vetting").download(d.storage_path);
+    if (got.error) throw new Error("Could not read " + d.doc_type + " out of the vetting bucket: " + got.error.message);
+
+    const ext = (d.storage_path.split(".").pop() || "bin").toLowerCase().slice(0, 5);
+    const path = `${row.worker_user || row.slug}/${kind}-${d.id}.${ext}`;
+    const put = await sb.storage.from("showcase").upload(path, got.data, {
+      contentType: d.mime || got.data.type || "application/octet-stream",
+      upsert: true,
+    });
+    if (put.error) throw new Error("Could not write " + d.doc_type + " to the showcase bucket: " + put.error.message);
+
+    const { error } = await sb.from("worker_showcase").insert({
+      worker_email: row.worker_email,
+      kind,
+      storage_path: path,
+      mime: d.mime || null,
+      bytes: d.bytes || null,
+      source_document: d.id,
+      position: kind === "profile_photo" ? 0 : kind === "intro_video" ? 1 : 2 + done,
+      published_by: SESSION_EMAIL,
+    });
+    if (error) throw new Error(error.message);
+    done++;
+  }
+  if (!done) throw new Error("Everything publishable is already on their profile. Nothing to do.");
+}
+
+async function deskUnpublishShowcase(row){
+  const live = row._showcase_live || [];
+  if (!live.length) throw new Error("Nothing of theirs is published, so there is nothing to take down.");
+  // Files first, then rows. The other order would leave a public URL alive
+  // with nothing in the database pointing at it, which is the one state
+  // nobody would ever go looking for.
+  const rm = await sb.storage.from("showcase").remove(live.map(x => x.storage_path));
+  if (rm.error) throw new Error(rm.error.message);
+  const { error } = await sb.from("worker_showcase").delete().eq("worker_email", row.worker_email);
   if (error) throw new Error(error.message);
 }
 
@@ -930,15 +1092,15 @@ const VIEWS = [
     // Every column except budget_band, named one by one on purpose. "*" plus a
     // hide list would still fetch the client's private figure into this page
     // and merely decline to draw it. The rule is that it never arrives.
-    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency",
-    order:"updated_at", search:["id","title","parish","client_name","client_phone","worker_name","trade","descr"],
+    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency,requested_worker_email,requested_at,request_state",
+    order:"updated_at", search:["id","title","parish","client_name","client_phone","worker_name","trade","descr","requested_worker_email"],
     empty:["No jobs yet","A job appears here once somebody writes in by WhatsApp, email or the website form."],
     cols:[
       {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
       {h:"Where", f:r => esc(r.parish || "") + sub_(r.trade || "")},
       {h:"Client", f:r => esc(r.client_name || "none") + sub_(r.client_phone || r.client_email || "no way to reply")},
       {h:"In their own words", f:r => ownWords(r.descr)},
-      {h:"Worker", f:r => r.worker_name ? esc(r.worker_name) : mute_("not chosen")},
+      {h:"Worker", f:r => r.worker_name ? esc(r.worker_name) : (r.requested_worker_email ? requestChip(r) : mute_("not chosen"))},
       {h:"Materials store", f:r => matStore(r)},
       {h:"Stage", f:r => stageBar(r.stage)},
       {h:"Owed", n:true, f:r => r.owed ? jmd(r.owed) : mute_("none")},
@@ -1009,9 +1171,53 @@ const VIEWS = [
           ? `<div class="dfield"><span class="dk">file</span><video controls preload="metadata" src="${esc(r.img)}" style="max-width:100%;border-radius:10px"></video></div>`
           : `<div class="dfield"><span class="dk">file</span><a href="${esc(r.img)}" target="_blank" rel="noopener"><img src="${esc(r.img)}" alt="${esc(r.label || "evidence")}" style="max-width:100%;border-radius:10px"></a></div>`)
       : `<div class="dfield"><span class="dk">file</span><span class="dv empty">${r.storage_path ? "could not sign a link to this file just now, reopen the row to try again" : "no file recorded against this row"}</span></div>`,
+    actions:[
+      // A worker's answer is their claim about their own photograph, not a
+      // ruling, and a wrong one puts it in the wrong section of the client's
+      // record. This corrects it and stamps your address against the change.
+      // Nothing else on the row moves: not the image, not the fingerprint,
+      // not what they wrote. Materials is refused, because it is its own
+      // section on kind and the database will not take a phase on it.
+      { label:"Correct which section this is", cls:"g",
+        rpc:"retag_evidence",
+        ask:[
+          { k:"phase", label:"Which section it actually belongs to",
+            from:r => r.phase || "",
+            options:[
+              ["before","Before, how it was before anybody touched it"],
+              ["during","During the work"],
+              ["after","After, how it was when the stage finished"],
+              ["issue","A problem with work already in scope and priced"],
+              ["new","Something new found, never in the job as agreed"],
+            ] },
+          { k:"answers", label:"For an after, the code of the before it answers", type:"text",
+            placeholder:"P3",
+            hideWhen:v => v.phase !== "after" },
+        ],
+        args:(r, v) => ({ p_id:r.id, p_phase:v.phase, p_answers:v.answers || null }),
+        says:r => r.phase
+          ? `Changes this from "${r.phase}" to what you pick, on ${r.job_id}. Your address is stamped against the change and the client's portal moves the photograph into its new section. The image, the description and the fingerprint are untouched.`
+          : `Says which section this photograph belongs to on ${r.job_id}. Nobody answered when it was filed, so it is sitting under "Not marked" in the client's record. Your address is stamped against it; the image, the description and the fingerprint are untouched.` },
+    ],
     cols:[
       {h:"Job", f:r => id_(r.job_id) + sub_("stage " + (r.stage ?? "none"))},
-      {h:"Item", f:r => esc(r.label || "unlabelled") + sub_(r.mime || "")},
+      {h:"Item", f:r => esc(r.label || "unlabelled") + sub_((r.item_code ? r.item_code + " · " : "") + (r.mime || ""))},
+      // Which section it lands in, and whether anybody has corrected the
+      // person who filed it. Colours follow concierge/README.md: teal proven,
+      // mango held, coral blocked. A new find is coral because it is work
+      // nobody has quoted or agreed and it genuinely stops until somebody
+      // decides; a problem is mango because it sits inside work already paid
+      // for.
+      {h:"Section", f:r => (
+        r.kind === "materials" ? chip_("ok","materials")
+        : r.phase === "before" ? chip_("ok","before")
+        : r.phase === "during" ? chip_("ok","during")
+        : r.phase === "after" ? chip_("ok","after")
+        : r.phase === "issue" ? chip_("warn","a problem")
+        : r.phase === "new" ? chip_("crit","new find")
+        : chip_("mute","not marked"))
+        + (r.pairs_with ? sub_("answers a before") : "")
+        + (r.phase_set_by ? sub_("corrected by " + esc(r.phase_set_by)) : "")},
       {h:"Uploaded by", f:r => esc(r.uploaded_by || "unknown")},
       {h:"Checked", f:r => r.ok ? chip_("ok","signed off") : chip_("warn","waiting on you")},
       {h:"Fingerprint", f:r => r.sha256 ? `<span class="mono" style="color:var(--dim)">${esc(String(r.sha256).slice(0,16))}&hellip;</span>` : mute_("none")},
@@ -1087,31 +1293,72 @@ const VIEWS = [
     ],
     // PASS, GAP and BLOCK, the words the join journey already uses. The agent
     // flags. A person decides. Nothing here auto-passes anybody.
+    //
+    // These go through decide_application() rather than writing status, and
+    // that is not a refactor. Deciding whether somebody can earn on this
+    // platform is a consequential step under CLAUDE.md section 2, and until
+    // 5 September 2026 it left no record of who decided it: the status changed
+    // and nobody's name was attached. The RPC takes the name from your session
+    // rather than from anything the page sends, and a trigger refuses the
+    // write outright if it arrives without one, so the rule holds for a script
+    // and for psql too and not only for this page.
+    //
+    // The note is asked for, not required. A block with no reason written down
+    // is the hardest thing to stand behind six months later, but a forced box
+    // gets filled with a full stop, so it is offered rather than demanded.
     actions:[
       { label:"Pass", cls:"", when:r => r.status !== "passed",
-        set:{ status:"passed" },
+        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "passed", p_note: v.note || null }),
+        ask:[{ k:"note", label:"What convinced you? (optional, kept on the record)", placeholder:"references checked, ID matches, 8 years verifiable" }],
         says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. Publishing their profile is a separate step and is what actually lets them quote.` },
       { label:"Send the gap back", cls:"g", when:r => r.status !== "gap",
-        set:{ status:"gap" },
+        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "gap", p_note: v.note || null }),
+        ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"proof of address, and the second reference never replied" }],
         says:() => "Marks it as waiting on a document. Name the document when you contact them, because a gap that is not named cannot be closed." },
       { label:"Block", cls:"d", when:r => r.status !== "blocked",
-        set:{ status:"blocked" },
+        rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "blocked", p_note: v.note || null }),
+        ask:[{ k:"note", label:"Why? (optional, but this is the one worth writing down)", placeholder:"ID did not match the name on the certificate" }],
         says:r => `Blocks ${r.name || "this applicant"}. This is a safety finding, not a tidy-up, and it should be said to them plainly.` },
     ]},
 
   { k:"workers", g:"People", label:"Workers", icon:"tools",
     title:"Workers", table:"worker_profiles",
-    sub:"A published profile is what lets somebody quote. The trigger checks it on every insert, so publishing is the switch, not a label.",
+    sub:"A published profile is what lets somebody quote. The trigger checks it on every insert, so publishing is the switch, not a label. Public profile is a separate thing and a separate consent: their own photograph, their thirty second introduction and their work photos, copied out of the private vetting store onto a page anyone can open, only if they agreed and only when you press the button. Open the row to look at each file first.",
     select:"*",
     order:"updated_at", search:["name","worker_email","trade","parish"],
     empty:["No published workers","Publishing an application puts a worker here and lets them quote."],
+    pre: preWorkers,
+    // The candidate files, with links to open them. Publishing somebody's
+    // face is a decision, and a decision needs to be made looking at the
+    // thing, so the links are here rather than a button firing blind.
+    detailExtra: showcaseDetail,
     cols:[
       {h:"Worker", f:r => esc(r.name || "no name") + sub_(r.worker_email || "")},
       {h:"Trade & area", f:r => esc(r.trade || "") + sub_(r.parish || "")},
       {h:"Lane", f:r => r.lane ? chip_("mute", r.lane) : mute_("none")},
       {h:"Jobs done", n:true, f:r => String(r.jobs_completed ?? 0)},
       {h:"Guidelines", f:r => guidelinesChip(r.worker_email, "worker_guidelines", "WG")},
+      {h:"Public profile", f:r => showcaseCell(r)},
       {h:"State", f:r => r.active ? chip_("ok","active") : chip_("warn","cannot quote")},
+    ],
+    actions:[
+      { label:"Record their answer about a public profile", cls:"g",
+        says:() => "Writes down whether this worker agreed that their photograph, their introduction video and their work photos may go on a page anyone can open. It publishes nothing by itself. Set it to declined and their profile empties on the next page load, before any file has been deleted. Applicants answer this on the last screen of /apply; use this for the workers who joined before the question existed, and only after you have actually asked them.",
+        ask:[
+          { k:"answer", label:"What did they say", options:[["granted","They agreed"],["declined","They said no"]],
+            from:r => r.showcase_consent || "" },
+          { k:"version", label:"Which wording they answered", from:r => r.showcase_consent_version || "showcase-v1" },
+        ],
+        call: deskSetShowcaseConsent },
+
+      { label:"Put their photograph, video and work up", cls:"",
+        says:r => "Copies their photograph, their thirty second introduction and their portfolio out of the private vetting store onto their public profile, where anyone with the link can see them. Look at each one first, using the links in this drawer. Refused unless they have agreed. The originals keep their ninety day clock and are still destroyed on time. Your address is recorded against each file as the person who published it."
+              + (String(r.showcase_consent || "") === "granted" ? "" : " THEY HAVE NOT AGREED YET, so this will refuse."),
+        call: deskPublishShowcase },
+
+      { label:"Take their public profile down", cls:"d",
+        says:() => "Deletes the published copies and the rows behind them. Their profile goes back to trade, parish and what was checked. Their vetting documents are untouched, and this does not change their answer about consent: if you are taking this down because they asked you to, record that answer as declined too.",
+        call: deskUnpublishShowcase },
     ]},
 
   { k:"clients", g:"People", label:"Clients", icon:"home",
@@ -1219,6 +1466,16 @@ const VIEWS = [
         rpc:"approve_quote_pack_draft",
         args:(r) => ({ p_draft_id:r.id }),
         says:() => "Marks this draft approved. A worker writing a quote on this job sees it as the starting point for their own scope, timeline and payment stages the moment they open the form. Refused outright if the guardrail still flags price or banned language: fix the draft or wait for a fresh one first." },
+
+      { label:"Correct the wording", cls:"g", when:r => r.status === "ready",
+        ask:[
+          { k:"docs", label:"The pack. Correct the wording, keep the shape.", type:"long",
+            from:r => JSON.stringify(r.docs, null, 2) },
+          { k:"note", label:"Why (optional, kept on the row)",
+            placeholder:"\"fully covered\" was about paint, not about cover" },
+        ],
+        call: deskRescanPack,
+        says:r => `Re-checks this pack with the same rule the drafter uses. It clears nothing: if the wording still trips the guardrail it stays flagged and Approve still refuses it. Nothing is sent to anybody, and no model is called.` },
     ]},
 
   { k:"kickd", g:"Documents & money", label:"Kickoff Drafts", icon:"doc",
@@ -1955,6 +2212,27 @@ const MAT_STORE = {
   indoors:       ["ok",   "indoors"],
   none_available:["warn", "nowhere securable"],
 };
+// A client asked for one worker off their profile page (20260905a). Nobody is
+// booked by that, so this sits in the Worker column only while worker_name is
+// still empty: the moment somebody is actually chosen, the real name wins.
+//
+// The three states say different things to the desk. Held is a job the board
+// cannot see, so it should be watched: if that worker goes quiet the client
+// waits two days for nothing and a person may want to ring them. Priced and
+// passed both mean the hold is over and the board has it, which needs no
+// action at all.
+function requestChip(r){
+  const who = String(r.requested_worker_email || "").trim();
+  const st  = String(r.request_state || "");
+  const live = st === "pending" && r.requested_at
+    && (Date.now() - new Date(r.requested_at).getTime()) < 48 * 3600 * 1000;
+  const chip = st === "declined" ? chip_("mute", "asked, passed on it")
+             : st === "quoted"   ? chip_("ok",   "asked, priced it")
+             : live              ? chip_("warn", "asked, held for them")
+             :                     chip_("mute", "asked, window ran out");
+  return chip + sub_(who);
+}
+
 function matStore(r){
   const m = MAT_STORE[String(r.materials_store_type || "")];
   if (!m) return chip_("crit", "not nominated") + sub_("no materials release possible");
@@ -2166,6 +2444,92 @@ async function preJobPhotos(rows){
     const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
     for (const r of items) r.img = byPath.get(r.storage_path) || null;
   } catch (_) { /* a photo nobody can sign is a gap to show, not a crash */ }
+}
+
+/* ---- Workers: what could go on their public profile, and what already has.
+ *
+ * Three publishable doc types out of the private vetting bucket (the photo,
+ * the introduction, the portfolio), signed for an hour so the person deciding
+ * can actually LOOK at each one before pressing publish. Everything else in
+ * that bucket is a vetting paper and is not fetched here at all.
+ *
+ * Joined on worker_user, not email: that is the key vetting_documents carries,
+ * and it is a uuid rather than an address somebody controls. A worker with no
+ * worker_user (an older row, published before storage existed) simply has no
+ * candidates, which is the correct answer rather than an error.
+ */
+const SHOWCASE_DOC_TYPES = ["profile_photo", "intro_video", "portfolio"];
+
+async function preWorkers(rows){
+  const list = rows || [];
+  for (const r of list) { r._showcase_candidates = []; r._showcase_live = []; }
+  if (!list.length) return;
+
+  const byUser = new Map(list.filter(r => r.worker_user).map(r => [r.worker_user, r]));
+  const emails = list.map(r => String(r.worker_email || "").toLowerCase()).filter(Boolean);
+
+  try {
+    if (byUser.size) {
+      const { data } = await sb.from("vetting_documents")
+        .select("id,worker_user,doc_type,storage_path,mime,bytes,created_at")
+        .in("worker_user", [...byUser.keys()])
+        .in("doc_type", SHOWCASE_DOC_TYPES)
+        .is("purged_at", null)
+        .not("storage_path", "is", null);
+      const docs = data || [];
+      if (docs.length) {
+        const signed = await sb.storage.from("vetting").createSignedUrls(docs.map(d => d.storage_path), 3600);
+        const byPath = new Map((signed.data || []).map(d => [d.path, d.signedUrl]));
+        for (const d of docs) {
+          d.look = byPath.get(d.storage_path) || null;
+          const r = byUser.get(d.worker_user);
+          if (r) r._showcase_candidates.push(d);
+        }
+      }
+    }
+
+    if (emails.length) {
+      const { data } = await sb.from("worker_showcase")
+        .select("id,worker_email,kind,storage_path,source_document,published_by,published_at")
+        .in("worker_email", emails);
+      const byEmail = new Map(list.map(r => [String(r.worker_email || "").toLowerCase(), r]));
+      for (const w of data || []) {
+        const r = byEmail.get(String(w.worker_email || "").toLowerCase());
+        if (r) r._showcase_live.push(w);
+      }
+    }
+  } catch (_) { /* a profile nobody can preview is a gap to show, not a crash */ }
+}
+
+const SHOWCASE_LABEL = { profile_photo: "photograph", intro_video: "introduction video", portfolio: "portfolio or work photos" };
+
+function showcaseCell(r){
+  const consent = String(r.showcase_consent || "");
+  const live = (r._showcase_live || []).length;
+  const cands = (r._showcase_candidates || []).length;
+  if (consent === "declined") return chip_("mute", "said no") + sub_(live ? live + " still published, take it down" : "profile shows checks only");
+  if (consent !== "granted")  return chip_("warn", "never asked") + sub_(cands ? cands + " file" + (cands === 1 ? "" : "s") + " waiting on an answer" : "nothing on file anyway");
+  if (live) return chip_("ok", live + " published") + sub_(cands > live ? (cands - live) + " more could go up" : "all of it is up");
+  return chip_("warn", "agreed, nothing up") + sub_(cands ? cands + " file" + (cands === 1 ? "" : "s") + " ready to publish" : "nothing on file to publish");
+}
+
+function showcaseDetail(r){
+  const cands = r._showcase_candidates || [];
+  const live = new Set((r._showcase_live || []).map(x => x.source_document));
+  if (!cands.length) {
+    return `<div class="dfield"><span class="dk">public profile</span><div>${mute_("No photograph, introduction video or portfolio on file, or the ninety day purge has already destroyed them.")}</div></div>`;
+  }
+  const items = cands.map(d => {
+    const up = live.has(d.id) ? chip_("ok", "published") : chip_("mute", "not up");
+    const look = d.look
+      ? `<a href="${esc(d.look)}" target="_blank" rel="noreferrer">open it</a>`
+      : mute_("could not sign a link");
+    return `<div>${esc(SHOWCASE_LABEL[d.doc_type] || d.doc_type)} &middot; ${look} ${up}</div>`;
+  }).join("");
+  // The link is signed for an hour and points at the PRIVATE original, not at
+  // anything published. Looking is not publishing.
+  return `<div class="dfield"><span class="dk">public profile</span><div class="reqlist" style="margin-top:0">${items}`
+       + `<div style="margin-top:6px">${mute_("Links open the private originals, signed for an hour. Opening one publishes nothing.")}</div></div></div>`;
 }
 
 // A picture, or an honest word about why there is not one. A row with no
@@ -3139,7 +3503,15 @@ function drawAsk(k, a, row, btn){
     return `<div data-askrow="${n}"><label>${esc(f.label)}</label>${control}</div>`;
   }).join("");
 
+  // An action with a form skips the confirm dialog, so anything the action had
+  // to say about what it means was being dropped on the floor. No action used
+  // both until the vetting decisions did, and "this is a safety finding, not a
+  // tidy-up" is exactly the sentence that should be in front of somebody as
+  // they block a person. Shown above the fields, not behind an OK button.
+  const preamble = a.says ? `<p class="mute" style="margin:0 0 12px">${esc(a.says(row))}</p>` : "";
+
   $("drwMsg").innerHTML = `<div class="card" style="margin-top:12px">
+      ${preamble}
       <div class="row" style="margin-bottom:0" id="askRow">${fields}</div>
       <div class="brow" style="margin-top:12px">
         <button class="btn" id="askGo">${esc(a.label)}</button>
@@ -3585,11 +3957,18 @@ async function signOut(){ if (sb) await sb.auth.signOut(); location.reload(); }
 
 const initials = (s) => String(s || "").replace(/@.*/,"").split(/[.\s_-]+/).filter(Boolean).slice(0,2).map(w => w[0].toUpperCase()).join("") || "Y";
 
+/* Who is at the desk. Set once at boot, after is_admin() has already agreed,
+   and read by anything that has to record a NAMED HUMAN against a decision.
+   worker_showcase.published_by is the first such column: "the desk" is not a
+   person and would defeat the point of writing it down. */
+let SESSION_EMAIL = "";
+
 async function boot(){
   if (!startClient()) return;
   const { data } = await sb.auth.getSession();
   if (!data?.session) { show("gate",true); show("desk",false); return; }
   const who = data.session.user.email;
+  SESSION_EMAIL = who || "";
 
   // is_admin() is the same predicate row level security uses, so this asks the
   // database the question rather than trusting the page. RLS still refuses the
@@ -3759,10 +4138,94 @@ async function loadOverview(){
   // two numbers are the whole of it: did we keep it, and is anybody waiting
   // right now. The assistant answering does not count towards either, because
   // the site promises a PERSON.
+  // Draft acceptance: how often what the assistant wrote was good enough to
+  // send as written. The headline metric for this business, because unlike
+  // "resolved without a human" it can only improve by the drafting getting
+  // better, never by a gate being removed.
+  const draftRows = await sb.from("draft_acceptance").select("kind,decisions,accepted,pct");
+  const drafts = (draftRows.data || []).reduce((a, r) => ({
+    decisions: a.decisions + Number(r.decisions || 0),
+    accepted: a.accepted + Number(r.accepted || 0),
+  }), { decisions: 0, accepted: 0 });
+  const draftPct = drafts.decisions ? Math.round((drafts.accepted / drafts.decisions) * 100) : null;
+
+  // Capacity: how many consequential decisions fit in one working session.
+  // A session rolls over at 05:00 Jamaica time rather than midnight, so a
+  // sign-off at half past midnight belongs to the evening that just happened.
+  // Quote packs held for a person. This is a queue, not a score, and it is
+  // the one queue that stops a job dead: the pack is what a worker edits and
+  // prices into the quote the client sees, and RLS only lets a worker read it
+  // at approved, so a held one means no quote is built and the client hears
+  // nothing, while the job still shows as open for quotes.
+  // Nothing on this page counted these until 5 September 2026, when a held
+  // draft was found only by going looking for it.
+  const heldQ = await sb.from("packs_awaiting_a_person").select("kind,ref,job_id,hours_waiting");
+  const held = heldQ.data || [];
+  const heldHrs = held.reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
+
+  const capRow = await sb.from("desk_capacity").select("*").maybeSingle();
+  const cap = capRow.data || {};
+  const capSessions = Number(cap.sessions || 0);
+  const capAvg = cap.avg_per_session === null || cap.avg_per_session === undefined
+    ? null : Number(cap.avg_per_session);
+
+  // Evidence completeness at sign-off. Read from the snapshot stage_approvals
+  // takes at approval time, not from the evidence table, so a photograph filed
+  // the day after does not quietly improve the number. All time, because
+  // approvals are the rarest thing in the system.
+  const evCompRow = await sb.from("evidence_completeness").select("*").maybeSingle();
+  const ec = evCompRow.data || {};
+  const signoffs = Number(ec.signoffs || 0);
+  const pctOf = n => signoffs ? Math.round((Number(n || 0) / signoffs) * 100) : null;
+  const withEv = pctOf(ec.with_any_evidence);
+  const withFp = pctOf(ec.fully_fingerprinted);
+  const withArr = pctOf(ec.with_arrival);
+  // Before and after, added 5 Sep 2026. Reads 0% on everything signed off
+  // before that date, and correctly so: nothing filed then declared which it
+  // was, so the honest answer is that we cannot show the pair, not that there
+  // was not one. See 20260906000700.
+  const withBA = pctOf(ec.with_before_and_after);
+  // Problems found on site, counted rather than scored. This is not a quality
+  // measure and must never be read as one: a worker who reports rot behind a
+  // panel is doing the job properly. It is here because a stage carrying
+  // several is a stage where the job stopped being the job that was quoted,
+  // and that is a conversation with the client, not a number to drive down.
+  const issuesRaised = Number(ec.issues_raised || 0);
+  const signoffsWithIssues = Number(ec.with_issues || 0);
+  const noEv = signoffs - Number(ec.with_any_evidence || 0);
+  const noFp = Number(ec.with_any_evidence || 0) - Number(ec.fully_fingerprinted || 0);
+
+  // Stall rate, and how long a stall lasts. job_stall_state holds only what is
+  // stuck RIGHT NOW, because a row is deleted the moment the job moves again.
+  // job_stall_resolved is what that delete now writes down on its way out, so
+  // the second half of this is only true forwards from 4 September 2026.
+  const stallRow = await sb.from("stall_metrics").select("*").maybeSingle();
+  const stall = stallRow.data || {};
+  const stalledNow = Number(stall.stalled_now || 0);
+  const liveJobs = Number(stall.live_jobs || 0);
+  const unstallHrs = stall.avg_hours_to_unstall === null || stall.avg_hours_to_unstall === undefined
+    ? null : Number(stall.avg_hours_to_unstall);
+  const unstallN = Number(stall.resolved_30d || 0);
+
   // v_reply_clock is sla_first_reply plus the contact form, sharing one
   // definition of the promise via within_one_working_day().
   const clockQ = await sb.from("v_reply_clock").select("kind,ref,channel,hours_waiting,breached").limit(300);
   const CLOCK = clockQ.data || [];
+
+  // The contact form, aged. sla_first_reply measures conversations and stops
+  // there, and the business page sends companies to this form, so an enquiry
+  // sitting for a week is the most expensive silence on the desk.
+  //
+  // DECLARED HERE, NOT DOWN WITH THE ALERTS, and that is load bearing. These
+  // three were const-declared below the tile that reads owedOldest, so
+  // loadOverview() threw "Cannot access 'owedOldest' before initialization"
+  // and the entire Overview rendered nothing. Same temporal dead zone class as
+  // the 17-18 August sign-in crash the CI file's header describes. A const is
+  // not hoisted; keep every one of these above its first use.
+  const owedOldest = CLOCK.reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
+  const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
+  const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
+    .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
   const slaRows = await sb.from("sla_first_reply").select("met,hours,awaiting_human_since,from_addr,job_id");
   const sla = slaRows.data || [];
   const answered = sla.filter(r => r.met !== null);
@@ -3811,6 +4274,64 @@ async function loadOverview(){
     tile(owedOldest >= 24 ? "crit" : owedOldest ? "warn" : "ok",
       "Longest anyone is waiting", owedOldest ? (owedOldest >= 48 ? Math.round(owedOldest / 24) + " days" : Math.round(owedOldest) + " hr") : "0",
       CLOCK.length ? `${CLOCK.length} waiting on a person` : "Nobody is waiting"),
+    // Not coloured green at 100%: a tiny sample reading 100 is not good news,
+    // it is no news, and colouring it would invite trusting it too early.
+    tile(draftPct === null ? "" : drafts.decisions < 5 ? "" : draftPct >= 60 ? "ok" : "warn",
+      "Drafts sent as written", draftPct === null ? "n/a" : draftPct + "%",
+      drafts.decisions
+        ? `${drafts.accepted} of ${drafts.decisions} in 30 days` + (drafts.decisions < 5 ? ", too few to read yet" : "")
+        : "No drafts decided yet"),
+    tile(stalledNow ? (Number(stall.escalated_now || 0) ? "crit" : "warn") : "ok",
+      "Jobs gone quiet", String(stalledNow),
+      liveJobs ? `${Math.round((stalledNow / liveJobs) * 100)}% of ${liveJobs} live jobs` : "No live jobs"),
+    // Measured from when Yaadly noticed, not from when the job actually went
+    // quiet. That earlier moment is not recorded anywhere and a number nobody
+    // can point at a row for is worse than no number.
+    tile(unstallHrs === null ? "" : unstallHrs <= 24 ? "ok" : unstallHrs <= 72 ? "warn" : "crit",
+      "Time to get moving again", unstallHrs === null ? "n/a" : Math.round(unstallHrs) + " hr",
+      unstallN ? `${unstallN} in 30 days, from when we chased` : "Nothing has unstalled yet"),
+    // Three separate numbers rather than one completeness score. The gaps have
+    // different causes: no evidence is a desk problem, no fingerprint is a
+    // plumbing problem, no arrival is a thing workers could not do from a
+    // phone until now. One percentage would hide which.
+    tile(withEv === null ? "" : withEv === 100 ? "ok" : "crit",
+      "Signed off with evidence", withEv === null ? "n/a" : withEv + "%",
+      signoffs ? `${ec.with_any_evidence} of ${signoffs} sign-offs, all time` : "Nothing signed off yet"),
+    tile(withFp === null ? "" : withFp === 100 ? "ok" : "warn",
+      "Bound to the exact files", withFp === null ? "n/a" : withFp + "%",
+      signoffs ? `${ec.fully_fingerprinted} of ${signoffs} carry a fingerprint on every item` : "Nothing signed off yet"),
+    tile(withArr === null ? "" : withArr >= 80 ? "ok" : "warn",
+      "Arrival logged first", withArr === null ? "n/a" : withArr + "%",
+      signoffs ? `${ec.with_arrival} of ${signoffs} had the worker on site on record` : "Nothing signed off yet"),
+    // Never coloured red. The site promises a before and an after, and until
+    // 5 Sep nothing could record which was which, so a low number here is a
+    // measure that has only just started rather than workers failing at it.
+    tile(withBA === null ? "" : withBA >= 80 ? "ok" : "warn",
+      "Before and after on record", withBA === null ? "n/a" : withBA + "%",
+      signoffs
+        ? `${ec.with_before_and_after} of ${signoffs} had both. ${ec.with_before} marked a before, ${ec.with_after} an after, ${ec.with_during || 0} filed during the work`
+        : "Nothing signed off yet"),
+    // Never coloured at all, for the reason above the variable: reporting a
+    // problem is the worker doing their job, and a green tick on a low number
+    // would be an instruction to stop reporting them.
+    tile("", "Problems found on site", String(issuesRaised),
+      signoffs
+        ? (issuesRaised
+            ? `Across ${signoffsWithIssues} of ${signoffs} sign-offs. Anything that changes price or timeline is agreed in writing first`
+            : "None reported since workers could mark one")
+        : "Nothing signed off yet"),
+    // Never coloured. This is a capacity reading, not a target: a low evening
+    // is a quiet week, not a bad one, and a green tick on it would invite
+    // treating throughput as the thing to maximise.
+    tile("", "Decisions in an evening", capAvg === null ? "n/a" : String(capAvg),
+      capSessions
+        ? `Average over ${capSessions} ${capSessions === 1 ? "session" : "sessions"}, busiest was ${cap.busiest_session}`
+        : "No sessions recorded yet"),
+    tile(heldHrs >= 24 ? "crit" : held.length ? "warn" : "ok",
+      "Quote packs held", String(held.length),
+      held.length
+        ? `Longest waiting ${Math.round(heldHrs)} hr, and that client gets no quote`
+        : "Every pack is with the workers"),
   ].join("");
 
   const needs = [];
@@ -3822,17 +4343,23 @@ async function loadOverview(){
     "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Answer them", "owed"));
   if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
     "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
+  if (held.length) needs.push(alertRow(heldHrs >= 24 ? "crit" : "warn", "!",
+    held.length + (held.length === 1 ? " quote pack is held and its job cannot be quoted" : " quote packs are held and those jobs cannot be quoted"),
+    "The guardrail flagged wording in the pack and stopped it, which is correct. But the pack is what a worker edits and prices into the quote the client sees, so until you clear or redraft it no worker can read it, no quote gets built, and nothing reaches that client at all. The job still shows as open for quotes. Longest held: " + Math.round(heldHrs) + " hours.",
+    "Open the drafts", "qpd"));
+  if (noEv) needs.push(alertRow("crit","!",
+    noEv + (noEv === 1 ? " stage was signed off with no evidence on file at all" : " stages were signed off with no evidence on file at all"),
+    "An approval with nothing behind it is the one thing this business sells, missing. Worth knowing which, because it is either a test row or a habit forming.", "See sign-offs", "evid"));
+  if (noFp) needs.push(alertRow("warn","?",
+    noFp + (noFp === 1 ? " sign-off is not bound to the exact files" : " sign-offs are not bound to the exact files"),
+    "An evidence item with no sha256 means the approval is attached to a label, not to the bytes. If the file is later swapped, nothing notices.", "See sign-offs", "evid"));
+  if (Number(stall.escalated_now || 0)) needs.push(alertRow("crit","!",
+    stall.escalated_now + (Number(stall.escalated_now) === 1 ? " job has been quiet long enough to escalate" : " jobs have been quiet long enough to escalate"),
+    "The worker was nudged and it did not move it. The client has been told. This is the point where a job stops being late and starts being a job somebody walked away from.", "See them", "stalled"));
   if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
     "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
   if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
     "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
-  // The contact form, aged. sla_first_reply measures conversations and stops
-  // there, and the business page sends companies to this form, so an enquiry
-  // sitting for a week is the most expensive silence on the desk.
-  const owedOldest = CLOCK.reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
-  const enqBreached = CLOCK.filter(r => r.kind === "enquiry" && r.breached).length;
-  const enqOldest = CLOCK.filter(r => r.kind === "enquiry")
-    .reduce((a, r) => Math.max(a, Number(r.hours_waiting) || 0), 0);
   if (enqBreached) needs.push(alertRow("crit","!",
     enqBreached + (enqBreached === 1 ? " enquiry is" : " enquiries are") + " past one working day",
     "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Answer them", "owed"));
@@ -4741,9 +5268,49 @@ async function rptFn(payload){
   return j;
 }
 
+const QPR_FN = SUPABASE_URL + "/functions/v1/yaad-quote-pack-rescan";
+
+// Correcting a held quote pack.
+//
+// A flagged draft used to have exactly one action, Approve, and Postgres
+// refuses that outright while a flag stands. So there was no route from "this
+// flag is a false positive" to "this job can move". The case that showed it
+// was a painting pack saying "surface fully covered": the phrase is banned
+// because "your job is fully covered" is a promise about money, and it fired
+// on paint covering a railing.
+//
+// This does NOT clear a flag. The corrected wording goes through the same
+// verdict function the drafter uses, so a correction that is still dirty stays
+// dirty and Approve still refuses it. No model is called: this is your edit
+// being re-checked, not a redraft, which is why there is no pause check here.
+async function qprFn(payload){
+  const r = await fetch(QPR_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+
+// The whole pack goes into the box, because a flag can be in any section and
+// showing only the flagged one would invite correcting a sentence while a
+// second copy of the phrase sits in another.
+async function deskRescanPack(row, vals){
+  let docs;
+  try { docs = JSON.parse(String(vals.docs || "")); }
+  catch (e) { throw new Error("That is not valid JSON, so nothing was saved. " + String(e.message || e)); }
+  const out = await qprFn({ draftId: row.id, docs, note: String(vals.note || "").trim() });
+  if (!out.clean) {
+    throw new Error("Saved, and it is STILL flagged: " + (out.guardrail.banned_samples || []).concat(out.guardrail.samples || []).join(", ") + ". Fix those words and run it again.");
+  }
+}
+
 const SK_FN = SUPABASE_URL + "/functions/v1/yaad-sketch";
 let SK_FRAMES = [];     // [{n, t, data, keep}]
 let SK_DESCRIBED = [];  // what the vision model said
+let SK_SELECTED = new Set(); // still numbers the person has clicked, for naming a room
 let SK_PACK = null;
 
 async function skFn(payload){
@@ -4769,7 +5336,11 @@ const mmss = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padSta
 async function skExtract(file, count){
   const url = URL.createObjectURL(file);
   const v = document.createElement("video");
-  v.preload = "auto"; v.muted = true; v.playsInline = true; v.src = url;
+  // "metadata", not "auto", since 6 September 2026. We only ever seek to a
+  // dozen moments, and "auto" asked Chrome to pull a whole phone video into
+  // memory first. A long 4K walkthrough is over a gigabyte, and the tab went
+  // white on the first real one before a single still was drawn.
+  v.preload = "metadata"; v.muted = true; v.playsInline = true; v.src = url;
   try {
     await new Promise((res, rej) => {
       v.onloadedmetadata = res;
@@ -4778,6 +5349,9 @@ async function skExtract(file, count){
     });
     let dur = v.duration;
     if (!isFinite(dur) || dur <= 0) throw new Error("That video has no readable length, so stills cannot be spaced through it.");
+    // Never closer together than one still every three seconds. A seven second
+    // clip gets four stills, not twelve copies of the same wall.
+    count = Math.max(4, Math.min(count, Math.ceil(dur / 3)));
 
     const canvas = document.createElement("canvas");
     const scale = Math.min(1, 960 / Math.max(v.videoWidth || 960, v.videoHeight || 720));
@@ -4786,6 +5360,7 @@ async function skExtract(file, count){
     const ctx = canvas.getContext("2d");
 
     const out = [];
+    let black = 0;
     for (let i = 0; i < count; i++) {
       const t = dur * (i + 0.5) / count;
       await new Promise((res, rej) => {
@@ -4795,8 +5370,15 @@ async function skExtract(file, count){
         v.currentTime = t;
       });
       ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      if (skIsBlack(ctx, canvas)) black++;
       out.push({ n: i + 1, t, data: canvas.toDataURL("image/jpeg", 0.72), keep: true });
       $("skProgress").textContent = `Pulling still ${i + 1} of ${count}.`;
+    }
+    // A video Chrome can open but cannot decode draws every still as a black
+    // square and says nothing. iPhones record HEVC by default, and that is the
+    // usual reason. Say so, with the two ways round it that actually work.
+    if (black === out.length) {
+      throw new Error("Every still came out black: this browser cannot decode this video. MP4 only. Send the video to yourself on WhatsApp and use the copy it sends back, which is an MP4.");
     }
     return out;
   } finally {
@@ -4804,75 +5386,186 @@ async function skExtract(file, count){
   }
 }
 
+// True when a drawn still is black or near it: a 32 by 32 sample of the canvas
+// with almost no light in it. Cheap enough to run on every still.
+function skIsBlack(ctx, canvas){
+  try {
+    const sx = Math.max(1, Math.floor(canvas.width / 32)), sy = Math.max(1, Math.floor(canvas.height / 32));
+    let sum = 0, n = 0;
+    for (let y = 0; y < canvas.height; y += sy) {
+      const row = ctx.getImageData(0, y, canvas.width, 1).data;
+      for (let x = 0; x < canvas.width; x += sx) { sum += row[x * 4] + row[x * 4 + 1] + row[x * 4 + 2]; n += 3; }
+    }
+    return n > 0 && (sum / n) < 6;
+  } catch (_) { return false; }
+}
+
 function skRenderThumbs(){
-  const kept = SK_FRAMES.filter(f => f.keep).length;
-  $("skFramesTitle").textContent = `Stills, ${kept} kept of ${SK_FRAMES.length}`;
+  // The cross removes the still outright, since 6 September 2026. It used to
+  // grey it out with a plus to put it back, and a greyed still that is still
+  // on the page reads as "still in the pack". Gone is gone; pull the stills
+  // again if one was dropped by mistake.
+  $("skFramesTitle").textContent = `${SK_FRAMES.length} still${SK_FRAMES.length === 1 ? "" : "s"}`;
   $("skThumbs").innerHTML = SK_FRAMES.map(f => {
     const d = SK_DESCRIBED.find(x => x.n === f.n);
-    return `<div class="pthumb ${f.keep ? "" : "out"}" data-n="${f.n}">
+    return `<div class="pthumb ${SK_SELECTED.has(f.n) ? "sel" : ""}" data-n="${f.n}">
       <span class="n">${f.n}</span>
-      <button class="x" title="${f.keep ? "drop this one" : "put it back"}">${f.keep ? "×" : "+"}</button>
-      <img src="${f.data}" alt="still ${f.n}">
-      <div class="cap">${esc(d ? (d.room || "") : mmss(f.t))}${d && d.visible ? "<br>" + esc(d.visible.slice(0, 90)) : ""}</div>
+      <button class="x" title="remove this still">×</button>
+      <img src="${f.data}" alt="still ${f.n}" title="click to select this still for naming">
+      <div class="cap">${d
+        ? `<input class="roomedit" data-n="${f.n}" value="${esc(d.room || "")}" placeholder="which room?" title="Type the room this still is in. The pack uses what you type.">`
+        : esc(mmss(f.t))}${d && d.visible ? "<br>" + esc(d.visible.slice(0, 90)) : ""}</div>
     </div>`;
   }).join("");
+  // What she types is the truth about the room; the model's guess was only
+  // ever a starting point. Written straight into the described entry, so the
+  // assembler sees her name and not the model's.
+  $("skThumbs").querySelectorAll(".roomedit").forEach(inp => inp.addEventListener("input", (e) => {
+    const n = Number(e.target.dataset.n);
+    const d = SK_DESCRIBED.find(x => x.n === n);
+    if (d) { d.room = e.target.value.trim(); d.room_confidence = "high"; }
+  }));
+  // Click a still to select it for naming. The cross and the name box keep
+  // their own jobs; only the picture toggles selection.
+  $("skThumbs").querySelectorAll(".pthumb img").forEach(img => img.addEventListener("click", (e) => {
+    const n = Number(e.target.closest(".pthumb").dataset.n);
+    if (SK_SELECTED.has(n)) SK_SELECTED.delete(n); else SK_SELECTED.add(n);
+    e.target.closest(".pthumb").classList.toggle("sel", SK_SELECTED.has(n));
+    skUpdateNameLabel();
+  }));
+  skUpdateNameLabel();
+  show("skOneRoomRow", SK_DESCRIBED.length > 0);
   $("skThumbs").querySelectorAll(".x").forEach(b => b.addEventListener("click", (e) => {
     const n = Number(e.target.closest(".pthumb").dataset.n);
-    const f = SK_FRAMES.find(x => x.n === n);
-    f.keep = !f.keep;
+    SK_FRAMES = SK_FRAMES.filter(x => x.n !== n);
+    SK_DESCRIBED = SK_DESCRIBED.filter(x => x.n !== n);
+    if (!SK_FRAMES.length) { show("skFramesCard", false); $("skAssemble").disabled = true; return say("skMsg","warn","Every still has been removed. Pull the stills again."); }
     skRenderThumbs();
   }));
 }
 
-$("skPull").addEventListener("click", async () => {
-  const file = $("skVideo").files[0];
-  if (!file) return say("skMsg","err","Choose the walkthrough video first.");
-  if (!$("skLabel").value.trim()) return say("skMsg","err","Give the property a label. Not the address: something like 'The Portmore house'.");
-  const count = Math.max(4, Math.min(36, Number($("skCount").value) || 12));
-  $("skPull").disabled = true;
-  say("skMsg","ok","Reading the video. It is not being uploaded.");
+// A photograph becomes one still, downscaled the same way a video frame is.
+async function skFromImage(file){
+  const url = URL.createObjectURL(file);
   try {
-    SK_FRAMES = await skExtract(file, count);
-    SK_DESCRIBED = []; SK_PACK = null;
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error(`${file.name} could not be read as an image.`)); i.src = url; });
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 960 / Math.max(img.naturalWidth || 960, img.naturalHeight || 720));
+    canvas.width = Math.round((img.naturalWidth || 960) * scale);
+    canvas.height = Math.round((img.naturalHeight || 720) * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    return { t: 0, data: canvas.toDataURL("image/jpeg", 0.72), keep: true, source: file.name };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+const SK_MAX_STILLS = 30;
+
+// Several files, one report, since 6 September 2026. Each Pull ADDS to the
+// stills already on the page, numbered on from the last, so a walkthrough of
+// three videos and a handful of photographs comes out as one document. Start
+// again clears the lot.
+$("skPull").addEventListener("click", async () => {
+  const files = [...$("skVideo").files];
+  if (!files.length) return say("skMsg","err","Choose a video or some photographs first.");
+  if (!$("skLabel").value.trim()) return say("skMsg","err","Give the property a label, something like 'The Portmore house'.");
+  const isVideo = (f) => /\.mp4$/i.test(f.name) || f.type === "video/mp4";
+  const isImage = (f) => /\.(jpe?g|png)$/i.test(f.name) || /^image\/(jpeg|png)$/.test(f.type);
+  const bad = files.find(f => !isVideo(f) && !isImage(f));
+  if (bad) return say("skMsg","err",`${bad.name} is not an MP4 video or a JPG or PNG photograph. Videos must be MP4: send it to yourself on WhatsApp and use the copy it sends back.`);
+  // Sixteen per video at most, eight by default, since 6 September 2026.
+  // Thirty-six stills of one bedroom is thirty-six near-identical pictures
+  // for the model to reconcile, and it invented a second room out of them.
+  const perVideo = Math.max(4, Math.min(16, Number($("skCount").value) || 8));
+  $("skPull").disabled = true;
+  try {
+    const added = [];
+    for (const file of files) {
+      if (SK_FRAMES.length + added.length >= SK_MAX_STILLS) { say("skMsg","warn",`Stopped at ${SK_MAX_STILLS} stills. That is enough for one report; build it, or Start again.`); break; }
+      const mb = Math.round(file.size / 1048576);
+      say("skMsg","ok", `Reading ${file.name}${mb > 400 ? `, ${mb} MB, which can take a minute to open` : ""}. It is not being uploaded.`);
+      if (isVideo(file)) {
+        const room = SK_MAX_STILLS - SK_FRAMES.length - added.length;
+        const stills = await skExtract(file, Math.min(perVideo, Math.max(1, room)));
+        stills.forEach(s => added.push({ ...s, source: file.name }));
+      } else {
+        added.push(await skFromImage(file));
+      }
+    }
+    let n = SK_FRAMES.length;
+    added.forEach(s => { s.n = ++n; });
+    SK_FRAMES = [...SK_FRAMES, ...added];
+    SK_SELECTED.clear(); $("skApplied").textContent = "";
+    SK_PACK = null;
     show("skFramesCard", true); show("skPackCard", false); show("skPreviewCard", false);
     $("skProgress").textContent = "";
     $("skAssemble").disabled = true;
+    $("skVideo").value = "";
     skRenderThumbs();
-    say("skMsg","ok",`${SK_FRAMES.length} stills pulled from ${mmss(SK_FRAMES[SK_FRAMES.length-1].t)} of footage. Nothing has left this machine.`);
+    const undescribed = SK_FRAMES.filter(f => !SK_DESCRIBED.some(d => d.n === f.n)).length;
+    say("skMsg","ok",`${added.length} still${added.length === 1 ? "" : "s"} added from ${files.length} file${files.length === 1 ? "" : "s"}, ${SK_FRAMES.length} on the page. Nothing has left this machine.${undescribed && SK_DESCRIBED.length ? ` ${undescribed} still${undescribed === 1 ? " is" : "s are"} not described yet; Describe runs only those.` : ""}`);
   } catch (e) {
     say("skMsg","err", e.message);
   }
   $("skPull").disabled = false;
 });
 
+$("skClear").addEventListener("click", () => {
+  if (SK_FRAMES.length && !confirm("Remove every still on the page and start again?")) return;
+  SK_FRAMES = []; SK_DESCRIBED = []; SK_SELECTED.clear(); SK_PACK = null;
+  $("skVideo").value = ""; $("skApplied").textContent = ""; $("skProgress").textContent = "";
+  show("skFramesCard", false); show("skPackCard", false); show("skPreviewCard", false);
+  say("skMsg","ok","Cleared. Pick the files for the next report.");
+});
+
 $("skDescribe").addEventListener("click", async () => {
-  const kept = SK_FRAMES.filter(f => f.keep);
-  if (!kept.length) return say("skMsg","err","Every still is dropped. Keep at least one.");
+  // Only the stills not yet described, so adding a second video does not
+  // re-run, and re-name, the first.
+  const kept = SK_FRAMES.filter(f => f.keep && !SK_DESCRIBED.some(d => d.n === f.n));
+  if (!kept.length) return say("skMsg", SK_FRAMES.length ? "ok" : "err", SK_FRAMES.length ? "Every still on the page is already described. Name the rooms, then build the pack." : "Pull some stills first.");
   $("skDescribe").disabled = true;
-  SK_DESCRIBED = [];
   const scrubs = [];
   try {
-    // Six at a time. The batching is not politeness, it is what keeps each
-    // call inside the edge function's timeout.
-    for (let i = 0; i < kept.length; i += 6) {
-      const batch = kept.slice(i, i + 6);
-      $("skProgress").textContent = `Looking at stills ${batch[0].n} to ${batch[batch.length-1].n}, ${i + batch.length} of ${kept.length}.`;
-      const out = await skFn({
-        action: "frames",
-        images: batch.map(b => b.data),
-        start_at: batch[0].n,
-        context: $("skContext").value.trim(),
-      });
+    // One at a time. The batching is not politeness, it is what keeps each
+    // call inside the edge function's timeout. It was six until 6 September
+    // 2026, then three, and three stills at 960px was still enough for NVIDIA
+    // to answer nothing in forty seconds on the first real walkthrough. One
+    // still is a call the model answers in seconds, and twelve short calls
+    // beat one long one that dies.
+    // A still the model fumbles must not stop the eleven after it. Since
+    // 6 September 2026 a failure is noted against that still and the loop
+    // carries on; the failed ones get one more go at the end; and whatever is
+    // still missing is written into the pack as "not described", which the
+    // "what this pack does not cover" section is for.
+    const failed = [];
+    const describeOne = async (f) => {
+      const out = await skFn({ action: "frames", images: [f.data], start_at: f.n, context: $("skContext").value.trim() });
       SK_DESCRIBED.push(...(out.frames || []));
       scrubs.push(...(out.scrubbed || []));
+    };
+    for (let i = 0; i < kept.length; i += 1) {
+      $("skProgress").textContent = `Looking at still ${kept[i].n}, ${i + 1} of ${kept.length}.`;
+      try { await describeOne(kept[i]); } catch (e) { failed.push({ f: kept[i], why: e.message }); }
       skRenderThumbs();
     }
+    const secondGo = failed.splice(0);
+    for (const { f } of secondGo) {
+      $("skProgress").textContent = `Trying still ${f.n} once more.`;
+      try { await describeOne(f); } catch (e) { failed.push({ f, why: e.message }); }
+      skRenderThumbs();
+    }
+    for (const { f } of failed) {
+      SK_DESCRIBED.push({ n: f.n, room: "", room_confidence: "low", same_room_as_previous: false, visible: "Not described: the vision model did not give a usable answer for this still.", doors_to: [], observations: [] });
+    }
+    SK_DESCRIBED.sort((a, b) => a.n - b.n);
+    skRenderThumbs();
     $("skProgress").textContent = "";
     $("skAssemble").disabled = false;
-    say("skMsg", scrubs.length ? "warn" : "ok",
+    const described = kept.length - failed.length;
+    const tail = failed.length ? ` ${failed.length} still${failed.length > 1 ? "s" : ""} (${failed.map(x => x.f.n).join(", ")}) could not be read after two tries and will show as not described.` : "";
+    say("skMsg", scrubs.length || failed.length ? "warn" : "ok",
       scrubs.length
-        ? `${SK_DESCRIBED.length} stills described. ${scrubs.length} measurement phrase${scrubs.length > 1 ? "s were" : " was"} removed: the model tried to state a size it cannot know. That is the guard doing its job.`
-        : `${SK_DESCRIBED.length} stills described, no measurements attempted. Now build the pack.`);
+        ? `${described} of ${kept.length} stills described. ${scrubs.length} measurement phrase${scrubs.length > 1 ? "s were" : " was"} removed: the model tried to state a size it cannot know. That is the guard doing its job.${tail}`
+        : `${described} of ${kept.length} stills described, no measurements attempted.${tail} Now build the pack.`);
   } catch (e) {
     $("skProgress").textContent = "";
     say("skMsg","err", /NVIDIA_API_KEY/i.test(e.message)
@@ -4882,19 +5575,60 @@ $("skDescribe").addEventListener("click", async () => {
   $("skDescribe").disabled = false;
 });
 
+function skUpdateNameLabel(){
+  const live = [...SK_SELECTED].filter(n => SK_FRAMES.some(f => f.n === n));
+  $("skOneRoomLabel").textContent = live.length
+    ? `Name the ${live.length} selected still${live.length === 1 ? "" : "s"} (${live.sort((a, b) => a - b).join(", ")})`
+    : "Name every still";
+}
+
+// Naming rooms by hand. The commonest correction is a short video of one room
+// that the model read as two because the angle changed; the next commonest is
+// a real walkthrough of several rooms where the model's names drift. Select
+// the stills for a room, name it, Apply, repeat. Nothing selected means all.
+$("skOneRoomApply").addEventListener("click", () => {
+  const name = $("skOneRoom").value.trim();
+  if (!name) { $("skApplied").textContent = "Type the room's name first."; return say("skMsg","err","Type the room's name first."); }
+  const chosen = [...SK_SELECTED].filter(n => SK_FRAMES.some(f => f.n === n));
+  const targets = chosen.length ? SK_DESCRIBED.filter(d => chosen.includes(d.n)) : SK_DESCRIBED;
+  if (!targets.length) return say("skMsg","err","Describe the stills first, then name them.");
+  targets.forEach((d) => { d.room = name; d.room_confidence = "high"; d.doors_to = []; });
+  // same_room_as_previous follows the names now, still by still, in order.
+  SK_DESCRIBED.sort((a, b) => a.n - b.n).forEach((d, i, arr) => { d.same_room_as_previous = i > 0 && String(arr[i - 1].room || "").trim().toLowerCase() === String(d.room || "").trim().toLowerCase(); });
+  const which = chosen.length ? `still${chosen.length === 1 ? "" : "s"} ${chosen.sort((a, b) => a - b).join(", ")}` : `every still`;
+  SK_SELECTED.clear();
+  skRenderThumbs();
+  // Say it three ways: on the button, under the box, and in the card message.
+  const btn = $("skOneRoomApply"); const was = btn.textContent;
+  btn.textContent = "Applied"; btn.disabled = true;
+  setTimeout(() => { btn.textContent = was; btn.disabled = false; }, 1800);
+  $("skApplied").textContent = `"${name}" is now on ${which}.`;
+  const rooms = [...new Set(SK_DESCRIBED.map(d => String(d.room || "").trim()).filter(Boolean))];
+  say("skMsg","ok",`"${name}" applied to ${which}. The pack will have ${rooms.length} room${rooms.length === 1 ? "" : "s"}: ${rooms.join(", ")}.`);
+  $("skOneRoom").value = ""; $("skOneRoom").focus();
+});
+
 $("skAssemble").addEventListener("click", async () => {
   if (!SK_DESCRIBED.length) return say("skMsg","err","Describe the stills first.");
   $("skAssemble").disabled = true;
   say("skMsg","ok","Working out the rooms and drawing the sketch.");
   try {
+    // The stills go with their descriptions now, so the report can print the
+    // photograph beside the words. Only the ones still on the page.
+    const images = Object.fromEntries(SK_FRAMES.filter(f => SK_DESCRIBED.some(d => d.n === f.n)).map(f => [String(f.n), f.data]));
     const out = await skFn({
       action: "assemble",
-      frames: SK_DESCRIBED,
+      frames: SK_DESCRIBED.filter(d => SK_FRAMES.some(f => f.n === d.n)),
+      images,
       property_label: $("skLabel").value.trim(),
       client_name: $("skClient").value.trim(),
       parish: $("skParish").value.trim(),
       visit_date: $("skDate").value || null,
       captured_by: $("skWho").value.trim(),
+      conditions: $("skConditions").value.trim(),
+      job_ref: $("skJobRef").value.trim(),
+      contractor: $("skContractor").value.trim(),
+      visit_notes: $("skVisitNotes").value.trim(),
     });
     SK_PACK = out.pack;
     skRenderPack(out);
@@ -4942,6 +5676,93 @@ function safeSvg(raw){
   }
 }
 
+// The measurement rule, the desk's copy. Mirrors has_measurement() in the
+// database and MEASUREMENT_PATTERN in supabase/functions/_shared. Here so a
+// person typing "the crack is about 2 metres" into the report is told at the
+// moment they save it, rather than at the moment they try to approve it. The
+// database still refuses the approval either way: this is courtesy, not the
+// control. If the rule changes, change it in all three.
+const SK_MEASUREMENT = /(^|[^a-z0-9])[0-9]+([.,][0-9]+)?\s*[-]?\s*(mm|cm|m|m2|m²|km|metre|metres|meter|meters|ft|ft2|foot|feet|yd|yds|yard|yards|inch|inches|acre|acres|sq\.?\s*(m|ft|yd|metre|metres|meter|meters|foot|feet|yard|yards)|square\s+(metre|metres|meter|meters|foot|feet|yard|yards))([^a-z0-9]|$)|(^|[^a-z0-9])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|half|quarter)(\s+and)?(\s+a)?(\s+(half|quarter))?[\s-]+(metre|metres|foot|feet|inch|inches|yard|yards)([^a-z0-9]|$)|[0-9]+\s*(['"])(\s*[0-9]+([.,][0-9]+)?\s*")?(\s|$|[.,;)])/i;
+
+const SK_CATS = ["cosmetic","maintenance","safety","structural","scope_mismatch"];
+const SK_SEVS = ["low","medium","high"];
+
+/**
+ * The draft, editable, before anybody sees it.
+ *
+ * Everything a client reads can be corrected here: the room names, the words
+ * beside every photograph, the notes, and the detail block. The model wrote a
+ * first draft and a named person decides what the document actually says,
+ * which is the governing rule wearing an ordinary form. Only a draft is
+ * editable; approving freezes it, and reopening clears the approval.
+ */
+function skEditor(p){
+  const rooms = p.rooms || [];
+  const frames = p.frames || [];
+  const byN = new Map(frames.map(f => [Number(f.n), f]));
+  const placed = new Set();
+  const isImg = (s) => /^data:image\/(png|jpeg|jpg);base64,/.test(String(s || ""));
+
+  const obsBlock = (path, o, i) => `
+    <div class="obs" data-path="${path}" data-i="${i}">
+      <textarea data-f="note" rows="2" placeholder="What is visible, in one sentence">${esc(o.note || "")}</textarea>
+      <div class="obsrow">
+        <select data-f="category">${SK_CATS.map(c => `<option value="${c}"${o.category === c ? " selected" : ""}>${c.replace("_"," ")}</option>`).join("")}</select>
+        <select data-f="severity">${SK_SEVS.map(s => `<option value="${s}"${o.severity === s ? " selected" : ""}>${s}</option>`).join("")}</select>
+        <label class="pro"><input type="checkbox" data-f="recommend_professional"${o.recommend_professional ? " checked" : ""}> qualified eye</label>
+        <button class="btn d sm" data-act="delobs">Remove</button>
+      </div>
+    </div>`;
+
+  const photoBlock = (n) => {
+    const f = byN.get(n) || { n }; placed.add(n);
+    return `<div class="pedit" data-n="${n}">
+      <div class="pic">${isImg(f.image) ? `<img src="${f.image}" alt="Photograph ${n}">` : `<div class="noimg">Photograph ${n}</div>`}<div class="pn">${n}</div></div>
+      <div class="txt">
+        <label>What this photograph shows</label>
+        <textarea data-f="caption" rows="2" placeholder="One sentence on what the photograph shows">${esc(f.caption || "")}</textarea>
+        <div class="obslist">${(f.observations || []).map((o, i) => obsBlock(`frame:${n}`, o, i)).join("")}</div>
+        <button class="btn g sm" data-act="addobs" data-path="frame:${n}">Add a finding to this photograph</button>
+      </div>
+    </div>`;
+  };
+
+  const roomBlocks = rooms.map((r, ri) => {
+    const ns = (r.frames || []).map(Number).filter(n => byN.has(n));
+    return `<section class="redit" data-ri="${ri}">
+      <div class="rhead">
+        <input data-f="roomname" value="${esc(r.name || "")}" placeholder="Room name">
+        <select data-f="level">${["ground","upper","outside","roof"].map(l => `<option value="${l}"${r.level === l ? " selected" : ""}>${l}</option>`).join("")}</select>
+        <span class="cnt">${ns.length} photograph${ns.length === 1 ? "" : "s"}</span>
+      </div>
+      <div class="rooombs"><label>Findings for the room as a whole</label>
+        <div class="obslist">${(r.observations || []).map((o, i) => obsBlock(`room:${ri}`, o, i)).join("")}</div>
+        <button class="btn g sm" data-act="addobs" data-path="room:${ri}">Add a finding to this room</button>
+      </div>
+      ${ns.map(photoBlock).join("")}
+    </section>`;
+  }).join("");
+
+  const loose = frames.map(f => Number(f.n)).filter(n => !placed.has(n)).sort((a,b) => a-b);
+
+  return `<div id="skEdit">
+    <p class="hint" style="margin:0 0 10px">This is the draft. <b>Everything here is what the client will read</b>, so correct it now. Nothing is sent until you approve and then issue it.</p>
+    <div class="row">
+      <div style="flex:1"><label>Job reference</label><input id="skEJobRef" value="${esc(p.job_ref || "")}" placeholder="The client's own reference"></div>
+      <div style="flex:1"><label>Contractor</label><input id="skEContractor" value="${esc(p.contractor || "")}" placeholder="Who is doing the work, if anyone yet"></div>
+      <div style="flex:1"><label>Conditions on the day</label><input id="skEConditions" value="${esc(p.conditions || "")}" placeholder="Sunny, dry, after rain overnight"></div>
+    </div>
+    <label style="margin-top:10px">Your own notes from the visit, one per line</label>
+    <textarea id="skEVisitNotes" rows="4" placeholder="What you saw, in your own words. One line each.">${esc(p.visit_notes || "")}</textarea>
+    ${roomBlocks || '<p class="hint">No rooms in this pack.</p>'}
+    ${loose.length ? `<section class="redit"><div class="rhead"><b>Photographs not in a room</b></div>${loose.map(photoBlock).join("")}</section>` : ""}
+    <div class="brow" style="margin-top:14px">
+      <button class="btn" id="skSaveBtn">Save the changes</button>
+      <span id="skSaveMsg" style="color:var(--dim);font-size:12px;align-self:center"></span>
+    </div>
+  </div>`;
+}
+
 function skRenderPack(extra){
   const p = SK_PACK;
   if (!p) return show("skPackCard", false);
@@ -4954,8 +5775,13 @@ function skRenderPack(extra){
 
   $("skPackBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}${p.parish ? " &middot; " + esc(p.parish) : ""}</p>
+    <div class="row" style="align-items:flex-end;margin-bottom:12px">
+      <div style="flex:1"><label>Property address, printed on the report with a map</label><input id="skAddress" value="${esc(p.address || "")}" placeholder="12 Hope Road, Kingston 6" ${draft ? "" : "disabled"}></div>
+      ${draft ? `<div><button class="btn g" id="skMapBtn">${p.map_image ? "Update the map" : "Add the map"}</button></div>` : ""}
+    </div>
+    ${p.map_image && /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(p.map_image) ? `<div class="sketchbox" style="margin-bottom:12px"><img src="${p.map_image}" alt="Map of the property" style="width:100%;display:block;border-radius:8px"></div>` : ""}
     ${p.sketch_svg ? `<div class="sketchbox">${safeSvg(p.sketch_svg)}</div>` : ""}
-    <div class="tw"><table>
+    ${draft ? skEditor(p) : `<div class="tw"><table>
       <thead><tr><th>Room</th><th>Photos</th><th>What was seen</th></tr></thead>
       <tbody>${rooms.map(r => `
         <tr>
@@ -4967,7 +5793,7 @@ function skRenderPack(extra){
              ${o.recommend_professional ? '<span style="color:var(--coral)"> Needs a qualified eye.</span>' : ""}</div>`).join("")
             : '<span style="color:var(--dim)">Nothing notable visible.</span>'}</td>
         </tr>`).join("")}</tbody>
-    </table></div>
+    </table></div>`}
     ${(extra?.scrubbed || []).length ? `<div class="alert warn"><span class="ic">!</span><div><b>${extra.scrubbed.length} measurement phrase${extra.scrubbed.length > 1 ? "s" : ""} removed before this was saved</b><p>What the model tried to say: ${esc(extra.scrubbed.slice(0,3).join(" · "))}</p></div></div>` : ""}
     ${(extra?.gaps || []).length ? `<div class="qs"><h4>What this pack does not cover</h4><ul>${extra.gaps.map(g => "<li>" + esc(g) + "</li>").join("")}</ul></div>` : ""}
     <div class="brow" style="margin-top:16px">
@@ -4981,6 +5807,107 @@ function skRenderPack(extra){
     ${p.status === "approved" ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>` : ""}`;
 
   show("skPackCard", true);
+
+  // ── Editing the draft ──
+  //
+  // Reads every field back out of the form into the same shape the pack is
+  // stored in, checks it for a measurement the way the database will, and
+  // writes it. Only drafts have this form; the freeze trigger refuses content
+  // changes on anything approved or issued, which is the real control.
+  const editEl = $("skEdit");
+  if (editEl) {
+    const collect = () => {
+      const rooms = [...editEl.querySelectorAll(".redit[data-ri]")].map(sec => {
+        const ri = Number(sec.dataset.ri);
+        const base = (p.rooms || [])[ri] || {};
+        const obs = [...sec.querySelectorAll(`.rooombs .obs`)].map(readObs).filter(o => o.note);
+        return { ...base,
+          name: sec.querySelector('[data-f="roomname"]').value.trim() || base.name || `Room ${ri + 1}`,
+          level: sec.querySelector('[data-f="level"]').value,
+          observations: obs };
+      });
+      const frames = (p.frames || []).map(f => {
+        const el = editEl.querySelector(`.pedit[data-n="${f.n}"]`);
+        if (!el) return f;
+        return { ...f,
+          caption: el.querySelector('[data-f="caption"]').value.trim(),
+          observations: [...el.querySelectorAll(".obs")].map(readObs).filter(o => o.note) };
+      });
+      return { rooms, frames,
+        job_ref: $("skEJobRef").value.trim(),
+        contractor: $("skEContractor").value.trim(),
+        conditions: $("skEConditions").value.trim(),
+        visit_notes: $("skEVisitNotes").value.trim() };
+    };
+    const readObs = (el) => ({
+      note: el.querySelector('[data-f="note"]').value.trim(),
+      category: el.querySelector('[data-f="category"]').value,
+      severity: el.querySelector('[data-f="severity"]').value,
+      recommend_professional: el.querySelector('[data-f="recommend_professional"]').checked,
+    });
+
+    // Add and remove a finding, without a save in between.
+    editEl.addEventListener("click", (e) => {
+      const add = e.target.closest('[data-act="addobs"]');
+      const del = e.target.closest('[data-act="delobs"]');
+      if (!add && !del) return;
+      e.preventDefault();
+      if (del) { const o = del.closest(".obs"); const list = o.parentElement; o.remove(); if (!list.children.length) list.innerHTML = ""; return; }
+      const list = add.previousElementSibling;
+      const i = list.children.length;
+      const div = document.createElement("div");
+      div.innerHTML = `<div class="obs" data-path="${add.dataset.path}" data-i="${i}">
+        <textarea data-f="note" rows="2" placeholder="What is visible, in one sentence"></textarea>
+        <div class="obsrow">
+          <select data-f="category">${SK_CATS.map(c => `<option value="${c}"${c === "maintenance" ? " selected" : ""}>${c.replace("_"," ")}</option>`).join("")}</select>
+          <select data-f="severity">${SK_SEVS.map(s => `<option value="${s}">${s}</option>`).join("")}</select>
+          <label class="pro"><input type="checkbox" data-f="recommend_professional"> qualified eye</label>
+          <button class="btn d sm" data-act="delobs">Remove</button>
+        </div></div>`;
+      list.appendChild(div.firstElementChild);
+      list.lastElementChild.querySelector("textarea").focus();
+    });
+
+    $("skSaveBtn").addEventListener("click", async () => {
+      const patch = collect();
+      // The same rule the database enforces, checked here so she is told now
+      // rather than when the approval is refused.
+      const texts = [
+        ...patch.rooms.flatMap(r => [r.name, ...(r.observations || []).map(o => o.note)]),
+        ...patch.frames.flatMap(f => [f.caption, ...(f.observations || []).map(o => o.note)]),
+        patch.visit_notes, patch.job_ref, patch.contractor,
+      ].filter(Boolean);
+      const bad = texts.find(t => SK_MEASUREMENT.test(t));
+      if (bad) return say("skPackMsg","err",`That states a measurement, and this report may not: "${bad.slice(0,120)}". A photograph carries no scale, so the number was invented. Say it in words instead, for example a full height crack.`);
+
+      $("skSaveBtn").disabled = true; $("skSaveMsg").textContent = "Saving.";
+      const { error } = await sb.from("sketch_packs").update(patch).eq("id", p.id);
+      $("skSaveBtn").disabled = false;
+      if (error) { $("skSaveMsg").textContent = ""; return say("skPackMsg","err", error.message); }
+      $("skSaveMsg").textContent = "Saved.";
+      say("skPackMsg","ok","Saved. Preview it to see what the client will read.");
+      setTimeout(() => { const m = $("skSaveMsg"); if (m) m.textContent = ""; }, 2500);
+      SK_PACK = { ...p, ...patch };
+    });
+  }
+
+  // The map. The address goes to Google once, the image comes back and is
+  // stored on the pack, and the report prints both. Founder instruction,
+  // 6 September 2026.
+  const mapBtn = $("skMapBtn");
+  if (mapBtn) mapBtn.addEventListener("click", async () => {
+    const address = $("skAddress").value.trim();
+    if (!address) return say("skPackMsg","err","Type the property address first.");
+    mapBtn.disabled = true; mapBtn.textContent = "Asking Google for the map";
+    try {
+      await skFn({ action: "map", pack_id: p.id, address });
+      say("skPackMsg","ok","Map added. It prints on the report under the address.");
+      await skReload(p.id);
+    } catch (e) {
+      say("skPackMsg","err", e.message);
+      mapBtn.disabled = false; mapBtn.textContent = p.map_image ? "Update the map" : "Add the map";
+    }
+  });
 
   $("skPreviewBtn").addEventListener("click", async () => {
     try {

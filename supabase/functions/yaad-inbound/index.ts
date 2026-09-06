@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { fetchModel, pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
@@ -798,27 +798,24 @@ async function classifyTheJob(
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "classify",
     }, async (sp) => {
-      const r = await fetchModel(prov.api, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // 2000, down from the 6000 the combined call needed. This one emits
-          // a fixed set of short fields and never a paragraph, so the budget
-          // is for the model's own reasoning and a couple of hundred tokens of
-          // JSON. Temperature 0: there is one right reading of "it in
-          // Portland" and creativity is not wanted anywhere near it.
-          model: prov.model, temperature: 0, max_tokens: 2000,
-          messages: [
-            { role: "system", content: CLASSIFY_SYSTEM },
-            { role: "user", content: text.slice(0, 6000) },
-          ],
-        }),
-        signal: sig,
-      }, { timeoutMs: 25000 });
+      // Retry, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      // The request budget still travels with the call as `signal`.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        // 2000, down from the 6000 the combined call needed. This one emits
+        // a fixed set of short fields and never a paragraph, so the budget
+        // is for the model's own reasoning and a couple of hundred tokens of
+        // JSON. Temperature 0: there is one right reading of "it in
+        // Portland" and creativity is not wanted anywhere near it.
+        temperature: 0, max_tokens: 2000,
+        messages: [
+          { role: "system", content: CLASSIFY_SYSTEM },
+          { role: "user", content: text.slice(0, 6000) },
+        ],
+      }, { timeoutMs: 25000, signal: sig });
       const raw = await r.text();
-      sp.setAttributes({ "http.response.status_code": r.status });
+      sp.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
       if (!r.ok) {
-        const msg = `classify: ${prov.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        const msg = `classify: ${provider.name} http ${r.status}: ${raw.slice(0, 200)}`;
         sp.recordError(msg); console.error(msg); return null;
       }
       let j: Record<string, unknown> = {};
@@ -974,18 +971,16 @@ async function composeReply(
     return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.model.job": "compose",
     }, async (sp) => {
-      const r = await fetchModel(prov.api, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          // 1200. The reply itself is under 400 characters by instruction, so
-          // this is almost entirely the model's own reasoning, and there is far
-          // less to reason about now that the classification is already done
-          // and handed to it.
-          model: prov.model, temperature: 0.3, max_tokens: 1200,
-          messages: [
-            { role: "system", content: COMPOSE_SYSTEM },
-            { role: "user", content:
+      // Retry, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        // 1200. The reply itself is under 400 characters by instruction, so
+        // this is almost entirely the model's own reasoning, and there is far
+        // less to reason about now that the classification is already done
+        // and handed to it.
+        temperature: 0.3, max_tokens: 1200,
+        messages: [
+          { role: "system", content: COMPOSE_SYSTEM },
+          { role: "user", content:
 `STATE: ${stage}
 
 ALREADY UNDERSTOOD:
@@ -993,14 +988,12 @@ ${known}
 
 THE CONVERSATION SO FAR, oldest first:
 ${transcript.slice(0, 6000)}` },
-          ],
-        }),
-        signal: sig,
-      }, { timeoutMs: 25000 });
+        ],
+      }, { timeoutMs: 25000, signal: sig });
       const raw = await r.text();
-      sp.setAttributes({ "http.response.status_code": r.status });
+      sp.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
       if (!r.ok) {
-        const msg = `compose: ${prov.name} http ${r.status}: ${raw.slice(0, 200)}`;
+        const msg = `compose: ${provider.name} http ${r.status}: ${raw.slice(0, 200)}`;
         sp.recordError(msg); console.error(msg); return "";
       }
       let j: Record<string, unknown> = {};

@@ -25,13 +25,29 @@
 // no nine-file edit. That was the whole point of moving the decision into this
 // file ahead of the decision itself, and it worked exactly as designed.
 //
-// The MiniMax branch that used to sit below has been REMOVED, which is step
-// three of RUNBOOK §9. It was correct while it was the current choice. It
-// stops being correct the moment Mistral is the choice, because then it is no
-// longer a provider, it is a silent fallback to China waiting for one missing
-// secret. There is deliberately nothing to fall back to now: with no provider
-// configured every caller gets NO_PROVIDER_MESSAGE and fails loudly, which is
-// the right failure. Do not reintroduce it.
+// ── The MiniMax fallback, removed 4 September, reinstated 5 September ──
+//
+// The branch was removed the day Mistral went live, on the reasoning that a
+// provider that is no longer the choice is a silent route to China waiting on
+// one missing secret. On 5 September 2026 Monique asked for it back as a
+// fallback for when the Mistral key does not load, was told plainly what that
+// means (any time Mistral is unconfigured, client and worker text goes to
+// China), and reaffirmed it. Founder decision, recorded in DECISIONS.md.
+//
+// So it is back, on three conditions that make it a decision rather than an
+// accident:
+//   1. pickTextProvider() reaches it ONLY when no Mistral key is set. A
+//      Mistral key that is present and failing gets the retry ladder in
+//      fetchModel first. On 6 September 2026 Monique added: the file must
+//      still be produced when Mistral is rate limited. So chatWithFailover()
+//      hands a call that is STILL 429 or 5xx after its retries to MiniMax,
+//      per call, logged each time, and only when MINIMAX_API_KEY is set.
+//   2. It is opt-in. With MINIMAX_API_KEY unset there is still no third
+//      branch, and every caller gets NO_PROVIDER_MESSAGE.
+//   3. It is never quiet. Every time it is chosen it writes a line to the
+//      function log naming the provider and the country, so "where did this
+//      message go" is answerable from the logs even with tracing off.
+// docs/privacy.html says the same thing to the people whose text it is.
 //
 // Every model span still carries yaadly.model.region, so "where did this
 // client's message actually go" is answerable from telemetry rather than from
@@ -97,12 +113,118 @@ export function pickTextProvider(): TextProvider | null {
     };
   }
 
-  // There is no third branch, on purpose. MiniMax (China) was here until
-  // 4 September 2026 and was removed the day Mistral went live, because a
-  // provider that is no longer the choice is not a fallback, it is a silent
-  // route to a country the privacy page says we do not use. Failing loudly
-  // is the correct behaviour: see NO_PROVIDER_MESSAGE below.
+  // 3. MiniMax, in China. The fallback, and only when no Mistral key is set.
+  // See the header: reinstated 5 September 2026 on Monique's reaffirmed
+  // instruction. It is opt-in through MINIMAX_API_KEY and it announces itself
+  // in the log on every call it is chosen for, because a reroute of personal
+  // data to another country is a thing to be able to see afterwards.
+  const minimax = minimaxProvider("MISTRAL_API_KEY is not set");
+  if (minimax) return minimax;
+
+  // No fourth branch. With neither key set every caller gets
+  // NO_PROVIDER_MESSAGE, which is a loud failure rather than a quiet guess.
   return null;
+}
+
+/**
+ * The MiniMax provider, if its key is set, announced in the log with the
+ * reason it is being reached for. Null when MINIMAX_API_KEY is unset, which
+ * is the state the estate is in unless somebody sets it on purpose.
+ */
+function minimaxProvider(reason: string): TextProvider | null {
+  const key = Deno.env.get("MINIMAX_API_KEY");
+  if (!key) return null;
+  console.error(
+    `textmodel: ${reason}, falling back to MiniMax (China). ` +
+    "Text sent on this call leaves the EU.",
+  );
+  return {
+    name: "minimax",
+    api: "https://api.minimax.io/v1/chat/completions",
+    key,
+    model: Deno.env.get("MINIMAX_MODEL") || "MiniMax-M2.7",
+    region: "cn",
+  };
+}
+
+/**
+ * The provider to try when the one in hand has refused with a rate limit or
+ * a server error, or null when there is nowhere else to go.
+ *
+ * Asked for on 6 September 2026: "I want my file to be produced even when the
+ * limit is used on Mistral." Before this, a 429 from Mistral on a report
+ * draft or a sketch assembly was the end of it: no retry, no second provider,
+ * a 502 to the desk. Now the call is retried with the Retry-After honoured
+ * (fetchModel), and only if Mistral still says no does this hand the call to
+ * MiniMax, if and only if MINIMAX_API_KEY is set. With it unset, which is the
+ * state today, this returns null and the failure stays loud.
+ *
+ * This widens the header's condition 1. A Mistral key that is present and
+ * rate limited now CAN fall through, per call, logged each time. It is the
+ * founder's instruction and DECISIONS.md carries it.
+ */
+export function pickFallbackProvider(after: TextProvider, reason: string): TextProvider | null {
+  if (after.name === "minimax") return null;
+  return minimaxProvider(`${after.name} ${reason}`);
+}
+
+export type FetchModelOpts = {
+  timeoutMs: number;
+  retryDelayMs?: number;
+  /** How long a Retry-After may ask us to wait before we give up instead. Default MAX_RETRY_WAIT_MS. */
+  maxRetryWaitMs?: number;
+  /** How many times to retry a 429 or 5xx. Default 1, which is right for a webhook. A desk call can afford more. */
+  retries?: number;
+  /** A caller's own deadline, combined with the timeout. The inbound webhook passes its request budget here. */
+  signal?: AbortSignal;
+};
+
+function deadline(opts: FetchModelOpts): AbortSignal {
+  const t = AbortSignal.timeout(opts.timeoutMs);
+  return opts.signal ? AbortSignal.any([opts.signal, t]) : t;
+}
+
+/**
+ * Which answers from the first provider are worth taking to the second.
+ *
+ * 429 and 5xx: the provider is there and busy or broken. 401 and 403, added
+ * 6 September 2026 when the Mistral key on the project started being refused
+ * as invalid and Monique said "use the MiniMax key when Mistral fails": the
+ * provider is refusing OUR CREDENTIALS, which says nothing about whether
+ * another provider will take the same request. A 400 stays out. That is the
+ * request itself being wrong, and it is wrong everywhere.
+ */
+export function failsOver(status: number): boolean {
+  return status === 429 || status === 401 || status === 403 || status >= 500;
+}
+
+/**
+ * One chat completion, with the retry ladder and then the failover.
+ *
+ * `payload` is the request without `model`; the model comes from whichever
+ * provider actually answers. The provider that answered comes back with the
+ * response so the caller can put the right name and region on its span.
+ */
+export async function chatWithFailover(
+  prov: TextProvider,
+  payload: Record<string, unknown>,
+  opts: FetchModelOpts,
+): Promise<{ provider: TextProvider; res: Response }> {
+  const call = (p: TextProvider) => fetchModel(p.api, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.key}` },
+    body: JSON.stringify({ ...payload, model: p.model }),
+  }, opts);
+
+  let res = await call(prov);
+  if (!failsOver(res.status)) return { provider: prov, res };
+
+  const fallback = pickFallbackProvider(prov, `http ${res.status} after retries`);
+  if (!fallback) return { provider: prov, res };
+
+  try { await res.text(); } catch (_) { /* discarded on purpose, see fetchModel */ }
+  res = await call(fallback);
+  return { provider: fallback, res };
 }
 
 /**
@@ -136,10 +258,12 @@ export function pickTextProvider(): TextProvider | null {
 export async function fetchModel(
   url: string,
   init: RequestInit,
-  opts: { timeoutMs: number; retryDelayMs?: number },
+  opts: FetchModelOpts,
 ): Promise<Response> {
   const delay = opts.retryDelayMs ?? 1200;
-  const once = () => fetch(url, { ...init, signal: AbortSignal.timeout(opts.timeoutMs) });
+  const budget = opts.maxRetryWaitMs ?? MAX_RETRY_WAIT_MS;
+  const retries = opts.retries ?? 1;
+  const once = () => fetch(url, { ...init, signal: deadline(opts) });
 
   let res: Response;
   try {
@@ -151,7 +275,11 @@ export async function fetchModel(
     return await once();
   }
 
-  if (res.status === 429 || res.status >= 500) {
+  // More than one retry, added 6 September 2026 for the desk callers. A
+  // Twilio webhook keeps the default of one because it has fifteen seconds in
+  // total; a person at the desk drafting a report can wait longer for the
+  // file than for a 502, and said so.
+  for (let attempt = 1; attempt <= retries && (res.status === 429 || res.status >= 500); attempt++) {
     // The body is read and discarded on purpose. Leaving it unread on a
     // response nobody will use leaks the connection in Deno.
     try { await res.text(); } catch (_) { /* nothing to do with it */ }
@@ -169,20 +297,23 @@ export async function fetchModel(
     // Failing immediately is the better answer, because it leaves time to send
     // the person a real reply instead of timing out silently mid-wait.
     const waitMs = retryAfterMs(res.headers.get("retry-after"));
-    if (waitMs !== null && waitMs > MAX_RETRY_WAIT_MS) {
+    if (waitMs !== null && waitMs > budget) {
       console.error(
         `fetchModel: http ${res.status}, Retry-After is ${Math.round(waitMs / 1000)}s, ` +
-        `longer than the ${MAX_RETRY_WAIT_MS}ms budget. Not retrying.`,
+        `longer than the ${budget}ms budget. Not retrying.`,
       );
       return res;
     }
     const pause = waitMs ?? delay;
     console.error(
-      `fetchModel: http ${res.status}, retrying once in ${pause}ms` +
+      `fetchModel: http ${res.status}, retry ${attempt} of ${retries} in ${pause}ms` +
       (waitMs !== null ? " (Retry-After)" : ""),
     );
     await new Promise((r) => setTimeout(r, pause));
-    return await once();
+    res = await once();
+    if (res.status === 429 || res.status >= 500) {
+      try { await res.text(); } catch (_) { /* nothing to do with it */ }
+    }
   }
   return res;
 }
@@ -220,9 +351,33 @@ export function retryAfterMs(header: string | null): number | null {
   return ms > 0 ? ms : null;
 }
 
+/**
+ * The model's answer with its thinking removed.
+ *
+ * MiniMax-M2.7 reasons inside a <think> block before it answers, and on
+ * 6 September 2026 the sketch assembler read that block as the answer and
+ * reported "not in JSON". yaad-inbound had already learned this on its own.
+ * Every caller that parses a model's text should go through here first.
+ */
+export function answerText(content: unknown): string {
+  return String(content ?? "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+}
+
+/**
+ * The first JSON object in a model's answer, or null. First { to last },
+ * after the thinking is removed, so a sentence before or after the object
+ * does not matter.
+ */
+export function firstJsonObject(content: unknown): Record<string, unknown> | null {
+  const s = answerText(content);
+  const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  if (a < 0 || b <= a) return null;
+  try { return JSON.parse(s.slice(a, b + 1)); } catch (_) { return null; }
+}
+
 /** The error to return when no provider is configured at all. */
 export const NO_PROVIDER_MESSAGE =
-  "No text model is configured. Set MISTRAL_API_KEY in the Edge Function secrets.";
+  "No text model is configured. Set MISTRAL_API_KEY in the Edge Function secrets (MINIMAX_API_KEY is the fallback).";
 
 /**
  * Span attributes for a provider. Region travels with every call on purpose:

@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, type TextProvider, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, type TextProvider, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 
 // Project Kickoff Pack agent.
@@ -269,33 +269,30 @@ async function draftPart(
     "yaadly.agent.name": "kickoff",
     "yaadly.kickoff.part": part.name,
   }, async (s) => {
-    const r = await fetch(prov.api, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-      body: JSON.stringify({
-        model: prov.model,
-        temperature: 0.3,
-        max_tokens: part.maxTokens,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content:
-            userPrompt.slice(0, 8000) +
-            "\n\nFOR THIS RESPONSE ONLY: return STRICT JSON with EXACTLY these top-level keys and no others: " +
-            part.keys.join(", ") +
-            ". Follow the shape defined for those keys in the schema above. The remaining sections are being drafted separately; do not mention or include them." },
-        ],
-      }),
-      signal: AbortSignal.timeout(300_000),
-    });
-    const j = await r.json();
+    // Retries, then the failover, 6 September 2026. See _shared/textmodel.ts.
+    const { provider, res: r } = await chatWithFailover(prov, {
+      temperature: 0.3,
+      max_tokens: part.maxTokens,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content:
+          userPrompt.slice(0, 8000) +
+          "\n\nFOR THIS RESPONSE ONLY: return STRICT JSON with EXACTLY these top-level keys and no others: " +
+          part.keys.join(", ") +
+          ". Follow the shape defined for those keys in the schema above. The remaining sections are being drafted separately; do not mention or include them." },
+      ],
+    }, { timeoutMs: 300_000, retries: 2, maxRetryWaitMs: 15_000 });
+    let j: any = {};
+    try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
     s.setAttributes({
+      ...providerAttrs(provider),
       "http.response.status_code": r.status,
       "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
       "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
     });
     if (!r.ok) {
-      s.recordError(`${prov.name} http ${r.status}`);
-      throw new Error(`part ${part.name}: model call failed (${prov.name} ${r.status})`);
+      s.recordError(`${provider.name} http ${r.status}`);
+      throw new Error(`part ${part.name}: model call failed (${provider.name} ${r.status})`);
     }
     finishReason = j?.choices?.[0]?.finish_reason ?? "";
     return j?.choices?.[0]?.message?.content ?? "";

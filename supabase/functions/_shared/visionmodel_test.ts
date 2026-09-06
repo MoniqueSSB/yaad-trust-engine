@@ -32,10 +32,12 @@ Deno.test("no key configured is null, never a silent route to a country nobody c
   });
 });
 
-Deno.test("the defaults reproduce exactly what each call site resolved to before", () => {
+// Sketch moved to the 11b on 6 September 2026: the 90b answered nothing in
+// forty seconds, twice, on the first real walkthrough. See visionmodel.ts.
+Deno.test("the defaults are the ones each job is meant to run on", () => {
   withEnv({ ...CLEAR, NVIDIA_API_KEY: "k" }, () => {
     assertEquals(pickVisionProvider("evidence")!.model, "meta/llama-3.2-11b-vision-instruct");
-    assertEquals(pickVisionProvider("sketch")!.model, "meta/llama-3.2-90b-vision-instruct");
+    assertEquals(pickVisionProvider("sketch")!.model, "meta/llama-3.2-11b-vision-instruct");
     assertEquals(pickVisionProvider("vetting")!.model, "meta/llama-3.2-90b-vision-instruct");
   });
 });
