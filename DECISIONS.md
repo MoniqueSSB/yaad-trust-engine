@@ -44,6 +44,20 @@ The fix is to force a job when real photographs arrive, rather than to patch the
 
 ---
 
+## 2026-09-06 · A question that reaches a person still is not a job
+
+**Founder, reading her own WhatsApp while testing it:** *"yES IT WORKED, BUT IT HAD A JOB CODE, JOB-WA-1788699164893".*
+
+**Handing over forced a job row for about four hours that afternoon**, on my reasoning that a person taking a conversation over needs something to open, and that a reference with no row behind it is worse than no reference. Both halves were wrong, and the second was checkable.
+
+Somebody who asks a question and then asks for a person has not got a job. Minting one so that a notification has something to quote is the tail wagging the dog, and it quietly contradicted her own decision from earlier the same afternoon that a question writes no row at all.
+
+**The claim that a person needs a job to open was simply untrue.** The desk's Conversations view is keyed on `channel` and `from_addr`, not on a job, and renders "no job yet" for a thread without one. `v_waiting_on_you` (migration `20260904q`) selects `from public.intake_threads` with no join to `jobs` anywhere in it. So a person taking one of these over already has the whole conversation, found by the number it came from, which is exactly how she found this one. I had reasoned about the schema instead of reading it.
+
+**What followed from the fix.** `writeJob` is now `!!priorJobId || !justAsking`, and a single `reference` constant decides whether a code may be spoken at all, so a new reply cannot quote one that resolves to nothing. Six client-facing sentences were changed to read it rather than `jobId`. The alerts stopped opening with a code as well: it is the least useful thing in the message, and where a job really exists it is named once, at the end.
+
+---
+
 ## 2026-09-06 · A conversation becomes a job when she says so, and not before
 
 **Founder:** *"What if i want to turn this person into a job, can i do that, be saying, attached a job to this, as i dont want it To attach automatically to every single question that's asked."*
@@ -114,7 +128,7 @@ The fix is to force a job when real photographs arrive, rather than to patch the
 
 **Founder's two decisions, taken by her.** A question-asker keeps being answered and is never pushed at a person on the third turn; they reach one when they ask, which `wantsAPerson()` catches as a word match as well as a model read, or when nothing can answer them. And a question writes **no job row at all**, which needed `intake_threads.job_id` to stop being `NOT NULL`, since until then a conversation could not physically exist without a job. `web_chat_replies.job_id` came with it: `yaad-desk-reply` inserts `thread.job_id` there with no coalesce, so the first website question she answered from the desk would have failed `23502` and told her only "Could not save the reply".
 
-**Three consequences worth keeping in view.** `justAsking` is deliberately narrow, requiring the classifier to have positively said so *and* scope, trade and parish to all be empty, because its consequences are suppressive and must never fire on a guess. `handingOver` forces the job row regardless, so every reference this file ever speaks aloud has a row behind it and a person taking over has something to open. And `writerState` is not the same value as `stage`: the thread keeps recording `gathering`, which is true and which its check constraint requires, while the writer is told `helping`. Widening a database constraint to carry a hint for a prompt would be the tail wagging the dog.
+**Three consequences worth keeping in view.** `justAsking` is deliberately narrow, requiring the classifier to have positively said so *and* scope, trade and parish to all be empty, because its consequences are suppressive and must never fire on a guess. ~~`handingOver` forces the job row regardless, so every reference this file ever speaks aloud has a row behind it and a person taking over has something to open.~~ **That held for about four hours and was wrong; corrected the same evening, see "A question that reaches a person still is not a job" below.** And `writerState` is not the same value as `stage`: the thread keeps recording `gathering`, which is true and which its check constraint requires, while the writer is told `helping`. Widening a database constraint to carry a hint for a prompt would be the tail wagging the dog.
 
 **None of this touches §2 or §3.** No human gate moved. Nothing auto-releases, nothing is adjudicated, no price is quoted, and the banned-language screen, the promise stripper and the price-figure guard all still run on the same output path they always did. The new fixed strings were run through all three before they shipped.
 
