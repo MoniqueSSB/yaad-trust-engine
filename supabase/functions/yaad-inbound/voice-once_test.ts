@@ -120,3 +120,55 @@ Deno.test("the flag that tells the desk it was spoken is set where it is transcr
       "a transcription happens without recording that the message was spoken:\n" + site);
   }
 });
+
+// ── 6 September 2026, the same failure from the other end ────────────────
+//
+// The tests above stop the SAME audio being transcribed twice when the first
+// attempt succeeds. They could not see the case that actually happened next: a
+// first attempt that comes back EMPTY leaves msg.text empty, which leaves
+// every guard above open, so the second call site fetched the file from Twilio
+// again and transcribed it again. Both attempts were real work and only the
+// second returned the words. 5.7 seconds of a 12 second budget, for one short
+// note, most of it spent downloading the same file twice. What was left could
+// not fit the classifier, and the client was sent the opener that asks her to
+// say what she had just said.
+//
+// The retry is worth keeping: without it there would have been no transcript
+// at all. What is not worth keeping is paying for the download twice. So the
+// retry moved inside transcribeUrl, where the bytes are already in hand, and
+// the caller records that it tried.
+
+Deno.test("the retry happens where the audio already is, not by fetching it again", () => {
+  const at = src.indexOf("async function transcribeUrl(");
+  assert(at > 0, "transcribeUrl is gone or renamed");
+  const body = src.slice(at, src.indexOf("/** Keep what they sent."));
+  assert(body.length > 200, "transcribeUrl's body could not be read");
+  assert(/const attempt = async \(\)/.test(body),
+    "transcribeUrl no longer has a retryable attempt, so a first transcription " +
+    "that comes back empty costs a second download of the same audio");
+  assertEquals(body.match(/await attempt\(\)/g)?.length, 2,
+    "transcribeUrl should try exactly twice on bytes it already holds: once is " +
+    "a flaky provider losing a client's words, three times is the budget gone");
+  // The retry must still ask the budget for its slice, or it is a fixed
+  // timeout wearing a different hat, which is what deadline.ts exists for.
+  assert(body.includes("deadline.signal(4_000, 4_500, 1_200)"),
+    "the transcription attempt no longer asks the request budget for a slice");
+  // One download, inside the function, above both attempts.
+  assertEquals(body.match(/await fetch\(url, \{ headers, signal: fetchSig \}\)/g)?.length, 1,
+    "the audio is being downloaded more than once inside transcribeUrl");
+});
+
+Deno.test("an empty transcription does not reopen the guard on the next call site", () => {
+  // The flag is set BEFORE the attempt, deliberately. Setting it after, or
+  // only on success, restores exactly the behaviour this exists to stop.
+  const at = src.indexOf("msg.transcribeTried = true;");
+  assert(at > 0, "nothing records that a transcription was attempted");
+  const after = src.slice(at, at + 200);
+  assert(after.indexOf("await transcribeUrl(") > 0,
+    "the attempt is recorded after the transcription rather than before it, so " +
+    "an empty result still leaves the next call site free to fetch the same " +
+    "audio again");
+  assert(src.includes("if (!msg.text && !msg.transcribeTried && voice)"),
+    "the second call site no longer checks whether a transcription was already " +
+    "attempted, so an empty first attempt costs a second download");
+});

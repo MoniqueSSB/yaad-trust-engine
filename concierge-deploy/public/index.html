@@ -1905,6 +1905,16 @@ const VIEWS = [
         says:r => "Puts your words, exactly as typed, into the chat window on yaadly.co.uk, where they appear as you within a few seconds if the visitor still has the page open. If they have left, they cannot see it: the widget gave them a WhatsApp button with this reference, so expect them there. Replying also marks the thread as with you.",
         ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
         call: deskReply },
+      // Founder, 6 September 2026: "What if i want to turn this person into a
+      // job, can i do that... as i dont want it To attach automatically to
+      // every single question that's asked." A question writes no job row, on
+      // purpose. This is how one becomes a job, and a named human is the only
+      // thing that can do it. No confidence score, no auto promote.
+      { label:"Attach a job to this conversation", cls:"g",
+        when:r => !r.job_id,
+        rpc:"attach_job_to_thread",
+        args:(r) => ({ p_channel:r.channel, p_from:r.from_addr }),
+        says:r => `Creates a job from this conversation and links the two, so everything ${esc(r.from_addr || "they")} said travels with it. It sends nothing and tells them nothing. It lands closed, at stage 0, showing as awaiting client setup, which is where every new job starts: nothing reaches a worker until you open it. Nothing in it is classified either, so the trade, the parish and the access are yours to write from their own words. Press it twice and you still get one job.` },
       { label:"Hand back to the assistant", cls:"g",
         when:r => r.human_handling === true,
         says:() => "The assistant starts answering this number again from their next message. Nothing is sent to the client by pressing this.",
@@ -3384,7 +3394,8 @@ const SETTING_META = {
   client_guidelines_version: ["Client Guidelines in force", "Read by the go-live check. Bumping it stops a job reaching the board until the client re-signs.", false],
   trade_list:           ["The trades the classifier may choose from", "yaad-agent reads this into its prompt, so the model cannot invent a trade that yaad-match cannot route.", false],
   ntfy_topic:           ["Where intake alerts go", "yaad-inbound pushes to this topic. Reference, trade and parish only, never personal data.", false],
-  desk_url:             ["This desk's address", "Written into the links the functions send you.", false],
+  desk_url:             ["This desk's address", "Written into the links the functions send you, and set as the tap target on every phone notification. Store it bare, with no quote marks: it sat here as <span class=\"mono\">&quot;https://concierge.yaadly.co.uk&quot;</span> until 6 Sep 2026, quotes included, which this view stripped for display while the functions read it raw and built broken links from it.", false],
+  desk_phone:           ["Your own WhatsApp, for the ones that need you", "When a conversation needs a person, the Yaadly number messages you on WhatsApp with what the client actually said, so you can act without opening the desk. Only the ones that need you: somebody asking for a person, nothing being able to answer them, a held thread writing again, a reply held back, a job that would not save. Not every message, because that is how a phone gets muted. Full international form, +447... One limit and it is Meta's: WhatsApp only carries a message to you for 24 hours after you last message the Yaadly number, and replying to an alert reopens it. Leave empty to switch these off.", false],
   admin_email:          ["The address this desk answers to", "is_admin() is what actually gates the data. This row is for the functions to write to.", false],
   sketch_stamp:         ["The stamp on every sketch pack", "sketch_guard_approval puts this on the document and refuses to approve a pack carrying a measurement.", false],
   purge_cron_secret_sha256: ["Deletion clock secret, hashed", "A SHA-256, never the secret itself. yaad-vetting-purge compares against it so a caller cannot run the deletion clock without the real value.", false],
@@ -3393,6 +3404,7 @@ const SETTING_GROUP = {
   agents_paused:"Agents", trade_list:"Agents",
   worker_guidelines_version:"Documents in force", client_guidelines_version:"Documents in force", sketch_stamp:"Documents in force",
   ntfy_topic:"Notifications and addresses", desk_url:"Notifications and addresses", admin_email:"Notifications and addresses",
+  desk_phone:"Notifications and addresses",
 };
 
 const isBool = (v) => /^"?(true|false)"?$/i.test(String(v));
