@@ -189,8 +189,8 @@ Deno.test("there is one push path, and it carries the link", () => {
   assert(body.includes('headers.Click = cfg.desk_url'),
     "the push no longer sets ntfy's Click header, so tapping the notification " +
     "does nothing, which is the entire complaint this was built for");
-  assert(/readSettings\(supabase, \["ntfy_topic", "desk_url", "desk_sms"\]\)/.test(body),
-    "pushToDesk is no longer reading desk_url and desk_sms alongside the topic");
+  assert(/readSettings\(supabase, \["ntfy_topic", "desk_url", "desk_phone"\]\)/.test(body),
+    "pushToDesk is no longer reading desk_url and desk_phone alongside the topic");
   assert(body.includes("if (!cfg.ntfy_topic) return;"),
     "pushToDesk no longer bails out when no topic is configured");
 });
@@ -289,7 +289,7 @@ Deno.test("a setting is not trusted to have been written cleanly", () => {
 // so it adds no new company holding client words, where ntfy.sh is a public
 // relay whose topic name is the only thing between a stranger and everything.
 
-Deno.test("only the notifications she must act on carry the client's words", () => {
+Deno.test("only the notifications she must act on reach her WhatsApp", () => {
   // The rule lives at the call sites, not in a condition inside pushToDesk,
   // so adding a notification means deciding this on purpose.
   const texted = src.match(/alsoText:/g) ?? [];
@@ -306,7 +306,7 @@ Deno.test("only the notifications she must act on carry the client's words", () 
     "she now gets a text for every first message from every stranger");
 });
 
-Deno.test("a text carries what they actually said", () => {
+Deno.test("the alert carries what they actually said", () => {
   // The whole point. A notification that says something is waiting and not
   // what it is still ends at a laptop.
   const at = src.indexOf("const said = msg.text.trim().slice(0, 700);");
@@ -315,7 +315,7 @@ Deno.test("a text carries what they actually said", () => {
     "the handover text no longer quotes them");
 });
 
-Deno.test("a blocked reply texts her without quoting anything a model wrote", () => {
+Deno.test("a blocked reply reaches her without quoting anything a model wrote", () => {
   // What was blocked is the DRAFT. The guidance strings are a fixed closed
   // set, which is the rule alertDeskBlocked has always followed for its push.
   const at = src.indexOf("async function alertDeskBlocked(");
@@ -327,32 +327,40 @@ Deno.test("a blocked reply texts her without quoting anything a model wrote", ()
     "blocked is the model's own draft");
 });
 
-Deno.test("the text is bounded, and says so when it cannot send", () => {
-  const at = src.indexOf("async function textTheDesk(");
-  assert(at > 0, "textTheDesk is gone");
+Deno.test("the alert goes to her WhatsApp, on the sender Yaadly already owns", () => {
+  // Founder, after I proposed SMS: "why sms WHEN I HAVE TO ANSWER BACK IN
+  // WHATSAPP. make everything in whatsapp." An alert on one channel and the
+  // reply on another is a context switch on every single message, and the data
+  // protection argument for SMS did not apply: WhatsApp is the same Twilio
+  // account on a sender Yaadly already owns.
+  const at = src.indexOf("async function alertHerPhone(");
+  assert(at > 0, "alertHerPhone is gone, or the alert went back to SMS");
   const body = src.slice(at, at + 2200);
-  assert(body.includes("body.slice(0, 1500)"),
-    "the text is unbounded, so a long voice note transcript is rejected by " +
-    "Twilio rather than trimmed");
-  assert(body.includes('Deno.env.get("TWILIO_SMS_FROM")'),
-    "textTheDesk is no longer reading the SMS number");
-  assert(/console\.error\(\s*\n?\s*"textTheDesk: desk_sms is set but /.test(body),
-    "a missing Twilio number now fails silently, which from her side is a " +
-    "number set on the desk and no texts ever arriving");
-  assert(body.includes('if (!to) return;'),
-    "textTheDesk no longer treats an empty desk_sms as switched off");
+  assert(body.includes("await sendWhatsAppTo(to, body.slice(0, 1500), trace)"),
+    "the alert is no longer sent over WhatsApp, or is unbounded");
+  assert(body.includes('const to = (cfg.desk_phone ?? "").trim();'),
+    "alertHerPhone is not reading desk_phone");
+  assert(body.includes("if (!to) return;"),
+    "alertHerPhone no longer treats an empty desk_phone as switched off");
+  assert(/console\.error\(\s*\n?\s*"alertHerPhone: Twilio would not deliver/.test(body),
+    "a refused delivery now fails silently, which from her side is a number " +
+    "set on the desk and no messages ever arriving. The usual cause is Meta's " +
+    "24 hour window and it has to be visible in the log");
+  assert(!src.includes("TWILIO_SMS_FROM"),
+    "the SMS route is back. She answers clients in WhatsApp, so an alert by " +
+    "text is a context switch on every message");
 });
 
-Deno.test("the text and the push cannot take each other down", () => {
+Deno.test("the WhatsApp alert and the push cannot take each other down", () => {
   // yaad-enquiry's own comment records making this mistake: the push was
   // fetched first and returned early when no topic was configured, which took
   // the email with it. They fail for different reasons.
   const at = src.indexOf("async function pushToDesk(");
   const body = src.slice(at, at + 2600);
-  const textAt = body.indexOf("await textTheDesk(");
+  const textAt = body.indexOf("await alertHerPhone(");
   const bailAt = body.indexOf("if (!cfg.ntfy_topic) return;");
   assert(textAt > 0 && bailAt > 0, "one of the two notification paths is gone");
   assert(textAt < bailAt,
-    "the text is sent after the no-topic bail out, so not configuring ntfy " +
-    "silently switches off her text messages too");
+    "the WhatsApp alert is sent after the no-topic bail out, so not configuring " +
+    "ntfy silently switches off her WhatsApp alerts too");
 });

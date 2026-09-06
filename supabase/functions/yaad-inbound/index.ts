@@ -1297,68 +1297,57 @@ async function readSettings(supabase: SettingsReader, keys: string[]): Promise<R
     [r.key, String(r.value ?? "").trim().replace(/^"(.*)"$/, "$1")]));
 }
 
-/** Text the desk's own phone, with the client's actual words in it.
+/** Message Monique's own WhatsApp, with the client's actual words in it.
  *
- *  Founder, 6 September 2026: "a message needs to reach me on my phone than in
- *  the desk. But I'm not on the desk all the time."
+ *  Founder, 6 September 2026, after I proposed SMS and she pushed back on it:
+ *  "why sms WHEN I HAVE TO ANSWER BACK IN WHATSAPP. make everything in
+ *  whatsapp." Then, plainly: "send all the message that ask for an human or to
+ *  speak to Monique to 07767171858."
  *
- *  The ntfy push tells her something is waiting. It does not tell her what was
- *  said, so every notification still ended at a laptop. This carries the words.
+ *  She is right and the SMS version was wrong. An alert on one channel and the
+ *  reply on another is a context switch on every single message, and the
+ *  reason I reached for SMS was a data protection argument that does not apply
+ *  here: WhatsApp is Twilio too, on the sender Yaadly already owns. It is the
+ *  same company, the same account, no new number to buy, and it lands in the
+ *  app she is going to answer in anyway.
  *
- *  WHY SMS AND NOT THE OTHER THREE. She chose it, given the trade. Twilio
- *  already carries every one of these messages, so texting her adds no new
- *  company holding client words: ntfy.sh would have, and it is a public relay
- *  whose topic name is the only thing standing between a stranger and every
- *  message. WhatsApp to her own number reads better and would have gone quiet
- *  most of the time, because Meta's 24 hour window applies to her as much as to
- *  a client and she is not messaging the Yaadly number daily. Email adds
- *  nobody either but is the easiest thing in the world to lose at 11pm.
+ *  ONLY WHEN SHE MUST ACT. Callers opt in per notification with `alsoText`, so
+ *  the rule is visible at the call site. Every message from every stranger is
+ *  how a phone gets muted, and a muted phone loses a real job later.
  *
- *  ONLY WHEN SHE MUST ACT. Also her decision, and the important half of it.
- *  Every message from every stranger is how a phone gets muted, and a muted
- *  phone loses a real job later. Callers opt in per notification by passing
- *  `alsoText`, so the rule is visible at the call site rather than hidden in a
- *  condition here.
- *
- *  It needs an SMS capable Twilio number in TWILIO_SMS_FROM. That was NOT set
- *  when this was written, checked against the live secret list, so this stays
- *  inert and says so in the log rather than failing quietly. RUNBOOK.md §10e. */
-async function textTheDesk(cfg: Record<string, string>, body: string, trace: Trace): Promise<void> {
-  const to = (cfg.desk_sms ?? "").replace(/[^\d+]/g, "");
+ *  THE ONE REAL LIMIT, and it is Meta's, not ours. WhatsApp only carries a
+ *  freeform message to somebody for 24 hours after they last messaged the
+ *  business number. That window applies to Monique exactly as it applies to a
+ *  client. Every alert she replies to reopens it for another 24 hours, so an
+ *  active day looks after itself; a quiet week does not, and the first alert
+ *  after one may not land. sendWhatsAppTo returns false when Twilio refuses,
+ *  which is logged loudly rather than swallowed, and the push to her phone
+ *  fires either way so nothing is ever only in this channel. Making it
+ *  unconditional means a Meta approved template, which this account has done
+ *  three times already (TWILIO_CONTENT_SID_QUOTE, _APPROVE, _DAILY_CHECKIN)
+ *  and is an approval queue rather than an afternoon. RUNBOOK.md 10e. */
+async function alertHerPhone(cfg: Record<string, string>, body: string, trace: Trace): Promise<void> {
+  const to = (cfg.desk_phone ?? "").trim();
   if (!to) return;
-  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
-  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
-  const from = Deno.env.get("TWILIO_SMS_FROM") ?? "";
-  if (!sid || !tok || !from) {
-    // Loud, because the failure is invisible from her side: she set a number
-    // on the desk, she is expecting texts, and nothing arrives.
-    console.error(
-      "textTheDesk: desk_sms is set but " +
-      (!from ? "TWILIO_SMS_FROM is not" : "the Twilio credentials are not") +
-      ". No text was sent. Buy an SMS capable Twilio number and set the secret, see RUNBOOK.md 10e.",
-    );
-    return;
-  }
   try {
-    await trace.span("twilio.send.sms.desk", SpanKind.CLIENT, {
-      "server.address": "api.twilio.com", "messaging.system": "twilio",
-    }, async (sp) => {
-      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-        method: "POST",
-        headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        // 1500, inside Twilio's 1600 character ceiling for a concatenated
-        // message, so a long voice note transcript is trimmed rather than
-        // rejected outright. The whole thing is on the thread either way.
-        body: new URLSearchParams({ To: to, From: from, Body: body.slice(0, 1500) }),
-        signal: AbortSignal.timeout(4000),
-      });
-      sp.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) console.error(`textTheDesk: twilio ${r.status}: ${(await r.text()).slice(0, 200)}`);
-    });
+    // 1500 is well inside WhatsApp's own 4096 ceiling and keeps a long voice
+    // note transcript readable on a lock screen. The whole thread is on the
+    // desk either way.
+    const ok = await sendWhatsAppTo(to, body.slice(0, 1500), trace);
+    if (!ok) {
+      // Loud, because the failure is invisible from her side: she set a
+      // number, she is expecting messages, and nothing arrives. The usual
+      // cause is Meta's 24 hour window having closed.
+      console.error(
+        "alertHerPhone: Twilio would not deliver to desk_phone. Usually Meta's " +
+        "24 hour window: it opens for 24 hours each time she messages the Yaadly " +
+        "number and this alert fell outside it. The ntfy push still went. RUNBOOK.md 10e.",
+      );
+    }
   } catch (e) {
-    // Same rule as every other notification here: it must never cost somebody
-    // their message.
-    console.error("textTheDesk: threw:", String(e).slice(0, 200));
+    // Same rule as every other notification here: never at the cost of the
+    // client's own message.
+    console.error("alertHerPhone: threw:", String(e).slice(0, 200));
   }
 }
 
@@ -1387,20 +1376,21 @@ async function pushToDesk(
   note: {
     title: string; body: string;
     priority?: "default" | "high" | "urgent"; tags?: string;
-    /** The full text to send to her own phone, WITH the client's own words in
-     *  it. Present only on notifications she has to act on. Absent means the
-     *  push is informational and no text goes. See textTheDesk. */
+    /** The full message to send to her own WhatsApp, WITH the client's own
+     *  words in it. Present only on notifications she has to act on. Absent
+     *  means the push is informational and nothing reaches her WhatsApp.
+     *  See alertHerPhone. */
     alsoText?: string;
   },
   trace: Trace,
 ): Promise<void> {
   try {
-    const cfg = await readSettings(supabase, ["ntfy_topic", "desk_url", "desk_sms"]);
+    const cfg = await readSettings(supabase, ["ntfy_topic", "desk_url", "desk_phone"]);
     // The text goes first and independently of the push. They fail for
     // different reasons (a missing topic, a missing Twilio number) and neither
     // should be able to take the other down with it, which is the mistake
     // yaad-enquiry's own comment records making with its push and its email.
-    if (note.alsoText) await textTheDesk(cfg, note.alsoText, trace);
+    if (note.alsoText) await alertHerPhone(cfg, note.alsoText, trace);
     if (!cfg.ntfy_topic) return;
     await trace.span("ntfy.push", SpanKind.CLIENT, {
       "server.address": "ntfy.sh", "yaadly.push.linked": !!cfg.desk_url,
@@ -3503,9 +3493,9 @@ Deno.serve(async (req: Request) => {
       : agentsPaused ? `${jobId}: the assistant is paused at the desk, so this one is yours.`
       : `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`;
 
-      // Her own phone, with their words in it, only when she has to act.
-      // said() is the quote; everything around it is what she needs to act
-      // from a bus stop: who, where, and the one link that opens the thread.
+      // Her own WhatsApp, with their words in it, only when she has to act.
+      // said is the quote; everything around it is what she needs to act on
+      // from a bus stop: what happened, who, and on which channel.
       const said = msg.text.trim().slice(0, 700);
       const who = msg.channel === "web" ? "the website chat" : (msg.from || "an unknown sender");
       await pushToDesk(supabase as unknown as SettingsReader, {
