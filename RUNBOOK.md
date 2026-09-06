@@ -446,6 +446,26 @@ Everything else is push only. Every message from every stranger is how a phone g
 
 ---
 
+## 10f. Turning a conversation into a job
+
+A conversation the assistant read as a question writes **no job row**. That is deliberate, and it is why your job list is not full of people asking how Yaadly works. When one of them turns out to be real work, you promote it yourself.
+
+**Conversations, open the row, "Attach a job to this conversation".** The button only appears when the thread has no job. It creates the job, links the two, and carries the whole transcript into the brief.
+
+It sends nothing and tells the client nothing.
+
+**What you get:** a job at stage 0, closed, showing as **awaiting client setup**, which is where every new job starts including the ones intake creates. Nothing reaches a worker until you open it.
+
+**What you do not get, on purpose:** a trade, a parish, an urgency or an access note. Nothing in the conversation was classified, so nothing is guessed. Read it and write the brief from their own words. Guessing a trade here would put the job in front of the wrong workers, and guessing a parish is the start of the exact pricing problem the business exists to end.
+
+**Press it twice and you still get one job.** It returns the existing id rather than creating a second.
+
+**If the button is missing**, the thread already has a job; the Job column shows it. **If it refuses with "Only the desk can attach a job"**, you are not signed in as an admin on this desk; check `admins` has your email.
+
+**Why this is a button and not a rule.** CLAUDE.md §2: a named human confirms every consequential step. Deciding somebody's question is now a job they will be quoted for is exactly that kind of step, and there is deliberately no confidence score and no automatic promotion behind it.
+
+---
+
 ## Publishing a worker profile
 
 **The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.

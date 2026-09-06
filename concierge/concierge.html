@@ -1747,6 +1747,16 @@ const VIEWS = [
         says:r => "Puts your words, exactly as typed, into the chat window on yaadly.co.uk, where they appear as you within a few seconds if the visitor still has the page open. If they have left, they cannot see it: the widget gave them a WhatsApp button with this reference, so expect them there. Replying also marks the thread as with you.",
         ask:[{ k:"text", label:"Your message", type:"long", placeholder:"Written as you, sent as you. No agent touches this." }],
         call: deskReply },
+      // Founder, 6 September 2026: "What if i want to turn this person into a
+      // job, can i do that... as i dont want it To attach automatically to
+      // every single question that's asked." A question writes no job row, on
+      // purpose. This is how one becomes a job, and a named human is the only
+      // thing that can do it. No confidence score, no auto promote.
+      { label:"Attach a job to this conversation", cls:"g",
+        when:r => !r.job_id,
+        rpc:"attach_job_to_thread",
+        args:(r) => ({ p_channel:r.channel, p_from:r.from_addr }),
+        says:r => `Creates a job from this conversation and links the two, so everything ${esc(r.from_addr || "they")} said travels with it. It sends nothing and tells them nothing. It lands closed, at stage 0, showing as awaiting client setup, which is where every new job starts: nothing reaches a worker until you open it. Nothing in it is classified either, so the trade, the parish and the access are yours to write from their own words. Press it twice and you still get one job.` },
       { label:"Hand back to the assistant", cls:"g",
         when:r => r.human_handling === true,
         says:() => "The assistant starts answering this number again from their next message. Nothing is sent to the client by pressing this.",

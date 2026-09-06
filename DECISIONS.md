@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · A conversation becomes a job when she says so, and not before
+
+**Founder:** *"What if i want to turn this person into a job, can i do that, be saying, attached a job to this, as i dont want it To attach automatically to every single question that's asked."*
+
+**The second half was already true by the time she asked**, which is the point of it: a message the classifier reads as a question, with no scope, trade or parish in it, writes no job row. This is the missing half. Until now the only way to promote a question was to wait for the client to describe the work again on a later turn so the classifier would catch it, which is asking somebody to repeat themselves so a machine can notice. That is the same failure the whole day has been about.
+
+**`attach_job_to_thread(channel, from_addr)`, admin gated, idempotent.** Two taps or two people must not produce two jobs for one conversation, so a thread that already has one gets that id back rather than a second row. It lives in Postgres rather than in the desk's JavaScript for the reason every rule in this schema does: it then holds for anything else that ever needs it, not only for whoever is looking at that page.
+
+**It classifies nothing, deliberately.** No trade, no parish, no urgency, no access note. The transcript is carried into `descr` verbatim with a line saying a person attached this and nothing in it was read by a model. Guessing a trade from an unread conversation puts a job in front of the wrong workers; guessing a parish is the first step of the exact pricing problem the business exists to end (CLAUDE.md §5). The desk writes the brief from their own words.
+
+**A button, not a heuristic, and that is CLAUDE.md §2 rather than a preference.** Deciding that somebody's question is now a job they will be quoted for is a consequential step, so a named human takes it. There is no confidence score and no automatic promotion, and adding one later would be the request §3 exists to refuse.
+
+**A dry run against the live schema found something before it shipped.** The insert was rehearsed inside a transaction that raised at the end so it rolled back, and the row came back `awaiting_client_setup` when `'draft'` had been passed. `sync_job_status` owns that column: with no worker, `open` false, and a client not cleared for go-live, that is where it lands, and it is where every job created by intake lands too. Nothing was wrong with the function; the button's own help text was wrong, and it was corrected to say what the desk will actually see rather than what I assumed. Worth recording because the temptation was to write the copy from the code I had just written rather than from the row the database actually produced.
+
+---
+
 ## 2026-09-06 · The alert reaches her own WhatsApp, and only when she has to act
 
 **Founder:** *"a message needs to reach me on my phone than in the desk. But I'm not on the desk all the time."* I offered four routes with a data protection argument and she chose SMS. Then, reading it back: *"why sms WHEN I HAVE TO ANSWER BACK IN WHATSAPP. make everything in whatsapp."* Then, with her own number: *"send all the message that ask for an human or to speak to Monique to 07767171858."*
