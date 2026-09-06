@@ -74,18 +74,20 @@
 .three .num{font:600 13px var(--mono);color:var(--ai-amber);margin-bottom:12px}
 .three p{font-size:14.5px;color:var(--ai-mute);margin:0}
 .arc{position:absolute;left:0;top:10px;width:100%;height:100%;overflow:visible}
-.sheet{position:absolute;left:16px;right:16px;top:22px;bottom:-30px;background:#F5F3FF;border-radius:6px 6px 0 0;padding:16px 18px;color:#0D0D28;box-shadow:0 -6px 30px rgba(155,115,245,0.18);transform:rotate(-1.5deg)}
-.sheet .row{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(13,13,40,0.12);padding-bottom:6px;margin-bottom:8px}
-.sheet .row span:first-child{font-family:var(--disp);font-size:13px;white-space:nowrap}
-.sheet .row span:last-child{font:500 9px var(--mono);color:var(--ai-mute)}
-.sheet .k{font:600 8px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#7B4FE0;margin-bottom:5px;white-space:nowrap}
-.sheet .ln{display:block;height:5px;border-radius:3px;background:rgba(13,13,40,0.14);margin-bottom:4px}
-.sheet .verdict{border:1px solid rgba(245,158,11,0.6);background:rgba(245,158,11,0.08);border-radius:6px;padding:8px 10px;margin-top:9px}
-.sheet .verdict .k{color:#B45309;margin:0}
-.sheet .verdict .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
-.sheet .badge{font:600 9px var(--mono);color:#fff;background:var(--mango);border-radius:100px;padding:2px 7px}
-.sheet .q{font-family:var(--disp);font-style:italic;font-size:11.5px;line-height:1.35;color:#0D0D28}
-.sheet .sig{margin-top:6px;font:500 9px var(--mono);color:var(--ai-mute)}
+.p1{position:absolute;inset:12px 16px 0;display:flex;flex-direction:column;gap:3px}
+.p1h{display:flex;justify-content:space-between;font:600 8.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-faint);margin-bottom:3px}
+.p1r{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(155,115,245,.14)}
+.p1r i,.p1v i{width:16px;height:16px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font:600 8.5px var(--mono);font-style:normal;flex-shrink:0;color:var(--tealb);background:rgba(155,115,245,.12);border:1px solid rgba(155,115,245,.3)}
+.p1r .lab{font:500 9.5px var(--mono);color:var(--ai-mute);white-space:nowrap}
+.p1r .sk{height:4px;border-radius:2px;background:rgba(155,115,245,.22);margin-left:auto}
+.p1v{display:flex;gap:8px;align-items:flex-start;margin-top:4px;padding:7px 10px 6px 8px;border-radius:10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.35)}
+.p1v>div{min-width:0;flex:1}
+.p1v i{color:var(--ai-amber);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4)}
+.p1vh{display:flex;justify-content:space-between;align-items:center;font:600 8.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-amber)}
+.p1vh em{font:600 8.5px var(--mono);font-style:normal;letter-spacing:.12em;color:var(--bg);background:var(--ai-amber);border-radius:100px;padding:1px 7px}
+.p1v p{margin:3px 0 0;font-family:var(--disp);font-style:italic;font-size:11px;line-height:1.3;color:var(--ink)}
+.p1s{display:flex;align-items:center;gap:8px;margin-top:3px;font:500 8.5px var(--mono);color:var(--ai-mute)}
+.p1s svg{width:56px;height:14px;stroke:var(--ai-amber);fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex-shrink:0}
 .dlog{position:absolute;left:18px;right:18px;top:34px;display:flex;flex-direction:column}
 .dlog .e{display:flex;align-items:center;gap:9px;padding:5px 0}
 .dlog .av{width:22px;height:22px;border-radius:50%;background:var(--grad);color:#fff;display:inline-flex;align-items:center;justify-content:center;font:600 9px var(--mono);flex-shrink:0}
@@ -342,15 +344,16 @@
 
     <div class="card3">
       <div class="art">
-        <div class="sheet" aria-hidden="true">
-          <div class="row"><span>Condition Report</span><span>PAGE 1 OF 14</span></div>
-          <div class="k">Findings · machine</div>
-          <span class="ln" style="width:92%"></span><span class="ln" style="width:78%"></span><span class="ln" style="width:85%"></span>
-          <div class="verdict">
-            <div class="hd"><span class="k">Verdict · person</span><span class="badge">MODERATE</span></div>
-            <div class="q">Roof is sound. Replace the guttering before the rains; do not pay the second stage until then.</div>
-            <div class="sig">signed · Yaadly · 09:41</div>
-          </div>
+        <div class="p1" aria-hidden="true">
+          <div class="p1h"><span>Condition Report · page one</span><span>who wrote each line</span></div>
+          <div class="p1r"><i>M</i><span class="lab">Finding 01 · roof covering</span><b class="sk" style="width:38%"></b></div>
+          <div class="p1r"><i>M</i><span class="lab">Finding 02 · guttering</span><b class="sk" style="width:30%"></b></div>
+          <div class="p1r"><i>M</i><span class="lab">Finding 03 · fascia board</span><b class="sk" style="width:34%"></b></div>
+          <div class="p1v"><i>P</i><div>
+            <div class="p1vh"><span>Verdict</span><em>Moderate</em></div>
+            <p>Roof is sound. Replace the guttering before the rains; do not pay the second stage until then.</p>
+            <div class="p1s"><svg viewBox="0 0 90 22"><path d="M2 16c8-12 12-10 14-2s6 4 10-4 8-6 10 2 6 8 12 0 10-10 14-2 8 6 12 0 6-4 12 2"/></svg><span>signed · 09:41</span></div>
+          </div></div>
         </div>
       </div>
       <div class="body">
