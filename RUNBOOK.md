@@ -4406,7 +4406,21 @@ the desk shows which is which: People → Alert list, "vetted worker" or "lead".
 `can_quote` there is resolved live, so somebody who finishes vetting next month
 flips on their own with nothing to backfill.
 
-**To join, they message the Yaadly WhatsApp number.** `ALERTS` on its own is
+**There is a button, and it is a link rather than a form.** "Get job alerts" on
+`docs/marketplace.html` and on the board at `app.yaadly.co.uk/jobs` opens
+WhatsApp with a sentence already typed. The person presses send, and that send
+is what puts them on the list: the message proves the number is theirs and
+carries the consent in their own words, neither of which a typed number box
+proves. Nothing is stored by pressing the button.
+
+**The sentence in every button must stay exactly `ALERTS_OPENER`**, which
+`supabase/functions/yaad-inbound/job-alerts.ts` owns. A page carrying a sentence
+the lane does not recognise opens WhatsApp, sends fine, and drops the person
+into the ordinary intake assistant instead of joining anything, with no error
+anywhere. `job-alerts_test.ts` reads both pages and `web/lib/alerts.ts` and
+fails if any of them drifts.
+
+**To join by hand, they message the Yaadly WhatsApp number.** `ALERTS` on its own is
 enough. The lane then asks two questions, trades and then parishes, and they
 answer in their own words: "plumbing, tiling and a likkle bit of masonry" and
 "Portmore and Kingston 8" both read correctly, because the answers go through
@@ -4429,6 +4443,12 @@ select phone, name, trades, trade_keys, parishes, parish_keys, listening, stoppe
 from job_alert_subscribers order by created_at desc limit 20;
 ```
 
+- **They pressed the button and nothing happened.** Check the href on the page
+  against `ALERTS_OPENER`, and run the Deno tests, which compare them.
+- **It was Monique's own phone.** `desk_phone` is claimed by the desk reply lane
+  before every lane below it, so ALERTS from her number returns "I do not know
+  who that is for". Testing this needs a second phone. That cost was accepted
+  knowingly when the desk lane was built, 6 Sep 2026.
 - **No row at all.** The opener was not recognised. `ALERTS_EXACT` in
   `supabase/functions/yaad-inbound/job-alerts.ts` takes `ALERTS`, `alerts`,
   `job alerts`, `start alerts` and `subscribe`. The looser phrasings

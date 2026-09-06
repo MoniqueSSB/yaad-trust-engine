@@ -49,6 +49,30 @@ export const ALERTS_EXACT = /^(alerts?|job alerts?|start alerts?|subscribe)[.!]*
  *  job. That second condition lives in index.ts, where the prior thread is. */
 export const ALERTS_PHRASE = /\b(?:want|get|join|for)\s+(?:the\s+)?(?:job\s+)?alerts?\b/i;
 
+/** The exact sentence the "get job alerts" button puts in somebody's WhatsApp
+ *  box, and the link that does it. Both live here, in one place, because the
+ *  lane has to recognise this exact sentence: a page that drifts from it by a
+ *  word produces a button that looks fine and silently does nothing. There is a
+ *  test that reads every page carrying the button and checks it still matches.
+ *
+ *  Matched exactly rather than through ALERTS_PHRASE, and that distinction
+ *  matters. The loose phrasings are refused from a number with a job
+ *  conversation already running, which is right for a sentence somebody typed
+ *  themselves and wrong for one our own button wrote: a tradesperson who posted
+ *  a job from the same number last month should still be able to press it. */
+export const ALERTS_OPENER = "Hello Yaadly, I am a tradesperson and I want job alerts.";
+
+/** The Yaadly WhatsApp sender, the same number every button on the site uses. */
+export const ALERTS_WA_LINK =
+  "https://wa.me/447878877567?text=" + encodeURIComponent(ALERTS_OPENER);
+
+/** Asking to join, whether or not they have a job conversation running. The
+ *  keyword on its own, or the button's own sentence. */
+export function alertsOpenerExact(said: string): boolean {
+  const t = (said ?? "").trim();
+  return ALERTS_EXACT.test(t) || t.toLowerCase() === ALERTS_OPENER.toLowerCase();
+}
+
 /** Coming off the list. Answered with or without a session open: somebody who
  *  wants out must never have to be in the middle of something to say so. */
 export const ALERTS_STOP = /^(stop|stop alerts?|unsubscribe|no more alerts?)[.!]*$/i;

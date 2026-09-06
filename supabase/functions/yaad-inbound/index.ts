@@ -9,8 +9,8 @@ import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
-  ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_EXACT, ALERTS_PHRASE, ALERTS_STOP,
-  ALERTS_MAX_TRIES, sayList,
+  ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
+  ALERTS_MAX_TRIES, alertsOpenerExact, sayList,
 } from "./job-alerts.ts";
 import { FAQ_FACTS } from "./faq.ts";
 import { priceFigureGuard } from "./price-figures.ts";
@@ -2344,7 +2344,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Joining, or changing what they are on for. Both are ALERTS.
-        if (ALERTS_EXACT.test(alertsSaid) || (ALERTS_PHRASE.test(alertsSaid) && !prior)) {
+        if (alertsOpenerExact(alertsSaid) || (ALERTS_PHRASE.test(alertsSaid) && !prior)) {
           const { data, error } = await supabase.rpc("subscribe_to_job_alerts", {
             p_phone: msg.from,
             p_words: alertsSaid,

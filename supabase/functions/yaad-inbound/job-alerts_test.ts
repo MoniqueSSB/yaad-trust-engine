@@ -8,7 +8,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_EXACT, ALERTS_PHRASE, ALERTS_STOP,
-  ALERTS_MAX_TRIES, sayList,
+  ALERTS_MAX_TRIES, ALERTS_OPENER, ALERTS_WA_LINK, alertsOpenerExact, sayList,
 } from "./job-alerts.ts";
 import { scan } from "./guardrails.ts";
 
@@ -145,4 +145,71 @@ Deno.test("a list of trades reads as a sentence", () => {
   assertEquals(sayList(["plumbing", "tiling"]), "plumbing and tiling");
   assertEquals(sayList(["plumbing", "tiling", "masonry"]), "plumbing, tiling and masonry");
   assertEquals(sayList(["plumbing", "", "  "]), "plumbing", "empties do not become stray commas");
+});
+
+// ── the button, and the reason this test reads other people's files ────────
+//
+// The "get job alerts" button is a link that opens WhatsApp with a sentence
+// already typed. If a page carries a sentence this lane does not recognise, the
+// button opens, the message sends, and the person gets the ordinary intake
+// assistant instead of joining anything. Nothing errors and nobody finds out.
+// So the pages are checked against the constant rather than trusted.
+
+const repoRoot = new URL("../../../", import.meta.url);
+const read = (p: string) => Deno.readTextFileSync(new URL(p, repoRoot));
+
+Deno.test("the button's own sentence is recognised as joining", () => {
+  assert(alertsOpenerExact(ALERTS_OPENER), "the opener must be read as joining");
+  assert(alertsOpenerExact("  " + ALERTS_OPENER + "  "), "whitespace from a paste must not break it");
+  assert(alertsOpenerExact("ALERTS"), "the bare keyword still works");
+  assert(!alertsOpenerExact("The roof is leaking"), "an ordinary message is not the opener");
+});
+
+Deno.test("the button's sentence is matched exactly, not through the loose phrase", () => {
+  // ALERTS_PHRASE is refused from a number with a job conversation running,
+  // which is right for something somebody typed and wrong for something our own
+  // button wrote. A tradesperson who posted a job last month must still be able
+  // to press it, so the opener has to pass the exact check on its own.
+  assert(
+    /alertsOpenerExact\(alertsSaid\)\s*\|\|/.test(inboundSource),
+    "the joining branch must check the exact opener before falling back to the loose phrase",
+  );
+});
+
+Deno.test("every page carrying the button uses the exact sentence the lane recognises", () => {
+  const encoded = encodeURIComponent(ALERTS_OPENER);
+  assertEquals(ALERTS_WA_LINK, "https://wa.me/447878877567?text=" + encoded);
+
+  // The marketing site writes the href out by hand, because docs/ has no build
+  // step and cannot import anything.
+  const marketplace = read("docs/marketplace.html");
+  assert(
+    marketplace.includes(encoded),
+    "docs/marketplace.html carries an alerts link whose text has drifted from ALERTS_OPENER",
+  );
+
+  // The app builds the href from its own copy of the sentence, duplicated the
+  // way web/lib/taxonomy.ts duplicates the trade list, because a Next.js build
+  // cannot import from a Deno function.
+  const webCopy = read("web/lib/alerts.ts");
+  assert(
+    webCopy.includes(JSON.stringify(ALERTS_OPENER)),
+    "web/lib/alerts.ts has drifted from ALERTS_OPENER in job-alerts.ts",
+  );
+  assert(
+    read("web/app/jobs/page.tsx").includes("ALERTS_WA_LINK"),
+    "the board should still carry the button",
+  );
+});
+
+Deno.test("the button is a link, never a form that posts a number", () => {
+  // The whole design. A typed box proves neither that the number is theirs nor
+  // that they consented, and it does not open WhatsApp's 24 hour window, so the
+  // first reply would need an approved template that does not exist yet.
+  const board = read("web/app/jobs/page.tsx");
+  // lastIndexOf, not indexOf: the first occurrence is the import line.
+  const at = board.lastIndexOf("ALERTS_WA_LINK");
+  const around = board.slice(Math.max(0, at - 400), at + 400);
+  assert(/<a\s/.test(around), "the alerts button must be a link");
+  assert(!/<input|<form/.test(around), "the alerts button must not collect a number on the page");
 });

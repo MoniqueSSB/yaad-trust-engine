@@ -440,6 +440,14 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
       <li class="t-gold">Work reviewed before the tradesperson is paid <span>Never a timer</span></li>
       <li>A client in London pays what a client in Portmore pays <span>No overseas markup</span></li>
       <li>Tradespeople paid by Yaadly on completion <a href="https://app.yaadly.co.uk/apply">Apply to join &rarr;</a></li>
+      <!-- The alert list. A link rather than a form on purpose: the message
+           they send is what puts them on it, and that one message proves the
+           number is theirs and carries the consent in their own words. The
+           text must stay exactly ALERTS_OPENER, which
+           supabase/functions/yaad-inbound/job-alerts.ts owns and a test there
+           checks this file against. Anybody may join; only a vetted worker can
+           quote, and the reply they get says so. -->
+      <li>Hear about work before you finish joining <a href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20am%20a%20tradesperson%20and%20I%20want%20job%20alerts." target="_blank" rel="noopener">Get job alerts &rarr;</a></li>
     </ul>
   </div>
 </div></section>

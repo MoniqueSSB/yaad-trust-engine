@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TRADES } from "@/lib/taxonomy";
+import { ALERTS_WA_LINK } from "@/lib/alerts";
 import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
@@ -510,12 +511,25 @@ export default async function Board({
             <p className="mt-1.5 max-w-[60ch] text-[13.5px] leading-relaxed text-mute">
               Property owners: pitch your job free, and your record builds from
               the first completed job. Tradespeople: pass verification and every
-              job on this board is yours to quote.
+              job on this board is yours to quote. Not ready to join yet? Put
+              your number on the alert list and hear when work comes up in your
+              trades and parishes.
             </p>
           </div>
           <div className="flex flex-wrap gap-2.5">
             <Link href="/jobs/new" className="rounded-full bg-linear-to-r from-purple to-gold px-5 py-2.5 text-[13px] font-bold text-white shadow-[0_0_18px_rgba(155,115,245,0.25)] transition hover:-translate-y-px hover:brightness-110">Post a job, free &rarr;</Link>
             <Link href="/apply" className="rounded-full border-[1.5px] border-purple/32 px-5 py-2.5 text-[13px] font-bold text-purpleb transition hover:border-purple hover:bg-panel2">Join as a worker &rarr;</Link>
+            {/* The alert list. A link, not a form, and the message they send is
+                what puts them on it: that one message proves the number is
+                theirs and carries the consent in their own words, which a typed
+                box proves neither of. The text must stay exactly ALERTS_OPENER,
+                which supabase/functions/yaad-inbound/job-alerts.ts owns and a
+                test in that folder checks this file against. Anybody may join;
+                only a vetted worker can quote, and the reply says so. */}
+            <a href={ALERTS_WA_LINK} target="_blank" rel="noopener"
+               className="rounded-full border-[1.5px] border-gold/35 px-5 py-2.5 text-[13px] font-bold text-goldb transition hover:border-gold hover:bg-panel2">
+              Get job alerts on WhatsApp &rarr;
+            </a>
           </div>
           <div className="flex w-full flex-wrap gap-4 font-mono-app text-[10.5px] text-dim">
             <Link href="/portal/guidelines?read=client_guidelines" className="underline underline-offset-2 transition hover:text-purpleb">Read the Client Guidelines</Link>
