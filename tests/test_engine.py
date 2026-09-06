@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import sys
+
 import pytest
 
 from yaad import benchmarks as bm
@@ -37,6 +39,17 @@ def client() -> LLMClient:
         "You are 100% protected.",
         "Every job is fully covered.",
         "We hold your money safely.",
+        # The passive. Added 4 Sep 2026, because the active-voice pattern was
+        # the only one there and this is the form the model actually writes.
+        "Your money is held and released stage by stage.",
+        "We are holding your money until the work is proven.",
+        # Added 5 Sep 2026. Until today this exact sentence was the PRESCRIBED
+        # replacement for "escrow" in CLAUDE.md section 8, in both guardrail
+        # runtimes' guidance strings, and in the Reporting agent's own prompt,
+        # so the screen was clean while the instructions handed the model the
+        # one claim the screen exists to stop.
+        "Money is held safely with a licensed payment provider.",
+        "Your payment is held safely until the work is signed off.",
     ],
 )
 def test_banned_language_is_caught(text: str) -> None:
@@ -46,9 +59,28 @@ def test_banned_language_is_caught(text: str) -> None:
 
 
 def test_approved_language_passes() -> None:
+    # The fixture describes the business Yaadly actually runs. It used to read
+    # "Payment is held safely with a licensed payment provider and released to
+    # the worker within 24 hours of your approval", which passes the screen
+    # (none of those words are banned) but describes escrow, the arrangement
+    # the principal-contractor structure exists to avoid. Nothing was failing.
+    # It was worse than that: this test is the worked example of GOOD copy, so
+    # the wrong sentence sat here as the thing to imitate. Replaced 4 Sep 2026.
     assert_clean(
-        "Payment is held safely with a licensed payment provider and released to the worker "
-        "within 24 hours of your approval. Work is protected up to the guarantee limit."
+        "You buy the job from Yaadly, and a stage closes once you have seen the evidence "
+        "and agreed the work is right. The tradesperson is engaged and paid by Yaadly under "
+        "its own separate agreement. Work is protected up to the guarantee limit."
+    )
+
+
+def test_the_principal_wording_the_assistant_now_uses_passes() -> None:
+    # The replacement for the retired "money is held" fact. If a future edit
+    # widens the passive pattern far enough to catch this, the screen would
+    # block the very sentence it is meant to leave standing.
+    assert_clean(
+        "You pay Yaadly, not the tradesperson. Yaadly sells you the job at one agreed price, "
+        "engages a vetted tradesperson and pays them directly. Payment terms are agreed in "
+        "writing for each job, and a named person approves every release."
     )
 
 
@@ -199,7 +231,23 @@ def test_sdk_is_available_in_this_environment() -> None:
     # opentelemetry-sdk is a first-class dependency now (requirements.txt),
     # not an optional extra, so it must always be importable here. The rest
     # of the module still no-ops gracefully if it is ever absent elsewhere.
-    assert telemetry.enabled() is True
+    #
+    # THE ASSERTION IS UNCHANGED. Only the message is new, added 4 September
+    # 2026 after this failed on the founder's laptop and said nothing except
+    # "assert False is True", which sent a session chasing pip before anyone
+    # looked at the Python version. The dependency is pinned at a release whose
+    # metadata says Requires-Python >=3.10; macOS ships 3.9 as
+    # /usr/bin/python3, so on a fresh Mac the install fails and then this test
+    # fails, and neither of them explains the other. A test that knows why it
+    # failed should say so.
+    assert telemetry.enabled() is True, (
+        "opentelemetry-sdk is not importable, so telemetry is disabled.\n"
+        f"This interpreter is Python {sys.version.split()[0]} at {sys.executable}.\n"
+        "requirements.txt needs Python 3.10 or newer (CI runs 3.11 and 3.12), and\n"
+        "macOS ships 3.9 as /usr/bin/python3. If `pip install -r requirements.txt`\n"
+        "said 'No matching distribution found', that is the same problem, not a\n"
+        "separate one. See the README run instructions for the venv line."
+    )
 
 
 def test_banned_language_violation_emits_a_bounded_event(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -213,7 +261,17 @@ def test_banned_language_violation_emits_a_bounded_event(monkeypatch: pytest.Mon
     assert attrs["where"] == "Client Update"
     # The event carries the fixed, closed-set guidance string from
     # BANNED_TERMS, never the sentence that was actually being screened.
-    assert attrs["terms"] == "Use 'held safely with a licensed payment provider', never 'escrow'."
+    #
+    # Read out of BANNED_TERMS rather than written out again here. Until
+    # 4 September 2026 this line hardcoded the guidance copy, so correcting
+    # that copy (it still described the pre-principal-contractor arrangement)
+    # failed a guardrail test for a reason that had nothing to do with the
+    # guardrail. Asserting against the source is strictly stronger: it proves
+    # the telemetry value IS the closed-set entry, rather than proving it
+    # matches a second copy of the sentence that has to be kept in step. The
+    # Deno port already tested the property rather than the copy, which is
+    # why it never broke. Same idea, done properly.
+    assert attrs["terms"] == yaad_guardrails.BANNED_TERMS[r"\bescrow(ed|s)?\b"]
     assert "sits in escrow until the job is done" not in attrs["terms"]
 
 

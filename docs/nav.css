@@ -27,7 +27,7 @@
    onto a second row on exactly those pages and nowhere else. Same for the
    flex-wrap and gap resets on .views and .quiet-links below. */
 .site-nav .nav-in{
-  max-width:1100px; margin:0 auto; padding:0 24px;
+  max-width:1180px; margin:0 auto; padding:0 24px;
   display:flex; flex-wrap:nowrap; justify-content:flex-start;
   align-items:center; gap:0; min-height:58px;
 }
@@ -70,9 +70,18 @@
 
 /* The one filled button in the header, and it stays the only one.
    Sizes through this file were measured, not guessed: with IBM Plex loaded,
-   brand + six tabs + three portal links + this button come to exactly the
+   brand + six tabs + three portal links + this button came to exactly the
    1100px the page content uses. Grow any of them and the button pushes out
-   past the page grid on a wide screen. */
+   past the row on a wide screen.
+
+   6 Sep 2026: a seventh tab, "How we use AI", on Monique's instruction. It is
+   105px wide and overflowed the row by 65px. Trimming every padding and gap
+   in the row recovered 50px and left the button sitting in the row's own
+   padding, so instead .nav-in above is 1180px, which is the header sitting
+   40px proud of the page grid each side with 15px to spare. The portal links
+   now hide at 1180px rather than 1080px for the same reason: between those
+   two widths the row is narrower than its contents. If an eighth tab is ever
+   wanted, something has to come out. */
 .site-nav .navcta{
   flex-shrink:0; margin-left:12px; white-space:nowrap;
   display:inline-flex; align-items:center;
@@ -85,7 +94,7 @@
 /* Narrow screens. The old pages hid the menu entirely below their own
    breakpoint, which left a phone with a logo and nothing to navigate by. The
    tabs scroll sideways instead, so every page stays reachable. */
-@media(max-width:1080px){
+@media(max-width:1180px){
   .site-nav .quiet-links{display:none}
 }
 @media(max-width:820px){

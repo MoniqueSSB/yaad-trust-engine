@@ -6,11 +6,12 @@ import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
+import { jmd } from "@/lib/money";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
 export const dynamic = "force-dynamic";
 
-const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
+
 
 /**
  * The worker portal.
@@ -30,6 +31,11 @@ const jmd = (n: number) => "J$" + Math.round(n).toLocaleString("en-JM");
  * 88%-plus-materials arithmetic FeeBreakdown.tsx already shows per job,
  * summed across every job this worker has actually won.
  */
+/* A title of its own, so a client with three tabs open can tell them apart.
+   Every portal screen used to fall back to the root layout's bare "Yaadly".
+   Three tabs, one word, three times. */
+export const metadata = { title: "Worker portal · Yaadly" };
+
 export default async function WorkerPortal() {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
@@ -148,20 +154,46 @@ export default async function WorkerPortal() {
     }),
   );
 
-  const held = moneyJobs.filter((j) => j.held).reduce((sum, j) => sum + j.takeHome, 0);
+  const heldJobs = moneyJobs.filter((j) => j.held);
+  const held = heldJobs.reduce((sum, j) => sum + j.takeHome, 0);
   const released = moneyJobs.filter((j) => !j.held).reduce((sum, j) => sum + j.takeHome, 0);
+
+  /* What the held figure is actually waiting on, named.
+     "Released once each client approves" is true and tells a worker nothing
+     they can act on: not which job, not how many, not whether the ball is with
+     them or with somebody else. A tradesperson looking at a number with their
+     name on it wants to know who is holding it up. Naming the single job when
+     there is one is the common case and the useful one.
+
+     Reworded 4 Sep 2026: it used to say "waiting on the client to approve",
+     which pointed a worker at the wrong party. The worker is Yaadly's
+     subcontractor, so Yaadly owes them and Yaadly pays them. The client
+     accepting the work is one input to that sign-off, not the thing that
+     pays. See docs/COPY-GUIDELINES.md section 3. */
+  const heldNote =
+    heldJobs.length === 0
+      ? "Nothing held right now"
+      : heldJobs.length === 1
+        ? `Waiting on sign-off for ${heldJobs[0].title ?? "this job"}`
+        : `Waiting on sign-off for ${heldJobs.length} jobs. See job by job below.`;
 
   const tiles: Tile[] = [
     {
       label: "Held right now",
       value: jmd(held),
       held: held > 0,
-      note: held > 0 ? "Released once each client approves" : "Nothing held right now",
+      note: heldNote,
     },
     {
       label: "Released",
+      /* "Paid off-platform" was honest and meant nothing to the person
+         reading it. A tradesperson does not know what a platform is, let
+         alone what being off one implies about when money arrives. Say the
+         thing itself: how it comes, and how long. The 3 working days figure
+         is unchanged, and nothing here claims the money has moved, which is
+         WorkerInvoices' job and is worded carefully there. */
       value: jmd(released),
-      note: "Paid off-platform within 3 working days of release",
+      note: "Paid straight to you by bank transfer, Lynk or cash, within 3 working days",
     },
   ];
 

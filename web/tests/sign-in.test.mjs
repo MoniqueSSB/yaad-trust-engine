@@ -7,7 +7,11 @@
  * essential and what is optional", not a code box hidden until a first
  * click. The logic tests below prove the branch; the source tests prove the
  * page still shows both fields together rather than gating one behind the
- * other again.
+ * other again. This still holds for /portal/sign-in.
+ *
+ * /portal/join is a different page with a different answer, since 3 Sep
+ * 2026: see the "the join page" tests further down for why it went back to
+ * two visual stages rather than one screen with everything on it.
  *
  * Every test code here is built from CODE_LENGTH, never a literal digit
  * string. The first version of this file hardcoded "123456", six digits,
@@ -129,13 +133,59 @@ describe("the sign in page itself", () => {
 });
 
 describe("the join page", () => {
+  // Rebuilt 3 Sep 2026, founder instruction: the 31 Aug all-fields-at-once
+  // screen read as confusing (three boxes, most people only ever needed to
+  // fill in one of them), so it went back to two visual stages on the same
+  // URL. The 31 Aug fix this replaces is still worth guarding, just aimed at
+  // the new shape: the stage that shows the sign-in code field must never be
+  // reachable except by way of sendCode actually confirming delivery, never
+  // as a stage sitting there unseen from first render.
   const source = readFileSync(join(HERE, "../app/portal/join/page.tsx"), "utf8");
 
-  test("shows email, job code and the code field, all required or optional, never hidden", () => {
+  // Amended 5 Sep 2026, founder's decision, when a THIRD stage arrived: the
+  // booking receipt now carries a single-use sign-in token, so a client who
+  // taps it has nothing to type and meets no form at all. The assertion below
+  // changed shape. The property it guards did not: the stage holding the
+  // sign-in code field must never be the stage this page opens on.
+  test("starts on the email stage, or the one-tap stage, never the code stage", () => {
+    assert.match(source, /useState<Stage>\(\(\) => \(params\.get\("t"\) \? "link" : "email"\)\)/);
+    assert.doesNotMatch(source, /useState<Stage>\("code"\)/);
+  });
+
+  test("spends the one-tap token once, and takes it off the address bar first", () => {
+    // Single use means single use: a second attempt shows an expired screen
+    // for a link that worked. And an unspent token in a query string is a
+    // live credential, so it comes out of the address bar before anything
+    // else on the page runs.
+    assert.match(source, /spent\.current = true/);
+    assert.match(source, /history\.replaceState/);
+  });
+
+  test("an expired or already-spent one-tap link falls back to the email stage", () => {
+    // The fallback is the whole reason this is safe to ship: a dead link is
+    // never a dead end, it is one button away from the code that always
+    // worked.
+    assert.match(source, /setStage\("email"\)/);
+  });
+
+  test("only moves to the code stage from inside sendCode, after delivery is confirmed", () => {
+    assert.match(source, /setStage\("code"\)/);
+    // The old failure mode: a code box that exists in the DOM from first
+    // render, just visually hidden by a stage nobody was told about.
+    assert.doesNotMatch(source, /useState<"ask" \| "enter">/);
+  });
+
+  test("shows the email field", () => {
     assert.match(source, /type="email"/);
+  });
+
+  test("the job code field is conditional on it not already being known from the link", () => {
+    assert.match(source, /!jobCodeKnown &&/);
     assert.match(source, />Job code</);
+  });
+
+  test("shows the sign-in code field, marked required now that it has its own stage", () => {
     assert.match(source, /autoComplete="one-time-code"/);
-    assert.doesNotMatch(source, /stage === "enter"/);
   });
 
   test("does not commit to a specific digit count in its own visible copy", () => {

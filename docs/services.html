@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yaadly · Managed services. Independent eyes on your property in Jamaica</title>
-<meta name="description" content="You cannot be there. Someone independent should be. Deposit checks, condition reports, technical sign-off and monthly oversight on your property in Jamaica. Every price on the page.">
+<title>Yaadly · Managed services. Eyes on your property in Jamaica</title>
+<meta name="description" content="You cannot be there. Someone should be, in writing. Deposit checks, condition reports, technical sign-off and monthly oversight on your property in Jamaica. The person who assesses the work is never the person who did it. Every price on the page.">
 <meta property="og:title" content="Yaadly · Managed services for property in Jamaica">
 <meta property="og:description" content="Deposit checks, condition reports, technical sign-off and monthly oversight. Timestamped evidence, checked against a written scope. Every price on the page.">
 <meta property="og:type" content="website">
@@ -14,7 +14,7 @@
 <meta property="og:image" content="https://yaadly.co.uk/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Yaadly. Independent proof of work on your property in Jamaica.">
+<meta property="og:image:alt" content="Yaadly. Timestamped proof of work on your property in Jamaica.">
 <meta name="twitter:image" content="https://yaadly.co.uk/og.png">
 <link rel="canonical" href="https://yaadly.co.uk/services.html">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%237B4FE0'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%23ffffff'%3EY%3C/text%3E%3C/svg%3E">
@@ -22,23 +22,28 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;0,9..144,600;1,9..144,200;1,9..144,300;1,9..144,400;1,9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* ─── TOKENS ─────────────────────────────────────────────── */
+/* ─── TOKENS ─────────────────────────────────────────────────
+   Same values as docs/yaadly.css and web/app/globals.css. The three
+   text tiers were retuned 3 Sep 2026 for AA contrast on --bg:
+   ink 17.4:1, mute 7.8:1, dim 5.0:1. Change all three files together
+   or the site drifts against itself. */
 :root {
   --bg:     #07071A;
-  --bg2:    #0D0D28;
   --panel:  rgba(155,115,245,0.05);
-  --panel2: rgba(155,115,245,0.09);
   --line:   rgba(155,115,245,0.14);
   --line2:  rgba(155,115,245,0.28);
+  --gline:  rgba(245,158,11,0.18);
   --ink:    #EEEEFF;
-  --mute:   #7878A8;
-  --dim:    #44446A;
+  --mute:   #9E9ECB;
+  --dim:    #7C7CA6;
   --purple: #9B73F5;
   --purpleb:#C4AAFF;
   --gold:   #F59E0B;
   --goldb:  #FBBF24;
   --red:    #F87171;
   --grad:   linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
+  --card:   linear-gradient(180deg,rgba(19,19,50,0.90),rgba(12,12,38,0.72));
+  --cardg:  linear-gradient(180deg,rgba(30,22,58,0.95),rgba(14,12,40,0.75));
   --disp:   'Fraunces',Georgia,serif;
   --body:   'IBM Plex Sans',-apple-system,sans-serif;
   --mono:   'IBM Plex Mono',ui-monospace,Menlo,monospace;
@@ -46,565 +51,223 @@
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 html { scroll-behavior:smooth; }
 body {
-  font-family:var(--body);
-  background:var(--bg);
-  color:var(--ink);
-  font-size:16px;
-  line-height:1.6;
+  font-family:var(--body); font-size:16px; line-height:1.6; color:var(--ink);
   -webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(ellipse 900px 500px at 12% -12%,rgba(155,115,245,0.16),transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 0%,rgba(245,158,11,0.09),transparent 55%),
+    var(--bg);
 }
-a { color:var(--purple); text-decoration:none; }
-a:hover { color:var(--purpleb); }
-img { max-width:100%; display:block; }
+a { color:var(--purpleb); text-decoration:none; }
+a:hover { color:var(--ink); }
+svg { fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
 /* ─── LAYOUT ─────────────────────────────────────────────── */
-.wrap { max-width:1100px; margin:0 auto; padding:0 24px; }
-.wrap-sm { max-width:780px; margin:0 auto; padding:0 24px; }
+.wrap { max-width:1100px; margin:0 auto; padding:0 28px; }
+.sect { padding:48px 0 0; }
+.kick {
+  font:600 10px var(--mono); letter-spacing:.18em; text-transform:uppercase;
+  color:var(--dim); margin-bottom:10px;
+}
+.heading {
+  font-family:var(--disp); font-weight:300; letter-spacing:-0.015em;
+  font-size:clamp(28px,3.4vw,38px); line-height:1.14;
+}
+.heading em { font-style:italic; color:var(--purpleb); }
 
 /* ─── HERO ───────────────────────────────────────────────── */
 .hero {
-  padding:64px 0 56px;
-  position:relative; overflow:hidden;
+  max-width:1100px; margin:0 auto;
+  padding:72px 28px 44px;
+  display:flex; flex-direction:column; align-items:center; text-align:center;
 }
-.hero::before {
-  content:''; position:absolute;
-  top:-120px; right:-200px;
-  width:700px; height:700px;
-  border-radius:50%;
-  background:radial-gradient(ellipse at 60% 40%,rgba(155,115,245,0.13) 0%,transparent 65%);
-  pointer-events:none;
-}
-.hero-grid {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:64px; align-items:center;
-}
-.hero-left { display:flex; flex-direction:column; }
-.hero-eyebrow {
+.hero-badge {
   display:inline-flex; align-items:center; gap:8px;
-  font-size:12px; font-weight:600; letter-spacing:.1em; text-transform:uppercase;
-  color:var(--gold); margin-bottom:20px;
+  font:600 11px var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--purpleb); background:rgba(155,115,245,.09);
+  border:1px solid var(--line2); border-radius:100px;
+  padding:7px 16px; margin-bottom:24px;
 }
-.hero-eyebrow .dot {
-  width:6px; height:6px; border-radius:50%; background:var(--gold);
-  animation:pulse 2s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%,100%{opacity:1;transform:scale(1)}
-  50%{opacity:.4;transform:scale(.8)}
-}
+.hero-badge .dot { width:5px; height:5px; border-radius:50%; background:var(--gold); }
 h1.display {
-  font-family:var(--disp); font-weight:300; line-height:1.08;
-  font-size:clamp(40px,5.5vw,76px);
-  letter-spacing:-0.02em; margin-bottom:24px;
+  font-family:var(--disp); font-weight:200;
+  font-size:clamp(36px,5.6vw,66px); line-height:1.06; letter-spacing:-0.025em;
+  max-width:900px; text-wrap:pretty;
 }
 h1.display em {
-  font-style:italic;
-  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  font-style:italic; font-weight:300;
+  background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent;
 }
 .hero-sub {
-  font-size:17px; color:var(--mute); line-height:1.65;
-  max-width:48ch; margin-bottom:32px;
+  margin-top:22px; font-size:18px; color:var(--mute); max-width:62ch; text-wrap:pretty;
 }
 .hero-sub b { color:var(--ink); }
-.hero-ctas { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:40px; }
+.hero-lane {
+  margin-top:14px; font-size:15.5px; color:var(--mute); max-width:62ch; text-wrap:pretty;
+}
+.hero-ctas { display:flex; gap:12px; margin-top:32px; flex-wrap:wrap; justify-content:center; }
 .btn {
   display:inline-flex; align-items:center; gap:8px;
-  padding:12px 22px; border-radius:10px; font-weight:600; font-size:14.5px;
-  cursor:pointer; text-decoration:none; transition:all .2s; white-space:nowrap;
+  border-radius:100px; font-weight:600; font-size:15.5px;
+  padding:13px 26px; cursor:pointer; transition:border-color .2s, transform .2s, box-shadow .2s;
+  white-space:nowrap; border:1px solid transparent;
 }
 .btn-primary {
-  background:var(--grad); color:#fff;
-  box-shadow:0 0 24px rgba(155,115,245,0.3);
+  font-weight:700; color:#fff; background:var(--grad);
+  box-shadow:0 0 24px rgba(155,115,245,.28); padding:14px 28px;
 }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 32px rgba(155,115,245,0.4); color:#fff; }
-.btn-ghost {
-  background:transparent; color:var(--purpleb);
-  border:1.5px solid rgba(155,115,245,0.35);
+.btn-primary:hover { color:#fff; transform:translateY(-1px); }
+.btn-ghost { color:var(--ink); border-color:var(--line2); }
+.btn-ghost:hover { color:var(--ink); border-color:rgba(155,115,245,.6); }
+.btn-quiet { color:var(--purpleb); border-color:var(--line); }
+.btn-quiet:hover { border-color:rgba(155,115,245,.4); }
+.proof {
+  display:flex; gap:14px; margin-top:40px; flex-wrap:wrap; justify-content:center;
+  font:500 12.5px var(--mono); color:var(--mute);
 }
-.btn-ghost:hover { background:var(--panel2); border-color:var(--purple); color:var(--purpleb); }
-.stat-bar {
-  display:flex; gap:28px; padding-top:32px; border-top:1px solid var(--line);
+.proof span {
+  border:1px solid var(--line); border-radius:100px;
+  padding:8px 16px; background:var(--panel);
 }
-.stat { display:flex; flex-direction:column; gap:2px; }
-.stat-n {
-  font-family:var(--mono); font-size:22px; font-weight:600;
-  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-}
-.stat-l { font-size:12px; color:var(--mute); text-transform:uppercase; letter-spacing:.06em; }
 
-/* Hero right: credential card */
-.hero-right { position:relative; }
-.cred-card {
-  background:rgba(13,13,40,0.9);
-  border:1px solid var(--line2);
-  border-radius:20px;
-  padding:28px;
-  backdrop-filter:blur(10px);
-  box-shadow:0 32px 80px rgba(0,0,0,0.5);
-  position:relative; z-index:1;
-}
-.cred-card::before {
-  content:''; position:absolute; inset:-1px; border-radius:21px; z-index:-1;
-  background:linear-gradient(135deg,rgba(155,115,245,0.3),rgba(245,158,11,0.15),transparent 60%);
-  border-radius:21px;
-}
-.cred-row {
-  display:flex; align-items:flex-start; gap:14px;
-  padding:16px 0; border-bottom:1px solid var(--line);
-}
-.cred-row:first-child { padding-top:0; }
-.cred-row:last-child { border-bottom:none; padding-bottom:0; }
-.cred-ico {
-  width:38px; height:38px; border-radius:10px;
-  background:rgba(155,115,245,0.12);
-  display:flex; align-items:center; justify-content:center;
-  flex-shrink:0;
-}
-.cred-ico svg { width:18px; height:18px; stroke:var(--purple); fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-.cred-label { font-size:11.5px; color:var(--mute); text-transform:uppercase; letter-spacing:.07em; margin-bottom:2px; }
-.cred-val { font-size:15px; font-weight:600; color:var(--ink); }
-.cred-note { font-size:12.5px; color:var(--dim); margin-top:2px; }
-
-/* ─── SECTION STYLES ─────────────────────────────────────── */
-.sect { padding:64px 0; }
-.sect-alt { background:var(--bg2); }
-.kick {
-  font-family:var(--mono); font-size:11.5px; font-weight:600;
-  letter-spacing:.12em; text-transform:uppercase;
-  color:var(--gold); margin-bottom:14px;
-}
-.kick.p { color:var(--purple); }
-h2.heading {
-  font-family:var(--disp); font-weight:300; font-size:clamp(28px,3.8vw,52px);
-  letter-spacing:-0.02em; line-height:1.1; margin-bottom:16px;
-}
-h2.heading em {
-  font-style:italic;
-  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-}
-.lead-text {
-  font-size:16.5px; color:var(--mute); max-width:58ch; line-height:1.7;
-}
-.lead-text b { color:var(--ink); }
-
-/* ─── EVIDENCE TRAIL (how it works) ──────────────────────── */
-.trail { margin-top:40px; position:relative; }
-.trail-track {
-  position:absolute; top:34px; left:8%; right:8%;
-  height:3px; border-radius:3px;
-  background:rgba(155,115,245,0.12);
-  overflow:hidden;
-}
-.trail-fill {
-  height:100%; width:0%;
-  background:var(--grad);
-  border-radius:3px;
-  transition:width .9s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 0 12px rgba(155,115,245,0.6);
-}
-.trail-steps {
-  display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
-  position:relative;
-}
-.trail-step {
-  text-align:center; cursor:pointer;
-  padding-top:0;
-  transition:opacity .4s;
-  opacity:.4;
-}
-.trail-step.active { opacity:1; }
-.trail-orb {
-  width:68px; height:68px; margin:0 auto 18px;
-  border-radius:50%;
-  background:var(--bg);
-  border:2px solid rgba(155,115,245,0.25);
-  display:flex; align-items:center; justify-content:center;
-  position:relative; z-index:2;
-  transition:border-color .4s, box-shadow .4s, transform .4s;
-}
-.trail-step.active .trail-orb {
-  border-color:var(--purple);
-  box-shadow:0 0 0 6px rgba(155,115,245,0.12), 0 0 30px rgba(155,115,245,0.35);
-  transform:scale(1.08);
-}
-.trail-step:last-child.active .trail-orb {
-  border-color:var(--gold);
-  box-shadow:0 0 0 6px rgba(245,158,11,0.12), 0 0 30px rgba(245,158,11,0.35);
-}
-.trail-orb svg {
-  width:26px; height:26px;
-  stroke:var(--purpleb); fill:none; stroke-width:1.6;
-  stroke-linecap:round; stroke-linejoin:round;
-  transition:stroke .4s;
-}
-.trail-step:last-child.active .trail-orb svg { stroke:var(--goldb); }
-.trail-num {
-  font-family:var(--mono); font-size:10.5px; font-weight:600;
-  letter-spacing:.14em; color:var(--purple); margin-bottom:6px;
-}
-.trail-step:last-child .trail-num { color:var(--gold); }
-.trail-title { font-size:15px; font-weight:600; color:var(--ink); margin-bottom:6px; }
-.trail-body {
-  font-size:12.5px; color:var(--mute); line-height:1.55;
-  max-width:22ch; margin:0 auto;
-  opacity:0; transform:translateY(6px);
-  transition:opacity .4s .15s, transform .4s .15s;
-}
-.trail-step.active .trail-body { opacity:1; transform:translateY(0); }
-
-/* ─── AI + WHATSAPP SECTION ──────────────────────────────── */
-.ai-grid { display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; margin-top:44px; }
-.ai-feature {
-  display:flex; align-items:flex-start; gap:16px;
-  padding:18px 0; border-bottom:1px solid var(--line);
-}
-.ai-feature:last-child { border-bottom:none; }
-.ai-fico {
-  width:42px; height:42px; border-radius:11px; flex-shrink:0;
-  background:rgba(155,115,245,0.1);
-  display:flex; align-items:center; justify-content:center;
-}
-.ai-fico svg { width:20px; height:20px; stroke:var(--purpleb); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-.ai-ftitle { font-size:15.5px; font-weight:600; color:var(--ink); margin-bottom:4px; }
-.ai-fbody { font-size:13.5px; color:var(--mute); line-height:1.6; }
-.ai-fbody b { color:var(--ink); }
-/* phone mock */
-.phone {
-  max-width:340px; margin:0 auto;
-  background:rgba(13,13,40,0.95);
-  border:1px solid var(--line2);
-  border-radius:28px; padding:14px;
-  box-shadow:0 32px 80px rgba(0,0,0,0.55), 0 0 60px rgba(155,115,245,0.12);
-  position:relative;
-}
-.phone-head {
-  display:flex; align-items:center; gap:10px;
-  padding:10px 12px 14px; border-bottom:1px solid var(--line);
-}
-.phone-avatar {
-  width:34px; height:34px; border-radius:50%;
-  background:var(--grad);
-  display:flex; align-items:center; justify-content:center;
-  font-weight:700; font-size:15px; color:#fff;
-}
-.phone-name { font-size:13.5px; font-weight:600; color:var(--ink); }
-.phone-status { font-size:11px; color:var(--gold); display:flex; align-items:center; gap:5px; }
-.phone-status .dot { width:6px; height:6px; border-radius:50%; background:var(--gold); animation:pulse 2s infinite; }
-.chat { padding:16px 6px 6px; display:flex; flex-direction:column; gap:10px; min-height:320px; }
-.msg {
-  max-width:82%; padding:9px 13px; border-radius:14px;
-  font-size:12.5px; line-height:1.5;
-  opacity:0; transform:translateY(10px);
-  transition:opacity .45s ease, transform .45s ease;
-}
-.msg.show { opacity:1; transform:translateY(0); }
-.msg.them {
-  align-self:flex-start;
-  background:rgba(155,115,245,0.12);
-  border:1px solid rgba(155,115,245,0.2);
-  color:var(--ink);
-  border-bottom-left-radius:4px;
-}
-.msg.me {
-  align-self:flex-end;
-  background:rgba(245,158,11,0.12);
-  border:1px solid rgba(245,158,11,0.22);
-  color:var(--ink);
-  border-bottom-right-radius:4px;
-}
-.msg .tag {
-  display:block; font-family:var(--mono); font-size:9.5px; font-weight:600;
-  letter-spacing:.1em; text-transform:uppercase; color:var(--purple);
-  margin-bottom:3px;
-}
-.msg.me .tag { color:var(--gold); }
-.typing {
-  align-self:flex-start; display:none; gap:4px;
-  padding:11px 14px; border-radius:14px; border-bottom-left-radius:4px;
-  background:rgba(155,115,245,0.12); border:1px solid rgba(155,115,245,0.2);
-}
-.typing.show { display:flex; }
-.typing i {
-  width:6px; height:6px; border-radius:50%; background:var(--purpleb);
-  animation:tdot 1.2s infinite;
-}
-.typing i:nth-child(2){ animation-delay:.2s }
-.typing i:nth-child(3){ animation-delay:.4s }
-@keyframes tdot { 0%,60%,100%{opacity:.25} 30%{opacity:1} }
-
-.sect-compact { padding:52px 0; }
-.sect-compact h2.heading { font-size:clamp(24px,3vw,40px); }
-.sect-compact .ai-grid { margin-top:28px; gap:44px; }
-.sect-compact .phone { max-width:300px; }
-.sect-compact .chat { min-height:170px; padding-top:12px; }
-.sect-compact .ai-feature { padding:13px 0; }
-
-/* ─── AI STRIP ───────────────────────────────────────────── */
-.ai-strip {
-  display:grid; grid-template-columns:5fr 7fr; gap:36px; align-items:center;
-  background:linear-gradient(135deg,rgba(123,79,224,0.10),rgba(245,158,11,0.05));
-  border:1px solid var(--line2); border-radius:18px;
-  padding:28px 32px; position:relative; overflow:hidden;
-}
-.ai-strip::before {
-  content:''; position:absolute; top:-70px; right:-70px;
-  width:280px; height:280px; border-radius:50%;
-  background:radial-gradient(ellipse,rgba(155,115,245,0.13) 0%,transparent 70%);
-  pointer-events:none;
-}
-.ai-strip-title {
-  font-family:var(--disp); font-weight:300; font-size:clamp(21px,2.6vw,30px);
-  letter-spacing:-0.02em; line-height:1.15; color:var(--ink);
-}
-.ai-strip-title em {
-  font-style:italic;
-  background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-}
-.ai-strip-points { display:flex; flex-direction:column; gap:10px; }
-.ai-point {
-  display:flex; align-items:center; gap:12px;
-  font-size:13.5px; color:var(--mute);
-  padding:9px 14px; border-radius:10px;
-  background:rgba(155,115,245,0.06); border:1px solid var(--line);
-}
-.ai-point b { color:var(--ink); }
-.ai-point svg { width:17px; height:17px; flex-shrink:0; stroke:var(--purpleb); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-@media(max-width:860px){ .ai-strip { grid-template-columns:1fr; gap:20px; } }
-
-/* ─── SERVICES GRID ──────────────────────────────────────── */
+/* ─── SERVICE CARDS ──────────────────────────────────────── */
 .svcs-grid {
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:16px;
-  margin-top:40px;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));
+  gap:16px; margin-top:32px;
 }
 .svc-card {
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:26px;
-  position:relative;
-  transition:border-color .25s, box-shadow .25s, transform .25s;
-  overflow:hidden;
+  position:relative; display:flex; flex-direction:column; gap:10px;
+  background:var(--card); box-shadow:inset 0 1px 0 rgba(238,238,255,0.04);
+  border:1px solid var(--line); border-radius:20px; padding:26px 24px;
+  transition:border-color .2s, transform .2s;
 }
-.svc-card::before {
-  content:''; position:absolute; inset:0; border-radius:16px;
-  background:radial-gradient(ellipse at 80% 0%,rgba(155,115,245,0.08) 0%,transparent 60%);
-  pointer-events:none;
+.svc-card:hover { border-color:rgba(155,115,245,0.45); transform:translateY(-3px); }
+.svc-card.wide { grid-column:1/-1; }
+/* Two columns only where they are wide enough to read. Below this the list
+   stays a single stack, and the second to last row keeps its rule. */
+@media(min-width:700px){
+  .svc-card.wide .svc-list { display:grid; grid-template-columns:1fr 1fr; column-gap:28px; }
+  .svc-card.wide .svc-list div:nth-last-child(2) { border-bottom:0; }
 }
-.svc-card:hover {
-  border-color:rgba(155,115,245,0.4);
-  box-shadow:0 8px 40px rgba(155,115,245,0.12);
-  transform:translateY(-2px);
-}
-.svc-card.featured {
-  border-color:rgba(245,158,11,0.3);
-  background:rgba(245,158,11,0.04);
-}
-.svc-card.featured::before {
-  background:radial-gradient(ellipse at 80% 0%,rgba(245,158,11,0.08) 0%,transparent 60%);
-}
-.svc-card.featured:hover {
-  border-color:rgba(245,158,11,0.5);
-  box-shadow:0 8px 40px rgba(245,158,11,0.1);
-}
+.svc-card.featured { background:var(--cardg); border-color:rgba(245,158,11,0.30); box-shadow:inset 0 1px 0 rgba(238,238,255,0.06); }
+.svc-card.featured:hover { border-color:rgba(245,158,11,0.55); }
 .svc-badge {
-  display:inline-flex; align-items:center; gap:5px;
-  font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
-  padding:4px 9px; border-radius:20px;
-  background:rgba(245,158,11,0.12); color:var(--gold);
-  border:1px solid rgba(245,158,11,0.25);
-  margin-bottom:16px;
+  position:absolute; top:-11px; left:24px;
+  font:600 10px var(--mono); letter-spacing:.16em; text-transform:uppercase;
+  color:var(--bg); background:linear-gradient(135deg,#FBBF24,#F59E0B);
+  border-radius:100px; padding:5px 12px;
 }
-.svc-ico {
-  width:44px; height:44px; border-radius:12px;
-  background:rgba(155,115,245,0.1);
-  display:flex; align-items:center; justify-content:center;
-  margin-bottom:16px;
+.svc-title {
+  font-family:var(--disp); font-weight:400; font-size:22px;
+  letter-spacing:-0.01em; line-height:1.15;
 }
-.svc-card.featured .svc-ico { background:rgba(245,158,11,0.1); }
-.svc-ico svg { width:22px; height:22px; stroke:var(--purple); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-.svc-card.featured .svc-ico svg { stroke:var(--gold); }
-.svc-title { font-size:16px; font-weight:600; color:var(--ink); margin-bottom:10px; }
-.svc-desc { font-size:13.5px; color:var(--mute); line-height:1.6; margin-bottom:20px; }
-.svc-price {
-  display:flex; align-items:baseline; gap:8px; margin-bottom:4px;
+.svc-list { display:flex; flex-direction:column; margin:2px 0 4px; }
+.svc-list div {
+  display:flex; align-items:baseline; gap:10px; padding:9px 0;
+  border-bottom:1px solid var(--line); font-size:14px; color:var(--mute); line-height:1.45;
 }
-.price-main {
-  font-family:var(--mono); font-size:26px; font-weight:600;
-  color:var(--ink);
+.svc-list div:last-child { border-bottom:0; }
+.svc-list i {
+  width:5px; height:5px; border-radius:50%; flex-shrink:0;
+  background:rgba(155,115,245,0.6); transform:translateY(-2px);
 }
-.price-unit { font-size:13px; color:var(--mute); }
-.price-alt { font-size:12.5px; color:var(--dim); margin-bottom:18px; }
+.featured .svc-list div { border-bottom-color:var(--gline); }
+.featured .svc-list i { background:rgba(245,158,11,0.6); }
+.svc-foot {
+  margin-top:auto; padding-top:14px; border-top:1px solid var(--line);
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.featured .svc-foot { border-top-color:rgba(245,158,11,0.22); }
+.svc-price { font:600 15px var(--mono); color:var(--purpleb); }
+.featured .svc-price { color:var(--goldb); }
+.price-main, .price-unit { font:inherit; color:inherit; }
+.price-unit { color:var(--mute); }
 .svc-cta {
   display:inline-flex; align-items:center; gap:6px;
-  padding:9px 16px; border-radius:9px; font-size:13.5px; font-weight:600;
-  background:rgba(155,115,245,0.12); color:var(--purpleb);
-  border:1px solid rgba(155,115,245,0.25);
-  text-decoration:none; transition:all .2s; cursor:pointer;
+  font-size:13.5px; font-weight:600; color:var(--purpleb); white-space:nowrap;
 }
-.svc-cta:hover { background:rgba(155,115,245,0.22); border-color:var(--purple); color:var(--purpleb); }
-.svc-card.featured .svc-cta {
-  background:rgba(245,158,11,0.12); color:var(--gold);
-  border-color:rgba(245,158,11,0.3);
-}
-.svc-card.featured .svc-cta:hover { background:rgba(245,158,11,0.22); }
-.svc-cta svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.svc-cta svg { width:14px; height:14px; }
+.featured .svc-cta { color:var(--goldb); }
+.price-alt { font-size:12.5px; color:var(--dim); margin-top:-2px; }
 
-/* Wide card spans 2 cols */
-.svc-card.wide { grid-column:span 2; }
-.wide-inner { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:center; }
-.wide-right { display:flex; flex-direction:column; gap:10px; }
-.wide-feature {
-  display:flex; align-items:flex-start; gap:10px;
-  background:rgba(245,158,11,0.05); border:1px solid rgba(245,158,11,0.15);
-  border-radius:10px; padding:12px;
+/* ─── NOTES ──────────────────────────────────────────────── */
+.note {
+  margin-top:22px; background:var(--panel); border:1px solid var(--line);
+  border-radius:16px; padding:20px 22px; font-size:14.5px; color:var(--mute); line-height:1.65;
 }
-.wide-feature svg { width:16px; height:16px; stroke:var(--gold); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; margin-top:2px; }
-.wide-feature span { font-size:13px; color:var(--mute); line-height:1.5; }
-.wide-feature b { color:var(--ink); }
+.note b { color:var(--ink); }
 
-/* ─── PAYMENT NOTE ───────────────────────────────────────── */
-.payment-note {
-  margin-top:28px; padding:18px 22px;
-  background:rgba(155,115,245,0.05);
-  border:1px solid var(--line);
-  border-radius:12px;
-  display:flex; align-items:flex-start; gap:14px;
+/* ─── FORMS ──────────────────────────────────────────────── */
+.panel {
+  background:var(--card); box-shadow:inset 0 1px 0 rgba(238,238,255,0.04);
+  border:1px solid var(--line2); border-radius:24px; padding:32px 30px; margin-top:26px;
 }
-.payment-note svg { width:20px; height:20px; stroke:var(--purple); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; margin-top:2px; }
-.payment-note p { font-size:14px; color:var(--mute); line-height:1.6; }
-.payment-note b { color:var(--ink); }
-.payment-note a { color:var(--purple); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.fgroup { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; min-width:0; }
+.fgroup label { font-size:12.5px; font-weight:600; color:var(--mute); }
+.fgroup input, .fgroup select, .fgroup textarea {
+  font-family:var(--body); font-size:15px; color:var(--ink);
+  background:rgba(7,7,26,0.6); border:1px solid var(--line);
+  border-radius:12px; padding:12px 14px; width:100%;
+}
+.fgroup textarea { min-height:110px; resize:vertical; }
+.fgroup input:focus, .fgroup select:focus, .fgroup textarea:focus {
+  outline:2px solid var(--purple); outline-offset:1px; border-color:transparent;
+}
+.fgroup input::placeholder, .fgroup textarea::placeholder { color:var(--dim); }
+.bk-consent {
+  display:flex; align-items:flex-start; gap:10px; margin:6px 0 4px;
+  font-size:13.5px; color:var(--mute); line-height:1.55; cursor:pointer;
+}
+.bk-consent input { margin-top:4px; width:16px; height:16px; accent-color:var(--purple); flex-shrink:0; }
+.bk-consent b { color:var(--ink); }
+.bk-consent-note { font-size:12.5px; color:var(--dim); margin:0 0 14px 26px; }
 
-/* ─── SCOPE NOTICE ───────────────────────────────────────── */
-.scope-notice {
-  margin-top:24px; padding:18px 22px;
-  border-left:3px solid var(--purple);
-  background:rgba(155,115,245,0.05);
-  border-radius:0 10px 10px 0;
-  font-size:14px; color:var(--mute); line-height:1.6;
+/* ─── CONTACT ────────────────────────────────────────────── */
+.contact-grid {
+  display:flex; flex-wrap:wrap; gap:36px;
+  align-items:flex-start; justify-content:space-between;
 }
-.scope-notice b { color:var(--ink); }
-
-/* ─── REVIEWS ────────────────────────────────────────────── */
-.reviews-grid {
-  display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:40px;
-  align-items:start;
-}
-.review-card {
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:14px; padding:24px;
+.contact-left { flex:1 1 300px; min-width:0; }
+.contact-form { flex:1 1 400px; min-width:0; }
+.contact-right { flex:0 1 360px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+.channel {
+  display:flex; align-items:baseline; justify-content:space-between; gap:14px;
+  padding:14px 18px; border:1px solid var(--line); border-radius:14px;
+  background:var(--panel); color:var(--ink); font-size:15px; font-weight:600;
   transition:border-color .2s;
 }
-.review-card:nth-child(2) { transform:translateY(20px); }
-.review-card:hover { border-color:rgba(155,115,245,0.3); }
-.stars { display:flex; gap:3px; margin-bottom:14px; }
-.stars svg { width:15px; height:15px; fill:var(--gold); stroke:none; }
-.review-text {
-  font-size:14.5px; color:var(--ink); line-height:1.65; margin-bottom:16px;
-  font-family:var(--disp); font-weight:300; font-style:italic;
-}
-.review-meta { display:flex; flex-direction:column; gap:2px; }
-.review-name { font-size:13.5px; font-weight:600; color:var(--purpleb); }
-.review-detail { font-size:12px; color:var(--mute); }
-.review-badge {
-  display:inline-flex; align-items:center; gap:4px;
-  font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-  padding:3px 8px; border-radius:20px;
-  background:rgba(155,115,245,0.1); color:var(--mute);
-  border:1px solid var(--line);
-  margin-top:10px;
-}
-.review-badge svg { width:11px; height:11px; stroke:var(--purple); fill:none; stroke-width:2; }
-.reviews-note { text-align:center; margin-top:36px; font-size:13.5px; color:var(--mute); }
-.reviews-note a { color:var(--purple); }
-
-/* ─── CONTACT CARD ───────────────────────────────────────── */
-.contact-card {
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:20px; padding:40px;
-}
-.contact-grid { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start; }
-.contact-left {}
-.contact-left .lead-text { margin-bottom:24px; }
-.channel {
-  display:flex; align-items:flex-start; gap:14px;
-  padding:16px 0; border-bottom:1px solid var(--line);
-  text-decoration:none; color:inherit; transition:opacity .2s;
-}
-.channel:last-child { border-bottom:none; }
-.channel:hover { opacity:.8; }
-.ch-ico {
-  width:40px; height:40px; border-radius:10px;
-  background:rgba(155,115,245,0.1);
-  display:flex; align-items:center; justify-content:center; flex-shrink:0;
-}
-.ch-ico svg { width:20px; height:20px; stroke:var(--purple); fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
-.ch-label { font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--mute); margin-bottom:2px; }
-.ch-val { font-size:15px; font-weight:600; color:var(--ink); }
-.ch-note { font-size:12.5px; color:var(--dim); margin-top:2px; }
-.contact-right {}
-.fgroup { margin-bottom:16px; }
-.fgroup label { display:block; font-size:12.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--mute); margin-bottom:6px; }
-.fgroup input, .fgroup select, .fgroup textarea {
-  width:100%; padding:11px 14px; font-size:14.5px; font-family:var(--body);
-  background:rgba(155,115,245,0.06); border:1.5px solid var(--line);
-  border-radius:9px; color:var(--ink); transition:border-color .2s;
-  outline:none;
-}
-.fgroup input:focus, .fgroup select:focus, .fgroup textarea:focus { border-color:var(--purple); }
-.fgroup textarea { min-height:100px; resize:vertical; }
-.fgroup select option { background:#1a1a38; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.f-note { font-size:12.5px; color:var(--dim); margin-top:10px; line-height:1.5; }
-.f-note a { color:var(--purple); }
+.channel:hover { color:var(--ink); border-color:rgba(155,115,245,0.5); }
+.channel span { font:500 13.5px var(--mono); color:var(--purpleb); text-align:right; }
+.channel.gold { border-color:rgba(245,158,11,0.30); background:rgba(245,158,11,0.06); }
+.channel.gold:hover { border-color:rgba(245,158,11,0.60); }
+.channel.gold span { color:var(--goldb); }
+.f-note { font-size:13px; color:var(--dim); margin-top:4px; }
 
 /* ─── FOOTER ─────────────────────────────────────────────── */
 footer {
-  border-top:1px solid var(--line); padding:36px 0;
-  margin-top:80px;
+  margin-top:56px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--mute); padding:26px 0 44px;
 }
-.fgrid {
-  display:flex; flex-direction:column; gap:16px;
-  font-size:13px; color:var(--mute);
-}
-.flinks { display:flex; flex-wrap:wrap; gap:6px 18px; }
-.flinks a { color:var(--dim); font-size:13px; }
-.flinks a:hover { color:var(--purple); }
+.fgrid { display:flex; flex-direction:column; gap:12px; }
+.flinks { display:flex; flex-wrap:wrap; gap:8px 18px; }
+.flinks a { color:var(--mute); }
+.flinks a:hover { color:var(--ink); }
 
 /* ─── SCROLL REVEAL ──────────────────────────────────────── */
-.rv { opacity:0; transform:translateY(28px); transition:opacity .6s ease, transform .6s ease; }
-.rv.in { opacity:1; transform:translateY(0); }
-.rv.d1 { transition-delay:.1s; }
-.rv.d2 { transition-delay:.2s; }
-.rv.d3 { transition-delay:.3s; }
+.rv { opacity:0; transform:translateY(14px); transition:opacity .5s ease, transform .5s ease; }
+.rv.in { opacity:1; transform:none; }
+@media(prefers-reduced-motion:reduce){
+  .rv { opacity:1; transform:none; transition:none; }
+  html { scroll-behavior:auto; }
+  .svc-card:hover, .btn-primary:hover { transform:none; }
+}
 
 /* ─── RESPONSIVE ─────────────────────────────────────────── */
-@media(max-width:900px){
-  .hero-grid { grid-template-columns:1fr; gap:40px; }
-  .ai-grid { grid-template-columns:1fr; gap:36px; }
-  .svcs-grid { grid-template-columns:1fr 1fr; }
-  .svc-card.wide { grid-column:span 2; }
-  .wide-inner { grid-template-columns:1fr; }
-  .wide-right { flex-direction:row; flex-wrap:wrap; }
-  .reviews-grid { grid-template-columns:1fr; }
-  .review-card:nth-child(2) { transform:none; }
-  .contact-grid { grid-template-columns:1fr; }
-  .trail-steps { grid-template-columns:1fr 1fr; gap:28px 12px; }
-  .trail-track { display:none; }
-  .trail-step { opacity:1; }
-  .trail-body { opacity:1; transform:none; }
-}
 @media(max-width:640px){
-  .svcs-grid { grid-template-columns:1fr; }
-  .svc-card.wide { grid-column:span 1; }
-  .steps-grid { grid-template-columns:1fr; }
   .form-row { grid-template-columns:1fr; }
-  .stat-bar { flex-wrap:wrap; gap:16px; }
+  .hero { padding-top:52px; }
+  .panel { padding:24px 20px; }
 }
 </style>
 <!-- Error monitoring (Sentry). Errors only, no tracing, no replay. PII is
@@ -625,11 +288,10 @@ footer {
     }catch(e){} return ev; } });
 })();
 </script>
-<link rel="stylesheet" href="nav.css?v=1">
+<link rel="stylesheet" href="nav.css?v=2">
 </head>
 <body>
 
-<!-- NAV -->
 <nav class="site-nav"><div class="nav-in">
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
   <div class="views">
@@ -637,6 +299,7 @@ footer {
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn on" href="/services">Managed services</a>
     <a class="vbtn" href="/business">For business</a>
+    <a class="vbtn" href="/how-we-use-ai">How we use AI</a>
     <a class="vbtn" href="/contact">Contact</a>
     <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
@@ -648,295 +311,147 @@ footer {
   <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
+
 <!-- HERO -->
-<section class="hero">
-  <div class="wrap">
-    <div class="hero-grid">
-      <div class="hero-left">
-        <div class="hero-eyebrow"><span class="dot"></span>Managed services · Kingston &amp; Portmore first</div>
-        <h1 class="display">You cannot<br>be there.<br><em>Someone independent<br>should be.</em></h1>
-        <p class="hero-sub">Timestamped proof of work on your property in Jamaica, checked against a written scope. <b>Independent of every contractor on the job.</b></p>
-        <div class="hero-ctas">
-          <a class="btn btn-primary" href="#contact">Tell us about your property</a>
-          <a class="btn btn-ghost" href="#services">See the prices</a>
-        </div>
-        <div class="stat-bar">
-          <div class="stat"><span class="stat-n">72h</span><span class="stat-l">Report turnaround</span></div>
-          <div class="stat"><span class="stat-n">7+</span><span class="stat-l">Years UK construction PM</span></div>
-          <div class="stat"><span class="stat-n">BEng</span><span class="stat-l">Aerospace Engineering</span></div>
-        </div>
-      </div>
-      <div class="hero-right rv">
-        <div class="cred-card">
-          <div class="cred-row">
-            <div class="cred-ico">
-              <svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg>
-            </div>
-            <div>
-              <div class="cred-label">Evidence standard</div>
-              <div class="cred-val">Timestamped &amp; geotagged</div>
-              <div class="cred-note">Every photograph against a written checklist.</div>
-            </div>
-          </div>
-          <div class="cred-row">
-            <div class="cred-ico">
-              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg>
-            </div>
-            <div>
-              <div class="cred-label">You read it first</div>
-              <div class="cred-val">Draft before final report</div>
-              <div class="cred-note">A fact wrong, you tell me and I fix it. Verdict is on page one.</div>
-            </div>
-          </div>
-          <div class="cred-row">
-            <div class="cred-ico">
-              <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            </div>
-            <div>
-              <div class="cred-label">Fixed prices, in writing</div>
-              <div class="cred-val">Nothing starts until you agree</div>
-              <div class="cred-note">Every price is on this page.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+<header class="hero">
+  <span class="hero-badge"><i class="dot"></i>Managed services · Kingston and Portmore</span>
+  <h1 class="display">You cannot be there. <em>Someone should be, in writing.</em></h1>
+  <p class="hero-sub">Timestamped proof of work on your property in Jamaica. <b>The person who assesses the work is never the person who did it, and both are named on the report.</b></p>
+  <p class="hero-lane">On everything except Full Project Management you keep your own contractor and pay them directly. Yaadly sells the eyes: we attend, we record, and we write it up. Yaadly's own fee is invoiced separately.</p>
+  <div class="hero-ctas">
+    <a class="btn btn-primary" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica." target="_blank" rel="noopener">Message us on WhatsApp</a>
+    <a class="btn btn-ghost" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a 15 minute call</a>
+    <a class="btn btn-quiet" href="#prices">See the prices</a>
   </div>
-</section>
-
-
-
-
-
-
-
-<!-- HOW IT WORKS: EVIDENCE TRAIL -->
-<section class="sect sect-compact">
-  <div class="wrap">
-    <div class="kick p">What happens after you book</div>
-    <h2 class="heading">Booked, attended, <em>written up.</em></h2>
-    <div class="trail rv" id="trail">
-      <div class="trail-track"><div class="trail-fill" id="trail-fill"></div></div>
-      <div class="trail-steps">
-        <div class="trail-step active" data-step="0">
-          <div class="trail-orb">
-            <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-          </div>
-          <div class="trail-num">01</div>
-          <div class="trail-title">You reach out</div>
-          <div class="trail-body">WhatsApp, form or voice note. Nothing charged.</div>
-        </div>
-        <div class="trail-step" data-step="1">
-          <div class="trail-orb">
-            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg>
-          </div>
-          <div class="trail-num">02</div>
-          <div class="trail-title">Fixed price, invoiced</div>
-          <div class="trail-body">In writing. Nothing starts until you say yes.</div>
-        </div>
-        <div class="trail-step" data-step="2">
-          <div class="trail-orb">
-            <svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg>
-          </div>
-          <div class="trail-num">03</div>
-          <div class="trail-title">We attend</div>
-          <div class="trail-body">Timestamped, geotagged, independent.</div>
-        </div>
-        <div class="trail-step" data-step="3">
-          <div class="trail-orb">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg>
-          </div>
-          <div class="trail-num">04</div>
-          <div class="trail-title">Independent review</div>
-          <div class="trail-body">Reviewed independently of every contractor on the job. Report in 72h, verdict on page one.</div>
-        </div>
-      </div>
-    </div>
+  <div class="proof">
+    <span>7+ years UK construction PM</span>
+    <span>BEng Aerospace Engineering</span>
+    <span>A person replies within one working day</span>
   </div>
-</section>
+</header>
 
-<!-- AI + WHATSAPP -->
-<section class="sect sect-compact sect-alt" id="ai">
-  <div class="wrap">
-    <div class="ai-strip rv">
-      <div class="ai-strip-head">
-        <div class="kick" style="margin-bottom:8px">The part nobody else has</div>
-        <div class="ai-strip-title">Your whole project, <em>run from WhatsApp.</em></div>
-      </div>
-      <div class="ai-strip-points">
-        <div class="ai-point">
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-          <span>One number, answered instantly, <b>day or night</b></span>
-        </div>
-        <div class="ai-point">
-          <svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4Z"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>
-          <span>AI agents track <b>every stage of your project</b></span>
-        </div>
-        <div class="ai-point">
-          <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
-          <span>A human confirms <b>every step that moves money</b></span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- SERVICES -->
+<!-- PRICES -->
 <section class="sect" id="services">
   <div class="wrap">
+    <span id="prices" aria-hidden="true"></span>
     <div class="kick">Professional services</div>
     <h2 class="heading">Every price <em>on the page.</em></h2>
-    <p class="lead-text">Founding rates: first five clients per service.</p>
 
     <div class="svcs-grid">
 
-      <!-- Deposit Protection Check — featured -->
+      <!-- Deposit Protection Check -->
       <div class="svc-card featured rv">
-        <div class="svc-badge">
-          <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
-          Founding rate
+        <span class="svc-badge">Start here</span>
+        <h3 class="svc-title">Deposit Protection Check</h3>
+        <div class="svc-list">
+          <div><i></i><span>Your contractor and their quote, checked before you pay anybody</span></div>
+          <div><i></i><span>Quote reviewed against real material costs and real day rates</span></div>
+          <div><i></i><span>Identity of the contractor checked, not taken on trust</span></div>
+          <div><i></i><span>A written verdict, go or no go</span></div>
         </div>
-        <div class="svc-ico">
-          <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">£149</span> <span class="price-unit">fixed fee</span></span>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Deposit%20Protection%20Check%20for%20%C2%A3149." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="svc-title">Deposit Protection Check</div>
-        <div class="svc-desc">Your contractor and their quote, checked before you pay anybody. <b style="color:var(--ink)">Written go or no-go, 72 hours.</b></div>
-        <div class="svc-price">
-          <span class="price-main">£149</span>
-          <span class="price-unit">fixed fee</span>
-        </div>
-        <div class="price-alt">Founding rate · first five clients</div>
-        <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Deposit%20Protection%20Check%20for%20%C2%A3149." target="_blank" rel="noopener">
-          Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-        </a>
+        <div class="price-alt">Founding rate, first five clients. Standard £249.</div>
       </div>
 
       <!-- Visual Check -->
-      <div class="svc-card rv d1">
-        <div class="svc-ico">
-          <svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg>
+      <div class="svc-card rv">
+        <h3 class="svc-title">Visual Check</h3>
+        <div class="svc-list">
+          <div><i></i><span>Trained checker attends to a fixed schedule</span></div>
+          <div><i></i><span>Photographic capture against an agreed checklist</span></div>
+          <div><i></i><span>Timestamped image set, filed against the visit</span></div>
+          <div><i></i><span>They record. They do not rate or advise.</span></div>
         </div>
-        <div class="svc-title">Visual Check</div>
-        <div class="svc-desc">A trained checker photographs everything against a checklist. <b style="color:var(--ink)">They record. They do not rate or advise.</b></div>
-        <div class="svc-price">
-          <span class="price-main">£95</span>
-          <span class="price-unit">per visit</span>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">£95</span> <span class="price-unit">per visit</span></span>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Visual%20Check%20at%20the%20%C2%A395%20founding%20rate." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="price-alt">Inside 48 hours: £185</div>
-        <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Visual%20Check." target="_blank" rel="noopener">
-          Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-        </a>
+        <div class="price-alt">Founding rate, first five clients. Standard £125.</div>
       </div>
 
       <!-- Condition Report -->
-      <div class="svc-card rv d2">
-        <div class="svc-ico">
-          <svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9"/></svg>
+      <div class="svc-card rv">
+        <h3 class="svc-title">Condition Report</h3>
+        <div class="svc-list">
+          <div><i></i><span>Roof, structure, water, electrics, drainage, termites</span></div>
+          <div><i></i><span>Security provision and external works</span></div>
+          <div><i></i><span>Every finding rated severe, moderate or low</span></div>
+          <div><i></i><span>Draft issued for your comment before sign off</span></div>
         </div>
-        <div class="svc-title">Condition Report</div>
-        <div class="svc-desc">System by system: roof, structure, water, electrics, drainage, termites, security. <b style="color:var(--ink)">Every finding rated Severe, Moderate or Low.</b></div>
-        <div class="svc-price">
-          <span class="price-main">£245</span>
-          <span class="price-unit">fixed fee</span>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">£249</span> <span class="price-unit">fixed fee</span></span>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Condition%20Report." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="price-alt">Founding rate · first five clients</div>
-        <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Condition%20Report." target="_blank" rel="noopener">
-          Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-        </a>
+        <div class="price-alt">Founding rate, first five clients. Standard £349.</div>
       </div>
 
       <!-- Technical Sign-off -->
       <div class="svc-card rv">
-        <div class="svc-ico">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg>
+        <h3 class="svc-title">Technical Sign-off</h3>
+        <div class="svc-list">
+          <div><i></i><span>Qualified trade inspector attends the stage</span></div>
+          <div><i></i><span>Workmanship judged against the standard for that trade</span></div>
+          <div><i></i><span>Pass, fail, or an itemised put right list</span></div>
+          <div><i></i><span>Photographic evidence supports each finding</span></div>
         </div>
-        <div class="svc-title">Technical Sign-off</div>
-        <div class="svc-desc">A qualified trade inspector judges one stage against the standard for that job. <b style="color:var(--ink)">Pass, fail, or a written put-right list.</b></div>
-        <div class="svc-price">
-          <span class="price-main">£245</span>
-          <span class="price-unit">per sign-off</span>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">£245</span> <span class="price-unit">per sign-off</span></span>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Technical%20Sign-off." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="price-alt">Inside 48 hours: £395</div>
-        <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Technical%20Sign-off." target="_blank" rel="noopener">
-          Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-        </a>
+        <div class="price-alt">Fixed fee, the same rate for everyone.</div>
       </div>
 
       <!-- Property Care -->
-      <div class="svc-card rv d1">
-        <div class="svc-ico">
-          <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      <div class="svc-card rv">
+        <h3 class="svc-title">Property Care</h3>
+        <div class="svc-list">
+          <div><i></i><span>Empty homes, elder occupied homes, rentals and Airbnbs</span></div>
+          <div><i></i><span>The same checklist run every attendance</span></div>
+          <div><i></i><span>Full photographic set per visit</span></div>
+          <div><i></i><span>Change tracked visit to visit</span></div>
         </div>
-        <div class="svc-title">Property Care</div>
-        <div class="svc-desc"><b style="color:var(--ink)">An empty or elder-occupied home, watched.</b> The same checklist every visit, so change is visible.</div>
-        <div class="svc-price">
-          <span class="price-main">£75</span>
-          <span class="price-unit">per visit, standard</span>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">£45</span> <span class="price-unit">per visit</span></span>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20Property%20Care." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="price-alt">Large or rental: £135 · villa: £175</div>
-        <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20Property%20Care." target="_blank" rel="noopener">
-          Book this service
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-        </a>
+        <div class="price-alt">Standard home. Large or rental £70 a visit. Villa £95 a visit.</div>
       </div>
 
-      <!-- Oversight Retainer — featured, spans 2 but in a 3-col it goes alone -->
-      <div class="svc-card featured rv d2">
-        <div class="svc-badge">
-          <svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-          Popular
+      <!-- Oversight Retainer -->
+      <div class="svc-card featured rv">
+        <span class="svc-badge">Popular</span>
+        <h3 class="svc-title">Oversight Retainer</h3>
+        <div class="svc-list">
+          <div><i></i><span>Documented site attendance, twice monthly</span></div>
+          <div><i></i><span>Monthly cost and progress report</span></div>
+          <div><i></i><span>A scheduled accountability call each month</span></div>
+          <div><i></i><span>A direct WhatsApp escalation line to Monique</span></div>
         </div>
-        <div class="svc-ico">
-          <svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">£395</span> <span class="price-unit">a month</span></span>
+          <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20enquire%20about%20the%20Oversight%20Retainer." target="_blank" rel="noopener">Enquire<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="svc-title">Oversight Retainer</div>
-        <div class="svc-desc">Documented visits, a monthly cost-and-progress report, an accountability call, a WhatsApp line to me. <b style="color:var(--ink)">Pick your frequency.</b></div>
-        <div class="svc-price">
-          <span class="price-main">£495</span>
-          <span class="price-unit">per month, fortnightly</span>
-        </div>
-        <div class="price-alt">Weekly visits: £895/mo</div>
-        <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20enquire%20about%20the%20Oversight%20Retainer." target="_blank" rel="noopener">
-          Enquire about retainer
-          <svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg>
-        </a>
+        <div class="price-alt">Founding rate, first five clients. Standard £495. Monthly subscription, 30 days notice to stop.</div>
       </div>
 
-      <!-- Full Project Management — wide -->
-      <div class="svc-card featured wide rv" style="grid-column:1/-1">
-        <div class="wide-inner">
-          <div>
-            <div class="svc-badge">From December 2026</div>
-            <div class="svc-ico" style="margin-top:12px">
-              <svg viewBox="0 0 24 24"><path d="M5 21V10l5-3 5 3v11"/><path d="M15 10l4-2v9"/><path d="M3 21h18"/></svg>
-            </div>
-            <div class="svc-title">Full Project Management</div>
-            <div class="svc-desc">The whole build. Scope, contractor vetting, staged payments, programme, inspections, handover. Paid in milestones, never up front.</div>
-            <div class="svc-price">
-              <span class="price-main">12–15%</span>
-              <span class="price-unit">of build cost</span>
-            </div>
-            <div class="price-alt">Minimum fee £2,500</div>
-          </div>
-          <div class="wide-right">
-            <div class="wide-feature">
-              <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/></svg>
-              <span><b>Contractor vetting</b>. Every trade checked before they price a single nail.</span>
-            </div>
-            <div class="wide-feature">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></svg>
-              <span><b>Stage-by-stage sign-off</b>. Payments only release once evidence is verified.</span>
-            </div>
-            <div class="wide-feature">
-              <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg>
-              <span><b>Written programme</b>. Dates, stages and costs in a format you can hold anyone to.</span>
-            </div>
-          </div>
+      <!-- Full Project Management. The other lane: on this one the client
+           buys the job from Yaadly and Yaadly engages and pays the trades. -->
+      <div class="svc-card wide rv">
+        <h3 class="svc-title">Full Project Management</h3>
+        <div class="svc-list">
+          <div><i></i><span>Scope of works drafted before anyone prices it</span></div>
+          <div><i></i><span>Trades vetted, engaged and instructed by Yaadly</span></div>
+          <div><i></i><span>Each stage checked against the scope, then the trade is paid</span></div>
+          <div><i></i><span>Programme, handover and defects list</span></div>
         </div>
+        <div class="svc-foot">
+          <span class="svc-price"><span class="price-main">12 to 15%</span> <span class="price-unit">of build cost</span></span>
+          <a class="svc-cta" href="#contact">Enquire<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <div class="price-alt">Minimum fee £2,500. Managed job, from December 2026. <b style="color:var(--ink)">On this one you buy the job from Yaadly</b>, and Yaadly engages and pays the trades.</div>
       </div>
 
     </div><!-- /svcs-grid -->
@@ -944,9 +459,11 @@ footer {
     <!-- BOOK DIRECTLY. A booking is held, never charged, until Monique
          confirms the scope and the exact price in writing. The card CTAs
          above jump here with the service preselected. -->
-    <div class="payment-note rv" id="book" style="display:block">
-      <p style="margin:0 0 4px"><b>Book a service, nothing charged now.</b> The booking is held while Monique confirms the scope and the exact price with you in writing. The invoice comes by email after that, and you can cancel anytime before you pay.</p>
-      <div class="form-row" style="margin-top:14px">
+    <div class="panel rv" id="book">
+      <div class="kick">Book a service</div>
+      <h3 class="heading" style="font-size:clamp(22px,2.6vw,28px);margin-bottom:12px">Nothing is <em>charged now.</em></h3>
+      <p style="font-size:14.5px;color:var(--mute);line-height:1.65;margin-bottom:16px">Every fixed-fee service on this page can be paid by card, and the card button appears here the moment your booking is registered. Nothing is taken at that point: on a one-off service your card is authorised and only charged once the work is done and you have accepted it. You have 14 days to <a href="/cancellation">cancel</a>.</p>
+      <div class="form-row">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
             <option value="deposit">Deposit Protection Check</option>
@@ -955,8 +472,14 @@ footer {
             <option value="signoff">Technical Sign-off</option>
             <option value="retainer">Oversight Retainer</option>
             <option value="care">Property Care</option>
-            <option value="setup">Project Setup Pack</option>
-            <option value="docs">Document Pack Check</option>
+          </select>
+        </div>
+        <div class="fgroup" id="bk-care-tier-row" style="display:none">
+          <label for="bk-care-tier">Which home</label>
+          <select id="bk-care-tier">
+            <option value="standard">Standard, £45 a visit</option>
+            <option value="large">Large or rental, £70 a visit</option>
+            <option value="villa">Villa, £95 a visit</option>
           </select>
         </div>
         <div class="fgroup"><label for="bk-name">Your name</label><input id="bk-name" autocomplete="name"></div>
@@ -969,63 +492,49 @@ footer {
         <div class="fgroup"><label for="bk-parish">Where is the property? Parish or town</label><input id="bk-parish" placeholder="Portmore"></div>
         <div class="fgroup"><label for="bk-msg">Anything we should know</label><input id="bk-msg" placeholder="Optional"></div>
       </div>
+      <!-- THE EXPRESS REQUEST TO START EARLY. cancellation.html says, in
+           its own words, "we will ask you for that in writing at booking".
+           This is that ask, and it is where the promise said it would be.
+           Deliberately NOT required: a client who leaves it alone has not
+           asked, and waiting the 14 days is the correct outcome for them.
+           A tick nobody can decline is not a request anybody made.
+           The wording here and START_NOW_WORDING in the script below are
+           one sentence in two places. Change them together, in one commit. -->
+      <label class="bk-consent" for="bk-start-now">
+        <input type="checkbox" id="bk-start-now">
+        <span><b>Start before my 14 days are up.</b> I am asking Yaadly to begin inside my cancellation period. If I cancel after the work has started, I pay a fair share of what has already been done, and no more. <a href="/cancellation" target="_blank" rel="noopener">What this means</a>.</span>
+      </label>
+      <div class="bk-consent-note">Leave this unticked and nothing starts until your 14 days have run out. Your right to cancel lasts the full 14 days either way.</div>
       <button class="btn btn-primary" id="bk-send" style="width:100%;justify-content:center" onclick="sendBooking()">Book it, nothing charged yet</button>
       <div id="bk-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
     </div>
 
-    <!-- PAYMENT NOTE — replaces old split rule -->
-    <div class="payment-note rv">
-      <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-      <p><b>How you pay:</b> every service is paid in full by bank transfer against an invoice we send you. GBP, USD or CAD. Nothing starts until the invoice is settled. Retainers are invoiced monthly with 30 days notice to stop. <a href="/payments">Full payment terms.</a></p>
-    </div>
+    <!-- HOW YOU PAY -->
+    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every fixed-fee service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. You have 14 days to <a href="/cancellation">cancel</a>. <b>Yaadly does not operate an escrow service and does not hold money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
 
-    <!-- SCOPE NOTICE -->
-    <div class="scope-notice rv">
-      <b>We know the edge of our scope.</b> Boundaries go to a land surveyor, structures to a PERB engineer, title to an attorney. In writing, never guessed. <a href="/payments">See the legal detail.</a>
-    </div>
+    <!-- WHAT THIS IS NOT -->
+    <div class="note rv"><b>Inspection and oversight, not a guarantee.</b> Yaadly records condition, judges workmanship against the standard for that trade, and oversees progress. Yaadly does not guarantee an outcome, and four things always go out to a named professional in writing rather than being guessed at: <b>valuation</b> to a licensed valuer, <b>title and legal opinion</b> to an attorney, <b>structural engineering</b> to a PERB registered engineer, and <b>boundaries</b> to a commissioned land surveyor. The same boundaries in full are on <a href="/business">Yaadly for business</a>.</div>
 
   </div>
 </section>
 
-
-
-
-
 <!-- CONTACT -->
-<section class="sect sect-alt" id="contact">
+<section class="sect" id="contact">
   <div class="wrap">
-    <div class="kick p">Get in touch</div>
-    <h2 class="heading">Tell us about <em>your property.</em></h2>
-    <div class="contact-card rv">
+    <div class="panel rv">
       <div class="contact-grid">
         <div class="contact-left">
-          <p class="lead-text" style="margin-bottom:28px">No account, no commitment, nothing charged. Say where the property is and what is worrying you about it. <b>Monique reads these herself.</b></p>
-          <a class="channel" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica." target="_blank" rel="noopener">
-            <div class="ch-ico"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z"/></svg></div>
-            <div>
-              <div class="ch-label">WhatsApp</div>
-              <div class="ch-val">Message us on WhatsApp</div>
-              <div class="ch-note">Fastest. Text, photos or a voice note. Patois or English.</div>
-            </div>
-          </a>
-          <a class="channel" href="mailto:monique@yaadly.co.uk">
-            <div class="ch-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg></div>
-            <div>
-              <div class="ch-label">Email</div>
-              <div class="ch-val">monique@yaadly.co.uk</div>
-              <div class="ch-note">Best when you have quotes, drawings or documents to attach.</div>
-            </div>
-          </a>
-          <a class="channel" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">
-            <div class="ch-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
-            <div>
-              <div class="ch-label">Book a call</div>
-              <div class="ch-val">Free 15 minute call</div>
-              <div class="ch-note">Talk it through. No obligation.</div>
-            </div>
-          </a>
+          <div class="kick">Get in touch</div>
+          <h2 class="heading">Something not here, or need it <em>customised?</em></h2>
+          <p style="margin-top:14px;font-size:15.5px;color:var(--mute);max-width:46ch;text-wrap:pretty">Write below and we will scope it to your property. No account, nothing charged. <b style="color:var(--ink)">Monique reads every message herself.</b></p>
+          <div class="contact-right" style="flex:1 1 auto;margin-top:22px">
+            <a class="channel" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica." target="_blank" rel="noopener">WhatsApp<span>Fastest channel</span></a>
+            <a class="channel" href="mailto:monique@yaadly.co.uk">Email<span>monique@yaadly.co.uk</span></a>
+            <a class="channel gold" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call<span>Free 15 minutes</span></a>
+            <p class="f-note">A person replies within one working day.</p>
+          </div>
         </div>
-        <div class="contact-right">
+        <div class="contact-form">
           <div class="form-row">
             <div class="fgroup"><label for="ct-name">Your name</label><input id="ct-name" autocomplete="name"></div>
             <div class="fgroup"><label for="ct-contact">Email or WhatsApp</label><input id="ct-contact" placeholder="+44… or you@email.com"></div>
@@ -1033,22 +542,22 @@ footer {
           <div class="fgroup">
             <label for="ct-topic">What is it about?</label>
             <select id="ct-topic">
-              <option>A question before I commit to anything</option>
-              <option>Property in Jamaica that needs work doing</option>
-              <option>I already have a contractor and want somebody watching</option>
-              <option>Property care while the house is empty</option>
-              <option>Something already booked or in progress</option>
+              <option>A question first</option>
+              <option>Property needing work</option>
+              <option>Already have a contractor</option>
+              <option>Property care</option>
+              <option>Already in progress</option>
               <option>Press, partnership or investment</option>
               <option>Something else</option>
             </select>
           </div>
           <div class="fgroup">
             <label for="ct-msg">Your message</label>
-            <textarea id="ct-msg" placeholder="Where the property is, what is happening, and what you want to know."></textarea>
+            <textarea id="ct-msg" placeholder="Where the property is and what is happening."></textarea>
           </div>
           <button class="btn btn-primary" id="ct-send" style="width:100%;justify-content:center" onclick="sendEnquiry()">Send enquiry</button>
           <div id="ct-status" style="margin-top:10px;font-size:13.5px;line-height:1.6"></div>
-          <p class="f-note">What you write is used to answer you and nothing else. Replied within one working day. <a href="https://cal.com/yaadly/15min" target="_blank">Prefer a call?</a></p>
+          <p class="f-note">Used only to reply, one working day. <a href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Or book a call.</a></p>
         </div>
       </div>
     </div>
@@ -1060,8 +569,7 @@ footer {
   <div class="wrap">
     <div class="fgrid">
       <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
-      <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
-      <span>A human confirms every step that moves money or changes a reputation.</span>
+      <span>More parishes as we grow. A named person at Yaadly confirms every step that moves money.</span>
       <div class="flinks">
         <a href="/">Home</a>
         <a href="/marketplace">Overview</a>
@@ -1070,8 +578,12 @@ footer {
         <a href="/payments">How you pay</a>
         <a href="/faq">Questions and answers</a>
         <a href="/contact">Contact</a>
-        <a href="https://app.yaadly.co.uk/portal" target="_blank">Client portal</a>
-        <a href="https://app.yaadly.co.uk/apply" target="_blank">Join as a pro</a>
+        <a href="https://app.yaadly.co.uk/portal" target="_blank" rel="noopener">Client portal</a>
+        <a href="https://app.yaadly.co.uk/apply" target="_blank" rel="noopener">Join as a pro</a>
+        <a href="/how-we-use-ai">How we use AI</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/cancellation">Cancelling</a>
+        <a href="/terms">Terms</a>
       </div>
     </div>
   </div>
@@ -1092,7 +604,70 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
    never charged, until Monique confirms scope and price in writing. A card
    whose service has no bookable catalogue entry keeps its WhatsApp link. */
 const BOOKING_URL = "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-book-service";
+/* Stripe payment links, live since 5 Sep 2026. The keys are the service
+   values this form actually posts, which are the same strings the booking
+   function's own BOOKABLE allowlist uses, so one service means one key in
+   both places. They used to be keyed care_standard / care_large / care_villa
+   here and 'care' everywhere else, which is how a villa came to be recorded
+   at the standard price while being asked for the villa one.
+
+   Leave a URL empty and that service's confirmation simply reads as it did
+   before, with no button. There is never a dead button or a half wired
+   payment on the page.
+
+   All but the retainer are holds, not charges: the card is authorised and
+   captured only when a named person accepts the work. The retainer is a
+   monthly subscription and bills immediately, hence SUBSCRIPTION_SERVICES
+   below. Every service here is under GBP 500, which is the rule that makes
+   a hold possible at all. Anything at or above GBP 500 is invoiced and must
+   never be given a link.
+
+   Deliberately after the booking, not instead of it. The button on a service
+   card opens the booking form, which is where the client's name, contact and
+   property go on record, and where the cancellation information has to
+   reach them. A card CTA pointing straight at Stripe would skip all of it.
+   Confirmed again by the founder on 5 Sep 2026 when the card path was made
+   visible: more prominent, still after the record, never instead of it. */
+const PAYMENT_LINKS = {
+  deposit:        "https://buy.stripe.com/cNicMYb3CgKVdSIdU19Zm09",
+  visual:         "https://buy.stripe.com/8x214ggnW7al8yo5nv9Zm08",
+  condition:      "https://buy.stripe.com/14A9AM9Zy3Y93e4bLT9Zm0b",
+  signoff:        "https://buy.stripe.com/fZu5kwdbK52dg0QaHP9Zm0a",
+  care:           "https://buy.stripe.com/eVqbIU1t20LX7uk6rz9Zm05",
+  "care-large":   "https://buy.stripe.com/6oUbIUgnW8ep9Cs2bj9Zm06",
+  "care-villa":   "https://buy.stripe.com/3cI6oA6Nm0LX7uk2bj9Zm07",
+  retainer:       "https://buy.stripe.com/28E6oAgnWeCN4i8cPX9Zm0c"
+};
+
+/* The retainer link is a monthly subscription, so it bills on the spot and
+   keeps billing. Every other link is a hold. Saying "authorised, not
+   charged" over a subscription would be a false statement about somebody's
+   money, so the two are worded separately and this set is what decides. */
+const SUBSCRIPTION_SERVICES = new Set(["retainer"]);
+
+/* The three Property Care tiers, as the booking function's own allowlist
+   spells them and as the prices on the card read. */
+/* The express request to start inside the 14 day cancellation period, and
+   the exact sentence the client agreed to when they gave it. Versioned for
+   the same reason AI_CONSENT_VERSION is in the apply flow: a consent is only
+   worth what the sentence that earned it said, so rewording the tickbox
+   without bumping this silently reinterprets everybody's existing answer.
+   Change the copy in the form and this string together, in one commit. */
+const START_NOW_VERSION = "start-now-v1";
+const START_NOW_WORDING = "Start before my 14 days are up. I am asking Yaadly to begin inside my cancellation period. If I cancel after the work has started, I pay a fair share of what has already been done, and no more.";
+
+const CARE_KEYS = { standard: "care", large: "care-large", villa: "care-villa" };
+const CARE_LABELS = {
+  standard: "Property Care, standard home, £45 a visit",
+  large:    "Property Care, large or rental, £70 a visit",
+  villa:    "Property Care, villa, £95 a visit"
+};
+
 const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
+function updateCareTierRow(){
+  $id("bk-care-tier-row").style.display = $id("bk-svc").value === "care" ? "" : "none";
+}
+$id("bk-svc").addEventListener("change", updateCareTierRow);
 document.querySelectorAll(".svc-cta").forEach(el => {
   const hit = CTA_KEYS.find(([frag]) => (el.getAttribute("href") || "").includes(frag));
   if (!hit) return;
@@ -1102,19 +677,33 @@ document.querySelectorAll(".svc-cta").forEach(el => {
   el.href = "#book"; el.removeAttribute("target"); el.removeAttribute("rel");
   el.addEventListener("click", () => {
     const sel = $id("bk-svc");
-    if (sel) { sel.value = hit[1]; sel.dataset.label = label; }
+    if (sel) { sel.value = hit[1]; sel.dataset.label = label; updateCareTierRow(); }
   });
 });
 
 async function sendBooking(){
   const g = i => ($id(i).value||"").trim();
   const status = $id("bk-status"), btn = $id("bk-send");
-  const say = (tone, html) => { status.innerHTML = '<span style="color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</span>'; };
+  /* block, not inline: the confirmation now carries a full width pay button */
+  const say = (tone, html) => { status.innerHTML = '<span style="display:block;color:'+(tone==="bad"?"#F87171":"#C4AAFF")+'">'+html+'</span>'; };
   const fallback = ' Book it on <a href="https://wa.me/447878877567" target="_blank" rel="noopener">WhatsApp</a> instead, or email <a href="mailto:'+SVC_EMAIL+'">'+esc(SVC_EMAIL)+'</a>.';
   const sel = $id("bk-svc");
-  const b = { service: sel.value, label: sel.dataset.label || sel.options[sel.selectedIndex].text,
+  /* Property Care is three separately priced services behind one option, so
+     the tier has to travel with the booking. It did not, which meant a villa
+     was recorded at the standard £45 while the pay button asked for £95. The
+     tier picks the catalogue row, the pay link and the label, all from here. */
+  const tier = $id("bk-care-tier").value || "standard";
+  const service = sel.value === "care" ? CARE_KEYS[tier] : sel.value;
+  const label = sel.value === "care"
+    ? CARE_LABELS[tier]
+    : (sel.dataset.label || sel.options[sel.selectedIndex].text);
+  const startNow = $id("bk-start-now").checked;
+  const b = { service, label,
               name: g("bk-name"), email: g("bk-email"), phone: g("bk-phone"),
-              parish: g("bk-parish"), message: g("bk-msg") };
+              parish: g("bk-parish"), message: g("bk-msg"),
+              startNow,
+              startNowVersion: startNow ? START_NOW_VERSION : "",
+              startNowWording: startNow ? START_NOW_WORDING : "" };
   if(!b.name || (!b.email && !b.phone)){
     say("bad", "<b>Nearly.</b> We need your name and an email or WhatsApp number, so the booking has somebody to belong to.");
     return;
@@ -1137,7 +726,25 @@ async function sendBooking(){
   }
   btn.disabled = false; btn.textContent = "Book it, nothing charged yet";
   const channel = j.phoneGiven ? "WhatsApp" : "email";
-  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal. Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.");
+  /* No express request to start early means the work waits out the 14 days,
+     and a card authorisation only lasts seven. Offering the button anyway
+     would take a hold that is guaranteed to expire before the job can begin,
+     so the card path is offered only to a client who actually asked. */
+  const payUrl = startNow ? (PAYMENT_LINKS[b.service] || "") : "";
+  const subs = SUBSCRIPTION_SERVICES.has(b.service);
+  const terms = subs
+    ? ' This one is a monthly subscription, so the first month is charged when you pay and it bills again each month until you stop it. Thirty days notice to stop, and you have 14 days to <a href="/cancellation">cancel</a>.'
+    : ' Your card is authorised, not charged. It is only taken once the work is done and you have accepted it, and you have 14 days to <a href="/cancellation">cancel</a>.';
+  const tail = payUrl
+    ? ' Nothing has been charged.' + terms
+      + '<a class="btn btn-primary" style="margin-top:14px;width:100%;justify-content:center" href="'
+      + payUrl + '" target="_blank" rel="noopener">Pay for ' + esc(b.label)
+      + '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg></a>'
+      + '<div style="margin-top:8px;font-size:12.5px;color:var(--mute)">Card handled by Stripe. Yaadly never sees or stores your card number. Prefer an invoice or a bank transfer? Reply to your receipt and say so.</div>'
+    : (startNow
+        ? ' Nothing is charged: Monique confirms the scope and the exact price with you in writing first, and the invoice follows only after that.'
+        : ' <b>You have not asked us to start inside your 14 days</b>, so nothing begins until they have run out, and there is nothing to pay before then. Monique will confirm the scope and the exact price with you in writing in the meantime. If you change your mind and want it started sooner, say so in your reply and we will take that as the request.');
+  say("ok", "<b>Held for you, "+esc(b.name)+".</b> Your reference is <b>"+esc(j.ref)+"</b> and a receipt is on its way by "+channel+", with the code that opens your client portal." + tail);
   ["bk-name","bk-email","bk-phone","bk-parish","bk-msg"].forEach(i=>$id(i).value="");
 }
 
@@ -1184,47 +791,6 @@ const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); obs.unobserve(e.target); } });
 }, { threshold:0.08, rootMargin:'0px 0px 40px 0px' });
 document.querySelectorAll('.rv').forEach(el => obs.observe(el));
-
-/* Evidence trail: auto-advance, click to jump, pauses off-screen */
-const steps = [...document.querySelectorAll('.trail-step')];
-const fill = document.getElementById('trail-fill');
-const FILLS = ['12%','40%','68%','100%'];
-let cur = 0, timer = null;
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-function setStep(i){
-  cur = i;
-  steps.forEach((s,j) => s.classList.toggle('active', j === i));
-  fill.style.width = FILLS[i];
-}
-function play(){ if(reduce || timer) return; timer = setInterval(() => setStep((cur+1) % steps.length), 2800); }
-function stop(){ clearInterval(timer); timer = null; }
-steps.forEach((s,i) => s.addEventListener('click', () => { stop(); setStep(i); play(); }));
-if(reduce){ steps.forEach(s => s.classList.add('active')); fill.style.width = '100%'; }
-else {
-  const tObs = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? play() : stop()), { threshold:0.3 });
-  tObs.observe(document.getElementById('trail'));
-}
-
-/* Stat count-up */
-function countUp(el){
-  const raw = el.textContent.trim();
-  const m = raw.match(/^(\d+)(.*)$/);
-  if(!m) return;
-  const target = +m[1], suffix = m[2];
-  const t0 = performance.now(), dur = 1100;
-  function tick(t){
-    const p = Math.min((t - t0) / dur, 1);
-    el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))) + suffix;
-    if(p < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-}
-if(!reduce){
-  const sObs = new IntersectionObserver(es => es.forEach(e => {
-    if(e.isIntersecting){ countUp(e.target); sObs.unobserve(e.target); }
-  }), { threshold:0.6 });
-  document.querySelectorAll('.stat-n').forEach(el => { if(/^\d/.test(el.textContent.trim())) sObs.observe(el); });
-}
 </script>
 <script src="chat.js" defer></script>
 </body>

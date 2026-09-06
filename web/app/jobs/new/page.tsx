@@ -10,26 +10,34 @@ export const metadata = {
 export default async function NewJob({
   searchParams,
 }: {
-  searchParams: Promise<{ trade?: string; worker?: string }>;
+  searchParams: Promise<{ trade?: string; parish?: string; worker?: string }>;
 }) {
   /* ?trade= comes off the one tap trade tiles on the marketing site, so
      somebody who has already said "roof and zinc" is not asked again.
+     ?parish= comes off the two question starter card on /marketplace, which
+     asks trade and parish before sending anybody here. Without this the card
+     asked a question and then threw the answer away, and the person was asked
+     it again on stage two.
      ?worker= comes off "Book for a job" on the marketplace board: the
      client picked somebody, and rather than a second way to create a job,
      they land in this one flow with that name carried through to the
      enquiry. Resolved to a real active profile here so a hand-typed slug
      cannot put a name on an enquiry that nobody vetted. */
-  const { trade, worker } = await searchParams;
+  const { trade, parish, worker } = await searchParams;
   let requestedWorker: string | undefined;
+  let requestedWorkerSlug: string | undefined;
   if (worker) {
     const supabase = await createClient();
     const { data } = await supabase
-      .from("worker_profiles")
+      .from("public_worker_profiles")
       .select("name,trade")
       .eq("slug", worker)
-      .eq("active", true)
       .maybeSingle();
-    if (data?.name) requestedWorker = data.name;
+    /* The NAME is for the client to read. The SLUG is what travels to
+       yaad-post-job, which resolves it to a worker on the server, so this
+       page never handles a worker's email and a request cannot be pinned on
+       somebody who is not an active vetted worker. */
+    if (data?.name) { requestedWorker = data.name; requestedWorkerSlug = worker; }
   }
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-10">
@@ -44,7 +52,7 @@ export default async function NewJob({
           </span>
         </div>
       )}
-      <PostJob initialTrade={trade} requestedWorker={requestedWorker} />
+      <PostJob initialTrade={trade} initialParish={parish} requestedWorker={requestedWorker} requestedWorkerSlug={requestedWorkerSlug} />
     </div>
   );
 }

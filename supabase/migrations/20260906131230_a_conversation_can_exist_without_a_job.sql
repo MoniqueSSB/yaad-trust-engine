@@ -1,0 +1,51 @@
+-- A conversation can exist without a job.
+--
+-- Founder's instruction, 6 September 2026: "People should be able to contact
+-- me on WhatsApp and get help. Not only just load a job." Followed by her
+-- decision that a question should leave no job row at all until there is
+-- actually a job.
+--
+-- It could not, before this. intake_threads.job_id was NOT NULL with a foreign
+-- key to jobs, so the record of a conversation literally could not be written
+-- unless a job row was written first. That single constraint is why every
+-- greeting, every "how do you choose workers" and every wrong number became a
+-- draft job titled "Someone writing in on whatsapp". There is one in the
+-- database from this morning whose entire content is the question "how do you
+-- choose workers", sitting in the job list with a reference number.
+--
+-- Nothing is lost by this. The desk's Conversations view reads intake_threads
+-- directly and has always rendered "no job yet" for a thread without one, so
+-- Monique still sees every person who writes in, in full, word for word. What
+-- goes away is the job list being padded with things that are not jobs.
+--
+-- WHAT THIS DOES NOT DO. It does not make job_id optional for a real job. The
+-- handler writes the row the moment work is described, and it writes the row
+-- unconditionally whenever a conversation is handed to a person, so every
+-- reference ever spoken to a client still has a row behind it.
+
+-- ── intake_threads ───────────────────────────────────────────────────────
+--
+-- The foreign key STAYS, and stays ON DELETE CASCADE. A null never violates a
+-- foreign key in Postgres, so this widens what may be stored without weakening
+-- what a stored value has to mean: a job_id that is present is still a real
+-- job, and deleting that job still takes the thread with it.
+alter table public.intake_threads alter column job_id drop not null;
+
+-- The client read policy joins jobs on this column to check a proven email.
+-- A null job_id matches no job, so the exists() is false and a help thread is
+-- readable by nobody but an admin. That is the correct answer and it needs no
+-- change: somebody who has only asked a question has no portal to read it in.
+
+-- ── web_chat_replies ─────────────────────────────────────────────────────
+--
+-- Came along for the ride, and would have broken quietly without this.
+-- yaad-desk-reply reads the thread and inserts the reply with
+-- `job_id: thread.job_id`, no coalesce, unlike the two inserts below it which
+-- both write `thread.job_id ?? ""`. So the first time Monique answered a
+-- website question from the desk, the insert would have failed 23502 and she
+-- would have been told "Could not save the reply" with no reason given.
+--
+-- Nullable rather than defaulted to '', because this column is also a foreign
+-- key to jobs and '' is not a job. The only policy on this table is
+-- web_chat_replies_admin_all, so nothing is opened up by the change.
+alter table public.web_chat_replies alter column job_id drop not null;

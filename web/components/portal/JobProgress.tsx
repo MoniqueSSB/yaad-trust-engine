@@ -17,7 +17,7 @@ import Link from "next/link";
 export type Step = {
   title: string;
   state: "done" | "now" | "todo";
-  /** shown right-aligned, for stages that release money */
+  /** shown right-aligned, for stages that carry a payment */
   amount?: string;
 };
 

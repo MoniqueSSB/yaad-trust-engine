@@ -7,8 +7,11 @@ import Link from "next/link";
  *
  * The phase view above says which stage is live. This says what each one
  * actually is, which matters because on this product a stage is the unit
- * money moves in: the client approves a stage, and that approval is what
- * raises the worker's pay invoice for it (20260902j, 20260902l).
+ * money moves in: the client accepts a stage, and that acceptance is what
+ * raises Yaadly's payable to its subcontractor for it (20260902j,
+ * 20260902l). The client accepts the work; Yaadly pays its own
+ * subcontractor. Two acts, and the copy must not merge them back into one.
+ * See docs/COPY-GUIDELINES.md section 3.
  *
  * Stage names, proportions and release conditions are read from whichever
  * agreement the job actually went through, a Kickoff Pack or the lighter
@@ -240,9 +243,9 @@ export function StageLedger({
                        invoice that is never coming. */
                     "none recorded against this stage"
                   ) : side === "client" ? (
-                    "not raised until this stage is approved"
+                    "not raised until you accept this stage"
                   ) : (
-                    "raised the moment the client approves this stage"
+                    "raised as soon as this stage is accepted and checked"
                   )}
                 </span>
               </span>
@@ -253,7 +256,7 @@ export function StageLedger({
                     href={jobBase + "?tab=evidence"}
                     className="rounded-full bg-linear-to-br from-goldb to-gold px-4.5 py-2.5 text-[12.5px] font-bold text-[#1A0F00] transition hover:brightness-105"
                   >
-                    Review and approve stage {s.n} &rarr;
+                    Review the evidence for stage {s.n} &rarr;
                   </Link>
                   {/* The other way to sign a stage off. It existed at the
                       bottom of the evidence tab and nowhere else, so nobody

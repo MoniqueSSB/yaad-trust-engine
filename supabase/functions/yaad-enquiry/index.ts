@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 
 // The contact form at the bottom of yaadly.co.uk posts here.
 //
@@ -49,6 +50,22 @@ const FROM_EMAIL   = Deno.env.get("YAAD_FROM_EMAIL") ?? "jobs@in.yaadly.co.uk";
 // Where a reply to the receipt should land. The receipt says "just reply to
 // this", and that promise is only true if replies reach a person.
 const REPLY_TO     = Deno.env.get("YAAD_REPLY_TO") ?? "monique@yaadly.co.uk";
+
+// The WhatsApp receipt, for somebody who left a phone number rather than an
+// email. Dark until the template exists, exactly like yaad-daily-checkin, and
+// for the same reason: a business-initiated WhatsApp message needs a Meta
+// approved Content Template, and submitting one is a Twilio console action
+// that no migration can perform. Until the secret is set nothing is sent and
+// the row says wa_invited, which is true, rather than pretending.
+//
+// The template's body should carry one variable, the person's name, and read
+// as a receipt and not as marketing, or Meta will refuse the category:
+//   "Thanks {{1}}, your enquiry reached Yaadly. Monique replies within one
+//    working day. You can reply here any time."
+const WA_RECEIPT_SID = Deno.env.get("TWILIO_CONTENT_SID_ENQUIRY_RECEIPT") ?? "";
+const TWILIO_SID     = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+const TWILIO_TOKEN   = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+const TWILIO_FROM    = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
 
 // Per caller, per hour. Generous: a genuine person who writes twice because
 // they forgot something must never meet a wall.
@@ -160,7 +177,27 @@ Deno.serve(async (req: Request) => {
   // throttle protects the mail path, it does not get to lose somebody's
   // question.
   const willEmail = Boolean(email) && recipientBudgetLeft && globalBudgetLeft;
-  const receipt = !email ? "no_email" : willEmail ? "sent" : "throttled";
+  // "no_email" was the honest name for a hole and a bad name for a state: it
+  // read on the desk as a failure, when what it actually means is "they left a
+  // phone number, so no receipt could be emailed and none was". Two better
+  // outcomes now exist for that case.
+  //
+  //   wa_receipt  a Meta approved template went out from the Yaadly number.
+  //               Only possible where TWILIO_CONTENT_SID_ENQUIRY_RECEIPT is
+  //               set: free text to somebody who has never written to us is
+  //               refused, which is the same wall the daily check-in hit.
+  //   wa_invited  no template exists, so nothing was sent, and the page
+  //               instead offered them one tap into WhatsApp. If they take it
+  //               they open the 24 hour window themselves and a person can
+  //               answer freely from then on, with no template and no cost.
+  //               That is the route that works today.
+  const phone = !email ? contact.replace(/\D/g, "") : "";
+  const canTemplate = Boolean(WA_RECEIPT_SID && TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM && phone.length >= 7);
+  const receipt = email
+    ? (willEmail ? "sent" : "throttled")
+    : canTemplate ? "wa_receipt"
+    : phone.length >= 7 ? "wa_invited"
+    : "no_contact";
 
   // ── write the enquiry ───────────────────────────────────────────────────
   const { data: row, error: insertErr } = await trace.span("db.insert enquiries", SpanKind.CLIENT, {
@@ -190,6 +227,40 @@ Deno.serve(async (req: Request) => {
 
   root.setAttributes({ "yaadly.enquiry.outcome": "recorded" });
 
+  // ── the WhatsApp receipt, where they left a phone ───────────────────────
+  //
+  // Runs only when a Meta approved template exists. Same anti-amplification
+  // reasoning as the email receipt above and the throttle it lives behind:
+  // this form is open to the internet, so anything it can send to a stranger's
+  // number is something a stranger can make it send. The throttle is what
+  // makes this safe, not the template.
+  //
+  // Failure is swallowed on purpose. The enquiry is already recorded and
+  // already on the desk. A receipt that does not arrive is a courtesy missed,
+  // not a message lost, and it must never turn into an error for the person
+  // who just wrote in.
+  if (canTemplate) {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+        method: "POST",
+        headers: {
+          Authorization: "Basic " + btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: withStatusCallback(new URLSearchParams({
+          To: `whatsapp:+${phone}`,
+          From: TWILIO_FROM,
+          ContentSid: WA_RECEIPT_SID,
+          ContentVariables: JSON.stringify({ "1": name }),
+        })),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) console.error("enquiry whatsapp receipt", r.status, (await r.text()).slice(0, 200));
+    } catch (e) {
+      console.error("enquiry whatsapp receipt threw", String(e).slice(0, 200));
+    }
+  }
+
   // ── the receipt ─────────────────────────────────────────────────────────
   let emailed = false;
   const when = new Date().toUTCString();
@@ -206,7 +277,7 @@ What you wrote
 --------------
 ${message}
 
-Monique reads these herself and comes back within 24 hours, usually sooner.
+Every one of these is read by a person at Yaadly, and answered within 24 hours, usually sooner.
 Nothing is charged and nothing is booked by sending this.
 
 If it is urgent, WhatsApp is faster: https://wa.me/447878877567
@@ -220,7 +291,7 @@ with this address. If that was not you, ignore it. Nothing else happens.`;
     const html =
 `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
 <p style="margin:0 0 18px">Thank you, ${esc(name)}. <b>Your message reached us.</b></p>
-<p style="margin:0 0 18px">Monique reads these herself and comes back within 24 hours, usually sooner. Nothing is charged and nothing is booked by sending it.</p>
+<p style="margin:0 0 18px">Every one of these is read by a person at Yaadly, and answered within 24 hours, usually sooner. Nothing is charged and nothing is booked by sending it.</p>
 <div style="margin:0 0 20px;padding:14px 16px;border-radius:12px;background:#f2f7f5;border:1px solid #dbe7e3">
   <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#67807a">What you sent us</p>
   <p style="margin:0 0 10px;font-size:13.5px;color:#67807a">About: ${esc(topic || "not said")}<br>Sent: ${esc(when)}</p>
@@ -338,6 +409,32 @@ ${message}
 ${heard}
 Answer within 24 hours, that is what the page promises.`;
 
+      // HOW TO ANSWER THIS ONE, in the email itself.
+      //
+      // Where they left an address, Reply-To is set and the mail app already
+      // does the right thing. Where they left a PHONE, this email used to
+      // arrive with no Reply-To at all: it landed in the inbox and could not
+      // be answered from the inbox, and there is no automatic receipt to them
+      // either, so they had heard nothing from anybody. Found live on 4 Sep
+      // 2026 with a real person waiting on an urgent roof.
+      //
+      // A wa.me link is not automation and is not pretending to be. It is one
+      // tap from the phone she reads mail on, and it opens WhatsApp with the
+      // message already written. Deliberately NOT a send from the Yaadly
+      // number: that is business-initiated, so it needs a Meta approved
+      // template that does not exist, and SMS needs a TWILIO_SMS_FROM that is
+      // not set. Both are decisions with a cost attached. This needs neither
+      // and works today.
+      const digits = email ? "" : contact.replace(/\D/g, "");
+      const waText = encodeURIComponent(
+        `Hello ${name}, this is Yaadly. Thank you for your enquiry, we are picking it up now.`,
+      );
+      const answerBlock = email
+        ? `<p style="margin:0 0 18px;font-size:13px;color:#67807a">Reply to this email and it goes straight to them.</p>`
+        : digits.length >= 7
+          ? `<p style="margin:0 0 18px"><a href="https://wa.me/${digits}?text=${waText}" style="background:#14b8a6;color:#04211d;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:100px;display:inline-block">Answer on WhatsApp</a><br><span style="font-size:12.5px;color:#67807a">They left a phone number, not an email, so replying to this message reaches nobody and no automatic receipt could be sent to them. They have heard nothing at all. This opens WhatsApp with a first line ready.</span></p>`
+          : `<p style="margin:0 0 18px;font-size:13px;color:#b3261e">They left no usable way to reach them. Nothing can be sent, and nothing was.</p>`;
+
       const html =
 `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#0b1a16;max-width:600px">
 <p style="margin:0 0 14px"><b>${esc(name)}</b> sent an enquiry through yaadly.co.uk.</p>
@@ -347,6 +444,7 @@ Answer within 24 hours, that is what the page promises.`;
 <tr><td style="padding:4px 14px 4px 0;color:#67807a;white-space:nowrap">Sent</td><td style="padding:4px 0">${esc(when)}</td></tr>
 </table>
 <div style="margin:0 0 18px;padding:14px 16px;border-radius:12px;background:#f2f7f5;border:1px solid #dbe7e3;white-space:pre-wrap">${esc(message)}</div>
+${answerBlock}
 <p style="margin:0;font-size:12.5px;color:#67807a">${esc(heard)}<br>Answer within 24 hours, that is what the page promises.</p>
 </div>`;
 

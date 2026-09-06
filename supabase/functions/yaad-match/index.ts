@@ -1,5 +1,5 @@
 // =====================================================================
-// yaad-match — tell the right vetted workers a job just went live.
+// yaad-match — tell the right identity checked workers a job just went live.
 //
 // Deploy with verify_jwt = true. Two callers are expected:
 //   1. the admin desk, with Monique's JWT  -> is_admin() must pass

@@ -91,7 +91,8 @@ async function isAdmin(req: Request): Promise<boolean> {
    lines that three functions already carry independently. */
 async function sendTwilio(
   to: string, body: string, channel: "whatsapp" | "sms", trace: Trace,
-): Promise<{ sent: boolean; reason?: string }> {
+  template?: { sid: string; vars: Record<string, string> },
+): Promise<{ sent: boolean; reason?: string; code?: number; sid?: string }> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = channel === "whatsapp"
@@ -106,25 +107,41 @@ async function sendTwilio(
 
   return await trace.span(`twilio.send.${channel}`, SpanKind.CLIENT, {
     "server.address": "api.twilio.com", "messaging.system": "twilio",
+    "yaadly.send.templated": !!template,
   }, async (s) => {
     try {
+      // Same two shapes yaad-notify-client uses: free text, or an approved
+      // template with its fixed variable slots. A template is only ever sent
+      // with the variables it was approved for.
+      const params = template
+        ? new URLSearchParams({ To: dest, From: from, ContentSid: template.sid, ContentVariables: JSON.stringify(template.vars) })
+        : new URLSearchParams({ To: dest, From: from, Body: body });
+      // Ask Twilio to tell us what actually happens to it. A 201 means Twilio
+      // took the message, not that a phone received it, and this is the one
+      // message a client has been promised. Only set when the URL is
+      // configured, so nothing changes until yaad-message-status is deployed.
+      const statusUrl = Deno.env.get("TWILIO_STATUS_CALLBACK_URL") ?? "";
+      if (statusUrl) params.set("StatusCallback", statusUrl);
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: {
           Authorization: "Basic " + btoa(`${sid}:${tok}`),
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({ To: dest, From: from, Body: body }),
+        body: params,
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
-      if (r.ok) return { sent: true };
+      if (r.ok) {
+        const accepted = await r.json().catch(() => null) as { sid?: string } | null;
+        return { sent: true, sid: accepted?.sid };
+      }
       const d = await r.json().catch(() => null) as { code?: number; message?: string } | null;
       const reason = d?.code === 63016
-        ? "More than 24 hours since their last message, so WhatsApp will not deliver a typed reply. Ask them to send anything at all to reopen the window, or reply from your own phone this once."
+        ? "More than 24 hours since their last message, so WhatsApp will not deliver a typed reply."
         : `Twilio refused it: ${r.status}${d?.code ? ` (code ${d.code})` : ""}${d?.message ? `, ${d.message}` : ""}`;
       s.recordError(reason);
-      return { sent: false, reason };
+      return { sent: false, reason, code: d?.code };
     } catch (e) {
       const reason = String(e).slice(0, 160);
       s.recordError(reason);
@@ -168,9 +185,13 @@ Deno.serve(async (req: Request) => {
 
     // The thread first, under the caller's token: if RLS will not show it,
     // nothing gets sent to anybody.
-    const q = `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}&select=job_id,transcript,turns`;
+    const q = `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}&select=job_id,transcript,turns,first_human_reply_at`;
     const tr = await db(req, q);
-    const rows = tr.ok ? await tr.json() as { job_id: string; transcript: string; turns: number }[] : [];
+    // job_id is nullable from 6 September 2026: a conversation that is only a
+    // question never writes a job row, so the desk can be answering a thread
+    // that has no job behind it. The inserts below already coalesce it; this
+    // type was the last thing still claiming it could not be null.
+    const rows = tr.ok ? await tr.json() as { job_id: string | null; transcript: string; turns: number; first_human_reply_at: string | null }[] : [];
     if (!rows.length) return json({ error: "That conversation is not in intake_threads any more. Reload the desk." }, 404);
     const thread = rows[0];
 
@@ -185,18 +206,109 @@ Deno.serve(async (req: Request) => {
       if (!ins.ok) return json({ error: `Could not save the reply: rest ${ins.status}.` }, 502);
     } else {
       const sent = await sendTwilio(fromAddr, text, channel, trace);
+      // The row a status callback updates. Written on the caller's own token,
+      // so RLS still applies and this function keeps holding no service key.
+      // Best effort throughout: not knowing what happened to a delivered
+      // message is a smaller problem than refusing to send one.
+      if (sent.sid) {
+        await db(req, "message_deliveries", {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify({
+            message_sid: sent.sid, to_addr: fromAddr, channel,
+            kind: "desk_reply", job_id: thread.job_id ?? "", status: "accepted",
+          }),
+        }).catch(() => { /* never let bookkeeping cost a delivered reply */ });
+      }
+      if (!sent.sent && sent.code === 63016) {
+        // ── the 24 hour window closed, 4 September 2026 ──────────────────
+        //
+        // Until now this returned 502 and her typed reply was simply gone.
+        // That is the ordinary shape of her week rather than an edge case:
+        // a client writes on Tuesday afternoon, she reaches the desk on
+        // Wednesday night, and WhatsApp will not carry free text that far.
+        // Meanwhile the assistant has already promised the client she would
+        // come back to them on this number.
+        //
+        // So the reply is kept, and an approved template goes instead saying
+        // one is waiting. Her actual words are NOT put in the template:
+        // a template's variable slots are approved for one specific
+        // sentence, and yaad-notify-client's header records why reusing one
+        // to carry a different sentence is how a sender gets flagged. The
+        // words go as free text the moment the client writes back, which is
+        // what reopens the window, and yaad-inbound does that flush.
+        const queued = await db(req, "pending_desk_replies", {
+          method: "POST",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ channel, to_addr: fromAddr, job_id: thread.job_id ?? "", body: text }),
+        });
+        if (!queued.ok) {
+          return json({ error: `${sent.reason} It could not be queued either (rest ${queued.status}), so it is not saved. Copy it somewhere before you lose it.` }, 502);
+        }
+
+        const nudgeSid = Deno.env.get("TWILIO_CONTENT_SID_DESK_REPLY") ?? "";
+        let nudged = false;
+        if (nudgeSid && channel === "whatsapp") {
+          const n = await sendTwilio(fromAddr, "", channel, trace, {
+            sid: nudgeSid,
+            vars: { "1": String(thread.job_id || "your job") },
+          });
+          nudged = n.sent;
+        }
+        root.setAttributes({ "yaadly.desk_reply.queued": true, "yaadly.desk_reply.nudged": nudged });
+
+        // Recorded on the transcript and the thread claimed, exactly as a
+        // delivered reply would be: she said it, it is going, and the
+        // assistant must not start answering this number in the meantime.
+        const heldTranscript = `${String(thread.transcript ?? "")}\n\nYaadly (from the desk, waiting to send): ${text}`.slice(-8000);
+        await db(
+          req,
+          `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}`,
+          { method: "PATCH", body: JSON.stringify({ transcript: heldTranscript, human_handling: true, last_at: new Date().toISOString() }) },
+        );
+
+        return json({
+          ok: true,
+          queued: true,
+          nudged,
+          note: nudged
+            ? "More than 24 hours had passed, so WhatsApp would not carry your words directly. They are saved, and a short approved message has gone telling them a reply is waiting. The moment they send anything back, your reply goes out in full, automatically."
+            : "More than 24 hours had passed, so WhatsApp would not carry your words directly. They are saved and will go out the moment that number writes back. No nudge was sent, because TWILIO_CONTENT_SID_DESK_REPLY is not configured, so they do not yet know to write back. See RUNBOOK.md.",
+        });
+      }
       if (!sent.sent) return json({ error: sent.reason ?? "The send failed." }, 502);
     }
 
     // Sent, so it is part of the record. Labelled as hers, and the thread is
     // hers now too: yaad-inbound stands down until the desk hands it back.
-    const transcript = `${String(thread.transcript ?? "")}\n\nMonique (from the desk): ${text}`.slice(-8000);
+    const transcript = `${String(thread.transcript ?? "")}\n\nYaadly (from the desk): ${text}`.slice(-8000);
+    // The site says "a person replies within one working day", and until 4
+    // September 2026 nothing recorded when that happened. Written ONCE and
+    // never overwritten: the promise is about the first reply, not the most
+    // recent one, so a long conversation cannot make a slow start look fast.
+    // awaiting_human_since is cleared in the same write, because the queue it
+    // feeds is "who is still owed an answer".
+    const firstReply = thread.first_human_reply_at ? {} : { first_human_reply_at: new Date().toISOString() };
     const up = await db(
       req,
       `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}`,
       {
         method: "PATCH",
-        body: JSON.stringify({ transcript, human_handling: true, last_at: new Date().toISOString() }),
+        // THE REPLY CLOCK. This is the only place a real person answering is
+        // recorded, which is what makes the "a person replies within one
+        // working day" promise on every public page checkable at all.
+        //
+        //   first_human_reply_at  set ONCE and never overwritten (see
+        //                         firstReply above), because the promise is
+        //                         about the first answer, not the most recent.
+        //   awaiting_human_since  cleared here, so a thread that has been
+        //                         answered stops counting against the desk.
+        //
+        // first_client_at is set on the way in, by yaad-inbound, not here.
+        body: JSON.stringify({
+          transcript, human_handling: true, last_at: new Date().toISOString(),
+          awaiting_human_since: null, ...firstReply,
+        }),
       },
     );
     // The message is already with the client either way; a failed record

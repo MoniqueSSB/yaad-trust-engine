@@ -49,8 +49,6 @@ const BOOKABLE: Record<string, string> = {
   care: "care-standard",
   "care-large": "care-large",
   "care-villa": "care-villa",
-  docs: "document-check",
-  setup: "setup-pack",
 };
 
 const PER_CALLER_PER_DAY = 3;
@@ -94,6 +92,18 @@ Deno.serve(async (req: Request) => {
   const phone = s(body.phone, 40);
   const parish = s(body.parish, 80);
   const message = s(body.message, 2000);
+
+  // The express request to start work inside the client's 14 day
+  // cancellation period, per docs/cancellation.html, which promises this is
+  // asked for "in writing at booking". Without it a client can cancel on day
+  // ten owing nothing while Yaadly has already paid the checker, so the
+  // record of who asked, and of the exact sentence they were shown, has to
+  // survive the browser. The wording is taken from the page rather than
+  // written here on purpose: only the page can say what was actually in
+  // front of them, and the version is what makes a later reword detectable.
+  const startNow = body.startNow === true;
+  const startNowVersion = startNow ? s(body.startNowVersion, 40) : "";
+  const startNowWording = startNow ? s(body.startNowWording, 600) : "";
 
   const catalogueId = BOOKABLE[serviceKey];
   if (!catalogueId) {
@@ -150,6 +160,9 @@ Deno.serve(async (req: Request) => {
   const notes = [
     `Booked on the web${label ? `: ${label}` : ""}.`,
     message ? `Client wrote: ${message}` : "",
+    startNow
+      ? `EXPRESS REQUEST TO START INSIDE THE 14 DAYS, given at booking (${startNowVersion || "version not sent"}). Client ticked: "${startNowWording}"`
+      : `NO request to start inside the 14 days. Do not begin work, and do not take payment, before the cancellation period has run out.`,
   ].filter(Boolean).join(" ");
 
   // status 'held' is what makes this safe to expose publicly: the insert

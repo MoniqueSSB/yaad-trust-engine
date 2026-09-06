@@ -2,20 +2,35 @@
 
 import { useState } from "react";
 import { uploadEvidence } from "@/app/portal/evidence-actions";
+import { EVIDENCE_PHASES, PHASE_OPTION } from "@/lib/portal/evidence-sections";
+
+/** The befores already on this job, so an after can name the one it answers. */
+export type BeforeShot = { id: string; item_code: string | null; label: string | null };
 
 export function EvidenceUpload({
   jobId,
   maxStage,
   storeType,
   store,
+  befores = [],
 }: {
   jobId: string;
   maxStage: number;
   storeType: string | null;
   store: string | null;
+  befores?: BeforeShot[];
 }) {
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
+  // Only so the section control can take itself out of the way on materials,
+  // which is a section in its own right and which the database refuses a phase
+  // on outright. Being shown a choice that would be thrown away is worse than
+  // not being shown it.
+  const [kind, setKind] = useState<"work" | "materials">("work");
+  /* Held in state so the pairing picker below is genuinely absent from the
+     submitted form on every other answer, rather than hidden and still
+     posting a value. */
+  const [phase, setPhase] = useState("");
   return (
     <form
       action={async (fd) => {
@@ -26,7 +41,15 @@ export function EvidenceUpload({
           setMsg("Filed, timestamped and fingerprinted. It cannot be edited now.");
         } catch (e) {
           setState("error");
-          setMsg(e instanceof Error && /large|image|materials store/.test(e.message) ? e.message : "The database refused this upload.");
+          /* The database's own sentences are written for the person reading
+             them (no store named, that before is on another job), so they are
+             passed through rather than flattened to "refused". */
+          setMsg(
+            e instanceof Error &&
+              /large|image|materials store|answer a before|same job|does not exist|answer itself/.test(e.message)
+              ? e.message
+              : "The database refused this upload.",
+          );
         }
       }}
       className="mt-4 rounded-2xl border border-line bg-panel p-4"
@@ -47,7 +70,7 @@ export function EvidenceUpload({
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
       <input type="hidden" name="jobId" value={jobId} />
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_120px_auto]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_120px_auto]">
         <input name="label" required maxLength={140} placeholder='What this shows, e.g. "The joint before work"'
           className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal" />
         {/* Materials on site is its own kind because it does a different job:
@@ -55,11 +78,30 @@ export function EvidenceUpload({
             place the client named are what move the risk in them across. The
             database refuses it on a job where the client has not named a
             place, and says so in words worth reading. */}
-        <select name="kind" defaultValue="work" className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
+        <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as "work" | "materials")} className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
           <option value="work">The work</option>
           <option value="materials" disabled={!storeType}>
             {storeType ? "Materials on site" : "Materials (no store named)"}
           </option>
+        </select>
+        {/* Which section of the job this belongs to, declared here in answer
+            to the question and never read back out of the label. A photograph
+            of a cracked joint captioned "the joint before work" is a sentence
+            about a before; it is not the worker saying this one is the before.
+            Leaving it unmarked is a real answer and files perfectly well.
+            Materials is its own section and carries no phase, so the control
+            says why rather than disappearing. */}
+        <select name="phase" value={phase} onChange={(e) => setPhase(e.target.value)} disabled={kind === "materials"} className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40">
+          {kind === "materials" ? (
+            <option value="">Its own section</option>
+          ) : (
+            <>
+              <option value="">Not marked</option>
+              {EVIDENCE_PHASES.map((ph) => (
+                <option key={ph} value={ph}>{PHASE_OPTION[ph]}</option>
+              ))}
+            </>
+          )}
         </select>
         <select name="stage" className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
           {Array.from({ length: Math.max(1, maxStage) }, (_, i) => (
@@ -69,12 +111,36 @@ export function EvidenceUpload({
         <input type="file" name="photo" accept="image/*"
           className="text-[12.5px] text-mute file:mr-3 file:rounded-full file:border file:border-line2 file:bg-transparent file:px-3.5 file:py-2 file:text-[12.5px] file:font-bold file:text-ink" />
       </div>
+      {phase === "after" && kind !== "materials" && (
+        befores.length ? (
+          <div className="mt-3">
+            <label className="text-[12px] text-dim" htmlFor="pairs_with">Which before does this answer?</label>
+            <select id="pairs_with" name="pairs_with" required defaultValue=""
+              className="mt-1.5 w-full rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal sm:max-w-md">
+              <option value="" disabled>Pick the before</option>
+              {befores.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {(b.item_code ?? "?") + " " + (b.label ?? "no description")}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          /* Said plainly rather than silently filing an unpaired after. A
+             worker who photographed the finished work first has done nothing
+             wrong, and should know why it will not sit next to anything. */
+          <p className="mt-3 text-[12px] leading-relaxed text-dim">
+            There is no before on this job yet, so this after will stand on its
+            own. File the before first if you have one.
+          </p>
+        )
+      )}
       {state !== "idle" && state !== "busy" && (
         <p role="status" className={"mt-2.5 rounded-xl px-3.5 py-2.5 text-[13px] " + (state === "done" ? "border border-softline bg-soft text-mute" : "border border-coral/30 bg-coral/10 text-mute")}>
           {msg}
         </p>
       )}
-      <button disabled={state === "busy"} className="mt-3 rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40">
+      <button disabled={state === "busy"} className="mt-3 rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40">
         {state === "busy" ? "Filing..." : "File this evidence"}
       </button>
     </form>

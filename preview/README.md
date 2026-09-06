@@ -39,7 +39,7 @@ No signature, no listing, whichever door they came through.
 **Agents are locked until signature.** No AI touches a client's work until they have
 signed and have a profile. The first job is a fully manual intake.
 
-**Yaadly does not price work.** No price band is shown to a worker, ever. The client's
+**Yaadly does not estimate or quote the trade work.** No price band is shown to a worker, ever. The client's
 budget band is client-side only and carries a "never shown to workers" marker. Yaadly
 does project management and oversight, not price estimation.
 

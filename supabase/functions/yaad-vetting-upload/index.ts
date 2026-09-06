@@ -48,6 +48,12 @@ const DOC_TYPES = [
   // in their own voice, which is worth more to a client deciding who to let
   // onto their mother's roof than another PDF.
   "intro_video",
+  // A photograph of the tradesperson themselves, so the person reading the
+  // application can put a face to the name (founder instruction, 3 Sep 2026).
+  // Same bucket, same ninety day clock, same server-side hash as every other
+  // document here. It is a face, so yaad-vetting-review withholds it from the
+  // model exactly as it withholds the selfie and the introduction video.
+  "profile_photo",
 ];
 
 // Video is here for one reason: the left-to-right face turn in step 3. A still
@@ -330,11 +336,24 @@ Deno.serve(async (req: Request) => {
       // of a missing answer is the one that sends the passport nowhere.
       const aiConsent = s(b.aiReviewConsent) === "granted" ? "granted" : "declined";
 
+      // Consent to their own photograph, introduction video and work photos
+      // appearing on a public profile. Read exactly as strictly as the one
+      // above and for the same reason: a browser that never sent the field is
+      // a no, and the safe reading of a missing answer is the one that puts
+      // nobody's face on the open internet. Recording it is all that happens
+      // here. Nothing is published by this function, or by any automatic path:
+      // a person at the desk copies each file across, one at a time, and
+      // public_worker_showcase re-tests this word on every single read.
+      const showcaseConsent = s(b.showcaseConsent) === "granted" ? "granted" : "declined";
+
       const { error } = await admin.from("applications").update({
         status: "received",
         ai_review_consent: aiConsent,
         ai_review_consent_at: new Date().toISOString(),
         ai_review_consent_version: s(b.aiReviewConsentVersion).slice(0, 40) || "ai-review-v1",
+        showcase_consent: showcaseConsent,
+        showcase_consent_at: new Date().toISOString(),
+        showcase_consent_version: s(b.showcaseConsentVersion).slice(0, 40) || "showcase-v1",
         phone:    s(b.phone)  || undefined,
         email:    s(b.email).toLowerCase() || undefined,
         parish:   s(b.parish) || undefined,
@@ -428,7 +447,7 @@ Deno.serve(async (req: Request) => {
             method: "POST",
             headers: { Title: "New Yaadly pro application", Priority: "default", Tags: "hammer" },
             body: `${s(b.trade) || "trade"}, ${s(b.parish) || "parish not given"}. ${count ?? 0} document(s) on file.`
-              + (aiConsent === "granted" ? "" : " No AI read, they refused. You promised an answer within 48 hours."),
+              + (aiConsent === "granted" ? "" : " No AI read, they refused. You promised an answer within 24 hours."),
             signal: AbortSignal.timeout(4000),
           });
         }

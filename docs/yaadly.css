@@ -1,9 +1,18 @@
-/* Yaadly marketing site stylesheet. Shared by index, payments, faq and
-   business. Tokens carried over from the old single-file page so the site
-   does not change its face, only its length. */
+/* Yaadly marketing site stylesheet. Linked by contact, faq, payments and
+   prices; index, business, services and marketplace carry their own inline
+   copy of these tokens instead (kept in sync by hand, see the comment
+   above --ink below). Tokens carried over from the old single-file page so
+   the site does not change its face, only its length. */
 :root{
   --bg:#07071A; --panel:rgba(155,115,245,0.05); --panel2:rgba(155,115,245,0.09); --line:rgba(155,115,245,0.12); --line2:rgba(155,115,245,0.22);
-  --ink:#EEEEFF; --mute:#7878A8; --dim:#44446A;
+  /* The three text tiers, retuned 3 Sep 2026 so all three are readable.
+     Measured against --bg #07071A: ink 17.4:1, mute 7.8:1, dim 5.0:1.
+     The old values were mute 4.8:1 and dim 2.2:1, and --dim carried the
+     supporting copy on every page: what is held, what is released, what
+     a field wants. Copy nobody can read builds no trust, so the tier that
+     carries it has to clear AA like the rest. Keep any new tier above
+     4.5:1 on --bg or it is decoration, not text. */
+  --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
   /* Same variable names, purple/gold values — every rule in the file picks up the new palette automatically */
   --teal:#9B73F5; --tealb:#C4AAFF; --mango:#F59E0B; --coral:#F87171; --sand:#FBBF24;
   --soft:rgba(155,115,245,0.08); --softline:rgba(155,115,245,0.22); --red:#F87171; --redsoft:rgba(248,113,113,0.10);
@@ -11,6 +20,17 @@
   --disp:'Fraunces',Georgia,serif; --body:'IBM Plex Sans',-apple-system,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --wrap:1080px; --gutter:20px; --r:14px; --r-lg:18px; --tr:.15s;
+
+  /* Spacing, radius and breakpoint scale, added 3 Sep 2026. Additive only,
+     same values as web/app/globals.css, change both together. Nothing in
+     this file reads these names yet, --r/--r-lg above are untouched.
+     Breakpoints are reference values only, a custom property cannot appear
+     inside an @media condition, so consolidating an existing breakpoint
+     onto this scale still means writing the literal px value. */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px;
+  --space-6:24px; --space-8:32px; --space-10:40px; --space-14:56px;
+  --radius-sm:8px; --radius-md:12px; --radius-lg:18px; --radius-pill:100px;
+  --bp-sm:640px; --bp-md:820px; --bp-lg:1080px;
 
   /* Light-section tokens */
   --l-bg:#FFFFFF; --l-panel2:#F3F2EE; --l-line:#E2E0D9; --l-line2:#CFCBBE;
@@ -269,6 +289,10 @@ textarea.f{min-height:110px;resize:vertical}
 /* faq */
 details.fq{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-top:10px}
 details.fq summary{cursor:pointer;font-weight:700;font-size:15px;padding:15px 18px;list-style:none}
+/* The question text is a real h2 inside the summary, so the FAQ has a
+   document outline a screen reader can navigate, while the summary keeps
+   its disclosure semantics. The h2 inherits everything so nothing moves. */
+details.fq summary>h2{display:inline;font:inherit;color:inherit;margin:0;letter-spacing:inherit}
 details.fq summary::-webkit-details-marker{display:none}
 details.fq summary::after{content:"+";float:right;color:var(--tealb)}
 details.fq[open] summary::after{content:"\2212"}
@@ -360,3 +384,10 @@ table.ptable tbody tr:hover{background:var(--panel2)}
 .sect.light details.fq summary::after{color:var(--l-grad-teal)}
 .sect.light details.fq .ans{color:var(--l-mute)}
 .sect.light details.fq .ans b{color:var(--l-ink)}
+
+/* Legal pages (privacy, cancellation, terms). The global reset at the top of
+   this file zeroes list padding, so a plain <ul> loses its bullets entirely.
+   These pages are reading matter, not marketing, so the list gets its
+   indent and markers back explicitly rather than being restyled. */
+ul.lgl{list-style:disc;padding-left:20px;margin-top:10px;display:flex;flex-direction:column;gap:7px}
+ul.lgl li{padding-left:3px}

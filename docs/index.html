@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Yaadly · Your trust engine for property back home</title>
-<meta name="description" content="Property work in Jamaica, homes and commercial: photos, approvals and payments locked together, so nobody is paid until you approve the evidence. Independent inspection and oversight available as a managed service.">
-<meta property="og:title" content="Yaadly · Your trust engine for property back home">
-<meta property="og:description" content="Photos, approvals and payments locked together, so nobody is paid until you approve the evidence.">
+<title>Yaadly · Property work in Jamaica, managed while you're abroad</title>
+<meta name="description" content="Tell Yaadly what needs doing on your property in Jamaica. You buy the job from Yaadly, we put an identity checked tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you accept it. Launching in Kingston and Portmore.">
+<meta property="og:title" content="Yaadly · Property work in Jamaica, managed while you're abroad">
+<meta property="og:description" content="You buy the job from Yaadly, we put an identity checked tradesperson on it, each stage is photographed, and a named person at Yaadly reviews the finished work before you accept it. Launching in Kingston and Portmore.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://yaadly.co.uk/">
 <meta property="og:site_name" content="Yaadly">
@@ -26,7 +26,11 @@
   --bg:#07071A; --bg2:#0D0D28;
   --panel:rgba(155,115,245,0.05); --panel2:rgba(155,115,245,0.09);
   --line:rgba(155,115,245,0.14); --line2:rgba(155,115,245,0.28);
-  --ink:#EEEEFF; --mute:#7878A8; --dim:#44446A;
+  /* Text tiers retuned 3 Sep 2026, same values as docs/yaadly.css and
+     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1. The old
+     mute 4.8:1 and dim 2.2:1 put the supporting copy below AA. Change all
+     three files together or the site drifts against itself. */
+  --ink:#EEEEFF; --mute:#9E9ECB; --dim:#7C7CA6;
   --purple:#9B73F5; --purpleb:#C4AAFF; --gold:#F59E0B; --goldb:#FBBF24;
   --grad:linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
   --disp:'Fraunces',Georgia,serif;
@@ -45,28 +49,44 @@ html::after{
 body{font-family:var(--body);background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:var(--purple);text-decoration:none}
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* NAV */
 
 /* PAGE */
 .stage{position:relative;overflow:hidden;padding:60px 0 64px}
-.orb{position:absolute;border-radius:50%;pointer-events:none;will-change:transform}
-.orb1{top:-180px;right:-220px;width:700px;height:700px;background:radial-gradient(ellipse at 60% 40%,rgba(155,115,245,0.13) 0%,transparent 65%)}
-.orb2{bottom:-240px;left:-200px;width:600px;height:600px;background:radial-gradient(ellipse,rgba(245,158,11,0.06) 0%,transparent 65%)}
-
-.head{text-align:center;max-width:900px;margin:0 auto 46px;position:relative;z-index:1}
-.eyebrow{
-  display:inline-flex;align-items:center;gap:8px;
-  font:600 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;
-  color:var(--purpleb);padding:6px 15px;
-  border:1px solid rgba(155,115,245,0.25);border-radius:100px;
-  background:rgba(155,115,245,0.07);margin-bottom:22px;
+/* Mobile first screen, 3 Sep 2026: eyebrow, headline, one line of support
+   and both buttons must fit an 812px phone without a scroll. */
+@media(max-width:640px){.stage{padding:30px 0 48px}.head{padding-bottom:30px}}
+/* Hero glow. Until 6 Sep 2026 this was two orbs that tracked the mouse. The
+   "Crew" design replaced them with two fixed radials sitting behind the
+   headline, so the parallax listener at the foot of this page came out in the
+   same change. Nothing here moves. */
+.stage-glow{
+  position:absolute;top:0;left:0;right:0;height:660px;pointer-events:none;
+  background:
+    radial-gradient(ellipse 900px 460px at 50% 0%,rgba(155,115,245,0.18),transparent 62%),
+    radial-gradient(ellipse 640px 400px at 50% 10%,rgba(245,158,11,0.10),transparent 58%);
 }
-.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.head{text-align:center;max-width:900px;margin:0 auto;position:relative;z-index:1;padding-bottom:clamp(34px,5vw,54px)}
+/* The eyebrow lost its pill on 6 Sep 2026. One row, one blipping dot, and the
+   dot blips three times and stops rather than pulsing forever. */
+.eyebrow{
+  display:inline-flex;align-items:center;gap:9px;
+  font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--purpleb);margin-bottom:22px;
+}
+.eyebrow .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);flex:none;animation:blip 1.8s 3 forwards}
+/* Must sit after .eyebrow, not in the .stage phone block above it: that rule
+   sets font-size and this one sets the font shorthand, so whichever comes last
+   wins. On a 320px screen the eyebrow is one line at 10px and two at 11px. */
+@media(max-width:640px){.eyebrow{font-size:10px;letter-spacing:.12em;margin-bottom:16px}}
+@keyframes blip{0%{opacity:.3}50%{opacity:1}100%{opacity:1}}
 h1.display{
-  font-family:var(--disp);font-weight:200;line-height:1.08;
-  font-size:clamp(36px,5vw,64px);letter-spacing:-0.025em;margin-bottom:16px;
+  font-family:var(--disp);font-weight:200;line-height:1.02;
+  font-size:clamp(38px,6.4vw,78px);letter-spacing:-0.03em;
+  max-width:24ch;margin:0 auto 24px;text-wrap:pretty;
 }
 h1.display .w{display:inline-block;overflow:hidden;vertical-align:bottom}
 h1.display .w i{display:inline-block;font-style:inherit;transform:translateY(110%);animation:wordup .7s cubic-bezier(.2,.8,.2,1) forwards}
@@ -78,126 +98,163 @@ h1.display em{
 }
 @keyframes wordup{to{transform:translateY(0)}}
 @keyframes gradshift{0%,100%{background-position:0% 40%}50%{background-position:95% 60%}}
-.sub{font-size:16px;color:var(--mute);max-width:76ch;margin:0 auto;opacity:0;animation:fadeup .7s .7s ease forwards}
+.sub{font-size:clamp(16px,1.5vw,19px);color:var(--mute);max-width:58ch;margin:0 auto;opacity:0;animation:fadeup .7s .7s ease forwards}
 .sub b{color:var(--ink)}
+
+/* Hero buttons. .btn is copied from yaadly.css rather than linked, because
+   this page carries its own :root and the rest of that sheet with it would
+   restyle the hero. Same values; change both or the site drifts. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--grad);color:#fff;font:700 15px var(--body);padding:15px 28px;border-radius:100px;border:1px solid transparent;cursor:pointer;text-decoration:none;text-align:center;box-shadow:0 0 30px rgba(155,115,245,0.28);transition:.15s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+/* The secondary slot belongs to WhatsApp on every consumer page, per
+   docs/COPY-GUIDELINES.md section 5. The bordered ghost button it used to
+   wear became a plain link with the WhatsApp green against it on 6 Sep 2026,
+   so the one filled button on the screen stays the primary. */
+.btn.wa{background:none;border:none;box-shadow:none;color:var(--ink);font-weight:600;gap:10px;padding:14px 6px}
+.btn.wa .wdot{width:20px;height:20px;border-radius:50%;background:#25D366;flex:none}
+.btn.wa:hover{color:var(--purpleb);filter:none}
+.cta{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin-top:32px;position:relative;z-index:1;opacity:0;animation:fadeup .7s .85s ease forwards}
+@media(max-width:640px){.cta{flex-direction:column;align-items:stretch;margin-top:24px}.btn{width:100%;padding:14px 20px}}
 @keyframes fadeup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 
-/* THREE DOORS */
-.doors{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;position:relative;z-index:1}
+/* THE CREW. Four assistants across a wire, then the gate. Added 6 Sep 2026
+   from the "Yaadly Home - Crew" design. This band is the governing rule of the
+   whole product drawn as a picture: the assistants draft, and a named person
+   decides. The pips run the wire three times and stop, and the whole band is
+   flattened by the reduced-motion block at the foot of this sheet. */
+.crew{padding:0 0 clamp(28px,3.6vw,46px);position:relative;z-index:1}
+.crew-top{height:1px;margin-bottom:clamp(26px,3.6vw,44px);background:linear-gradient(90deg,rgba(155,115,245,0.4),rgba(245,158,11,0.35) 60%,transparent)}
+.crew-row{display:flex;align-items:flex-start;gap:clamp(10px,1.4vw,20px);flex-wrap:wrap}
+.crew-agents{flex:1 1 440px;position:relative;display:flex;align-items:flex-start;gap:clamp(6px,1vw,18px)}
+.crew-wire{
+  position:absolute;left:4%;right:calc(-1 * clamp(10px,1.4vw,20px));top:28px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(155,115,245,0.5) 8%,rgba(155,115,245,0.5) 82%,rgba(245,158,11,0.6));
+}
+.crew-pip{
+  position:absolute;top:25px;left:4%;width:7px;height:7px;border-radius:50%;opacity:0;
+  background:var(--purpleb);box-shadow:0 0 12px var(--purple);
+  animation:flow 3.6s cubic-bezier(.4,0,.7,1) 3 forwards;
+}
+.crew-pip.gold{background:var(--goldb);box-shadow:0 0 12px var(--gold)}
+@keyframes flow{0%{left:4%;opacity:0}8%{opacity:1}78%{opacity:1}94%{left:99%;opacity:0}100%{left:99%;opacity:0;visibility:hidden}}
+.crew-agent{flex:1 1 118px;min-width:104px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;position:relative;z-index:1}
+.crew-badge{
+  width:58px;height:58px;border-radius:50%;flex:none;
+  border:1px solid var(--line2);
+  background:radial-gradient(circle,rgba(155,115,245,0.16),var(--bg) 78%);
+  display:grid;place-items:center;font:600 15px var(--mono);color:var(--purpleb);
+  box-shadow:0 0 0 6px var(--bg),0 0 22px rgba(155,115,245,0.22);
+}
+.crew-name{font-family:var(--disp);font-weight:300;font-size:clamp(19px,2vw,25px);letter-spacing:-0.015em;color:var(--ink)}
+.crew-note{font-size:13.5px;color:var(--mute);line-height:1.45}
+.crew-note a{font-weight:600;color:var(--goldb);white-space:nowrap}
+.crew-note a:hover{opacity:.8}
+.crew-gate{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;max-width:230px;position:relative;z-index:1}
+.crew-gate-top{display:flex;align-items:center;gap:14px}
+.crew-bar{
+  width:3px;height:58px;border-radius:3px;flex:none;
+  margin-left:calc(-1 * clamp(10px,1.4vw,20px));
+  background:linear-gradient(180deg,var(--goldb),var(--gold));
+  box-shadow:0 0 20px rgba(245,158,11,0.6);
+  animation:gatepulse 3.6s ease-in-out 3 forwards;
+}
+@keyframes gatepulse{0%,72%,100%{box-shadow:0 0 20px rgba(245,158,11,0.45)}82%{box-shadow:0 0 34px rgba(245,158,11,0.95)}}
+.crew-y{
+  width:58px;height:58px;border-radius:50%;flex:none;
+  border:1px solid rgba(245,158,11,0.55);
+  background:radial-gradient(circle,rgba(245,158,11,0.22),var(--bg) 78%);
+  display:grid;place-items:center;
+  font-family:var(--disp);font-size:24px;font-weight:300;color:var(--goldb);
+  box-shadow:0 0 0 6px var(--bg);animation:halo 3.6s ease-in-out 3 forwards;
+}
+@keyframes halo{0%,70%,100%{box-shadow:0 0 0 6px var(--bg),0 0 0 6px rgba(245,158,11,0.3)}85%{box-shadow:0 0 0 6px var(--bg),0 0 0 18px rgba(245,158,11,0)}}
+.crew-say{display:flex;flex-direction:column;gap:8px}
+.crew-say .crew-name{white-space:nowrap}
+/* Two breakpoints, both measured rather than guessed. Below about 732px the
+   gate no longer fits beside a 440px run of assistants and drops to its own
+   row, so the connecting bar goes and a hairline takes its place. Below 560px
+   four badges across would each be under 120px wide, so they become a 2x2 and
+   the wire is dropped: a wire that only reaches half the crew says the wrong
+   thing. Neither breakpoint may be widened without checking the page still
+   does not scroll sideways on a 320px phone. */
+@media(max-width:740px){
+  .crew-gate{flex:1 1 100%;max-width:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
+  .crew-bar{display:none}
+}
+@media(max-width:560px){
+  .crew-agents{flex-wrap:wrap;gap:26px 12px}
+  .crew-agent{flex:1 1 calc(50% - 6px);min-width:0}
+  .crew-wire,.crew-pip{display:none}
+}
+
+/* TWO DOORS: owners and tradespeople. Was three, all of them client-side,
+   which is how the worker path ended up as a footnote. 3 Sep 2026.
+   Flattened to an editorial card the same day on founder feedback that pill
+   badges, rounded corners, watermark glows and hover lift read as playful.
+   6 Sep 2026 puts all four back, from the founder's own "Crew" design, which
+   is a deliberate reversal of that note and not an oversight: the flat card
+   sat badly under a hero and a crew band that are both lit. If the doors ever
+   read as playful again, this comment is where the argument is. */
+.doors{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:clamp(18px,2.4vw,28px);position:relative;z-index:1;
+  border-top:1px solid var(--line);padding:clamp(34px,4.5vw,58px) 0;
+}
 .door{
   --ac:var(--purple); --acb:var(--purpleb);
-  position:relative;display:flex;flex-direction:column;
-  background:linear-gradient(180deg,rgba(19,19,50,0.9),rgba(12,12,38,0.75));
-  box-shadow:inset 0 1px 0 rgba(238,238,255,0.04);
-  border:1px solid var(--line);
-  border-radius:22px;padding:28px 26px 24px;
-  overflow:hidden;color:inherit;
-  opacity:0;transform:translateY(26px);
-  transition:transform .5s cubic-bezier(.2,.8,.3,1),opacity .5s ease,border-color .25s,box-shadow .25s;
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;gap:14px;
+  padding:clamp(26px,3vw,40px);
+  border:1px solid var(--line2);border-radius:26px;
+  background:linear-gradient(150deg,rgba(155,115,245,0.16),rgba(13,13,40,0.6) 58%);
+  color:inherit;
+  transition:transform .25s,border-color .25s,box-shadow .25s;
 }
-.door.gold{--ac:var(--gold);--acb:var(--goldb)}
-.door.mix{--ac:#C4AAFF;--acb:#E4D6FF}
-.door::after{
-  content:'';position:absolute;top:-70px;right:-70px;width:220px;height:220px;border-radius:50%;
-  background:radial-gradient(ellipse,color-mix(in srgb,var(--ac) 14%,transparent) 0%,transparent 70%);
-  pointer-events:none;
-}
-.door.up{opacity:1;transform:translateY(0)}
-.door:hover{border-color:color-mix(in srgb,var(--ac) 50%,transparent);box-shadow:0 16px 50px rgba(0,0,0,0.45),0 0 44px color-mix(in srgb,var(--ac) 12%,transparent);transform:translateY(-4px)}
 .door::before{
-  content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  background:var(--grad);opacity:0;transition:opacity .25s;
+  content:'';position:absolute;top:-70px;right:-60px;width:230px;height:230px;
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(155,115,245,0.28),transparent 70%);
 }
-.door:hover::before{opacity:1}
-.door-who{
-  position:relative;z-index:1;
-  display:inline-flex;align-self:flex-start;align-items:center;gap:7px;
-  font-size:12px;font-weight:600;color:var(--acb);
-  background:color-mix(in srgb,var(--ac) 10%,transparent);
-  border:1px solid color-mix(in srgb,var(--ac) 28%,transparent);
-  border-radius:100px;padding:5px 13px;margin-bottom:16px;
+.door:hover{transform:translateY(-5px);border-color:rgba(155,115,245,0.6);box-shadow:0 22px 50px rgba(123,79,224,0.22)}
+.door.gold{
+  --ac:var(--gold); --acb:var(--goldb);
+  border-color:rgba(245,158,11,0.35);
+  background:linear-gradient(150deg,rgba(245,158,11,0.14),rgba(13,13,40,0.6) 58%);
 }
-.door-who i{width:5px;height:5px;border-radius:50%;background:var(--ac)}
-.door-mark{
-  position:absolute;right:-34px;bottom:-30px;z-index:0;
-  width:190px;height:190px;
-  pointer-events:none;user-select:none;
-  transform:rotate(-8deg);
-  transition:transform .5s ease,opacity .3s;
-  opacity:.08;
-}
-.door-mark svg{width:100%;height:100%;stroke:var(--ac);fill:none;stroke-width:0.9;stroke-linecap:round;stroke-linejoin:round}
-.door:hover .door-mark{transform:rotate(-4deg) scale(1.04);opacity:.12}
-/* offer list inside a door */
-.door-list{display:flex;flex-direction:column;margin:2px 0 18px}
-.door-li{
-  display:flex;align-items:baseline;gap:11px;
-  padding:12px 0;border-bottom:1px solid var(--line);
-  font-size:15px;color:var(--mute);line-height:1.45;
-  position:relative;z-index:1;
-}
-.door-li:last-child{border-bottom:none}
-.door-li b{color:var(--ink);font-weight:600}
-.door-li .m{margin-left:auto;font:600 12.5px var(--mono);color:var(--acb);white-space:nowrap;padding-left:10px}
-.door-li::before{content:'';width:5px;height:5px;border-radius:50%;background:color-mix(in srgb,var(--ac) 60%,transparent);flex-shrink:0;transform:translateY(-2px)}
-.door-head-row{display:flex;align-items:center;gap:13px;margin:2px 0 14px;position:relative;z-index:1}
-.door-ic{
-  width:42px;height:42px;border-radius:12px;flex-shrink:0;
-  background:color-mix(in srgb,var(--ac) 12%,transparent);
-  border:1px solid color-mix(in srgb,var(--ac) 30%,transparent);
-  display:flex;align-items:center;justify-content:center;
-}
-.door-ic svg{width:20px;height:20px;stroke:var(--acb);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.door-title{font-family:var(--disp);font-weight:300;font-size:clamp(24px,2.6vw,30px);letter-spacing:-0.015em;line-height:1.1}
+.door.gold::before{background:radial-gradient(circle,rgba(245,158,11,0.22),transparent 70%)}
+.door.gold:hover{border-color:rgba(245,158,11,0.75);box-shadow:0 22px 50px rgba(245,158,11,0.18)}
+.door-who{font:600 10.5px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--acb);position:relative}
+.door-title{font-family:var(--disp);font-weight:300;font-size:clamp(34px,4vw,52px);line-height:1.02;letter-spacing:-0.025em;color:var(--ink);position:relative}
+.door-chips{display:flex;gap:8px;flex-wrap:wrap;position:relative}
+.chip{font:600 12px var(--mono);color:var(--ink);border:1px solid var(--line2);border-radius:100px;padding:6px 13px;white-space:nowrap;flex:none}
+.chip.ac{color:var(--acb)}
+.door.gold .chip{border-color:rgba(245,158,11,0.35)}
 .door-cta{
-  display:inline-flex;align-items:center;justify-content:space-between;gap:7px;
-  font-size:14.5px;font-weight:600;color:var(--acb);
-  border-top:1px solid var(--line);padding-top:15px;width:100%;margin-top:auto;position:relative;z-index:1;
+  position:relative;margin-top:8px;align-self:flex-start;
+  display:inline-flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:15px 24px;border-radius:100px;white-space:nowrap;
+  font-size:16px;font-weight:700;color:#fff;
+  background:var(--grad);box-shadow:0 0 30px rgba(155,115,245,0.32);
+  transition:filter .2s;
 }
-.door-cta .arr{
-  width:28px;height:28px;border-radius:50%;flex-shrink:0;
-  background:color-mix(in srgb,var(--ac) 14%,transparent);
-  border:1px solid color-mix(in srgb,var(--ac) 32%,transparent);
-  display:inline-flex;align-items:center;justify-content:center;
-  transition:background .2s,transform .2s;
-}
-.door:hover .door-cta .arr{background:color-mix(in srgb,var(--ac) 26%,transparent);transform:translateX(3px)}
-.door-cta .arr svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.door.gold .door-cta{color:#1A0F00;background:linear-gradient(135deg,#FBBF24,#F59E0B);box-shadow:0 0 30px rgba(245,158,11,0.28)}
+.door:hover .door-cta{filter:brightness(1.06)}
 
-/* under-rail: quiet, centred, typographic */
-.rail{
-  margin:44px auto 0;max-width:680px;position:relative;z-index:1;
-  text-align:center;
-  opacity:0;animation:fadeup .8s 1.5s ease forwards;
+/* The business lane, one quiet row, never competing with the two doors.
+   The sentence about paying your own contractor directly is the line that
+   keeps the two lanes apart, per docs/COPY-GUIDELINES.md section 2. Do not
+   trim it to make the row fit. */
+.bizrail{
+  border-top:1px solid var(--line);padding:20px 0;
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  font-size:13.5px;color:var(--mute);line-height:1.6;
+  position:relative;z-index:1;
+  opacity:0;animation:fadeup .8s 1.4s ease forwards;
 }
-.rail-line{
-  position:relative;height:1px;margin:0 40px 22px;
-  background:linear-gradient(90deg,transparent,rgba(155,115,245,0.35) 35%,rgba(245,158,11,0.35) 65%,transparent);
-}
-.rail-line::after{
-  content:'';position:absolute;left:50%;top:50%;width:5px;height:5px;
-  transform:translate(-50%,-50%) rotate(45deg);
-  background:var(--bg);border:1px solid rgba(245,158,11,0.6);
-}
-.rail-agent{
-  font:400 10.5px var(--mono);letter-spacing:.04em;color:var(--dim);
-  margin-bottom:18px;min-height:16px;
-  transition:opacity .35s;
-}
-.rail-agent.fade{opacity:0}
-.rail-agent .a{color:color-mix(in srgb,var(--purpleb) 62%,transparent)}
-.rail-agent .h{color:color-mix(in srgb,var(--goldb) 70%,transparent)}
-.rail-links{
-  display:flex;justify-content:center;align-items:baseline;gap:14px;flex-wrap:wrap;
-  font-size:13.5px;color:var(--mute);
-}
-.rail-links .sep{color:var(--dim);opacity:.5}
-.rail-links a{font-weight:600;white-space:nowrap;transition:opacity .2s}
-.rail-links a.pro{color:var(--goldb)}
-.rail-links a.ov{color:var(--purpleb)}
-.rail-links a:hover{opacity:.75}
-.rail-links a .ar{display:inline-block;transition:transform .2s}
-.rail-links a:hover .ar{transform:translateX(3px)}
+.bizrail b{color:var(--ink);font-weight:600}
+.bizrail a{font-weight:600;color:var(--purpleb);white-space:nowrap}
+.bizrail a .ar{display:inline-block;transition:transform .2s}
+.bizrail a:hover .ar{transform:translateX(3px)}
 
 /* floating WhatsApp */
 /* Bottom LEFT since 2 Sep 2026: the bottom right corner belongs to the Ask
@@ -230,59 +287,14 @@ h1.display em{
 @media(max-width:640px){.wa-float{left:16px;bottom:16px}.wa-float .wa-label{display:none}}
 @media (prefers-reduced-motion: reduce){.wa-float .wa-btn{transition:none}}
 
-/* baseline strip *//* floating WhatsApp */
-/* Bottom LEFT since 2 Sep 2026: the bottom right corner belongs to the Ask
-   Yaadly chat (chat.js) on every page, and two buttons in one corner is a
-   button nobody can press. The hover label sits to the right of the button. */
-.wa-float{
-  position:fixed;left:22px;bottom:22px;z-index:79;
-  display:flex;flex-direction:row-reverse;align-items:center;gap:0;
-  text-decoration:none;
-}
-.wa-float .wa-label{
-  font-size:12.5px;font-weight:600;color:var(--ink);
-  background:rgba(13,13,40,0.92);border:1px solid var(--line2);
-  border-radius:100px;padding:8px 14px;margin-left:10px;
-  opacity:0;transform:translateX(-8px);
-  transition:opacity .25s,transform .25s;
-  white-space:nowrap;pointer-events:none;
-  backdrop-filter:blur(8px);
-}
-.wa-float:hover .wa-label{opacity:1;transform:translateX(0)}
-.wa-float .wa-btn{
-  width:52px;height:52px;border-radius:50%;
-  background:#25D366;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 8px 28px rgba(37,211,102,0.35),0 4px 14px rgba(0,0,0,0.4);
-  transition:transform .2s,box-shadow .2s;
-}
-.wa-float:hover .wa-btn{transform:translateY(-2px);box-shadow:0 12px 34px rgba(37,211,102,0.45),0 6px 18px rgba(0,0,0,0.4)}
-.wa-float .wa-btn svg{width:26px;height:26px;fill:#fff}
-@media(max-width:640px){.wa-float{left:16px;bottom:16px}.wa-float .wa-label{display:none}}
-@media (prefers-reduced-motion: reduce){.wa-float .wa-btn{transition:none}}
-
-/* baseline strip */
-.baseline{
-  margin-top:40px;display:flex;justify-content:center;gap:26px;flex-wrap:wrap;
-  font:500 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
-  position:relative;z-index:1;
-  opacity:0;animation:fadeup .8s 1.6s ease forwards;
-}
-.baseline span{display:inline-flex;align-items:center;gap:7px}
-.baseline i{width:5px;height:5px;border-radius:50%;background:var(--purple)}
-.baseline span:nth-child(2) i{background:var(--gold)}
-.baseline span:nth-child(3) i{background:#4ADE80}
-
 footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:var(--dim)}
 .fgrid{display:flex;flex-direction:column;gap:12px}
 .flinks{display:flex;flex-wrap:wrap;gap:6px 18px}
 .flinks a{color:var(--dim);font-size:12.5px}
 .flinks a:hover{color:var(--purple)}
 
-@media(max-width:860px){.doors{grid-template-columns:1fr}}
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.01ms !important;animation-delay:0ms !important}
-  .door{opacity:1;transform:none}
 }
 </style>
 <!-- Error monitoring (Sentry). Errors only, no tracing, no replay. PII is
@@ -303,7 +315,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
     }catch(e){} return ev; } });
 })();
 </script>
-<link rel="stylesheet" href="nav.css?v=1">
+<link rel="stylesheet" href="nav.css?v=2">
 </head>
 <body>
 <div style="position:fixed;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(155,115,245,0.5) 30%,rgba(245,158,11,0.5) 70%,transparent);z-index:300;pointer-events:none"></div>
@@ -315,6 +327,7 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
     <a class="vbtn" href="https://app.yaadly.co.uk/jobs">Job board</a>
     <a class="vbtn" href="/services">Managed services</a>
     <a class="vbtn" href="/business">For business</a>
+    <a class="vbtn" href="/how-we-use-ai">How we use AI</a>
     <a class="vbtn" href="/contact">Contact</a>
     <a class="vbtn" href="https://cal.com/yaadly/15min" target="_blank" rel="noopener">Book a call</a>
   </div>
@@ -327,104 +340,121 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
 </div></nav>
 
 <section class="stage" id="stage">
-  <div class="orb orb1" data-px="26"></div>
-  <div class="orb orb2" data-px="16"></div>
+  <div class="stage-glow"></div>
 
   <div class="wrap">
     <div class="head">
-      <div class="eyebrow"><span class="dot"></span>Homes &amp; commercial property · Yaadly Ltd · UK 17358077</div>
+      <div class="eyebrow"><span class="dot"></span>Launching in Kingston and Portmore</div>
       <h1 class="display">
-        <span class="w"><i style="animation-delay:.05s">Your</i></span>
-        <span class="w"><i style="animation-delay:.13s"><em>trust</em></i></span>
-        <span class="w"><i style="animation-delay:.21s"><em>engine</em></i></span><br>
-        <span class="w"><i style="animation-delay:.38s">for</i></span>
-        <span class="w"><i style="animation-delay:.46s">property</i></span>
-        <span class="w"><i style="animation-delay:.54s">back</i></span>
-        <span class="w"><i style="animation-delay:.62s">home.</i></span>
+        <span class="w"><i style="animation-delay:.05s">Four</i></span>
+        <span class="w"><i style="animation-delay:.11s">AI</i></span>
+        <span class="w"><i style="animation-delay:.17s">assistants</i></span>
+        <span class="w"><i style="animation-delay:.25s">draft.</i></span><br>
+        <span class="w"><i style="animation-delay:.36s"><em>One</em></i></span>
+        <span class="w"><i style="animation-delay:.44s"><em>named</em></i></span>
+        <span class="w"><i style="animation-delay:.52s"><em>person</em></i></span>
+        <span class="w"><i style="animation-delay:.60s"><em>decides.</em></i></span>
       </h1>
-      <p class="sub">Homes and commercial property: photos, approvals and payments locked together, <b>so nobody is paid until you approve the evidence.</b> On WhatsApp or on the web, AI agents handle your project and its paperwork day and night, and a human responds the same day.</p>
-    </div>
-
-    <div class="doors" id="doors">
-
-      <!-- DOOR 1: MARKETPLACE -->
-      <a class="door" href="/marketplace">
-        <div class="door-who"><i></i>I need work done back home</div>
-        <span class="door-mark"><svg viewBox="0 0 24 24"><path d="m17.2 5.2 2.6 2.6-3 3-2.6-2.6 3-3Z"/><path d="m14.5 8-9.7 9.7 2.5 2.5L17 10.5"/></svg></span>
-        <div class="door-head-row">
-          <span class="door-ic"><svg viewBox="0 0 24 24"><path d="m17.2 5.2 2.6 2.6-3 3-2.6-2.6 3-3Z"/><path d="m14.5 8-9.7 9.7 2.5 2.5L17 10.5"/></svg></span>
-          <span class="door-title">Post a job</span>
-        </div>
-        <div class="door-list">
-          <div class="door-li"><span><b>Post any job</b></span><span class="m">Free</span></div>
-          <div class="door-li"><span><b>Vetted workers</b> quote it</span></div>
-          <div class="door-li"><span><b>Paid only on proof</b></span></div>
-        </div>
-        <span class="door-cta">Post a job, free <span class="arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span>
-      </a>
-
-      <!-- DOOR 2: MANAGED SERVICES -->
-      <a class="door gold" href="/services">
-        <div class="door-who"><i></i>I want independent eyes on it</div>
-        <span class="door-mark"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
-        <div class="door-head-row">
-          <span class="door-ic"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span>
-          <span class="door-title">Book a service</span>
-        </div>
-        <div class="door-list">
-          <div class="door-li"><span><b>Deposit check</b></span><span class="m">£149</span></div>
-          <div class="door-li"><span><b>Condition report</b></span><span class="m">£245</span></div>
-          <div class="door-li"><span><b>Care &amp; oversight</b></span><span class="m">from £75</span></div>
-        </div>
-        <span class="door-cta">See the prices <span class="arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span>
-      </a>
-
-      <!-- DOOR 3: BUSINESS -->
-      <a class="door mix" href="/business">
-        <div class="door-who"><i></i>I run a company with property risk</div>
-        <span class="door-mark"><svg viewBox="0 0 24 24"><path d="M5 21V10l5-3 5 3v11"/><path d="M15 10l4-2v9"/><path d="M3 21h18"/></svg></span>
-        <div class="door-head-row">
-          <span class="door-ic"><svg viewBox="0 0 24 24"><path d="M5 21V10l5-3 5 3v11"/><path d="M15 10l4-2v9"/><path d="M3 21h18"/></svg></span>
-          <span class="door-title">Work with us</span>
-        </div>
-        <div class="door-list">
-          <div class="door-li"><span><b>Agents, insurers, developers</b></span></div>
-          <div class="door-li"><span><b>Independent inspections</b></span></div>
-          <div class="door-li"><span><b>Forwardable reports</b></span><span class="m">Consult free</span></div>
-        </div>
-        <span class="door-cta">Book a consultation <span class="arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></span>
-      </a>
-
-    </div>
-
-    <div class="rail">
-      <div class="rail-line"></div>
-      <div class="rail-agent" id="ticker-line"><span class="a">agent</span> · 02:14 · WhatsApp intake answered · Portmore roof</div>
-      <div class="rail-links">
-        <span>A tradesperson in Jamaica? <a class="pro" href="https://app.yaadly.co.uk/apply">Join as a pro <span class="ar">→</span></a></span>
-        <span class="sep">·</span>
-        <span>Want the full picture? <a class="ov" href="/marketplace">See the overview <span class="ar">→</span></a></span>
+      <p class="sub">Property work in Jamaica, run for you while you live abroad. <b>You buy the job from Yaadly</b>, an identity checked tradesperson does it, every stage is photographed, and a named person at Yaadly reviews the finished work before you accept it.</p>
+      <!-- WhatsApp owns the secondary slot on every consumer page, per
+           docs/COPY-GUIDELINES.md section 5. The Ask Yaadly launcher from
+           chat.js is not a CTA and does not take this slot. -->
+      <div class="cta">
+        <a class="btn" href="https://app.yaadly.co.uk/jobs/new">Start a project</a>
+        <a class="btn wa" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener"><span class="wdot"></span>Message us on WhatsApp</a>
       </div>
     </div>
 
-    <div class="baseline">
-      <span><i></i>Evidence before payment</span>
-      <span><i></i>Independent checks, as a service</span>
-      <span><i></i>AI agents, human judgment</span>
-      <span><i></i>Human response the same day</span>
+    <div class="crew">
+      <div class="crew-top"></div>
+      <h2 class="vh">The four AI assistants, and the gate they cannot pass</h2>
+      <div class="crew-row">
+        <div class="crew-agents">
+          <span class="crew-wire"></span>
+          <span class="crew-pip gold"></span>
+          <span class="crew-pip" style="animation-delay:1.2s"></span>
+          <span class="crew-pip" style="animation-delay:2.4s"></span>
+
+          <div class="crew-agent">
+            <span class="crew-badge">SC</span>
+            <span class="crew-name">Scope</span>
+            <span class="crew-note">Reads your message, writes it up</span>
+          </div>
+          <div class="crew-agent">
+            <span class="crew-badge">PA</span>
+            <span class="crew-name">Papers</span>
+            <span class="crew-note">Drafts the quote and agreement</span>
+          </div>
+          <div class="crew-agent">
+            <span class="crew-badge">EV</span>
+            <span class="crew-name">Evidence</span>
+            <span class="crew-note">Reads each stage photo</span>
+          </div>
+          <div class="crew-agent">
+            <span class="crew-badge">CH</span>
+            <span class="crew-name">Chase</span>
+            <span class="crew-note">Chases a job gone quiet</span>
+          </div>
+        </div>
+
+        <div class="crew-gate">
+          <div class="crew-gate-top">
+            <span class="crew-bar"></span>
+            <span class="crew-y">Y</span>
+          </div>
+          <div class="crew-say">
+            <span class="crew-name">The gate</span>
+            <span class="crew-note">Money, prices and verdicts, signed by a named person. <a href="/how-we-use-ai">How we use AI <span class="ar">&rarr;</span></a></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="vh">Choose your route into Yaadly</h2>
+    <div class="doors" id="doors">
+
+      <!-- DOOR 1: PROPERTY OWNERS -->
+      <a class="door" href="https://app.yaadly.co.uk/jobs/new">
+        <span class="door-who">For property owners</span>
+        <h3 class="door-title">Get work done</h3>
+        <span class="door-chips">
+          <span class="chip">Post a job free</span>
+          <span class="chip ac">Deposit check &pound;149</span>
+          <span class="chip ac">Condition report &pound;249</span>
+        </span>
+        <span class="door-cta">Start a project <span>&rarr;</span></span>
+      </a>
+
+      <!-- DOOR 2: TRADESPEOPLE -->
+      <a class="door gold" href="https://app.yaadly.co.uk/apply">
+        <span class="door-who">For tradespeople in Jamaica</span>
+        <h3 class="door-title">Join as a worker</h3>
+        <span class="door-chips">
+          <span class="chip">Identity checked once</span>
+          <span class="chip ac">Free to join</span>
+          <span class="chip ac">No fee to quote</span>
+        </span>
+        <span class="door-cta">Join as a worker <span>&rarr;</span></span>
+      </a>
+
+    </div>
+
+    <div class="bizrail">
+      <span><b>Own contractor? Keep them.</b> We attend, record and write it up, and you pay your contractor directly.</span>
+      <a href="/business">Yaadly for business <span class="ar">&rarr;</span></a>
     </div>
   </div>
 </section>
 
 <a class="wa-float" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20property%20in%20Jamaica%20and%20I%20would%20like%20to%20talk%20about%20it." target="_blank" rel="noopener" aria-label="Message Yaadly on WhatsApp">
-  <span class="wa-label">Message us on WhatsApp · answered day or night</span>
+  <span class="wa-label">Message us on WhatsApp · a person replies within one working day</span>
   <span class="wa-btn"><svg viewBox="0 0 32 32"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.7.9 3.6 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.3l-.4-.2-4.9 1 1-4.7-.3-.4c-1-1.5-1.5-3.3-1.5-5.2 0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.1 10.8-8.5 10.8zm5.4-7.3c-.3-.1-1.8-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.7-1-2.3-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.3-.7.3-1.3.2-1.4-.1-.1-.3-.2-.6-.3z"/></svg></span>
 </a>
 
 <footer><div class="wrap"><div class="fgrid">
   <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
   <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
-  <span>A human confirms every step that moves money or changes a reputation.</span>
+  <span>A named person at Yaadly confirms every step that moves money or changes a reputation.</span>
   <div class="flinks">
     <a href="/marketplace">Overview</a>
     <a href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
@@ -436,49 +466,13 @@ footer{border-top:1px solid var(--line);padding:32px 0;font-size:12.5px;color:va
     <a href="/contact">Contact</a>
     <a href="https://app.yaadly.co.uk/portal">Client portal</a>
     <a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
+    <a href="/how-we-use-ai">How we use AI</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/cancellation">Cancelling</a>
+    <a href="/terms">Terms</a>
   </div>
 </div></div></footer>
 
-<script>
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/* doors rise in */
-const doors = [...document.querySelectorAll('.door')];
-if(reduce){ doors.forEach(d => d.classList.add('up')); }
-else { doors.forEach((d,i) => setTimeout(() => d.classList.add('up'), 900 + i * 180)); }
-
-/* agent ticker cycles */
-const tline = document.getElementById('ticker-line');
-if(!reduce && tline){
-  const LINES = [
-    '<span class="a">agent</span> · 02:14 · WhatsApp intake answered · Portmore roof',
-    '<span class="a">agent</span> · 02:15 · quote.pdf read · checked vs market rates',
-    '<span class="a">agent</span> · 02:16 · scope drafted from the quote',
-    '<span class="a">agent</span> · 06:40 · evidence photos logged · stage 2',
-    '<span class="a">agent</span> · 06:41 · invoice raised and sent',
-    '<span class="h">human</span> · 08:03 · Monique reviews · approval signed',
-    '<span class="h">human</span> · 08:04 · payment released · worker paid'
-  ];
-  let ti = 0;
-  setInterval(() => {
-    tline.classList.add('fade');
-    setTimeout(() => {
-      ti = (ti + 1) % LINES.length;
-      tline.innerHTML = LINES[ti];
-      tline.classList.remove('fade');
-    }, 380);
-  }, 2600);
-}
-
-/* parallax orbs */
-if(!reduce && matchMedia('(pointer:fine)').matches){
-  const orbs = [...document.querySelectorAll('.orb')];
-  addEventListener('mousemove', e => {
-    const nx = (e.clientX / innerWidth - .5), ny = (e.clientY / innerHeight - .5);
-    orbs.forEach(o => { o.style.transform = 'translate(' + (nx * +o.dataset.px) + 'px,' + (ny * +o.dataset.px) + 'px)'; });
-  });
-}
-</script>
 <script src="chat.js" defer></script>
 </body>
 </html>

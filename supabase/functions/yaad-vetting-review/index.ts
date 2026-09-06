@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
+import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, visionAttrs } from "./visionmodel.ts";
 
 // The vetting reviewer.
 //
@@ -69,16 +70,14 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const ANON_KEY       = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-const NVIDIA_API_KEY = Deno.env.get("NVIDIA_API_KEY") ?? "";
-
-// Its own model setting, falling back to the photo reviewer's. Vetting and
+// Its own model setting, falling back to the shared one. Vetting and
 // defect-spotting are different jobs and should be able to move apart without
-// one retuning the other.
-const MODEL = Deno.env.get("NVIDIA_VETTING_MODEL")
-  || Deno.env.get("NVIDIA_VISION_MODEL")
-  || "meta/llama-3.2-90b-vision-instruct";
+// one retuning the other. That intent is unchanged; as of 5 September 2026 the
+// resolution, the key and the endpoint live in _shared/visionmodel.ts, so the
+// country these documents travel to is a setting rather than a string typed
+// into three functions. NVIDIA_VETTING_MODEL still moves this job alone.
+const visionProvider = () => pickVisionProvider("vetting");
 
-const NV_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 const BUCKET = "vetting";
 
 // Only images reach a vision model. A PDF, a Word CV and the face-turn video
@@ -116,7 +115,15 @@ const CORE_DOCS = ["photo_id", "selfie_with_id", "trn", "proof_of_address"];
 // tradesperson's face and voice, which is the same category of thing as the
 // selfie and the liveness turn, whatever it is called and whatever it is for.
 // The file says "adding a doc_type here is safe", and this is that case.
-const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video", "intro_video"];
+//
+// profile_photo joined it the day IT was created (3 Sep 2026), for the same
+// reason and by the same reading. It is asked for so a person at the desk can
+// put a face to the name, which is a purpose no model serves, and a
+// photograph of somebody's face is a photograph of somebody's face whatever
+// the row is called. It is added here in the same commit that creates the
+// document type, deliberately: a face that reaches this function before it
+// reaches this list is a face that has already been sent.
+const IDENTITY_DOCS = ["photo_id", "selfie_with_id", "face_video", "intro_video", "profile_photo"];
 
 // When Persona has confirmed the government ID and selfie, those two are not
 // missing, they are somewhere better: checked by a vendor with real document
@@ -290,22 +297,20 @@ type Answer =
 async function ask(
   trace: Trace, pass: string, system: string, content: unknown, maxTokens: number,
 ): Promise<Answer> {
+  const prov = visionProvider();
+  if (!prov) return { ok: false, error: NO_VISION_PROVIDER_MESSAGE };
   try {
-    const r = await trace.span(`chat ${MODEL}`, SpanKind.CLIENT, {
-      "gen_ai.system": "nvidia_nim",
-      "gen_ai.operation.name": "chat",
-      "gen_ai.request.model": MODEL,
+    const r = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+      ...visionAttrs(prov),
       "gen_ai.request.max_tokens": maxTokens,
       "gen_ai.request.temperature": 0.1,
-      "server.address": "integrate.api.nvidia.com",
-      "yaadly.agent.name": "vetting_review",
       "yaadly.vetting.pass": pass,
     }, async (sp) => {
-      const res = await fetch(NV_URL, {
+      const res = await fetch(prov.api, {
         method: "POST",
-        headers: { Authorization: `Bearer ${NVIDIA_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: MODEL,
+          model: prov.model,
           messages: [{ role: "system", content: system }, { role: "user", content }],
           max_tokens: maxTokens,
           temperature: 0.1,
@@ -353,7 +358,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
   });
 
   const save = async (row: Record<string, unknown>, status = 200): Promise<Result> => {
-    const full = { application_id: appId, model: MODEL, ...row };
+    const full = { application_id: appId, model: visionProvider()?.model ?? "not configured", ...row };
     const { error } = await admin.from("vetting_reviews").insert(full);
     if (error) root.recordError(error.message);
     return { body: { ok: status === 200, review: full }, status };
@@ -415,7 +420,7 @@ async function review(trace: Trace, root: ReturnType<Trace["startSpan"]>, appId:
     });
   }
 
-  if (!NVIDIA_API_KEY) return { body: { error: "NVIDIA_API_KEY is not set on this function." }, status: 500 };
+  if (!visionProvider()) return { body: { error: NO_VISION_PROVIDER_MESSAGE }, status: 500 };
 
   /* ── fetch the files ──
      Inlined as base64 rather than handed over as signed URLs: a signed URL
@@ -652,7 +657,7 @@ Deno.serve(async (req: Request) => {
           try {
             await createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
               .from("vetting_reviews").insert({
-                application_id: appId, model: MODEL,
+                application_id: appId, model: visionProvider()?.model ?? "not configured",
                 summary: "The automatic run failed. Press Run the check again on the desk.",
                 checks: [], questions: [], extracted: [], docs_read: [], docs_skipped: [], flag_count: 0,
                 error: String(e).slice(0, 400),

@@ -12,13 +12,24 @@
  * a second implementation of money-adjacent stage logic, free to drift from
  * the first. One implementation, imported, beats two that agree today.
  *
- * FAIL CLOSED, UNLIKE yaad-whatsapp-webhook. That function treats a missing
- * WHATSAPP_APP_SECRET as "skip the check", which is a deliberate and
- * documented convenience: it lets the intake flow be built before the Meta app
- * exists, and the worst case is a junk enquiry row. The worst case here is a
- * deal that claims a client's money is held when it is not. So a missing
- * secret is 503 and nothing moves. An endpoint that guards money does not get
- * a development mode.
+ * FAIL CLOSED. A missing secret is 503 and nothing moves. An endpoint that
+ * guards money does not get a development mode.
+ *
+ * This paragraph used to draw the contrast with yaad-whatsapp-webhook, which
+ * treated a missing secret as "skip the check" on the grounds that the worst
+ * case was a junk enquiry row. Both halves of that have since stopped being
+ * true and the comment is corrected rather than deleted, because the reasoning
+ * is the useful part:
+ *
+ *   yaad-whatsapp-webhook was deleted on 1 September 2026 (see DECISIONS.md).
+ *   It spoke to Meta's Cloud API directly and never received real traffic.
+ *   Real WhatsApp intake runs through yaad-inbound, over Twilio.
+ *
+ *   yaad-inbound had the same fail-open and no longer does, as of 3 September
+ *   2026. The "junk enquiry row" reasoning had expired: that function can now
+ *   agree quotes, agree Kickoff Packs, choose workers and approve stages, and
+ *   approving a stage raises a worker pay invoice. It now refuses a Twilio
+ *   request it could not verify, the same call this file made first.
  *
  * THE SENDER PICKS AN EVENT, NEVER A STAGE. The payload names something that
  * happened; this file decides which stage that implies. Accepting a stage ID
@@ -31,7 +42,7 @@ import { NextResponse } from "next/server";
 import { verifyWebhookSignature } from "@/lib/webhookSignature";
 import {
   HubSpotError,
-  advanceDealToFundsHeld,
+  advanceDealToClientPaid,
   advanceDealToEvidenceSubmitted,
   advanceDealToClientApproved,
   advanceDealToCompletedPaid,
@@ -51,7 +62,15 @@ import {
  * releasing funds is its own human decision, and is not this endpoint.
  */
 const EVENTS: Record<string, (dealId: string) => Promise<StageMove>> = {
-  payment_held: advanceDealToFundsHeld,
+  // 'client_paid' replaced 'payment_held' on 4 September 2026, alongside the
+  // stage rename in hubspotConfig.ts. 'payment_held' is kept as an accepted
+  // alias rather than deleted: this is a wire contract, nothing in the
+  // repository sends it today but a sender configured outside the repository
+  // would break silently, and a webhook that starts answering 400 to a sender
+  // nobody can see is the worst kind of outage. Remove the alias once the
+  // senders are known.
+  client_paid: advanceDealToClientPaid,
+  payment_held: advanceDealToClientPaid,
   evidence_submitted: advanceDealToEvidenceSubmitted,
   client_approved: advanceDealToClientApproved,
   worker_paid: advanceDealToCompletedPaid,

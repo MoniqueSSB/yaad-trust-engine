@@ -1,0 +1,52 @@
+-- ask_question() becomes the only door into questions. Third attempt, and the
+-- first two are why this file spells out the reasoning instead of just running
+-- the drop.
+--
+-- WHAT HAPPENED, from the live migration history, reconstructed 3 Sep 2026 by
+-- the post-optimisation regression audit:
+--
+--   1. the_public_question_box_gets_a_throttle   created ask_question().
+--   2. ask_question_becomes_the_only_door...      dropped "anyone may ask".
+--   3. a_visitor_can_actually_ask_a_question      put it straight back.
+--
+-- Steps 2 and 3 are not in this repository at all, which is how the audit found
+-- this: the migrations folder and the live database disagreed about a public
+-- route. Step 3's name says what went wrong. The policy was dropped while the
+-- deployed web app was still inserting directly, so /ask broke for real
+-- visitors and was reverted, correctly and quickly.
+--
+-- WHY IT IS SAFE NOW, checked rather than assumed:
+--
+--   ask_question() is SECURITY DEFINER, owned by postgres. postgres also owns
+--   public.questions, and questions does not have FORCE ROW LEVEL SECURITY.
+--   A table owner bypasses RLS on their own table, so the function does not
+--   consult any policy and cannot be broken by removing one. Confirmed live
+--   before writing this.
+--
+--   The web app deployed at app.yaadly.co.uk calls supabase.rpc("ask_question")
+--   from web/app/ask/actions.ts. There is no direct insert left to break.
+--
+-- WHAT THIS CLOSES. With the policy in place, ask_question() carries the length
+-- floor, both caps, the throttle and published = false, while a caller holding
+-- the publishable key could POST straight to /rest/v1/questions and skip the
+-- throttle entirely. The counter was doing nothing against anybody who did not
+-- want to be counted.
+--
+-- The blast radius was small and worth stating honestly: rows land unpublished
+-- and a person reads them before anything appears, so the worst case was a
+-- flooded moderation queue rather than a defaced page. That is a reason it was
+-- survivable, not a reason to leave it.
+--
+-- IF /ask BREAKS AFTER THIS, the revert is one statement and it is step 3
+-- above, kept here so nobody has to go looking for it:
+--
+--   create policy "anyone may ask" on public.questions
+--     for insert to anon, authenticated
+--     with check (published = false
+--       and length(btrim(body)) between 10 and 500
+--       and (area is null or length(btrim(area)) <= 60));
+
+drop policy if exists "anyone may ask" on public.questions;
+
+comment on table public.questions is
+  'Ask Yaadly. The ONLY public insert path is ask_question(), which carries the length floor, both caps, the throttle and published = false; there is deliberately no INSERT policy for anon. A person at the desk publishes, in the Questions view of the concierge. Answers are vetted workers only.';

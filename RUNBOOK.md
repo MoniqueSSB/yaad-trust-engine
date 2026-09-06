@@ -53,7 +53,13 @@ Read `verify_jwt` for the function you are about to deploy, then match it.
 supabase functions deploy yaad-agent --project-ref leffyisvfvjwzilydlwf
 ```
 
-**`verify_jwt` is false**, only the endpoints that carry their own authentication (`yaad-inbound`, `yaad-whatsapp-webhook`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`), so deploy with the flag:
+**`verify_jwt` is false**, only the endpoints that carry their own authentication, so deploy with the flag. **Read the live setting before you deploy, do not trust this list**, which is the whole point of the rule and which this line itself got wrong: it named four functions when ten were actually running without platform auth, and it named `yaad-whatsapp-webhook`, deleted on 1 September 2026. As of 4 September 2026 the list is `yaad-inbound`, `yaad-vetting-review`, `yaad-vetting-upload`, `yaad-enquiry`, `yaad-website-intake`, `yaad-post-job`, `yaad-book-service`, `yaad-portal-code`, `yaad-quote-landed`, `yaad-notify-client` and `yaad-message-status`.
+
+`yaad-message-status` was added on 4 September 2026 and this line was updated in the same change, which is the whole discipline: the previous session added six endpoints to this set and left the list naming four, which is the failure the list exists to prevent. **`yaad-phone-check`, added the same day, is deliberately NOT on it**: Twilio Lookup is charged per call and the only legitimate caller is a signed-in worker, so it keeps platform auth and deploys with no flag.
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
 
 ```bash
 supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
@@ -144,35 +150,164 @@ This is the Python engine only. The live Edge Functions are step 9.
 
 ## 9. Switching the text model to the EU
 
-The eight live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set.
+The nine live functions that call a text model all read `supabase/functions/_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`, `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack` and `yaad-sketch`. It prefers Mistral in the EU and uses MiniMax in China while no Mistral key is set. (`yaad-kickoff` also has a provider picker of its own, which checks OpenRouter and NVIDIA first and otherwise falls through to the shared one.)
+
+**Done on 4 September 2026, all three steps.** The switch is live, the MiniMax branch is gone, and there is no fallback provider any more. This section is kept as the record of how it was done and as the procedure for the next provider change, not as outstanding work.
 
 **MiniMax is the current choice, deliberately.** Founder decision, 30 August 2026: the data flowing through these functions today is synthetic, and a China transfer of invented job cards is not what the DPIA is about. **The trigger for this step is real client and worker data, which arrives with the December pilot.** Do it before then, not after.
 
-**Step one, set the secret.** One command, and every function picks it up on its next invocation. No redeploy needed, because it is read at call time.
+**Step one, set TWO secrets, not one.** Every function picks them up on its next invocation. No redeploy needed, because they are read at call time.
 
 ```bash
 supabase secrets set MISTRAL_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
 ```
 
-**Step two, prove it switched.** Send one message through WhatsApp intake or post a test job, then look at the trace. The span attribute `yaadly.model.region` reads `eu` when it worked and `cn` when it did not. There is no need to guess: the region travels with every model call on purpose, and it is the same attribute that answers "where is our data going" today.
+```bash
+supabase secrets set MISTRAL_MODEL=mistral-small-latest --project-ref leffyisvfvjwzilydlwf
+```
 
-**Step three, remove the MiniMax branch.** Once step two is confirmed, delete it in `_shared/textmodel.ts`, run `supabase/functions/sync-shared.sh`, and redeploy the eight functions. It is about four lines. Leaving it in once real data is flowing means one missing secret quietly sends client messages to China again.
+**The model id is not optional and it is the step that goes wrong.** The default in `textmodel.ts` was `mistral-large-latest`, which Mistral no longer serves, so setting only the key sends every agent into its holding reply. Learned the hard way on 4 September 2026, twice: once on the dead default, and once on `mistral-medium-3-5-26-04`, which is the model's NAME in Mistral's overview table and not its API id. The id form is `mistral-small-latest`, `mistral-medium-latest`, or a dated snapshot such as `mistral-medium-2604`.
 
-**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. Model names move. Confirm the current one on Mistral's model page and set it without touching code:
+`mistral-small-latest` is the current choice. It resolves to Mistral Small 4, its reasoning is off unless a request passes `reasoning_effort: high`, so it does not burn the token budget thinking, and unlike `mistral-medium` it is not scheduled for deprecation inside the pilot window.
+
+**Step two, prove it switched.**
+
+This step used to say: look at the span attribute `yaadly.model.region`, which reads `eu` when it worked. That is still true and it is still the right answer **once tracing is on**. It was not on. `OTEL_EXPORTER_OTLP_ENDPOINT` has never been set on this project, so the tracer is completely inert and there are no spans to read. A proof method that needs infrastructure nobody has set up is not a proof method. Rewritten 4 September 2026 to say what actually worked.
+
+Post a synthetic job through `yaad-post-job` in draft mode. It is public, it calls the model, and it hands the model's own answer straight back in the `read` field:
 
 ```bash
-supabase secrets set MISTRAL_MODEL=the-current-id --project-ref leffyisvfvjwzilydlwf
+curl -s -X POST "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-post-job" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Content-Type: application/json" -d '{"mode":"draft","assist":true,"desc":"Di pipe unda mi kitchen sink a leak bad since Tuesday and di cupboard bottom gone soft. One storey house inna Portmore. Mi cousin Winston have di key from 8 inna di morning."}'
 ```
+
+`"read": null` means the model did not answer. A filled-in card with `"trade": "Plumbing"` means it did, and since `mistral-small-latest` is a Mistral model id that MiniMax would reject outright, an answer is itself the proof the call went to `api.mistral.ai` in the EU.
+
+It leaves a draft job in the desk. Delete it when you are done.
+
+When `read` comes back null, the reason is now in the logs rather than nowhere. Look for a line naming the provider and the status:
+
+```bash
+supabase functions logs yaad-post-job --project-ref leffyisvfvjwzilydlwf
+```
+
+Turning on a real OTLP endpoint is still worth doing and would make this a one-query answer across all nine functions instead of one function at a time. It is not a prerequisite for the switch.
+
+**Step three, remove the MiniMax branch. Done, 4 September 2026.** The branch is out of `_shared/textmodel.ts`, `sync-shared.sh` has pushed the change into all nine copies, all nine are redeployed, and the `MINIMAX_API_KEY` secret has been unset. `docs/privacy.html` now names Mistral in the European Union, and the table row and both dates on that page moved with it.
+
+**The MiniMax fallback came back on 5 September 2026**, on Monique's reaffirmed instruction, after being told what it means. The paragraph that used to sit here said "do not add a fallback back in"; that was the right default and she overrode it, which is her call to make. What is back is narrower than what was removed:
+
+- `pickTextProvider()` reaches it only when `MISTRAL_API_KEY` is not set at all. A wrong model id or a 400 never falls through: that is bad everywhere
+- **a refused key does, since 6 September 2026.** The Mistral key on the project started coming back `401 Invalid API Key` on the night of the 5th, and the instruction was "use the MiniMax key when Mistral fails". So `chatWithFailover()` also hands a 401 or a 403 to MiniMax, without retrying it first, because a refused key is refused the same way every time. That covered the two file makers first, and then, later the same morning, after "didn't I say to use MiniMax to solve this", **every text caller**: `yaad-agent`, `yaad-completion`, `yaad-inbound` (classify and compose, with the webhook's own deadline still attached), `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack`, `yaad-report`, `yaad-sketch`. All ten go through `chatWithFailover()` and all ten were redeployed with their existing `verify_jwt` setting. Desk callers retry twice with up to fifteen seconds of Retry-After; webhook callers retry once with the four second budget; then MiniMax, if its key is set. The log line is the same in every function
+- **a rate limit can, since 6 September 2026.** Monique's words: "I want my file to be produced even when the limit is used on Mistral." So the two desk callers that make a file, `yaad-report` (the draft) and `yaad-sketch` (assemble), now go through `chatWithFailover()`: Mistral first, two retries with `Retry-After` honoured up to fifteen seconds, and only if it is STILL a 429 or a 5xx, one call to MiniMax. Per call, logged as `mistral http 429 after retries, falling back to MiniMax (China)`. The webhook callers keep one retry and no failover, because a webhook has fifteen seconds in total and a client message is not a file
+- **with `MINIMAX_API_KEY` unset, which is the state today, none of that reroutes anything.** The retries still happen, so a short rate limit now produces the file on Mistral alone where yesterday it produced a 502. A rate limit that outlasts the retries is still a loud failure
+- it is opt-in: with `MINIMAX_API_KEY` unset there is still no third branch
+- it announces itself: every call it is chosen for writes `falling back to MiniMax (China)` to the function log, so `supabase functions logs <fn>` answers "did any of this go to China, and when"
+- `docs/privacy.html` says so, in the paragraph and in the table
+
+To arm it, set the secret. It was unset on 4 September, so until this is run the fallback exists in code and does nothing:
+
+```bash
+supabase secrets set MINIMAX_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
+```
+
+To disarm it, unset the secret. No deploy either way. A function only carries the fallback once it has been redeployed with the new `textmodel.ts` copy: `yaad-sketch` and `yaad-report` were, on 5 September; the other seven text callers run the no-fallback copy until they are.
+
+If a provider ever needs changing again, use the four `TEXT_MODEL_*` secrets, which take priority over everything and need no deploy.
+
+**If the model starts refusing requests after the switch**, the likely cause is the model id rather than the key. See step one, which is where that goes wrong.
 
 **To point at something else entirely**, no code change: set `TEXT_MODEL_KEY`, `TEXT_MODEL_API`, `TEXT_MODEL_NAME` and `TEXT_MODEL_REGION`. Those take priority over everything. A new hard-coded provider in that file is a new country receiving personal data, so it is a founder decision and a line in the data inventory before it is a code change.
 
-**Deploying the eight**, from disk only, never by pasting file contents:
+**Deploying the nine**, from disk only, never by pasting file contents.
+
+The loop that used to be here was wrong in three ways and the third was dangerous. It said eight functions when there are nine. It named `yaad-whatsapp-webhook`, deleted on 1 September 2026, so it errored partway. And it applied `--no-verify-jwt` to every function in the list, which is exactly the blanket form CLAUDE.md §12 exists to forbid: running it would have stripped platform authentication from six functions that require it, silently, with the deploy still reporting success. Corrected 4 September 2026.
+
+**Six require a JWT. Deploy these WITHOUT the flag:**
 
 ```bash
-for f in yaad-agent yaad-completion yaad-inbound yaad-invoice yaad-kickoff yaad-post-job yaad-sketch yaad-whatsapp-webhook; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-quote-pack yaad-sketch; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf; done
+**Deploying them**, from disk only, never by pasting file contents.
+
+**Do not paste the loop that used to be here.** It ran `--no-verify-jwt` across eight functions at once, including `yaad-whatsapp-webhook`, which no longer exists, and including `yaad-agent`, `yaad-completion`, `yaad-invoice`, `yaad-kickoff` and `yaad-sketch`, which all run with `verify_jwt = true`. Pasting it would have silently stripped platform authentication from five admin-only endpoints, the deploy would have succeeded, and nothing would have said so. That is exactly the failure CLAUDE.md section 12 describes when it says the flag is per function and never a blanket. Corrected 4 September 2026.
+
+Read the live settings first, then deploy each function with the flag it already has:
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
 ```
 
+```bash
+for f in yaad-agent yaad-completion yaad-invoice yaad-kickoff yaad-sketch; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf; done
+```
+
+```bash
+for f in yaad-inbound yaad-post-job yaad-notify-client; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+```
+
+**Three carry their own authentication and keep the flag:**
+
+```bash
+for f in yaad-inbound yaad-notify-client yaad-post-job; do supabase functions deploy $f --project-ref leffyisvfvjwzilydlwf --no-verify-jwt; done
+```
+
+Read the live settings before trusting the split above, the same way §12 says to. It was true on 4 September 2026 and it is a list, which means it will go stale:
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+Then check `verify_jwt` still reads the same after deploying. A deploy that silently flipped it succeeds and says nothing.
+
 ---
+
+## 9a. Mistral says 429, and the two account questions behind it
+
+Two separate things, both in Mistral's console and neither of them in this
+repository. They are written here because they keep being described as done.
+
+**The 429s.** On 4 September 2026 the retry was watched firing, waiting its
+fixed 1200ms, and getting 429 again, which rules out a burst from a test loop
+and points at a quota or a sustained throttle. Which of the two it is can only
+be read from the account.
+
+1. Mistral console, **Admin, then Limits**. Read the requests per second and
+   the monthly token allowance for the key in use, and whether the workspace is
+   on the free tier. The free tier is roughly one request per second, and nine
+   Edge Functions share one key.
+2. If it is the free tier, the question is whether to pay for throughput. That
+   is a spending decision and it is Monique's.
+3. What the code now does about it, since 5 September 2026:
+   `fetchModel` reads `Retry-After`. If the wait fits inside
+   `MAX_RETRY_WAIT_MS` (4 seconds, sized against the roughly fifteen a Twilio
+   webhook gets) it waits exactly that and retries. If the server asks for
+   longer, **it does not retry at all**, because spending the caller's budget
+   to reach the same refusal is worse than failing now with time left to send
+   the person a real reply. Before this it always waited 1200ms and never read
+   the header.
+4. Watching it: the failures print to the function logs with `fetchModel:` at
+   the front. `console.error` is deliberate, because these used to go only to
+   OpenTelemetry spans that were never exported, so a rate limit looked
+   identical to no traffic at all.
+
+**Training on your data, and the DPA. Not answered, and the privacy page does
+not currently mention it.** `docs/privacy.html` says where the model runs, the
+European Union, and that is true. It says nothing about whether Mistral trains
+on the text sent to it, and on the free tier the default is that it does,
+unless the workspace opts out.
+
+1. Mistral console, **Admin, then Privacy**, the setting about anonymous
+   improvement data. Read what it is actually set to. Do not assume.
+2. Ask Mistral for the data processing agreement, which is the document that
+   makes the EU processing a commitment rather than a location.
+3. Then, and only then, add a sentence to the "Two things we will not soften"
+   box on `docs/privacy.html`. Nothing has been written there yet on purpose:
+   a privacy page that claims an opt-out nobody has verified is worse than one
+   that is silent, and CLAUDE.md forbids the overclaim either way.
+4. This is a **December pilot blocker**, not a nice-to-have. The trigger named
+   in section 9 above is real client and worker data, and the same trigger
+   applies here: a client's job description going to a model that may train on
+   it is a data protection question, not a technical one.
+
 
 ## 10. A client got a holding reply instead of an answer
 
@@ -187,6 +322,181 @@ The banned-language screen fired. `yaad-inbound` composed a reply, the screen fo
 **Never widen the screen to stop the alert.** The alert is the product working. The banned list is a port of `yaad/guardrails.py` and the two move together, with tests on both sides asserting the same phrases.
 
 The span attributes `yaadly.guardrail.blocked` and `yaadly.guardrail.terms` carry the same information in telemetry, with the guidance strings rather than anything the client or the model wrote.
+
+---
+
+## 10a. A client was asked to repeat what they had just said
+
+The reply that fires here is the fixed opener: *"Thanks for writing in. Yaadly gets property work done in Jamaica... Tell me what needs doing, which parish the property is in, and who can let a worker in."* It is correct for a message with no readable content in it and wrong for everything else, so seeing it after somebody clearly said something means a model call failed upstream.
+
+**Their words are not lost.** Check first, so you can answer them properly:
+
+```bash
+# the thread, with everything they actually said
+select transcript, turns, stage, job_id from intake_threads order by last_at desc limit 5;
+```
+
+Then find which of the two calls failed, in the `yaad-inbound` function logs:
+
+- `classify: threw: TimeoutError` or `classify: mistral http 429`, the **classifier** died. Since 6 September 2026 this no longer costs the reply: the writer runs anyway and answers from the transcript. If you are seeing the opener *and* a classifier error, the writer failed too, which is the next line.
+- `compose: skipped, no time left`, the **writer** never started. Something above it ate the budget. Look at `yaadly.request.spent_ms` on the trace and at how long the transcription took.
+- Neither in the logs, and the reply probably went out fine and the opener you are looking at is older than you think. Check `last_at`.
+
+**Since 6 September 2026 this path hands over by itself.** When neither model produced anything and the client did say something, `handingOver` is set, the thread is marked `human_handling`, the job row is written so there is something to open, and the client is told plainly that it is going to a person rather than being asked to say it again. So the realistic version of this ticket is now "she is waiting on you", not "she was insulted by a robot".
+
+**Do not fix this by widening a timeout.** The whole point of `deadline.ts` is that the request has somewhere to be: Twilio abandons an inbound webhook at about fifteen seconds and the client gets nothing at all. If the budget is genuinely too tight, the thing to cut is work, not the deadline. See §9a for the Mistral rate limit, which is the usual cause and is a paid-capacity decision, not a code one.
+
+---
+
+## 10b. Somebody asked a question and got interrogated about a job
+
+From 6 September 2026 a message that is a question rather than work being described is answered as a question. It writes **no job row at all**, gets no reference number, and is not pushed at a person after three turns. It is still recorded in full under **Conversations** on the desk, which is where to read it. The phone push for one is titled *"A question on whatsapp"* and says there is nothing for you to do.
+
+If a question is still being treated as a job intake:
+
+1. Look at the trace for `yaadly.reply.source`. `none` means neither model wrote anything, so the writer's own override could not run either. That is §10a, not this.
+2. Otherwise the classifier returned `asking: false`. It is one model call's read of one message. The writer has an override for exactly this and answers from the conversation regardless, so a wrong `asking` should cost the job row decision, not the reply. If the reply itself is interrogating them, the writer's brief in `COMPOSE_SYSTEM` has drifted: check the `STATE helping` block and the override paragraph under `STATE gathering` are both still there. `asking_test.ts` asserts both.
+
+**The opposite failure is the one that costs money.** A real job filed as a question writes no row. `justAsking` therefore requires the classifier to say so *and* scope, trade and parish to all be empty, so a message with any actual work in it is written up as it always was. If a real job ever goes missing this way, that condition is the first thing to read.
+
+---
+
+## 10c. A voice note came back empty, or transcription is slow
+
+`yaad-transcribe` runs a failover chain: Cloudflare Workers AI Whisper first, then OpenAI, Deepgram, Scribe, AssemblyAI, whichever keys are set. The first provider can return an **empty transcript rather than an error**, which reads as "nothing was said" and is not the same thing.
+
+From 6 September 2026 `transcribeUrl` in `yaad-inbound` tries twice on bytes it already holds, and the caller records `msg.transcribeTried` before the attempt so the second call site cannot download the same audio from Twilio again. Before that, an empty first attempt cost a full second download: 5.7 seconds of a 12 second budget for one short note, which is what left no room for anything else.
+
+To see it:
+
+```sql
+-- two yaad-transcribe invocations close together used to mean a wasted download
+select timestamp, log_attributes['function_id'] as fn, log_attributes['execution_time_ms'] as ms
+from logs where source = 'function_edge_logs' order by timestamp desc limit 40;
+```
+
+`yaad-transcribe` is `c9e4d794-da76-4ff3-83f5-c1ec1bd93e0b`, `yaad-inbound` is `02d2d78a-418d-4743-a2e3-ed338c19bbde`. Two transcribe rows inside one inbound request is now a retry on held bytes, which is cheap and expected. Two *inbound-triggered downloads* is the bug and should not happen.
+
+The trace carries `yaadly.transcribe.retried` when the second attempt ran. If that is firing often, the first provider in the chain is unreliable and the order in `yaad-transcribe/index.ts` is worth revisiting. That is a provider choice, and where model calls are routed is Monique's decision, not a tuning knob.
+
+---
+
+## 10d. What actually reaches your phone, and when
+
+Every phone push goes through `pushToDesk()` in `yaad-inbound`, and every one of them carries ntfy's `Click` header set to `app_settings.desk_url`, so tapping the notification opens the desk. If tapping does nothing, `desk_url` is unset or wrong:
+
+```sql
+select key, value from app_settings where key in ('ntfy_topic','desk_url');
+```
+
+Both must be set. `ntfy_topic` is the private topic name, `desk_url` is `https://concierge.yaadly.co.uk/`. Nothing about the conversation goes in that link on purpose: a notification sits on a lock screen, and the desk is behind Cloudflare Access anyway.
+
+**What fires, and what it means:**
+
+| Title | When | What it wants from you |
+|---|---|---|
+| `Needs you: whatsapp` | handed to a person | **Act.** The body says which of the four reasons: they asked for a person, nothing could answer them, the assistant is paused, or three turns and still unclear. |
+| `They wrote again: whatsapp` | a held thread got another message | **Act.** The assistant is standing down on this number until you hand it back. |
+| `A job did not save` | the job row would not write | **Act, urgently.** The client was answered politely and their job does not exist. Nothing else chases this. |
+| `Reply held back` | banned language screen fired | **Act.** See §10. |
+| `Your web chat moved to WhatsApp` | a website conversation you were on carried over | **Act.** The whole thread came with them. |
+| `New whatsapp job` | the client confirmed the read-back | Informational. It is on the board. |
+| `A question on whatsapp` | somebody is asking rather than describing work | Informational. No job row exists. Open **Conversations** to read it or take it over. |
+| `Someone writing in on whatsapp` | first message of any other thread | Informational. |
+
+**You are told once per conversation, not once per message.** `worthTelling` is first turn, handed over, or finished. That is deliberate: three pushes for one conversation is noise, noise gets muted, and a muted phone loses a real job later. The exception is a thread already held for you, which pushes on **every** message, because at that point the assistant is silent and you are the only one answering.
+
+**If you want to see everyone still owed an answer rather than waiting for a buzz**, that is the queue view on the desk, fed by `awaiting_human_since`. The push is a nudge, not the list.
+
+**If nothing arrives at all**, check `agents_paused` is not `true` in `app_settings`, then check the `yaad-inbound` logs for the request at all. A push failure is swallowed on purpose and never breaks intake, so silence on the phone with a delivered reply to the client means `ntfy_topic` is wrong, not that the message was lost.
+
+---
+
+## 10e. You are not getting the WhatsApp alerts
+
+When a conversation needs a person, the Yaadly WhatsApp number messages `app_settings.desk_phone` with what the client actually said, so you can act without opening the desk. It is set to `+447767171858`. Empty switches it off.
+
+Nothing to buy: this is the same Twilio account and the same WhatsApp sender that already messages workers. An earlier version of this section described an SMS route, which was wrong and is gone. You answer clients in WhatsApp, so an alert by text was a context switch on every single message.
+
+**Which conversations reach your WhatsApp.** Five, and only five:
+
+- Somebody asked to speak to a person.
+- Nothing could answer them, so it came straight to you.
+- A thread already yours got another message.
+- A job would not save.
+- A reply was held back by the language screen.
+
+Everything else is push only. Every message from every stranger is how a phone gets muted, and a muted phone loses a real job later.
+
+**The one real limit, and it is Meta's.** WhatsApp only carries a freeform message to you for **24 hours after you last message the Yaadly number**. Replying to any alert reopens it for another 24. So an active day looks after itself and a quiet week does not: the first alert after a silent stretch may not land. The ntfy push fires either way, so nothing is ever only in this channel.
+
+**To open the window right now**, send anything to the Yaadly WhatsApp number from `+447767171858`.
+
+**To make it unconditional**, a Meta approved template is needed. This account has done that three times already (`TWILIO_CONTENT_SID_QUOTE`, `_APPROVE`, `_DAILY_CHECKIN`), so the path is known; it is an approval queue rather than an afternoon.
+
+**If nothing arrives**, look for `alertHerPhone:` in the `yaad-inbound` function logs:
+
+- `Twilio would not deliver to desk_phone`. Almost always the 24 hour window. Message the Yaadly number and try again.
+- Nothing in the log at all, so no alert fired. The conversation was not one of the five above. Check the thread under Conversations.
+- Check `desk_phone` is in full international form, `+447...`, not `07...`.
+
+**What is in an alert.** What happened, the client's own words up to 700 characters, and which number and channel it came from. Trimmed to 1500 characters. The full thread is always on the desk.
+
+**What is NOT built yet.** Replying from your own WhatsApp does not route back to the client. Right now the alert tells you what was said and you answer from the desk, which works on a phone browser. Routing your reply from your own number back into the right client thread is a separate build.
+
+---
+
+## 10f. Turning a conversation into a job
+
+A conversation the assistant read as a question writes **no job row**. That is deliberate, and it is why your job list is not full of people asking how Yaadly works. When one of them turns out to be real work, you promote it yourself.
+
+**Conversations, open the row, "Attach a job to this conversation".** The button only appears when the thread has no job. It creates the job, links the two, and carries the whole transcript into the brief.
+
+It sends nothing and tells the client nothing.
+
+**What you get:** a job at stage 0, closed, showing as **awaiting client setup**, which is where every new job starts including the ones intake creates. Nothing reaches a worker until you open it.
+
+**What you do not get, on purpose:** a trade, a parish, an urgency or an access note. Nothing in the conversation was classified, so nothing is guessed. Read it and write the brief from their own words. Guessing a trade here would put the job in front of the wrong workers, and guessing a parish is the start of the exact pricing problem the business exists to end.
+
+**Press it twice and you still get one job.** It returns the existing id rather than creating a second.
+
+**If the button is missing**, the thread already has a job; the Job column shows it. **If it refuses with "Only the desk can attach a job"**, you are not signed in as an admin on this desk; check `admins` has your email.
+
+**Why this is a button and not a rule.** CLAUDE.md §2: a named human confirms every consequential step. Deciding somebody's question is now a job they will be quoted for is exactly that kind of step, and there is deliberately no confidence score and no automatic promotion behind it.
+
+---
+
+## 10g. Answering a client from your own WhatsApp
+
+Reply to a Yaadly alert in WhatsApp and your words go to the client from the Yaadly number. Nothing else needed, no desk, no app.
+
+**Which conversation it goes to.** The one the last alert was about. Every alert that names a conversation points your phone at it, so a plain reply lands there.
+
+- **`who`** tells you which conversation you are on.
+- **Start with a number** to answer somebody else: `+447700900123 I can be there Thursday`. The rest of the line is the message. Send just the number to switch without sending anything.
+
+**What you get back.** A one line confirmation from the Yaadly number saying it went, and that the thread is yours now, so the assistant will not answer over the top of you. Hand it back from the desk when you are done.
+
+**Text only, in both directions, and the client is told.** Photographs and voice notes are not carried out, and the ones the client already sent are not shown to you: they are in the bucket and on the job, where the desk and a worker can see them. So on your **first** reply on a conversation, if that conversation has photographs, one sentence is appended to your message in your voice: *"I should say, I cannot see any photos you sent before now, so if there is something you want me to look at, send it again here."* Your confirmation tells you when it was added. It is appended after your words, never woven into them, and never repeated on later messages.
+
+To send a photo to a client, use the desk.
+
+**Outside WhatsApp's 24 hour window**, your words are saved rather than lost and go the moment the client writes back, using the same queue the desk's reply button uses. You are told which of the two happened.
+
+**Your own number cannot act as a test client any more.** This lane claims it first, which is the point. To test the client side, use a second phone.
+
+### If it does not work
+
+- **"I do not know who that is for."** No conversation is recorded against your phone yet, which happens if you reply to something other than an alert. Start the message with the client's number.
+- **"No conversation here from ..."** The number does not match a thread. It is compared with `samePhone`, so a missing country code is fine, but a wrong digit is not.
+- **Your message was read as a new job.** The lane did not claim it, so `desk_phone` does not match the number you sent from. Check Settings on the desk; it must be the number WhatsApp actually sends from, in full international form.
+- **Nothing happened at all.** Check the `yaad-inbound` logs for the request. The lane runs before every client lane, so if it did not fire, `desk_phone` is the thing to look at.
+
+### What it deliberately cannot do
+
+It can send a message and nothing else. It cannot approve a stage, release a payable, publish a worker, book a worker or change a job, and `desk-reply-lane_test.ts` asserts that by name.
+
+That is not caution for its own sake. The only thing authenticating these messages is the number they came from, which is a weaker gate than the desk's Cloudflare Access plus `is_admin()`. A message can be corrected. A released payable cannot. Anything consequential stays where a person is signed in, which is CLAUDE.md §2.
 
 ---
 
@@ -306,7 +616,44 @@ The body ended with the link variable. It now ends with a sentence after it. Kee
 
 **The four variables, in order:** job title, worker name, price, link.
 
-**Sign in codes deliberately do NOT use a template.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules, and Twilio Verify is the supported product for one. Pushing an OTP through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Over WhatsApp a sign in code stays free text: it works inside the 24 hour window and fails honestly outside it, and email remains the reliable path for it.
+**Sign in codes deliberately do NOT use one of our templates.** An OTP is an AUTHENTICATION message in WhatsApp's own categories, with its own rules. Pushing one through an ordinary utility template is how a sender gets flagged, and a flagged sender takes every other message down with it. Since 4 September 2026 they go through **Twilio Verify** instead, which uses Meta's own pre-defined authentication templates, so there is no template here for anybody to write or submit. See the Verify section below.
+
+---
+
+## The WhatsApp template for stage approvals
+
+**Two sessions built this on 4 September 2026, separately, on the same day.** The one that survives is the one on `main`, written up under "Tap to approve, instead of typing a job code" further down this file. Build that template, not any other. Its secret is **`TWILIO_CONTENT_SID_APPROVE`** and its button payload is **`{{2}}`, the bare job code**.
+
+The version that lost, recorded so nobody rebuilds it: a fixed button payload (`yaadly_approve_stage`) resolved by a new `matchApprovingButton()` that approved only when exactly one job was waiting on the client. It was safe, but it was a second door onto the approval path with its own matching rule, and the surviving design needs no new door at all: the payload IS the job code, so a tap arrives as the same string a typed code does and goes through the same `matchApprovingJob()`, the same phone check and the same RPC. One door beats two safe ones. See DECISIONS.md.
+
+**If a template was already approved carrying the button id `yaadly_approve_stage`, it is the wrong one** and will match no job. Build the `{{2}}` one and leave the other unused; a rejected or unused template costs nothing, and `TWILIO_CONTENT_SID_APPROVE` unset means nothing changes meanwhile.
+
+---
+
+## Twilio Verify, for sign in codes only
+
+**What it is for, and what it is deliberately not.** A sign in code cannot go through one of our own UTILITY templates without risking the WhatsApp sender, and as free text it only reaches somebody who has messaged us in the last 24 hours. Verify solves exactly that and nothing else. It uses Meta's pre-defined authentication templates, so **there is no template to write, submit or get approved for this one.**
+
+**Supabase still owns the code and the session.** `yaad-portal-code` takes the six digit `email_otp` out of `generateLink`, exactly as before, and hands it to Verify as `CustomCode`. Verify is a delivery rail, not a second source of truth. The browser still verifies against Supabase and this function still never sees the code come back. **`VerificationCheck` is deliberately never called.** If a future change routes the check through Twilio, that moves session minting out of the browser and into an Edge Function, which is a different and much larger decision; say so rather than doing it.
+
+**With `TWILIO_VERIFY_SERVICE_SID` unset, nothing changes.** The free text path behaves exactly as it did before Verify was added. Order of attempts when it IS set: Verify WhatsApp, Verify SMS, free text WhatsApp, free text SMS, with email running independently through Resend either way. Free text stays underneath because inside the 24 hour window it is legitimate and costs less than a verification.
+
+**Console setup, and it is longer than the template ones because Meta is involved:**
+
+1. **Messaging Service.** Twilio Console, Messaging, Services. Create one (or reuse one) and add the existing WhatsApp sender to it. Verify will not accept a bare number: it needs the `MG...` SID of a Messaging Service that contains the sender. This is the step people miss.
+2. **Verify Service.** Console, Verify, Services, **Create new**. The friendly name is what appears in the message, so make it `Yaadly`.
+3. **WhatsApp tab** on that Verify Service. Paste the `MG...` Messaging Service SID from step 1.
+4. Copy the Verify Service SID, which starts `VA`, and set it:
+
+```bash
+npx supabase secrets set TWILIO_VERIFY_SERVICE_SID=VApasteTheRealSidHere --project-ref leffyisvfvjwzilydlwf
+```
+
+Read fresh on every call, so no redeploy of the secret itself. `yaad-portal-code` does need deploying once for the code change, `verify_jwt` read live first as always.
+
+**Two things that can stop this before it starts.** Since March 2024 Twilio has no generic WhatsApp sender for Verify: you must bring your own, which we have. And `CustomCode` is documented as an ordinary optional parameter, but if a verification comes back rejecting it, that is an account level feature and Twilio support enables it. If they will not, the fallback is to stop passing `CustomCode` and let Verify mint its own code, which then means calling `VerificationCheck` and the much larger change above. **Do not make that change without asking.**
+
+**If a code does not arrive**, the trace names the leg: `twilio.verify.start` with `yaadly.verify.channel`, then the free text `twilio.send.*` spans underneath. The response body carries `phone.reason` verbatim, including Verify's own error text, which is what the desk needs to answer somebody locked out of their own job.
 
 ---
 
@@ -405,7 +752,7 @@ select id, created, status_code, content::text
 
 **None of this fires twice for the same event.** `evidence_landed`'s trigger condition is a transition (`old.status IS DISTINCT FROM 'evidence' AND new.status = 'evidence'`), not a state, so a second evidence item filed against a stage that already flipped the status does not notify again. If a client reports being told the same thing twice, that is two genuinely separate events, most likely two different stages, not a repeat.
 
-**The shared secret lives only as a hash.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. The plaintext is baked into the three trigger function bodies (`notify_client_quote_arrived`, `notify_client_on_job_change`, `notify_client_dispute_raised`) at the point they were created. If it ever needs rotating, regenerate it the way `20260831i` did and rewrite all three function bodies together; a mismatch between what a trigger sends and what the hash expects fails closed; `yaad-notify-client` returns 401 rather than notifying on a bad secret.
+**The shared secret lives in Supabase Vault, and only as a hash in the database.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. Since 3 September 2026 the plaintext is held in Vault under the name `notify_trigger_secret` and fetched at call time by `public.notify_trigger_secret()`; no trigger function body contains it any more, so reading a definition back with `pg_get_functiondef` reveals nothing. EXECUTE on that function is granted to `service_role` only, never to `anon` or `authenticated`, because it returns the plaintext. Ten callers use it: the eight `notify_*` trigger functions, `notify_client_service_change`, and `relay_confirmed_report`. A mismatch between what a caller sends and what the hash expects fails closed; `yaad-notify-client` returns 403 rather than notifying on a bad secret. This paragraph previously described the plaintext as baked into three function bodies, which was the design until 3 September and named three of what were by then nine callers. Corrected 4 September 2026.
 
 **`yaad-quote-landed` is retired.** It answers 410 and names where the work went. If something still calls it, `console.warn` inside the stub logs the referer, visible in that function's logs.
 
@@ -585,11 +932,1178 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## Reading the Overview after 6 September 2026
+
+The Overview is four bands, not a wall of tiles. Anywhere else in this file
+that says "On the Overview" and names a tile, the tile is still there: it is in
+the fourth band, **How the desk is doing**, at the bottom. Nothing was removed.
+
+1. **The day, whose move is it.** Four lanes: Yours, A worker's, A client's,
+   Nobody's. Yours is open on load, the rest are one summary line until you
+   click them. Every row is a move with a button, never a total. Under the
+   lanes, one row names every queue that is currently clear.
+2. **Live jobs, where each one is.** Every open job as a card in one of six
+   stage columns. The bar under a card is days since anything at all happened
+   on that job. A coral card has an open dispute, a gold one has been quiet
+   three days or more.
+3. **To answer.** People on the left, words on the right.
+4. **How the desk is doing.** The counting tiles, unchanged.
+
+**If a band is empty or the page is blank**, it is the same failure every time
+and it is not a data problem: a `const` declared below the line that first
+reads it, inside `loadOverview()`. Run the check below, which is the CI job
+that catches it, and move the declaration up.
+
+**To look at it without deploying**, serve the folder and sign in with your
+admin address. There is no way to see the real figures without signing in, by
+design: the page reads Postgres directly and row level security is what
+answers.
+
+```bash
+python3 -m http.server 8931 --directory concierge
+```
+
+---
+
+## The desk script is linted now, and what to do when that job goes red
+
+**`scripts/check-desk-script.mjs`, CI job "Admin desk script".** It pulls the
+inline script out of `concierge/concierge.html` and runs one rule over it.
+Line numbers in the error are real line numbers in `concierge.html`, because
+the extraction blanks everything outside the script rather than removing it.
+
+**Why it exists.** Nothing in CI read a line of the desk until 5 September
+2026, and the same bug has now shipped from it twice: the 17-18 August
+temporal dead zone that broke admin sign-in on a direct link, and one found on
+5 September where three consts sat below the tile that read them, so
+`loadOverview()` threw and rendered 13 tiles instead of 29, losing the whole
+"what needs me today" alert list. Both were found by a person walking into
+them.
+
+**One rule, not a style pass, and that is the design.** The stock ESLint
+`no-use-before-define` reports 17 findings on this file and every one is safe:
+`tile`, `sb`, `ROWS`, `currentView` are read inside functions that run long
+after the module finishes. A job that cries wolf gets switched off, which is
+the same reasoning the secrets scanner's comment gives for filtering
+placeholders. The custom rule compares scopes, so it only fires on a read in
+the same scope as the `let` or `const`, before the declaration. That throws
+whenever the line runs, every time.
+
+**When it goes red**, move the declaration above its first use. Do not disable
+the rule and do not add an eslint-disable comment: the finding is not a style
+opinion, it is a line that throws.
+
+```bash
+node scripts/check-desk-script.mjs
+```
+
+---
+
+## Creating TWILIO_CONTENT_SID_DESK_REPLY
+
+**What it is for.** You reply from the desk to somebody who last wrote more
+than 24 hours ago. WhatsApp will not carry free text that far, so
+`yaad-desk-reply` saves your words in `pending_desk_replies` and sends an
+approved template instead saying a reply is waiting. The moment they write
+back, the window reopens and `yaad-inbound` flushes your real words in full.
+
+**Without it your reply is still saved, and they are never told to write
+back**, so it sits there until they happen to message. That is the whole cost
+of not having it.
+
+**Your words never go in the template.** A template's variable slots are
+approved for one specific sentence, and reusing one to carry different text is
+how a sender gets flagged.
+
+### The template
+
+One variable, `{{1}}`, which `yaad-desk-reply` fills with the job code, or with
+the literal words "your job" when the thread has no job yet. So the sentence
+has to read correctly both ways.
+
+```
+Hi, this is Yaadly. There is a reply waiting for you about {{1}}. WhatsApp only lets us send it after you message us, so send us anything back and it will come through straight away.
+```
+
+Checked against `_shared/guardrails.ts`: no banned language, no dashes, reads
+correctly with a job code and with "your job".
+
+### Steps
+
+1. Twilio Console, **Messaging, Content Template Builder, Create new**.
+2. Name it `yaadly_desk_reply_waiting`, language English. The name is internal.
+3. Content type **Text**.
+4. Paste the body above. Give `{{1}}` a sample value, `JOB-WEB-1788281626906`.
+5. Save, then **Submit for WhatsApp approval**, category **Utility**. It is
+   utility because it is about an enquiry the person already started. Choosing
+   Marketing invites a slower review and a stricter bar for no benefit.
+6. Wait for Meta. Usually minutes, sometimes a day. It is out of your hands.
+7. When approved, copy the Content SID. It starts `HX`.
+8. Set it:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_DESK_REPLY=HXyour_sid_here --project-ref leffyisvfvjwzilydlwf
+```
+
+**No redeploy is needed.** The function reads it with `Deno.env.get` at send
+time, so the next send picks it up.
+
+### Checking it worked
+
+Send a desk reply to a number that last wrote more than 24 hours ago. The
+response says a short approved message has gone, rather than the sentence about
+the secret not being configured. Then:
+
+```sql
+select to_addr, job_id, created_at, sent_at from public.pending_desk_replies order by created_at desc limit 5;
+```
+
+Your words should be sitting there unsent, and they go out on their own the
+moment that number replies.
+
+---
+
+## A quote pack held on a phrase that was not the phrase the rule is for
+
+**What happened, 5 September 2026.** A quote pack draft on the test job
+`JOB-WEB-1788281626906` was held. The banned-language rule caught **"fully
+covered"**, and it was right to look: that phrase is on the list because "your
+job is fully covered" is a promise about money and cover that Yaadly must never
+make.
+
+The pack said: *"First coat applied evenly over all railings, surface fully
+covered"*. Paint, on a railing. Nothing to do with cover at all.
+
+**No client was waiting.** Every job in this database is a test job
+(`CLAUDE.md` §12), so the elapsed time meant nothing. The reason to write this
+down is what it predicts, not what it cost: with a real painting job the same
+phrase blocks it the same way, and there is no route out.
+
+**The real defect was not the false positive.** It was that a flagged draft had
+exactly one action on the desk, Approve, and `approve_quote_pack_draft()`
+refuses outright on any flag with no override, correctly. So there was no route
+from "this flag is wrong" to "this job can move". On a real job that is a dead
+stop.
+
+### Correcting a held pack, from 5 September 2026
+
+The Quote Pack Drafts view has a second action, **"Correct the wording"**. It
+loads the whole pack into a box, you fix the words, and it goes to
+`yaad-quote-pack-rescan`.
+
+**It clears nothing.** The corrected text goes through
+`_shared/quote-pack-verdict.ts`, which is the identical function the drafter
+uses, not a second opinion. A correction that is still dirty stays dirty, the
+desk tells you which words tripped it, and `approve_quote_pack_draft()` still
+refuses. `status` is never touched, so a named human still presses Approve
+afterwards.
+
+**The whole pack is in the box, not just the flagged line**, because a flag can
+be in any section and showing one sentence invites fixing it while a second
+copy of the phrase sits in another.
+
+**No model is called.** This is your edit being re-checked, not a redraft, so
+there is no pause switch to honour. Redrafting from the brief is
+`yaad-quote-pack`'s separate job.
+
+The row keeps `rescanned_by`, `rescanned_at`, `rescan_note` and
+`previous_banned_samples` in its `guardrail`, so what was flagged before a
+correction is still readable afterwards.
+
+**Why the banned pattern was not narrowed instead.** "fully covered" is on the
+list because "your job is fully covered" is a promise about money. Telling that
+apart from paint coverage by regex is not something to attempt under time
+pressure, and a loosened rule is permanent and applies to every future client
+while a stuck draft is one row. `CLAUDE.md` §3. Widen what the desk can do,
+never the rule.
+
+**How this one was corrected, and the rule to follow next time.** The wording
+was changed to "complete coverage with no bare metal showing", then re-scanned
+by running `_shared/guardrails.ts` itself over the corrected text: original
+flagged `["fully covered"]`, corrected flagged nothing, price check found
+nothing. **The flag was recomputed by the real scanner, never cleared by
+hand.** `guardrail.rescan_note` on the row records exactly that. The draft
+stayed at `ready`, so a named human still presses Approve.
+
+**Never clear `banned_language_detected` by editing the JSON to false.** That
+is the one move that turns this table from a record into a decoration. Change
+the wording, run the scanner, write what the scanner says.
+
+**Expect this phrase again.** Painting and decorating is a large share of the
+trade list and "fully covered" is ordinary language for paint coverage. The
+banned pattern was deliberately left alone: narrowing a guardrail so a job can
+proceed is exactly the change `CLAUDE.md` §3 exists to refuse, and telling the
+financial sense from the decorating sense by regex is not something to attempt
+under time pressure on a live job. Widening the desk's options is the right
+fix; loosening the rule is not.
+
+---
+
+## The 5 September 2026 deploy, and what is still not wired
+
+Three functions went to production on 5 September: `yaad-message-status`
+(`--no-verify-jwt`), `yaad-phone-check` and `yaad-vision` (both without the
+flag, platform auth on). `scripts/check-deploy-drift.sh` then reported no drift
+in either direction.
+
+**Verified by probe, not by reading the deploy output**, because a successful
+upload says nothing about whether the flag landed:
+
+```bash
+B=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-message-status" \
+  -H "Content-Type: application/x-www-form-urlencoded" --data "MessageSid=SMtest&MessageStatus=failed"
+curl -s -o /dev/null -w "%{http_code}\n" -X POST "$B/yaad-phone-check" \
+  -H "Content-Type: application/json" --data '{"phone":"+18765551234"}'
+```
+
+Correct answers are **403** ("Signature check failed.") and **401** ("Missing
+authorization header"). A 200 from the first means the signature check is not
+running and anybody can write delivery statuses; a 200 from the second means
+the flag was passed by mistake and Lookup, which costs money per call, is open.
+
+**Delivery reporting was then wired across every send, not just one.**
+`TWILIO_STATUS_CALLBACK_URL` is set to the function's own URL, and seven
+functions send over Twilio: `yaad-desk-reply`, `yaad-notify-client`,
+`yaad-portal-code`, `yaad-inbound`, `yaad-job-health`, `yaad-daily-checkin`,
+`yaad-enquiry`. Only the first attached a status callback, so setting the
+secret alone would have left six paths silent while the Overview reported zero
+failures. `_shared/twilio-status.ts` now does it in one place and all seven
+call it.
+
+It is inert with the variable unset, which is what made it safe to put in front
+of the portal sign-in code and a client's own notifications in one change.
+
+```sql
+select status, count(*) from public.message_deliveries group by status;
+```
+
+**If that stays empty after a real send**, check the secret is set, then check
+the function is reachable (`curl` the URL, expect 403 not 404), then read
+Twilio's own error log: Twilio silently drops a callback to a URL it cannot
+reach, and nothing on this side would know.
+
+**Still unset: `TWILIO_CONTENT_SID_DESK_REPLY`**, unrelated to this deploy. It
+needs a Utility template created in Twilio and approved by Meta, which is
+account work rather than a repository change. `TWILIO_CONTENT_SID_APPROVE` was
+set on 4 September.
+
+---
+
+## Passing or blocking an applicant, and why the buttons changed
+
+**Deciding whether somebody can earn on this platform is a §2 decision, and
+until 5 September 2026 it left no record of who made it.** The desk wrote
+`applications.status` directly through the generic action mechanism. The status
+changed and nobody's name went with it, so on the day somebody asks why a
+worker was blocked, the answer was a status string. `vetting_reviews` is the
+AI's read of the documents, never the person's ruling.
+
+**Pass, Send the gap back and Block now call `decide_application()`**, which is
+admin only and takes your name from your session rather than from anything the
+page sends. A trigger, `trg_application_decision_attributed`, refuses any
+status change into `passed`, `blocked`, `gap`, `approved` or `declined` that
+arrives without a name. So the rule holds for a script and for psql, not only
+for this page.
+
+**Each button now offers a note.** Optional on purpose: a forced box gets
+filled with a full stop. On Block it is the one worth writing, because it is
+the hardest decision to stand behind six months later.
+
+```sql
+select decided_at, decided_by, status, decision_note, name
+  from public.applications where decided_at is not null order by decided_at desc;
+```
+
+**If a button fails with "A vetting decision has to say who made it"**, the
+call went round the RPC and wrote `status` directly. That is the trigger
+working. Fix the caller; do not add `decided_by` to a direct update, because
+then the name is whatever the caller typed rather than whoever is signed in.
+
+**The eleven historical rows read NULL and stay that way.** Nobody knows who
+decided them. A plausible name backfilled into the column that exists to be
+trustworthy is worse than an empty one, and `system` would claim a machine did
+it. NULL means not recorded, which is the true statement.
+
+Rig: `supabase/tests/vetting_attribution_guards.sql`, six tests. Test 4 exists
+so the guard cannot pass by refusing everything, which is the easy way to look
+strict and break the desk.
+
+---
+
+## A quote pack held at "ready", and why it stops a job dead
+
+**The quote pack draft becomes the client's quote.** It is one AI-drafted
+overview per job, scope and rough timeline and payment stages, carrying no
+prices. A worker reads it, edits it, adds their own price on `job_quotes`, and
+that edited copy is what the client sees. RLS only lets a worker read a draft
+at status `approved`, so a draft held at `ready` means the job shows as
+`open_for_quotes`, shows as open on the board, and has nothing a worker can
+look at, which means no quote is ever built and nothing reaches the client.
+The job is not slow. It is stopped, and nothing about its status says so.
+
+The kickoff pack is the next document along and is gated on payment, one per
+quote, confirmed by both sides with a shared code.
+
+A clean draft auto-approves. A draft the guardrail flags is held on purpose,
+which is correct behaviour: `approve_quote_pack_draft()` is admin only and
+refuses outright on any flag rather than offering an override. What was missing
+was anybody being told.
+
+**Found on 5 September 2026 on a TEST job**: `JOB-WEB-1788281626906`, drafted
+2 September, flagged for the phrase "fully covered", which is on the banned
+list in `CLAUDE.md` §8. Nothing in this database is a real client, worker or
+job (`CLAUDE.md` §12), so no one was actually waiting; the elapsed time is just
+how long a test row sat. What is real is the shape: the phrase appeared as
+"surface fully covered", about paint on a railing, and painting is a large part
+of the trade list.
+
+```sql
+select * from public.packs_awaiting_a_person;
+select job_id, status, guardrail from public.quote_pack_drafts where status = 'ready';
+```
+
+**On the Overview**: "Quote packs held", amber at one, red once anything has
+been waiting a day, plus an alert row naming the wait. Opens the Quote Pack
+Drafts view.
+
+**To clear one**, read the pack, fix the flagged wording or redraft it, then
+approve it from that view. The flag itself tells you what tripped it, in
+`guardrail.banned_samples`. Never clear one by editing the guardrail.
+
+---
+
+## Desk capacity, how much gets through in an evening
+
+**The question behind it.** The product is that a named human confirms every
+consequential step, so "can this scale" is really "how many of those
+confirmations fit in an evening". Built before the December pilot rather than
+after, because the pilot is the run that produces the first real numbers and a
+view added in January measures nothing that already happened.
+
+```sql
+select * from public.desk_capacity;
+select * from public.desk_sessions order by session_date desc;
+select * from public.desk_decisions order by at desc limit 30;
+```
+
+**A session runs 05:00 to 05:00 Jamaica time, not midnight to midnight.**
+Grouping on the plain date splits a normal evening in half and reports two thin
+sessions where there was one, which halves the figure while looking perfectly
+reasonable. `supabase/tests/desk_capacity_guards.sql` pins the boundary at
+23:10, 00:40, 04:50 and 05:10.
+
+**Only rows naming a real person count.** `kickoff_packs` and
+`quote_pack_drafts` carry an `approved_by` that reads `system: auto-issued,
+guardrail-clean`, and on 4 September 2026 there were 314 of those against 11
+real decisions. An auto-issued guardrail-clean pack is the system deciding the
+content was clean, not a person sitting down to a decision. The exclusion is a
+`system:%` pattern rather than a table list, so a new auto-issuer cannot quietly
+join the count. Tests 4 and 5 in the rig are the guard.
+
+**A pack a person actually cleared does count**, and getting that wrong is the
+correction in `20260905c`. `approve_quote_pack_draft()` is admin only, refuses
+outright on any guardrail flag rather than offering an override, and attributes
+the approval to the signed-in admin so the row can prove a named human
+confirmed it. That is a desk decision by any definition, and excluding the
+whole table rather than the auto-issued rows threw it away.
+
+**The tile is never coloured, and that is deliberate.** A quiet evening is a
+quiet week, not a bad one. Colouring throughput invites treating it as the
+thing to maximise, and the thing to maximise here is not how many sign-offs
+happen per hour.
+
+**It undercounts, and by a known amount.** Passing or failing a worker's
+application is a human decision and nothing records who made it or when:
+`applications.status` moves and leaves no attributed row, and `vetting_reviews`
+is the AI's read rather than the person's ruling. So the evening is longer than
+this says by however much vetting took. Logged in `DECISIONS.md` as an open
+governance gap.
+
+---
+
+## Evidence completeness at sign-off
+
+**The question is what you had in front of you when you decided, not what is
+on the job now.** Counting rows in `evidence` per job answers the weaker
+version, because a photograph filed the day after an approval counts towards it
+identically. `stage_approvals.evidence` is a snapshot taken at approval time,
+each item carrying the sha256 of the exact bytes, so that is what these views
+read. Nothing filed afterwards can improve the number, and there is a rig
+proving both halves of that: `supabase/tests/signoff_snapshot_guards.sql`,
+five tests, all passing on 4 September 2026. Test 4 exists so tests 2 and 3
+cannot pass by being vacuous.
+
+```sql
+select * from public.evidence_completeness;
+select * from public.evidence_at_signoff order by approved_at desc limit 20;
+```
+
+**Three numbers, not one score, and that is on purpose.** The gaps have
+different causes and one percentage would hide which is open:
+
+- **Signed off with evidence.** Red at anything under 100%. An approval with
+  nothing behind it is the product missing.
+- **Bound to the exact files.** Every item in the snapshot carries a sha256. An
+  item without one means the approval is attached to a label rather than to the
+  bytes, so a file swapped later goes unnoticed.
+- **Arrival logged first.** The worker was on site, on record, before the stage
+  was approved. **Expect this one to read low for now and do not read it as
+  workers cutting corners**: until the location pin lane shipped (`20260904h`)
+  the only way to log arrival was to sign into the portal mid-job, which
+  `CLAUDE.md` §9 says outright is not a thing a worker in Portmore will do.
+  This number is the measure of whether the pin lane fixed it.
+
+**What is deliberately not measured: whether there is a before and an after.**
+Nothing in the schema records which a photograph is. The labels usually say so
+in free text, and reading it out of them would be a guess presented as a check.
+Measuring it needs a field that says so, which is a product decision.
+
+**`located` and `flagged_far_from_site` are in `evidence_at_signoff` but not on
+the Overview.** Both are about the pin lane, which has no real traffic yet.
+Promote them once it does.
+
+---
+
+## Stall rate, and how long a stall lasts
+
+**Two different questions, and until 4 September 2026 only one of them had an
+answer.** `job_stall_state` holds one row per job that has gone quiet long
+enough to be nudged or escalated, and `clear_resolved_job_stalls()` deletes
+that row the moment the job moves again. The delete is right: the clock should
+genuinely reset rather than leave a stale flag lingering. But it also threw away
+the only evidence the stall ever happened, so "how many are stuck right now"
+was answerable and "how long do they stay stuck" was not answerable at all.
+
+**What changed.** `clear_resolved_job_stalls()` now writes one
+`job_stall_resolved` row on its way out, then deletes exactly as before.
+Nudging, escalating and clearing all behave identically; the only difference is
+that the stall leaves a record. Nothing about this is retrospective: the
+history starts on the day the migration ran, so the time-to-unstall number is
+empty until stalls resolve after it.
+
+**What the clock measures, and it matters that this is said plainly.** It runs
+from **when Yaadly noticed** (`nudged_at`) to when the job moved again. Not
+from when the job actually went quiet. That earlier moment is not recorded
+anywhere, and back-computing it from `job_silence_hours()` at delete time would
+be inventing a figure nobody can point at a row for. Time from noticing to
+moving is also the more useful half, because it is the part Yaadly controls.
+
+**On the Overview**: "Jobs gone quiet" is the rate right now, stalled over live
+jobs, amber when anything is stalled and red once anything has escalated.
+"Time to get moving again" is the 30 day average, green under a day, amber
+under three, red past that.
+
+```sql
+select * from public.stall_metrics;
+select job_id, nudged_at, resolved_at, hours_stalled
+  from public.job_stall_resolved order by resolved_at desc limit 20;
+```
+
+**If the time figure reads n/a and stalls have definitely resolved**, check the
+cron is calling `clear_resolved_job_stalls()` rather than deleting from
+`job_stall_state` directly. A direct delete still clears the flag and writes no
+history, which is exactly the state this section exists to have fixed.
+
+---
+
+## Draft acceptance, the headline metric
+
+**Why this one and not "percentage resolved without a human".** The product is
+that a named person decided. A metric that improves when the person is removed
+argues against the thing being sold. Draft acceptance is the honest inverse: it
+measures whether the AI saved somebody time, and it can only go up by the
+drafting getting better.
+
+**Where it comes from.** When a worker sends an update, the assistant drafts
+the client-facing report and sends it to that worker with a choice: reply `1`
+to send it as written, or type their own version. That reply is the only moment
+anybody says whether the draft was good enough. Until 4 September 2026 it went
+to a trace span and nowhere else, which is off entirely unless an OTLP endpoint
+is configured, so in practice the number did not exist.
+
+`yaad-inbound` now writes a `draft_decisions` row at that moment, and only when
+the relay itself worked: a decision that never reached the client is not a
+decision.
+
+**On the Overview**: "Drafts sent as written". Deliberately not coloured until
+there are at least five decisions, because a sample of one reading 100% is not
+good news, it is no news, and colouring it invites trusting it too early.
+
+**The number to act on is roughly 60%.** Below that the drafter is costing time
+rather than saving it and should be paused rather than tuned indefinitely.
+
+```sql
+select * from public.draft_acceptance;
+```
+
+**`kind` exists from the start** so the report drafter writes the same rows when
+it is built. One table answering "how often is a draft good enough" across every
+drafter beats one table per agent.
+
+**Why the row is not written inside `relay_confirmed_report()`.** `yaad-inbound`
+resolves `1` into the stored draft text before calling that RPC, so by the time
+it runs, an accepted draft and a rewrite are the same argument. Only the code
+that read the worker's reply knows which happened.
+
+---
+
+
+## The one working day promise, and how it is measured
+
+yaadly.co.uk says "a person replies within one working day" on the services
+page, the business page and the desk pages. It is the most concrete promise the
+site makes. Until 4 September 2026 nothing measured it: no timestamp for when a
+person answered, no age on any alert, no way to say at the end of a week
+whether it held.
+
+**Three timestamps on `intake_threads`, and the rule in one function.**
+
+| Column | Set by | Meaning |
+|---|---|---|
+| `first_client_at` | `yaad-inbound`, on a new thread only | the clock starts |
+| `first_human_reply_at` | `yaad-desk-reply`, once, never overwritten | a real person answered |
+| `awaiting_human_since` | set on handover, cleared on reply | who is still owed one |
+
+**The assistant answering does not count.** The site promises a PERSON.
+Counting the assistant would make the number beautiful and meaningless, and
+quietly turn the promise into something the site does not make.
+
+**`first_human_reply_at` is written once.** The promise is about the first
+reply, so a long conversation cannot make a slow start look fast.
+
+**`first_client_at` is only set on a new thread.** Otherwise every new message
+would restart the clock and the promise would always look met.
+
+**The rule lives in `within_one_working_day()`**: same day or the next working
+day, weekends excluded. Verified against six cases including the one that
+matters, Friday afternoon to Monday morning, which counts as met.
+**Jamaica public holidays are deliberately not handled.** Adding a holiday
+table for a metric nobody has looked at yet would be inventing precision. When
+it matters it goes in that function and nowhere else.
+
+**On the Overview**: "Replied within a working day" as a percentage, and
+"Longest anyone is waiting" in hours. Anything past 24 hours raises a red
+alert, because that is the promise broken rather than a queue getting long.
+
+**Read it directly** with the `sla_first_reply` view, one row per conversation.
+
+```sql
+select from_addr, job_id, met, round(hours::numeric,1) as hours
+  from public.sla_first_reply
+ where met is not null order by first_client_at desc limit 20;
+```
+
+**The backfill is honest about what it does not know.** Existing rows took
+`last_at` as their start, which is the only timestamp those rows ever carried.
+Threads that already had a person on them were left null rather than guessed: a
+made up SLA figure is worse than a missing one, because it would be quoted.
+
+---
+
+
+## The assistant's own numbers, on the Overview
+
+A second row of tiles, added 4 September 2026, about the assistant rather than
+about your queue: conversations it has had, how many became a real job, how
+many it had to hand to you, the average number of messages it took, replies
+waiting outside the 24 hour window, and messages that never arrived.
+
+**Handed to you, read next to messages to finish one, is the honest read on
+whether it is helping.** A rising handover rate or a rising message count means
+it is grinding people down, whatever the conversations look like one at a time.
+
+**All time, not a rolling window, and deliberately so.** At this volume a
+window would mostly measure how quiet last week was, and a denominator that
+moves on its own is how a number stops meaning anything. Worth revisiting when
+there are enough jobs for a window to say something.
+
+**Handed to you starts near zero for a reason.** It was backfilled only where a
+conversation still existed in `intake_threads`, which is five threads. It is a
+going forward number, not a history.
+
+**Messages that failed is the only one that is a task.** It raises an alert,
+because Twilio accepted those and the phone never got them, so somebody is
+waiting on a message that is not coming and nothing else in the system knows.
+
+---
+
+
+## Reading a conversation in the desk
+
+**Conversations now shows both halves.** Until 4 September 2026 the transcript
+held only what the client said; the assistant's replies went nowhere. Lines are
+labelled:
+
+| Prefix | Who |
+|---|---|
+| *(none)* | the client |
+| `Yaadly:` | the assistant |
+| `Monique (from the desk):` | you |
+| `Monique (from the desk, waiting to send):` | you, queued outside the 24 hour window |
+
+The **Newest message** column says which of the three had the last word, which
+is usually the whole question: a thread whose last line is the assistant is
+waiting on the client, and one whose last line is the client is waiting on
+somebody.
+
+**If a client ever says "your assistant told me X", it is now in the
+transcript.** Before this it existed only in the raw `yaad-inbound` function
+logs, which are private to the project and expire.
+
+**What is recorded is what was sent**, not what the model drafted. If the
+banned-language screen blocked a reply, the transcript shows the holding
+message that actually went, because a record claiming Yaadly said something it
+refused to send would be worse than no record. The blocked draft is still in
+the function log, as it always was.
+
+---
+
+
+## Knowing whether a message actually arrived
+
+**Twilio returning 201 means Twilio took the message, not that a phone got
+it.** A number that has left WhatsApp, a handset that never comes online, a
+message a carrier drops: all of them look exactly like success from the sending
+side. Every send in this system was fire and forget.
+
+It matters most for a desk reply, because by then the assistant has already
+promised the client that Monique would come back to them on that number. A
+silent failure leaves a promise nobody kept and nobody knows.
+
+`yaad-message-status` receives Twilio's callbacks and records them in
+`message_deliveries`. The desk shows them under **Did it arrive**.
+
+**Only failed and undelivered are red.** Accepted and queued are honestly
+unknown rather than good, so they stay neutral rather than reading as a tick.
+Read means they opened it.
+
+### Turning it on
+
+Deploy the function **with the flag**, because Twilio holds no Supabase
+session and the endpoint carries its own HMAC check instead:
+
+```bash
+supabase functions deploy yaad-message-status --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+Then point sends at it:
+
+```bash
+supabase secrets set TWILIO_STATUS_CALLBACK_URL=https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-message-status --project-ref leffyisvfvjwzilydlwf
+```
+
+```bash
+supabase functions deploy yaad-desk-reply --project-ref leffyisvfvjwzilydlwf
+```
+
+Until that secret is set, no callback is requested and nothing changes.
+
+**A forged callback can only make a status wrong.** This endpoint records what
+it is told and acts on nothing, which is why it is safe to expose at all. It
+still refuses a request it cannot verify, the same call `yaad-inbound` makes:
+an endpoint that cannot tell who is calling does not get a development mode.
+
+**It always answers 200 once verified**, even when the database write fails.
+Twilio retries anything else, and a retry storm over a database blip would turn
+a cosmetic problem into a real one. Failures are in the function log.
+
+**A note on `twilio-signature.ts`.** It moved into `_shared/` on 4 September
+2026 when this became the second function to verify a Twilio signature. Two
+hand-copied versions of the check standing in front of endpoints that run with
+`--no-verify-jwt` could have drifted in silence; in `_shared` the build fails if
+they differ.
+
+---
+
+
+## A worker's number is checked before it is saved
+
+**The failure this closes.** A worker's whole surface is WhatsApp: the quote
+pack, the Kickoff Pack confirmation, the daily check-in, the prompt for
+evidence, the draft report they approve before a client sees it. All of it goes
+to `worker_profiles.phone`, which they type into a form themselves. A landline
+or one transposed digit means none of it arrives, nothing anywhere says so, and
+the first person to notice is a client asking why nobody turned up.
+
+`yaad-phone-check` runs Twilio Lookup when they submit the form.
+
+| Twilio says | What happens |
+|---|---|
+| Not a real number | Refused, with the reason, while they are still looking at the form |
+| A landline | **Saved**, with a warning shown. A worker with no mobile is a business problem, not a validation error |
+| A mobile | Saved, in proper E.164 |
+| Lookup unreachable or unconfigured | Saved exactly as typed, as it was before this existed |
+
+**It also fixes the stored shape**, which is the quieter win. `link_worker_phone`
+strips a number to bare digits, so "876 555 1234" was stored as 8765551234
+while Twilio delivers 18765551234 for the same person. That mismatch is why
+phone matching was ever written as "the last nine digits", the rule 20260904b
+had to replace because it made two numbers in different countries one person.
+Saving Lookup's E.164 stops the mismatch being created in the first place.
+
+**Nothing to configure.** It uses `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`,
+already set as Supabase secrets. Deploy with **no** flag, because `verify_jwt`
+must stay true: Lookup is charged per call and the only legitimate caller is a
+signed-in worker on their own form.
+
+```bash
+supabase functions deploy yaad-phone-check --project-ref leffyisvfvjwzilydlwf
+```
+
+**Why it is a function and not a server action.** The Twilio credentials live
+as Supabase secrets and nowhere else. The web app runs on Cloudflare Workers
+and does not have them, and copying a credential into a second place to save
+one HTTP hop is a bad trade.
+
+---
+
+
+## A worker checks in by dropping a location pin
+
+**Nothing to set up.** No template, no secret, no Twilio console step. WhatsApp
+has sent location pins natively for years and Twilio puts the coordinates
+straight on the inbound webhook, so this works the moment `yaad-inbound` is
+deployed.
+
+**How a worker uses it.** In the Yaadly chat: paperclip, Location, Send your
+current location. That is the Arrival Log entry. They get back "Checked in on
+JOB-XX (Roof leak, Portland). That is on the Arrival Log now."
+
+If they have more than one job running it asks which, with the same job code
+prompt the photo and update lanes already use. With one job it just logs it,
+because the portal has never asked for a code either: arrival is evidence, not
+a release.
+
+**Why this is better evidence than the portal button**, not just easier. A pin
+carries coordinates; the button carries only a timestamp. The coordinates go
+through the same 30km parish check the portal uses, so a pin dropped a long way
+from the job's parish is recorded and flagged (`arrival_log.far_from_site`)
+rather than refused. Flagged and not refused is deliberate: a parish centroid
+is a rough thing and a worker on a real job at the edge of a parish must not be
+locked out by geometry.
+
+**A second pin the same day changes nothing.** The Jamaica-local unique
+constraint holds, and they are told they are already checked in.
+
+### What it cannot do
+
+`log_arrival_via_whatsapp` refuses unless the sender's number belongs to a
+published worker who is already the worker on that job. A number that merely
+resembles another (the last-nine-digits collision) is refused, and a worker
+cannot check in on a colleague's job. Both are asserted in
+`supabase/tests/arrival_pin_guards.sql`, seven checks, all passing 4 September
+2026.
+
+**A structural note for whoever changes this next.** The logic now lives in
+`_do_log_arrival()`, which takes the worker's email as a parameter and is not
+reachable from PostgREST. `log_arrival()` (the portal) and
+`log_arrival_via_whatsapp()` are both thin wrappers that establish who the
+worker is and delegate, which is the same split `_do_approve_stage` and
+`_do_choose_worker` already use. Test 7 in that rig exists to catch the portal
+door losing its session check during a future edit.
+
+---
+
+
+## Tap to approve, instead of typing a job code
+
+**The friction this removes.** To approve a stage, a client sends the job's own
+code, `JOB-WA-1757000000000`. That code is deliberately hard to produce by
+accident: `approval-match.ts` refuses ordinals, titles and a bare "yes",
+because every plain message a client sends passes through that check and a
+stray "1" must never approve anything. The safety is right. The cost is that
+somebody has to type thirteen digits correctly, on a phone, to move money.
+
+**How a tap works.** Twilio delivers a WhatsApp Quick Reply tap as an ordinary
+inbound message, with `ButtonPayload` carrying whatever the template's button
+was built with. `yaad-inbound` takes the payload as the message text, so **put
+the job's own code in the payload** and a tap arrives as the same string a
+typed code does.
+
+**Nothing else changes, and that is deliberate.** The tap goes through the same
+`matchApprovingJob()`, the same phone check against `jobs.client_phone`, the
+same security definer RPCs and the same refusals in the same words. A button
+cannot do anything a typed code could not, and cannot reach a job the sender's
+number is not on. It is a way of typing, not a new authority. Giving buttons
+their own branch that trusted the payload would have made the button the thing
+being trusted rather than the code plus the number, and that is the gate this
+product sells.
+
+**It is inert until you build a template**, so nothing changes on the live
+number today.
+
+### Building the template
+
+**Twilio Console, Messaging, Content Template Builder, Create new.** Content
+type **Quick Reply**, category **Utility**.
+
+Body, with one variable for the job:
+
+```
+Your Yaadly job {{1}} has evidence waiting for you to look at. Approve it here, or reply with anything if something is not right.
+```
+
+Add one button:
+
+| Field | Value |
+|---|---|
+| Button text | `Approve` |
+| Button payload | `{{2}}` |
+
+Set the samples to a job title for `{{1}}` and a job code such as
+`JOB-WA-1757000000000` for `{{2}}`. Submit for WhatsApp approval.
+
+**The payload must be the bare job code and nothing else.** Not "APPROVE
+JOB-WA-...", not a label, not a sentence. `matchApprovingJob()` looks for the
+code inside the text, so extra words would still work, but only by luck, and
+the code alone is the thing that has been reasoned about.
+
+Then set the SID and redeploy:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_APPROVE=HX... --project-ref leffyisvfvjwzilydlwf
+```
+
+**Both halves are now built.** `yaad-notify-client` sends the button on the
+`evidence_report_confirmed` notification, which is the one message in the whole
+system that asks a client to approve. (Not `evidence_landed`, which despite the
+name goes to the WORKER, carrying the drafted report for them to send or
+reword.)
+
+**The button is sent AFTER the report, not instead of it,** and that is the
+part not to undo. The report itself carries the worker's own words about what
+was done, the AI's notes, the item codes and the photographs. A template's
+fixed variable slots hold none of that, and this file's own header records why
+sending a template in place of a richer message is the wrong trade. So the
+report goes as it always has, and a short second message follows carrying the
+button. `approve-button_test.ts` fails the build if that ever inverts.
+
+It only follows a successful WhatsApp delivery, because a lone Approve button
+arriving with no report in front of it asks somebody to approve work they have
+not been shown. If the button send itself fails, it is logged and nothing else
+happens: the client already has the report and the typed code still works.
+
+Trace attribute: `yaadly.notify.approve_button`.
+
+### If a tap ever fails
+
+The trace attribute `yaadly.inbound.tapped` says whether a message arrived as a
+tap or as typing. That is the difference between a broken template and a client
+mistyping, and it is the first thing to look at.
+
+---
+
+
+## A reply outside WhatsApp's 24 hour window
+
+**The rule is WhatsApp's, not Twilio's and not ours.** A business may send free
+text only within 24 hours of the person's last message. Outside that, Twilio
+refuses with code 63016 and nothing is delivered.
+
+It matters here more than it would elsewhere. You work evenings, a few hours a
+day. A client writes Tuesday afternoon, you reach the desk Wednesday night:
+that is outside the window, and it is the ordinary shape of the week rather
+than an edge case. Meanwhile the assistant has already told them you would come
+back to them on this number.
+
+**What happens now, since 4 September 2026.** Nothing is lost. `yaad-desk-reply`
+keeps your words in `pending_desk_replies`, sends a short approved template
+saying a reply is waiting, records it on the transcript, and claims the thread
+so the assistant stays quiet. The moment that number sends anything at all,
+`yaad-inbound` delivers your reply in full, in your own words. The client's own
+message is what reopens the window, so it is the only trigger; there is no
+timer and no cron.
+
+You can see anything waiting in the desk, under **Waiting to send**. A row that
+sits there for days is somebody who never wrote back, which is worth seeing
+rather than worth chasing.
+
+### The one setup step, and it needs the Twilio console
+
+The nudge cannot go until an approved template exists. Without it the reply is
+still saved and still delivered later, but the client is never told to write
+back, so it may sit a long time. The function says so in the note it returns.
+
+**Twilio Console, Messaging, Content Template Builder, Create new.**
+
+| Field | Value |
+|---|---|
+| Template name | `yaadly_desk_reply_waiting` |
+| Language | English |
+| Category | **Utility**, not Marketing |
+| Content type | Text |
+
+Body, exactly this, one variable:
+
+```
+Monique at Yaadly has replied to your message about {{1}}. Send any message back here and her reply will come through straight away.
+```
+
+Set the sample for `{{1}}` to a job code such as `JOB-WA-1757000000000`. Submit
+it for WhatsApp approval. Utility templates about an existing conversation are
+normally approved quickly.
+
+**Then set the SID in two places** (the same value), and redeploy:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_DESK_REPLY=HX... --project-ref leffyisvfvjwzilydlwf
+```
+
+```bash
+supabase functions deploy yaad-desk-reply --project-ref leffyisvfvjwzilydlwf
+```
+
+**Why your actual words are not in the template.** A template's variable slots
+are approved for one specific sentence. `yaad-notify-client`'s own header
+records why reusing a template to carry a different sentence is how a WhatsApp
+sender gets flagged. So the template says a reply is waiting, and your words go
+as free text once the window is open, which is the only way they arrive as you
+wrote them.
+
+**A related thing worth checking while you are in there.**
+`TWILIO_CONTENT_SID_QUOTE` is set as a Supabase secret and its value cannot be
+read back, so nothing here can confirm the template it names still exists. If
+`yaad-notify-client`'s quote fallback ever needs to fire, a stale SID would
+fail silently. Worth eyeballing the Content Template Builder list while the
+page is open.
+
+---
+
+
+## Turning the HubSpot lead sync on
+
+**Both HubSpot setup steps are done, 4 September 2026.**
+
+The deal property `yaadly_job_id` exists as a single-line text property, created
+by Monique. Verified live: an exact-match search on it returns cleanly, which is
+the call `findDealByJobId` makes before every write.
+
+The `default` pipeline's stage `presentationscheduled` was renamed from **"Funds
+Held"** to **"Client Paid"**, using the HubSpot API with the token in the main
+checkout's `.env`. Label only: `displayOrder` and `metadata` were read first and
+sent back unchanged so the PATCH could not quietly reorder the board or alter
+the stage's win probability. The internal id is untouched, which is what the
+code matches on. All seven stage labels now match `STAGE_LABELS` in
+`hubspotConfig.ts` exactly.
+
+It mattered because that label is client-facing whenever a deal notification or
+workflow email goes out, and "funds held" described a structure Yaadly stopped
+operating on 3 September when it became principal.
+
+**If a stage ever needs renaming again: rename, never delete and recreate.** The
+internal id survives a rename and is what every stage move matches on;
+recreating a stage hands out a new id and breaks them all at once.
+
+**Then deploy.** Nothing happens until both are out:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+```
+
+The web app deploys with its usual OpenNext build, which carries the new
+`/api/hubspot/lead` route.
+
+**What actually gets sent, and what does not.** Name if they gave one, the
+number they messaged from, parish, trade, urgency, the job code, and which door
+they came through. The job description, the address, the photographs and their
+email are deliberately held back: the description is whatever somebody typed on
+WhatsApp and routinely carries the address, who is alone in the house, and a
+voice note transcribed in their own words, none of which a sales pipeline
+needs. The same test file fails the build if that list is widened. Widening it
+is a data protection decision and it is Monique's.
+
+**It fires once, on a confirmed job.** Not on a greeting, not mid conversation,
+not on a thread handed to a person. A CRM full of people who said "hi" is a CRM
+nobody opens.
+
+**When it does not work, nothing breaks.** The sync runs after the client has
+already been answered, and every failure is a log line in `yaad-inbound`
+starting `hubspot lead:`. A CRM that missed a lead is a worse day; a client who
+was not answered is a worse business. Check the function logs, and the trace
+span `hubspot.lead` for the status code. If `yaadly_job_id` has not been
+created, the error says so in words rather than leaving you with HubSpot's own
+400.
+
+**To turn it off again**, remove the secret from either side. The function
+checks for it before doing anything at all.
+
+```bash
+supabase secrets unset HUBSPOT_LEAD_WEBHOOK_SECRET --project-ref leffyisvfvjwzilydlwf
+```
+
+---
+
+## Checking the assistant still reads Patois
+
+Twenty minutes, from a phone, and it wants doing before the December pilot and
+after any change to the intake prompt.
+
+"UNDERSTAND Patois perfectly" is the single most important line in that prompt
+and nothing automated can check it: judging whether a model understood "di pipe
+unda di sink bruk" needs the model. So this is a manual run, and the ten
+messages are checked in.
+
+1. Open `supabase/functions/yaad-inbound/patois-fixtures.ts`. Ten messages,
+   each with a one sentence note saying what the assistant has to get right.
+2. Send each one to the Yaadly WhatsApp number from a phone that is **not** on
+   a job and **not** a published worker, or every message gets diverted into a
+   worker lane before it reaches intake. Wait for the reply before the next.
+3. Mark each against its own `mustGetRight` line. Three are the ones that
+   matter most: the two marked SAFETY, which must refuse to say whether
+   something is safe, and the one marked PRICE, which must give no number even
+   though it is asked for a ballpark in the same breath.
+4. Bin the ten draft jobs afterwards. They will be `JOB-WA-` rows at status
+   `draft`, visible under Jobs in the concierge.
+
+`deno test --allow-read supabase/functions/` runs the one thing that can be
+automated: every trade the fixtures expect is still a trade the prompt offers.
+If somebody renames a trade, that goes red, and without it a whole run of this
+harness would be unmarkable without anybody noticing.
+
+---
+
+## The reply is late, or Twilio logged an 11200
+
+Twilio abandons an inbound message webhook at about fifteen seconds. Past that
+it logs error 11200 and the sender gets nothing, which from their side is
+identical to the message vanishing.
+
+Since 4 September 2026 the whole request runs on one budget of twelve seconds
+(`supabase/functions/yaad-inbound/deadline.ts`). Every slow step asks it for a
+slice rather than carrying its own timeout, and a step with no room left is not
+started at all.
+
+**Read the trace first.** Three attributes answer nearly everything:
+
+- `yaadly.request.spent_ms` how long it actually took.
+- `yaadly.request.budget_ms` twelve seconds for Twilio, ninety for email.
+- `yaadly.reply.source` `model` when the assistant wrote the reply, `card` when
+  it ran out of clock and the reply was built from the classification instead,
+  `none` when there was no classification either.
+
+**A run of `card` is the signal worth acting on.** It means replies are still
+going out and still make sense, but the writer is being squeezed, so something
+ahead of it is slow. Usually the transcriber. It is a warning, not an outage.
+
+**A run of `none` means the classifier is failing or being skipped.** Check the
+function logs for lines beginning `classify:`, which name the reason: an HTTP
+status from the provider, a body that was not JSON, or "skipped, no time left".
+
+**What gets dropped, in order.** The reserves are set so the last thing
+squeezed is the only step with a fallback: transcription, then the classifier,
+then the writer. Photographs are bounded too, and one that could not be fetched
+in time is recorded on the job as missing so it can be asked for again.
+
+**Do not fix this by raising a single timeout.** That is what the file used to
+do and it is why a voice note could not be answered: a 90 second transcription
+behind a 45 second media fetch behind a 25 second model call, every number
+sensible on its own and no one number wrong. `two-calls_test.ts` fails the
+build if a fixed timeout comes back on this path.
+
+---
+
+## A voice note came back as "tell me what needs doing"
+
+The symptom: somebody sends a perfectly clear voice note and gets the fixed
+opener, *"Thanks for writing in. Yaadly gets property work done in Jamaica..."*,
+which asks them for the very thing they just said. The thread in the desk shows
+their message as `[message with no readable text, review manually]`.
+
+**Check whether the words came back, before blaming the transcriber.** In the
+Supabase logs, filter `function_edge_logs` for `yaad-transcribe`. A `200` means
+it succeeded and returned text; `503` means no speech provider key is
+configured, `502` means every provider failed. `execution_time_ms` on that row
+is how long the work took.
+
+**Two `200` rows for one message is the fault, not a coincidence.** It means the
+same audio was transcribed twice in one request. That was live until 5 September
+2026: the WhatsApp worker lane transcribed the audio to decide whether a worker
+was filing an update, discarded the result when the number was not a worker's,
+and the client pipeline then transcribed it again on what was left of the twelve
+second budget. The second attempt's slice was shorter than the work takes, so
+the caller gave up while the server finished, and the words arrived nowhere.
+Fixed by transcribing once, above the worker/client fork, onto `msg.text`.
+`voice-once_test.ts` fails the build if a transcription is thrown away or a
+second one is added.
+
+**If there is only one `200` and the words still did not land,** look at what ran
+after it. On the message that exposed this, the classifier also hit
+`classify: mistral http 429: Rate limit exceeded`, retried once and failed
+again, so there was no Job Card and nothing for the writer to work from, which
+is what produces the fixed opener. That is the model provider's rate limit, not
+this path: see below.
+
+**`mistral http 429` in the function logs is the free tier limit.** It is
+bursty rather than constant. On 5 September it took out one client voice note at
+22:15 and six `kickoff draft ... failed: model call failed (mistral 429)` between
+11:30 and 11:51. The kickoff drafts recover on their own, because
+`yaad-kickoff-check` retries every minute. A client message does not get a second
+chance, so a run of these is a reason to buy capacity, which is Monique's call.
+
+**The audio itself is always kept**, whatever happened to the transcription:
+private `intake` bucket, and a `job_photos` row with `kind = 'audio'` against the
+job. Be aware the desk's Job photos view renders every row as an image, so an
+audio row shows as a broken thumbnail with no player. Known gap, not data loss.
+
+---
+
+## Somebody says the assistant has gone quiet
+
+Check these three, in this order.
+
+1. **Is the desk switch on?** Settings in the concierge, "Pause every agent".
+   Since 4 September 2026 that switch reaches `yaad-inbound`: when it is on,
+   the assistant does not call a model, and every message gets a fixed holding
+   reply saying Monique is picking it up herself. The message, the photographs
+   and the push to her phone all still happen. This is the switch working, not
+   a fault. Trace attribute: `yaadly.agents_paused`.
+2. **Has the thread been handed over?** `intake_threads.human_handling` true
+   means she has taken it, and the assistant stays quiet until "Hand back to
+   the assistant" is pressed in Conversations. There is deliberately no
+   timeout.
+3. **Have they hit the throttle?** Forty messages an hour from one number, from
+   4 September 2026, counted off `wa_inbound_seen`. They get a plain sentence
+   rather than silence. Outcome attribute reads `throttled`.
+
+```sql
+select from_addr, count(*) from public.wa_inbound_seen
+ where seen_at > now() - interval '1 hour' group by 1 order by 2 desc;
+```
+
+A fourth possibility, and the only one that is actually a fault: the job write
+failed. Outcome `job_write_failed`, an urgent push titled "A job did not save",
+and the conversation is kept with `human_handling` set so she picks it up. The
+client got a real reply either way; nothing else will chase it.
+
+---
+
+## Correcting what a job says before workers see it
+
+The description on a job that came in by conversation is the assistant's
+reading of it, with the client's own words kept verbatim underneath. The client
+corrects it at the read-back. Until 4 September 2026 Monique could not correct
+it at all.
+
+Jobs, open the row, **Correct what this job says**. The whole current text
+loads into the box so it is an edit rather than a retype. Leave the "In their
+own words" block at the bottom alone: that is the record of what the client
+actually said, and it is what a dispute would be read against.
+
+Notes that are for her and not for the job go in Conversations, **Write a note
+to yourself**. Those are never shown to the client, never read by
+`yaad-inbound` and never sent to a model, which is exactly why they are a
+separate column from the transcript rather than a line inside it.
+
+---
+
 ## Worker WhatsApp evidence now runs on Twilio, not Meta
 
-**There is no Meta setup to finish. It was tried, reverted, and moved.** `yaad-whatsapp-webhook` (Meta) is back to client intake and worker signup only, exactly as it was before 31 Aug 2026. The photo-texting feature lives in `yaad-inbound` now, on the number already registered with Twilio.
+**There is no Meta setup to finish. It was tried, reverted, and moved.** The Meta webhook was deleted on 1 September 2026 (see DECISIONS.md); it never received real traffic. Everything WhatsApp lives in `yaad-inbound` now, on the number already registered with Twilio.
 
-**A worker's evidence message is recognised by three things, checked in this order inside `yaad-inbound`:** the channel is `whatsapp` (not plain SMS), the sender's number matches a published (`active = true`) worker's `worker_profiles.phone` on the last 9 digits, and the message carries an image or video attachment. Miss any one of those and the message falls through to the ordinary client-intake pipeline this endpoint has always run, unchanged.
+**A worker's evidence message is recognised by four things, checked in this order inside `yaad-inbound`:** the channel is `whatsapp` (not plain SMS), Monique has not personally taken this number over (`intake_threads.human_handling`), the sender's number matches a published (`active = true`) worker's `worker_profiles.phone`, and the message carries an image or video attachment. Miss any one of those and the message falls through to the ordinary client-intake pipeline this endpoint has always run, unchanged.
+
+**Two things changed here on 4 September 2026.** The number match is now `samePhone()` in `supabase/functions/yaad-inbound/phone.ts`, which requires a full match or a country-code-sized difference, rather than the last nine digits, which treated two numbers in different countries as one person. And a worker whose message asks for a person ("can I speak to someone") is no longer filed as evidence: it falls through and reaches you, the same way a client asking for a person always has.
 
 **To see whether a worker's number is actually linked**, same query as before, table and matching logic are unchanged by the provider switch:
 
@@ -725,6 +2239,26 @@ Every `fn_hash` should equal `stored_hash`. If one does not, that function was r
 **The same drift exists in a shape this query does not check: an environment secret, not a trigger function.** `yaad-job-health`, `yaad-followup-check` and `yaad-evidence-landed-check` are Edge Functions, not `pg_proc` triggers, so they cannot bake a plaintext into their own source the way a trigger does; they read `YAAD_CRON_SECRET` from the environment instead and send that as `secret` when calling `yaad-notify-client` directly. Confirmed live, 31 Aug 2026: `YAAD_CRON_SECRET`'s current value does **not** hash to `notify_trigger_secret_sha256` (checked with a temporary diagnostic log comparing the two SHA-256 digests directly, then removed). Every `yaad-notify-client` call these three functions make gets a silent `403`, `net._http_response`-invisible the same way a trigger's own mismatch is, since none of these three go through `net.http_post`, they call `fetch()` from inside the function itself: check `function_logs` for `"notify-client" ... 403` on the calling function, not `net._http_response`. Not yet fixed: correcting it means rotating `YAAD_CRON_SECRET` to a fresh value, hashing it, and updating `notify_trigger_secret_sha256` in `app_settings` to match, which touches every live trigger that checks that same stored hash, a bigger blast radius than any one of these three functions on its own. Confirm with Monique before rotating it.
 
 **Fixed, 1 Sep 2026.** The secret had already been exposed and rotated; the new value sat in a Supabase Vault entry (`notify_trigger_secret_plaintext_20260831x`) with its own note to copy it into `YAAD_CRON_SECRET` via the dashboard or CLI, then delete the entry. Two attempts at the copy landed a value that still did not hash-match before a third attempt, copied by hand in the Edge Functions Secrets page, finally did: confirmed live by checking `supabase secrets list`'s displayed hash for `YAAD_CRON_SECRET` against `notify_trigger_secret_sha256` directly, not assumed from "I copied it." The Vault entry has been deleted, its job done.
+
+**Superseded 3 September 2026: the plaintext is out of the function bodies entirely.** Everything above is history and is kept because it explains why the design changed. The secret now lives in Supabase Vault under the name `notify_trigger_secret`, and every caller fetches it at call time with `public.notify_trigger_secret()`. There is no plaintext in any function body to extract, to re-bake, or to drift, so the "extract it from a function that still agrees" pattern above no longer applies and must not be revived. Adding a new trigger that calls `yaad-notify-client` now means calling `public.notify_trigger_secret()` in the body, nothing more.
+
+**The check, in its current shape:**
+
+```sql
+select p.proname,
+       p.prosrc like '%notify_trigger_secret()%' as uses_vault_lookup,
+       p.prosrc ~ '[0-9a-f]{64}'                 as carries_a_plaintext
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and (p.prosrc like '%yaad-notify-client%' or p.proname = 'notify_trigger_secret')
+ order by p.proname;
+```
+
+Every row should read `uses_vault_lookup = true` and `carries_a_plaintext = false`, except `notify_trigger_secret` itself, which is the lookup rather than a caller. Confirmed live 4 September 2026: ten rows, all correct. Note this query never prints the secret, which the older queries in this section did.
+
+**Rotating it, now that it is in Vault.** Update the Vault secret, set `app_settings.notify_trigger_secret_sha256` to the SHA-256 of the new value, and set `YAAD_CRON_SECRET` to the same new value with `supabase secrets set`. No function body has to change, which is the whole point of the move. `YAAD_CRON_SECRET` is still a separate copy held outside Postgres by `yaad-job-health`, `yaad-followup-check` and `yaad-evidence-landed-check`, so it is still the piece a rotation forgets; it fails silently with a `403` visible only in the calling function's own logs.
+
+**The repository and the database had drifted on exactly this, found 4 September 2026.** The migration that made the Vault move was applied to production on 3 September as version `20260903083651`, but its file was never committed. That is the reverse of section 18's usual direction and it was the more dangerous way round: a rebuild from migrations would have recreated the old plaintext function bodies carrying a value that no longer works, and every client notification would have failed a `403` silently. The file has been recovered by reading the live definitions back and committing them as `supabase/migrations/20260903a_the_notify_secret_lives_in_the_vault_not_the_trigger_body.sql`. If you ever find production and the repository disagreeing about a function body, read the live one back with `pg_get_functiondef` and commit that; do not reconstruct it from memory.
 
 ## The AI photo review comes back empty
 
@@ -1032,9 +2566,19 @@ Signed links here last 3600 seconds, not the 300 used for a one-shot WhatsApp or
 
 **That is the honest, expected answer until a WhatsApp Content Template is approved and its ContentSid is set.** This ping is business-initiated on a fixed schedule, every day, on every live job, so it can never rely on the free 24 hour customer-service window `yaad-notify-client` and `yaad-job-health` sometimes get to use: it always sends through a Meta-approved template, no exceptions, or it sends nothing at all rather than gambling on Twilio error 63016 mid-run. To bring it live:
 
-1. Twilio console → Messaging → Content Template Builder → new WhatsApp template, category **Utility** (this is an operational check-in on an existing job, not marketing, category matters for approval speed).
-2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title.
-3. Submit for WhatsApp approval. Usually resolves within a day; Twilio's console shows the status.
+1. Twilio console, Messaging, then Content Template Builder (Products and Services, then Templates, on the newer console). **Create new template**, filled in as:
+
+   | Field | What to put in it |
+   |---|---|
+   | Template name | `yaadly_daily_checkin_v1`. Lower case, letters, numbers and underscores only. |
+   | Template language | English |
+   | Select content type | **Text** (`twilio/text`). No buttons on this one. |
+   | Body | the sentence below |
+   | Variable 1 sample | `Kitchen sink pipe leak` |
+   | Category, at submit | **Utility**. An operational check-in on an existing job, not marketing, and the category decides both approval speed and whether it is approved at all. |
+
+2. Body text, one variable: *"Yaadly here. How did {{1}} go today? Send a voice note, or a couple of words and a photo, whenever you get a moment."* `{{1}}` is filled with the job's title, and the sentence deliberately neither opens nor closes with it.
+3. **Save and submit for WhatsApp approval.** Usually resolves within a day; Twilio's console shows the status.
 4. Once approved, copy its ContentSid (`HX...`) and set it as the `TWILIO_CONTENT_SID_DAILY_CHECKIN` function secret on the `leffyisvfvjwzilydlwf` project. No redeploy needed, it is read fresh from the environment on every run.
 
 **Runs once a day, 21:00 UTC (16:00 Jamaica), via pg_cron.** Same shape as `yaad-job-health`: a shared secret, generated once and kept only as a SHA-256 hash in `app_settings.daily_checkin_cron_secret_sha256`, plaintext living solely in the cron job's own stored command (`select command from cron.job where jobname = 'yaad-daily-checkin'` if it ever needs re-deriving). A manual run is available to a signed-in admin the same way `yaad-job-health` is, no secret needed, `is_admin()` is enough.
@@ -1195,6 +2739,1650 @@ Applies to short jobs taken on manual capture (authorise at booking, capture on 
 **Quotes already in were priced against the old wording.** The form tells the client that. If a change is big enough to move the price, message the workers who quoted; nothing does that automatically.
 
 **"Only the client of this job can change its description" / "A worker is booked on this job":** those are `edit_job_descr_as_me()` (20260903a) refusing, in words, and both are correct. The first means the signed-in email is not the job's `client_email`; the second is the rule above. There is no override in the portal on purpose.
+
+---
+
+## Changing a colour, or adding a text tier
+
+**Text colours live in six files and must move together.** `--mute` and `--dim` are defined in `web/app/globals.css`, `docs/yaadly.css`, and the inline `:root` blocks of `docs/index.html`, `docs/marketplace.html`, `docs/business.html` and `docs/services.html`. Editing the stylesheet alone reaches exactly half the marketing site, because those four pages carry their own copy. Check with:
+
+```bash
+grep -rnE -- '--(color-)?(mute|dim):? *#' docs/*.html docs/*.css web/app/globals.css
+```
+
+Every line that comes back should show the same two values. Today: `--mute:#9E9ECB`, `--dim:#7C7CA6`.
+Seven lines, six files. The app spells them `--color-mute` and `--color-dim`, because Tailwind v4
+derives `text-mute` and `text-dim` from that prefix; the plain names are aliased to them further down
+`globals.css` for the CSS ported from the preview. Same values, two spellings, one meaning.
+
+**Any colour used for text must clear 4.5:1 against `--bg` (`#07071A`).** That is not a preference, it is the WCAG AA floor for normal text, and `--dim` sat at 2.04:1 until 3 Sep 2026. To check a candidate, open any page and run this in the browser console:
+
+```js
+const lin=c=>{c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4)};
+const L=h=>{const n=parseInt(h.slice(1),16);return 0.2126*lin((n>>16)&255)+0.7152*lin((n>>8)&255)+0.0722*lin(n&255)};
+const ratio=(a,b)=>{const x=L(a),y=L(b);return ((Math.max(x,y)+0.05)/(Math.min(x,y)+0.05)).toFixed(2)};
+ratio('#7C7CA6','#07071A')   // must be 4.5 or above
+```
+
+**Status pill colours are `web/components/portal/statusTone.ts`, one file.** Four tones: `waiting` gold, `moving` purple, `done` green, `idle` grey. Add a tone there, never in the component asking for it, and check it against the panel background the same way. The wording of each status stays in `JobList.tsx`, per audience, because a client and a worker read the same status differently.
+
+**The ink on a brand gradient is `--color-onbrand`, one token.** It was hardcoded as `#04211D` in 53 places, a leftover green from the retired teal palette. If the gradient ever changes, this changes with it and nothing else needs to.
+
+**The favicon is the same purple mark on all eight marketing pages and the app** (`web/app/icon.svg`). Audit with:
+
+```bash
+for f in docs/*.html; do printf '%-24s ' "$f"; grep -o "fill='%23[0-9A-Fa-f]\{6\}'" "$f" | head -1; done
+```
+
+All eight should read `%237B4FE0`. Four of them were still the old teal square until 3 Sep 2026.
+
+---
+
+## A database function is exposed to the open internet, or the desk stops being able to invoice
+
+**The rule.** PostgREST publishes EVERY function in the `public` schema that the caller's role may execute, at `/rest/v1/rpc/<name>`. Supabase's default privileges grant EXECUTE to `anon` and `authenticated` when a function is created. **A new `SECURITY DEFINER` function is therefore on the open internet the moment it exists, unless you take it off.** Do that in the same migration that creates it.
+
+**To see what is currently exposed:**
+
+```sql
+select p.proname, pg_get_function_identity_arguments(p.oid) as args,
+       has_function_privilege('anon', p.oid,'EXECUTE') as anon,
+       has_function_privilege('authenticated', p.oid,'EXECUTE') as auth,
+       exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0) as public_grant
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and p.prosecdef and has_function_privilege('anon', p.oid,'EXECUTE')
+order by p.proname;
+```
+
+Anything in that list that does not open with `if not public.is_admin()` or check `auth.uid()` is a hole. Anything called only by an Edge Function should not be in the list at all.
+
+**What is deliberately still on that list, as of 3 Sep 2026.** Seven, and none of them writes anything:
+
+| Function | Why it stays |
+|---|---|
+| `job_for_code`, `quotes_for_code` | The whole point of "no account to get quotes". The job code is the bearer token and the page at `/jobs/[id]/quotes` is public. |
+| `request_kickoff_as_me` | Reached from that same public page. It refuses anybody who is not the job's signed-in client, so an anonymous call just fails. |
+| `current_doc_version`, `job_open_for_quotes` | Read-only lookups with no personal data in them. |
+| `job_client_email_matches`, `may_use_agents` | **Do not revoke these without checking first.** They look like oracles, and they are: an anonymous caller can test whether an email matches a job. But they are almost certainly evaluated inside RLS policy expressions, and a function called in a policy runs as the querying user, so revoking EXECUTE would make those policies fail for everybody rather than merely closing an oracle. Closing them properly means moving the check inside a definer function first. Worth doing, not worth doing quickly. |
+
+**Always revoke from `public` as well as `anon`.** A grant to PUBLIC covers `anon` no matter what `anon` itself holds, so `revoke ... from anon` alone is a silent no-op on any function carrying one. The `public_grant` column above is how you spot it. `release_materials_tranche` was exactly that case on 3 Sep 2026.
+
+**Never revoke `authenticated` without checking the desk first.** `concierge/concierge.html` reads Postgres with the PUBLISHABLE key, so Monique signed in is `authenticated`, and `is_admin()` is what separates her. These are the functions the desk calls and they must keep `authenticated`:
+
+```bash
+grep -oE "rpc/[a-z_]+|rpc\(.[a-z_]+" concierge/concierge.html | sed -E "s|rpc/||; s|rpc\(.||" | sort -u
+```
+
+Today, ignoring the `args` line the pattern also picks up: `is_admin`, `raise_job_agency_fee_invoice`, `raise_service_invoice`, `release_materials_tranche`. The desk reaches these two ways, a fetch to `/rest/v1/rpc/<name>` and a `supabase.rpc("<name>")` call, which is why the pattern matches both shapes; a grep for only the first misses three of the four.
+
+**If the desk starts refusing with a permission error after a grant change,** re-grant it: `grant execute on function public.<name>(<exact arg types>) to authenticated, service_role;`. The argument list must match exactly or you will create a second entry rather than fixing the first.
+
+**Migration files here are a record, not the mechanism.** `supabase migration list` skips every file in `supabase/migrations/` because the names are `20260903c_...` rather than a 14-digit timestamp, so `supabase db push` will NOT apply them. They are applied through the dashboard or the API, which records its own timestamped entry. Write the file for the reasoning, apply it separately, then verify with the query above.
+
+---
+
+## WhatsApp intake is returning 503 and nothing is arriving
+
+Since 3 Sep 2026 `yaad-inbound` **refuses** a Twilio request it could not verify, rather than letting it through. A 503 with `"Inbound verification is not configured."` means exactly one thing: `TWILIO_AUTH_TOKEN` is missing or wrong on the function.
+
+```bash
+npx supabase secrets list --project-ref leffyisvfvjwzilydlwf | grep TWILIO
+```
+
+`TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` must both be present. Set the token from the Twilio console (Account Info, Auth Token) with `npx supabase secrets set TWILIO_AUTH_TOKEN=... --project-ref leffyisvfvjwzilydlwf`, then redeploy nothing: secrets are read at request time.
+
+**Do not "fix" this by removing the check.** Before it existed, a missing token meant every unsigned request was accepted, on an endpoint that runs with `--no-verify-jwt` and can agree quotes, agree Kickoff Packs, choose workers and approve stages. Approving a stage raises a worker pay invoice. The 503 is the system telling you the front door is unlocked; the answer is the key, not the alarm.
+
+A 403 with `"Signature check failed."` is different and is the sender's problem: the token is set and the signature did not match. Usually the URL Twilio posts to has changed. See `twilio-signature.ts` for why the URL is rebuilt candidate by candidate.
+
+---
+
+## Somebody asks about a password, or a password reset email arrives
+
+**There are no passwords.** Sign in is a code, sent to the email address on the account, good for about an hour. `/portal/forgot` and `/portal/reset` both now forward to `/portal/sign-in`; they used to run the retired password flow, and `/portal/reset` could still set a password that nothing accepted.
+
+**If somebody cannot get in:** send them to `app.yaadly.co.uk/portal/sign-in`, have them type their email and leave the code box empty, and press the button. That sends a fresh code.
+
+**Outstanding, and it is the founder's call:** the Supabase Auth email templates may still contain a "reset your password" template pointing at `/portal/reset`. That link still works, because the route forwards and carries the session fragment across, so nobody is stranded. But the email says password and the product has none. Retiring or rewording that template changes what clients receive, so it has not been done for you. Dashboard, Authentication, Emails.
+
+---
+
+## Money is showing a different figure in two places on the same job
+
+**Every money string in the app comes from `web/lib/money.ts`.** If two panels disagree, one of them has grown its own formatter again. That is what this file exists to stop: there were ten, seven rounded and three did not, so a job could read J$1,234,567.89 in one panel and J$1,234,568 in another.
+
+```bash
+grep -rn 'toLocaleString("en-JM")\|toLocaleString("en-US")\|"J\$" +' web/app web/components
+```
+
+Anything that comes back other than `web/lib/money.ts` is the fault. Four exports, and they differ only in what they do with a missing figure:
+
+| Use | When |
+|---|---|
+| `jmd(n)` | you already know you have a number |
+| `jmdOrNull(n)` | the component renders nothing when there is no figure |
+| `jmdOrBlank(n)` | the caller concatenates the result regardless |
+| `amount(minorUnits, currency)` | an invoice total, in whatever currency it was raised |
+| `gbp(pence)` | a plain pence column, always two decimals |
+
+J$ is always rounded, because Jamaican pricing is quoted in whole dollars. Card currencies keep both decimals, because a statement has them. `amount(null, ...)` returns "not set", never a dash: a dash in a money column is ambiguous between nothing and zero.
+
+---
+
+## The question box on /ask is refusing people, or being flooded
+
+Since 3 Sep 2026 `/ask` writes through `ask_question()` in Postgres, not by direct insert, and `questions` has no INSERT policy for anon at all. Ten questions an hour per caller.
+
+**Somebody says they cannot ask.** The page tells them which of four things happened, so ask them what it said:
+
+| The page says | Means |
+|---|---|
+| "ten questions in an hour" | the throttle. Genuine, and it clears within the hour. |
+| "too short to answer well" | under 10 characters. |
+| "did not save, and it is our end" | the RPC errored. Check the function exists and `anon` can execute it. |
+| nothing appears after asking | working as intended: rows land unpublished and a person publishes them. |
+
+**To publish a question:** it is a row in `questions` with `published = false`. Set it true from the desk or the SQL editor. Answers come from vetted workers who have signed the Worker Guidelines; the policy enforces both.
+
+**To check the throttle is actually on:**
+
+```sql
+select has_function_privilege('anon','public.ask_question(text,text,text)','EXECUTE') as anon_can_ask,
+       exists (select 1 from pg_policies
+                where schemaname='public' and tablename='questions'
+                  and cmd='INSERT' and roles::text like '%anon%') as anon_can_insert_directly;
+```
+
+`anon_can_ask` must be true and `anon_can_insert_directly` must be **false**. If the second is true, the direct door is open again and the throttle is decorative.
+
+The caller key is a truncated SHA-256 of the address, computed in the server action, never the address itself. It is a throttle key, not a visitor log, and `question_attempts` sweeps itself within hours.
+
+---
+
+## Somebody cannot finish the "Post a job" form, or a job arrives with no urgency on it
+
+`/jobs/new` is six stages since 3 Sep 2026: the work, the property, urgency, photos, contact, review. It talks to two Edge Functions and nothing else. `yaad-post-job` in draft mode saves the job card, on the way out of stages one, two and three. `yaad-enquiry` sends the name and the contact detail, once, on Send.
+
+**Start by asking what the screen said.** The form shows the Edge Function's own words, so the message identifies the fault.
+
+| They saw | Means | Do |
+|---|---|---|
+| "That is a lot of job requests in one hour" | `yaad-post-job`'s per-caller throttle, eight creates an hour. A shared connection or an office can trip it. | Nothing is broken. Tell them to press **Carry on without saving**: the job still reaches you, without a reference number. Or finish it with them on WhatsApp. |
+| "Posting is not configured" | `SUPABASE_SERVICE_ROLE_KEY` is missing from the function's environment. | §9 of this runbook. Nothing saves until it is set. |
+| "That did not send. Nothing is lost on your side." | `yaad-enquiry` failed. The job card is already saved; only the contact detail did not go. | Ask them for the reference number on screen and their number. The job is in `jobs` and you can reply from the desk. |
+| "We need your name, a way to reach you, and what you want to ask" | `yaad-enquiry` got a blank field. Should be unreachable, the form checks first. | Report it, it is a bug. |
+| a stuck **Saving…** button | the invoke never came back. | Reload. The answers come back off the device, see below. |
+
+**A form that failed a save is never a locked door.** The error box offers **Try again** and **Carry on without saving**. Neither loses a word of what they typed.
+
+**Their answers survive a closed tab.** The trade, parish, description, urgency and access answer are kept in the browser under `yaadly.job.new.v1` for seven days, with the job reference, so a returning visitor lands on the stage they stopped at and keeps working on the SAME job rather than creating a second one. **The name, the contact detail and the portal code are deliberately never stored**, because this form gets filled in on shared family phones and the code is a credential. So somebody coming back re-types their name and number and nothing else. If they want a clean form, the banner has a **Start again** button.
+
+**A job arrives with no urgency or no access answer.** Both are required on the form, so it did not come from `/jobs/new`. It came in on WhatsApp through `yaad-inbound`, where the assistant fills what the conversation gave it. Set them from the desk.
+
+**Access answers matter more than they look.** The answer to "who can let a worker in" is written to `jobs.access_type`, and `enforce_vetted_worker_on_quote` reads it: a worker still in Probation is refused a job where they would hold keys or work inside an occupied home. Before 3 Sep 2026 this form never filled that column, so the gate was skipped on every job posted from the web. It is on now. If a worker says they cannot quote a web job, check their `vetting_state` and the job's `access_type` before assuming a bug: the refusal message names which of the two rules stopped them. The exact wording of the four options is asserted in `web/tests/new-job-form.test.mjs`; do not reword them in the page without reading that file.
+
+**Photographs are not uploaded on this form, on purpose.** Stage four says what to photograph and the confirmation screen hands over a link, `/portal/join?job=…&code=…&next=photos`, which sets up the account and lands directly on the photo panel. The file itself only ever travels the portal route: size capped, private storage, location stripped, deletable by the client. If somebody says the link did not open the photo screen, check that `next=photos` survived whatever copied the link, and that `?photos=1` is on the job URL afterwards.
+
+---
+
+## The worker directory or a worker profile is showing nobody, or `public_worker_profiles` errors
+
+Migration `20260903f_worker_profile_columns_stop_answering_the_open_internet.sql`. Same class of issue as "A database function is exposed to the open internet" above, but in RLS row policies instead of function grants: `worker_profiles.worker_email` and `.phone` sat on the same row as `name` and `trade`, and the old `wp_select_public` / `wp_select_signed_in` policies were row-only, so anybody holding the publishable key could `GET /rest/v1/worker_profiles?select=name,worker_email,phone` and read every active worker's contact details directly. Same shape of leak on `worker_checks` and `portfolio`, both of which carry `worker_email` purely as a join key.
+
+**The fix.** Three views, same pattern as `published_reviews`: `public_worker_profiles`, `public_worker_checks`, `public_portfolio`, none of which carry `worker_email` or `phone`; `worker_checks`/`portfolio` expose `subject_slug` instead of the email so the app can join on the public slug. The base tables are locked down behind them: `worker_profiles` now allows `select` only to the profile's own worker (`worker_user = auth.uid()` or their own `worker_email`) or `is_admin()`; `worker_checks`/`portfolio` keep only their existing admin-only policy.
+
+**web/app/jobs/page.tsx, web/app/jobs/new/page.tsx and web/app/workers/[slug]/page.tsx read the views, never the base tables.** If the worker directory or a profile page is rendering nobody, or a Supabase call against `worker_profiles`/`worker_checks`/`portfolio` from the web app is failing with a permission error, check first whether this migration has actually been applied:
+
+```sql
+select viewname from pg_views where schemaname = 'public' and viewname like 'public_%';
+```
+
+If the three views are missing, the migration file exists in the repo but was never run against `leffyisvfvjwzilydlwf`. **Migration files here are a record, not the mechanism** (see the entry above): apply it through the dashboard or the Supabase MCP, then verify:
+
+```sql
+select has_table_privilege('anon', 'worker_profiles', 'select') as anon_can_read_base_table; -- must be false
+select count(*) from public_worker_profiles; -- must return the active worker count
+```
+
+**What still needs `worker_email` on the base table, and stays working.** `web/app/portal/(gated)/worker/page.tsx` reads its own `phone` by `worker_user = auth.uid()`. `web/app/jobs/actions.ts` reads its own `name` by `worker_email`, matched against the signed-in user's own email. Both are covered by the new `wp_select_own_or_admin` policy; if either starts failing, check that policy exists and that its two OR-branches still match what those two call sites actually filter on.
+
+**The admin desk is unaffected.** `worker_checks`/`portfolio` keep their pre-existing `admin full ...` ALL-command policies, and `is_admin()` is part of the new `worker_profiles` SELECT policy, so `concierge.html` continues to see full worker rows including phone and email.
+
+---
+
+---
+
+## A tradesperson says they lost their place in the application, or cannot get back to the ID check
+
+`/apply` saves as they type, into `localStorage` under the key `yaadly.application.v1`, on the browser they were using. That is the whole mechanism: no account exists yet, so there is nowhere else to keep it.
+
+What is saved: the application id and upload token (the claim), every document already accepted, a recorded Persona check, the whole form including the three referees and the signature, which screen they were on, which of the two sittings they were in, and the reference once Phase 1 has been sent.
+
+1. **Same phone, same browser, not private mode:** send them back to `https://app.yaadly.co.uk/apply`. It reopens where they left off. If Phase 1 was already sent it reopens on the sent screen, which carries the "Carry on to the ID check" button.
+2. **Different phone, or they cleared their browser, or they were in private mode:** there is nothing to restore, and nothing is lost at the desk either. Their application is already in `applications` under its `APP-` reference and every document they sent is on file. Do **not** ask them to apply again, it makes a second row for the same person. Chase the remaining Phase 2 items on WhatsApp instead, which is the intended route anyway.
+3. **They want to wipe what is on the phone,** for instance it is a borrowed handset: the line under the heading carries "Start again, and clear what is saved here". It removes the key and reloads. It does not delete anything at the desk.
+
+**To read what a phone is holding,** in the browser's own console on that device:
+
+```js
+JSON.parse(localStorage.getItem("yaadly.application.v1"))
+```
+
+`sentRef` present means Phase 1 was submitted. `continuing: true` means they were in the second sitting. `step` is an index into that sitting, and an out-of-range value is clamped to the last screen rather than blanking the page.
+
+Note that the upload token stays on the phone until the second sitting is finished or "Start again" is pressed. Phase 2 uploads need it. If a handset is lost and the applicant is worried, the desk can invalidate it: change `upload_token` on their row in `applications` and their old browser copy stops working. They then finish over WhatsApp.
+
+---
+
+## The progress counter on /apply, and why it must never say "of 9"
+
+Phase 1 shows three dots, Phase 2 shows four, and the number comes from the length of the sitting being shown, not from a written constant.
+
+This is deliberate and it reverses nothing. The nine-item step rail was removed on 30 Aug 2026 because it was the first thing an applicant saw and a list of nine outstanding things is a reason to close the tab. A counter that spans both sittings is that rail again in smaller type. If a screen is added to a sitting the count follows on its own; if anybody proposes one counter across the whole check, the answer is no, and the reason is in `DECISIONS.md` under the 3 Sep 2026 entry.
+
+---
+
+## A photograph or an introduction video on /apply says "Could not record that document"
+
+The `doc_type` column on `vetting_documents` has a check constraint, and a value the constraint does not list fails at the insert **after** the file has already uploaded. The row shows that message, and the file sits orphaned in the bucket until the ninety day purge collects it.
+
+`intro_video` was in exactly this state from 31 Aug to 3 Sep 2026: accepted by the browser and by the edge function, refused by the database, every single time. `profile_photo` was added on 3 Sep. Both are in migration `20260903g`.
+
+**To see what the live constraint actually allows** (the migration history is not the schema, which is how the above went unnoticed):
+
+```sql
+select pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'public.vetting_documents'::regclass
+  and conname = 'vetting_documents_doc_type_check';
+```
+
+Adding a new document type takes **four** changes, and missing any one of them fails in a different place:
+
+1. The constraint above, by migration. Miss it and the insert fails after a successful upload.
+2. `DOC_TYPES` in `supabase/functions/yaad-vetting-upload`. Miss it and you get "Unknown document type" before anything uploads.
+3. `DocType` in `web/app/apply/JoinFlow.tsx`, and a row to upload it.
+4. **If it shows a person's face,** `IDENTITY_DOCS` in `supabase/functions/yaad-vetting-review`, in the same change. Miss it and the face is sent to a model. Today that list holds the photo ID, the selfie, the face turn, the introduction video and the profile photograph.
+
+---
+
+## What did an applicant actually agree to about AI reading their paperwork
+
+The question is on `/apply`, on the Phase 1 work screen and again on the Phase 2 identity screen. One answer, whichever screen they use.
+
+```sql
+select app_id, name, ai_review_consent, ai_review_consent_version, ai_review_consent_at
+from public.applications
+order by created_at desc
+limit 20;
+```
+
+- `granted` means the proof of address, TRN, certificates, CV and portfolio were sent to NVIDIA's vision model to be read, and flags were written for the desk. The photo ID, selfie, face video and profile photograph were **not**, whatever they chose: `IDENTITY_DOCS` withholds those before the download.
+- `declined`, or NULL, means nothing left Yaadly and a person reads every page by hand. The reviewer refuses to run, and so does the automatic hand-off from submit.
+- `ai_review_consent_version` is the sentence they agreed to. `ai-review-v3` is current, from 3 Sep 2026. Never read an older version as agreement to a newer or broader one; each is narrower than the last, so an old yes covers what is done today, but the version is the record of what was actually asked.
+
+**If a run of applications all say `declined` and nobody chose that:** the browser has stopped sending the field. That happened between 30 Aug and 3 Sep 2026, when the consent UI was removed from the page and the submit stopped sending `aiReviewConsent`; the server reads a missing field as declined, correctly, so every application in that window records a refusal nobody gave and no review ever ran for them. Check that `JoinFlow.tsx` still sends `aiReviewConsent` and `aiReviewConsentVersion` in the `submit` call. Those applications can be reviewed by hand at the desk, or re-asked; do not back-fill a consent nobody was asked for.
+
+**To change the wording of the question:** bump `AI_CONSENT_VERSION` in `JoinFlow.tsx` in the same commit. That is CLAUDE.md §6 and it is not a formality. The whole value of the column is that somebody can later ask what a given yes said.
+
+## 17. Turning the CSP from report-only to enforcing
+
+**Diary item, on or after 17 September 2026.** A Content-Security-Policy went out in report-only on 3 Sep with a two-week watch, founder's decision, no collector. If nobody does this, the policy sits there protecting nothing.
+
+**No collector means the reports go to the browser console and nowhere else**, so finding violations is a person walking the site with devtools open. That is the whole watch. Do it at least twice in the fortnight, and once more on the day.
+
+**Walk these, signed in, with the console open**, because each one loads something the others do not:
+
+1. `/jobs` — the board, client photographs on signed URLs, the chat widget from `yaadly.co.uk`
+2. `/jobs/new` — the post-a-job flow, photo upload
+3. `/apply` — **the important one.** The Persona identity step runs in an iframe from `inquiry.withpersona.com` and asks for the camera. If any single thing breaks under this policy it will be this.
+4. `/portal/jobs/<id>` — evidence images, video, the money panels
+5. `/portal/jobs/<id>/pack` — a Kickoff Pack document
+6. `/workers` and a worker profile
+
+Anything the console reports as a CSP violation is a source the policy is missing. Add it to the matching directive in `web/next.config.ts`, where every source already carries a comment saying where it came from. **A violation is not automatically something to allow**: if you cannot explain why the app is loading it, that is the policy doing its job.
+
+**To enforce**, in `web/next.config.ts`:
+
+1. Rename the header key `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
+2. Delete the separate `frame-ancestors 'none'` header above it. It is kept enforcing alongside the report-only policy on purpose, because that one clause is proven; the full policy already contains it, so leaving both would be duplication.
+3. Deploy, then walk the same six routes again. **This time a mistake breaks the page rather than logging.**
+
+**If something breaks after enforcing**, rename the key back to `Content-Security-Policy-Report-Only`, redeploy, and you are back to safe within one deploy. That is the whole rollback.
+
+**`'unsafe-inline'` on `script-src` is knowingly in there.** Next injects an inline bootstrap script, so removing it needs nonces threaded through the document. That is its own change and it is worth doing later; the policy is worth having in the meantime, because it still closes off every origin the app has no business talking to.
+
+**`service_catalogue` names and active flags can drift from what the marketing page and specs actually decided, since nothing keeps them in sync automatically.** On 3 Sep 2026, `eyes-on-it` still read "Eyes On It" and `condition-report` still read "Property Condition Report" in the live table, months after `specs/PRICING.md` and `CHANGELOG-2026-08-26.md` §4 renamed them to "Visual Check" and "Condition Report" on the day the invoicing migration was written; the seed data in `20260826_invoicing.sql` just never picked the rename up. Separately, `setup-pack` and `document-check` were still `active := true`, both listed under "Removed" in the same spec, which is why they were still raisable from the concierge desk's own catalogue dropdown (`loadCatalogueOptions` reads `active = true` straight off the table) and still selectable in the `<select id="bk-svc">` on `docs/services.html`, which never had its two leftover `<option>`s pulled when their product cards came off the page. Fixed in `20260903h`: renamed the two rows, set both retired ids `active = false`, dropped the two `<option>`s, and dropped `docs`/`setup` from the `BOOKABLE` allowlist in `yaad-book-service` so a crafted request can't book them even with the page unchanged; redeployed. **If a "removed" service becomes bookable again**, check three places: the row's `active` flag, whether its `<option>` is back in `docs/services.html`, and whether its key is back in `BOOKABLE`.
+
+**A bigger, separate gap found while fixing the above and not yet acted on:** several `service_catalogue` pence values still hold pre-26-Aug numbers, while `specs/PRICING.md` (dated the same day) records the founder's decided prices with sourced comparables. Live catalogue vs. spec, as of 3 Sep 2026: Visual Check full £125 vs. decided £149 · Condition Report £249/£349 vs. decided £245/£325 · Oversight Retainer £395/£495 vs. decided £595 fortnightly (and the catalogue has no weekly tier at all, spec wants one at £1,095) · Property Care standard/large/villa £45/£70/£95 flat vs. decided £95/£135/£175 · Technical Sign-off £245/£245 vs. decided £245/£300. The public page (`docs/services.html`) already shows the *decided* founding figures, so a client sees one number and, once an admin raises the invoice, `raise_service_invoice()` prices it off the *stale* catalogue figure. This is a money change, not a label fix, and the retainer needs an actual schema decision (one row or two), so it was left for the founder to confirm before anyone touches it.
+
+---
+
+## 18. A migration is in the repository but not in the database
+
+Found this way on 3 September 2026: `/apply` said "Could not record that document" for every profile photograph and introduction video, and had been doing so silently since the feature shipped. The file was committed. It had never been applied.
+
+**The folder is the intent. `supabase_migrations.schema_migrations` is the fact.** Do not trust one for the other. Symptoms look like a bad connection, a flaky upload, or nothing at all, because the code path in front of the missing change usually succeeds first.
+
+### Check for drift, both directions
+
+```bash
+ls supabase/migrations | sed 's/\.sql$//' | sort > /tmp/repo-migrations.txt
+```
+
+Then read the applied list and compare by name, remembering that the live `name` often drops the `20260903x_` prefix the filename carries, and that one file may have been applied as several named parts:
+
+```sql
+select version, name from supabase_migrations.schema_migrations order by version desc limit 40;
+```
+
+Two different problems come out of this and they need different answers:
+
+- **In the repository, not in the database.** A change nobody is getting. Read the file, check it is still what you want, then apply just that one. Do NOT reach for `supabase db push`: on 3 Sep it would have applied four migrations, of which two were already live under different names and one was a decision nobody had taken yet.
+- **In the database, not in the repository.** Worse, because the folder can no longer rebuild the database. Write the migration back as a file, copying the statements out of `schema_migrations` rather than from memory, and keep the reverts as their own files instead of tidying them away. The ordering mistake is usually the useful part.
+
+### Apply one migration, not all of them
+
+Use the Supabase MCP `apply_migration` with the single file's contents, or run the statements directly. Then prove it took, against the live schema rather than against the file you just ran:
+
+```sql
+select pg_get_constraintdef(oid) from pg_constraint
+where conrelid = 'public.vetting_documents'::regclass
+  and conname = 'vetting_documents_doc_type_check';
+```
+
+### Before applying anything that re-adds a CHECK constraint
+
+`drop constraint` then `add constraint` validates every existing row. Count what is in the column first, or the add fails and, outside a transaction, leaves the table with no constraint at all:
+
+```sql
+select doc_type, count(*) from public.vetting_documents group by doc_type;
+```
+
+### Still open, and it is a founder decision
+
+`20260901i_worker_guidelines_v14_drops_police_check_and_trial_job.sql` is unapplied. The app ships Worker Guidelines v1.4; `app_settings.worker_guidelines_version` still says 1.3. `match_workers_for_job` compares a worker's signed `doc_version` to that setting exactly, so a worker signing the text now on screen matches no jobs, and the two workers who signed the withdrawn v1.3 text still do. Applying it swaps which half is broken until those two re-sign. See DECISIONS.md, 3 Sep 2026.
+
+---
+
+## 19. A page 404s correctly but answers 200
+
+A `loading.tsx` on a dynamic route puts a Suspense boundary in front of the page, so Next flushes the shell with a 200 before the page's `notFound()` runs. The visitor sees the right page. Search engines are told every URL exists.
+
+Check any public route that can 404:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://app.yaadly.co.uk/workers/does-not-exist
+```
+
+404 is right, 200 is the bug. To confirm the cause, move the route's `loading.tsx` aside and curl again: if it becomes 404, that is it. The fix is to resolve the record in `generateMetadata`, which runs before the shell is flushed, and call `notFound()` there; keep the one in the page as the backstop.
+## The legal pages, and the placeholders that are still in them
+
+`docs/privacy.html`, `docs/cancellation.html` and `docs/terms.html` went up on 3 September 2026 with their open questions marked on the page rather than filled with guesses. Every gap is in a visible amber box or a square-bracketed `[TO BE INSERTED...]`, so to find all of them at once:
+
+```bash
+grep -rn "TO BE INSERTED\|gapcard" docs/privacy.html docs/cancellation.html docs/terms.html
+```
+
+What each one is waiting on:
+
+1. **Registered office address** (privacy, cancellation, and every page footer). Blocked on a registered office service address, which the founder decided on 3 September 2026 to take rather than publish her home address. It must be an "appropriate address" under the rules in force since 4 March 2024, meaning post reaches someone acting for the company and delivery can be acknowledged, so a PO Box does not qualify. Roughly £30 to £50 a year. Then file an AD01 within 14 days, and change the director's correspondence address at the same time.
+
+   Until it is filed the site carries no address at all, which leaves the Regulation 25 disclosure (part of the UK, registered number, registered office address) unmet on the third element. That is a known and accepted gap, chosen over republishing a home address on all eleven pages of a site fed by a 9,000 follower TikTok. It was briefly published on 3 September and reverted the same evening when the founder chose the service address instead; nothing reached `main`, so it was never live.
+
+   When the address exists, it goes in three places: the footer of all eleven pages in `docs/`, the "who we are" table in `docs/privacy.html`, and the postal route in `docs/cancellation.html`. Find them all with:
+
+```bash
+grep -rn "TO BE INSERTED\|no. 17358077" docs/*.html
+```
+
+   Honest limit worth knowing before you spend the money: a home address used as a registered office cannot be removed from the Companies House register. Filing the change protects the record going forward and historic filings stay visible. Suppressing it from other documents is a separate application at £32 per document, and a serving director has to supply an alternative address to replace it.
+
+2. **ICO registration number** (privacy). Register at ico.org.uk, around £52, then paste the number in.
+3. **Retention periods** (privacy). Legal decision, not a technical one. Identity document retention especially. Do not invent a number to close the box.
+4. **The model cancellation form and the statutory instructions** (cancellation). The text is substantially prescribed by Schedules 3 and 4 of the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. Take it from legislation.gov.uk verbatim and adapt only the company details. Note that legislation.gov.uk is blocked by the remote session's egress proxy, so this one has to be fetched from a normal browser and pasted in. Do not write it from memory.
+5. **Whether United States and Canada clients get the same cancellation rights, and whose law governs** (cancellation, terms). Genuinely open, with the adviser. In the meantime the site applies the 14 day right to every consumer client, wherever they are, as Yaadly's own commitment.
+6. **Liability, the workmanship guarantee and its length, governing law** (terms). With the adviser. The guarantee in particular is not to be promised before it is insured.
+
+Two rules that hold when editing these pages. The consent and provider facts on the privacy page mirror what the code actually does, so if `supabase/functions/_shared/textmodel.ts` moves off MiniMax, or a provider is added anywhere, the provider table and the "two things we will not soften" box change in the same commit or the page is lying. And the whole of `docs/` is subject to the language rules in CLAUDE.md §8: `guardrails.scan` does not read marketing copy, so nothing catches "escrow" or "held safely" on these pages except whoever is writing. Sweep before pushing:
+
+```bash
+grep -rnoiE "escrow|ring-fenc|segregated|held in trust|held safely|zero fraud|removes all fraud|fully covered" docs/*.html
+```
+
+Read the hits, do not just clear them. A DENIAL is the correct use and
+must stay: "Yaadly does not operate an escrow service and does not hold
+money on your behalf" appears on faq, payments, terms and services, and
+deleting it to make the sweep quiet would remove the sentence that makes
+the structure clear to a client. A CLAIM is the fault. As at 5 September
+2026 all six hits in `docs/` are denials and these pages are clean: the
+wrong copy was in CLAUDE.md §8 and in the Reporting agent's prompt, not
+here.
+
+```bash
+grep -rn $'—\|–' docs/*.html   # em and en dashes, banned in copy
+```
+
+**A third sweep, added 3 September 2026: the tradesperson's money must never be described as waiting on the client's click.** Under the principal structure the client owes Yaadly and Yaadly owes the tradesperson, and those two obligations are independent. Copy saying "nobody is paid until you approve" glues them back together, which is the escrow picture the structure exists to avoid, and it is also untrue of the worker, who is Yaadly's subcontractor and gets paid whether or not a client abroad has replied. The client's gate is not removed by this, it is pointed at the right party: their sign-off closes the job with Yaadly and releases the balance they owe Yaadly. Eleven places said the old thing on 3 September and all eleven were changed in one commit. Note the contraction, which is why the sweep is two patterns and not one: `docs/marketplace.html` said "Nobody's paid", not "Nobody is paid", and the first sweep missed it.
+
+```bash
+grep -rniE "(nobody|no one|nothing)('s| is| are)? (paid|charged) until|paid until you|until you release" docs/*.html preview/*.html web/app supabase/functions
+```
+
+Hits on the client's own card ("nothing is charged until you pick one", "authorised at booking") are correct and stay: that is the client's money and the gate genuinely is theirs. Hits describing the *worker* being paid are the bug.
+
+**Run this sweep on every design import, without being asked.** The banned phrasing keeps arriving the same way: a design file is handed over, the page is rebuilt from it, and the old escrow sentence rides in with the visuals because a designer writing plausible copy has no reason to know the principal structure. It happened on `docs/marketplace.html` and was corrected 6 September 2026, and the identical sentence came in again on `docs/how-we-use-ai.html` in commit 32fde56, "The AI page, rebuilt from the Claude Design file", where it sat inside a chat mockup and read as dialogue rather than as policy, which is exactly why nobody spotted it. Two pages, one cause, so treat it as a standing pattern and not a coincidence: rebuilding or importing any page from a design file means running all three sweeps over that page before the commit lands. Mockup dialogue counts. A sentence in a speech bubble is published copy.
+
+The 6 September 2026 pass also found the fault twice inside the client portal, in `web/app/portal/(gated)/jobs/[id]/page.tsx`, which is worth knowing because neither hit was on a marketing page. The client side said "Nothing is invoiced or paid until you decide", where "invoiced" was true of the client's own balance and "or paid" left the tradesperson's money hanging on the client's click. The worker side said "Your pay invoice for this stage is raised the moment they approve it", which is the same fault told to the person it misleads most, and it was also untrue of the code: `raise_job_client_invoice` and `raise_job_worker_payable` are both `is_admin()` only, and the worker payable additionally refuses to run unless the job is already `complete`. A named human at Yaadly raises both. Read those two functions in `supabase/migrations/20260903a_principal_one_client_invoice_and_a_worker_payable.sql` before writing any sentence about when either invoice appears.
+
+**And the sweep must cover the signed terms, not only the marketing pages.** `web/lib/legal-copy.json` is what a client and a worker put their name to, and on 3 September 2026 it still said the client pays the worker directly while the website said the opposite. A contradiction between a marketing page and a signed document resolves in favour of the document, so the terms are the more important half, and they are the half nobody thinks to grep. The same wording was also duplicated inline in `web/app/apply/JoinFlow.tsx` (what an applicant reads before signing anything) and in `supabase/functions/yaad-inbound/faq.ts` (the facts the reply model may state to a real client), so fixing the canonical JSON is never the whole job.
+
+**Changing either guidelines document is a three-part change, and doing two parts is worse than doing none.**
+
+1. Edit the section in `web/lib/legal-copy.json`, and add a `<p class="amend">` saying what changed and whether earlier signatures carry over. The convention set in v1.1 is that they do not.
+2. Bump `WG_VERSION` / `CG_VERSION` and the matching date in the same file.
+3. Add a migration setting `worker_guidelines_version` / `client_guidelines_version` in `app_settings` to the new number, in the same commit.
+
+Skip step 3 and everyone who signs the new text fails the gate on the old number while everyone holding a withdrawn signature keeps passing it, because `match_workers_for_job` and `client_go_live` both compare the signature's `doc_version` to `current_doc_version()` with `=`. That has now happened twice, `20260828e` and `20260901i`. Read the live values before assuming the folder is the truth:
+
+```sql
+select key, value from public.app_settings where key like '%guidelines_version%';
+select doc_type, doc_version, count(*) from public.doc_signatures group by 1,2 order by 1,2;
+```
+
+Anyone whose signed version is not the current one must re-sign before they can be matched to a job or go live. Tell the founder how many people that is before applying the migration, not after. The two live client message templates, `yaad-inbound` (the facts the reply model may state) and `yaad-notify-client` (the booking confirmation), are inside this sweep on purpose, because they are the only copy a real client reads without visiting the site, and a fix that stops at `docs/` leaves the worst offender live.
+
+## Creating the Stripe payment links
+
+There is a script: `scripts/create-payment-links.mjs`, with its prices in `scripts/payment-links.json`. Read the JSON before you run anything, because it is the list of amounts Stripe will actually charge.
+
+```bash
+export STRIPE_SECRET_KEY=sk_live_...          # your own terminal, never a chat session
+node scripts/create-payment-links.mjs          # dry run, creates nothing
+node scripts/create-payment-links.mjs --live   # actually creates them
+```
+
+The URLs land in `scripts/payment-links.out.json` (gitignored). Those are `https://buy.stripe.com/...` addresses: public, safe to paste anywhere, and the thing a session needs in order to wire them to buttons. The secret key is not in that file and must not leave your terminal.
+
+**Why a script and not the Dashboard.** The Dashboard link builder charges the card the moment the client pays and has no hold option. A hold needs `payment_intent_data[capture_method]=manual`, which is API only. Every one-off service on the menu is under £500, and at or under £500 is a hold under the 3 September rule, so the Dashboard is the wrong tool for the entire menu. The hold is what makes "your card is not charged until you approve the work" true, and that sentence is live on three pages.
+
+**Three guards, all tested.** The script refuses to run without a key, refuses a string that is not shaped like a Stripe secret key, and refuses any one-off priced at or above £500 because that is an invoice, not a link. It dry-runs by default even with a live key.
+
+**Re-running is safe.** Every object is created under an idempotency key derived from the service id and its price, so a second run returns the same link instead of a duplicate. Change a price and you get a new link, which is correct: a Payment Link's amount cannot be edited after creation, it has to be replaced and the old one deactivated in the Dashboard.
+
+**A hold is not money in the bank.** A card authorisation lasts seven days on every brand, with no request to Stripe and no special pricing. If nobody captures it in that window it expires and you have to ask the client again. Capturing is a named person's decision on the evidence, never a timer, so the seven days is an operational commitment: work delivered inside seven days can be a hold, anything slower cannot.
+
+**Before running it live, one thing is unresolved.** `docs/services.html` and `public.service_catalogue` disagree on prices. Property Care is the serious one: the site shows £75, £135 and £175, the catalogue holds £45, £70 and £95. Oversight Retainer and Condition Report differ too, and the express tiers and Project Setup Pack exist on only one side. The JSON follows the site, because that is what a client has been shown, and the `_UNRESOLVED` key in it records the conflict. Settling it is a pricing decision and therefore the founder's. Fix both sides in the same change, or the invoice and the payment link will take different amounts for the same job.
+
+## The older note on choosing between Dashboard and API links
+
+Not done, and it cannot be done from a chat session: creating a link needs the Stripe account, and a secret key must never be pasted into one. The founder creates each link in Stripe, hands over the URLs, and a session wires them to the buttons.
+
+Decide this per service before creating any of them, because it cannot be changed on a link afterwards:
+
+- **A Dashboard link** charges the card immediately. Five minutes, no code. It costs the line "your card is not charged until you approve the work", which is a real loss.
+- **An API-created link with `payment_intent_data.capture_method` set to `manual`** holds the card instead of charging it, keeping that line. One API call per link, created once and reused. The Dashboard link builder cannot do this; only the API can.
+
+The recommendation on file is manual capture via the API for the six fixed-price services, because the hold is the differentiator and the links are reusable. Dashboard links are the answer only if money needs to move this week.
+
+The rule underneath the table: work delivered inside seven days is a hold, because a card authorisation lasts seven days on every brand with no request to Stripe. Recurring is a subscription. Long or staged work is a deposit plus stages. Variable trade jobs get invoices, never links, because a link carries a fixed amount and a trade job prices differently every time.
+
+One thing left unresolved for the founder: short jobs paid by hold produce no invoice, and the invoice was the evidence of the principal structure, each one saying the client bought the job from Yaadly. Either raise one separately for the record, or decide the Quote Pack plus a written confirmation carries it. Something has to go out either way, because a written confirmation on a durable medium is required by the distance selling rules.
+
+## Which jobs get an invoice and which get a card hold
+
+Founder's rule, 3 September 2026: **above £500 the job is invoiced. At or under £500 the card is authorised at booking and captured when the client approves the work.** The price of the job picks the instrument. Everything else about the terms, the stages and what each covers, is still agreed in writing per job.
+
+The rule is stated in three places and they must not drift apart: `docs/terms.html` (payment section), `docs/payments.html` (paying for a report or a retainer), and `docs/services.html` (the payment note under the service list). Change one, change all three.
+
+Two things to keep true while you edit them:
+
+1. **The card half is live, as of 5 September 2026.** The eight Stripe links exist and are wired to the booking confirmation. The "not switched on yet" sentence came off all three pages, plus `docs/privacy.html` and `docs/cancellation.html`, in that change. Do not put it back: it now tells a client the opposite of what the page does. An invoice by bank transfer stays available on request at any size, and the pages say that instead.
+2. **"Your card is not charged until you approve the work" is only true on a hold.** It must never appear on, or next to, an invoice job, and it is **false on the Oversight Retainer**, which is a monthly subscription that bills immediately. `docs/services.html` keeps `SUBSCRIPTION_SERVICES` for exactly that reason: it picks which of the two sentences the confirmation shows. That is why the hold sentence is scoped to "at or under £500" and away from the retainer everywhere it appears. Sweep it with:
+
+```bash
+grep -rn "not charged until\|authorised at booking" docs/*.html
+```
+
+This also part-answers the open question about the invoice being the evidence of the principal structure. Above £500 there is always an invoice saying the client bought the job from Yaadly Ltd. At or under £500 there is not, so the written confirmation that goes out at booking has to carry it, and it has to go out anyway to satisfy the durable-medium requirement in the distance selling rules.
+
+## The worker's 12% is displayed but never collected, and the two sides contradict
+
+Found 3 September 2026 while answering "how do I take my fees from the worker". **Needs a founder ruling before any code moves.** Nothing has been changed except the description on `docs/payments.html`.
+
+**What the two sides are currently told, on the same job:**
+
+| Side | What it says | Where |
+|---|---|---|
+| The worker | Your labour price, less Yaadly's 12%, "You receive" 88% | `web/components/QuotePanel.tsx`, `web/components/portal/FeeBreakdown.tsx` |
+| The client | Pay the tradesperson their labour price plus materials, **"no fee added"** | `raise_job_worker_pay_invoice()` in `20260902i`, which totals `labour_jmd + materials_jmd` |
+
+So the client is invoiced to pay him 100% of labour, and he is shown 88%. **There is no mechanism anywhere that collects the 12%**: no invoice type, no `payable_to` value, no function. The number is decorative. Searching for it finds only the two display components above and a label in the desk.
+
+**Why it cannot be fixed by editing the labels.** Under today's live model the client pays the worker directly and Yaadly never touches that money, so "Yaadly pays you 88%" would be false. The display and the invoicing are one decision, not two.
+
+**The two ways out.**
+
+1. **Principal, which the founder chose on 3 September.** One all-in invoice from Yaadly to the client (labour plus the 15%). Yaadly pays the worker labour less 12%. The 12% is never collected because it is never paid out, and Yaadly's margin on a job becomes 27% of labour. This deletes `raise_job_worker_pay_invoice()` as a client-facing document and turns it into a record of what Yaadly owes the worker. It also means Yaadly receives the whole job payment, which is exactly what `docs/payments.html` promises will not happen until legal sign-off and insurance are in hand, so it is gated on that, not on the code.
+
+2. **Stay agent until that gate lifts.** The client keeps paying the worker directly at 100%, and Yaadly bills the worker separately for the 12%. That is legitimate (an invoice for a service rendered to him, not his money passing through Yaadly), but it means chasing a man in Portmore for 12% after he has already been paid in full, with no leverage left. It is the weakest collection position available and it is why option 1 is the recommendation.
+
+Whichever is chosen, the two display components and the desk label at `concierge/concierge.html` (the "Worker 12%, keeps 88%" row) must change in the same commit as the invoicing, or the contradiction just moves.
+
+## The stage worker-pay function is still on the old shape
+
+`raise_job_stage_worker_pay_invoice(p_job, p_stage)` was **not** converted when the whole-job pair moved to the principal structure on 3 September 2026 (`20260903a`). It still computes the old shape: the worker's full labour apportioned by stage, billed to the client, described as "pay them directly".
+
+Until it is converted, do not use it on a job that has been invoiced with `raise_job_client_invoice()`, or the client will be billed twice for the same labour: once inside their all-in invoice and again on the stage document.
+
+Converting it means the same two changes the whole-job version got, plus one more:
+
+1. The amount becomes the stage's share of labour **less 12%**, plus whatever materials rule the existing function applies.
+2. `client_email` becomes the `payable@yaadly.invalid` sentinel and `client_name` becomes Yaadly, so the client cannot read Yaadly's cost base through `invoices_client_read`.
+3. Its stage apportionment reads `kickoff_packs.docs -> payment_schedule -> stages` and falls back to `quote_pack_drafts.docs -> payment_stages`. Read both before touching it. That fallback is the part most likely to be got wrong in a hurry, which is why it was left rather than rewritten in passing.
+
+Check for the old function and its callers with:
+
+```bash
+grep -rn "raise_job_stage_worker_pay_invoice\|raise_job_agency_fee_invoice\|raise_job_worker_pay_invoice" \
+  --include=*.sql --include=*.html --include=*.ts --include=*.tsx . | grep -v node_modules
+```
+
+The first two names should appear only in migration files as history. Any live caller in `concierge/`, `web/` or `supabase/functions/` is a bug.
+
+## Payment as principal is switched on, and what still is not
+
+Founder's instruction, 3 September 2026: legal sign-off and insurance are in hand, move forward with payment. The client now buys the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson. The "not switched on yet" and "pay your tradesperson directly" statements are gone from `docs/payments.html`, `docs/marketplace.html`, `docs/faq.html` (both the visible answer and the structured data), `supabase/functions/yaad-inbound/faq.ts` and `supabase/functions/yaad-notify-client/index.ts`.
+
+**The claim on the site is deliberately hers, and it is narrower than a guarantee.** It says Yaadly reviews the works and makes sure issues are handled. It does not say Yaadly guarantees the work, and it does not state a workmanship guarantee period, because no length has been set and none should be promised before it is insured for that length. The placeholder box on `docs/terms.html` stays until she sets one.
+
+**Two things this did not switch on.**
+
+1. **Card payment.** This was true when written. It stopped being true on 5 September 2026: the links were created, the caveat came off every page, and the booking confirmation now carries a pay button. See "Making the card path visible" below.
+2. **CLAUDE.md section 9** still lists "payment integration of any kind, before the legal review lands" as deliberately not being built. That is now stale. **Monique owns that file and a session must not rewrite it**, so it needs her edit, not ours.
+
+**Redeploy after any change to the assistant's facts.** `faq.ts` and `price-figures.ts` live in `yaad-inbound`, not `_shared`, so `sync-shared.sh` does not copy them. Deploy from disk:
+
+```bash
+supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf
+```
+
+Check the live `verify_jwt` setting with `supabase functions list` first and preserve it: `yaad-inbound` carries its own authentication and takes the flag, `yaad-notify-client` does not.
+
+## The figure guard and the published prices move together
+
+`supabase/functions/yaad-inbound/price-figures.ts` holds `PUBLISHED_POUNDS`, an exact list of every pound figure the assistant is allowed to say. Any figure not on it gets the whole sentence cut before the reply is sent.
+
+This bit us on 3 September 2026: the catalogue price alignment changed the published prices without touching the list, so the assistant would have had "Condition Report from £249" and "Property Care from £45" silently stripped, leaving clients with no price at all. The file's own comment says to update it in the same commit as `faq.ts`. Do that.
+
+The list is now `45, 70, 95, 125, 149, 245, 249, 349, 395, 495, 500, 2500`. Whenever a price on `docs/services.html` changes, this list and `faq.ts` change in the same commit, and `service_catalogue` is the source of truth for all three.
+
+Deno is not installed in every session, so if you cannot run `deno test` in `supabase/functions/yaad-inbound`, the four assertions that matter can be checked directly: every £, J$ and % figure in `FAQ_FACTS` appears in the published sets, and `FAQ_FACTS` contains no em or en dash and no backtick or `${`.
+
+## Making the card path visible
+
+**Done 5 September 2026.** All eight links are live and each of the six bookable services offers one. Founder's report was that she could not book a service by card at all, and she was right: the link only appeared as small text inside a sentence after the form was submitted, and the grey box directly under the form still said card was not switched on. What changed:
+
+- The booking panel says up front that card is available, and the confirmation now carries a full width **Pay for &lt;service&gt;** button rather than an inline link.
+- The caveat came off `services.html`, `payments.html`, `terms.html`, `privacy.html`, `cancellation.html` and `docs/COPY-GUIDELINES.md`.
+- **Two dead options were removed from the booking dropdown.** Project Setup Pack and Document Pack Check were deactivated in the catalogue on 3 Sep and are not in the function's `BOOKABLE` allowlist, so choosing either returned "Pick one of the services on this page." They were unbookable on the live site for two days.
+- **Property Care was booking the wrong tier.** The form always posted `care`, so a villa was recorded at the standard £45 while the pay button asked for £95. It now posts `care`, `care-large` or `care-villa`, matching `BOOKABLE`, and `PAYMENT_LINKS` was rekeyed to the same strings so one service means one key on both sides.
+- **The retainer is a subscription, not a hold**, and the confirmation now says so. It was telling retainer clients their card was authorised and not charged, which was false: it bills the first month immediately and monthly after.
+
+## Changing the Stripe payment links
+
+One place to edit: `PAYMENT_LINKS` near the top of the script block in `docs/services.html`.
+
+```js
+const PAYMENT_LINKS = {
+  deposit:      "https://buy.stripe.com/...",
+  visual:       "https://buy.stripe.com/...",
+  condition:    "https://buy.stripe.com/...",
+  signoff:      "https://buy.stripe.com/...",
+  care:         "https://buy.stripe.com/...",
+  "care-large": "https://buy.stripe.com/...",
+  "care-villa": "https://buy.stripe.com/...",
+  retainer:     "https://buy.stripe.com/..."
+};
+```
+
+Paste a URL against a service and a pay button appears on that service's booking confirmation. Leave one empty and that confirmation reads as it did before, with no button, so there is never a dead button or a half wired payment. **The keys are the service values the form posts, which are the same strings `yaad-book-service`'s own `BOOKABLE` allowlist uses.** They are not the catalogue ids, and they used to be a third set again on the Property Care tiers, which is how the tier bug above happened. If you add a service, add it in both places with the same string.
+
+Add a new subscription link to `SUBSCRIPTION_SERVICES` in the same file, directly below, or its confirmation will tell the client their card is only authorised when it is being charged.
+
+**To check the wiring without writing to the live database**, serve `docs/` and stub the endpoint in the console before submitting the form:
+
+```js
+const real = fetch; window.fetch = async (u,o) => String(u).includes('yaad-book-service')
+  ? new Response(JSON.stringify({ok:true,ref:'SVC-TEST01',emailGiven:true}),{status:200})
+  : real(u,o);
+```
+
+Then book each service in turn and confirm the posted `service` value and the button's `href` agree. Submitting for real creates a `services` row and pushes to the founder's phone, so do not test that way.
+
+**Why the pay link is after the booking and not on the service card.** The card buttons are already claimed by the page's own script, which routes them into the booking form. That form is where the client's name, contact and property go on record, where the reference is minted, and where the cancellation information has to reach them. A card button pointing straight at Stripe would skip all of it, and a client would have paid before Yaadly knew who they were or had given them their 14 day cancellation notice. So the link appears on the confirmation, once the booking exists.
+
+Get the URLs by running `scripts/create-payment-links.mjs` with your own key, per the entry above. Do not create them in the Dashboard: those charge immediately and cannot hold.
+
+**Closed on the booking side, 5 September 2026, and still open on the Stripe side.** The express request to start work inside the client's 14 day cancellation period is now asked for and recorded at booking, which is where `docs/cancellation.html` always said it would be: "we will ask you for that in writing at booking".
+
+**How it works.** An unticked checkbox in the booking panel on `docs/services.html`. Ticking it posts `startNow`, `startNowVersion` and the exact sentence shown, and `yaad-book-service` writes all three into the booking's `notes`, so the record of who asked, and of what they were actually shown, survives the browser. Not ticking is a valid and recorded answer: the note then reads "NO request to start inside the 14 days. Do not begin work, and do not take payment, before the cancellation period has run out."
+
+**The checkbox is deliberately not required.** A tick nobody can decline is not a request anybody made, and a client who does not want an early start is entitled to have the 14 days run. If they leave it alone, the confirmation says so and **no pay button is offered at all**: a card authorisation lasts seven days and the wait is fourteen, so a hold taken then is guaranteed to expire before the job can begin.
+
+**`START_NOW_VERSION` and the wording move together**, same rule as `AI_CONSENT_VERSION` in the apply flow. Reword the checkbox without bumping the version and you silently reinterpret every answer already given. Both live at the top of the script block in `docs/services.html`, next to each other for that reason.
+
+**Stripe checkout now carries its own equivalent, added later the same day**, for the client who is sent a payment link directly and never passes the booking form. It is the section immediately below. The booking form remains the primary route and the only one that covers invoice jobs over £500.
+
+**The express request to start inside the 14 days: done 5 September 2026, on all eight live links.** It was written here as a Dashboard job on each link. It is not: the Stripe API does it in one call per link, and that is how it was done, so there is no eight rounds of clicking.
+
+Each link now carries two separate controls, and the separation is the point.
+
+- **A required dropdown, "When should we start?"**, with no pre-selected answer. Option one is "Start now. I ask you to begin inside the 14 days." Option two is "Wait the full 14 days. The hold may expire and we will contact you.", or on the retainer "Wait the full 14 days before any work starts.", because the retainer is a subscription and holds nothing. This is the express request. It arrives on the Checkout Session as custom field key `starttiming`, with values `startnow` and `waitfourteen`. **Change the labels freely, never the values**, or the answers stop reconciling with the ones already taken.
+
+  The second option names the hold expiring on purpose. The booking form solves the same problem by offering no pay button at all when the client has not asked for an early start, since a card authorisation lasts seven days and the wait is fourteen. A payment link cannot do that: the client is already on the pay page and the dropdown cannot gate the button. So the link says plainly what will happen instead of quietly taking a hold that is certain to die. A client who picks option two on a link should be treated as not yet paid, and contacted.
+- **A required terms acceptance tickbox**, carrying the cancellation wording. Seven links share one message; the Oversight Retainer has its own, because it charges the first month immediately rather than holding, and the shared wording would be false on it.
+
+They are two controls rather than one because bundling the express request into the terms tickbox makes an early start a condition of paying at all. A consumer who wants to wait the full 14 days could then not buy, and an express request that is forced is a weaker instrument than one freely given. Do not merge them back into a single tickbox to save a line on the page.
+
+**Two things are still not finished. Neither is a link change.**
+
+*The account has no Terms of service URL.* Set it at Settings, Public details, in the Stripe Dashboard. Stripe accepts `consent_collection[terms_of_service] = required` over the API without one and renders the tickbox anyway, linked to nothing: checked on the live checkout page on 5 September 2026, the only three links on it are Stripe's own "Powered by", "Terms" and "Privacy". Until the URL is set, the tickbox is an acceptance of a document the client cannot open. The wording was written around that, naming `yaadly.co.uk/cancellation` in plain text rather than claiming a link that is not there, so nothing on the page is untrue in the meantime. `https://yaadly.co.uk/terms.html` is the right target: it is what the tickbox says it is, and it already links to `cancellation.html` twice. Once it is set, reload a live link and confirm a Yaadly link renders beside the tickbox.
+
+*Nothing in this repository reads the answer back.* `starttiming` is captured by Stripe on the Checkout Session and nowhere else. The `services` row is created by `yaad-book-service` before payment and has no column for it, so today the only way to see what a client chose is the Checkout Session in the Stripe Dashboard. That is workable for the pilot and it is a real gap for anything past it.
+
+**To change any of this**, use the payment link API rather than the Dashboard, the same way the links themselves were made: `POST /v1/payment_links/{id}` with `consent_collection`, `custom_text.terms_of_service_acceptance` and `custom_fields`. The eight ids are recoverable with `GET /v1/payment_links`, and each carries `metadata.yaadly_service_id` so you can tell which service it is without matching URLs by eye. Five older links are inactive and deliberately untouched.
+
+---
+
+## Publishing a question somebody asked on /ask
+
+Read this with the section above, which covers a visitor who cannot ask at all. This one is the other half: a question arrived and nothing happens to it until you act.
+
+**Where they wait.** Every question lands in `questions` with `published = false`. The concierge desk shows them under **Inbox, Questions**, and the Overview carries a tile, "Questions to publish", plus an alert while any are waiting, so you do not have to remember to look.
+
+**To publish one.** Open the row, read the whole thing, then press **Publish it**. It goes onto the public page word for word, where anybody on the internet can read it and any vetted worker can answer it. Check it carries no name, phone number, email or address first. The column **Worth a second read** marks anything number-shaped: a run of seven digits is both a local phone number and a price in Jamaican dollars, and the form deliberately lets that through so pricing questions are not blocked, which makes it yours to judge.
+
+**Take it down** removes it from the public page again, along with any answers under it, because an answer is only public while its question is. The row stays for you.
+
+**To leave one.** Do nothing. There is no reject button and no timing promised to the asker, so an unpublished question simply stays unpublished.
+
+---
+
+## 20. The evidence gap list is wrong, or nobody is getting it
+
+The completeness checks run in `yaad-notify-client` when evidence lands on a stage, debounced 90 seconds so a burst of photographs makes one check. They are deterministic, in `supabase/functions/_shared/evidence-checks.ts`, and they read only hard columns. No model is involved.
+
+**They never block anything.** They assemble a list. `approve_stage()` still requires a named human and is still the only door. If a change ever proposes letting these gate a stage or a payment, that is the request CLAUDE.md §3 exists to refuse.
+
+**The worker gets the gaps, the desk gets a push only when there are gaps.** Founder decision, 4 September 2026. A worker still on site can fix a gap in two minutes; the desk cannot.
+
+**If the gap list looks wrong, check in this order:**
+
+1. **Does the job have an approved Kickoff Pack?** The checklist check reads `kickoff_packs.docs.evidence_checklist` where `status = 'approved'`. No pack means no checklist claim, and the check says so to the desk rather than inventing a count.
+2. **Is the stage number right?** The checklist is a list and stage N reads entry N-1, the same convention `stageLabel()` uses. A pack with fewer entries than the job has stages returns nothing for the later ones.
+3. **Is it the clip check?** It reads `evidence.mime`, not the label. A video uploaded with a wrong mime reads as a photograph. That is deliberate: reading the label instead would mean trusting text the worker typed.
+4. **Is it the site note?** That one is desk-only and never reaches a worker. It fires on `arrival_log.far_from_site`, which is 30km from a parish centroid, and a materials run or a bad GPS fix raises it exactly as loudly as a wrong site. It is a glance, not a finding.
+
+**Nobody getting the push at all:** `app_settings.ntfy_topic` is where it goes. Unset, and `ntfyPush()` returns silently by design, because a missing notification must never break the report it rides on.
+
+**The location pin.** A worker sharing a location on WhatsApp lands in `work_log_pins` via `yaad-inbound`. Twilio delivers `Latitude`, `Longitude`, `Address` and `Label` as ordinary inbound parameters; nothing is installed for this. The worker is asked which job it belongs to and the code is always checked, the same rule the evidence lane follows: nothing lands on a job until the worker names it.
+
+**A missing pin is never a gap.** It is a note, and the test suite enforces that. `arrival_log`'s own migration sets the rule, that GPS strengthens the record and never gates it, and it holds here without exception. If a change ever proposes making a pin required, that turns a voluntary thing into an obligation and a worker starts being judged for declining. Refuse it.
+
+**A pin is not a photo geotag and never can be.** WhatsApp re-encodes images on send and discards EXIF, GPS included, and this project's own portal upload path strips location deliberately. There was never a photo geotag to read. Anyone proposing to recover one is proposing something that does not work.
+
+**Two checks remain absent** and should not be added by guessing. "Is this clip long enough" needs a duration column, which does not exist. "Receipts geolocated" needs lat/lon on `evidence` rows, which only `arrival_log` and `work_log_pins` have. Both are schema changes and both are decisions.
+
+---
+
+## 21. A pack is not reaching a client or a worker
+
+Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean draft was approved by a cron and went straight out. Roadmap item 7 of the agent audit removed that, because the guardrail is a banned-word scan and a currency regex, and a clean scan was standing in for a judgement it never made.
+
+**Kickoff Pack.** Built and linked automatically, then waits at `draft`. Approve it in the desk under **Kickoff packs**. Read **Notes for you** first: it is the model's own list of what a project manager must personally verify, and it now renders at the top of the pack for that reason. Payment stages render third because the model picks those percentages and they are Yaadly's commercial terms on the job.
+
+**This one blocks a booking, on the jobs that use it.** `choose_worker()` refuses until the chosen quote's pack is confirmed by both sides, and neither side can confirm a pack nobody has approved. If a client is stuck at "waiting to be booked", check here first. `yaad-kickoff-check` pushes to your phone on every poll where any pack is waiting.
+
+**Since 4 September 2026 most jobs will not have a Kickoff Pack at all.** Accepting a price in the portal calls `agree_quote_as_me` and books on `quote_confirmed`, with no pack anywhere. A pack is ordered only when a client presses "Ask for full project documentation first". So if a job is stuck waiting on a pack, check the client actually asked for one: on the ordinary route the pack queue is irrelevant.
+
+**Quote Pack.** Waits at `ready` in **Quote Pack Drafts**. RLS keeps an unapproved draft off a worker's screen (20260901r), so until you approve it a worker sees no scoping document. He can still quote without one, so this delays a courtesy rather than stalling the board.
+
+**No push arriving?** Both use `app_settings.ntfy_topic`. Unset, and the helper returns silently by design, because a notification must never break a scheduled run.
+
+**Do not restore auto-issue.** If a change proposes it, or proposes approving on a guardrail pass, that is roadmap item 7 being undone. The guardrail cannot read whether a scope is right or a risk register is honest, and the model chooses the payment staging.
+
+---
+
+## 22. A price check looks wrong, or a band has changed
+
+The Price check view in the desk reads bands generated from `yaad/benchmarks.py`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+
+**To change a band:** edit `yaad/benchmarks.py`, then run
+
+```bash
+python3 scripts/gen_price_benchmarks.py
+```
+
+That rewrites the generated block inside `concierge/concierge.html`. Copy the file into `concierge-deploy/public/index.html` and deploy the desk. `tests/test_price_benchmarks.py` fails if the page has drifted from the engine, so a hand edit to the page is caught rather than shipped.
+
+**"No public price exists in Jamaica for this work" is a correct answer**, not a missing row. Painting, masonry, septic and general repair are deliberately empty: four-agent research on 1 August 2026 found no public prices for them anywhere in the country, and that gap is the reason the product exists. Do not fill them with a guess. A test asserts those four stay empty.
+
+**The verdict thresholds** are ported verbatim from `review_quote()`: over 2x the top of the band is a red flag, over 1.3x is worth asking about, under half the bottom is suspiciously low. Coarse on purpose. Six cases are checked against the Python source directly.
+
+**A trade with no band family** simply is not offered in the dropdown. Nine of the eighteen taxonomy trades map onto seeded families; the rest have no benchmark at all, and offering them would imply a lookup that cannot happen. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and checking a fence against it is a wrong reference dressed as a right one.
+
+**Three outcomes, not two, and the difference matters.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. Those report **"say which kind of job"** and list the variants. They must never report "no public price exists", which is the third outcome and is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. A test asserts no mapped trade can fall into the wrong one.
+
+**Nothing here is ever shown to a client or a worker.** `quote_reviews` is admin-only in RLS, deliberately with no party read policy. A band beside somebody's price reads as an estimate, and estimating is QS work, which is the one thing Yaadly does not guarantee.
+
+## Changing anything a customer reads about money, checks or prices
+
+`docs/COPY-GUIDELINES.md` is the source of truth for customer facing wording, across both the marketing site and the app. Read it before writing page copy, and change it first if the underlying fact has changed. See DECISIONS.md, "Two lanes, named" (4 Sep 2026), for why it exists.
+
+**Say which lane it is, before you say anything about money.** A **managed job**: the client buys the job from Yaadly, and Yaadly engages and pays the tradesperson as its subcontractor. **Oversight only**: the contractor stays the client's, the client pays them directly, Yaadly holds none of that money and invoices only its own fee. Almost every contradiction the September audit found came from a page reaching for the wrong one.
+
+**Never write that the client releases, approves or triggers a payment.** They accept the work. Yaadly then pays its own subcontractor, and a named person at Yaadly makes that call. Both halves, every time. The forbidden phrasings are listed in COPY-GUIDELINES section 3, and the reason is legal rather than stylistic: `docs/terms.html` says the client does not contract with the tradesperson, so a client cannot release that person's pay.
+
+**A price appears in more places than you think.** Changing one means changing all of these in the same commit, or the site starts contradicting itself and, where a founding rate is involved, breaks the Digital Markets, Competition and Consumers Act 2024:
+
+1. `docs/services.html`, the card price and the `price-alt` line under it
+2. the `wa.me` prefill message on that same card, which quotes the price in the text
+3. `docs/faq.html`, the "What does it cost?" answer
+4. `docs/index.html`, the owner door, for the two services listed there
+5. `docs/prices.html`, the "What Yaadly charges" table, for fees rather than service prices
+6. `web/lib/.../price-figures.ts`, the exact-figure allowlist that governs what the assistant may say
+7. `service_catalogue` in the database
+
+**A founding rate must be a real reduction.** Never publish one equal to the standard rate. Where there is no discount, write "Fixed fee, the same rate for everyone".
+
+**Never claim a check the database does not enforce.** `trg_profile_publish_checks` is the gate: a Persona identity check approved or completed, a TRN approved, and an email. That is what "nobody is listed before" may claim. The three-referees rule (any job over £500, any occupied home, any job holding keys) is real policy but is operational, not enforced by the trigger, so it is written as policy. If you find copy claiming a video call or that references are called for everyone, it is wrong: that exact wording was live until 4 September 2026.
+
+**One reply promise, site wide:** a person replies within one working day. Not "same day", not "any time", not "day or night", not "24 hours".
+
+**After changing copy on the app side**, run `npm --prefix web run typecheck`, `npm --prefix web test` and `npm --prefix web run lint`. Several tests assert on visible strings.
+
+---
+
+## The reply clock, and what to do when the Overview goes coral
+
+The Overview's first tile is **Oldest thing waiting**. It reads `v_reply_clock`, which lists everything nobody has answered yet, oldest first, across `intake_threads` (WhatsApp, SMS, email, website chat) and `enquiries` (the contact form).
+
+- **Amber** means somebody is waiting and is still inside one working day.
+- **Coral, with an alert row above the tiles**, means the published promise has been missed. Every public page says a person replies within one working day. Clear these first, before evidence and before drafts, because it is the one promise a client can check without your help.
+
+**A thread leaves the clock when you reply from the desk**, not when you read it. `yaad-desk-reply` stamps `first_human_reply_at` once and never clears it, so the number is about the first answer rather than the most recent. An enquiry leaves the clock when its status becomes `replied` or `converted`, stamped by `trg_enquiry_reply_clock`.
+
+**If the tile says "nothing" and you know somebody is waiting**, the row has been answered in a way that did not go through the desk (a reply sent from your own phone, for instance). That is not a bug in the clock, it is the clock telling the truth about what it can see. Reply from the desk, or mark the enquiry, and it will correct itself.
+
+**One working day is 24 hours here**, not a business-hours calculation, because clients are in the UK, the United States and Canada and workers are in Jamaica. The interval lives in `v_reply_clock` and nowhere else.
+
+---
+
+## Pausing the agents, including the one that answers WhatsApp at 2am
+
+The switch is in the top bar of the desk and writes `app_settings.agents_paused`.
+
+**Since 4 September 2026 it reaches `yaad-inbound`**, which is the function that answers WhatsApp, SMS, email and the website chat. Before that it did not, and the desk said so in three places.
+
+What paused actually does:
+
+- No model call happens anywhere, on any path through `yaad-inbound`.
+- The message is still recorded. Photographs and voice notes are still kept and still transcribed, because those build the record you then read.
+- The client is told a person is reading it and given their reference. Nobody is left in silence.
+- The thread is handed to you on their **first** message, not after three turns.
+
+**If you pause and somebody still gets an assistant reply**, check in this order:
+
+1. `select value from app_settings where key = 'agents_paused'` actually says `true`.
+2. The deployed `yaad-inbound` is the current one. `agentsPaused()` should be in it. Redeploy from disk if not.
+3. Whether the reply was really from the assistant, or from the desk, or a Twilio template such as the daily check-in, which this switch does not touch.
+
+**The read fails closed.** If `app_settings` cannot be read at all, inbound treats itself as paused and hands every conversation to you. So a flood of handoffs with no obvious cause is a symptom of the settings read failing, not of the switch being stuck on.
+
+**Do not widen the Settings or Health copy without widening the code.** A switch that claims more than it does is worse than no switch, and that now cuts in both directions.
+
+---
+
+## Renaming a HubSpot deal stage
+
+Stage labels reach clients through deal notifications, workflow emails, exports and any screenshot. **`guardrails.scan` never sees them**, so the banned-language rules are yours to enforce here by hand. A stage called "Funds Held" was live until 4 September 2026 while every page on the site said Yaadly does not hold money on a client's behalf.
+
+To rename one:
+
+1. **Relabel in the HubSpot UI. Never delete and recreate.** Settings, Data Management, Objects, Deals, Pipelines. Relabelling keeps the internal stage ID; recreating mints a new one and every ID in `web/lib/hubspotConfig.ts` goes stale at once.
+2. Update `STAGE_LABELS` in `hubspotConfig.ts` so the file and the portal agree.
+3. If the meaning changed rather than only the wording, rename the key in `DEAL_STAGES` and every use of it, and say why in `DECISIONS.md`.
+4. `npm --prefix web run typecheck && npm --prefix web test`.
+
+**Read the portal before you believe this repository.** On 4 September 2026 `hubspotConfig.ts` said `Funds Held` and the live pipeline already said `Client Paid`, so the stale half was the code. Ask HubSpot for the `dealstage` property on the deals object, or open Settings, Data Management, Objects, Deals, Pipelines. It returns every stage's internal value and its current label.
+
+`presentationscheduled` is the one that matters: it must never carry a label suggesting Yaadly holds anybody's money. It reads `Client Paid`, and `STAGE_LABELS` has been corrected to match.
+
+---
+
+## Drafting a report
+
+`yaad-report` turns the notes you wrote on site into the findings of a draft report. It does not finish it, and it cannot.
+
+1. Write your notes however you like, roughly is fine, and gather the photograph captions. Fewer than 40 characters of notes is refused rather than drafted thinly.
+2. Call the function with `kind` (`deposit_check`, `condition`, `technical_signoff` or `visual_check`), your `notes`, and any `captions`. It writes a `reports` row at `draft` and its `report_findings`.
+3. **Rate every finding** Severe, Moderate or Low. Nothing drafts this and nothing ever will. Your rating is stamped with your email and the time.
+4. **Write the verdict and the page one line.** Same rule.
+5. Move the report to `issued`. That mints its number and records who issued it.
+
+**If it refuses to issue**, the message says which of the three it is: an unrated finding, a missing verdict, or a measurement that survived the scrubber. All three are the gate working. The third one names the offending sentence: reword it in words rather than numbers, or refer it to a surveyor.
+
+**Check the `scrubbed` array on the report.** It lists every measurement the model produced and had removed. A long list means the notes themselves were full of dimensions, which is worth knowing before you sign something that says Yaadly does not measure.
+
+**If the draft comes back thin or wrong**, it is almost always the notes rather than the model. It is forbidden from adding anything you did not record, which is the correct behaviour and will look like laziness the first time. Read the `omitted` list it returns: that is the agent telling you what it could not source.
+
+---
+
+## Reading a job's whole history
+
+`agent_actions` is the append-only record of what the agents drafted and what a named person then decided. `v_job_history` reads one job as a single list, oldest first.
+
+Use it when a client disputes something, when you want to know why a job took nine days, or before any conversation where somebody is going to ask who decided what.
+
+**It refuses to record a consequential action against a machine.** Releasing or withholding funds, refunding, ruling on a dispute, changing a reputation, suspending a worker, approving a job or a stage: all of these require `actor_kind = 'human'` and a real name. "system", "auto", "agent" and an empty actor are refused by the check constraint. If a write fails with `agent_actions_human_only`, the code doing the writing is wrong, not the constraint.
+
+**Nothing can edit it through the API.** Insert, update and delete are revoked from `anon` and `authenticated`. Writes come from the Edge Functions on the service role. That is what makes it worth putting in front of somebody.
+
+---
+
+## Publishing a change to the How We Use AI page
+
+`docs/how-we-use-ai.html` is linked from the footer of all twelve public pages and from the business page. It makes five specific, checkable claims. The function that would falsify each one is named beside it, because that is the point of the list:
+
+1. The invoicing model has no field for an amount. `yaad-invoice`.
+2. The sketch packs cannot state a measurement, stopped in three places. `yaad-sketch`, plus `has_measurement()`.
+3. The report drafter cannot rate a finding or write a verdict, and a report cannot be issued while either is missing. `yaad-report`, plus `report_guard_issue()` in `20260904n_the_report_drafter.sql`.
+4. Identity documents are held back before the file is fetched, with no setting to override. `IDENTITY_DOCS` in `yaad-vetting-review`.
+5. The vision model's severity word and its escalation sentence are kept out of the client's automatic message and sent to the desk instead. `summariseFindings` and `pingDeskOnEscalation` in `yaad-notify-client`.
+
+**If any of those five stops being true, that page becomes a false claim to clients**, which is worse than never having made it. Before changing any of the code named above, read that page and decide which sentence has to change with it.
+
+Claim 5 is the one with a live exception on the page, and the exception is load bearing. A sketch pack *does* carry the severity and the "worth a qualified person looking at this in person" line, and the page says so. What makes that honest is that `yaad-sketch` is admin only end to end, so a pack reaches a client only after a person opened it, read it and released it. **If the sketch pack ever gains a path that reaches a client without `is_admin()` in front of it, that paragraph becomes untrue** and has to be rewritten before the path ships.
+
+The full provider list is still not repeated on that page. It lives on `privacy.html`, and that is the one to update when a provider changes. What the page now does carry is the three that a client would otherwise have to go and find: Mistral in the European Union for text, NVIDIA in the United States for photographs and video, and Cloudflare with United States failover for voice notes. Those three sentences must agree with the table on `privacy.html`; changing a provider means changing both.
+
+---
+
+## What is applied and deployed, as at 4 September 2026
+
+Applied to the database: `agent_actions` and `v_job_history`; `reports`, `report_findings` and their guards; `rate_finding`, `write_report_verdict`, `issue_report` and `v_reports_open`; `enquiries.first_replied_at` with its trigger, and `v_reply_clock`.
+
+Deployed: `yaad-report`, version 1, `verify_jwt` true.
+
+`yaad-inbound` v121 and `yaad-desk-reply` v17 are also deployed, by three way merge rather than by overwriting. Read the next section before you deploy either again.
+
+---
+
+## Deploying a function a parallel session is also working on
+
+This happened on 4 September 2026 and will happen again, because `CLAUDE.md` section 12 says parallel sessions share this tree.
+
+**Never deploy from the repository on the assumption it matches production.** Production had a whole file, `yaad-inbound/trades.ts`, that existed in no branch, and 86 changed lines in `index.ts` adding WhatsApp location pin evidence. Deploying this branch over it would have silently deleted both.
+
+The safe sequence, all of it. Download into a scratch directory, never over your working copy:
+
+```bash
+supabase functions download yaad-inbound --project-ref leffyisvfvjwzilydlwf --use-api
+```
+
+Then three way merge, where the base is the commit your branch started from:
+
+```bash
+git merge-file -L mine -L base -L live <your-copy> <base-copy> <downloaded-copy>
+```
+
+Exit code 0 means it merged cleanly. Anything above 0 is the number of conflicts, and you read every one. Then confirm BOTH sides survived by grepping for something only yours has and something only theirs has, typecheck, run the tests, and only then deploy.
+
+**Preserve the live verify_jwt per function. Read it, do not remember it:**
+
+```bash
+supabase functions list --project-ref leffyisvfvjwzilydlwf
+```
+
+`yaad-inbound` is false and keeps `--no-verify-jwt`, because it carries its own Twilio signature check and origin throttle. `yaad-desk-reply` and `yaad-report` are true and must NOT get that flag.
+
+**A version number moving is not proof the code changed.** Between two checks that day `yaad-inbound` went v114 to v120 and `yaad-desk-reply` v11 to v16, and both sources were byte identical: somebody had redeployed everything unchanged. Diff the downloads before you panic, and before you re-merge.
+
+**The standing risk this leaves.** A bulk deploy with no function named deploys every function from whichever checkout it is run in. Run from a tree without this branch, it discards this work exactly as silently. If two people are working, name the function you mean.
+
+**Prove it after deploying.** Post an empty JSON body to the function and read the code:
+
+- `yaad-inbound` answers 403 with a signature error. Correct: the request reached the code and its own check refused it.
+- `yaad-desk-reply` and `yaad-report` answer 401, missing authorization header. Correct: platform auth stopped it before the code ran.
+- A 503 or a timeout means the bundle did not boot.
+
+---
+
+## Answering the people who are waiting
+
+**Waiting on you**, first item in the Inbox on the desk. One list: WhatsApp, SMS, website chat and contact form enquiries together, oldest first, everybody who has written in and not had a person answer.
+
+It exists because until 4 September the desk knew who was waiting and would not show it. The Overview counted them; acting on the count meant opening Conversations, opening Enquiries and working out which rows were which. A measurement nobody can act on is decoration.
+
+**Red means the promise on every page of the site has already been missed.** A person replies within one working day. Clear red rows before evidence, before drafts, before anything.
+
+**What each row can do:**
+
+- **WhatsApp or SMS.** Reply from here. It goes from the Yaadly number so it continues the chat they already have, marks the thread as yours, and stamps the reply clock, which is what clears the row.
+- **Website chat.** Reply from here. They see it only while that page is open; if they have left, they were given a WhatsApp button carrying the same reference, so watch for them there. The clock is stamped either way.
+- **Contact form enquiry.** There is **no reply lane yet**. Answer it on WhatsApp or by email, then press "I have answered this", which is what clears the row and stamps the clock. It sends nothing.
+
+**Read the "Heard from us" column before you choose who to answer first.**
+
+- `nothing at all` means the automatic receipt never even reached them. It happens when somebody leaves a phone number rather than an email, so there is no address to send a receipt to. They have had complete silence since they wrote, and they should be first.
+- `receipt failed` means we tried and it bounced.
+
+**Somebody who left a phone number and not an email.** Two separate things happen to them, and only one is fixed.
+
+*Answering them is one tap now.* The enquiry email in your inbox carries an **Answer on WhatsApp** button, and the desk row carries **Open WhatsApp to them**. Both open WhatsApp with a first line already written. Neither sends anything, and both go from your own WhatsApp rather than the Yaadly number. When you have actually sent it, press **I have answered this**.
+
+*They are acknowledged now, and it costs nothing.* The form's own success message tells them there is nowhere to send a copy and offers **one tap into WhatsApp**, with their message already written and their name in it.
+
+That is the whole trick, and it is worth understanding rather than just using. WhatsApp refuses free text from a business to somebody who has never written to it. **The moment they tap and say hello, they have written to it**, the 24 hour window opens, and from then on you can answer freely from the Yaadly number with no template and no cost. The problem was never that we could not talk to them. It was that we were trying to speak first.
+
+The desk says **offered WhatsApp** on those rows, and `nothing sent, they must tap first` under it. That is the honest state: they have been told how to reach you and nothing has been sent to them.
+
+*Fully automatic is one Twilio console action away, if you want it.* Set `TWILIO_CONTENT_SID_ENQUIRY_RECEIPT` to an approved template and `yaad-enquiry` sends the receipt itself, with no tap needed, and the desk says **WhatsApp receipt** instead. Until the secret is set nothing is sent, the same as the daily check-in. Submit it as **Utility**, with one variable, the name, and wording that reads as a receipt:
+
+> Thanks {{1}}, your enquiry reached Yaadly. Monique replies within one working day. You can reply here any time.
+
+**Do not reach for SMS instead.** `TWILIO_SMS_FROM` is unset, SMS bills per message, and wiring a paid send to a form open to the internet is an open relay that charges you. The throttle comment already in `yaad-enquiry` makes that argument about email; it is sharper for SMS.
+
+**Do not "fix" this by sending automatically from the public form.** The contact form is open to the internet and its throttle exists because, in the words already in this repository, without a per-recipient cap it is an open relay pointed at whoever somebody names. That reasoning was about email. It is worse for SMS, which costs you money per message somebody else chose to send.
+
+---
+
+## The evidence sections
+
+**What they are.** Since 5 September 2026 a job's evidence is read in five sections rather than as one pile: **before**, **during the work**, **problems found**, **after**, and **materials on site**.
+
+The first four are on `evidence.phase`, set by the person filing the item in answer to a direct question. Nothing infers it from the caption. The fifth is not a phase at all: materials has lived on `evidence.kind` since 20260828c, because filing it is what moves the risk in the materials to the client, and the database refuses a phase on it. The words are defined once, in `web/lib/portal/evidence-sections.ts`, so the client page, the Completion Report and the upload forms cannot drift into three different vocabularies.
+
+**Where a worker answers it.**
+
+- *Portal, photo:* a Before / During the work / A problem found / After dropdown next to the label, defaulting to Not marked.
+- *Portal, video:* the same dropdown on the video upload form.
+- *WhatsApp:* after the job code and the "what does this show" question, the worker is asked `Which is this? Reply B for before, D for during the work, A for after, or P for a problem you found. Reply N if it is none of those.` Only that reply is read as the answer. The parser accepts the full words too, and takes I or "issue" as well as P.
+
+**It never blocks anything.** An answer that is none of them files the evidence unmarked and tells the worker so. Nothing is refused, no stage is held, and a stage can still be approved with no before on file. That is deliberate: whether a missing before should ever stop an approval is a decision for Monique, not a default.
+
+**A problem found is not a quality score and must never be reported as one.** A worker who photographs rot behind a panel is doing the job properly. The desk tile counts them and is deliberately left uncoloured, because a green tick on a low number is an instruction to stop reporting them. What the count is actually for is spotting a stage carrying several, which is a stage where the job has stopped being the job that was quoted.
+
+**Where to see it.** Client portal, grouped under headings on the job page, with a badge on each card and a line in "Show the record for this stage". Completion Report, on the evidence index line. Client's WhatsApp report, in the `Items:` line as `A1 (before), A2 (problem found), A3 (after)`. Admin desk Overview, the **Before and after on record** and **Problems found on site** tiles.
+
+### If the Before and after tile reads 0% and you think that is wrong
+
+It is almost certainly right. The tile reads `evidence_completeness.with_before_and_after`, which reads `evidence_at_signoff`, which reads the **snapshot taken at approval time**, not the evidence table. So:
+
+1. Nothing signed off before 5 September 2026 can ever count. No phase was declared then, and backfilling one would be inventing history. Expect a low number for a while.
+2. A phase declared on a photograph **after** its stage was approved does not count towards that approval, on purpose. Same rule as the item count and the arrival log.
+
+Check what a given sign-off actually holds:
+
+```sql
+select job_id, stage, items, has_before, has_during, has_after, issues, before_and_after
+  from public.evidence_at_signoff order by approved_at desc limit 20;
+```
+
+### If a worker says the database refused their upload
+
+The only phase-related refusal is a **phase on materials evidence**, which the constraint `evidence_phase_chk` rejects. Materials is a custody record and a section in its own right, not a part of the work. Both portal forms disable the dropdown when Materials is chosen, and both server paths drop the value, so this should only ever be reachable by a direct API call. Note that a materials upload on a job where the client has never named a store is refused for a different reason entirely, by `trg_evidence_materials_needs_store`, and that message says so in words worth reading. Check with:
+
+```sql
+select id, job_id, kind, phase from public.evidence where phase is not null and kind = 'materials';
+```
+
+That should always return nothing.
+
+### One known consequence: abandoned uploads leave files behind
+
+A worker who sends photographs over WhatsApp and then never answers the
+questions leaves those files staged in the evidence bucket under `_pending/`.
+The session is dropped after 48 hours and the files are not. This predates the
+before/after step, which adds one more place a worker can walk away mid-flow.
+Nothing cleans `_pending/` on a schedule yet. It is storage cost and clutter
+rather than a data protection problem, since the bucket is private and nothing
+outside it links to those objects, but it should be swept eventually. Look at
+what is sitting there with:
+
+```bash
+supabase storage ls ss:///evidence/_pending --project-ref leffyisvfvjwzilydlwf
+```
+
+### After changing anything in this area
+
+Run the rig, which proves a phase declared after a sign-off cannot improve it:
+
+```sql
+\i supabase/tests/evidence_phase_guards.sql
+```
+
+Nine checks, all should read PASS. Then redeploy `yaad-inbound`, `yaad-notify-client` and `yaad-evidence-video`, which all write or read the column.
+
+The rig reports through `raise notice`, which psql shows and the Supabase MCP does not. To run it through the MCP instead, replace the temp table `t` with a real one, select from it at the end, and drop it. That is how it was run on 5 September 2026.
+
+**Applied to production 5 September 2026**, as `20260906000700_a_photograph_says_which_section_of_the_job_it_belongs_to.sql`, in three parts: the column and its constraint, the snapshot in `_do_approve_stage`, then the two views. All nine checks passed against live and the rig left no rows behind.
+
+---
+
+## A client asked for a worker by name and nothing seems to have happened
+
+The button on a worker profile records the request on the job row and holds
+the job off the open board for 48 hours so only that worker can price it. Work
+through it in this order.
+
+1. **Is it on the row at all?** In the desk, Jobs, find the job. The Worker
+   column shows an amber "asked, held for them" chip with the worker's address
+   under it while the hold is live. If it says nothing, the request never
+   landed: either the client did not arrive through a profile page, or the
+   slug did not resolve to an ACTIVE worker profile. `yaad-post-job` drops a
+   request it cannot resolve rather than recording a name nobody vetted.
+2. **Did the worker get told?** The message fires when the job goes LIVE, not
+   when the draft is saved, so a job still sitting as a draft has correctly
+   told nobody. There is no per-notification log on this path:
+   `yaad-notify-client` does not write `message_deliveries`, only
+   `yaad-desk-reply` does, so do not go looking for a row that was never
+   written. Check two things instead. First, does the worker have a phone
+   number on their profile: without one there is nobody to send to and the
+   function stops quietly. Second, the Supabase logs for `yaad-notify-client`
+   around the time the job went live, which is the only place this send leaves
+   a trace.
+3. **The worker cannot find the job.** It is deliberately NOT on the open
+   board while the hold is live. It appears at the top of app.yaadly.co.uk/jobs
+   for that worker only, in a gold panel, and only when they are signed in and
+   count as an approved worker (published profile plus a signed Worker
+   Guidelines). If they are signed in and see nothing, check those two things
+   first: the panel reads `my_requested_jobs`, which matches on their own
+   signed-in email.
+4. **Another worker says they cannot quote it.** That is the hold working. The
+   refusal message names the date and time it opens up.
+5. **The client needs it opened now.** Either ask the worker to press "Pass on
+   this job", or at the desk set `request_state` to `declined` on the job row.
+   Either opens it to the board immediately; the desk route does not message
+   the client, the worker's own route does.
+
+The window is 48 hours and it lives in ONE place: `public.request_is_live` in
+`20260905a`. Change the interval there and every gate follows. Nothing has to
+run for a hold to lapse, so there is no cron job here to check.
+
+## Putting a worker's photograph, video and work on their public profile
+
+Nothing is published automatically, ever. Order matters.
+
+1. **Ask them, and record the answer.** Applicants answer on the last screen
+   of /apply. For anybody who joined before that question existed, ask them
+   yourself, then in the desk, Workers, open the row and use "Record their
+   answer about a public profile". The Public profile column shows "never
+   asked" until you do. Do not record granted on somebody you have not asked.
+2. **Look at the files.** Open the worker's row in the drawer. Under "public
+   profile" each candidate file has an "open it" link, signed for an hour,
+   pointing at the private original. Opening one publishes nothing.
+3. **Publish.** "Put their photograph, video and work up" copies each file
+   into the public showcase bucket and records your address against it. It
+   refuses if consent is not granted, and it refuses if it cannot tell who is
+   signed in, because the record of who published it is the point.
+4. **Check it.** Open `app.yaadly.co.uk/workers/<slug>`. The photograph
+   replaces the initials block, the video appears as "<name>, in thirty
+   seconds", and the work photos appear as "Work <name> showed us", above the
+   evidence portfolio and labelled as not carrying the evidence trail.
+
+**To take it down.** If they ask you to remove it, do BOTH: "Take their public
+profile down", which deletes the copies and the rows, AND record their answer
+as declined. Recording declined alone empties the profile immediately (the
+view re-tests consent on every read) but leaves the files sitting in a public
+bucket. Deleting alone leaves their answer saying granted, so the next publish
+would put it all straight back.
+
+**Why a copy and not a link.** The vetting originals are destroyed ninety days
+after they arrive, which is what the applicant was promised. A profile served
+out of that bucket would work for three months and then go blank. The published
+copy is a separate file in a separate bucket and is not on that clock.
+
+**What can never be published.** Only three doc types are eligible:
+`profile_photo`, `intro_video`, `portfolio`. The photo ID, the selfie, the face
+turn, proof of address, the TRN, the CV and the certificates are vetting papers
+and are not even fetched by the desk's preview. Widening that list is a legal
+decision, not a tidy-up.
+
+---
+
+## The one-tap link in a booking email did not sign somebody in
+
+The service booking receipt carries a single-use sign-in token (`?t=` on the `/portal/join` link, minted by `oneTapJoinLink()` in `yaad-notify-client`). Symptoms and what each one means:
+
+1. **"That link has expired, or it has already been used."** Normal and expected. The token is single use and short lived, so a link tapped days later, or tapped twice, lands here. Nothing is broken: the email form on that same screen sends a fresh sign-in code and that path is unchanged. Tell the client to type their email on the page they are already looking at.
+2. **The receipt has no `&t=` on its link at all.** Token minting failed and the function fell back to the plain join link on purpose, so the receipt still went. Look for the `auth.one_tap_link` span on that request; it records the actual reason. Everything still works, with one extra step.
+3. **"You are signed in, but that job code would not attach to your account."** Auth worked and `claim_code_as_me()` refused. Usually the booking already carries a different `client_email`, or the rate limiter in `portal_code_attempts` has tripped after five failures in fifteen minutes. Check `services.client_email` against the address the receipt went to.
+4. **Never test a real token twice.** Spending it is the point. To retest, have the desk re-send the receipt, which mints a new one.
+
+The token is deliberately removed from the address bar on arrival, so it will not be in the client's history or in a screenshot they send you. Ask for the email instead, not the link.
+
+---
+
+## Checking the database and the repository still describe the same thing
+
+Symptom you are trying to avoid: the repository looks complete, and a rebuild
+from it produces a database that is missing something nobody noticed was only
+ever in production. It has happened three times, on 3, 4 and 5 September 2026,
+the last time to `is_admin()` and to the event trigger that switches row level
+security on for new tables.
+
+The cause is not carelessness. SQL applied through the Supabase MCP goes
+straight to the database and writes no file, and nothing afterwards reconciles
+the two. `scripts/check-deploy-drift.sh` does this job for Edge Functions.
+There is no equivalent for the schema, so it is done by hand.
+
+**1. The offline half, no credentials needed, catches the worst cases.** Every
+function a migration calls should be defined in a migration:
+
+```bash
+grep -rhoiE 'create table (if not exists )?(public\.)?[a-z_]+' supabase/migrations/ \
+  | grep -oiE '[a-z_]+$' | sort -u > /tmp/tables.txt
+grep -rhoE '\bpublic\.[a-z_]+\(' supabase/migrations/ | sed 's/public\.//; s/(//' | sort -u > /tmp/called.txt
+comm -23 /tmp/called.txt /tmp/tables.txt | while read -r fn; do
+  grep -rqiE "function[[:space:]]+(public\.)?${fn}[[:space:]]*\(" supabase/migrations/ \
+    || echo "called but never defined: $fn"
+done
+```
+
+The table subtraction matters: without it the check reports every table a
+migration writes to and nobody reads it twice. `is_admin` printed here for
+weeks and nobody ran it.
+
+Read what it prints carefully, because it catches two different faults. A
+FUNCTION name is the case above. A TABLE name means that table is written to
+by a migration and created by none, which is the same drift one level up and
+is the state this repository is in: on 5 September 2026 `jobs`, `evidence`,
+`job_quotes`, `applications`, `app_settings`, `kickoff_drafts` and
+`kickoff_packs` all printed. See DECISIONS.md.
+
+**2. The live half, needs the MCP or the SQL editor.** List every function in
+`public` and compare against the same grep. In the SQL editor:
+
+```sql
+select string_agg(p.proname, ',' order by p.proname)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prokind = 'f';
+```
+
+**What to do with a gap.** Read the definition back out and commit it as a
+recovery migration, transcribed rather than rewritten, saying in the header
+that it is transcribed and untested because production already has it:
+
+```sql
+select pg_get_functiondef(p.oid)
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.proname = 'the_function_name';
+```
+
+Grants have to be read separately, with `has_function_privilege`, because
+`pg_get_functiondef` does not include them. A recovered function with no grant
+line is a function nobody can call after a rebuild.
+
+**Do not run a recovery migration against production.** It is written to be a
+no-op there and it should stay unrun, because an event trigger recovery has to
+drop and recreate the trigger, and there is no reason to open that window on a
+live database to prove a file you can read.
+
+## Changing which vision model reads photographs, and where it runs
+
+Three functions send images to a model: `yaad-notify-client` (the evidence
+photo review, `photo_review` in telemetry), `yaad-sketch` (walkthrough stills)
+and `yaad-vetting-review` (an applicant's supporting paperwork, never their
+identity documents). Since 5 September 2026 all three resolve the provider,
+the key and the model through `supabase/functions/_shared/visionmodel.ts`, the
+same way text goes through `textmodel.ts`. No function types the endpoint out
+itself, and CI fails one that does.
+
+**Move one job without touching the others.** Each has its own secret, read
+first, falling back to the shared `NVIDIA_VISION_MODEL` and then to a default:
+
+```bash
+supabase secrets set NVIDIA_EVIDENCE_MODEL=meta/llama-3.2-90b-vision-instruct --project-ref leffyisvfvjwzilydlwf
+```
+
+`NVIDIA_EVIDENCE_MODEL` is the evidence review, `NVIDIA_SKETCH_MODEL` the
+walkthrough stills, `NVIDIA_VETTING_MODEL` the paperwork. Secrets are read at
+call time, so no redeploy is needed. `NVIDIA_VISION_MODEL` still moves all
+three at once if that is what you want.
+
+**Decided 5 September 2026: the evidence review runs on
+`meta/llama-3.2-90b-vision-instruct`.** `NVIDIA_EVIDENCE_MODEL` is set to it on
+the project. Founder instruction, on being shown that the smallest model was
+reading the evidence by accident. The same id was already the live default for
+the sketch pack and the vetting read, so it is known good on this NVIDIA
+account rather than newly chosen. Watch the first few stages: 90b is slower
+than 11b, each photo has a 25 second timeout, and a timeout is retried once and
+then leaves the AI paragraph out of the client's report rather than delaying it.
+If timeouts show up in the logs, `mistral-medium-latest` is not an option here
+(it is the text provider), so the move would be back to a smaller vision model
+or on to a different provider through `VISION_MODEL_API`.
+
+**Why it needed deciding at all.** The evidence
+review defaulted to the 11b checkpoint while the other two defaulted to 90b,
+which nobody chose; it happened because all three shared one secret and had
+different fallbacks, and `NVIDIA_VISION_MODEL` was never set on this project so
+every job sat on its own default. The defaults were kept exactly as they were so this change
+altered no behaviour on the day it landed. Setting `NVIDIA_EVIDENCE_MODEL` is
+how that gets decided on purpose. This is the vision call standing closest to a
+stage approval, so it is worth deciding rather than inheriting.
+
+**Moving off NVIDIA entirely, to a provider in another country.** Set
+`VISION_MODEL_KEY` and `VISION_MODEL_API` (any OpenAI-compatible vision
+endpoint), plus `VISION_MODEL_PROVIDER` and `VISION_MODEL_REGION` so telemetry
+records where the images actually went. Those take priority over everything
+else and need no deploy. Do not add a branch to `visionmodel.ts` instead: a new
+hard-coded provider is a new country receiving personal data, which is a
+founder decision and a line in the data inventory before it is a code change.
+
+**To check what is set now:**
+
+```bash
+supabase secrets list --project-ref leffyisvfvjwzilydlwf
+```
+
+**If reviews stop appearing.** With no provider configured the callers now fail
+loudly rather than silently skipping: the evidence review logs
+`yaad-vision: No vision model is configured`, and the sketch and vetting
+endpoints return that sentence with a 500. NVIDIA's hosting is also uneven,
+confirmed live on 3 September 2026 across three calls in a row: a clean 15
+second answer, a request that ran past 35 seconds with nothing back, and a flat
+500 immediately after. A timeout or a 5xx is retried once. A refusal or an
+unparseable answer is not, because asking again does not fix it. Every vision
+span now carries `yaadly.model.region`, so which country a photograph went to
+is answerable from telemetry rather than from memory.
+
+## The staging prefix in the evidence bucket, and the sweep that empties it
+
+`yaad-inbound` puts an inbound WhatsApp photo or video into
+`evidence/_pending/<uuid>` the moment it arrives, before it knows which job it
+belongs to. When the worker answers the job code and the "what does this
+show" question, the file is MOVED to
+`<job_id>/<uuid>`. A move is a rename, so a filed item leaves nothing behind.
+
+Anything still under `_pending/` is a photo somebody sent and then never
+answered for. Until 5 September 2026 nothing removed those.
+
+### Look at what is there
+
+```bash
+supabase storage ls "ss:///evidence/_pending/" --experimental --project-ref leffyisvfvjwzilydlwf
+```
+
+`{"paths":[]}` means the prefix is empty, which is the normal state. Objects
+appear only while a conversation is mid-flight, or when one was abandoned.
+
+### Ask the sweep what it would delete, without deleting anything
+
+Signed in as an admin, from the desk's browser console, or with any admin
+session token:
+
+```bash
+curl -s -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-evidence-sweep -H "Content-Type: application/json" -H "apikey: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz" -H "Authorization: Bearer <your admin session token>" -d '{"dry_run": true}'
+```
+
+It answers with `staged` (everything in the prefix), `held_by_live_session`
+(paths a conversation touched in the last 72 hours still names, which are never
+touched), `would_delete`, `would_drop_sessions`, and a `sample` of up to ten
+paths. Drop `"dry_run": true` and it does it.
+
+### The schedule
+
+pg_cron runs it at 04:23 UTC daily, an hour clear of `yaad-vetting-purge` at
+03:17. Same secret-hash pattern: the job presents a secret and the function
+checks it against `app_settings.evidence_sweep_cron_secret_sha256`. See
+`20260906013700_the_staging_prefix_gets_a_sweep.sql`.
+
+Proof it is on:
+
+```sql
+select jobname, schedule, active from cron.job where jobname = 'yaad-evidence-sweep';
+select status_code, content, created from net._http_response order by created desc limit 5;
+```
+
+To rotate the secret, re-run the `do $do$ ... $do$;` block in that migration.
+It overwrites the hash and reschedules the job in one transaction.
+
+### What it will not delete
+
+An object goes only when it is older than 72 hours, no intake session updated
+in the last 72 hours still names it, and no `public.evidence` row carries it as
+`storage_path`. 72 rather than 48 so it can never race a live conversation.
+Nothing it touches is a job, a piece of filed evidence, money or a Yaad Score.
+
+It also deletes the abandoned evidence session row itself. That is not tidying.
+`yaad-inbound` means to drop a stale evidence session at 48 hours, but the
+branch that does it sits after the evidence branch and is never reached, so the
+row lives forever. If the files went and the row stayed, a worker coming back on
+day five would be asked what their photo shows, answer, and be told "Confirmed,
+but nothing saved properly". Removing both means they are simply read fresh.
+
+### If it starts finding hundreds of objects a night
+
+That is workers abandoning the evidence conversation, not a bug in the sweep.
+Read it as a product signal: the job code question or the "what does this
+show" question is losing people. The count is in the
+trace attribute `yaadly.sweep.deleted`.
+## The evidence email goes once per stage
+
+A client gets one "evidence has landed" email per job and per stage. Not one
+per photograph, and not one per batch.
+
+Two separate mechanisms do that, and they solve different problems:
+
+1. **The burst debounce** (`20260831zzzz6`). Every evidence insert resets a 90
+   second quiet timer. Five photos sent back to back over WhatsApp produce one
+   email, ninety seconds after the last of them.
+2. **Once per stage** (`20260906015600`). A second batch filed an hour later on
+   the same stage lands silently, because that stage has already been emailed
+   about. Added because tagging photographs by phase (`20260906000700`) makes
+   two batches per stage, a before and later an after, the ordinary shape of a
+   job rather than the exception.
+
+The cost, stated so nobody is surprised by it: a client who reads the email
+when the before lands and never looks again is not pinged when the after
+arrives. That is deliberate. Two emails carrying the same sentence about the
+same stage is how people learn to ignore both.
+
+### Checking it
+
+```sql
+select job_id, stage, created_at, fired_at, notified_at from public.evidence_landed_pending order by created_at desc limit 10;
+```
+
+Exactly one row per job and stage should have `notified_at` set. `fired_at` is
+stamped on every timer that gets dealt with, including ones cleared silently
+because the stage was approved or disputed inside the 90 seconds, so it is not
+the column that answers "was the client told".
+
+### If the client says they were emailed twice anyway
+
+Check that `yaad-evidence-landed-check` has actually been redeployed since
+5 September 2026. The suppression only works when it passes `p_notified` to
+`mark_evidence_landed_fired`. The older deployed copy passes only `p_id`, which
+defaults to false, records no sends, and therefore suppresses nothing. That
+fallback is deliberate: it fails towards the old behaviour rather than towards
+silence.
+
+## A new find is not a problem, and an after answers a named before
+
+Two additions to the five sections `20260906000700` put on every stage.
+
+### The fifth section: something new found
+
+`evidence.phase` now takes **`new`** as well as before, during, after and
+issue. The split matters because it is the difference between a problem and a
+bill:
+
+- **A problem with the work** is something wrong inside work that is already in
+  scope and already priced. Putting it right is included.
+- **Something new found** was never in the job at all. Nobody has quoted it and
+  nobody has agreed it, so it may change the price or the timeline, and that is
+  agreed with the client in writing first.
+
+Before this, `issue` carried both, and the client-facing note under it read
+"not part of what was originally quoted", which was only true of half the
+things filed there.
+
+On the desk a new find shows coral (blocked, because it stops until somebody
+decides) and a problem shows mango (held).
+
+### The after names the before it answers
+
+On WhatsApp the worker adds the code to the same reply: `A P3`. `P3` is the
+item code every evidence item already carries (`20260831zzzz2`). The question
+only offers this when the job actually has a before to point at, and it names
+the codes:
+
+> Which is this? Reply B for before, D for during the work, A for after, P for
+> a problem with the work, or N for something new you found that was not in the
+> job. Reply S to skip. If it is the after for one of the befores on this job
+> (P3, P5), put its code after the letter, like "A P3".
+
+**N used to mean "none of those" and now means "new". Skipping is S.** If a
+worker replies N expecting to skip, their photo is filed as a new find. Correct
+it from the desk. The letter moved because "N for new" is the mnemonic that
+matches the word, and skipping is the rarer answer.
+
+A code that names nothing on the job never blocks the filing. The evidence
+lands, and the reply says it could not find that code, so the desk can link it
+without the worker resending anything.
+
+In the portal, picking After on the upload form reveals a second dropdown
+listing that job's befores. If there are none it says so rather than silently
+filing an unpaired after.
+
+The client sees the comparison inside the After card: a thumbnail of the before
+it answers, captioned "Answers P3". The before is not drawn twice; it appears
+once in its own section and at thumbnail size here. A before that has an after
+against it says "Answered by P7" rather than looking like it is still waiting.
+
+### The WhatsApp message names the stage
+
+Every job in the "which job is this for" list carries the stage it is on, and
+the confirmation names the stage in full from the approved kickoff pack: "Got
+it, that's for JOB-1042 (Bathroom retile), stage 3, First fix. Anything you
+send now files against that stage."
+
+A worker on site does not know which stage the job is sitting on and the stages
+move while they are working. They should know where a photograph is going
+before they send it. The proportion of the money a stage carries is stripped
+out of that sentence on purpose.
+
+### Correcting a wrong answer
+
+Evidence view on the desk, "Correct which section this is". It changes the
+section and, for an after, which before it answers. It stamps your address and
+the time, and the row then reads "corrected by ...". The image, the description
+and the fingerprint are never touched.
+
+There is deliberately no way to change it without leaving your name on it. A
+worker's answer is their claim about their own photograph, not a ruling, so
+correcting one is ordinary. Doing it silently would not be.
+
+Materials is refused a section, here and everywhere: it is its own thing on
+`evidence.kind` and the database constraint will not take a phase on it.
+
+## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
+
+The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
+It is imported by `yaad-sketch` and `yaad-report`, and the identical text sits
+inside `has_measurement()` in the database. The refusal message quotes the
+sentence it objected to. Read that sentence against what the rule catches:
+
+- a number in digits, with or without a hyphen, followed by a unit of length
+  or area: m, cm, mm, km, metre(s), meter(s), ft, ft2, foot, feet, yd(s),
+  yard(s), inch(es), acre(s), sq ft, sq m, square metres, m2, m²
+- a number written as a word (one to ninety, half, quarter, "two and a half")
+  followed by metre(s), foot, feet, inch(es), yard(s)
+- a feet or inch mark after a digit: 6', 8", 6'6"
+
+Not caught, on purpose: a bare "in" ("1 in 5 tiles"), and "meter" or
+"meters" after a number WORD, because "two meters on the outside wall" is the
+electricity meter. Digits still catch "3 meters".
+
+If the sentence is a real measurement, reword it in words ("a full height
+crack", "most of the ceiling") or refer it to a surveyor. If it is a false
+positive, do not widen the exception by hand. Add the sentence to the case
+list in `measurements_test.ts` as a clean case, watch the test go red, and
+then change the pattern in `measurements.ts`. The same string then has to go
+into a new migration inside `$re$` dollar quotes, because the test reads the
+newest migration that defines `has_measurement()` and fails if the two differ
+by one character. That is the point of it. Then run
+`supabase/functions/sync-shared.sh` and redeploy `yaad-sketch` and
+`yaad-report`, or the thing you tested is not the thing that is running.
+
+Verify the live database is on the repo's pattern without reading it by eye:
+
+```bash
+md5 -q <(deno eval 'import {MEASUREMENT_PATTERN as A} from "./supabase/functions/_shared/measurements.ts"; Deno.stdout.writeSync(new TextEncoder().encode(A))')
+```
+
+and compare with `select md5(split_part(pg_get_functiondef('public.has_measurement(text)'::regprocedure), '$re$', 2))`. Same hash, same rule. Set 5 September 2026, the day the rule was tested by hand for the first time and let "a 2-metre crack" through every layer.
+
+## Describe the stills hangs, then the desk says 504 or nothing at all
+
+Seen on the first real walkthrough, 5 September 2026 at 23:22 and 23:40. The
+edge log showed a 504 and then a 546 for `yaad-sketch`, and the function log
+showed nothing from the function itself, because NVIDIA took the request and
+never answered it and the fetch had no deadline, so the platform killed the
+function before the code got control back.
+
+Fixed 6 September 2026, two halves:
+
+- `yaad-sketch` "frames" now gives NVIDIA forty seconds, tries once more on a
+  timeout or a 5xx, and logs `yaad-sketch frame: nvidia gave no answer in 40s`
+  when it happens. Two goes fit inside the platform limit with room to answer.
+- The desk sends three stills per call instead of six. Same twelve stills,
+  four calls instead of two, each one well inside the deadline. Deployed with
+  `npm run deploy --prefix concierge-deploy` after copying the source in.
+
+If it still hangs: the log line above tells you it is NVIDIA and not us. Drop
+the still count to eight, or try again in a minute. The stills are still on
+the machine; nothing has to be pulled again.
+
+**What to film so the pack comes out right.** Twelve stills spaced evenly
+through the video is what the desk pulls, so the video has to be the kind
+twelve evenly spaced stills can describe: one slow walk, every room entered,
+a few seconds standing in each, phone held level and landscape, lights on,
+doorways in shot as you pass through them, because "connects to" is read from
+what is visible. Do not film the house number, any paperwork or anybody's
+face; the prompt is told to refuse those and the frame is wasted. A shaky
+thirty second sprint gives twelve blurred stills and a pack of "too blurred to
+judge".
+
+## The text model says 401 Invalid API Key
+
+Seen 5 September 2026 at 23:23 and again 6 September at 07:03, on
+`yaad-inbound` and on the RUNBOOK §9 proof call. Every text agent is out
+while this is true: every WhatsApp reply, every draft, every report. It is
+not a rate limit, and no retry or fallback helps: a 401 is refused the same
+way every time and the failover deliberately does not catch it.
+
+```bash
+supabase functions logs
+```
+
+is not a command in this CLI version. Read the log with the Supabase MCP
+`query_logs` tool or the dashboard, filter `function_logs` for
+`mistral http 401`.
+
+The fix is the key, nothing else: a live key from the Mistral console, set as
+`MISTRAL_API_KEY`, then the §9 proof call until `read` stops being null.
+Yaadly never sees the key value in chat, so this step is Monique's.
+
+## 25. The site inspection report will not build
+
+The desk flow is Pull the stills, Describe, name the rooms, Build the pack, Add the map. Each step fails in its own way, and the log names which. Read it with the function id for `yaad-sketch`, or `supabase functions logs yaad-sketch --project-ref leffyisvfvjwzilydlwf`.
+
+- **Pull the stills says MP4 only, or every still is black.** The video is an iPhone .mov (HEVC). Send it to yourself on WhatsApp and use the copy that comes back, which is an MP4. No code is involved.
+- **Describe stops on one still, or says N of 12 described.** The log line `yaad-sketch frame:` says what the model answered. "not in JSON, asking once more strictly" is normal and self-healing. "not in JSON, twice" on many stills means the model has changed behaviour; check `NVIDIA_SKETCH_MODEL` and the default in `_shared/visionmodel.ts`. "gave no answer in 40s" twice means NVIDIA is not answering; there is no second vision provider, so wait.
+- **The pack has the wrong rooms.** Not a bug: name them. Click the stills for a room, type the name, Apply, repeat. The server merges same-named rooms and will not split a name you gave.
+- **Build the pack says not in JSON.** The text model's answer had no JSON object after its thinking. The log line `yaad-sketch assemble:` shows the start of the answer. If the provider was MiniMax, `answerText()` should have stripped the `<think>` block; if the block has changed shape, that helper in `_shared/textmodel.ts` is the place.
+- **Add the map.** No key is needed. With no `GOOGLE_MAPS_API_KEY` set, the map comes from OpenStreetMap: the address is geocoded by Nominatim, a three by three grid of tiles is fetched, and they are assembled into one SVG with a marker. Both services are the OpenStreetMap Foundation's, in the EU, free, no account. If it says no map could be made, Nominatim did not recognise the address: try it more plainly, with the parish, for example "Hope Road, Kingston, Jamaica".
+- **To use Google's aerial imagery instead**, which is better for showing a roof, set a key and the function switches to it on its next call, no deploy. Google's free monthly credit covers this volume many times over, but a card must be on the account before it will serve anything. **Claude cannot do this step: it needs the founder's own Google account and card.** In Google Cloud Console: create a project, APIs and Services then Library then enable **Maps Static API**, Credentials then Create credentials then API key, restrict that key to the Maps Static API, and Billing then link a payment account. Then:
+
+```bash
+supabase secrets set GOOGLE_MAPS_API_KEY=your-key --project-ref leffyisvfvjwzilydlwf
+```
+
+  "Google would not give a map for that address" means the key is restricted away from the Maps Static API or has no billing account behind it. Unset the secret and the free OpenStreetMap map comes back.
+
+## 26. A photograph attached on the job form did not arrive
+
+The form at `/jobs/new` uploads through `yaad-job-photo`, which is a different
+route from the portal's own upload and from WhatsApp. What lands is a row in
+`job_photos` with `source = 'client'` and a file in the private `intake`
+bucket under `client/<job id>/`. The desk sees it under **Job photos**.
+
+Read the log with the Supabase MCP `query_logs` tool, or
+`supabase functions logs yaad-job-photo --project-ref leffyisvfvjwzilydlwf`.
+The span attribute `yaadly.photo.outcome` names what happened.
+
+- **"That job code is not valid."** The pair (job id, portal code) did not
+  match a row. Check the code on the job: `select id, portal_code from jobs
+  where id = '<job>'`. The client sees this if they reload the form after the
+  draft was cleared, because the code only lives in the page.
+- **"This job already has an account on it."** Correct, and the door closing
+  as designed: the moment a `client_email` is on the job it belongs to an
+  account, and photographs go through the portal, where the client's own
+  session and a Postgres policy decide. Send them the portal link.
+- **"That photo did not arrive."** The signed upload URL was issued and the
+  file never reached the bucket, usually a phone losing signal mid-upload.
+  Nothing is recorded, so they simply try again.
+- **"That photo could not be stored safely."** The GPS strip could not be
+  written back, so the function refused rather than keep a photograph with its
+  location on it. The file is deleted. Ask them to send it again, and if it
+  repeats, that image is worth looking at by hand.
+- **"That is 8 photographs, which is plenty."** The per-job cap on this door,
+  counted across every route. More can come in through the portal or WhatsApp
+  once there is an account.
+- **A client wants one taken down after they have sent the job.** The × on the
+  form only works while they are still on it. Afterwards it is the desk:
+  Job photos, find the row, and delete it there.
+
+Nothing this endpoint writes is public. `board_ok` is false on every row it
+creates and there is no input that can change it, so publishing to
+`app.yaadly.co.uk/jobs` stays a decision at the desk.
+
+
+---
+
+## 27. Somebody picked a trade or a parish on /marketplace and the job form asked again
+
+The "Trade and parish" card at the top of `docs/marketplace.html` sends both
+answers to `/jobs/new` as query parameters. `/jobs/new` checks each one against
+`web/lib/taxonomy.ts` and **silently drops anything that is not on the list**,
+because a hand-typed parameter must not be able to put an unknown trade on a
+job. There is deliberately no error: to the person it just looks like the form
+forgot.
+
+**Reproduce it before touching anything.** Open the link the card builds and
+look at the chips:
+
+```bash
+open "https://app.yaadly.co.uk/jobs/new?trade=Roofing&parish=Portland"
+```
+
+The trade chip should read `✓ Roofing` and the parish chip `✓ Portland`.
+
+**Almost always the cause is a display label sitting in a value attribute.**
+The taxonomy values are not the words on screen: it is `Painting &
+Decorating`, not `Painting`; `Drainage & Septic`, not `Drainage`; `Grille &
+Gate Welding`, not `Grille`; and `St Catherine`, not `St Catherine (incl.
+Portmore)`. All four of those wrong forms have been live at some point. Run
+the check that names the offender:
+
+```bash
+cd web && npm test -- --test-name-pattern="marketplace|two answers"
+```
+
+That reads `docs/marketplace.html` directly and fails with the bad value in
+the message. Fix the `value=` or the `href=` on the page, not the test.
+
+**If the values are right and it still does not prefill,** the parameter is
+not being read. `parish` is threaded through `web/app/jobs/new/page.tsx` into
+`PostJob.tsx` alongside `trade`; both go through `askedFor` in
+`web/lib/jobs/new-form.ts`. A new parameter added to the card without being
+added to `page.tsx` behaves exactly like a wrong value.
+
+**A saved draft wins over the link, and that is intended.** `restoreFields`
+runs on mount and only falls back to the query parameters for a field the
+draft left empty. Somebody who half filled the form yesterday and clicks a
+tile today keeps yesterday's answers. To tell the two apart, clear
+`localStorage` for the origin and reload.
+
+**The "outside our first parishes" note** shows for any parish that is not
+Kingston, St Andrew or St Catherine. That list is `LAUNCH_PARISHES`, and the
+copy of it in the page script is asserted against the real one by the same
+test file. It is a note, never a block: the job can still be posted.
 
 ---
 

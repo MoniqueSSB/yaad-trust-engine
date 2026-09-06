@@ -1,3 +1,6 @@
+import { amount } from "@/lib/money";
+import { whenDate } from "@/lib/date";
+
 /**
  * What this job costs, what has been invoiced, and the rules that govern
  * both. Founder's instruction, 2 Sep 2026: the agency fee has to be in
@@ -28,15 +31,10 @@ export type InvoiceRow = {
   period_label: string | null;
 };
 
-function amount(total: number | null, currency: string | null) {
-  if (total == null) return "—";
-  const n = total / 100;
-  const cur = (currency ?? "GBP").toUpperCase();
-  if (cur === "JMD") return "J$" + Math.round(n).toLocaleString("en-JM");
-  if (cur === "USD") return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
-  if (cur === "CAD") return "C$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
-  return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2 });
-}
+/* amount() moved to lib/money.ts, unchanged apart from the null case, which
+   said a lone em dash and now says "not set". A dash in a money column is
+   ambiguous between nothing and zero, and those are different answers to
+   somebody asking what they owe. */
 
 const TERMS: { title: string; body: string }[] = [
   {
@@ -112,7 +110,7 @@ export function MoneyPanel({
                 label={side === "client" ? "Worker labour" : "Your labour price"}
                 value={money(labour) ?? "—"}
                 width={fee != null && labour != null ? Math.round((labour / (labour + fee)) * 100) : 100}
-                caption="Paid across the payment stages in the Kickoff Pack, each released only when the client approves that stage's evidence."
+                caption="Paid across the payment stages in the Kickoff Pack, each one paid once that stage has been accepted and checked."
               />
               {materials != null && materials > 0 && (
                 <MoneyRow
@@ -159,7 +157,7 @@ export function MoneyPanel({
         <p className="mb-1 mt-1 text-[12.5px] text-dim">
           {side === "client"
             ? "Every invoice on this job, newest last. Paid by bank transfer."
-            : "Raised in your favour as the client approves each stage."}
+            : "Raised in your favour by Yaadly as each stage is accepted and checked."}
         </p>
 
         {invoices.length === 0 ? (
@@ -167,8 +165,8 @@ export function MoneyPanel({
             <b className="mb-1 block text-[14px] font-semibold text-ink">No invoices yet</b>
             <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
               {side === "client"
-                ? "The first will be Yaadly's Guarantee & Support fee once you have chosen a quote. Stage invoices follow, one per stage, each raised only after you approve that stage."
-                : "A pay invoice is raised the moment the client approves a stage. Nothing appears here before that."}
+                ? "The first will be Yaadly's Guarantee & Support fee once you have chosen a quote. Stage invoices follow, one per stage, each raised only after you have accepted that stage."
+                : "Yaadly raises a pay invoice as soon as a stage is accepted and checked. Nothing appears here before that."}
             </p>
           </div>
         ) : (
@@ -208,7 +206,7 @@ export function MoneyPanel({
                     <div className="mt-1 text-[12px] leading-relaxed text-dim">
                       <span className="font-mono-app">{inv.id}</span>
                       {inv.issue_date ? " · issued " + inv.issue_date : ""}
-                      {inv.paid_at ? " · paid " + String(inv.paid_at).slice(0, 10) : ""}
+                      {inv.paid_at ? " · paid " + (whenDate(inv.paid_at) ?? inv.paid_at) : ""}
                       {inv.period_label ? " · " + inv.period_label : ""}
                     </div>
                   </div>

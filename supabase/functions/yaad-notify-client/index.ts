@@ -48,8 +48,11 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { type AttrValue, httpAttrs, SpanKind, Trace } from "./otel.ts";
-import { pickTextProvider, providerAttrs } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.ts";
+import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
+import { withStatusCallback } from "./twilio-status.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -66,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -119,7 +122,7 @@ async function sendTwilio(
       const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
-        body: params,
+        body: withStatusCallback(params),
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
@@ -191,7 +194,10 @@ Return STRICT JSON only, exactly this shape:
 Rules you must not break:
 - Report only what the worker said. Never add detail, never estimate progress as a percentage, never guess a completion date the worker did not give.
 - Never promise the work is good, finished, or that payment will be released. A human reviews the evidence and the client approves.
-- Never use the word escrow. Money is held safely with a licensed payment provider.
+- Never use the word escrow, and never describe the client's money as held.
+  Yaadly is principal: the client buys the job from Yaadly at one agreed price,
+  and Yaadly engages and pays the tradesperson. Payment terms are agreed in
+  writing for each job, and a named person approves every release.
 - Never make the worker sound unprofessional. Translate register, not dignity.
 - If the update is too vague to report, say so plainly and put the missing detail in what_happens_next.
 - Never use dash characters, use a comma or colon instead.`;
@@ -244,18 +250,14 @@ async function composeEvidenceReport(
     const raw = await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
       ...providerAttrs(prov), "gen_ai.operation.name": "chat", "yaadly.agent.name": "reporting",
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model, temperature: 0.3, max_tokens: 600,
-          messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
-        }),
-        signal: AbortSignal.timeout(25000),
-      });
+      // Retry, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0.3, max_tokens: 600,
+        messages: [{ role: "system", content: REPORTING_SYSTEM }, { role: "user", content: context }],
+      }, { timeoutMs: 25000 });
       const j = await r.json().catch(() => ({}));
-      s.setAttributes({ "http.response.status_code": r.status });
-      if (!r.ok) { s.recordError(`${prov.name} http ${r.status}`); return ""; }
+      s.setAttributes({ ...providerAttrs(provider), "http.response.status_code": r.status });
+      if (!r.ok) { s.recordError(`${provider.name} http ${r.status}`); return ""; }
       return j?.choices?.[0]?.message?.content ?? "";
     });
 
@@ -291,7 +293,7 @@ const MAX_PHOTOS_SENT_DIRECTLY = 5;
  *  page relies on for a signed-in client's own session: this is a
  *  server-to-server send, not a page render, and the URL it hands back is
  *  only good for five minutes and only ever reaches Twilio's own fetch. */
-type EvidencePhoto = { url: string; code: string | null; label: string | null };
+type EvidencePhoto = { url: string; code: string | null; label: string | null; phase: string | null };
 
 /** What a stage number actually means to the person reading the message.
  *  Founder's own correction, live, testing this for real: every message
@@ -315,9 +317,98 @@ async function stageLabel(admin: any, jobId: string, stageNum: number): Promise<
   return `stage ${stageNum}`;
 }
 
+/* ── One tap into the portal ───────────────────────────────────────────────
+ *
+ * The booking email is the first thing a service client ever gets from us,
+ * and until 5 Sep 2026 it sent them to a page that emailed the SAME mailbox
+ * a second time before letting them in. The founder read her own receipt and
+ * asked the obvious question: why email me again when you already sent me
+ * the key. In the ordinary case, somebody tapping the link from the inbox it
+ * arrived in, the second email proves nothing the first one did not.
+ *
+ * So this mints a single-use sign-in token and hangs it on the link. The
+ * join page spends it on arrival and the client is in, one tap, no code box.
+ *
+ * WHAT THIS TRADES, and it was the founder's call, not a technical one: an
+ * unspent token makes the booking email itself the login. Forward it and the
+ * person you forwarded it to is you, until it is used or it expires. Before
+ * this, a forwarded email handed over the job key but never the account.
+ * Single use and a short life are what keep that bounded.
+ *
+ * NOT the gate on anything that matters. Signing in is not approving: the
+ * Client Guidelines still have to be signed, and every release of money is
+ * still a named human's decision on the desk. This changes who can open a
+ * portal, and nothing at all about what can happen inside one.
+ *
+ * FAILS SOFT, always. Anything that goes wrong here returns the plain join
+ * link, which is exactly the journey that worked yesterday: type an email,
+ * get a code. A receipt that does not arrive because a token could not be
+ * minted would be a far worse bug than one extra step.
+ */
+async function oneTapJoinLink(
+  admin: any, email: string, portalCode: string, trace: Trace,
+): Promise<string> {
+  const plain = `${APP_URL}/portal/join?code=${encodeURIComponent(portalCode)}`;
+  const addr = String(email ?? "").trim().toLowerCase();
+  if (!addr || !portalCode) return plain;
+
+  return await trace.span("auth.one_tap_link", SpanKind.CLIENT, {
+    "server.address": "supabase.auth", "yaadly.portal.code": portalCode,
+  }, async (sp) => {
+    try {
+      /* The account has to exist before a link can be minted for it. Public
+         signup is off on this project on purpose, and an admin create is the
+         intended way round that: it is the same call yaad-portal-code makes
+         when somebody types their address, and it sets no password, because
+         there is no password anywhere in this flow to set. */
+      const { error: createErr } = await admin.auth.admin.createUser({ email: addr, email_confirm: false });
+      if (createErr && !/already|registered|exists/i.test(String(createErr.message))) {
+        sp.recordError(createErr.message);
+        return plain;
+      }
+
+      const { data: link, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: addr });
+      const hashed = link?.properties?.hashed_token;
+      if (error || !hashed) {
+        sp.recordError(error?.message ?? "no hashed_token returned");
+        return plain;
+      }
+
+      /* Our own URL, not the action_link GoTrue hands back. The action_link
+         goes to Supabase first and bounces through redirect_to, which has to
+         be allowlisted in Auth settings and is one more thing to get wrong in
+         a place nobody looks. The hashed token verifies from any browser, so
+         the classic magic-link failure, opening the link somewhere other than
+         where you started, is not a failure here. */
+      return `${plain}&t=${encodeURIComponent(String(hashed))}`;
+    } catch (e) {
+      sp.recordError(String(e).slice(0, 160));
+      return plain;
+    }
+  });
+}
+
+// "A1 (before), A2 (problem found), A3 (after)". The worker's own answer to
+// which part of the job a photograph belongs to, put where the client already
+// looks for the codes, so a before, its after and anything found on the way can
+// be told apart without opening the portal. Silent when nobody said, which is
+// most photographs filed before 5 Sep 2026: see 20260906000700.
+const PHASE_IN_LIST: Record<string, string> = {
+  before: "before",
+  during: "during",
+  issue: "problem found",
+  after: "after",
+};
+
+function itemCode(p: EvidencePhoto): string {
+  const code = p.code ?? "?";
+  const said = p.phase ? PHASE_IN_LIST[p.phase] : null;
+  return said ? `${code} (${said})` : code;
+}
+
 async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace: Trace): Promise<EvidencePhoto[]> {
   const { data: items } = await admin.from("evidence")
-    .select("storage_path, mime, item_code, label")
+    .select("storage_path, mime, item_code, label, phase")
     .eq("job_id", jobId).eq("stage", stage)
     .not("storage_path", "is", null)
     .like("mime", "image/%")
@@ -333,7 +424,7 @@ async function evidencePhotoUrls(admin: any, jobId: string, stage: number, trace
       if (error) { s.recordError(error.message); return []; }
       const byPath = new Map((data ?? []).map((r: any) => [r.path, r.signedUrl]));
       return rows
-        .map((e: any) => ({ url: byPath.get(e.storage_path), code: e.item_code ?? null, label: e.label ?? null }))
+        .map((e: any) => ({ url: byPath.get(e.storage_path), code: e.item_code ?? null, label: e.label ?? null, phase: e.phase ?? null }))
         .filter((p: EvidencePhoto) => p.url) as EvidencePhoto[];
     } catch (e) {
       s.recordError(String(e).slice(0, 200));
@@ -424,14 +515,14 @@ type VisionFinding = {
 // is NVIDIA answering and answering badly, which asking again is unlikely
 // to fix and isn't tried a second time.
 async function attemptVisionReview(
-  model: string, key: string, userContent: Record<string, unknown>[], s: { setAttributes: (a: Record<string, AttrValue>) => unknown },
+  prov: VisionProvider, userContent: Record<string, unknown>[], s: { setAttributes: (a: Record<string, AttrValue>) => unknown },
 ): Promise<{ ok: true; findings: VisionFinding[] } | { ok: false; retryable: boolean }> {
   try {
-    const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    const r = await fetch(prov.api, {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${prov.key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model, temperature: 0.2, max_tokens: 1200,
+        model: prov.model, temperature: 0.2, max_tokens: 1200,
         messages: [{ role: "system", content: VISION_SYSTEM_PROMPT }, { role: "user", content: userContent }],
       }),
       signal: AbortSignal.timeout(25000),
@@ -522,11 +613,10 @@ async function shrinkForReview(url: string): Promise<string | null> {
 }
 
 async function reviewOnePhoto(
-  model: string, key: string, photo: EvidencePhoto, jobTitle: string, trace: Trace,
+  prov: VisionProvider, photo: EvidencePhoto, jobTitle: string, trace: Trace,
 ): Promise<VisionFinding[] | null> {
-  return await trace.span(`chat ${model}`, SpanKind.CLIENT, {
-    "gen_ai.system": "nvidia_nim", "gen_ai.operation.name": "chat", "gen_ai.request.model": model,
-    "server.address": "integrate.api.nvidia.com", "yaadly.agent.name": "photo_review",
+  return await trace.span(`chat ${prov.model}`, SpanKind.CLIENT, {
+    ...visionAttrs(prov),
     "yaadly.vision.photo_code": photo.code ?? "",
   }, async (s) => {
     const shrunk = await shrinkForReview(photo.url);
@@ -535,10 +625,10 @@ async function reviewOnePhoto(
       { type: "text", text: `Job: ${jobTitle || "unspecified"}\n\nReview this photo and return findings as instructed.` },
       { type: "image_url", image_url: { url: shrunk ?? photo.url } },
     ];
-    let result = await attemptVisionReview(model, key, userContent, s);
+    let result = await attemptVisionReview(prov, userContent, s);
     let attempts = 1;
     if (!result.ok && result.retryable) {
-      result = await attemptVisionReview(model, key, userContent, s);
+      result = await attemptVisionReview(prov, userContent, s);
       attempts = 2;
     }
     s.setAttributes({ "yaadly.vision.attempts": attempts });
@@ -561,13 +651,17 @@ async function reviewOnePhoto(
  *  returns the findings that did, rather than discarding a partial result
  *  because one photo out of several had a bad moment. */
 async function reviewEvidencePhotos(images: EvidencePhoto[], jobTitle: string, trace: Trace): Promise<VisionFinding[] | null> {
-  const key = Deno.env.get("NVIDIA_API_KEY");
-  if (!key) { console.error("yaad-vision: NVIDIA_API_KEY is not set"); return null; }
+  // The evidence review has its own model setting (NVIDIA_EVIDENCE_MODEL) as
+  // of 5 September 2026. It is the vision call standing closest to a stage
+  // approval, and it used to share one dial with the sketch pack and the
+  // vetting read while defaulting to a smaller model than either. See
+  // _shared/visionmodel.ts.
+  const prov = pickVisionProvider("evidence");
+  if (!prov) { console.error(`yaad-vision: ${NO_VISION_PROVIDER_MESSAGE}`); return null; }
   if (!images.length) { console.error("yaad-vision: no image URLs to review"); return null; }
-  const model = Deno.env.get("NVIDIA_VISION_MODEL") || "meta/llama-3.2-11b-vision-instruct";
 
   const perPhoto = await Promise.all(
-    images.slice(0, 6).map((p) => reviewOnePhoto(model, key, p, jobTitle, trace)),
+    images.slice(0, 6).map((p) => reviewOnePhoto(prov, p, jobTitle, trace)),
   );
   const reviewed = perPhoto.filter((r): r is VisionFinding[] => r !== null);
   if (!reviewed.length) return null;
@@ -580,8 +674,28 @@ async function reviewEvidencePhotos(images: EvidencePhoto[], jobTitle: string, t
  *  Prefixes each note with its photo's code, but only when there is more
  *  than one photo to tell apart: on a single-photo stage, "P1:" in front
  *  of every sentence is noise nobody needs to disambiguate anything. */
-function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): string {
-  if (!findings.length) return "Nothing of concern visible in what was sent.";
+/** Two summaries from one set of findings, and the split is the point.
+ *
+ *  Until 4 September 2026 there was one string and it went to everybody. It
+ *  carried the model's severity word and, where a finding set
+ *  recommend_professional, the sentence "Worth a professional look in person."
+ *  That reached an overseas client attached to the worker's confirmed report,
+ *  with nobody at Yaadly having read it. A machine telling somebody their
+ *  house may have a structural problem is a quasi-diagnosis, it is the exact
+ *  register yaad-completion's prompt forbids ("Describe, never certify"), and
+ *  Yaadly guarantees project management judgment rather than survey findings.
+ *
+ *  So: the CLIENT gets what is visible, in plain words, and nothing else. The
+ *  severity, the category and the escalation flag stay on the desk side, where
+ *  a named human decides whether any of it is worth telling the client and in
+ *  what words. That is the governing rule applied to a sentence rather than to
+ *  a payment: the machine observes, a person judges.
+ */
+type FindingSummary = { desk: string; client: string; escalate: boolean; worst: string };
+
+function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): FindingSummary {
+  const none = "Nothing of concern visible in what was sent.";
+  if (!findings.length) return { desk: none, client: none, escalate: false, worst: "none" };
   const worst = findings.some((f) => f.severity === "high") ? "high"
     : findings.some((f) => f.severity === "medium") ? "medium" : "low";
   const escalate = findings.some((f) => f.recommend_professional);
@@ -592,9 +706,88 @@ function summariseFindings(findings: VisionFinding[], images: EvidencePhoto[]): 
     const code = multi ? findingLabel(f, images) : "";
     return code ? `${code}: ${text}` : text;
   }).filter(Boolean).join(" ");
-  const tail = escalate ? " Worth a professional look in person." : "";
   const more = findings.length > 3 ? ` (${findings.length - 3} more noted on the job.)` : "";
-  return `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
+  const tail = escalate ? " Worth a professional look in person." : "";
+
+  // The desk keeps everything, including the fallback that names a severity
+  // when no finding carried usable words.
+  const desk = `${items}${tail}${more}`.trim() || `${findings.length} item(s) noted, severity ${worst}.`;
+
+  // The client gets observations only. No severity word, no escalation
+  // sentence, and if there were no usable words at all it says nothing rather
+  // than reporting a bare count with a severity attached to it.
+  const client = `${items}${more}`.trim();
+
+  return { desk, client, escalate, worst };
+}
+
+/** Tell the desk when the model saw something it wants a professional to look
+ *  at. Without this, "kept internal" means "written to a column nobody reads",
+ *  which is not a human in the loop, it is a human out of it. Same ntfy shape
+ *  yaad-inbound already uses, and it never breaks the notification it rides on. */
+async function pingDeskOnEscalation(
+  admin: any, jobId: string, jobTitle: string, summary: FindingSummary,
+): Promise<void> {
+  if (!summary.escalate && summary.worst !== "high") return;
+  await ntfyPush(admin, `Photo review flagged: ${jobTitle}`,
+    `${jobId}: the photo review flagged something (severity ${summary.worst}`
+      + `${summary.escalate ? ", professional look suggested" : ""}). The client has NOT been told this. `
+      + `Your call whether to say anything. What it saw: ${summary.desk.slice(0, 400)}`,
+    "warning");
+}
+
+/** One push to Monique's phone. Extracted 4 Sep 2026 when the evidence checks
+ *  needed the same thing; it never throws, because a notification must never
+ *  break the report it rides on. */
+async function ntfyPush(admin: any, title: string, body: string, tags: string): Promise<void> {
+  try {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: title.slice(0, 120), Priority: "high", Tags: tags },
+      body,
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (_) { /* never let a notification break a report */ }
+}
+
+/** Fetch what the checks need and run them. Everything it reads is a hard
+ *  column; nothing here calls a model, and nothing it returns can act. */
+async function assembleEvidenceChecks(admin: any, jobId: string, stage: number) {
+  try {
+    const [{ data: ev }, { data: arr }, { data: job }, { data: pack }] = await Promise.all([
+      admin.from("evidence").select("label, mime, captured_at, created_at, kind, item_code")
+        .eq("job_id", jobId).eq("stage", stage).order("created_at", { ascending: true }),
+      admin.from("arrival_log").select("arrived_at, arrived_on, lat, far_from_site")
+        .eq("job_id", jobId).eq("stage", stage).order("arrived_at", { ascending: true }),
+      admin.from("jobs").select("parish").eq("id", jobId).maybeSingle(),
+      admin.from("kickoff_packs").select("docs").eq("job_id", jobId).eq("status", "approved")
+        .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    // The quote pack stands in for the checklist when there is no Kickoff
+    // Pack, which since 4 Sep 2026 is the ordinary case.
+    const { data: qp } = await admin.from("quote_pack_drafts")
+      .select("docs").eq("job_id", jobId).eq("status", "approved")
+      .order("approved_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: pins } = await admin.from("work_log_pins")
+      .select("shared_at, far_from_site, address")
+      .eq("job_id", jobId).eq("stage", stage).order("shared_at", { ascending: false });
+    return runEvidenceChecks({
+      stage,
+      evidence: ev ?? [],
+      arrivals: arr ?? [],
+      checklist: pack?.docs?.evidence_checklist ?? null,
+      quoteStages: qp?.docs?.payment_stages ?? null,
+      pins: pins ?? [],
+      parish: job?.parish ?? null,
+    });
+  } catch (e) {
+    // A failed check must never stop the report. Say so in the logs, which as
+    // of 4 Sep 2026 is where a failure in this function is actually readable.
+    console.error("assembleEvidenceChecks failed:", String(e).slice(0, 300));
+    return [];
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -654,7 +847,7 @@ Deno.serve(async (req: Request) => {
       svc = data;
     } else {
       const { data } = await admin.from("jobs")
-        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
+        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email, requested_worker_email")
         .eq("id", jobId).maybeSingle();
       if (!data) return json({ error: "No such job." }, 404);
       job = data;
@@ -689,6 +882,15 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
+    // worker_requested goes to the one worker a client asked for by name.
+    // Read off jobs.requested_worker_email, not worker_email, which is still
+    // blank: nobody is booked. Same "read it off the right column, not the
+    // job's own worker" shape as kickoff_pack_ready above.
+    if (kind === "worker_requested" && job?.requested_worker_email) {
+      const { data: worker } = await admin.from("worker_profiles")
+        .select("phone").ilike("worker_email", job.requested_worker_email).maybeSingle();
+      workerPhone = String(worker?.phone ?? "").trim();
+    }
     if (kind === "kickoff_pack_ready" && kickoffWorkerEmail) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", kickoffWorkerEmail).maybeSingle();
@@ -708,7 +910,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker" || kind === "worker_requested") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -721,7 +923,7 @@ Deno.serve(async (req: Request) => {
     const roomLink = isService
       ? `${APP_URL}/portal/services/${encodeURIComponent(svc.id)}`
       : `${APP_URL}/portal/jobs/${encodeURIComponent(job.id)}`;
-    const codeLink = isService
+    let codeLink = isService
       ? (svc.portal_code
         ? `${APP_URL}/portal/join?code=${encodeURIComponent(svc.portal_code)}`
         : roomLink)
@@ -740,6 +942,11 @@ Deno.serve(async (req: Request) => {
     // substitute for the richer free-text message when that can still be
     // delivered: see the send site below.
     let waTemplate: { sid: string; vars: Record<string, string> } | undefined;
+    // A SECOND, different thing from waTemplate, and the difference is the
+    // whole design. waTemplate is a FALLBACK: it replaces a message that could
+    // not be delivered. approveButton is an ADDITION: it follows a message
+    // that was delivered, carrying the one thing free text cannot, a button.
+    let approveButton: { sid: string; vars: Record<string, string> } | undefined;
 
     if (kind === "service_booked") {
       // Fires the moment an enquiry is converted in the desk. A receipt with
@@ -747,10 +954,29 @@ Deno.serve(async (req: Request) => {
       // the founder's confirm is the next thing that happens. The portal
       // code rides in this first message because a service client has no
       // account yet; the join page is the door and the code is the key.
+      //
+      // The code is no longer printed as a number to type, and there is no
+      // second email either (5 Sep 2026, founder's own report from her
+      // inbox). Two different things used to be called "a code" here: the
+      // booking reference, which the join page reads out of ?code= and never
+      // asks for, and the sign-in code that page emailed once you typed your
+      // address. Being told to "set up your portal with the code 08A0A130"
+      // and then shown a page offering to send you a code reads as being
+      // asked for something you are holding. Both are gone from the wording:
+      // oneTapJoinLink puts a single-use sign-in token in the link, and the
+      // sentence below promises one tap. If that promise and the join page
+      // ever disagree, the join page is what the client actually meets, so
+      // they move together.
+      // One tap, from here. Falls back to the plain join link on its own if
+      // the token cannot be minted, so this line can never cost a receipt.
+      if (svc.portal_code) {
+        codeLink = await oneTapJoinLink(admin, String(svc.client_email ?? ""), String(svc.portal_code), trace);
+      }
       subject = `We have your booking: ${svc.type}`;
       line = `Your ${svc.type} booking with Yaadly is in, reference ${svc.id}. ` +
-        `It is held while Monique agrees the scope and dates with you: nothing is charged and nothing starts until you hear from us that it is confirmed. ` +
-        `When you want to see it online, set up your portal with the code ${svc.portal_code}: ${codeLink}`;
+        `It is held while Yaadly agrees the scope and dates with you: nothing is charged and nothing starts until you hear from us that it is confirmed. ` +
+        `See it online here, and that link signs you straight in: ${codeLink} ` +
+        `It is for you alone and it works once, so do not forward it. If it stops working, open it anyway and we will email you a fresh sign-in code.`;
     } else if (kind === "service_confirmed") {
       // Fires when the founder clicks "Confirm the work": the booking is now
       // real, the invoice exists, and payment is the one thing between here
@@ -814,10 +1040,13 @@ Deno.serve(async (req: Request) => {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
       // the two doors set it: a portal tap or a WhatsApp reply. Payment is
-      // relayed here, not collected: Yaadly is not holding money yet
-      // (CLAUDE.md 9), so this states the same off-platform terms already
-      // published in the worker FAQ, word for word, rather than inventing
-      // new payment language.
+      // relayed here, not collected. Comment corrected 3 Sep 2026: it used to
+      // say "Yaadly is not holding money yet (CLAUDE.md 9)", which stopped
+      // being true when payment came off that section's not-built list the
+      // same day. The client buys the job from Yaadly and Yaadly engages and
+      // pays the worker, so the wording below states the principal structure
+      // and matches the worker FAQ rather than inventing new payment
+      // language.
       const { data: q } = await admin.from("job_quotes")
         .select("worker_name, labour_jmd, materials_jmd")
         .eq("job_id", jobId).eq("status", "accepted")
@@ -829,10 +1058,9 @@ Deno.serve(async (req: Request) => {
       // moves. Saying "the worker is on site" here would be wrong now.
       line = `${q?.worker_name ?? "Your worker"} is booked on ${job.id} (${job.title}). ` +
         `Labour ${money(q?.labour_jmd ?? 0)}, materials ${money(q?.materials_jmd ?? 0)} paid at cost against the receipt. ` +
-        `Yaadly is not holding this payment: pay the worker directly, per stage as you approve it, ` +
-        `within 3 working days, by bank transfer, Lynk wallet or remittance pick up, whichever you agree between you. ` +
-        `Before any of that starts, Yaadly's own Guarantee & Support fee invoice is on its way separately. ` +
-        `The job only goes live once that is paid. ${roomLink}`;
+        `You pay Yaadly, not the worker: Yaadly engages and pays them. ` +
+        `Your invoice for the job is on its way separately, one price covering the work, materials at cost and Yaadly's Guarantee & Support fee. ` +
+        `The job goes live once that is paid. Yaadly pays the worker under our own agreement with him, so he never waits on you. Your approval is what closes each stage with us, once you have seen the evidence. ${roomLink}`;
     } else if (kind === "quote_awaiting_worker_confirm") {
       // Fires once, the moment the worker's own quote lands (job_quotes
       // AFTER INSERT WHEN status = 'submitted'). Writing the quote is not
@@ -845,6 +1073,27 @@ Deno.serve(async (req: Request) => {
         `Reply with the code ${job.id} to confirm it. ` +
         `The client is being asked to confirm the same price; once you have both replied, ` +
         `they can book you straight away, or ask for a fuller Kickoff Pack first if they want one.`;
+    } else if (kind === "request_declined") {
+      // The other half of the promise on the job wizard's confirmation
+      // screen. Goes to the CLIENT, so it is not in the worker-recipient
+      // list above. Says the job is moving, not that the worker let them
+      // down: a tradesperson with a full diary is not a failure and Yaadly
+      // is not in the business of reporting on one to the other side.
+      subject = `${job.title} is going out to more workers`;
+      line = `The worker you asked for on ${job.id} (${job.title}) cannot take it on right now, so it has gone out to the rest of the vetted network in ${job.parish ?? "your parish"} today. ` +
+        `Prices will start reaching you the same way. Nothing about your job has changed and you have not lost your place.`;
+    } else if (kind === "worker_requested") {
+      // A client read this worker's profile and asked for them by name. The
+      // whole point of the message is the clock: they have first refusal for
+      // 48 hours and then it goes to the board, so a message that does not
+      // say so is worse than none. Free text, no approved template, and the
+      // job id doubles as the reference, the same shape as every other
+      // WhatsApp-reply kind. Deliberately does not say "you have the job":
+      // nobody is booked until the client accepts a price.
+      subject = `A client asked for you: ${job.title}`;
+      line = `A client picked you off your Yaadly profile and asked for you by name on ${job.id} (${job.title}) in ${job.parish ?? "Jamaica"}. ` +
+        `It is yours to price first: nobody else can quote it for the next 48 hours. After that it goes onto the open board. ` +
+        `Open your Yaadly portal to read it and put your price in, or say you cannot take it on and we will find the client somebody else straight away.`;
     } else if (kind === "stage_released_worker") {
       // Founder's own correction, 2 Sep 2026: stage_released only ever told
       // the client. Nothing told the worker their own work had been
@@ -880,11 +1129,40 @@ Deno.serve(async (req: Request) => {
       const evLandedLabel = await stageLabel(admin, jobId, job.stage ?? 1);
       const draftText = composed?.message
         || `Photos have come in for ${evLandedLabel}, with no description from you yet.`;
-      const aiSummary = findings ? summariseFindings(findings, photoUrls) : "";
+      // Two summaries, deliberately. The worker sees the desk one, severity
+      // and escalation included, because they are standing in front of the
+      // thing and can look again. What gets STORED is the client-safe one,
+      // because that is the string that later rides out to the client through
+      // relay_confirmed_report(). Storing only the safe version means no
+      // change is needed in yaad-inbound or the RPC to keep a machine's
+      // severity judgement away from a client.
+      const aiSummaries = findings ? summariseFindings(findings, photoUrls) : null;
+      const aiSummary = aiSummaries?.client ?? "";
+      if (aiSummaries) await pingDeskOnEscalation(admin, jobId, job.title, aiSummaries);
+
+      // The evidence completeness checks, live at last (roadmap item 6). They
+      // are deterministic, they read only hard columns, and they decide
+      // nothing: the worker sees the short list of what is missing while he is
+      // still on site and can fix it, and the desk is told only when something
+      // actually is. Founder's own call, 4 Sep 2026: worker first, desk on
+      // gaps. That is the Mirror Rule, because the same check that gives the
+      // client a complete pack keeps the worker off the hook for one he could
+      // have finished in two minutes.
+      const evChecks = await assembleEvidenceChecks(admin, jobId, job.stage ?? 1);
+      const gaps = workerGaps(evChecks);
+      // Notes are offers, not demands, and are carried separately so the
+      // location-pin ask can never read as one more thing he has to do.
+      const notes = workerNotes(evChecks);
+      if (gaps.length) {
+        await ntfyPush(admin, `Evidence gaps: ${job.title}`,
+          `${jobId} stage ${job.stage ?? 1}: ${gaps.length} thing${gaps.length === 1 ? "" : "s"} missing. `
+            + `The worker has been told and can still fix it.\n\n${deskPack(evChecks)}`.slice(0, 900),
+          "clipboard");
+      }
       // Named once here, on more than one photo, so a reply naming a code
       // means something without repeating "Items: ..." on every line below.
       const itemsLine = photoUrls.length > 1
-        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}`
+        ? `Items: ${photoUrls.map(itemCode).join(", ")}`
         : null;
 
       // The report's own "Next:" line finally does something, rather than
@@ -913,7 +1191,13 @@ Deno.serve(async (req: Request) => {
       line = [
         `Here's what we'd tell the client about ${evLandedLabel} of ${job.title}:`,
         `"${draftText}"`,
-        aiSummary ? `AI noticed: ${aiSummary}` : null,
+        aiSummaries?.desk ? `AI noticed: ${aiSummaries.desk}` : null,
+        // The gaps sit BELOW the draft and ABOVE the reply instruction, so a
+        // worker reads what the client would be told, then what is missing,
+        // then what to do. Nothing here stops him replying 1: the choice is
+        // still his, and a stage is never blocked by this.
+        gaps.length ? `Still missing on this stage:\n${gaps.map((g) => "- " + g).join("\n")}` : null,
+        notes.length ? notes.join("\n\n") : null,
         itemsLine,
         `Reply 1 to send this as written, or reply with your own version and we'll send that instead.`,
       ].filter(Boolean).join("\n\n");
@@ -922,6 +1206,7 @@ Deno.serve(async (req: Request) => {
         "yaadly.notify.ai_review_ran": findings !== null,
         "yaadly.notify.ai_finding_count": findings?.length ?? 0,
         "yaadly.notify.draft_sent_to_worker": !!workerPhone,
+        ...checkAttrs(evChecks),
       });
     } else if (kind === "evidence_report_confirmed") {
       // The other half of evidence_landed's new shape: fired only once the
@@ -940,12 +1225,37 @@ Deno.serve(async (req: Request) => {
       const workerSays = overrideText || `Photos have come in for ${reportLabel} of your job, ${job.title}.`;
       const aiSays = aiSummary ? `AI noticed: ${aiSummary}` : null;
       const itemsLine = photoUrls.length > 1
-        ? `Items: ${photoUrls.map((p) => p.code ?? "?").join(", ")}. Mention a code if your comment is about one specific photo.`
+        ? `Items: ${photoUrls.map(itemCode).join(", ")}. Mention a code if your comment is about one specific photo.`
         : null;
       const actionHint = clientPhone
         ? `Reply with the code ${job.id} to approve, or just say what you think and we will pass it to the worker.`
         : "Review it and reply from your portal.";
       line = [workerSays, aiSays, itemsLine, `${actionHint} ${roomLink}`].filter(Boolean).join("\n\n");
+
+      // ── the approve button, 4 September 2026 ──────────────────────────
+      //
+      // This is the one message in the system that asks a client to approve,
+      // and approving means typing JOB-WA-1757000000000 correctly on a phone
+      // to move money. A Quick Reply button makes it one tap.
+      //
+      // IT IS SENT AFTER THE FREE TEXT, NOT INSTEAD OF IT, and that is the
+      // point. The free text here carries the worker's own words about what
+      // was done, the AI's notes, the item codes and the photographs
+      // themselves. A template's fixed variable slots hold none of that, and
+      // this file's own header records why sending a template in place of a
+      // richer message is the wrong trade. So the report goes as it always
+      // has, and the button follows it.
+      //
+      // The payload is the bare job code, because yaad-inbound reads a tapped
+      // payload as the message text and hands it to the same
+      // matchApprovingJob() and the same RPC a typed code goes through. The
+      // button is a way of typing, not a new authority.
+      //
+      // Unset secret means no second message and nothing changes.
+      const approveSid = Deno.env.get("TWILIO_CONTENT_SID_APPROVE") ?? "";
+      if (approveSid && clientPhone) {
+        approveButton = { sid: approveSid, vars: { "1": String(job.title ?? "your job"), "2": String(job.id) } };
+      }
       root.setAttributes({ "yaadly.notify.photos_attached": photoUrls.length, "yaadly.notify.was_customised": !!overrideText });
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
@@ -979,7 +1289,7 @@ Deno.serve(async (req: Request) => {
         line += `\n\nOne more thing, now that this is off your list. Want ${workerName} to keep an eye on the place going forward, without you having to ask again? ` +
           `It's called the Yaad Report: a monthly WhatsApp update, 6 to 10 timestamped photos, a short walkthrough video, three lines on the property's condition, and what's changed since last time. ` +
           `Founding rate is £350 a month, or one 12 month term instead of twelve separate decisions.\n\n` +
-          `Reply INTERESTED and Monique will follow up with how it works.`;
+          `Reply INTERESTED and Yaadly will follow up with how it works.`;
       }
     } else if (kind === "worker_on_site") {
       const { data: arrival } = await admin.from("arrival_log")
@@ -1090,6 +1400,21 @@ Deno.serve(async (req: Request) => {
           const sms = await sendTwilio(recipientPhone, line, "sms", trace);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
+      }
+
+      // The button, once the report itself has landed on WhatsApp. Only on
+      // WhatsApp, because a button is a WhatsApp thing and an SMS fallback
+      // would just be a second copy of nothing. Only after a successful send,
+      // because a lone "Approve" button arriving with no report in front of it
+      // asks somebody to approve work they have not been shown.
+      //
+      // Its failure is recorded and never propagated: the client already has
+      // the report and the typed code still works, so a missing button is a
+      // worse experience and not a lost message.
+      if (approveButton && wa.sent && wa.via === "twilio whatsapp") {
+        const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton);
+        root.setAttributes({ "yaadly.notify.approve_button": btn.sent });
+        if (!btn.sent) console.error(`approve button not sent for ${jobId}: ${btn.reason ?? "unknown"}`);
       }
     }
 

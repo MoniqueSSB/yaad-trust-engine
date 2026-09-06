@@ -111,25 +111,53 @@ jobs:
       # The banned-language screen exists twice, once in Python for the engine
       # and once in Deno for the live functions, because they are two runtimes
       # and the rule has to hold in both. Two copies of a rule drift, so both
-      # suites assert the same five phrases. If somebody loosens one pattern,
-      # one of these two jobs goes red.
-      - name: Run the Deno guardrail tests
-        run: deno test --allow-read supabase/functions/_shared/
+      # suites assert the same phrases. If somebody loosens one pattern, one of
+      # these two jobs goes red.
+      #
+      # POINTED AT THE WHOLE TREE, 4 Sep 2026, and that is the point of this
+      # step now. It used to read `supabase/functions/_shared/`, which ran ten
+      # tests and left forty-eight sitting unenforced next door in yaad-inbound:
+      # the Twilio signature check that is the only door in front of four money
+      # RPCs, the price guard that stops an invented figure reaching a client,
+      # the job-code matcher that decides which job an approval lands on. All
+      # forty-eight passed the day they were written and no build has ever
+      # depended on them. `deno test` only picks up files matching its own
+      # naming convention, so widening the path runs the tests and never an
+      # index.ts. Do not narrow this back to one directory: a test nobody runs
+      # is documentation, not a control.
+      #
+      # --allow-env added 5 Sep 2026 for _shared/twilio-status.ts, whose entire
+      # behaviour is "do nothing unless TWILIO_STATUS_CALLBACK_URL is set", so
+      # the test that matters is the one proving the unset case changes no
+      # send. That test cannot be written without setting and clearing the
+      # variable. Caught before pushing by running the suite with CI's exact
+      # flags rather than the looser local ones.
+      - name: Run the Deno guardrail and Edge Function tests
+        run: deno test --allow-read --allow-env supabase/functions/
 
       # The provider decision lives in _shared/textmodel.ts and nowhere else.
       # A hard-coded model endpoint in a function is how the estate ended up on
       # eight copies of the same China URL, and how it would quietly drift back.
+      #
+      # VISION ADDED 5 Sep 2026, and it is the more important half. This job was
+      # written for the text move and watched only the text endpoints, so while
+      # it stood green the NVIDIA vision URL sat typed out in three functions:
+      # yaad-notify-client, yaad-sketch and yaad-vetting-review. Site photos, a
+      # walkthrough of somebody's house and a worker's proof of address are more
+      # sensitive than the job text this rule was protecting, and a control
+      # pointed at the safer half of the estate reads as cover it does not give.
+      # Both endpoints now resolve in _shared, so both are checked here.
       - name: No function hard-codes a model endpoint
         run: |
           set -e
-          hits=$(grep -rnE 'https://(api\.minimax\.io|api\.mistral\.ai)' \
+          hits=$(grep -rnE 'https://(api\.minimax\.io|api\.mistral\.ai|integrate\.api\.nvidia\.com)' \
             supabase/functions/yaad-*/index.ts || true)
           if [ -n "$hits" ]; then
             echo "$hits"
-            echo "::error::A text model endpoint is hard-coded in a function. Use pickTextProvider() from _shared/textmodel.ts."
+            echo "::error::A model endpoint is hard-coded in a function. Use pickTextProvider() from _shared/textmodel.ts or pickVisionProvider() from _shared/visionmodel.ts."
             exit 1
           fi
-          echo "No hard-coded text model endpoints."
+          echo "No hard-coded model endpoints, text or vision."
 
   web:
     name: Web app (typecheck and tests)
@@ -155,12 +183,21 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # `npm run lint` is deliberately NOT run here yet. It currently reports a
-      # pre-existing error in app/portal/join/page.tsx (react-hooks
-      # set-state-in-effect) that predates this job. Adding lint today would
-      # mean either a permanently red build, or quietly changing portal
-      # behaviour to make an unrelated job go green. Fix that error, then add
-      # `npm run lint` here in the same commit.
+      # Lint runs, as of 3 Sep 2026.
+      #
+      # This block used to explain why it could not: a pre-existing
+      # react-hooks set-state-in-effect error in app/portal/join/page.tsx,
+      # which could only be cleared by changing portal behaviour to make an
+      # unrelated job go green. That is the right call and it is why lint
+      # waited.
+      #
+      # The description had gone stale. The hooks error is gone; what was
+      # actually left was one unescaped apostrophe in QuotePanel.tsx and an
+      # unused catch binding in sign-in. Neither changes behaviour, both were
+      # fixed in the same commit that added this line, which is exactly the
+      # sequence the old comment asked for.
+      - name: Lint
+        run: npm run lint
 
       # The tests that matter here are the negative ones: an unsigned, forged or
       # replayed request to /api/hubspot/stage must write NOTHING. That endpoint
@@ -170,10 +207,115 @@ jobs:
       - name: Run the web tests
         run: npm test
 
-      # `next build` is deliberately not run here. check-env.mjs stops a
-      # production build without the Supabase values, which are secrets this
-      # workflow has no reason to hold. Typecheck and lint already catch the
-      # class of breakage a build would.
+      # The build DOES run here, with placeholder Supabase values.
+      #
+      # This used to say a build could not run because check-env.mjs stops one
+      # without the Supabase values and this workflow has no reason to hold
+      # secrets. The first half is true; the conclusion was not. check-env only
+      # asks that the variables are PRESENT, the values are inlined into an
+      # artifact this job throws away, and no page queries Supabase at build
+      # time (every data route is dynamic, only /, /_not-found and /icon.svg
+      # prerender). So placeholders are enough, and they are visibly fake so
+      # nobody mistakes them for a leaked key.
+      #
+      # It earns its place because `tsc --noEmit` does NOT generate Next's route
+      # types, and `next build` does. A route-shape mistake, a deleted layout
+      # still referenced by a generated validator, a bad generateMetadata
+      # signature, all pass typecheck and fail the deploy. That is the gap this
+      # closes, and it is the gap that was open on 3 Sep 2026 when a deleted
+      # layout left a dangling type reference behind.
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder_not_a_real_key
+        run: npx next build
+
+  desk:
+    name: Admin desk script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # ESLint lives in web/node_modules; the desk is not part of the app but
+      # this is the only place the repository installs anything.
+      - name: Install
+        run: npm ci
+        working-directory: web
+
+      # concierge.html is one file with one very large inline script, and until
+      # 5 September 2026 nothing in CI read a line of it. Twice the same bug has
+      # shipped from it: the 17-18 August temporal dead zone that broke admin
+      # sign-in on a direct link, and one found on 5 September where three
+      # consts sat below the tile that read them, so loadOverview() threw
+      # "Cannot access 'owedOldest' before initialization" and rendered 13 tiles
+      # instead of 29, losing the entire "what needs me today" alert list.
+      # Both were found by walking into them.
+      #
+      # The check is deliberately ONE narrow rule rather than a style pass. The
+      # stock no-use-before-define reports 17 findings on this file, every one
+      # of them safe, because it flags reads inside functions that only run
+      # later. A job that cries wolf gets switched off. See the script.
+      - name: The desk has no dead zone reads
+        run: node scripts/check-desk-script.mjs
+
+  migrations:
+    name: New migrations sort last
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # needs the base branch to diff against
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Migrations were named <date><letter>: 20260904a, 20260904b, and so on.
+      # Parallel sessions share this repository and cannot see each other's
+      # branches, so two sessions both take the next free letter and both are
+      # right at the time. On 5 September 2026 that happened FOUR times in one
+      # day.
+      #
+      # It is dangerous rather than annoying because it does not conflict. The
+      # filenames differ, so git merges both sets silently into a directory
+      # whose entire purpose is applying things in order.
+      #
+      # The rule checked is "sorts last", not "looks like a timestamp", because
+      # the format alone does not give you the property: a 14-digit stamp added
+      # on a day that already has letter-suffixed files sorts BEFORE them, since
+      # '0' sorts before 'a'.
+      - name: A new migration must sort after every existing one
+        run: node scripts/check-migration-order.mjs
+        env:
+          MIGRATION_BASE_REF: origin/${{ github.base_ref || 'main' }}
+
+  taxonomy:
+    name: Job taxonomy has not drifted
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # The taxonomy exists in four copies: the generated source, a byte copy
+      # the marketing site loads, an inlined copy in the prototype, and a
+      # TypeScript restatement the app imports (the app cannot import a file
+      # that declares `var`). They agreed when this job was written and nothing
+      # kept them agreeing.
+      #
+      # This matters more than tidiness. The ONLY reason a client's roofing job
+      # and a worker's roofing profile find each other is that both came from
+      # one list. The day the copies diverge, a client posts a job in a trade no
+      # worker profile can carry and the two never meet, with both halves
+      # individually valid so nothing else notices. Same idea as the _shared
+      # drift check above, for the list the marketplace is built on.
+      - name: Check the four copies agree
+        run: node scripts/check-taxonomy.mjs
 
   secrets:
     name: No secrets committed
@@ -199,3 +341,35 @@ jobs:
             exit 1
           fi
           echo "No key-shaped strings found in tracked files."
+
+      # Added 4 Sep 2026. The scan above looks for prefixed key shapes (sk-,
+      # nvapi-, JWT). It cannot see a bare hex string, so it walked straight
+      # past the notify trigger secret, which is 64 hex characters and was
+      # committed as a plaintext literal in two migrations, in a public
+      # repository, twice. Rotation fixed the exposure; this step is what
+      # stops the third time.
+      #
+      # The two historical migrations are excluded by path on purpose. They
+      # are applied history: editing them would not remove the value from git
+      # history and rewriting applied migrations is its own hazard. The value
+      # in them is dead. See DECISIONS.md.
+      - name: Scan tracked files for bare hex secrets
+        run: |
+          set -e
+          # Real 64-hex values that are NOT secrets: content hashes, lockfile
+          # integrity fields, git object ids. Those are filtered by context on
+          # the line rather than by path, so a new lockfile does not silently
+          # widen the hole.
+          matches=$(git grep -nIE "['\"][0-9a-f]{64}['\"]" -- . \
+            ':!.github/workflows/ci.yml' \
+            ':!**/package-lock.json' \
+            ':!**/*.lock' \
+            ':!supabase/migrations/20260901g_workers_couldnt_reach_their_own_kickoff_pack.sql' \
+            ':!supabase/migrations/20260902c_quote_pack_dual_agreement.sql' \
+            | grep -viE 'sha-?256|sha-?512|checksum|integrity|digest|[^a-z]hash|fingerprint|commit|placeholder|example|redacted|x{8,}' || true)
+          if [ -n "$matches" ]; then
+            echo "$matches"
+            echo "::error::A bare 64-character hex literal is committed. If it is a secret, rotate it first, then remove it. If it is a content hash, name it so on the same line (sha256, checksum, digest)."
+            exit 1
+          fi
+          echo "No bare hex secrets found in tracked files."
