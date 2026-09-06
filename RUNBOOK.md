@@ -4476,3 +4476,107 @@ and `supabase/tests/job_alert_list_guards.sql` against the database, which
 checks eighteen things including that none of the four functions is reachable
 from the open internet and that the desk view still reads through row level
 security rather than round it.
+
+---
+
+## Changing which trade a job or a worker is matched on
+
+**`trade_key()` decides who hears about a job.** Both sides go through it: the
+trade on the job, and the trade on the worker's profile or the words an alert
+subscriber typed. That is the only reason a client's roofing job and a roofer
+find each other.
+
+**It is a chain of CASE branches, so the answer depends on their order, and
+every branch is a substring test.** This is the one function in the schema
+where adding a line in the wrong place is both the easiest mistake to make and
+the hardest to see, because a wrong trade key does not throw. It sends the job
+to the wrong tradespeople, or to nobody, and looks perfectly healthy doing it.
+
+**Two orderings are load bearing and have guard tests naming them:**
+
+- **Masonry above security.** The security branch matches `lock`, and the word
+  "block" contains it. Move security up and every piece of blockwork becomes a
+  locksmith job.
+- **Security above carpentry.** The carpentry branch matches `door`. Below it,
+  "Locks & Security Doors" was read as joinery while "CCTV & Alarms" was read as
+  security, splitting one trade in two. Fixed 7 September 2026.
+- **Solar above plumbing.** The plumbing branch matches `water`. Below it, a
+  solar water heater is a plumbing job.
+
+**Do not sort this function alphabetically or tidy it for readability.**
+
+### If you change it, three things have to happen in the same migration
+
+1. **Read the live definition first**, with `pg_get_functiondef`, rather than
+   copying the newest migration file. Section 18 explains why.
+2. **REINDEX `wp_match` and `jobs_match`.** Both are expression indexes built on
+   `trade_key(trade)`. Redefining the function does not rebuild them and
+   Postgres does not warn. The index keeps the values the old function produced
+   and queries silently return the wrong workers.
+   ```sql
+   reindex index public.wp_match;
+   reindex index public.jobs_match;
+   ```
+3. **Recompute `job_alert_subscribers.trade_keys`.** That column stores this
+   function's output, so a GIN index has a real column to read, which makes it a
+   cache of a function you have just changed. Their own words are kept in
+   `.trades` for exactly this purpose:
+   ```sql
+   update job_alert_subscribers s
+      set trade_keys = (select coalesce(array_agg(distinct trade_key(w)), '{}')
+                          from unnest(s.trades) as w where trade_key(w) is not null),
+          updated_at = now()
+    where coalesce(array_length(s.trades, 1), 0) > 0;
+   ```
+
+### Proving it
+
+`supabase/tests/trade_key_guards.sql` against the database. Ten checks,
+read only, including both ordering traps above and that every one of the
+eighteen published trades still produces a key. To see the whole mapping:
+
+```sql
+select n as trade, trade_key(n) as key
+  from unnest(string_to_array((select value from app_settings where key='trade_list'), ',')) as n
+ order by 2, 1;
+```
+
+**The eighteen published trades produce fourteen keys, and that is intended.**
+"Water Tank & Pump" and "Drainage & Septic" both read as plumbing, because a
+plumber does both and splitting them would narrow matching for nothing.
+"Fencing" has no branch and falls through to a cleaned copy of itself, which is
+safe precisely because both sides of a match fall through the same way.
+
+---
+
+## The founder's phone buzzed several times for one job
+
+**Fixed 7 September 2026, and if it comes back the cause is the same one.**
+`yaad-match` posted its ntfy notification inside the per worker loop, so a job
+matching twelve workers sent twelve identical pushes. `ntfy_topic` is one topic
+and it is Monique's phone, not any worker's.
+
+**The half worth checking for is the one nobody would notice.** Each push also
+wrote a `job_alerts` row saying that worker had been told on the ntfy channel,
+and `match_workers_for_job` strikes off anybody holding a `sent` row on **any**
+channel. A worker whose email bounced was excluded from every later run by a
+notification that never reached them.
+
+```sql
+select channel, status, count(*) from job_alerts group by 1, 2 order by 1, 2;
+```
+
+**There must be no rows on the `ntfy` channel.** The desk push is deliberately
+not recorded there any more: `job_alerts` is one row per worker per job per
+channel, and a push to the desk is none of those three. It is reported in
+`yaad-match`'s response as `desk_push` instead. If ntfy rows reappear, somebody
+has put the push back inside the loop, and
+`supabase/functions/yaad-match/desk-push_test.ts` should have caught it.
+
+**To clear the damage if it ever happens again**, delete only the ntfy rows.
+The workers they wrongly excluded become eligible on the next run, and no real
+alert record is touched:
+
+```sql
+delete from job_alerts where channel = 'ntfy';
+```
