@@ -45,9 +45,10 @@
  * the evidence table, which is immutable, with the GPS coordinate the phone
  * wrote into the file left on them. The portal's own route (job_photos) is
  * capped, goes to private storage, strips the location and can be deleted by
- * the person who sent it. So stage four explains what to photograph and the
- * confirmation screen hands over a link that lands directly on the upload,
- * and the file itself only ever travels the safe path.
+ * the person who sent it. So stage four explains what to photograph and hands
+ * over the link that lands directly on that upload, the confirmation screen
+ * offers the same link again, and the file itself only ever travels the safe
+ * path.
  *
  * The work goes to yaad-post-job in draft mode, which stores no personal data
  * at all. The contact details go separately to yaad-enquiry, which is the
@@ -651,14 +652,31 @@ export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: 
           {/* ── 4. photos and evidence ──────────────────────────────────── */}
           {key === "evidence" && (
             <div className="grid gap-3">
+              {/* "Saved" was printed here whether or not anything saved. A
+                  throttled draft leaves this screen with no reference at all,
+                  and the panel below now says so out loud, so the two would
+                  have contradicted each other on the same screen. */}
               <div className="rounded-xl border border-softline bg-soft px-4 py-3 text-[12.5px] leading-relaxed">
-                <b className="text-ink">Saved.</b>{" "}
-                <span className="text-mute">
-                  Your job is on file{jobId ? <> as <span className="font-mono text-ink">{jobId}</span></> : null}, before
-                  we have asked you for a single personal detail.{" "}
-                  <b className="text-ink">No worker can see it.</b> Nothing goes
-                  anywhere until you finish the last two screens.
-                </span>
+                {jobId ? (
+                  <>
+                    <b className="text-ink">Saved.</b>{" "}
+                    <span className="text-mute">
+                      Your job is on file as <span className="font-mono text-ink">{jobId}</span>, before
+                      we have asked you for a single personal detail.{" "}
+                      <b className="text-ink">No worker can see it.</b> Nothing goes
+                      anywhere until you finish the last two screens.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <b className="text-ink">Not saved, and nothing is lost.</b>{" "}
+                    <span className="text-mute">
+                      Your job has no reference on file, so there is nothing for
+                      anybody to see. Your answers are still on this screen and
+                      they reach us in full when you send on the last one.
+                    </span>
+                  </>
+                )}
               </div>
               <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
                 <b className="text-ink">Photos help more than anything else you
@@ -685,15 +703,63 @@ export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: 
               <div className="rounded-xl border border-teal/40 bg-teal/5 px-4 py-4 text-[13.5px] leading-relaxed text-mute">
                 <b className="text-ink">Where they go, and this is the part that
                 matters.</b>
-                <p className="mt-2">
-                  When you send this job, the next screen gives you a link that
-                  sets up your portal and lands you straight on the photo
-                  screen. That is the route: it stores them privately, strips
-                  the location your phone writes into the file, and lets you
-                  delete any of them later.{" "}
-                  <b className="text-ink">Nothing is published unless you say
-                  so.</b> WhatsApp works too, once we reply.
-                </p>
+                {/* THE LINK IS HERE, not only on the confirmation screen.
+                    This panel used to describe a link and then not give one,
+                    which asked somebody standing in front of the wet patch to
+                    remember a promise for two more screens. The portal code
+                    comes back from yaad-post-job on the first draft save, so
+                    by the time anybody reads this it already exists.
+
+                    NEW TAB, deliberately. Sending the job is what puts it in
+                    front of a person; the portal on its own does not. Taking
+                    over this tab would let somebody upload six photographs and
+                    never send the job, and the answers are only in
+                    localStorage. One caveat worth knowing: joining the portal
+                    attaches an email to the job, and yaad-post-job will not
+                    let an anonymous caller update a claimed draft, so going
+                    back and changing an answer after joining shows the save
+                    error and its carry on anyway button. */}
+                {jobId && portalCode ? (
+                  <>
+                    <p className="mt-2">
+                      Here is the link, now rather than at the end. It sets up
+                      your portal and lands you straight on the photo screen.
+                      That is the route: it stores them privately, strips the
+                      location your phone writes into the file, and lets you
+                      delete any of them later.{" "}
+                      <b className="text-ink">Nothing is published unless you
+                      say so.</b> WhatsApp works too, once we reply.
+                    </p>
+                    <Link
+                      href={`/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}&next=photos`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
+                    >
+                      Attach your photos, in a new tab
+                    </Link>
+                    <p className="mt-3 text-[12.5px]">
+                      It opens in a new tab so this form stays exactly as you
+                      left it. Come back here and finish the last screen either
+                      way: the job only reaches a person when you send it. Your
+                      job code, if you are asked for it:{" "}
+                      <span className="font-mono text-ink">{portalCode}</span>.
+                      The same link is waiting on the confirmation screen, so
+                      nothing is lost by leaving the photos until after you
+                      have sent this.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2">
+                    Your job has no reference saved against it, so there is no
+                    photo link to hand you here. Send it on the last screen and
+                    we will sort the photographs out when we reply, by message
+                    or on WhatsApp. However they reach us they are stored
+                    privately, and{" "}
+                    <b className="text-ink">nothing is published unless you say
+                    so.</b>
+                  </p>
+                )}
               </div>
             </div>
           )}

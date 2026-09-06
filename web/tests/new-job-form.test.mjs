@@ -33,6 +33,7 @@ import { register } from "node:module";
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(HERE, "ts-resolve-hooks.mjs")));
@@ -268,5 +269,58 @@ describe("restoring only ever offers values the lists still have", () => {
       { trades: ["Roofing"], parishes: ["Kingston"] });
     assert.equal(r.urgency, "Urgent, within 48 hours");
     assert.equal(r.accessType, "No inside access needed, outside work only");
+  });
+});
+
+describe("the photo stage hands over a link, not a promise of one", () => {
+  /* Added 6 Sep 2026, founder instruction: the photo screen described a link
+     and did not give one. It told somebody standing in front of the problem
+     to remember, for two more screens, a route they could have taken there
+     and then.
+
+     Three properties, and each one is here because losing it quietly is easy.
+
+     The link itself, aimed at next=photos, which is the only value the join
+     page honours as a destination. Without it a client lands on /portal and
+     hunts for the job, the board preview and an Add a photo button.
+
+     target="_blank". Sending the job is what puts it in front of a person.
+     The portal on its own does not, and the answers on the screen behind it
+     live in localStorage and nowhere else. A link that takes over the tab
+     lets somebody upload six photographs of their mother's roof and never
+     send the job at all.
+
+     A branch for the case where no reference saved. yaad-post-job is
+     throttled per caller per hour and can trip on a shared connection, and
+     that person carries on with no jobId and no portal code. Rendering a
+     dead link at them is worse than the sentence that says why there is no
+     link yet. */
+  const source = readFileSync(join(HERE, "../app/jobs/new/PostJob.tsx"), "utf8");
+  const evidence = source.slice(
+    source.indexOf('key === "evidence"'),
+    source.indexOf('key === "reach"'),
+  );
+
+  test("the evidence stage exists in the source and was found", () => {
+    assert.ok(evidence.length > 500);
+  });
+
+  test("it links straight to the photo screen, not to the portal front door", () => {
+    assert.match(evidence, /\/portal\/join\?job=/);
+    assert.match(evidence, /next=photos/);
+  });
+
+  test("that link opens in a new tab, so an unsent job cannot be lost behind it", () => {
+    assert.match(evidence, /target="_blank"/);
+    assert.match(evidence, /rel="noopener noreferrer"/);
+  });
+
+  test("it says out loud that the job still has to be sent from this tab", () => {
+    assert.match(evidence, /only reaches a person when you send it/);
+  });
+
+  test("a draft that never saved gets a sentence instead of a broken link", () => {
+    assert.match(evidence, /jobId && portalCode \?/);
+    assert.match(evidence, /no reference saved against it/);
   });
 });

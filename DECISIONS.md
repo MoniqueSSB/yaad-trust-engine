@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The photo screen hands over the link instead of describing one
+
+**Founder instruction, reading her own funnel: this section needs a link to attach your pictures.** Stage four of `/jobs/new` told a client that photographs are the single thing that turns a guess into a quote, listed the four worth taking, and then said the link to send them would arrive on a later screen. Somebody standing in front of the wet patch with a phone in their hand was being asked to remember a promise for two more screens. The link existed the whole time: `yaad-post-job` returns `portalCode` on the first draft save and again on every update, so by the time anybody reads that paragraph the route to `/portal/join?job=...&code=...&next=photos` is already known to the page. It was simply never rendered until the confirmation screen.
+
+**It opens in a new tab, and that is the load bearing part of this change.** Sending the job is what puts it in front of a person. The portal on its own does not: the draft sits unclaimed, the enquiry that reaches Monique is a separate call on the last screen, and the answers behind the link live in `localStorage` and nowhere else. A link that took over the tab would let somebody upload six photographs of their mother's roof and never send the job at all, and they would never know. So `target="_blank"`, `rel="noopener noreferrer"`, and the copy says out loud that the form is still open behind it and the job only reaches a person when they send it. `tests/new-job-form.test.mjs` asserts the href, the `next=photos` destination and the new tab, because all three are easy to lose to a tidy-up that reads better.
+
+**One known consequence, stated rather than discovered later.** Joining the portal attaches an email to the job, and `yaad-post-job` only lets an anonymous caller update an unclaimed draft. So a client who takes the link, joins, comes back and then edits an earlier answer meets the save error and its "carry on anyway" button. That path costs a reference number, not their words, which is the trade the error box was built for.
+
+**And the panel above it stopped saying "Saved" when nothing saved.** The draft save is throttled per caller per hour and trips on a shared connection; that person continues with no reference at all, and the screen still opened with "Saved. Your job is on file." It now says it is not saved, that there is nothing for anybody to see, and that the answers still reach us on send. The photo panel has an honest branch for the same case: no reference means no link to hand over, so it says so instead of rendering a dead one.
+
+---
+
 ## 2026-09-06 · The homepage leads with the crew and the gate, and the two doors go back to being lit
 
 **Implemented from the founder's own Claude Design file, "Yaadly Home - Crew".** The design was read off the design project rather than rebuilt from a screenshot, so the colours, radii, timings and copy below are hers, not an interpretation. Three things landed: a new hero, a band showing the four assistants running a wire into a gold gate, and a restyle of the two doors. The `_ds_bundle.js` and `support.js` the file imports were checked and deliberately not brought across. The bundle's manifest declares no tokens and no global CSS, so it contributes nothing to how the page looks, and `support.js` is the design canvas runtime that interprets `<x-dc>`, `<sc-if>` and `style-hover`. Those became ordinary markup and real `:hover` rules here.
