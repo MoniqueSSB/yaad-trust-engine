@@ -44,6 +44,7 @@ two copies of one prompt with only one of them maintained.)
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
 | `yaad-quote-pack-rescan` | true | An admin corrects a held quote pack's wording; the same verdict function the drafter uses decides again. Approves nothing, never touches `status`, calls no model. |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |
+| `yaad-job-photo` | **false** | Photographs attached on the job form at `/jobs/new`, where the person filling it in has no account by deliberate decision. Three calls per photograph, the same shape as `yaad-vetting-upload`: `start` picks the path and signs an upload URL, the browser PUTs straight into the private `intake` bucket, `finish` downloads what arrived, strips every APP1 segment (the phone's GPS) and only then writes the `job_photos` row. `remove` takes one back. The credential is the pair (job id, portal code) and it only opens while the job is unclaimed: once a `client_email` is on the job, the portal is the route. Writes `board_ok = false` always, with no input that can change it |
 | `yaad-enquiry` | false | Public contact form on yaadly.co.uk → enquiry row + emailed receipt |
 | `yaad-invoice` | true | Invoicing agent: instruction → numbered draft invoice, admin session only |
 | `yaad-sketch` | true | Site Sketch Pack: video stills → rooms, condition schedule, schematic, admin session only |
@@ -55,13 +56,15 @@ two copies of one prompt with only one of them maintained.)
 | `yaad-evidence-sweep` | true | Nightly housekeeping on `evidence/_pending/`, the prefix `yaad-inbound` stages inbound WhatsApp photos into before the worker has said which job they belong to. Deletes staged objects older than 72 hours that no live intake session still names and no `public.evidence` row claims, and drops the abandoned session row with them. Scheduled by pg_cron at 04:23 UTC, same secret-hash pattern as `yaad-vetting-purge` (`20260906013700`). `POST {"dry_run": true}` counts without deleting |
 
 `verify_jwt` matters, and the count in this paragraph was wrong too. It said
-three public endpoints. As at 4 September 2026 **ten** run with `verify_jwt =
-false`: `yaad-book-service`, `yaad-enquiry`, `yaad-inbound`,
-`yaad-notify-client`, `yaad-portal-code`, `yaad-post-job`, `yaad-quote-landed`,
+three public endpoints. Verified live on 6 September 2026, **twelve** run with
+`verify_jwt = false`: `yaad-book-service`, `yaad-enquiry`, `yaad-inbound`,
+`yaad-job-photo`, `yaad-message-status`, `yaad-notify-client`,
+`yaad-portal-code`, `yaad-post-job`, `yaad-quote-landed`,
 `yaad-vetting-review`, `yaad-vetting-upload` and `yaad-website-intake`. Each
 carries its own authentication instead: a signature check, an origin check, a
-throttle, or a shared secret. An anonymous website visitor has no Supabase
-session, so these cannot be "fixed" to `true`.
+throttle, a shared secret, or a code that only opens an unclaimed row. An
+anonymous website visitor has no Supabase session, so these cannot be "fixed"
+to `true`.
 
 Read that list live before acting on it, exactly as CLAUDE.md §12 says. This
 line has now been wrong twice, and it is the control.

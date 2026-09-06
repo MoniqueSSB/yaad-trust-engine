@@ -4082,3 +4082,41 @@ supabase secrets set GOOGLE_MAPS_API_KEY=your-key --project-ref leffyisvfvjwzily
 ```
 
   "Google would not give a map for that address" means the key is restricted away from the Maps Static API or has no billing account behind it. Unset the secret and the free OpenStreetMap map comes back.
+
+## 26. A photograph attached on the job form did not arrive
+
+The form at `/jobs/new` uploads through `yaad-job-photo`, which is a different
+route from the portal's own upload and from WhatsApp. What lands is a row in
+`job_photos` with `source = 'client'` and a file in the private `intake`
+bucket under `client/<job id>/`. The desk sees it under **Job photos**.
+
+Read the log with the Supabase MCP `query_logs` tool, or
+`supabase functions logs yaad-job-photo --project-ref leffyisvfvjwzilydlwf`.
+The span attribute `yaadly.photo.outcome` names what happened.
+
+- **"That job code is not valid."** The pair (job id, portal code) did not
+  match a row. Check the code on the job: `select id, portal_code from jobs
+  where id = '<job>'`. The client sees this if they reload the form after the
+  draft was cleared, because the code only lives in the page.
+- **"This job already has an account on it."** Correct, and the door closing
+  as designed: the moment a `client_email` is on the job it belongs to an
+  account, and photographs go through the portal, where the client's own
+  session and a Postgres policy decide. Send them the portal link.
+- **"That photo did not arrive."** The signed upload URL was issued and the
+  file never reached the bucket, usually a phone losing signal mid-upload.
+  Nothing is recorded, so they simply try again.
+- **"That photo could not be stored safely."** The GPS strip could not be
+  written back, so the function refused rather than keep a photograph with its
+  location on it. The file is deleted. Ask them to send it again, and if it
+  repeats, that image is worth looking at by hand.
+- **"That is 8 photographs, which is plenty."** The per-job cap on this door,
+  counted across every route. More can come in through the portal or WhatsApp
+  once there is an account.
+- **A client wants one taken down after they have sent the job.** The × on the
+  form only works while they are still on it. Afterwards it is the desk:
+  Job photos, find the row, and delete it there.
+
+Nothing this endpoint writes is public. `board_ok` is false on every row it
+creates and there is no input that can change it, so publishing to
+`app.yaadly.co.uk/jobs` stays a decision at the desk.
+
