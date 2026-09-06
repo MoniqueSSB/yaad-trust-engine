@@ -325,6 +325,62 @@ The span attributes `yaadly.guardrail.blocked` and `yaadly.guardrail.terms` carr
 
 ---
 
+## 10a. A client was asked to repeat what they had just said
+
+The reply that fires here is the fixed opener: *"Thanks for writing in. Yaadly gets property work done in Jamaica... Tell me what needs doing, which parish the property is in, and who can let a worker in."* It is correct for a message with no readable content in it and wrong for everything else, so seeing it after somebody clearly said something means a model call failed upstream.
+
+**Their words are not lost.** Check first, so you can answer them properly:
+
+```bash
+# the thread, with everything they actually said
+select transcript, turns, stage, job_id from intake_threads order by last_at desc limit 5;
+```
+
+Then find which of the two calls failed, in the `yaad-inbound` function logs:
+
+- `classify: threw: TimeoutError` or `classify: mistral http 429`, the **classifier** died. Since 6 September 2026 this no longer costs the reply: the writer runs anyway and answers from the transcript. If you are seeing the opener *and* a classifier error, the writer failed too, which is the next line.
+- `compose: skipped, no time left`, the **writer** never started. Something above it ate the budget. Look at `yaadly.request.spent_ms` on the trace and at how long the transcription took.
+- Neither in the logs, and the reply probably went out fine and the opener you are looking at is older than you think. Check `last_at`.
+
+**Since 6 September 2026 this path hands over by itself.** When neither model produced anything and the client did say something, `handingOver` is set, the thread is marked `human_handling`, the job row is written so there is something to open, and the client is told plainly that it is going to a person rather than being asked to say it again. So the realistic version of this ticket is now "she is waiting on you", not "she was insulted by a robot".
+
+**Do not fix this by widening a timeout.** The whole point of `deadline.ts` is that the request has somewhere to be: Twilio abandons an inbound webhook at about fifteen seconds and the client gets nothing at all. If the budget is genuinely too tight, the thing to cut is work, not the deadline. See §9a for the Mistral rate limit, which is the usual cause and is a paid-capacity decision, not a code one.
+
+---
+
+## 10b. Somebody asked a question and got interrogated about a job
+
+From 6 September 2026 a message that is a question rather than work being described is answered as a question. It writes **no job row at all**, gets no reference number, and is not pushed at a person after three turns. It is still recorded in full under **Conversations** on the desk, which is where to read it. The phone push for one is titled *"A question on whatsapp"* and says there is nothing for you to do.
+
+If a question is still being treated as a job intake:
+
+1. Look at the trace for `yaadly.reply.source`. `none` means neither model wrote anything, so the writer's own override could not run either. That is §10a, not this.
+2. Otherwise the classifier returned `asking: false`. It is one model call's read of one message. The writer has an override for exactly this and answers from the conversation regardless, so a wrong `asking` should cost the job row decision, not the reply. If the reply itself is interrogating them, the writer's brief in `COMPOSE_SYSTEM` has drifted: check the `STATE helping` block and the override paragraph under `STATE gathering` are both still there. `asking_test.ts` asserts both.
+
+**The opposite failure is the one that costs money.** A real job filed as a question writes no row. `justAsking` therefore requires the classifier to say so *and* scope, trade and parish to all be empty, so a message with any actual work in it is written up as it always was. If a real job ever goes missing this way, that condition is the first thing to read.
+
+---
+
+## 10c. A voice note came back empty, or transcription is slow
+
+`yaad-transcribe` runs a failover chain: Cloudflare Workers AI Whisper first, then OpenAI, Deepgram, Scribe, AssemblyAI, whichever keys are set. The first provider can return an **empty transcript rather than an error**, which reads as "nothing was said" and is not the same thing.
+
+From 6 September 2026 `transcribeUrl` in `yaad-inbound` tries twice on bytes it already holds, and the caller records `msg.transcribeTried` before the attempt so the second call site cannot download the same audio from Twilio again. Before that, an empty first attempt cost a full second download: 5.7 seconds of a 12 second budget for one short note, which is what left no room for anything else.
+
+To see it:
+
+```sql
+-- two yaad-transcribe invocations close together used to mean a wasted download
+select timestamp, log_attributes['function_id'] as fn, log_attributes['execution_time_ms'] as ms
+from logs where source = 'function_edge_logs' order by timestamp desc limit 40;
+```
+
+`yaad-transcribe` is `c9e4d794-da76-4ff3-83f5-c1ec1bd93e0b`, `yaad-inbound` is `02d2d78a-418d-4743-a2e3-ed338c19bbde`. Two transcribe rows inside one inbound request is now a retry on held bytes, which is cheap and expected. Two *inbound-triggered downloads* is the bug and should not happen.
+
+The trace carries `yaadly.transcribe.retried` when the second attempt ran. If that is firing often, the first provider in the chain is unreliable and the order in `yaad-transcribe/index.ts` is worth revisiting. That is a provider choice, and where model calls are routed is Monique's decision, not a tuning knob.
+
+---
+
 ## Publishing a worker profile
 
 **The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.

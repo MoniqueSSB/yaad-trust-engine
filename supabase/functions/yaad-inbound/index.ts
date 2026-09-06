@@ -56,7 +56,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 type Media = { url: string; mime: string };
-type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string; messageId?: string; tapped?: boolean; lat?: number; lon?: number; place?: string };
+type Inbound = { channel: string; from: string; name: string; text: string; media: Media[]; resendId?: string; subject?: string; messageId?: string; tapped?: boolean; lat?: number; lon?: number; place?: string; transcribeTried?: boolean };
 
 /** photo, video, audio or file, from whatever Twilio says it is. */
 function mediaKind(mime: string): string {
@@ -577,17 +577,46 @@ async function transcribeUrl(url: string, trace: Trace, deadline: Deadline): Pro
       const bytes = new Uint8Array(await f.arrayBuffer());
       let bin = "";
       for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-      const transcribeSig = deadline.signal(4_000, 4_500, 1_200);
-      if (!transcribeSig) { sp.recordError("skipped: no time to transcribe"); return ""; }
-      const r = await fetch(`${SUPABASE_URL}/functions/v1/yaad-transcribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-        body: JSON.stringify({ audio: btoa(bin), filename: "note.ogg" }),
-        signal: transcribeSig,
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) { sp.recordError(j?.error ?? `transcribe ${r.status}`); return ""; }
-      return s(j.text);
+      // TWO ATTEMPTS, ONE DOWNLOAD.
+      //
+      // On 6 September 2026 a real voice note was transcribed twice. The first
+      // attempt came back empty and the second returned the words, so the
+      // retry was worth having: without it there would have been no transcript
+      // at all. What was not worth having is what the retry cost. The two
+      // attempts were two separate calls to this function, from the two call
+      // sites in the handler, and each one fetched the same audio from Twilio
+      // again first. Five point seven seconds of a twelve second budget, for
+      // one short note, most of it spent downloading the same file twice.
+      //
+      // So the retry lives here now, where the bytes are already in hand. A
+      // second attempt costs one more round trip to yaad-transcribe and no
+      // second download. It only runs when the budget can still afford a full
+      // slice for it, so a retry can never be the thing that eats the reply.
+      //
+      // Why an empty first attempt happens at all is not settled. The speech
+      // providers are tried in a failover chain inside yaad-transcribe and the
+      // first one in it can return an empty transcript rather than an error,
+      // which reads as "nothing was said" and is not the same thing. That is
+      // worth chasing separately; it is not a reason to make the client say it
+      // twice in the meantime.
+      const audio = btoa(bin);
+      const attempt = async (): Promise<string> => {
+        const transcribeSig = deadline.signal(4_000, 4_500, 1_200);
+        if (!transcribeSig) { sp.recordError("skipped: no time to transcribe"); return ""; }
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/yaad-transcribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ audio, filename: "note.ogg" }),
+          signal: transcribeSig,
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j?.ok) { sp.recordError(j?.error ?? `transcribe ${r.status}`); return ""; }
+        return s(j.text);
+      };
+      const first = await attempt();
+      if (first) return first;
+      sp.setAttributes({ "yaadly.transcribe.retried": true });
+      return await attempt();
     });
   } catch (_) { return ""; }
 }
@@ -718,6 +747,7 @@ type IntakeCard = {
   title: string; scope: string; trade: string; urgency: string; parish: string;
   client_name: string; client_email: string; access_note: string;
   questions: string[]; enough: boolean; confirmed: boolean; wants_human: boolean;
+  asking: boolean;
 };
 
 const CLASSIFY_SYSTEM =
@@ -736,7 +766,7 @@ Output one JSON object and nothing else, no explanation before or after.
 Never invent a fact. If something is not in the conversation, use "".
 
 Return exactly:
-{"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""],"enough":false,"confirmed":false,"wants_human":false}
+{"title":"","scope":"","trade":"","urgency":"","parish":"","client_name":"","client_email":"","access_note":"","questions":["",""],"enough":false,"confirmed":false,"wants_human":false,"asking":false}
 
 title: a short name for the job, in their own nouns.
 scope: one or two plain sentences a tradesperson could act on.
@@ -764,6 +794,22 @@ confirmation, it is more information. Silence is not confirmation.
 on the phone, or say they would rather explain it to somebody. Being annoyed is
 not the same as asking for a person; only set it when they actually ask.
 
+"asking" is true when the LATEST thing they said is a question or a first
+contact rather than work they want done. Somebody saying hello, asking how
+Yaadly works, what it costs, whether you cover their parish, how workers are
+chosen, whether their money is safe, or asking about something that is not
+property at all. It is about what they WANT from this message, not about
+whether there is a question mark.
+
+"asking" and the job fields are not opposites and both can be true at once.
+"My roof is leaking in Portland, how does this work" is a job AND a question:
+fill in the job fields as normal and set "asking" true as well. Only leave the
+job fields empty when they genuinely have not described any work yet.
+
+Set it honestly. It decides whether this person is answered or is asked for
+their parish, and getting it wrong means somebody who asked a plain question is
+interrogated about a job they never mentioned.
+
 A line like [they attached 2 photos] means media came with the message.`;
 
 /** Extraction only. Strict JSON, temperature 0, no reply field anywhere. */
@@ -787,7 +833,22 @@ async function classifyTheJob(
   if (!prov || !text.trim()) return null;
 
   // Leave the writer its slice and the database writes theirs.
-  const sig = deadline.signal(5_000, 2_500, 1_500);
+  //
+  // 5_500, raised from 2_500 on 6 September 2026, and the old number could not
+  // do the job its own comment claimed. The writer asks for
+  // deadline.signal(4_000, 1_500, 1_200), so it refuses to start at all with
+  // less than 2_700 left. This step was reserving 2_500. A classifier that ran
+  // to its full deadline therefore GUARANTEED the writer was skipped, every
+  // time, by two hundred milliseconds. That is not a tuning question, it is
+  // two numbers that were never checked against each other.
+  //
+  // 5_500 is the writer's want plus the writer's own reserve, so what this
+  // leaves behind is enough for a good reply and not merely enough to start
+  // one and fail. The cost is that the classifier is now the first thing
+  // dropped when a request is running late, and that is the right way round:
+  // a missing card is a thinner job row for a person to finish, a missing
+  // reply is a client who thinks they were ignored.
+  const sig = deadline.signal(5_000, 5_500, 1_500);
   if (!sig) {
     console.error("classify: skipped, no time left in the request budget");
     trace.startSpan("classify skipped, out of time").recordError("deadline").end();
@@ -873,8 +934,25 @@ Rules:
 
 WHAT TO WRITE depends on the state you are given:
 
-- STATE gathering: ask for AT MOST TWO missing things, the two a worker would
-  refuse to quote without. Ask them the way a person would.
+- STATE helping: they have asked a question, or they are just making contact,
+  and they have not described work they want done. ANSWER THEM. Answer the
+  question they actually asked, from the facts below, in plain words. Do NOT
+  ask them for a parish, for access, or for what needs doing. They have not
+  said there is a job, and being asked to fill in a job they never mentioned is
+  how somebody decides this is a form rather than a person. If you cannot
+  answer it from the facts below, say so plainly and say somebody at Yaadly can
+  answer it properly. One short, genuine offer at the end is plenty, along the
+  lines that if they do have something needing doing you can take it from
+  there. Never more than one.
+- STATE gathering: they have described work they want done, so ask for AT MOST
+  TWO missing things, the two a worker would refuse to quote without. Ask them
+  the way a person would.
+  BUT READ THE CONVERSATION FIRST. If they have not actually described any work
+  yet, ignore this state and follow STATE helping instead. Never ask what needs
+  doing of somebody who has just told you, and never demand a parish from
+  somebody who only asked a question. This override exists because the step
+  that works out which state you are in can fail, and when it does you are
+  handed "gathering" by default; you can see the conversation and it cannot.
 - STATE confirming: read the job back in plain sentences, everything known, and
   end by asking whether that is right and whether there is anything else. That
   is the ONE question always asked before a job is written up, because nobody
@@ -939,9 +1017,28 @@ ${FAQ_FACTS}
 If you do not know something, say you will have it checked rather than
 guessing. Never invent a worker, a timescale, a fee, or a guarantee.`;
 
-/** Writing only. Plain text out, so there is no envelope to fail at. */
+/** Writing only. Plain text out, so there is no envelope to fail at.
+ *
+ *  THE CARD IS OPTIONAL, and that is the whole point of this signature.
+ *
+ *  Found live on 6 September 2026, on a real voice note to the Yaadly number.
+ *  Whisper transcribed it correctly: "I want some work done in my property as
+ *  there is a leak in the back room in Portmore." The classifier then called
+ *  Mistral, was rate limited, retried, was rate limited again, failed over to
+ *  the backup model and ran out of clock, so it returned null. The caller read
+ *  that null as "no card, so nothing to write about" and never ran this
+ *  function at all. What went out was the fixed opener written for a message
+ *  with no readable content in it, asking her what needs doing and which
+ *  parish. She had just said both.
+ *
+ *  The writer never needed the card. It is handed the whole conversation and
+ *  the card only ever fills the "already understood" block, which has always
+ *  had "nothing understood yet" as its own empty case. A failed extraction is
+ *  a thinner job row for a person to finish. A skipped reply is a client
+ *  ignored. Those are not the same size of loss, and the code treated them as
+ *  if they were. */
 async function composeReply(
-  transcript: string, card: IntakeCard, stage: "gathering" | "confirming" | "done",
+  transcript: string, card: IntakeCard | null, stage: "gathering" | "confirming" | "done" | "helping",
   trace: Trace, deadline: Deadline, paused = false,
 ): Promise<string> {
   if (paused) return "";
@@ -957,13 +1054,13 @@ async function composeReply(
   }
 
   const known = [
-    card.title ? `title: ${card.title}` : "",
-    card.scope ? `what the work is: ${card.scope}` : "",
-    card.trade ? `trade: ${card.trade}` : "",
-    card.parish ? `parish: ${card.parish}` : "",
-    card.access_note ? `access: ${card.access_note}` : "",
-    card.urgency ? `urgency: ${card.urgency}` : "",
-    Array.isArray(card.questions) && card.questions.filter(Boolean).length
+    card?.title ? `title: ${card.title}` : "",
+    card?.scope ? `what the work is: ${card.scope}` : "",
+    card?.trade ? `trade: ${card.trade}` : "",
+    card?.parish ? `parish: ${card.parish}` : "",
+    card?.access_note ? `access: ${card.access_note}` : "",
+    card?.urgency ? `urgency: ${card.urgency}` : "",
+    Array.isArray(card?.questions) && card.questions.filter(Boolean).length
       ? `still worth asking: ${card.questions.filter(Boolean).join("; ")}` : "",
   ].filter(Boolean).join("\n") || "nothing understood yet";
 
@@ -2505,9 +2602,23 @@ Deno.serve(async (req: Request) => {
       // on msg.text, and some of them take a consequential action from it.
       // Handing those a machine transcript of a voice note is a separate
       // decision with a human gate in it, and it is not this change.
+      // msg.transcribeTried below is recorded BEFORE the attempt, not after,
+      // and that ordering is the whole point. A transcription that comes back
+      // empty leaves msg.text empty too, so the guard on the second call site
+      // further down stays open and the same audio is downloaded from Twilio
+      // and transcribed all over again. That is what happened on 6 September
+      // 2026 and it cost the client her reply: 5.7 seconds of a 12 second
+      // budget spent fetching one short voice note twice. transcribeUrl now
+      // carries its own retry on bytes it already holds, so a second trip from
+      // out here buys nothing and spends what is left of the budget.
+      //
+      // The comment sits above the guard rather than inside it because
+      // voice-once_test.ts reads the source around each call to check the
+      // guard is still there, and a long comment between the two hides it.
       if (!msg.text) {
         const voiceNote = msg.media.find((m) => m.mime.startsWith("audio/"));
         if (voiceNote) {
+          msg.transcribeTried = true;
           const said = (await transcribeUrl(voiceNote.url, trace, deadline)).trim();
           if (said) { msg.text = said; spoken = true; }
         }
@@ -2568,7 +2679,7 @@ Deno.serve(async (req: Request) => {
     // no-op; the guard is what makes it one. On email and the website chat
     // this is still where it happens, and still only once.
     const voice = msg.media.find((m) => m.mime.startsWith("audio/") || (!m.mime && !msg.text));
-    if (!msg.text && voice) {
+    if (!msg.text && !msg.transcribeTried && voice) {
       const said = await transcribeUrl(voice.url, trace, deadline);
       if (said) { msg.text = said; spoken = true; }
     }
@@ -2808,6 +2919,33 @@ Deno.serve(async (req: Request) => {
       : enough ? "confirming"
       : "gathering";
 
+    // ── somebody asking, rather than somebody loading a job ────────────────
+    //
+    // Founder's instruction, 6 September 2026: "People should be able to
+    // contact me on WhatsApp and get help. Not only just load a job."
+    //
+    // Everything below the classifier was built on one assumption, that an
+    // inbound message is work being described. It is a fair assumption for
+    // most messages and it was wrong for all the others. "How do you choose
+    // workers" became a job titled "Someone writing in on whatsapp", sitting
+    // in the job list, and its author was asked which parish the property is
+    // in. There is a real one in the database from this morning.
+    //
+    // justAsking is deliberately narrow. It needs the classifier to have
+    // positively said so AND no work to have been described, because the
+    // consequences below (no job row, no handover at three turns) should
+    // never fire on a guess. A null card, a failed classification or any hint
+    // of actual work all fall back to exactly the behaviour that was here
+    // before, which is the one that already works for a job.
+    const justAsking = card?.asking === true && !enough &&
+      !s(card?.scope) && !s(card?.trade) && !s(card?.parish);
+    // What the WRITER is told, which is not always what the THREAD records.
+    // intake_threads.stage has a check constraint of gathering, confirming or
+    // done, and widening a database constraint to carry a hint for a prompt
+    // would be the tail wagging the dog. The thread keeps saying gathering,
+    // which is true: nothing has been gathered.
+    const writerState = justAsking ? "helping" as const : stage;
+
     // JOB-WHAT-… helps nobody. Name the door it came through.
     // The writer runs here and not next to the classifier, because what it
     // has to write depends on the stage, and the stage is only settled once
@@ -2819,7 +2957,23 @@ Deno.serve(async (req: Request) => {
     // the reply is built from the card rather than falling all the way back to
     // the fixed generic opener, which would ask somebody who has just
     // described their roof what needs doing.
-    let written = card ? await composeReply(transcript, card, stage, trace, deadline, agentsPaused) : "";
+    //
+    // THE WRITER RUNS WHETHER OR NOT THE CLASSIFIER DID, 6 September 2026.
+    // This line used to read `card ? await composeReply(...) : ""`, so a
+    // classifier that failed took the reply down with it and the client got
+    // the fixed opener. See composeReply's own comment for the voice note that
+    // found it. The degradation ladder had a rung missing: the writer was
+    // treated as the droppable step because it "falls back to the card", and
+    // then the card was the thing that was gone.
+    //
+    // The ladder as it actually stands now, best to worst:
+    //   classifier and writer both ran   the reply, and a full job row
+    //   writer only                      the reply, and a thin job row
+    //   classifier only                  replyFromCard, built from the facts
+    //   neither                          the honest handover further down
+    // Every rung says something true. None of them asks somebody to repeat
+    // what they have just said.
+    let written = await composeReply(transcript, card, writerState, trace, deadline, agentsPaused);
     let replyFrom = written ? "model" : "none";
     if (!written && card && !agentsPaused) {
       written = replyFromCard(card, stage);
@@ -2832,7 +2986,17 @@ Deno.serve(async (req: Request) => {
     });
 
     const CODE: Record<string, string> = { whatsapp: "WA", sms: "SMS", email: "EMAIL", web: "WEB", generic: "WEB" };
-    const jobId = continuing ? String(prior!.job_id) : `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
+    // A thread can now exist without a job, so "continuing" and "already has a
+    // job" stopped being the same question on 6 September 2026. They were the
+    // same for as long as every inbound message wrote a job row.
+    //
+    // priorJobId is the one that decides INSERT or UPDATE below. Somebody who
+    // asks two questions and then describes their roof has a thread on turn
+    // three and no job, and updating a row that was never written silently
+    // matches nothing. jobId is still minted here so the code exists the
+    // moment it is needed, and it is only spoken aloud once a row carries it.
+    const priorJobId = continuing ? s(prior!.job_id) : "";
+    const jobId = priorJobId || `JOB-${CODE[msg.channel] ?? "WEB"}-${Date.now()}`;
     const turns = continuing ? Number(prior!.turns) + 1 : 1;
 
     // Photographs are the single most useful thing a client can hand a worker,
@@ -2892,10 +3056,35 @@ Deno.serve(async (req: Request) => {
     const contactIn = (typedEmail || emailIn || phoneIn || "").slice(0, 200);
 
     const HANDOFF_TURNS = 3;
+    // Did they actually say anything? msg.text is either their words, a
+    // transcript of them, or the honest placeholder set when a voice note
+    // could not be read. The placeholder is the one case where asking what
+    // needs doing is the right question, because nothing was received.
+    const saidSomething = msg.text.trim().length > 0 &&
+      !msg.text.startsWith("[message with no readable text");
+    // Neither model produced a reply: the writer failed or was skipped, and
+    // there was no card to build one from either. Added 6 September 2026
+    // alongside the writer fix above, because the two rungs of the ladder
+    // below the writer both end here, and a client at the bottom of that
+    // ladder is somebody nothing can answer right now. That is a person's
+    // job, and the thread should say so rather than quietly try again next
+    // turn with the same two model calls that just failed.
+    const modelSaidNothing = replyFrom === "none";
     // A paused assistant hands every thread over. It has just declined to
     // answer, so leaving the thread with a machine that will not speak is the
     // one outcome worse than answering.
-    const handingOver = wantsHuman || agentsPaused || (!enough && turns >= HANDOFF_TURNS);
+    // justAsking is exempt from the three turn rule, founder's decision,
+    // 6 September 2026: "keep answering, offer a person". Somebody working
+    // through four questions about how Yaadly works is not a stalled intake,
+    // and pushing them into Monique's inbox on the third one turns every
+    // curious stranger into an email she owes. They reach a person the moment
+    // they ask for one (wantsHuman, above, which is a word match as well as a
+    // model read so it survives a failed classification) or the moment nothing
+    // can answer them (modelSaidNothing). A conversation that turns into a
+    // real job stops being justAsking on that turn and the rule applies again.
+    const handingOver = wantsHuman || agentsPaused ||
+      (modelSaidNothing && saidSomething) ||
+      (!enough && !justAsking && turns >= HANDOFF_TURNS);
 
     const descr = [
       s(card?.scope) || transcript,
@@ -2953,7 +3142,33 @@ Deno.serve(async (req: Request) => {
     // client_email a later message has no way of knowing was already proven.
     if (provenEmail) row.client_email = provenEmail;
 
-    const { data, error } = continuing
+    // NO ROW UNTIL THERE IS A JOB. Founder's decision, 6 September 2026.
+    //
+    // A question is not a job, and until today every question became one: a
+    // draft titled "Someone writing in on whatsapp", in the job list, with a
+    // reference number, for somebody who asked how workers are chosen. The
+    // conversation is still kept in full under Conversations, which reads
+    // intake_threads directly and has always rendered "no job yet" for a
+    // thread without one, so nobody is lost by this. What goes away is the
+    // job list being padded with things that are not jobs.
+    //
+    // The moment they describe actual work, justAsking is false on that turn
+    // and the row is written then, carrying the whole conversation with it.
+    // Nothing is lost by waiting; descr is built from the transcript either
+    // way. See the migration that made intake_threads.job_id nullable.
+    // handingOver forces the row, and that is what keeps every reference in
+    // this file honest. Every reply that quotes a code to somebody ("your
+    // reference is", "saved as") sits on a path where handingOver is true:
+    // they asked for a person, nothing could answer them, or three turns went
+    // by without it becoming clear. A person taking one of those over needs
+    // something to open, and a code with no row behind it is worse than no
+    // code. The only replies that carry no reference are the pure help ones,
+    // which is deliberate and was already the rule here: a reference for a
+    // greeting teaches people the number means nothing.
+    const writeJob = !!priorJobId || !justAsking || handingOver;
+    const { data, error } = !writeJob
+      ? { data: null as { portal_code?: string } | null, error: null as { message: string } | null }
+      : priorJobId
       ? await supabase.from("jobs").update(row).eq("id", jobId).select("portal_code").single()
       // client_email defaults to "" here, matching every other creation path in
       // this codebase, and only when row.client_email (proven) is not already
@@ -3041,7 +3256,11 @@ Deno.serve(async (req: Request) => {
     await supabase.from("intake_threads").upsert({
       channel: threadKey.channel,
       from_addr: threadKey.from_addr,
-      job_id: jobId,
+      // null, not the minted code, when no row was written. The column is a
+      // foreign key to jobs, so a code with no row behind it would be rejected
+      // outright, and writing one that happened to be accepted would be worse:
+      // a reference pointing at nothing, shown to Monique on the desk.
+      job_id: writeJob ? jobId : null,
       transcript,
       turns,
       stage,
@@ -3067,7 +3286,12 @@ Deno.serve(async (req: Request) => {
     // a real job. Nothing for the turns in between.
     const worthTelling = stage === "done" || turns === 1 || handingOver;
 
-    const summary = worthTelling ? notifyAdmin(supabase as unknown as SettingsReader, {
+    // The email is a job brief: its subject line is literally "New job", and
+    // every row in it is a job field. Sending that for "how do you choose
+    // workers" is the same mistake as writing the job row, one channel along.
+    // The phone push below still fires, because knowing somebody wrote in is
+    // worth a buzz even when it is only a question, and it says what it is.
+    const summary = worthTelling && !justAsking ? notifyAdmin(supabase as unknown as SettingsReader, {
       id: jobId,
       trade: s(card?.trade), parish: s(card?.parish), title: s(card?.title),
       urgency: s(card?.urgency), from: msg.channel === "web" ? "the chat on yaadly.co.uk" : msg.from, channel: msg.channel, spoken,
@@ -3113,7 +3337,9 @@ Deno.serve(async (req: Request) => {
           headers: {
             Title: stage === "done"
               ? `New ${msg.channel} job`
-              : handingOver ? `Needs you: ${msg.channel}` : `Someone writing in on ${msg.channel}`,
+              : handingOver ? `Needs you: ${msg.channel}`
+              : justAsking ? `A question on ${msg.channel}`
+              : `Someone writing in on ${msg.channel}`,
             Priority: stage === "done" || handingOver ? "high" : "default",
             Tags: stage === "done" ? "house" : handingOver ? "raising_hand" : "speech_balloon",
           },
@@ -3121,7 +3347,11 @@ Deno.serve(async (req: Request) => {
             ? `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`
             : handingOver
               ? `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`
-              : `${jobId}: not enough to act on yet. The assistant has asked what is missing.`,
+              // No reference, because there is no job and there is no row. The
+              // whole thing is under Conversations on the desk if you want it.
+              : justAsking
+                ? `Somebody asked a question rather than describing work, and the assistant is answering it. No job, nothing for you to do. It is under Conversations if you want to read it.`
+                : `${jobId}: not enough to act on yet. The assistant has asked what is missing.`,
           signal: AbortSignal.timeout(4000),
         });
       }
@@ -3324,6 +3554,34 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!enough) {
+        // BOTH MODELS PRODUCED NOTHING AND THEY DID SAY SOMETHING.
+        //
+        // This is the bottom rung of the ladder in the writer comment above,
+        // and until 6 September 2026 it fell through to the opener below,
+        // which asks what needs doing and which parish. On 6 September a
+        // client sent a voice note saying she had a leak in the back room of
+        // her property in Portmore. It transcribed perfectly. The classifier
+        // then timed out on a rate limited model, the writer was never run,
+        // and she was asked what needs doing and which parish.
+        //
+        // The words are safe: the transcript is on the thread and the job row
+        // carries it verbatim. So the honest thing is to say we have it and
+        // hand it to a person, not to make the client do the work twice
+        // because two model calls had a bad minute. handingOver is already
+        // true for this case, so the thread is genuinely with Monique from
+        // their next message and this sentence is not a stall.
+        //
+        // No timescale in it. She reads these herself and a promise about
+        // when is exactly what unkeepableSentences exists to cut.
+        if (!safe && saidSomething) {
+          return say(
+            `Thanks, I have got ${spoken ? "your voice note" : "that"} and every word of it is saved. ` +
+            `Something went wrong at my end reading it back to you just now, so rather than ask you to say it again, ` +
+            `I am passing it to a person at Yaadly. They read these themselves, so it will not be instant. ` +
+            `Your reference is ${jobId}.`,
+            true,
+          );
+        }
         // No reference number yet, on purpose. A reference for a greeting
         // teaches people the number means nothing.
         return say(
