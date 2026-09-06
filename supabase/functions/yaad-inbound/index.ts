@@ -2901,7 +2901,7 @@ Deno.serve(async (req: Request) => {
         body: `${heldJobId ? `${heldJobId}: ` : ""}waiting on you. The assistant is standing down until the desk hands the thread back.`,
         // Always texted. This thread is already hers: the assistant is silent
         // on this number, so if she does not read it nobody does.
-        alsoText: `Yaadly, they wrote again${heldJobId ? ` on ${heldJobId}` : ""}.\n\nThey said:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown sender"} on ${msg.channel}. The assistant is standing down until you hand it back.`,
+        alsoText: `Yaadly, they wrote again.\n\nThey said:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown sender"} on ${msg.channel}.${heldJobId ? ` Job ${heldJobId}.` : ""} The assistant is standing down until you hand it back.`,
       }, trace);
       root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
       if (isTwilio) {
@@ -3305,16 +3305,32 @@ Deno.serve(async (req: Request) => {
     // and the row is written then, carrying the whole conversation with it.
     // Nothing is lost by waiting; descr is built from the transcript either
     // way. See the migration that made intake_threads.job_id nullable.
-    // handingOver forces the row, and that is what keeps every reference in
-    // this file honest. Every reply that quotes a code to somebody ("your
-    // reference is", "saved as") sits on a path where handingOver is true:
-    // they asked for a person, nothing could answer them, or three turns went
-    // by without it becoming clear. A person taking one of those over needs
-    // something to open, and a code with no row behind it is worse than no
-    // code. The only replies that carry no reference are the pure help ones,
-    // which is deliberate and was already the rule here: a reference for a
-    // greeting teaches people the number means nothing.
-    const writeJob = !!priorJobId || !justAsking || handingOver;
+    // HANDING OVER NO LONGER FORCES A ROW, 6 September 2026, second pass.
+    //
+    // It did for a few hours, on my reasoning that a person taking a
+    // conversation over needs something to open and a reference with no row
+    // behind it is worse than no reference. Both halves of that were wrong.
+    //
+    // The founder caught the first half in her own WhatsApp, testing it:
+    // "yES IT WORKED, BUT IT HAD A JOB CODE, JOB-WA-1788699164893". Somebody
+    // asking a question and then asking for a person has not got a job, and
+    // minting one so a notification has something to quote is the tail wagging
+    // the dog. It also contradicted her own decision from the same afternoon.
+    //
+    // The second half was simply untrue, and checkable: the desk's
+    // Conversations view is keyed on channel and from_addr, not on a job, and
+    // renders "no job yet" for a thread without one. The waiting-on-you queue
+    // (migration 20260904q) selects `from public.intake_threads` with no join
+    // to jobs at all. So a person taking this over has the whole conversation,
+    // found by the number it came from, which is how she found this one.
+    //
+    // What follows from it: nothing spoken to a client may name a reference
+    // unless writeJob is true. `reference` below is the single place that is
+    // decided, so a new reply cannot quote a code that does not exist.
+    const writeJob = !!priorJobId || !justAsking;
+    // The job code, or an empty string when there is no job to name. Every
+    // client-facing sentence and every notification reads this, never jobId.
+    const reference = writeJob ? jobId : "";
     const { data, error } = !writeJob
       ? { data: null as { portal_code?: string } | null, error: null as { message: string } | null }
       : priorJobId
@@ -3487,11 +3503,15 @@ Deno.serve(async (req: Request) => {
       //
       // Ordered most urgent first, and every one of them names the door and
       // the reference, so the push can be acted on from the lock screen.
+      // No code in front of the sentence. It used to open every one of these
+      // and it is the least useful thing in the message: she finds a thread by
+      // the number it came from. Where a job really exists it is named once,
+      // at the end, as `ref` below.
       const waiting =
-        wantsHuman   ? `${jobId}: they asked to speak to a person. Everything they said is saved, so they do not have to repeat it.`
-      : modelSaidNothing ? `${jobId}: nothing could answer them just now, so it came straight to you. Their words are on the thread in full.`
-      : agentsPaused ? `${jobId}: the assistant is paused at the desk, so this one is yours.`
-      : `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`;
+        wantsHuman   ? `They asked to speak to a person. Everything they said is saved, so they do not have to repeat it.`
+      : modelSaidNothing ? `Nothing could answer them just now, so it came straight to you. Their words are on the thread in full.`
+      : agentsPaused ? `The assistant is paused at the desk, so this one is yours.`
+      : `${turns} messages and still not clear. They have been told you will read it yourself.`;
 
       // Her own WhatsApp, with their words in it, only when she has to act.
       // said is the quote; everything around it is what she needs to act on
@@ -3500,7 +3520,7 @@ Deno.serve(async (req: Request) => {
       const who = msg.channel === "web" ? "the website chat" : (msg.from || "an unknown sender");
       await pushToDesk(supabase as unknown as SettingsReader, {
         alsoText: handingOver
-          ? `Yaadly needs you.\n\n${waiting}\n\nThey said:\n"${said}"\n\nFrom ${who} on ${msg.channel}. Reply in the desk, it goes back from the Yaadly number.`
+          ? `Yaadly needs you.\n\n${waiting}\n\nThey said:\n"${said}"\n\nFrom ${who} on ${msg.channel}.${reference ? ` Job ${reference}.` : ""} Reply from the desk and it goes back from this number.`
           : undefined,
         title: stage === "done"
           ? `New ${msg.channel} job`
@@ -3512,7 +3532,7 @@ Deno.serve(async (req: Request) => {
         body: stage === "done"
           ? `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`
           : handingOver
-            ? waiting
+            ? `${reference ? `${reference}: ` : ""}${waiting}`
             // No reference, because there is no job and there is no row. This
             // used to end "nothing for you to do", which was written to keep
             // the job list clean and read as "ignore this". A question from a
@@ -3595,7 +3615,7 @@ Deno.serve(async (req: Request) => {
           // worse conversation next turn; a failed send is a client ignored.
           console.error("could not record the assistant's turn:", String(e).slice(0, 200));
         }
-        return isWeb ? webSay(text, { reference: jobId, handoff }) : twiml(text);
+        return isWeb ? webSay(text, { reference, handoff }) : twiml(text);
       };
 
       // The assistant writes this, not a template. Somebody who says "I have a
@@ -3645,7 +3665,7 @@ Deno.serve(async (req: Request) => {
       if (wantsHuman) {
         if (isWeb) {
           return say(
-            `Of course. Everything you have told me is saved as ${jobId}, so you will not have to say it twice. ` +
+            `Of course. Everything you have told me is saved${reference ? ` as ${reference}` : ""}, so you will not have to say it twice. ` +
             `Someone at Yaadly will answer here when they pick this up. If you are leaving this page, tap the WhatsApp button and carry on there instead; everything you have said comes with you.` +
             askForContact,
             true,
@@ -3708,14 +3728,14 @@ Deno.serve(async (req: Request) => {
         if (isWeb) {
           return say(
             (noQuestions ? noQuestions + " " : "") +
-            `I have not got quite enough to write this up properly, so this is one for a person at Yaadly to read. Your reference is ${jobId}. They will answer here when they pick it up, or carry on on WhatsApp if you are leaving this page; everything you have said comes with you.` +
+            `I have not got quite enough to write this up properly, so this is one for a person at Yaadly to read.${reference ? ` Your reference is ${reference}.` : ""} They will answer here when they pick it up, or carry on on WhatsApp if you are leaving this page; everything you have said comes with you.` +
             askForContact,
             true,
           );
         }
         return say(
           (noQuestions ? noQuestions + " " : "") +
-          `I have not got quite enough to write this up properly, so I am passing it to a person at Yaadly to read. They will come back to you on this number, and every one is read personally, so it will not be instant. Your reference is ${jobId}.`,
+          `I have not got quite enough to write this up properly, so I am passing it to a person at Yaadly to read. They will come back to you on this number, and every one is read personally, so it will not be instant.${reference ? ` Your reference is ${reference}.` : ""}`,
         );
       }
 
@@ -3744,7 +3764,7 @@ Deno.serve(async (req: Request) => {
             `Thanks, I have got ${spoken ? "your voice note" : "that"} and every word of it is saved. ` +
             `Something went wrong at my end reading it back to you just now, so rather than ask you to say it again, ` +
             `I am passing it to a person at Yaadly. They read these themselves, so it will not be instant. ` +
-            `Your reference is ${jobId}.`,
+            (reference ? `Your reference is ${reference}.` : ""),
             true,
           );
         }

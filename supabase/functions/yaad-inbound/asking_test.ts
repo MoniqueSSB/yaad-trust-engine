@@ -102,10 +102,41 @@ Deno.test("a question writes no job row, and anything else still does", () => {
   assert(decl.includes("!!priorJobId"),
     "a conversation that already has a job would stop updating it");
   assert(decl.includes("!justAsking"), "the question case is no longer excluded");
-  assert(decl.includes("handingOver"),
-    "handing over no longer forces the job row, so a client can be given a " +
-    "reference with no row behind it and a person can be handed a conversation " +
-    "with nothing to open");
+  assert(!decl.includes("handingOver"),
+    "handing over forces a job row again. It did for a few hours on 6 Sep 2026 " +
+    "and the founder caught it in her own WhatsApp: somebody asking a question " +
+    "and then asking for a person has not got a job, and minting one so a " +
+    "notification has something to quote is the tail wagging the dog");
+});
+
+Deno.test("nothing tells a client a reference that has no row behind it", () => {
+  // One place decides it, so a new reply cannot quote a code that does not
+  // exist. The reason the old rule felt safe was a belief that a person taking
+  // over needs a job to open, and that was checkable and false: Conversations
+  // is keyed on channel and from_addr, and v_waiting_on_you selects from
+  // intake_threads with no join to jobs at all.
+  assert(src.includes('const reference = writeJob ? jobId : "";'),
+    "the single decision about whether a reference may be spoken is gone");
+  // Everything the client can read goes through `reference`, never jobId.
+  const replies = src.slice(src.indexOf("const say = async (text: string"));
+  for (const leak of ["Your reference is ${jobId}", "saved as ${jobId}", "reference: jobId"]) {
+    assert(!replies.includes(leak),
+      `a client-facing reply names jobId directly (${leak}), so a conversation ` +
+      "with no job row will quote a code that resolves to nothing");
+  }
+});
+
+Deno.test("an alert does not open with a job code", () => {
+  // "yES IT WORKED, BUT IT HAD A JOB CODE, JOB-WA-1788699164893", founder,
+  // 6 September 2026, reading her own WhatsApp. It is the least useful thing
+  // in the message: she finds a thread by the number it came from.
+  const at = src.indexOf("const waiting =");
+  assert(at > 0, "the handover reasons are gone");
+  const decl = src.slice(at, at + 700);
+  assert(!/\$\{jobId\}:/.test(decl) && !/\$\{reference\}:/.test(decl),
+    "a handover reason opens with a job code again");
+  assert(decl.includes("They asked to speak to a person."),
+    "the reasons no longer read as sentences");
 });
 
 Deno.test("insert or update is decided by whether a job exists, not by whether the thread does", () => {
@@ -217,9 +248,17 @@ Deno.test("an urgent push says why it is waiting, not one line for three reasons
     "a client nothing could answer no longer gets their own reason in the push");
   assert(decl.includes("agentsPaused"), "a paused assistant is no longer named in the push");
   assert(decl.includes("still not clear"), "the three turn case lost its wording");
-  // Every branch names the job, so the push can be acted on from a lock screen.
-  assertEquals(decl.match(/\$\{jobId\}/g)?.length, 4,
-    "not every reason names the reference any more");
+  // Four distinct reasons, not one sentence wearing four hats. They no longer
+  // name the job code: that moved to the end of the message and only appears
+  // when a job actually exists. See "an alert does not open with a job code".
+  for (const reason of [
+    "They asked to speak to a person.",
+    "Nothing could answer them just now",
+    "The assistant is paused at the desk",
+    "still not clear",
+  ]) {
+    assert(decl.includes(reason), `the handover reason "${reason}" is gone`);
+  }
 });
 
 Deno.test("a question push points somewhere instead of dismissing itself", () => {
