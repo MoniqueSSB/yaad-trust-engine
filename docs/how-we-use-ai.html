@@ -120,25 +120,26 @@
 .tgate .ch span.on{color:var(--ai-green);background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.28)}
 
 /* five limits */
-.five{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:56px;align-items:start}
-.five .sticky{position:sticky;top:104px}
-.five .sticky p{font-size:15.5px;color:var(--ai-mute);margin:0;max-width:36ch}
-.five .list{display:flex;flex-direction:column;gap:12px}
-.lim{display:grid;grid-template-columns:56px minmax(0,1fr) 184px;gap:20px;align-items:start;padding:22px 24px;transition:border-color .2s}
+.five .sticky{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:26px}
+.five .sticky .kick-m{order:2;margin-bottom:0}
+.five .list{display:grid;grid-template-columns:repeat(auto-fit,minmax(198px,1fr));gap:12px;align-items:stretch}
+.lim{display:flex;flex-direction:column;gap:11px;padding:16px;border-radius:14px;transition:border-color .2s}
 .lim:hover{border-color:rgba(155,115,245,0.4)}
-.lim .big{font-family:var(--disp);font-weight:200;font-size:56px;line-height:.9;color:var(--tealb);margin-top:-4px}
-.lim h3{margin-bottom:6px}
-.lim .ill{background:var(--ai-deep);border:1px solid var(--ai-line);border-radius:14px;padding:12px 14px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:120px}
+.lim .lh{display:flex;align-items:baseline;gap:9px}
+.lim .big{font-family:var(--disp);font-weight:200;font-size:30px;line-height:.9;color:var(--tealb);flex-shrink:0}
+.lim .h3{font-size:17px;margin:0}
+.lim .ill{background:var(--ai-deep);border:1px solid var(--ai-line);border-radius:10px;padding:12px 13px;flex:1;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:132px}
 .lim .ill .k{font:600 8.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-mute)}
 .lim .ill .k.f{color:var(--ai-faint);display:block;margin-bottom:3px}
-.lim .ill .fld{height:26px;border-radius:7px;display:flex;align-items:center;padding:0 9px;font-size:11.5px;background:rgba(155,115,245,0.09);border:1px solid var(--ai-line2);color:var(--ink)}
+.lim .ill .fld{min-height:26px;border-radius:7px;display:flex;align-items:center;padding:4px 9px;font-size:11px;line-height:1.3;background:rgba(155,115,245,0.09);border:1px solid var(--ai-line2);color:var(--ink)}
 .lim .ill .fld.no{background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(245,158,11,0.06) 6px 8px);border:1px dashed rgba(245,158,11,0.5);color:var(--ai-mute);gap:6px}
 .lim .ill .fld.no svg{width:12px;height:12px;stroke:var(--ai-amber);fill:none;stroke-width:2;stroke-linecap:round}
 .lim .ill .ln{display:block;height:5px;border-radius:3px;background:rgba(155,115,245,0.25);margin-bottom:3px}
 .lim .ill .foot{font:500 10px var(--mono);color:var(--ai-green)}
 .lim .ill .foot.a{color:var(--ai-amber);text-align:center}
 .lim .ill .foot.m{color:var(--ai-mute)}
-.lim .ill .kv{display:flex;justify-content:space-between;align-items:center;font:500 9.5px var(--mono);color:var(--ai-mute)}
+.lim .ill .kv{display:flex;justify-content:space-between;align-items:center;gap:8px;font:500 9.5px var(--mono);color:var(--ai-mute)}
+.lim .ill .kv>span:last-child{flex-shrink:0}
 .lim .ill .kv .g{color:var(--ai-green)}.lim .ill .kv .a{color:var(--ai-amber)}.lim .ill .kv .v{color:var(--tealb)}
 .lim .ill .red{background:var(--ai-faint);color:transparent;border-radius:3px;user-select:none}
 .lim .ill .chip{font-size:10px;font-weight:600;color:var(--tealb);background:rgba(155,115,245,0.12);border:1px solid rgba(155,115,245,0.3);border-radius:100px;padding:2px 8px}
@@ -227,10 +228,8 @@
 
 /* the design file has no breakpoints; these are ours */
 @media(max-width:980px){
-  .ai-hero,.five,.info,.faqg,.tgate{grid-template-columns:1fr;gap:32px}
+  .ai-hero,.info,.faqg,.tgate{grid-template-columns:1fr;gap:32px}
   .ai-hero{padding-top:56px}
-  .five .sticky{position:static}
-  .lim{grid-template-columns:56px minmax(0,1fr)}.lim .ill{grid-column:1/-1}
   .two{grid-template-columns:1fr}
 }
 @media(max-width:820px){
@@ -240,7 +239,6 @@
 }
 @media(max-width:560px){
   .ai .wrap,.ai-hero,.sec,.cta{padding-left:18px;padding-right:18px}
-  .lim{grid-template-columns:1fr}.lim .big{font-size:40px}
   .tbl .r{grid-template-columns:1fr;gap:6px}.tbl .r.h{display:none}
   .tbl .where b{font-size:22px}
   .lc .strike{font-size:52px}
@@ -400,10 +398,7 @@
     <div class="list">
 
       <div class="lim panel">
-        <span class="big">1</span>
-        <div>
-          <h3 class="h3">No amount field.</h3>
-        </div>
+        <div class="lh"><span class="big">1</span><h3 class="h3">No amount field.</h3></div>
         <div class="ill" aria-hidden="true">
           <span class="k">Invoice · new line</span>
           <div><span class="k f">Service</span><span class="fld">Plumbing · standard call-out</span></div>
@@ -413,10 +408,7 @@
       </div>
 
       <div class="lim panel">
-        <span class="big">2</span>
-        <div>
-          <h3 class="h3">No measurements.</h3>
-        </div>
+        <div class="lh"><span class="big">2</span><h3 class="h3">No measurements.</h3></div>
         <div class="ill" style="padding:10px" aria-hidden="true">
           <svg viewBox="0 0 160 110" style="width:100%;height:auto"><g fill="none" stroke="#C4AAFF" stroke-width="1.4" stroke-linejoin="round"><rect x="8" y="10" width="70" height="52" rx="2"/><rect x="78" y="10" width="74" height="30" rx="2"/><rect x="78" y="40" width="74" height="22" rx="2"/><rect x="8" y="62" width="144" height="36" rx="2"/><path d="M43 62v6M115 40v-6"/></g><g font-family="IBM Plex Mono" font-size="8" fill="#7878A8"><text x="14" y="24">Bedroom</text><text x="84" y="24">Bath</text><text x="84" y="54">Hall</text><text x="14" y="76">Living / kitchen</text></g><path d="M8 106h144" stroke="#F59E0B" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/><rect x="52" y="99" width="56" height="12" rx="6" fill="#07071A" stroke="#F59E0B"/><text x="80" y="108" font-family="IBM Plex Mono" font-size="7.5" font-weight="600" fill="#FBBF24" text-anchor="middle" text-decoration="line-through">4.2 m × 3.1 m</text></svg>
           <span class="foot a">rooms, not sizes</span>
@@ -424,10 +416,7 @@
       </div>
 
       <div class="lim panel">
-        <span class="big">3</span>
-        <div>
-          <h3 class="h3">No severity rating.</h3>
-        </div>
+        <div class="lh"><span class="big">3</span><h3 class="h3">No severity rating.</h3></div>
         <div class="ill" aria-hidden="true">
           <span class="k">Finding 07 · damp, rear wall</span>
           <div><span class="ln" style="width:95%"></span><span class="ln" style="width:70%"></span></div>
@@ -438,10 +427,7 @@
       </div>
 
       <div class="lim panel">
-        <span class="big">4</span>
-        <div>
-          <h3 class="h3">No identity documents.</h3>
-        </div>
+        <div class="lh"><span class="big">4</span><h3 class="h3">No identity documents.</h3></div>
         <div class="ill" aria-hidden="true">
           <span class="k">Applicant upload</span>
           <div style="display:flex;gap:8px"><div class="up"><span>not fetched</span></div><div class="up"><span>not fetched</span></div></div>
@@ -451,10 +437,7 @@
       </div>
 
       <div class="lim panel">
-        <span class="big">5</span>
-        <div>
-          <h3 class="h3">Photos read in the US.</h3>
-        </div>
+        <div class="lh"><span class="big">5</span><h3 class="h3">Photos read in the US.</h3></div>
         <div class="ill" aria-hidden="true">
           <span class="k">Photo 12 · model output</span>
           <div style="display:flex;flex-wrap:wrap;gap:4px"><span class="chip">maintenance</span><span class="chip">visible: staining, ceiling</span></div>
