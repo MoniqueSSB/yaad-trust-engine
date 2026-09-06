@@ -1777,6 +1777,51 @@ build if a fixed timeout comes back on this path.
 
 ---
 
+## A voice note came back as "tell me what needs doing"
+
+The symptom: somebody sends a perfectly clear voice note and gets the fixed
+opener, *"Thanks for writing in. Yaadly gets property work done in Jamaica..."*,
+which asks them for the very thing they just said. The thread in the desk shows
+their message as `[message with no readable text, review manually]`.
+
+**Check whether the words came back, before blaming the transcriber.** In the
+Supabase logs, filter `function_edge_logs` for `yaad-transcribe`. A `200` means
+it succeeded and returned text; `503` means no speech provider key is
+configured, `502` means every provider failed. `execution_time_ms` on that row
+is how long the work took.
+
+**Two `200` rows for one message is the fault, not a coincidence.** It means the
+same audio was transcribed twice in one request. That was live until 5 September
+2026: the WhatsApp worker lane transcribed the audio to decide whether a worker
+was filing an update, discarded the result when the number was not a worker's,
+and the client pipeline then transcribed it again on what was left of the twelve
+second budget. The second attempt's slice was shorter than the work takes, so
+the caller gave up while the server finished, and the words arrived nowhere.
+Fixed by transcribing once, above the worker/client fork, onto `msg.text`.
+`voice-once_test.ts` fails the build if a transcription is thrown away or a
+second one is added.
+
+**If there is only one `200` and the words still did not land,** look at what ran
+after it. On the message that exposed this, the classifier also hit
+`classify: mistral http 429: Rate limit exceeded`, retried once and failed
+again, so there was no Job Card and nothing for the writer to work from, which
+is what produces the fixed opener. That is the model provider's rate limit, not
+this path: see below.
+
+**`mistral http 429` in the function logs is the free tier limit.** It is
+bursty rather than constant. On 5 September it took out one client voice note at
+22:15 and six `kickoff draft ... failed: model call failed (mistral 429)` between
+11:30 and 11:51. The kickoff drafts recover on their own, because
+`yaad-kickoff-check` retries every minute. A client message does not get a second
+chance, so a run of these is a reason to buy capacity, which is Monique's call.
+
+**The audio itself is always kept**, whatever happened to the transcription:
+private `intake` bucket, and a `job_photos` row with `kind = 'audio'` against the
+job. Be aware the desk's Job photos view renders every row as an image, so an
+audio row shows as a broken thumbnail with no player. Known gap, not data loss.
+
+---
+
 ## Somebody says the assistant has gone quiet
 
 Check these three, in this order.
