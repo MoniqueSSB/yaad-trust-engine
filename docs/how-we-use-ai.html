@@ -9,11 +9,263 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20rx='24'%20fill='%237B4FE0'/%3E%3Ctext%20x='50'%20y='71'%20font-family='Arial,Helvetica,sans-serif'%20font-size='64'%20font-weight='700'%20text-anchor='middle'%20fill='%23ffffff'%3EY%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300;1,9..144,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="yaadly.css">
 <link rel="stylesheet" href="nav.css?v=1">
+<style>
+/* How we use AI. Implemented 6 September 2026 from the Claude Design file
+   "How We Use AI.dc.html". The design's tokens are the site's own (Fraunces,
+   IBM Plex, the purple to amber gradient), so nothing here redefines a
+   colour or a font; it reads the variables yaadly.css already declares.
+   Three deliberate departures from the design file, all recorded in
+   DECISIONS.md: the real site nav and footer are kept, every turnaround
+   figure is left out, and no illustration shows an invented price. */
+.ai{--ai-line:rgba(155,115,245,0.14);--ai-line2:rgba(155,115,245,0.28);--ai-panel:linear-gradient(180deg,rgba(19,19,50,0.75),rgba(12,12,38,0.6));--ai-panel2:linear-gradient(180deg,rgba(19,19,50,0.9),rgba(12,12,38,0.75));--ai-deep:rgba(7,7,26,0.7);--ai-faint:#44446A;--ai-amber:#FBBF24;--ai-green:#34D399;--ai-mute:#7878A8}
+.ai .wrap{max-width:1200px;margin:0 auto;padding:0 32px}
+.ai .kick-m{font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ai-faint);margin-bottom:12px}
+.ai .h2{font-family:var(--disp);font-weight:300;font-size:clamp(28px,3.6vw,38px);letter-spacing:-0.015em;line-height:1.15;margin:0;text-wrap:balance}
+.ai .h3{font-family:var(--disp);font-weight:400;font-size:21px;letter-spacing:-0.01em;margin:0 0 8px;line-height:1.2}
+.ai .grad-text{font-style:italic;font-weight:300;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ai .pillbtn{display:inline-flex;align-items:center;gap:9px;font-size:15.5px;font-weight:600;color:var(--ink);border:1px solid var(--ai-line2);border-radius:100px;padding:13px 26px;text-decoration:none}
+.ai .pillbtn.primary{font-weight:700;color:#fff;background:var(--grad);border-color:transparent;padding:14px 28px;box-shadow:0 0 24px rgba(155,115,245,.28)}
+.ai .pillbtn:hover{color:var(--ink);border-color:rgba(155,115,245,.5)}
+.ai .panel{background:var(--ai-panel);border:1px solid var(--ai-line);border-radius:18px}
+.ai .panel2{background:var(--ai-panel2);border:1px solid var(--ai-line);border-radius:22px}
+.ai .tag{display:inline-flex;align-items:center;gap:8px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--tealb);background:rgba(155,115,245,.09);border:1px solid var(--ai-line2);border-radius:100px;padding:7px 16px;white-space:nowrap}
+.ai .tag i{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--mango)}
+
+/* hero */
+.ai-hero{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:64px;align-items:end;padding:88px 32px 56px}
+.ai-hero h1{font-family:var(--disp);font-weight:200;font-size:clamp(40px,5.4vw,76px);line-height:1.04;letter-spacing:-0.025em;margin:26px 0 0;text-wrap:balance}
+.ai-hero .lead{margin:24px 0 0;font-size:18px;color:var(--ai-mute);max-width:52ch;text-wrap:pretty}
+.ai-hero .lead b{color:var(--ink);font-weight:600}
+.ai-hero .ctas{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap}
+.thread{background:var(--ai-panel2);border:1px solid var(--ai-line);border-radius:22px;padding:22px 22px 18px;box-shadow:inset 0 1px 0 rgba(238,238,255,0.04)}
+.thread .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ai-faint)}
+.thread .hd span:last-child{letter-spacing:0;font-weight:500;font-size:10.5px;text-transform:none}
+.thread .msgs{display:flex;flex-direction:column;gap:12px}
+.thread .m{display:flex;gap:10px;align-items:flex-start;animation:yFadeUp .6s ease both}
+.thread .m.r{flex-direction:row-reverse}
+.thread .t{font:600 11px var(--mono);color:var(--ai-mute);min-width:44px;padding-top:6px}
+.thread .m.r .t{text-align:right;color:var(--tealb)}
+.thread .m.p .t{color:var(--ai-amber)}
+.thread .b{background:rgba(155,115,245,0.09);border:1px solid var(--ai-line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:14px;color:var(--ink);max-width:36ch}
+.thread .m.r .b{background:rgba(13,13,40,0.92);border-color:var(--ai-line2);border-radius:14px 14px 4px 14px}
+.thread .m.p .b{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.3)}
+.thread .who{display:block;font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--tealb);margin-bottom:4px}
+.thread .m.p .who{color:var(--ai-amber)}
+.thread .vn{display:inline-flex;align-items:center;gap:5px;color:var(--ai-mute);font:500 12px var(--mono);vertical-align:middle}
+.thread .vn svg{width:13px;height:13px;stroke:var(--ai-mute);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.thread .log{font:500 10.5px var(--mono);color:var(--ai-faint);padding-left:54px;animation:yFadeUp .6s ease 1.7s both}
+.thread .log em{font-style:normal;color:rgba(196,170,255,.62)}
+.thread .cur{display:inline-block;width:6px;height:11px;background:var(--teal);margin-left:4px;vertical-align:-2px;animation:yBlink 1s steps(1) infinite}
+.thread .sun{display:flex;gap:10px;align-items:center;justify-content:center;margin:2px 0;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-amber);animation:yFadeUp .6s ease 2.1s both}
+.thread .sun i{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(245,158,11,.4),transparent)}
+.thread .ft{margin-top:16px;padding-top:14px;border-top:1px solid var(--ai-line);display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--ai-mute)}
+.thread .ft b{color:var(--ink)}
+
+/* three lines */
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:40px 0 64px}
+.three .card3{background:var(--ai-panel);border:1px solid var(--ai-line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column}
+.three .art{position:relative;height:190px;background:rgba(7,7,26,0.6);border-bottom:1px solid var(--ai-line);overflow:hidden}
+.three .art .lbl{position:absolute;top:14px;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-faint)}
+.three .art .lbl.l{left:18px}.three .art .lbl.r{right:18px}
+.three .body{padding:22px 24px 26px}
+.three .num{font:600 13px var(--mono);color:var(--ai-amber);margin-bottom:12px}
+.three p{font-size:14.5px;color:var(--ai-mute);margin:0}
+.arc{position:absolute;left:0;top:10px;width:100%;height:100%;overflow:visible}
+.p1{position:absolute;inset:12px 16px 0;display:flex;flex-direction:column;gap:3px}
+.p1h{display:flex;justify-content:space-between;font:600 8.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-faint);margin-bottom:3px}
+.p1r{display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(155,115,245,.14)}
+.p1r i,.p1v i{width:16px;height:16px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font:600 8.5px var(--mono);font-style:normal;flex-shrink:0;color:var(--tealb);background:rgba(155,115,245,.12);border:1px solid rgba(155,115,245,.3)}
+.p1r .lab{font:500 9.5px var(--mono);color:var(--ai-mute);white-space:nowrap}
+.p1r .sk{height:4px;border-radius:2px;background:rgba(155,115,245,.22);margin-left:auto}
+.p1v{display:flex;gap:8px;align-items:flex-start;margin-top:4px;padding:7px 10px 6px 8px;border-radius:10px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.35)}
+.p1v>div{min-width:0;flex:1}
+.p1v i{color:var(--ai-amber);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4)}
+.p1vh{display:flex;justify-content:space-between;align-items:center;font:600 8.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-amber)}
+.p1vh em{font:600 8.5px var(--mono);font-style:normal;letter-spacing:.12em;color:var(--bg);background:var(--ai-amber);border-radius:100px;padding:1px 7px}
+.p1v p{margin:3px 0 0;font-family:var(--disp);font-style:italic;font-size:11px;line-height:1.3;color:var(--ink)}
+.p1s{display:flex;align-items:center;gap:8px;margin-top:3px;font:500 8.5px var(--mono);color:var(--ai-mute)}
+.p1s svg{width:56px;height:14px;stroke:var(--ai-amber);fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;opacity:.9;flex-shrink:0}
+.dlog{position:absolute;left:18px;right:18px;top:34px;display:flex;flex-direction:column}
+.dlog .e{display:flex;align-items:center;gap:9px;padding:5px 0}
+.dlog .av{width:22px;height:22px;border-radius:50%;background:var(--grad);color:#fff;display:inline-flex;align-items:center;justify-content:center;font:600 9px var(--mono);flex-shrink:0}
+.dlog .av.w{background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);color:var(--ai-green)}
+.dlog .av.x{background:none;border:1px dashed rgba(155,115,245,0.4);color:var(--ai-mute)}
+.dlog .tx{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.dlog .tx b{font-size:12px;color:var(--ink);font-weight:600}
+.dlog .tx small{font:500 9.5px var(--mono);color:var(--ai-amber)}
+.dlog .e.w small{color:var(--ai-green)}
+.dlog .e.x{opacity:.5}.dlog .e.x b{text-decoration:line-through;color:var(--ai-mute)}.dlog .e.x small{color:var(--ai-mute)}
+
+/* where the line sits */
+.sec{padding:64px 32px;margin-top:0} /* yaadly.css also has .sec with a margin; zeroed so sections do not double-space */
+.sec .head{max-width:640px;margin:0 auto 48px;text-align:center}
+.path{display:flex;align-items:flex-start;gap:14px;max-width:1000px;margin:0 auto 52px;padding:26px 28px 22px;position:relative}
+.path .cap{position:absolute;left:24px;top:-9px;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-faint);background:var(--bg);padding:0 8px}
+.path .st{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.path .st i{width:44px;height:44px;border-radius:14px;background:rgba(155,115,245,0.12);border:1px solid rgba(155,115,245,0.3);display:flex;align-items:center;justify-content:center;font:600 12px var(--mono);font-style:normal;color:var(--tealb)}
+.path .st.g i{background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.3);color:var(--ai-green)}
+.path .st span{font-size:12.5px;font-weight:600;color:var(--ink);text-align:center;white-space:nowrap}
+.path .st.gate>span:last-child{color:var(--ai-amber)}
+.path .ln{flex:1;height:1px;margin-top:22px;background:rgba(155,115,245,.5)}
+.path .ln.a{background:linear-gradient(90deg,rgba(155,115,245,.5),rgba(245,158,11,.6))}
+.path .ln.b{background:linear-gradient(90deg,rgba(245,158,11,.6),rgba(52,211,153,.5))}
+.gate{position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:6px}
+.gate b{width:6px;height:44px;border-radius:3px;background:var(--mango);transform-origin:top;animation:yGate 4s ease-in-out infinite}
+.gate em{position:absolute;inset:0;border-radius:14px;animation:yPulse 4s ease-in-out infinite}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:0 40px;align-items:start}
+.cols .col{position:relative}
+.cols .ghost{position:absolute;right:0;top:-30px;font-family:var(--disp);font-weight:200;font-size:180px;line-height:1;color:rgba(155,115,245,0.07);pointer-events:none;user-select:none}
+.cols .col.p .ghost{color:rgba(245,158,11,0.07)}
+.cols .lbl{display:flex;align-items:center;gap:10px;margin-bottom:18px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--tealb);white-space:nowrap}
+.cols .lbl i{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 12px rgba(155,115,245,.7)}
+.cols .col.p .lbl{color:var(--ai-amber)}.cols .col.p .lbl i{background:var(--mango);box-shadow:0 0 12px rgba(245,158,11,.7)}
+.cols .row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--ai-line);font-size:15px;color:var(--ai-mute)}
+.cols .row:last-child{border-bottom:0}
+.cols .row b{color:var(--ink);font-weight:600}
+.cols .row .n{font:600 11px var(--mono);color:var(--ai-faint);min-width:22px;padding-top:5px}
+.cols .col.p .row .n{color:var(--ai-amber)}
+.cols .div{align-self:stretch;background:linear-gradient(180deg,transparent,rgba(155,115,245,0.35) 20%,rgba(245,158,11,0.35) 80%,transparent);position:relative}
+.cols .div i{position:absolute;left:50%;top:50%;width:6px;height:6px;transform:translate(-50%,-50%) rotate(45deg);background:var(--bg);border:1px solid rgba(245,158,11,0.6)}
+.tgate{margin-top:40px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:32px;align-items:center;padding:30px 32px;position:relative;overflow:hidden}
+.tgate .glow{position:absolute;top:-70px;right:-70px;width:240px;height:240px;border-radius:50%;background:radial-gradient(ellipse,rgba(52,211,153,0.14),transparent 70%);pointer-events:none}
+.tgate .gtag{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--ai-green);background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.28);border-radius:100px;padding:5px 13px;margin-bottom:14px;white-space:nowrap}
+.tgate .gtag i{width:5px;height:5px;border-radius:50%;background:var(--ai-green)}
+.tgate h3{font-family:var(--disp);font-weight:300;font-size:28px;letter-spacing:-0.015em;line-height:1.15;margin:0 0 10px;text-wrap:balance}
+.tgate p{font-size:14.5px;color:var(--ai-mute);margin:0}
+.tgate .demo{display:flex;gap:10px;align-items:stretch;position:relative}
+.tgate .demo .ghost{position:absolute;left:0;top:-38px;font-family:var(--disp);font-weight:200;font-size:96px;line-height:1;color:rgba(52,211,153,0.08);pointer-events:none;user-select:none}
+.tgate .bx{flex:1;background:rgba(13,13,40,0.92);border:1px solid var(--ai-line);border-radius:14px;padding:14px 16px}
+.tgate .bx.sent{background:rgba(52,211,153,0.06);border-color:rgba(52,211,153,0.28);animation:yFadeUp .7s ease 1.2s both}
+.tgate .bx .k{font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ai-faint);margin-bottom:8px}
+.tgate .bx.sent .k{color:var(--ai-green)}
+.tgate .bx p{font-size:13px;line-height:1.5}
+.tgate .bx.sent p{color:var(--ink)}
+.tgate .ch{display:flex;flex-direction:column;justify-content:center;gap:6px}
+.tgate .ch span{font-size:11.5px;font-weight:600;border-radius:100px;padding:5px 12px;white-space:nowrap;text-align:center;border:1px solid var(--ai-line2);color:var(--ink)}
+.tgate .ch span.on{color:var(--ai-green);background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.28)}
+
+/* five limits */
+.five{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:56px;align-items:start}
+.five .sticky{position:sticky;top:104px}
+.five .sticky p{font-size:15.5px;color:var(--ai-mute);margin:0;max-width:36ch}
+.five .list{display:flex;flex-direction:column;gap:12px}
+.lim{display:grid;grid-template-columns:56px minmax(0,1fr) 184px;gap:20px;align-items:start;padding:22px 24px;transition:border-color .2s}
+.lim:hover{border-color:rgba(155,115,245,0.4)}
+.lim .big{font-family:var(--disp);font-weight:200;font-size:56px;line-height:.9;color:var(--tealb);margin-top:-4px}
+.lim h3{margin-bottom:6px}
+.lim p{font-size:14.5px;color:var(--ai-mute);margin:0}
+.lim .code{font:500 11px var(--mono);color:var(--ai-faint);background:rgba(155,115,245,0.05);border:1px solid var(--ai-line);border-radius:6px;padding:4px 8px;display:inline-block;margin-top:12px;white-space:nowrap}
+.lim .code b{color:var(--ai-amber);font-weight:500}
+.lim .ill{background:var(--ai-deep);border:1px solid var(--ai-line);border-radius:14px;padding:12px 14px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:8px;min-height:120px}
+.lim .ill .k{font:600 8.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-mute)}
+.lim .ill .k.f{color:var(--ai-faint);display:block;margin-bottom:3px}
+.lim .ill .fld{height:26px;border-radius:7px;display:flex;align-items:center;padding:0 9px;font-size:11.5px;background:rgba(155,115,245,0.09);border:1px solid var(--ai-line2);color:var(--ink)}
+.lim .ill .fld.no{background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(245,158,11,0.06) 6px 8px);border:1px dashed rgba(245,158,11,0.5);color:var(--ai-mute);gap:6px}
+.lim .ill .fld.no svg{width:12px;height:12px;stroke:var(--ai-amber);fill:none;stroke-width:2;stroke-linecap:round}
+.lim .ill .ln{display:block;height:5px;border-radius:3px;background:rgba(155,115,245,0.25);margin-bottom:3px}
+.lim .ill .foot{font:500 10px var(--mono);color:var(--ai-green)}
+.lim .ill .foot.a{color:var(--ai-amber);text-align:center}
+.lim .ill .foot.m{color:var(--ai-mute)}
+.lim .ill .kv{display:flex;justify-content:space-between;align-items:center;font:500 9.5px var(--mono);color:var(--ai-mute)}
+.lim .ill .kv .g{color:var(--ai-green)}.lim .ill .kv .a{color:var(--ai-amber)}.lim .ill .kv .v{color:var(--tealb)}
+.lim .ill .red{background:var(--ai-faint);color:transparent;border-radius:3px;user-select:none}
+.lim .ill .chip{font-size:10px;font-weight:600;color:var(--tealb);background:rgba(155,115,245,0.12);border:1px solid rgba(155,115,245,0.3);border-radius:100px;padding:2px 8px}
+.lim .ill .up{flex:1;aspect-ratio:1.4;border-radius:8px;border:1px solid rgba(245,158,11,0.45);background:repeating-linear-gradient(135deg,rgba(245,158,11,0.12) 0 4px,transparent 4px 9px);display:flex;align-items:center;justify-content:center}
+.lim .ill .up span{font:600 7.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-amber);background:var(--bg);padding:2px 6px;border-radius:100px;border:1px solid rgba(245,158,11,0.45)}
+.lim .ill .bars{display:flex;gap:4px}.lim .ill .bars i{flex:1;height:6px;border-radius:3px;background:rgba(120,120,168,.25)}
+
+/* limits */
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.lc{padding:28px;position:relative;overflow:hidden}
+.lc .glow{position:absolute;top:-70px;right:-70px;width:220px;height:220px;border-radius:50%;pointer-events:none;background:radial-gradient(ellipse,rgba(245,158,11,0.14),transparent 70%)}
+.lc.v .glow{background:radial-gradient(ellipse,rgba(155,115,245,0.14),transparent 70%)}
+.lc .hd{display:flex;align-items:center;gap:13px;margin-bottom:14px}
+.lc .ic{width:42px;height:42px;border-radius:12px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lc .ic svg{width:20px;height:20px;stroke:var(--ai-amber);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lc.v .ic{background:rgba(155,115,245,0.12);border-color:rgba(155,115,245,0.3)}.lc.v .ic svg{stroke:var(--tealb)}
+.lc h3{font-family:var(--disp);font-weight:300;font-size:26px;letter-spacing:-0.015em;line-height:1.1;margin:0}
+.lc .four{margin-left:auto;font-family:var(--disp);font-weight:200;font-size:72px;line-height:1;color:rgba(196,170,255,0.35)}
+.lc .strike{font-family:var(--disp);font-weight:200;font-size:72px;line-height:1;letter-spacing:-0.03em;color:var(--ai-amber);text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:rgba(245,158,11,.8)}
+.lc .sub{font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-mute);margin:6px 0 16px}
+.lc p{font-size:15px;color:var(--ai-mute);margin:0}
+.lc .ref{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--ai-line);font-size:14.5px}
+.lc .ref:last-of-type{border-bottom:0}
+.lc .ref b{color:var(--ink);font-weight:600}.lc .ref span{color:var(--ai-mute)}
+
+/* your information */
+.info{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:start}
+.info .intro{font-size:15.5px;color:var(--ai-mute);margin:0 0 22px;text-wrap:pretty}
+.info .intro a{font-weight:600}
+.sw{display:flex;gap:12px;align-items:flex-start;background:rgba(155,115,245,0.05);border:1px solid var(--ai-line);border-radius:14px;padding:14px 16px;margin-bottom:10px;font-size:14px;color:var(--ai-mute)}
+.sw b{color:var(--ink);font-weight:600}
+.sw .tog{width:34px;height:20px;border-radius:100px;background:rgba(155,115,245,0.28);border:1px solid rgba(155,115,245,0.4);position:relative;flex-shrink:0;margin-top:2px}
+.sw .tog i{position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:var(--ink)}
+.sw .tog.a{background:rgba(245,158,11,0.18);border-color:rgba(245,158,11,0.5)}.sw .tog.a i{left:auto;right:2px;background:var(--ai-amber)}
+.tbl{overflow:hidden}
+.tbl .r{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:16px;padding:18px 24px;border-bottom:1px solid var(--ai-line);font-size:15px;align-items:center}
+.tbl .r.h{padding:14px 24px;font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ai-faint)}
+.tbl .r:last-child{border-bottom:0;background:rgba(52,211,153,0.04)}
+.tbl .r>b{color:var(--ink);font-weight:600}.tbl .r .by{color:var(--ai-mute)}.tbl .r .by small{display:block;font-size:12px;color:var(--ai-faint)}
+.tbl .r .g{color:var(--ai-green);font-weight:600}
+.tbl .where{display:flex;align-items:center;gap:10px}
+.tbl .where b{font-family:var(--disp);font-weight:200;font-size:30px;line-height:1;color:var(--tealb)}
+.tbl .where small{font:600 9px var(--mono);letter-spacing:.16em;text-transform:uppercase;line-height:1.3;color:var(--tealb)}
+.tbl .where.us b,.tbl .where.us small{color:var(--ai-amber)}
+.tbl .where.none b,.tbl .where.none small{color:var(--ai-green)}
+
+/* faq */
+.faqg{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:56px;align-items:start}
+.ai details.fq{border:0;border-bottom:1px solid var(--ai-line);border-radius:0;background:none;margin:0}
+.ai details.fq summary{padding:20px 0;display:flex;justify-content:space-between;align-items:center;gap:20px}
+.ai details.fq summary>h2{font-family:var(--disp);font-weight:400;font-size:21px;letter-spacing:-0.01em;color:var(--ink);line-height:1.25}
+.ai details.fq summary:hover>h2{color:var(--tealb)}
+.ai details.fq summary::after{content:"+";float:none;width:28px;height:28px;border-radius:50%;flex-shrink:0;background:rgba(155,115,245,0.14);border:1px solid rgba(155,115,245,0.32);display:inline-flex;align-items:center;justify-content:center;font:400 18px var(--body);color:var(--tealb);line-height:1}
+.ai details.fq[open] summary::after{content:"\2212"}
+.ai details.fq .ans{padding:0 48px 22px 0;font-size:15px;color:var(--ai-mute);text-wrap:pretty}
+
+/* cta + keyframes */
+.cta{text-align:center;max-width:680px;margin:0 auto;padding:48px 32px 80px}
+.cta .rule2{position:relative;height:1px;margin:0 40px 28px;background:linear-gradient(90deg,transparent,rgba(155,115,245,0.35) 35%,rgba(245,158,11,0.35) 65%,transparent)}
+.cta .rule2 i{position:absolute;left:50%;top:50%;width:5px;height:5px;transform:translate(-50%,-50%) rotate(45deg);background:var(--bg);border:1px solid rgba(245,158,11,0.6)}
+.cta h2{font-family:var(--disp);font-weight:200;font-size:clamp(34px,4.4vw,44px);letter-spacing:-0.02em;line-height:1.1;margin:0 0 26px;text-wrap:balance}
+.cta .ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.cta .wa{width:18px;height:18px;fill:#25D366}
+.cta .tiny{margin:26px 0 0;font-size:13.5px;color:var(--ai-mute)}
+@keyframes yFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes yBlink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes yPulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}60%{box-shadow:0 0 0 10px rgba(245,158,11,0)}}
+@keyframes yGate{0%,35%{transform:scaleY(1)}50%,85%{transform:scaleY(.15)}100%{transform:scaleY(1)}}
+@media(prefers-reduced-motion:reduce){.ai *{animation:none!important;transition:none!important}}
+
+/* the design file has no breakpoints; these are ours */
+@media(max-width:980px){
+  .ai-hero,.five,.info,.faqg,.tgate{grid-template-columns:1fr;gap:32px}
+  .ai-hero{padding-top:56px}
+  .five .sticky{position:static}
+  .cols{grid-template-columns:1fr;gap:36px}.cols .div{display:none}
+  .lim{grid-template-columns:56px minmax(0,1fr)}.lim .ill{grid-column:1/-1}
+  .two{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+  .three{grid-template-columns:1fr}
+  .path{flex-wrap:wrap;justify-content:center;gap:18px 22px}.path .ln{display:none}
+  .tgate .demo{flex-direction:column}.tgate .ch{flex-direction:row;justify-content:center}
+}
+@media(max-width:560px){
+  .ai .wrap,.ai-hero,.sec,.cta{padding-left:18px;padding-right:18px}
+  .lim{grid-template-columns:1fr}.lim .big{font-size:40px}
+  .cols .ghost{display:none}
+  .tbl .r{grid-template-columns:1fr;gap:6px}.tbl .r.h{display:none}
+  .tbl .where b{font-size:22px}
+  .lc .strike{font-size:52px}
+  .ai details.fq .ans{padding-right:0}
+}
+</style>
 </head>
-<body>
+<body class="ai">
 
 <nav class="site-nav"><div class="nav-in">
   <a class="brand" href="/"><span class="mark">Y</span><b>Yaadly<span>Hub</span></b></a>
@@ -33,192 +285,354 @@
   <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
-<div class="sect first"><div class="wrap">
-  <p class="kick">How we use AI</p>
-  <h1 class="hx" style="font-size:clamp(28px,4.5vw,44px)">Assistants draft.<br><span class="g2">A named person decides.</span></h1>
-  <p class="lead" style="margin-top:14px;max-width:64ch">Yaadly runs on a small set of assistants. They read your message at two in the morning, scope the job, draft the paperwork and check that the photographs arrived. That is why you get an answer straight away and a person replies within one working day, rather than waiting for both.</p>
+<!-- Hero -->
+<header class="wrap ai-hero">
+  <div>
+    <span class="tag"><i></i>How we use AI</span>
+    <h1>Assistants draft.<br><em class="grad-text">A named person</em> decides.</h1>
+    <p class="lead">Our assistants read your message at two in the morning, scope the job, draft the paperwork and check the photographs arrived. <b>They decide nothing.</b> Releasing money, ruling on a disagreement, setting a price: a person at Yaadly does that, and the limits are written into the code, not a policy.</p>
+    <div class="ctas">
+      <a class="pillbtn primary" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20question%20about%20how%20you%20use%20AI." target="_blank" rel="noopener">Ask us about this</a>
+      <a class="pillbtn" href="#line">See where the line sits</a>
+    </div>
+  </div>
 
-  <div class="rule soft" style="margin-top:24px">
-    <span><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg></span>
+  <!-- One night, one thread. Illustrative, not a transcript. -->
+  <div class="thread" aria-label="Illustration: a message answered overnight, approved by a person in the morning">
+    <div class="hd"><span>One night, one thread</span><span>Kingston · UTC minus 5</span></div>
+    <div class="msgs">
+      <div class="m"><span class="t">02:14</span><div class="b">Bathroom pipe burst, water on the floor. Can somebody go tomorrow? <span class="vn"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>0:41</span></div></div>
+      <div class="m r" style="animation-delay:.9s"><span class="t">02:14</span><div class="b"><span class="who">Assistant</span>Got it. Voice note read: burst pipe, bathroom, urgent. Drafting the job now. A plumber's quote brief will be ready for a person at Yaadly to approve in the morning.</div></div>
+      <div class="log"><em>agent</em> · 02:15 · voice to text · job drafted · nothing approved<span class="cur"></span></div>
+      <div class="sun"><i></i>sunrise · 06:11<i></i></div>
+      <div class="m r p" style="animation-delay:2.6s"><span class="t">08:52</span><div class="b"><span class="who">Yaadly · person</span>Morning. I have read the draft and approved the brief. Two vetted plumbers are quoting. Nothing is paid until you approve the photos.</div></div>
+    </div>
+    <div class="ft"><span>Answered <b>straight away</b></span><span>Approved <b>by a person</b></span></div>
+  </div>
+</header>
+
+<!-- Why this matters to you -->
+<section class="wrap">
+  <div class="three">
+    <div class="card3">
+      <div class="art">
+        <span class="lbl l">Kingston · 24h</span><span class="lbl r">London +6h</span>
+        <svg class="arc" viewBox="0 0 340 170" aria-hidden="true">
+          <defs><linearGradient id="nightArc" x1="0" x2="1"><stop offset="0" stop-color="#7B4FE0"/><stop offset=".55" stop-color="#9B73F5"/><stop offset="1" stop-color="#F59E0B"/></linearGradient></defs>
+          <path d="M40 150 A130 130 0 0 1 300 150" fill="none" stroke="rgba(155,115,245,0.14)" stroke-width="10" stroke-linecap="round"/>
+          <path d="M40 150 A130 130 0 0 1 170 20" fill="none" stroke="#7B4FE0" stroke-opacity=".35" stroke-width="10" stroke-linecap="round"/>
+          <text x="40" y="168" fill="#44446A" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">00:00</text>
+          <text x="170" y="12" fill="#44446A" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">12:00</text>
+          <text x="300" y="168" fill="#44446A" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">24:00</text>
+          <circle cx="63" cy="88" r="7" fill="#07071A" stroke="#C4AAFF" stroke-width="2"/>
+          <circle cx="63" cy="88" r="14" fill="none" stroke="#9B73F5" stroke-opacity=".35" stroke-width="1"/>
+          <text x="84" y="84" fill="#C4AAFF" font-family="IBM Plex Mono" font-size="11" font-weight="600">02:14</text>
+          <text x="84" y="98" fill="#7878A8" font-family="IBM Plex Sans" font-size="11">answered by assistant</text>
+          <circle cx="212" cy="30" r="7" fill="#07071A" stroke="#FBBF24" stroke-width="2"/>
+          <text x="226" y="27" fill="#FBBF24" font-family="IBM Plex Mono" font-size="11" font-weight="600">08:52</text>
+          <text x="226" y="41" fill="#7878A8" font-family="IBM Plex Sans" font-size="11">Yaadly replies</text>
+          <rect x="100" y="120" width="140" height="24" rx="12" fill="rgba(155,115,245,0.09)" stroke="rgba(155,115,245,0.28)"/>
+          <text x="170" y="136" fill="#EEEEFF" font-family="IBM Plex Sans" font-size="11" font-weight="600" text-anchor="middle">Voice note · Patois · read</text>
+        </svg>
+      </div>
+      <div class="body">
+        <div class="num">01</div>
+        <h3 class="h3">An answer while Jamaica is asleep</h3>
+        <p>A message, photo or voice note, in Patois if that is easier, is read and answered there and then. A person then picks it up from there. You are never left wondering whether it arrived.</p>
+      </div>
+    </div>
+
+    <div class="card3">
+      <div class="art">
+        <div class="p1" aria-hidden="true">
+          <div class="p1h"><span>Condition Report · page one</span><span>who wrote each line</span></div>
+          <div class="p1r"><i>M</i><span class="lab">Finding 01 · roof covering</span><b class="sk" style="width:38%"></b></div>
+          <div class="p1r"><i>M</i><span class="lab">Finding 02 · guttering</span><b class="sk" style="width:30%"></b></div>
+          <div class="p1r"><i>M</i><span class="lab">Finding 03 · fascia board</span><b class="sk" style="width:34%"></b></div>
+          <div class="p1v"><i>P</i><div>
+            <div class="p1vh"><span>Verdict</span><em>Moderate</em></div>
+            <p>Roof is sound. Replace the guttering before the rains; do not pay the second stage until then.</p>
+            <div class="p1s"><svg viewBox="0 0 90 22"><path d="M2 16c8-12 12-10 14-2s6 4 10-4 8-6 10 2 6 8 12 0 10-10 14-2 8 6 12 0 6-4 12 2"/></svg><span>signed · 09:41</span></div>
+          </div></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="num">02</div>
+        <h3 class="h3">A written verdict</h3>
+        <p>A machine drafts the findings. The ratings and the verdict on page one are written by a person: what was found, and what we think you should do.</p>
+      </div>
+    </div>
+
+    <div class="card3">
+      <div class="art">
+        <span class="lbl l">Decision log · one job</span>
+        <div class="dlog" aria-hidden="true">
+          <div class="e"><span class="av">Y</span><span class="tx"><b>Stage 2 approved</b><small>Yaadly · 09:41</small></span></div>
+          <div class="e"><span class="av">Y</span><span class="tx"><b>Price set</b><small>Yaadly · 09:38</small></span></div>
+          <div class="e w"><span class="av w">DW</span><span class="tx"><b>Day 3 account sent</b><small>Devon W. · 17:02</small></span></div>
+          <div class="e x"><span class="av x">·</span><span class="tx"><b>Approved by system</b><small>not allowed</small></span></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="num">03</div>
+        <h3 class="h3">A name against every decision</h3>
+        <p>Every step that moves money or changes your property has a real person's name against it. Not "the system". Ask who approved it, and there is an answer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Where the line sits -->
+<section id="line" class="sec">
+  <div class="head">
+    <div class="kick-m">Where the line sits</div>
+    <h2 class="h2">What happens by machine, and what waits for a person.</h2>
+  </div>
+
+  <div class="path panel">
+    <span class="cap">The path of one job</span>
+    <div class="st"><i>02:14</i><span>Your message</span></div><span class="ln"></span>
+    <div class="st"><i>M</i><span>Assistant reads</span></div><span class="ln"></span>
+    <div class="st"><i>M</i><span>Draft written</span></div><span class="ln a"></span>
+    <div class="st gate"><span class="gate"><b></b><b></b><em></em></span><span>Gate · a named person</span></div><span class="ln b"></span>
+    <div class="st g"><i>J$</i><span>Money moves</span></div>
+  </div>
+
+  <div class="cols" style="max-width:1136px;margin:0 auto">
+    <div class="col">
+      <span class="ghost" aria-hidden="true">M</span>
+      <div class="lbl"><i></i>Straight away, by machine</div>
+      <div class="row"><span class="n">M1</span><span>Your message is <b>read and answered</b>; a voice note becomes text</span></div>
+      <div class="row"><span class="n">M2</span><span>The job is <b>written up</b> in a structured form</span></div>
+      <div class="row"><span class="n">M3</span><span>A tradesperson's paperwork is read and <b>anything missing flagged</b></span></div>
+      <div class="row"><span class="n">M4</span><span>The quote brief and written agreement are <b>drafted</b></span></div>
+      <div class="row"><span class="n">M5</span><span>Photos and walkthrough video are read; <b>what is visible</b> is written up</span></div>
+      <div class="row"><span class="n">M6</span><span>Findings inside a paid report are <b>drafted</b></span></div>
+      <div class="row"><span class="n">M7</span><span>A job that has gone quiet is <b>noticed and chased</b></span></div>
+    </div>
+    <div class="div"><i></i></div>
+    <div class="col p">
+      <span class="ghost" aria-hidden="true">P</span>
+      <div class="lbl"><i></i>Always by a named person</div>
+      <div class="row"><span class="n">P1</span><span><b>Approving a stage</b>, the step that moves money</span></div>
+      <div class="row"><span class="n">P2</span><span><b>Issuing</b> every document and <b>setting</b> every price</span></div>
+      <div class="row"><span class="n">P3</span><span><b>Deciding</b> a disagreement</span></div>
+      <div class="row"><span class="n">P4</span><span>Changing a tradesperson's record; <b>accepting or declining</b> an applicant</span></div>
+      <div class="row"><span class="n">P5</span><span>Judging whether work <b>meets the standard</b> for that trade</span></div>
+      <div class="row"><span class="n">P6</span><span><b>Rating</b> how serious a finding is, and <b>writing the verdict</b> on page one</span></div>
+    </div>
+  </div>
+
+  <!-- Tradesperson's gate -->
+  <div class="tgate panel2" style="max-width:1136px;margin-left:auto;margin-right:auto">
+    <span class="glow"></span>
     <div>
-      <b>They do not decide anything.</b> A named person at Yaadly approves every stage, issues every document, sets every price and signs off every job. Releasing money, ruling on a disagreement and changing a tradesperson's record are decisions no assistant here can make.
-      <br><br>
-      <b>That is not a policy we ask them to follow.</b> It is built into the system, in the database and in the code, so it cannot be talked around by anyone typing the right thing into a chat window. Five of those limits are written out further down, and each one is checkable rather than a promise.
+      <span class="gtag"><i></i>One gate is not ours</span>
+      <h3>The tradesperson sees his day's account before you do.</h3>
+      <p>He did the work, so it is his account to stand behind. He chooses whether it goes to you as written or in his own words. A protection that only guards the client tells him what we think of him.</p>
+    </div>
+    <div class="demo" aria-label="Illustration: the assistant's draft, and the tradesperson's own version that was actually sent">
+      <span class="ghost" aria-hidden="true">1</span>
+      <div class="bx"><div class="k">Draft · assistant</div><p>Day 3. Old pipe cut out, new PVC run fitted and pressure tested. Tiles around the boxing removed, to be replaced Thursday.</p></div>
+      <div class="ch"><span class="on">Send as written</span><span>In my own words</span></div>
+      <div class="bx sent"><div class="k">Sent · Devon, plumber</div><p>Day 3 done. New pipe in and tested, no leaks. Had to take off four tiles by the boxing. I will put matching ones back Thursday.</p></div>
     </div>
   </div>
-</div></div>
+</section>
 
-<div class="sect light"><div class="wrap">
-  <p class="kick">Why this matters to you</p>
-  <h2 class="hx" style="font-size:clamp(24px,3.6vw,34px)">What you get out of it, in three lines.</h2>
-  <p class="lead" style="margin-top:12px;max-width:62ch">You are managing a property from four or five time zones away. Most of what goes wrong at that distance is not bad work. It is silence, and not knowing who is answerable for what.</p>
+<!-- Five built limits -->
+<section class="sec">
+  <div class="five" style="max-width:1136px;margin:0 auto">
+    <div class="sticky">
+      <div class="kick-m">Five things we built, not promised</div>
+      <h2 class="h2" style="margin-bottom:16px">Anyone can say a human is in charge.</h2>
+      <p>Five limits in the code and the database, not rules an assistant is asked to remember. Each one is checkable.</p>
+    </div>
+    <div class="list">
 
-  <div class="grid g3c" style="margin-top:24px">
-    <div class="card">
-      <span style="color:var(--tealb)"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-      <h3 style="margin:10px 0 8px;font-size:17px">An answer while Jamaica is asleep</h3>
-      <p style="margin:0;color:var(--mute);font-size:14px">Send a message, a photograph or a voice note at any hour, in Patois if that is easier, and it is read and answered there and then. A person comes back to you within one working day. You are never left wondering whether it arrived.</p>
-    </div>
-    <div class="card">
-      <span style="color:var(--tealb)"><svg class="gl" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6M9 14h6M9 17h4"/></svg></span>
-      <h3 style="margin:10px 0 8px;font-size:17px">A written verdict</h3>
-      <p style="margin:0;color:var(--mute);font-size:14px">Drafting the findings inside a report is work a machine can do. The ratings and the verdict on page one are not, and a person writes them. What you get is a document that says plainly what was found and what we think you should do, rather than a folder of photographs to work through yourself.</p>
-    </div>
-    <div class="card">
-      <span style="color:var(--tealb)"><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/></svg></span>
-      <h3 style="margin:10px 0 8px;font-size:17px">A name against every decision</h3>
-      <p style="margin:0;color:var(--mute);font-size:14px">Every step that moves money or changes what happens at your property has a real person's name recorded against it. Not "the system", not "our team". When you ask who approved something, there is an answer, and it is a person you can speak to.</p>
+      <div class="lim panel">
+        <span class="big">1</span>
+        <div>
+          <h3 class="h3">The invoicing assistant cannot type a number.</h3>
+          <p>It can name a service from our published price list and nothing else. There is no amount field to invent one in, and a line we cannot match to the list cannot be sent until a person prices it.</p>
+          <span class="code">invoice.amount → <b>no field</b></span>
+        </div>
+        <div class="ill" aria-hidden="true">
+          <span class="k">Invoice · new line</span>
+          <div><span class="k f">Service</span><span class="fld">Plumbing · standard call-out</span></div>
+          <div><span class="k f">Amount</span><span class="fld no"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>no field</span></div>
+          <span class="foot">→ looked up from the published list</span>
+        </div>
+      </div>
+
+      <div class="lim panel">
+        <span class="big">2</span>
+        <div>
+          <h3 class="h3">Sketches carry no measurements.</h3>
+          <p>A phone video has no scale, and measured drawings for reward are regulated work in Jamaica. Any dimension is stripped, reported to us, and the pack is refused until it is gone.</p>
+          <span class="code">sketch.dimension → <b>rejected</b></span>
+        </div>
+        <div class="ill" style="padding:10px" aria-hidden="true">
+          <svg viewBox="0 0 160 110" style="width:100%;height:auto"><g fill="none" stroke="#C4AAFF" stroke-width="1.4" stroke-linejoin="round"><rect x="8" y="10" width="70" height="52" rx="2"/><rect x="78" y="10" width="74" height="30" rx="2"/><rect x="78" y="40" width="74" height="22" rx="2"/><rect x="8" y="62" width="144" height="36" rx="2"/><path d="M43 62v6M115 40v-6"/></g><g font-family="IBM Plex Mono" font-size="8" fill="#7878A8"><text x="14" y="24">Bedroom</text><text x="84" y="24">Bath</text><text x="84" y="54">Hall</text><text x="14" y="76">Living / kitchen</text></g><path d="M8 106h144" stroke="#F59E0B" stroke-width="1" stroke-dasharray="3 3" opacity=".6"/><rect x="52" y="99" width="56" height="12" rx="6" fill="#07071A" stroke="#F59E0B"/><text x="80" y="108" font-family="IBM Plex Mono" font-size="7.5" font-weight="600" fill="#FBBF24" text-anchor="middle" text-decoration="line-through">4.2 m × 3.1 m</text></svg>
+          <span class="foot a">rooms, not sizes</span>
+        </div>
+      </div>
+
+      <div class="lim panel">
+        <span class="big">3</span>
+        <div>
+          <h3 class="h3">The report drafter cannot rate severity.</h3>
+          <p>Severe, moderate or low is the judgment you are paying for, and a person writes it, with the verdict on page one. The database will not issue a report while a finding is unrated or the verdict is empty.</p>
+          <span class="code">finding.severity → <b>person only</b></span>
+        </div>
+        <div class="ill" aria-hidden="true">
+          <span class="k">Finding 07 · damp, rear wall</span>
+          <div><span class="ln" style="width:95%"></span><span class="ln" style="width:70%"></span></div>
+          <div><span class="k f">Severity</span><span class="fld no" style="justify-content:space-between"><span>·</span><span class="k" style="color:var(--ai-amber)">person only</span></span></div>
+          <div class="bars"><i></i><i></i><i></i></div>
+          <span class="foot m">issue blocked while unrated</span>
+        </div>
+      </div>
+
+      <div class="lim panel">
+        <span class="big">4</span>
+        <div>
+          <h3 class="h3">Identity documents never reach a model.</h3>
+          <p>A tradesperson's photo ID, selfie and face video are blocked before the file is even fetched, and no setting turns that off. Their other paperwork is read by a model only where they said yes, and silence counts as no.</p>
+          <span class="code">identity.* → <b>blocked</b></span>
+        </div>
+        <div class="ill" aria-hidden="true">
+          <span class="k">Applicant upload</span>
+          <div style="display:flex;gap:8px"><div class="up"><span>not fetched</span></div><div class="up"><span>not fetched</span></div></div>
+          <div class="kv"><span>photo ID · selfie</span><span class="g">→ identity provider</span></div>
+          <div class="kv"><span>CV · certificates</span><span class="v">consent: yes</span></div>
+        </div>
+      </div>
+
+      <div class="lim panel">
+        <span class="big">5</span>
+        <div>
+          <h3 class="h3">A model reads your photos. We say so.</h3>
+          <p>NVIDIA, in the United States. What lands on your phone is the plain description. Any severity line or "call a professional" comes to us first, and reaches you only inside a document a person opened and released. The tradesperson gets the unedited version, because he can go and look again.</p>
+          <span class="code">photo.severity → <b>to us, not you</b></span>
+        </div>
+        <div class="ill" aria-hidden="true">
+          <span class="k">Photo 12 · model output</span>
+          <div style="display:flex;flex-wrap:wrap;gap:4px"><span class="chip">maintenance</span><span class="chip">visible: staining, ceiling</span></div>
+          <div class="kv"><span>description</span><span class="g">→ your phone</span></div>
+          <div class="kv"><span class="red">severity: high</span><span class="a">→ us first</span></div>
+          <div class="kv"><span class="red">call a professional</span><span class="a">→ us first</span></div>
+        </div>
+      </div>
+
     </div>
   </div>
-</div></div>
+</section>
 
-<div class="sect"><div class="wrap">
-  <p class="kick">Where the line sits</p>
-  <h2 class="hx" style="font-size:clamp(24px,3.6vw,34px)">What happens by machine, and what waits for a person.</h2>
+<!-- The limits -->
+<section class="sec">
+  <div class="head" style="margin-bottom:44px">
+    <div class="kick-m">The limits</div>
+    <h2 class="h2">What no assistant here will ever do.</h2>
+  </div>
+  <div class="two" style="max-width:1136px;margin:0 auto">
+    <div class="lc panel2">
+      <span class="glow"></span>
+      <div class="hd">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/><path d="m4 4 16 16"/></svg></span>
+        <h3>Nothing is closed by a countdown.</h3>
+      </div>
+      <div><span class="strike">72:00:00</span></div>
+      <div class="sub">no timer · no auto-approve · no confidence score</div>
+      <p>Not a timer, not a confidence score, not an evidence check going green on its own. No stage approves itself because the photos looked right, and nothing moves because you did not reply in time. There is no setting for that, and we are not going to add one.</p>
+    </div>
+    <div class="lc v panel2">
+      <span class="glow"></span>
+      <div class="hd">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16M6 20V9l6-5 6 5v11M10 20v-5h4v5"/></svg></span>
+        <h3>Four questions never come to us.</h3>
+        <span class="four" aria-hidden="true">4</span>
+      </div>
+      <div class="ref"><b>Valuation</b><span>licensed valuer</span></div>
+      <div class="ref"><b>Title and legal opinion</b><span>attorney</span></div>
+      <div class="ref"><b>Anything structural</b><span>PERB registered engineer</span></div>
+      <div class="ref"><b>Boundaries</b><span>commissioned land surveyor</span></div>
+      <p style="margin-top:14px;font-size:13.5px">We say so in writing and name the professional. What Yaadly guarantees is what Yaadly controls: project management, procurement and oversight judgment. Not an outcome. See <a href="services.html">managed services</a> for what each service covers.</p>
+    </div>
+  </div>
+</section>
 
-  <div class="rule soft" style="margin-top:24px">
-    <span><svg class="gl" viewBox="0 0 24 24"><path d="M12 3v18M5 8l-2 4 2 4M19 8l2 4-2 4"/></svg></span>
+<!-- Your information -->
+<section class="sec">
+  <div class="info" style="max-width:1136px;margin:0 auto">
     <div>
-      <b>Straight away, by machine:</b> your message is read and answered, a voice note is turned into text, the job is written up in a structured form, a tradesperson's paperwork is read and anything missing is flagged, the quote brief and the written agreement are drafted, photographs and walkthrough video are read and what is visible in them is written up, the findings inside a paid report are drafted, and a job that has gone quiet is noticed and chased.
+      <div class="kick-m">Your information</div>
+      <h2 class="h2" style="margin-bottom:16px">Where it goes, said plainly.</h2>
+      <p class="intro">Every company that touches your information is named, with the country it sits in, on the <a href="privacy.html">privacy page</a>. The list is the honest one, not the flattering one. It even records that our text model sat in China until 4 September 2026, because a page that only describes the present is one you cannot check.</p>
+      <div class="sw"><span class="tog"><i></i></span><div><b>Ask us not to use assistants on your job.</b> We take them out of your thread and answer ourselves. It is slower, and a fair trade to offer you rather than a reason to talk you out of it.</div></div>
+      <div class="sw"><span class="tog a"><i></i></span><div><b>One control switches every assistant off.</b> Your messages and photos are still kept, and you are told a person is reading. Nobody is left talking to silence.</div></div>
+    </div>
+    <div class="tbl panel2">
+      <div class="r h"><span>What you send</span><span>Read by</span><span>Where</span></div>
+      <div class="r"><b>Text you send us</b><span class="by">Mistral</span><span class="where"><b>EU</b><small>European<br>Union</small></span></div>
+      <div class="r"><b>Photos and video of your property</b><span class="by">NVIDIA</span><span class="where us"><b>US</b><small>United<br>States</small></span></div>
+      <div class="r"><b>Voice notes</b><span class="by">Cloudflare<small>United States providers as fallback</small></span><span class="where us"><b>US</b><small>United<br>States</small></span></div>
+      <div class="r"><b>Identity documents</b><span class="g">None of them</span><span class="where none"><b>·</b><small>Never<br>fetched</small></span></div>
     </div>
   </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4.4-3.2 7.4-8 8-4.8-.6-8-3.6-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
-    <div>
-      <b>Always by a named person:</b> approving a stage, which is the step that moves money. Issuing every document. Setting every price. Deciding a disagreement. Changing a tradesperson's record. Accepting or declining somebody who has applied to work with us. Judging whether work meets the standard for that trade. Rating how serious a finding is, and writing the verdict on page one of a report you paid for.
-    </div>
-  </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.2-3.6 3.8-5.5 7-5.5s5.8 1.9 7 5.5"/></svg></span>
-    <div>
-      <b>One gate is not ours, it is the tradesperson's.</b> Before a written account of a day's work reaches you, the person who did that work sees it first, framed honestly as a draft, and chooses whether it goes to you as written or in their own words instead. He did the work, so it is his account to stand behind, not something assembled about him while he was not looking.
-      <br><br>
-      That cuts both ways on purpose. A protection that only ever guards the client is telling the tradesperson what we think of him, and a tradesperson who does not trust the process is not one you want on your property.
-    </div>
-  </div>
-</div></div>
+</section>
 
-<div class="sect"><div class="wrap">
-  <p class="kick">Five things we built rather than promised</p>
-  <h2 class="hx" style="font-size:clamp(24px,3.6vw,34px)">Anyone can say a human is in charge.</h2>
-  <p class="lead" style="margin-top:12px;max-width:62ch">So here is what that is worth. Each of these is a limit built into the code and the database, not a rule we ask an assistant to remember.</p>
-
-  <div class="rule soft" style="margin-top:24px">
-    <span><svg class="gl" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
+<!-- FAQ -->
+<section class="sec">
+  <div class="faqg" style="max-width:1136px;margin:0 auto">
     <div>
-      <b>Our invoicing assistant cannot type a number.</b> It can name a service from our published price list and nothing else. There is no field in it for an amount. The figure is looked up from the list itself when the invoice is written, so an assistant that wanted to invent a price has nowhere to put one. An invoice with anything on it we could not match to the published list cannot be sent at all until a person prices that line.
+      <div class="kick-m">Questions people ask</div>
+      <h2 class="h2">The ones that come up most.</h2>
+    </div>
+    <div>
+      <details class="fq" open>
+        <summary><h2>Is a machine deciding whether my money is released?</h2></summary>
+        <div class="ans">No, and it is the one thing we will not build. Approving a stage is the step that releases money, and a named person does it every single time. Nothing releases on a timer, on an evidence check passing, or because an assistant judged itself confident enough.</div>
+      </details>
+      <details class="fq">
+        <summary><h2>Does AI set my price?</h2></summary>
+        <div class="ans">No. Prices come from our published list, and the invoicing assistant has no field for an amount. Work that is not on the list cannot be invoiced until a person prices it. See <a href="prices.html">what work costs</a>.</div>
+      </details>
+      <details class="fq">
+        <summary><h2>Who actually looks at photographs of my property?</h2></summary>
+        <div class="ans">A model run by NVIDIA, in the United States, reads them first and writes down what is visible. Then a person here reads it. What lands on your phone automatically is the plain description only. Any judgment about how serious something is comes to us first, and reaches you inside a document a person opened and released.</div>
+      </details>
+      <details class="fq">
+        <summary><h2>Can I ask you not to use AI on my job at all?</h2></summary>
+        <div class="ans">Yes. Say so and we take the assistants out of your thread and answer you ourselves. It will be slower, and we would rather tell you that than talk you out of asking.</div>
+      </details>
+      <details class="fq">
+        <summary><h2>What happens when the AI gets something wrong?</h2></summary>
+        <div class="ans">It gets caught at the gate, because the gates are where the consequences are. A wrong draft is a draft a person corrects before it goes anywhere. The decisions that would actually cost you, releasing money, ruling on a disagreement, rating a finding, are not the assistant's to make in the first place, so a mistake there cannot reach you as a decision.</div>
+      </details>
+      <details class="fq">
+        <summary><h2>Will I be talking to a bot instead of a person?</h2></summary>
+        <div class="ans">You get an immediate answer from an assistant, and then a person. If you ask to speak to somebody, you get Monique, replying in the same conversation from the same number rather than as a stranger messaging you out of nowhere.</div>
+      </details>
+      <details class="fq">
+        <summary><h2>Are tradespeople's identity documents fed into AI?</h2></summary>
+        <div class="ans">Never. The government photo ID, the live selfie and the face video are blocked in our code before the file is even fetched, and there is no setting that turns that off. A specialist identity provider does that check. Their other paperwork is read by a model only where they agreed to it, and an unanswered question counts as no.</div>
+      </details>
     </div>
   </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4"/></svg></span>
-    <div>
-      <b>Our property sketches carry no measurements.</b> A phone video has no scale in it, so any dimension taken from one would be invented, and measured drawings for reward are regulated work in Jamaica. The rule is enforced three times over: the assistant is told not to, anything that slips through is stripped out and reported to us rather than hidden, and the database refuses to let a pack carrying a measurement be approved. A sketch shows you which rooms there are and how they connect. It never tells you how big they are.
-    </div>
-  </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6M9 14h6M9 17h4"/></svg></span>
-    <div>
-      <b>Our report drafter cannot tell you how serious anything is.</b> Three of the services you can buy are a document: the Deposit Protection Check, the Condition Report and the Technical Sign-off. A machine drafts the findings inside them. It is not allowed to rate a single one of those findings, and there is no field in it for a verdict.
-      <br><br>
-      Severe, moderate or low is the professional judgment you are paying for, and a named person writes it, along with the conclusion on page one. The database will not let a report be issued while a finding is unrated, while the verdict is empty, or if a measurement has crept in anywhere. So the part of a report that a machine cannot do is exactly the part you bought.
-    </div>
-  </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9.5" cy="11" r="2"/><path d="M14 10h3M14 13h3M6 17c1-1.7 2.2-2.5 3.5-2.5S12 15.3 13 17"/></svg></span>
-    <div>
-      <b>Identity documents never reach an AI model.</b> A tradesperson's government photo ID, their live selfie and their face video stay where they were uploaded. They are held back before the file is even fetched, and there is deliberately no setting that turns that off. The identity check itself is done by a specialist provider built for it, not by us guessing from a photograph.
-      <br><br>
-      Their supporting paperwork, meaning proof of address, tax registration, certificates, CV and portfolio, is read by a model <b>only if they said yes</b>, and no is what we assume if they did not answer. That choice is recorded with the exact sentence they agreed to, so a consent can never quietly come to mean something it did not say when they gave it.
-    </div>
-  </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2.5L9 4h6l1.5 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.5"/></svg></span>
-    <div>
-      <b>A model reads your photographs, and we would rather say so than let you find out.</b> Photographs and walkthrough video of your property are analysed by a model run by NVIDIA, in the United States. It writes down what is visible and tags anything it notices as cosmetic, maintenance, safety, structural, or not what was asked for. That is useful, and it is also a machine looking at video of your house, so it is named here and on the <a href="privacy.html">privacy page</a> with the country it sits in.
-      <br><br>
-      <b>What it thinks does not reach you unread.</b> The message that lands on your phone when photographs arrive carries what is visible in plain words and nothing else. The severity it assigned, and any sentence about needing a professional, are taken out of your copy and sent to us instead, where a person reads them. A machine telling somebody overseas that their house may have a structural problem is a diagnosis, and we are not willing to have one made by something that has never stood in the building. Where that judgment does reach you it is inside a document a person here opened, read and released, never something sent while we slept. The tradesperson gets the unedited version, because he is standing in front of the thing and can go and look again.
-    </div>
-  </div>
-</div></div>
+</section>
 
-<div class="sect light"><div class="wrap">
-  <p class="kick">The limits</p>
-  <h2 class="hx" style="font-size:clamp(24px,3.6vw,34px)">What no assistant here will ever do.</h2>
-
-  <div class="rule soft" style="margin-top:24px">
-    <span><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
-    <div>
-      <b>Nothing is closed by a countdown.</b> Not a timer, not a confidence score, not an evidence check going green on its own. No stage approves itself because the photographs looked right, and nothing moves because you did not reply in time. There is no setting that makes it work that way, and we are not going to add one, because it is the only thing that makes the rest of this worth anything.
-    </div>
+<!-- Closing CTA -->
+<section class="cta">
+  <div class="rule2"><i></i></div>
+  <h2>Fast answers. <em class="grad-text">Human decisions.</em></h2>
+  <div class="ctas">
+    <a class="pillbtn primary" href="https://app.yaadly.co.uk/jobs/new">Start a project</a>
+    <a class="pillbtn" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20question%20about%20how%20you%20use%20AI." target="_blank" rel="noopener"><svg class="wa" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.7.9 3.6 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.3l-.4-.2-4.9 1 1-4.7-.3-.4c-1-1.5-1.5-3.3-1.5-5.2 0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.1 10.8-8.5 10.8z"/></svg>Ask us about this</a>
+    <a class="pillbtn" style="border-color:transparent;color:var(--tealb);padding:13px 10px" href="privacy.html">Read the privacy page →</a>
   </div>
-  <div class="rule soft" style="margin-top:14px">
-    <span><svg class="gl" viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4.4-3.2 7.4-8 8-4.8-.6-8-3.6-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></span>
-    <div>
-      <b>Four questions never come to us at all, and never to a machine.</b> Valuation goes to a licensed valuer. Title and legal opinion go to an attorney. Anything structural goes to a PERB registered engineer. Boundaries go to a commissioned land surveyor. We say so in writing and name the professional, rather than answering it ourselves because we were asked.
-      <br><br>
-      What Yaadly does guarantee is what Yaadly controls: project management, procurement and oversight judgment. We record condition and we judge workmanship against the standard for that trade. We do not guarantee an outcome. See the <a href="services.html">managed services</a> page for what each service does and does not cover.
-    </div>
-  </div>
-</div></div>
-
-<div class="sect"><div class="wrap">
-  <p class="kick">Your information</p>
-  <h2 class="hx" style="font-size:clamp(24px,3.6vw,34px)">Where it goes, said plainly.</h2>
-
-  <div class="rule soft" style="margin-top:24px">
-    <span><svg class="gl" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9S14.5 18.3 12 21c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg></span>
-    <div>
-      <b>Every company that touches your information is named, with the country it is in</b>, on our <a href="privacy.html">privacy page</a>. That list is kept current rather than written once, and it includes the uncomfortable parts. Our text drafting model sat in China until 4 September 2026 and now runs in the European Union. The privacy page said so plainly for as long as it was true, and it still records that it was true, because a page that only describes the present tense is one you cannot check.
-      <br><br>
-      <b>Not all of it is in Europe, and the list is the honest one rather than the flattering one.</b> Text you send us is read and drafted on by Mistral, in the European Union. Photographs and video of your property are read by NVIDIA in the United States. Voice notes are turned into text by Cloudflare, with providers in the United States standing behind it when that fails. Identity documents go to none of them.
-      <br><br>
-      <b>You can ask us not to use the assistants on your job.</b> Say so and we will take them out of your thread and answer you ourselves. It will be slower, and that is a fair trade to offer you rather than a reason to talk you out of it.
-      <br><br>
-      <b>We can switch every assistant off.</b> There is one control that stops them, and when it is on your message is still recorded, your photographs and voice notes are still kept, and you are told a person is reading it. Nobody is left talking to silence.
-    </div>
-  </div>
-</div></div>
-
-<div class="sect"><div class="wrap">
-  <p class="kick">Questions people ask</p>
-  <h2 class="hx" style="font-size:clamp(24px,3.6vw,34px)">The ones that come up most.</h2>
-
-  <details class="fq" open>
-    <summary><h2>Is a machine deciding whether my money is released?</h2></summary>
-    <div class="ans">No, and it is the one thing we will not build. Approving a stage is the step that releases money, and it is done by a named person every single time. Nothing releases on a timer, on an evidence check passing, or because an assistant judged itself confident enough.</div>
-  </details>
-  <details class="fq">
-    <summary><h2>Does AI set my price?</h2></summary>
-    <div class="ans">No. Prices come from our published list, and our invoicing assistant has no field in it for an amount. If a line of work is not on the published list, an invoice carrying it cannot be sent until a person prices it. See <a href="prices.html">what work costs</a>.</div>
-  </details>
-  <details class="fq">
-    <summary><h2>Who actually looks at photographs of my property?</h2></summary>
-    <div class="ans">A model run by NVIDIA, in the United States, reads them first and writes down what is visible. Then a person here reads it. What lands on your phone automatically is the plain description only. Any judgment about how serious something is comes to us first, and reaches you inside a document a person opened and released.</div>
-  </details>
-  <details class="fq">
-    <summary><h2>Can I ask you not to use AI on my job at all?</h2></summary>
-    <div class="ans">Yes. Say so and we take the assistants out of your thread and answer you ourselves. It will be slower, and we would rather tell you that than talk you out of asking.</div>
-  </details>
-  <details class="fq">
-    <summary><h2>What happens when the AI gets something wrong?</h2></summary>
-    <div class="ans">It gets caught at the gate, because the gates are where the consequences are. A wrong draft is a draft a person corrects before it goes anywhere. The decisions that would actually cost you, releasing money, ruling on a disagreement, rating a finding, are not the assistant's to make in the first place, so a mistake there cannot reach you as a decision.</div>
-  </details>
-  <details class="fq">
-    <summary><h2>Will I be talking to a bot instead of a person?</h2></summary>
-    <div class="ans">You will get an immediate answer from an assistant, and a person within one working day. If you ask to speak to somebody, you get Monique, replying in the same conversation from the same number rather than as a stranger messaging you out of nowhere.</div>
-  </details>
-  <details class="fq">
-    <summary><h2>Are tradespeople's identity documents fed into AI?</h2></summary>
-    <div class="ans">Never. The government photo ID, the live selfie and the face video are blocked in our code before the file is even fetched, and there is no setting that turns that off. A specialist identity provider does that check. Their other paperwork is read by a model only where they agreed to it, and an unanswered question counts as no.</div>
-  </details>
-
-  <div class="ctarow" style="margin:34px 0 10px">
-    <a class="btn sm" href="https://app.yaadly.co.uk/jobs/new">Start a project</a>
-    <a class="btn ghost sm" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20question%20about%20how%20you%20use%20AI." target="_blank" rel="noopener">Ask us about this</a>
-    <a class="btn ghost sm" href="privacy.html">Read the privacy page</a>
-  </div>
-  <p class="tiny" style="margin-top:16px">Questions about any of this go to <a href="mailto:monique@yaadly.co.uk">monique@yaadly.co.uk</a> and are read by a person, not a queue.</p>
-</div></div>
+  <p class="tiny">Questions go to <a href="mailto:monique@yaadly.co.uk" style="font-weight:600">monique@yaadly.co.uk</a> and are read by a person, not a queue.</p>
+</section>
 
 <footer><div class="wrap"><div class="fgrid">
   <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
