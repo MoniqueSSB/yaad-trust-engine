@@ -622,8 +622,8 @@ export default async function JobRoom({
           ? "Approve stage " + jobStage + " evidence, or raise a problem"
           : "The client is reviewing your stage " + jobStage + " evidence",
         detail: isClient
-          ? filed + " item" + (filed === 1 ? "" : "s") + " filed. Approve from the evidence, or book a live video walkthrough instead. Nothing is invoiced or paid until you decide."
-          : "Your pay invoice for this stage is raised the moment they approve it.",
+          ? filed + " item" + (filed === 1 ? "" : "s") + " filed. Approve from the evidence, or book a live video walkthrough instead. Nothing is invoiced to you until you decide."
+          : "Yaadly raises your pay invoice once the stage is accepted and checked.",
         href: isClient ? jobBase + "?tab=evidence" : undefined,
         cta: isClient ? "Review" : undefined,
       });
