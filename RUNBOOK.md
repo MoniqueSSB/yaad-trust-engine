@@ -325,6 +325,181 @@ The span attributes `yaadly.guardrail.blocked` and `yaadly.guardrail.terms` carr
 
 ---
 
+## 10a. A client was asked to repeat what they had just said
+
+The reply that fires here is the fixed opener: *"Thanks for writing in. Yaadly gets property work done in Jamaica... Tell me what needs doing, which parish the property is in, and who can let a worker in."* It is correct for a message with no readable content in it and wrong for everything else, so seeing it after somebody clearly said something means a model call failed upstream.
+
+**Their words are not lost.** Check first, so you can answer them properly:
+
+```bash
+# the thread, with everything they actually said
+select transcript, turns, stage, job_id from intake_threads order by last_at desc limit 5;
+```
+
+Then find which of the two calls failed, in the `yaad-inbound` function logs:
+
+- `classify: threw: TimeoutError` or `classify: mistral http 429`, the **classifier** died. Since 6 September 2026 this no longer costs the reply: the writer runs anyway and answers from the transcript. If you are seeing the opener *and* a classifier error, the writer failed too, which is the next line.
+- `compose: skipped, no time left`, the **writer** never started. Something above it ate the budget. Look at `yaadly.request.spent_ms` on the trace and at how long the transcription took.
+- Neither in the logs, and the reply probably went out fine and the opener you are looking at is older than you think. Check `last_at`.
+
+**Since 6 September 2026 this path hands over by itself.** When neither model produced anything and the client did say something, `handingOver` is set, the thread is marked `human_handling`, the job row is written so there is something to open, and the client is told plainly that it is going to a person rather than being asked to say it again. So the realistic version of this ticket is now "she is waiting on you", not "she was insulted by a robot".
+
+**Do not fix this by widening a timeout.** The whole point of `deadline.ts` is that the request has somewhere to be: Twilio abandons an inbound webhook at about fifteen seconds and the client gets nothing at all. If the budget is genuinely too tight, the thing to cut is work, not the deadline. See §9a for the Mistral rate limit, which is the usual cause and is a paid-capacity decision, not a code one.
+
+---
+
+## 10b. Somebody asked a question and got interrogated about a job
+
+From 6 September 2026 a message that is a question rather than work being described is answered as a question. It writes **no job row at all**, gets no reference number, and is not pushed at a person after three turns. It is still recorded in full under **Conversations** on the desk, which is where to read it. The phone push for one is titled *"A question on whatsapp"* and says there is nothing for you to do.
+
+If a question is still being treated as a job intake:
+
+1. Look at the trace for `yaadly.reply.source`. `none` means neither model wrote anything, so the writer's own override could not run either. That is §10a, not this.
+2. Otherwise the classifier returned `asking: false`. It is one model call's read of one message. The writer has an override for exactly this and answers from the conversation regardless, so a wrong `asking` should cost the job row decision, not the reply. If the reply itself is interrogating them, the writer's brief in `COMPOSE_SYSTEM` has drifted: check the `STATE helping` block and the override paragraph under `STATE gathering` are both still there. `asking_test.ts` asserts both.
+
+**The opposite failure is the one that costs money.** A real job filed as a question writes no row. `justAsking` therefore requires the classifier to say so *and* scope, trade and parish to all be empty, so a message with any actual work in it is written up as it always was. If a real job ever goes missing this way, that condition is the first thing to read.
+
+---
+
+## 10c. A voice note came back empty, or transcription is slow
+
+`yaad-transcribe` runs a failover chain: Cloudflare Workers AI Whisper first, then OpenAI, Deepgram, Scribe, AssemblyAI, whichever keys are set. The first provider can return an **empty transcript rather than an error**, which reads as "nothing was said" and is not the same thing.
+
+From 6 September 2026 `transcribeUrl` in `yaad-inbound` tries twice on bytes it already holds, and the caller records `msg.transcribeTried` before the attempt so the second call site cannot download the same audio from Twilio again. Before that, an empty first attempt cost a full second download: 5.7 seconds of a 12 second budget for one short note, which is what left no room for anything else.
+
+To see it:
+
+```sql
+-- two yaad-transcribe invocations close together used to mean a wasted download
+select timestamp, log_attributes['function_id'] as fn, log_attributes['execution_time_ms'] as ms
+from logs where source = 'function_edge_logs' order by timestamp desc limit 40;
+```
+
+`yaad-transcribe` is `c9e4d794-da76-4ff3-83f5-c1ec1bd93e0b`, `yaad-inbound` is `02d2d78a-418d-4743-a2e3-ed338c19bbde`. Two transcribe rows inside one inbound request is now a retry on held bytes, which is cheap and expected. Two *inbound-triggered downloads* is the bug and should not happen.
+
+The trace carries `yaadly.transcribe.retried` when the second attempt ran. If that is firing often, the first provider in the chain is unreliable and the order in `yaad-transcribe/index.ts` is worth revisiting. That is a provider choice, and where model calls are routed is Monique's decision, not a tuning knob.
+
+---
+
+## 10d. What actually reaches your phone, and when
+
+Every phone push goes through `pushToDesk()` in `yaad-inbound`, and every one of them carries ntfy's `Click` header set to `app_settings.desk_url`, so tapping the notification opens the desk. If tapping does nothing, `desk_url` is unset or wrong:
+
+```sql
+select key, value from app_settings where key in ('ntfy_topic','desk_url');
+```
+
+Both must be set. `ntfy_topic` is the private topic name, `desk_url` is `https://concierge.yaadly.co.uk/`. Nothing about the conversation goes in that link on purpose: a notification sits on a lock screen, and the desk is behind Cloudflare Access anyway.
+
+**What fires, and what it means:**
+
+| Title | When | What it wants from you |
+|---|---|---|
+| `Needs you: whatsapp` | handed to a person | **Act.** The body says which of the four reasons: they asked for a person, nothing could answer them, the assistant is paused, or three turns and still unclear. |
+| `They wrote again: whatsapp` | a held thread got another message | **Act.** The assistant is standing down on this number until you hand it back. |
+| `A job did not save` | the job row would not write | **Act, urgently.** The client was answered politely and their job does not exist. Nothing else chases this. |
+| `Reply held back` | banned language screen fired | **Act.** See §10. |
+| `Your web chat moved to WhatsApp` | a website conversation you were on carried over | **Act.** The whole thread came with them. |
+| `New whatsapp job` | the client confirmed the read-back | Informational. It is on the board. |
+| `A question on whatsapp` | somebody is asking rather than describing work | Informational. No job row exists. Open **Conversations** to read it or take it over. |
+| `Someone writing in on whatsapp` | first message of any other thread | Informational. |
+
+**You are told once per conversation, not once per message.** `worthTelling` is first turn, handed over, or finished. That is deliberate: three pushes for one conversation is noise, noise gets muted, and a muted phone loses a real job later. The exception is a thread already held for you, which pushes on **every** message, because at that point the assistant is silent and you are the only one answering.
+
+**If you want to see everyone still owed an answer rather than waiting for a buzz**, that is the queue view on the desk, fed by `awaiting_human_since`. The push is a nudge, not the list.
+
+**If nothing arrives at all**, check `agents_paused` is not `true` in `app_settings`, then check the `yaad-inbound` logs for the request at all. A push failure is swallowed on purpose and never breaks intake, so silence on the phone with a delivered reply to the client means `ntfy_topic` is wrong, not that the message was lost.
+
+---
+
+## 10e. You are not getting the WhatsApp alerts
+
+When a conversation needs a person, the Yaadly WhatsApp number messages `app_settings.desk_phone` with what the client actually said, so you can act without opening the desk. It is set to `+447767171858`. Empty switches it off.
+
+Nothing to buy: this is the same Twilio account and the same WhatsApp sender that already messages workers. An earlier version of this section described an SMS route, which was wrong and is gone. You answer clients in WhatsApp, so an alert by text was a context switch on every single message.
+
+**Which conversations reach your WhatsApp.** Five, and only five:
+
+- Somebody asked to speak to a person.
+- Nothing could answer them, so it came straight to you.
+- A thread already yours got another message.
+- A job would not save.
+- A reply was held back by the language screen.
+
+Everything else is push only. Every message from every stranger is how a phone gets muted, and a muted phone loses a real job later.
+
+**The one real limit, and it is Meta's.** WhatsApp only carries a freeform message to you for **24 hours after you last message the Yaadly number**. Replying to any alert reopens it for another 24. So an active day looks after itself and a quiet week does not: the first alert after a silent stretch may not land. The ntfy push fires either way, so nothing is ever only in this channel.
+
+**To open the window right now**, send anything to the Yaadly WhatsApp number from `+447767171858`.
+
+**To make it unconditional**, a Meta approved template is needed. This account has done that three times already (`TWILIO_CONTENT_SID_QUOTE`, `_APPROVE`, `_DAILY_CHECKIN`), so the path is known; it is an approval queue rather than an afternoon.
+
+**If nothing arrives**, look for `alertHerPhone:` in the `yaad-inbound` function logs:
+
+- `Twilio would not deliver to desk_phone`. Almost always the 24 hour window. Message the Yaadly number and try again.
+- Nothing in the log at all, so no alert fired. The conversation was not one of the five above. Check the thread under Conversations.
+- Check `desk_phone` is in full international form, `+447...`, not `07...`.
+
+**What is in an alert.** What happened, the client's own words up to 700 characters, and which number and channel it came from. Trimmed to 1500 characters. The full thread is always on the desk.
+
+**What is NOT built yet.** Replying from your own WhatsApp does not route back to the client. Right now the alert tells you what was said and you answer from the desk, which works on a phone browser. Routing your reply from your own number back into the right client thread is a separate build.
+
+---
+
+## 10f. Turning a conversation into a job
+
+A conversation the assistant read as a question writes **no job row**. That is deliberate, and it is why your job list is not full of people asking how Yaadly works. When one of them turns out to be real work, you promote it yourself.
+
+**Conversations, open the row, "Attach a job to this conversation".** The button only appears when the thread has no job. It creates the job, links the two, and carries the whole transcript into the brief.
+
+It sends nothing and tells the client nothing.
+
+**What you get:** a job at stage 0, closed, showing as **awaiting client setup**, which is where every new job starts including the ones intake creates. Nothing reaches a worker until you open it.
+
+**What you do not get, on purpose:** a trade, a parish, an urgency or an access note. Nothing in the conversation was classified, so nothing is guessed. Read it and write the brief from their own words. Guessing a trade here would put the job in front of the wrong workers, and guessing a parish is the start of the exact pricing problem the business exists to end.
+
+**Press it twice and you still get one job.** It returns the existing id rather than creating a second.
+
+**If the button is missing**, the thread already has a job; the Job column shows it. **If it refuses with "Only the desk can attach a job"**, you are not signed in as an admin on this desk; check `admins` has your email.
+
+**Why this is a button and not a rule.** CLAUDE.md §2: a named human confirms every consequential step. Deciding somebody's question is now a job they will be quoted for is exactly that kind of step, and there is deliberately no confidence score and no automatic promotion behind it.
+
+---
+
+## 10g. Answering a client from your own WhatsApp
+
+Reply to a Yaadly alert in WhatsApp and your words go to the client from the Yaadly number. Nothing else needed, no desk, no app.
+
+**Which conversation it goes to.** The one the last alert was about. Every alert that names a conversation points your phone at it, so a plain reply lands there.
+
+- **`who`** tells you which conversation you are on.
+- **Start with a number** to answer somebody else: `+447700900123 I can be there Thursday`. The rest of the line is the message. Send just the number to switch without sending anything.
+
+**What you get back.** A one line confirmation from the Yaadly number saying it went, and that the thread is yours now, so the assistant will not answer over the top of you. Hand it back from the desk when you are done.
+
+**Text only, in both directions, and the client is told.** Photographs and voice notes are not carried out, and the ones the client already sent are not shown to you: they are in the bucket and on the job, where the desk and a worker can see them. So on your **first** reply on a conversation, if that conversation has photographs, one sentence is appended to your message in your voice: *"I should say, I cannot see any photos you sent before now, so if there is something you want me to look at, send it again here."* Your confirmation tells you when it was added. It is appended after your words, never woven into them, and never repeated on later messages.
+
+To send a photo to a client, use the desk.
+
+**Outside WhatsApp's 24 hour window**, your words are saved rather than lost and go the moment the client writes back, using the same queue the desk's reply button uses. You are told which of the two happened.
+
+**Your own number cannot act as a test client any more.** This lane claims it first, which is the point. To test the client side, use a second phone.
+
+### If it does not work
+
+- **"I do not know who that is for."** No conversation is recorded against your phone yet, which happens if you reply to something other than an alert. Start the message with the client's number.
+- **"No conversation here from ..."** The number does not match a thread. It is compared with `samePhone`, so a missing country code is fine, but a wrong digit is not.
+- **Your message was read as a new job.** The lane did not claim it, so `desk_phone` does not match the number you sent from. Check Settings on the desk; it must be the number WhatsApp actually sends from, in full international form.
+- **Nothing happened at all.** Check the `yaad-inbound` logs for the request. The lane runs before every client lane, so if it did not fire, `desk_phone` is the thing to look at.
+
+### What it deliberately cannot do
+
+It can send a message and nothing else. It cannot approve a stage, release a payable, publish a worker, book a worker or change a job, and `desk-reply-lane_test.ts` asserts that by name.
+
+That is not caution for its own sake. The only thing authenticating these messages is the number they came from, which is a weaker gate than the desk's Cloudflare Access plus `is_admin()`. A message can be corrected. A released payable cannot. Anything consequential stays where a person is signed in, which is CLAUDE.md §2.
+
+---
+
 ## Publishing a worker profile
 
 **The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.
