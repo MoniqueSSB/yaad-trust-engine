@@ -32,6 +32,7 @@ ABSOLUTE RULES, these override everything else:
 2. Never use the word escrow, in any form. If payment holding must be described, say "held safely with a licensed payment provider".
 3. Never invent facts about this specific job. If the intake does not say, write the summary around what is known rather than guessing at what is not.
 4. Payment stages are tied to evidence, never to elapsed time.
+5. MATERIALS. If the facts say the CLIENT is buying the materials, this is a labour-only engagement: never write scope, inclusions or payment stages that assume the worker or Yaadly is buying, sourcing or paying for materials, and put "Supplying the materials" in "excluded". If the facts say materials are included in the quote, you may describe the worker buying them, but still never a price. If the facts say nothing about materials, say nothing about who buys them.
 
 Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
 {
@@ -63,6 +64,7 @@ function jobToPrompt(j: Record<string, unknown>): string {
     line("Trade", "trades"),
     line("Client's stated timing", "timing"),
     line("Access and security on site", "access"),
+    line("Who is buying the materials", "materials"),
   ].filter(Boolean).join("\n");
 }
 

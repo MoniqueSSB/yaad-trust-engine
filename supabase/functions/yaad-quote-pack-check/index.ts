@@ -35,7 +35,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type Job = { id: string; title: string | null; parish: string | null; descr: string | null; trade: string | null; urgency: string | null; access_type: string | null };
+type Job = { id: string; title: string | null; parish: string | null; descr: string | null; trade: string | null; urgency: string | null; access_type: string | null; materials_by: string | null };
 
 // Same field discipline as yaad-kickoff-check's jobToIntake: only what this
 // repository actually has structured data for, client_name and any contact
@@ -50,6 +50,14 @@ function jobToPrompt(j: Job): Record<string, string> {
   if (j.trade) out.trades = j.trade;
   if (j.urgency) out.timing = j.urgency;
   if (j.access_type) out.access = j.access_type;
+  /* Who buys the materials, from the client's own answer at posting. Added
+     6 Sep 2026 because the pack was drafting scope, exclusions and payment
+     stages as though Yaadly buys the materials on every job, including the
+     ones where the client said they are supplying them. A worker then opened
+     a pre-filled draft that contradicted the job he was quoting on.
+     Sent as a sentence rather than the code, because the model reads it. */
+  if (j.materials_by === "client") out.materials = "The CLIENT is buying and delivering the materials. This worker is being engaged for labour only.";
+  if (j.materials_by === "yaadly") out.materials = "Materials are included in the quote: the worker buys them and Yaadly pays for them at cost.";
   return out;
 }
 
@@ -100,7 +108,7 @@ Deno.serve(async (req: Request) => {
     // Live, unassigned, stage 0: exactly open_jobs' own definition
     // (COALESCE(worker_email,'') = '').
     const { data: jobRows } = await admin.from("jobs")
-      .select("id,title,parish,descr,trade,urgency,access_type,worker_email")
+      .select("id,title,parish,descr,trade,urgency,access_type,materials_by,worker_email")
       .eq("open", true).eq("stage", 0) as { data: (Job & { worker_email: string | null })[] | null };
     const jobs = (jobRows ?? []).filter((j) => !j.worker_email || !j.worker_email.trim());
 

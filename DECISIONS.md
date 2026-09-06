@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The quote pack reads the materials route, so a worker stops getting a draft that contradicts his job
+
+**Found while mapping the workflow for the founder, and it was a gap the route change itself created.** `yaad-quote-pack` had no reference to `materials_by` at all. The pack is the worker's starting draft and it becomes his quote, so on a client-supplied job it could write scope, inclusions and payment stages assuming Yaadly buys the materials, and the worker would open a pre-filled draft that contradicted the job in front of him. Adding the route at posting without teaching the pack about it made the pack confidently wrong rather than merely silent.
+
+**Fixed at both ends, because the pack does not read the database.** `yaad-quote-pack-check` selects `materials_by`, and `jobToPrompt` turns it into a sentence rather than passing the code, because a model reads the fact list. A fifth absolute rule joins the four already in the agent's system prompt, in the same place and the same register: on a client-supplied job it is a labour-only engagement, never write scope or stages that assume the worker or Yaadly is buying, and put supplying the materials in `excluded`. On a Yaadly-supplied job it may describe the worker buying, still never a price. Where the facts say nothing, it says nothing, which is rule 3 applied to this field.
+
+**Still flagged and still hers: the agent's rule 2 tells the model to say "held safely with a licensed payment provider".** `docs/COPY-GUIDELINES.md` lists that phrase twice as banned alongside escrow, and the reason is in this file: under the principal structure Yaadly holds no money for anybody, so it asserts something untrue. It survives because `CLAUDE.md` §8 prescribes it by name, and that file is the founder's. The same string is the guidance text in `_shared/guardrails.ts`. Put to her directly on 6 September; not changed without her word.
+
 ## 2026-09-06 · Step 4 built, both migrations applied, and the guard tests caught themselves passing for the wrong reason
 
 **Founder's instruction was "fix and update", after being told the visible half was done and the working half was not.** Two things were outstanding: the worker had no way to state what a job needs, and neither migration had ever been applied, so the form recorded a materials answer that nothing downstream acted on. Both are now done.
