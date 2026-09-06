@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The services page takes the Services 180 design, and drops three claims on the way in
+
+**The design, `Services 180.dc.html` in the "Content optimization for Yaadly" Claude Design project, is a much shorter services page.** A centred hero, a grid of price cards that are checklists rather than paragraphs, a three link contact block, a footer. The old page was 1357 lines carrying a hero, an animated evidence trail, an AI strip, seven service cards, two forms and two notices. The new one is about 790 and says the same commercial thing in a third of the words. That is the point of it and it is adopted.
+
+**Three claims in the design were not carried over, because `docs/COPY-GUIDELINES.md` bans them by name.** The design's hero read "Someone independent should be" and "independent of every contractor on the job", and its footnote read "Independent inspection, not a guarantee." Section 4 of the guidelines forbids exactly that phrasing: on a managed job and on Property Care the person doing the work IS Yaadly's, so a blanket independence claim describes one lane and is false on the other, and the guidelines already flagged this page as the last place still carrying it. The approved replacement is the separation claim, which is true on both lanes: **the person who assesses the work is never the person who did it, and both are named on the report.** The hero, the meta description, the title and the social preview text all say that now. The scope notice heading became "Inspection and oversight, not a guarantee."
+
+**"Timestamped, geotagged image set" came out too.** There is no photo geotag and there never can be: WhatsApp discards EXIF on send and this project's own portal upload path strips location deliberately, which is written up in the 4 September entry below and in RUNBOOK section 20. The card now says "Timestamped image set, filed against the visit", which is what actually happens.
+
+**"Staged payments released on inspection" became "Each stage checked against the scope, then the trade is paid."** Same three words of length, and it does not say an inspection passing is what moves money. A named human confirms every release, and the copy has to read that way or the page quietly contradicts the control.
+
+**Four things the design deleted were kept, because deleting them is the founder's call and not a design decision.** The Deposit Protection Check card, which is the entry rung and is quoted with its price on `faq.html` and named on `terms.html`. The booking form, which is the live card path: the eight Stripe links are wired to its confirmation and the card CTAs preselect through it, so removing it removes the only way to pay by card from the site. The express request to start inside the 14 day cancellation period, which `cancellation.html` promises will be asked "in writing at booking". And the enquiry form on `yaad-enquiry`. The founding rate lines stayed for the same reason: `faq.html` quotes all seven prices with them, and prices must match on every page they appear.
+
+**The lane sentence was added back above the prices**, because the guidelines require every page to make its lane obvious before it mentions money and the design put "Keep your contractor; pay them directly" directly above a Full Project Management card, where the opposite is true.
+
+**Two smaller things.** The design's body text colour was `#7878A8`, which is the value the site moved off on 3 September for failing AA; the page uses the current `--mute` and `--dim` tokens instead. And the animated evidence trail and the stat count up went with their sections, so their JavaScript went too, rather than being left to query elements that are no longer there.
+
+---
+
 ## 2026-09-06 · The client is told she cannot see their photographs, and a photograph is never just a question
 
 **Founder:** *"Add this as a note so the person is also aware i am unable to see photo before i started this conversation, if they want me to see photos they will have to send it to me when i respond to them."*
