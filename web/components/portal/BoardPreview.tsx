@@ -16,12 +16,22 @@ import type React from "react";
  *
  *   1. It renders ONLY fields open_jobs exposes, laid out the way
  *      app/jobs/page.tsx lays them out. Nothing is mocked up.
- *   2. boardDescr() mirrors the view's regexp_replace chain verbatim
- *      (20260828c). If the view's scrub changes, this copy must change in
- *      the same commit, which is why the patterns carry that reference.
+ *   2. The scrubbed text is computed BY POSTGRES and handed in as
+ *      `descr`. There is no JavaScript copy of the rule any more.
  *
  * It is a preview, not the enforcement. The enforcement stays in Postgres,
  * where a rule about who sees somebody's property belongs.
+ *
+ * Rule 2 used to say the opposite: boardDescr() lived here and mirrored the
+ * view's regexp_replace chain "verbatim", with a comment telling the next
+ * person to change both in the same commit. It was mirrored faithfully and it
+ * was wrong in both places, which is the failure a mirror cannot catch. The
+ * chain matched "Address:" and "Access contact:" and not a plain "Access:",
+ * and it had no email pattern at all, so on 6 September 2026 this card showed
+ * a client her own access arrangements and her own email address while the
+ * list underneath told her both were stripped. The scrub is now one Postgres
+ * function, public.board_descr(), called through rpc by the page above. A
+ * third copy cannot drift because there is no third copy.
  */
 
 /** board_ok is whether this photograph is on the public board. A photograph
@@ -38,23 +48,20 @@ const STORE_LABEL: Record<string, string> = {
   none_available: "No secure store, buy in drops",
 };
 
-/** The open_jobs descr scrub, JS spelling of the SQL. Address and Access
- *  contact lines vanish, anything shaped like a phone number becomes
- *  [contact removed], and the blank lines left behind collapse. */
-function boardDescr(descr: string | null): string | null {
-  if (!descr) return descr;
-  return descr
-    .replace(/(^|\n)\s*(Address|Access contact)\s*:[^\n]*/gi, "$1")
-    .replace(/\+?[0-9][0-9\s().-]{7,}[0-9]/g, "[contact removed]")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
 export function BoardPreview({
   job,
+  boardDescr,
   signed,
   photos,
   tools,
 }: {
+  /** The description as the board will show it, straight out of
+   *  public.board_descr() in Postgres, which is the same function open_jobs
+   *  itself calls. null means the scrub could not be computed, and this card
+   *  then shows no description at all rather than falling back to the raw
+   *  text: a preview that quietly prints the unscrubbed version is the exact
+   *  failure this component exists to prevent. */
+  boardDescr: string | null;
   job: {
     id: string;
     title: string | null;
@@ -76,8 +83,9 @@ export function BoardPreview({
    *  client. */
   tools?: React.ReactNode;
 }) {
-  const descr = boardDescr(job.descr);
-  const scrubbed = descr !== job.descr;
+  const descr = boardDescr;
+  const scrubbed = (job.descr ?? null) !== boardDescr;
+  const failed = boardDescr === null && !!job.descr;
   const sp = [
     job.job_type,
     job.size_band,
@@ -119,10 +127,25 @@ export function BoardPreview({
           </div>
         )}
 
+        {/* The WHOLE description, not the first 260 characters. The board's
+            own card truncates, and this preview used to truncate with it,
+            which is a large part of why nobody noticed what was going out:
+            on 6 September 2026 the live board carried a client's email
+            address and her full name, and both sat past the cut, so the one
+            screen built to show her what was published was the screen that
+            hid it. open_jobs returns the whole column to anyone with the
+            publishable key, so the truncation was never a control anyway.
+            Whatever is below is published. Show all of it. */}
         {descr && (
           <p className="mt-2 whitespace-pre-wrap text-[13.5px] leading-relaxed text-mute">
-            {descr.slice(0, 260)}
-            {descr.length > 260 ? "..." : ""}
+            {descr}
+          </p>
+        )}
+        {failed && (
+          <p className="mt-2 rounded-xl border border-mango/40 bg-mango/10 p-3 text-[13px] leading-relaxed text-mango">
+            The preview of your description could not be built just now, so it
+            is not shown here rather than shown unchecked. Nothing about your
+            job has changed. Try reloading, and tell us if it keeps happening.
           </p>
         )}
 
@@ -181,8 +204,8 @@ export function BoardPreview({
         <ul className="mt-2 grid gap-1.5 text-[13px] leading-relaxed text-mute">
           <li>
             Your address and your phone number. The public board has no
-            column for either, and any Address or Access contact line typed
-            into your description is stripped before a worker reads it.
+            column for either, and any Address or Access line typed into
+            your description is removed before a worker reads it.
             {scrubbed && (
               <b className="text-tealb">
                 {" "}
@@ -191,8 +214,21 @@ export function BoardPreview({
             )}
           </li>
           <li>
-            Your name and your email. A worker sees a job and a job number,
-            not a person.
+            Your name, your email and your phone number, wherever they appear
+            in the words themselves, along with anything else shaped like an
+            email address or a phone number.
+          </li>
+          {/* Said out loud rather than left for somebody to discover. The
+              scrub removes identifiers; it cannot know that "my cousin Andre
+              next door has the key" is an access arrangement, because that is
+              a sentence and not a pattern. A client deciding what to publish
+              is owed that distinction, and they can act on it: the description
+              is theirs to edit, with the tools in this very card. */}
+          <li>
+            Not everything. If your description names another person, or says
+            who holds a key or who is usually home, those words go up as you
+            wrote them. Read what is above and edit it if it says more than
+            you want strangers to read.
           </li>
           <li>
             Where things are kept on the property. The board carries the

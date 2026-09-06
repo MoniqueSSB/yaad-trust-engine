@@ -4395,3 +4395,64 @@ test file. It is a note, never a block: the job can still be posted.
 **Since 6 Sep 2026 `npm run typecheck` is immune to this**, because it runs against `web/tsconfig.typecheck.json`, which is `tsconfig.json` with build output excluded. If you are on that version and still see it, you are running bare `tsc` rather than the script, or something has put the `.next` globs back. Confirm which with `npx tsc --noEmit -p tsconfig.typecheck.json` from `web/`.
 
 **The first check on any "this module does not exist" error is whether it exists.** `git ls-files <path>` and `git log --oneline -- <path>`. If git can see it, do not delete the import. `rm -rf web/.next` and run the typecheck again.
+
+---
+
+## A worker messages asking for WhatsApp job alerts
+
+The job board's right rail carries a "Launching soon" panel with a **Put me on the list** button. It opens WhatsApp to the Yaadly sender with the message half written: *"Hello Yaadly, I am a worker and I want WhatsApp job alerts. My trades and parishes are:"*. Monique's call, 6 Sep 2026: the panel ships, but it collects something rather than being a promise with a dead button.
+
+**There is no alerts list and no table.** The message lands in `yaad-inbound` like any other worker message and sits in the conversation. That is deliberate: no new table, no new migration, and nowhere new for a phone number to sit until the feature is real. **So somebody has to read them.** They are in the desk with the rest of the inbound traffic.
+
+- **If these start arriving faster than they can be read,** the honest move is to take the button off rather than let people think they are on a list they are not on. It is one block in `web/app/jobs/page.tsx`, marked with Monique's decision in a comment above it.
+- **When the alerts are actually built,** the prefilled wording is the spec: trades and parishes, chosen once.
+- **The number is `447878877567`**, the same sender as everywhere else on the site. There is one, deliberately.
+
+---
+
+## A client says their access note is visible on the public job board
+
+**Fixed 7 September 2026, migration `20260907090000`, applied to production the same day.** Kept here because the shape of it matters more than the fix.
+
+The board's scrub matched `Address:` and `Access contact:` only. A line beginning plain `Access:` matched neither, and `Access:` is exactly what `yaad-inbound` writes. Worse, checking that found there was **no email pattern at all**: only phone numbers were masked, so the live board carried a client's full name and two of her email addresses in the "In their own words" block, on a view granted to `anon`.
+
+**The 260 character truncation on the job card was never a control.** `open_jobs` is granted to `anon` and returns the whole column, so anyone with the publishable key read all of it without opening the page. The card's cut is why it went unnoticed: the identifiers sat past it.
+
+**To check the board is clean now**, and this is worth running after any change to intake wording or to the view:
+
+```sql
+select count(*) as open_jobs,
+  count(*) filter (where descr ~ '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}') as emails,
+  count(*) filter (where descr ~* '(^|\n)\s*(Address|Access)') as access_lines,
+  count(*) filter (where descr ~* '(^|\n)\s*Arrived by') as provenance,
+  count(*) filter (where descr ~ '\+?[0-9][0-9\s().-]{7,}[0-9]') as phones
+from public.open_jobs;
+```
+
+All four counts must be zero. They were, on all 8 open jobs, after the fix.
+
+**The scrub is one function now**, `public.board_descr(descr, client_name, client_email, client_phone)`. `open_jobs` calls it, `my_requested_jobs` calls it once `20260905a` is applied here, and the client portal calls it through `rpc` to render `BoardPreview`. **Never write a second copy of these patterns.** The reason this survived from 26 August to 7 September is that fixing it meant finding three identical expressions, one of them in JavaScript, and a mirror cannot catch a rule that is wrong in the original.
+
+**What it deliberately does not do.** It removes identifiers. It does not remove the `In their own words:` block, which reproduces the client's whole intake message and is where most of this ended up: after the scrub that block still says things like "my cousin will let them in, she's usually home". No pattern can catch that, because it is a sentence. Whether the raw block belongs on a public board at all is a product decision and it is Monique's. `BoardPreview` now tells the client this in as many words and points them at the edit tools.
+
+**To take one job's wording down now:** edit `jobs.descr` in the desk. The view is computed, so the board follows on the next load.
+
+---
+
+## ⚠ Applying migration 20260905a to production
+
+**Do not apply it on its own.** `20260905a` (the named-worker 48 hour first refusal) has never been applied to this project, which came out on 7 September 2026 when `20260907090000` failed on `column j.request_state does not exist`. Production has none of the request columns and no `my_requested_jobs` view. `web/app/jobs/page.tsx` fails soft on this: the query returns null, the band renders nothing, which is why it was invisible.
+
+`20260905a` redefines `open_jobs` **without** `board_descr()`. Applying it alone silently reopens the identifier leak above, and `20260907090000` will not re-run to undo it because its name is already in production's migration history.
+
+**So: apply `20260905a`, then immediately re-apply the `open_jobs` and `my_requested_jobs` definitions from `20260907090000`, then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it.
+
+---
+
+## A worker says the "TRN matched" chip is missing from their profile
+
+It is derived, not assumed. The chip renders only when `public_worker_checks` holds a **passed** row for that worker whose label matches `TRN` or "tax number/registration". A profile with no rows at all shows "The verification record is being written up" under **What was checked, and how**, and no TRN chip, which is the honest state rather than a bug.
+
+The TRN was almost certainly checked. What is missing is the record of it on `worker_checks`, which is written at the desk. **So the fix is to write the check, not to change the page.** Do not hard code the chip: it is the strongest sentence on a public profile, and it is worth exactly what the recorded check behind it is worth.
+
+`Identity verified` and `Evidence vetted` beside it are not derived the same way, because the database publish gate (`enforce_profile_publish_checks`) refuses to make a profile active at all unless Persona reads back approved or completed. Every profile the public view can return has cleared that, so those two are structurally true of anything on screen.
