@@ -173,6 +173,26 @@ h1.hero-h em{font-style:italic;font-weight:300;background:linear-gradient(120deg
 .stages h3{font-family:var(--disp);font-weight:300;font-size:23px;letter-spacing:-0.015em;margin-top:4px}
 @media(max-width:640px){.stages li{padding:0 0 22px}.stages .bar{display:none}}
 
+/* ── agents and the gate ────────────────────────────────────────────────── */
+/* Added 6 Sep 2026. The homepage draws the four assistants as a wire with the
+   gate at the end; the Overview says the same thing as four rows, because a
+   reader who is this far down the page is deciding whether to post a job, not
+   meeting Yaadly for the first time. Three agent rows in purple, the gate row
+   in gold, the same two colours .stages and .promises already use here.
+   The gate row carries the price as well as the approval on purpose: setting a
+   price is P2 on /how-we-use-ai, always a named person, and the invoicing
+   assistant has no amount field to type one into. */
+.crew{list-style:none;margin-top:28px;border-top:1px solid var(--line2)}
+.crew li{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;padding:17px 0;border-bottom:1px solid rgba(155,115,245,0.18)}
+.crew .role{font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--purpleb);width:58px;flex-shrink:0}
+.crew .cw{flex:1;min-width:230px}
+.crew b{display:block;font:600 16px var(--body);color:var(--ink)}
+.crew .cw span{display:block;margin-top:3px;font-size:14.5px;color:var(--mute)}
+.crew a{font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--purpleb)}
+.crew li.gate{border-bottom-color:rgba(245,158,11,0.45);background:linear-gradient(90deg,rgba(245,158,11,.07),transparent 72%)}
+.crew li.gate .role{color:var(--goldb)}
+.crew li.gate a{color:var(--goldb)}
+
 /* ── real checks ────────────────────────────────────────────────────────── */
 .checks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:32px 64px;align-items:start}
 .checks-grid>div{min-width:0}
@@ -378,6 +398,33 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
       <h3>You accept the work</h3>
     </li>
   </ol>
+</div></section>
+
+<!-- AGENTS AND THE GATE -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv">
+    <h2 class="sh">Agents do the chasing. <em>People decide.</em></h2>
+    <span>Why you hear back fast</span>
+  </div>
+  <ul class="crew rv d1">
+    <li>
+      <span class="role">Agent</span>
+      <div class="cw"><b>Scopes your photos into a job spec</b><span>Minutes, not days of back and forth.</span></div>
+    </li>
+    <li>
+      <span class="role">Agent</span>
+      <div class="cw"><b>Checks the quote against real material costs</b><span>The same maths for every client.</span></div>
+    </li>
+    <li>
+      <span class="role">Agent</span>
+      <div class="cw"><b>Chases evidence and updates you</b><span>No time-zone excuses, day or night.</span></div>
+    </li>
+    <li class="gate">
+      <span class="role">Human</span>
+      <div class="cw"><b>Sets the price, approves the work, releases the payment</b><span>A named person at Yaadly. Never an agent, never a timer.</span></div>
+      <a href="/how-we-use-ai">How we use AI &rarr;</a>
+    </li>
+  </ul>
 </div></section>
 
 <!-- REAL CHECKS -->
