@@ -272,7 +272,7 @@ describe("restoring only ever offers values the lists still have", () => {
   });
 });
 
-describe("the photo stage hands over a link, not a promise of one", () => {
+describe("the photo stage takes photographs, and still hands over the link", () => {
   /* Added 6 Sep 2026, founder instruction: the photo screen described a link
      and did not give one. It told somebody standing in front of the problem
      to remember, for two more screens, a route they could have taken there
@@ -322,5 +322,59 @@ describe("the photo stage hands over a link, not a promise of one", () => {
   test("a draft that never saved gets a sentence instead of a broken link", () => {
     assert.match(evidence, /jobId && portalCode \?/);
     assert.match(evidence, /no reference saved against it/);
+  });
+
+  /* Added 6 Sep 2026, founder instruction: "it should be in the form to
+     attach a photo and it be included on the job card". The link alone was
+     not the answer. It sent somebody who already had the picture on the phone
+     in their hand away from a half finished form. */
+  test("the file picker is on the form itself, with the job and its code", () => {
+    assert.match(evidence, /<PhotoAttach/);
+    assert.match(evidence, /jobId=\{jobId\}/);
+    assert.match(evidence, /code=\{portalCode\}/);
+  });
+});
+
+describe("what the form does with a photograph once it is picked", () => {
+  /* The whole point of this component is WHERE the file goes. yaad-post-job
+     still accepts a base64 photos array left over from the deleted funnel: no
+     size limit, written into the immutable evidence table, with the phone's
+     GPS coordinate left on it. Anything that moves these files onto that
+     route undoes the reason this exists, and reads like a simplification
+     while doing it, so it is asserted rather than trusted to a comment. */
+  const source = readFileSync(join(HERE, "../app/jobs/new/PhotoAttach.tsx"), "utf8");
+  /* Comments stripped for the two assertions that say a thing is ABSENT. The
+     file explains at length which route it must never take, and naming the
+     old route in a comment is how it stays named; a doesNotMatch over the raw
+     text would fail on the explanation rather than on the code. */
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  test("it uploads through yaad-job-photo, not through the job form's own save", () => {
+    assert.match(code, /yaad-job-photo/);
+    assert.doesNotMatch(code, /yaad-post-job/);
+    assert.doesNotMatch(code, /toBase64|readAsDataURL/);
+  });
+
+  test("the server picks the path: the browser sends what it has, not where to put it", () => {
+    assert.match(source, /action: "start"/);
+    assert.match(source, /uploadToSignedUrl/);
+    assert.match(source, /action: "finish"/);
+  });
+
+  test("nothing shows as attached until the finish call has come back", () => {
+    const send = source.slice(source.indexOf("async function send("), source.indexOf("async function choose("));
+    assert.ok(send.indexOf('action: "finish"') < send.indexOf('state: "done"'));
+  });
+
+  test("a photograph can be taken back off the job from this screen", () => {
+    assert.match(source, /action: "remove"/);
+  });
+
+  test("nothing here can publish a photograph to the board", () => {
+    assert.doesNotMatch(code, /board_ok|board: *true/);
+  });
+
+  test("only image types a browser will actually paint are offered", () => {
+    assert.match(source, /accept="image\/jpeg,image\/png,image\/webp"/);
   });
 });

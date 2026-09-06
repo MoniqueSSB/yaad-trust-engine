@@ -60,6 +60,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { PhotoAttach } from "./PhotoAttach";
 import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
   ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY,
@@ -80,6 +81,9 @@ export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: 
 
   const [jobId, setJobId] = useState("");
   const [portalCode, setPortalCode] = useState("");
+  /* How many photographs actually landed on the job. Only used to tell
+     Monique, in the enquiry, that they are there. */
+  const [photoCount, setPhotoCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saveFailed, setSaveFailed] = useState(false);
@@ -263,7 +267,9 @@ export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: 
           `Reference: ${jobId || "draft not saved"}\n` +
           (requestedWorker ? `Client asked for: ${requestedWorker}\n` : "") +
           `Trade: ${f.trade}\nParish: ${f.parish}\n` +
-          `Urgency: ${f.urgency}\nAccess: ${f.accessType}\n\n${f.desc.trim()}` +
+          `Urgency: ${f.urgency}\nAccess: ${f.accessType}\n` +
+          (photoCount ? `Photos attached on the form: ${photoCount}\n` : "") +
+          `\n${f.desc.trim()}` +
           (joinLink ? `\n\nSet up your portal: ${joinLink}\nJob code, if asked: ${portalCode}` : ""),
       });
       /* Cleared only on a send that went through. A failed send keeps the
@@ -314,18 +320,38 @@ export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: 
             door. */}
         {jobId && portalCode && (
           <div className="mt-6 max-w-[62ch] rounded-2xl border border-teal/40 bg-teal/5 p-6 text-[14.5px] leading-relaxed text-mute">
-            <b className="text-ink">One more thing, thirty seconds: send your photos.</b>
-            <p className="mt-2">
-              This link sets up your portal and lands you straight on the photo
-              screen. It is what lets quotes, evidence and approvals reach you.
-              We would send you this same link by message either way, but
-              there is no reason to wait for it.
-            </p>
+            {/* Not "send your photos" any more when they already have. The
+                form takes them now, so this screen has to know whether it is
+                asking for something or thanking somebody for it. */}
+            {photoCount > 0 ? (
+              <>
+                <b className="text-ink">
+                  {photoCount === 1 ? "Your photograph is on the job." : `Your ${photoCount} photographs are on the job.`}
+                </b>
+                <p className="mt-2">
+                  Set up your portal with this link while you are here. It is
+                  what lets quotes, evidence and approvals reach you, and it is
+                  where you add more photographs or take one back down. We would
+                  send you this same link by message either way, but there is no
+                  reason to wait for it.
+                </p>
+              </>
+            ) : (
+              <>
+                <b className="text-ink">One more thing, thirty seconds: send your photos.</b>
+                <p className="mt-2">
+                  This link sets up your portal and lands you straight on the photo
+                  screen. It is what lets quotes, evidence and approvals reach you.
+                  We would send you this same link by message either way, but
+                  there is no reason to wait for it.
+                </p>
+              </>
+            )}
             <Link
               href={`/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}&next=photos`}
               className="mt-4 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
             >
-              Set up my portal and add photos
+              {photoCount > 0 ? "Set up my portal" : "Set up my portal and add photos"}
             </Link>
             <p className="mt-3 text-[12.5px]">
               Your job code, if you are asked for it: <span className="font-mono text-ink">{portalCode}</span>
@@ -701,61 +727,69 @@ export function PostJob({ initialTrade, requestedWorker, requestedWorkerSlug }: 
                 </p>
               </div>
               <div className="rounded-xl border border-teal/40 bg-teal/5 px-4 py-4 text-[13.5px] leading-relaxed text-mute">
-                <b className="text-ink">Where they go, and this is the part that
-                matters.</b>
-                {/* THE LINK IS HERE, not only on the confirmation screen.
-                    This panel used to describe a link and then not give one,
-                    which asked somebody standing in front of the wet patch to
-                    remember a promise for two more screens. The portal code
-                    comes back from yaad-post-job on the first draft save, so
-                    by the time anybody reads this it already exists.
+                <b className="text-ink">Attach them here, and they go straight
+                onto the job.</b>
+                {/* THE FILE PICKER IS ON THE FORM, founder instruction, 6 Sep
+                    2026. This panel used to describe a route and then send
+                    people down it somewhere else, which asked somebody
+                    standing in front of the wet patch, picture already on
+                    their phone, to leave a half finished form to use it.
 
-                    NEW TAB, deliberately. Sending the job is what puts it in
-                    front of a person; the portal on its own does not. Taking
-                    over this tab would let somebody upload six photographs and
-                    never send the job, and the answers are only in
-                    localStorage. One caveat worth knowing: joining the portal
-                    attaches an email to the job, and yaad-post-job will not
-                    let an anonymous caller update a claimed draft, so going
-                    back and changing an answer after joining shows the save
-                    error and its carry on anyway button. */}
+                    It does NOT go through this form's own submit, and it must
+                    never be moved onto yaad-post-job's leftover base64 photos
+                    array: no size limit, straight into the immutable evidence
+                    table, with the phone's GPS coordinate still on it. See
+                    PhotoAttach.tsx for the three step route it takes instead.
+
+                    THE LINK STAYS, underneath, and is not a duplicate. The
+                    person filling this form is often in another country and
+                    the person holding the phone is at the property. That is a
+                    different phone, so it needs a link rather than a file
+                    picker, and it opens in a new tab because sending the job
+                    is what puts it in front of a person: the portal on its own
+                    does not, and the answers here live only in localStorage.
+                    One caveat worth knowing: joining the portal attaches an
+                    email to the job, which closes both the anonymous photo
+                    door and yaad-post-job's anonymous draft update, so going
+                    back to change an answer after joining shows the save error
+                    and its carry on anyway button. */}
                 {jobId && portalCode ? (
                   <>
                     <p className="mt-2">
-                      Here is the link, now rather than at the end. It sets up
-                      your portal and lands you straight on the photo screen.
-                      That is the route: it stores them privately, strips the
-                      location your phone writes into the file, and lets you
-                      delete any of them later.{" "}
+                      Pick them off this phone and they attach to your job now,
+                      before you have sent anything else. They are stored
+                      privately, the location your phone writes into the file is
+                      taken off, and you can pull any of them back.{" "}
                       <b className="text-ink">Nothing is published unless you
-                      say so.</b> WhatsApp works too, once we reply.
+                      say so.</b>
+                    </p>
+                    <PhotoAttach jobId={jobId} code={portalCode} onCountChange={setPhotoCount} />
+                    <p className="mt-4 border-t border-teal/25 pt-3 text-[12.5px]">
+                      <b className="text-ink">Somebody else at the property?</b>{" "}
+                      This link opens your portal on the photo screen, so they
+                      can send them from their own phone. It opens in a new tab
+                      so this form stays exactly as you left it, and the job
+                      only reaches a person when you send it from here. Your job
+                      code, if you are asked for it:{" "}
+                      <span className="font-mono text-ink">{portalCode}</span>.
+                      WhatsApp works too, once we reply.
                     </p>
                     <Link
                       href={`/portal/join?job=${encodeURIComponent(jobId)}&code=${encodeURIComponent(portalCode)}&next=photos`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110"
+                      className="mt-2 inline-block rounded-full border border-teal/50 px-4 py-2 text-[12.5px] font-bold text-tealb transition hover:bg-teal/10"
                     >
-                      Attach your photos, in a new tab
+                      Open the photo screen in a new tab
                     </Link>
-                    <p className="mt-3 text-[12.5px]">
-                      It opens in a new tab so this form stays exactly as you
-                      left it. Come back here and finish the last screen either
-                      way: the job only reaches a person when you send it. Your
-                      job code, if you are asked for it:{" "}
-                      <span className="font-mono text-ink">{portalCode}</span>.
-                      The same link is waiting on the confirmation screen, so
-                      nothing is lost by leaving the photos until after you
-                      have sent this.
-                    </p>
                   </>
                 ) : (
                   <p className="mt-2">
-                    Your job has no reference saved against it, so there is no
-                    photo link to hand you here. Send it on the last screen and
-                    we will sort the photographs out when we reply, by message
-                    or on WhatsApp. However they reach us they are stored
-                    privately, and{" "}
+                    Your job has no reference saved against it, so there is
+                    nothing here to attach a photograph to yet. Send it on the
+                    last screen and we will sort the photographs out when we
+                    reply, by message or on WhatsApp. However they reach us they
+                    are stored privately, and{" "}
                     <b className="text-ink">nothing is published unless you say
                     so.</b>
                   </p>
