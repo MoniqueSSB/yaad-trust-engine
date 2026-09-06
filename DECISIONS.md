@@ -6,6 +6,32 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The business page takes the Business 180 design, and five things in it did not survive the copy guidelines
+
+**The design, `Business Page 180 Words.dc.html` in the "Yaadly Business Optimization" Claude Design project, is a much shorter `/business`.** It was read off the design project rather than rebuilt from a screenshot, so the layout, the colours, the case file structure and most of the copy are the founder's. A short hero, the four kinds of company as a tab row sitting on top of one case file panel, an AI versus human timeline, one closing card. The old page was 919 lines carrying a hero, a four cell credentials strip, the dossier, a four document animated paper trail, a terminal style AI log and a two column animated scope triage. The new one is 464 and makes the same argument. That is the point of the design and it is adopted.
+
+**`_ds_bundle.js` and `support.js` were checked and deliberately not carried across**, the same call as the marketplace and home page entries below. The bundle's manifest declares no components, no tokens, no global CSS and no fonts, and the page uses nothing from it. `support.js` is the design canvas runtime that interprets `<x-dc>` and `<sc-for>`; that loop became four buttons and a thirty line vanilla script.
+
+**Five things in the design were changed on the way in, each against `docs/COPY-GUIDELINES.md`.**
+
+Case file 03 said the evidence is "timestamped and geotagged". There is no photo geotag and there never can be: WhatsApp discards EXIF on send and this project's own portal upload path strips location deliberately. Same correction the services page took earlier the same day, and the sentence now reads "timestamped and filed against the visit". Note that `docs/job-taxonomy.js` still generates "Arrival photos, geotagged" into every trade checklist on the site, and that is a separate change nobody has made yet.
+
+Case file 03 promised "a file that stands up to a claim". That is a guarantee about the outcome of an insurance claim, and section 4 says Yaadly does not guarantee an outcome. It reads "a file built to be audited rather than admired", which is a claim about how the file is built and is Yaadly's to make.
+
+The design dropped the oversight lane entirely. Section 2 requires every page to make its lane obvious before it mentions money, and `/business` is the oversight lane: the client's contractor stays theirs and they keep paying them directly. One sentence went back into the hero, and the sentence the guidelines prescribe verbatim went back into the closing note with the link to `payments.html`.
+
+The design dropped the scope triage, and with it the statement that valuation, title, structural engineering and boundary lines go out to a named professional. Section 4 says the site must always make clear Yaadly does not replace a valuer, an attorney, an engineer or a land surveyor, so it came back as one line under the case file rather than as an animated section. The section going is right; the claim going is not.
+
+The design's body colour was `#7878A8` and its label colour `#44446A`, which are the values the site moved off on 3 September for failing AA. The page uses the current `--mute` and `--dim` tokens.
+
+**Two things the design deleted were kept in a smaller form.** The credentials strip became one line of mono text under the hero buttons, because the hero says "somebody qualified" and the page needs to say what the qualification is. The Kingston and Portmore geographic limit went on the end of that same line, because it is an honest limit on what can currently be delivered and the design left the page claiming Jamaica without qualification.
+
+**The case file stopped rotating on a timer.** The old dossier auto advanced every ten seconds until a reader picked one. The design has no timer, all four tabs are visible at once in the new row layout, and a panel that moves while somebody is reading it is worse than one that waits. The tabs are now real buttons with `role="tab"`, `aria-selected` and left and right arrow keys, which the old click handlers on `<div>` elements were not.
+
+Verified at 1180px and 390px: no horizontal page overflow at either, one `h1`, three `h2` elements, no console errors, and clicking or arrowing between the four tabs swaps the case file, its reference number and its ghost numeral. All three RUNBOOK copy sweeps come back clean on the page.
+
+---
+
 ## 2026-09-06 · The Overview became three bands, and the counting tiles moved to the bottom
 
 **Implemented from the founder's own Claude Design file, "Concierge Overview", option 2a.** The design was read off the design project rather than rebuilt from a screenshot, so the structure, the lane names and most of the copy below are hers. Its diagnosis of the screen it replaced is worth keeping: twenty-four tiles of equal weight, nineteen of them reading zero, a month calendar taking the top third to say nothing was booked, and a rail that printed RUN THE DAY and DOCUMENTS & MONEY twice each. Every tile was a count. Not one was a next action. The desk could tell you that six invoices existed and could not tell you that nothing would happen to any of them until somebody pressed something.
