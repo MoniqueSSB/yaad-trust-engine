@@ -381,6 +381,37 @@ The trace carries `yaadly.transcribe.retried` when the second attempt ran. If th
 
 ---
 
+## 10d. What actually reaches your phone, and when
+
+Every phone push goes through `pushToDesk()` in `yaad-inbound`, and every one of them carries ntfy's `Click` header set to `app_settings.desk_url`, so tapping the notification opens the desk. If tapping does nothing, `desk_url` is unset or wrong:
+
+```sql
+select key, value from app_settings where key in ('ntfy_topic','desk_url');
+```
+
+Both must be set. `ntfy_topic` is the private topic name, `desk_url` is `https://concierge.yaadly.co.uk/`. Nothing about the conversation goes in that link on purpose: a notification sits on a lock screen, and the desk is behind Cloudflare Access anyway.
+
+**What fires, and what it means:**
+
+| Title | When | What it wants from you |
+|---|---|---|
+| `Needs you: whatsapp` | handed to a person | **Act.** The body says which of the four reasons: they asked for a person, nothing could answer them, the assistant is paused, or three turns and still unclear. |
+| `They wrote again: whatsapp` | a held thread got another message | **Act.** The assistant is standing down on this number until you hand it back. |
+| `A job did not save` | the job row would not write | **Act, urgently.** The client was answered politely and their job does not exist. Nothing else chases this. |
+| `Reply held back` | banned language screen fired | **Act.** See §10. |
+| `Your web chat moved to WhatsApp` | a website conversation you were on carried over | **Act.** The whole thread came with them. |
+| `New whatsapp job` | the client confirmed the read-back | Informational. It is on the board. |
+| `A question on whatsapp` | somebody is asking rather than describing work | Informational. No job row exists. Open **Conversations** to read it or take it over. |
+| `Someone writing in on whatsapp` | first message of any other thread | Informational. |
+
+**You are told once per conversation, not once per message.** `worthTelling` is first turn, handed over, or finished. That is deliberate: three pushes for one conversation is noise, noise gets muted, and a muted phone loses a real job later. The exception is a thread already held for you, which pushes on **every** message, because at that point the assistant is silent and you are the only one answering.
+
+**If you want to see everyone still owed an answer rather than waiting for a buzz**, that is the queue view on the desk, fed by `awaiting_human_since`. The push is a nudge, not the list.
+
+**If nothing arrives at all**, check `agents_paused` is not `true` in `app_settings`, then check the `yaad-inbound` logs for the request at all. A push failure is swallowed on purpose and never breaks intake, so silence on the phone with a delivered reply to the client means `ntfy_topic` is wrong, not that the message was lost.
+
+---
+
 ## Publishing a worker profile
 
 **The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.

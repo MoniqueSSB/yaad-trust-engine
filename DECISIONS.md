@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · Every phone push opens the desk, and an urgent one says why
+
+**Founder, the same evening:** *"how am I being informed people need help, I should get a notification on my phone stating to check the dashboard."*
+
+**She was already being told, five different ways, and none of them went anywhere.** `yaad-inbound` had five separate `fetch` calls to ntfy: first message on a thread, handed to a person, job finished, they wrote again while held, a reply blocked by the language screen, and a job row that would not write. Every one of them arrived on her phone and then stopped, because `desk_url` had been sitting in `app_settings` since the beginning, read by the admin summary EMAIL and by nothing else. So the notification said something was waiting and the only way to act on it was to put the phone down and find a laptop. ntfy carries a `Click` header for exactly this and it was never set. That is the whole of the complaint, and it was one header.
+
+**They became one function rather than a sixth copy.** `pushToDesk()` reads `ntfy_topic` and `desk_url` together, sets `Click`, and every caller goes through it. Five copies had already drifted in tone and priority and the next one would have drifted further; more to the point, the failure being fixed is a push that cannot be tapped, so the link belongs in the one place no caller can forget it. `asking_test.ts` asserts there is exactly one `fetch` to ntfy in the file.
+
+**Nothing about the conversation travels in that link, and the test asserts that too.** The desk URL is the same string every time, no job id, no number, no name. A notification sits on a lock screen in public, and the desk is behind Cloudflare Access regardless, so a per-conversation deep link would leak more than it saved.
+
+**The urgent push was one sentence describing three different situations.** `handingOver` fires when the client asks for a person, when neither model could produce a reply, when the assistant is paused at the desk, and when three turns have gone by without it becoming clear. The body always said the last one: *"N messages and still not clear."* So somebody typing "can I speak to a person" generated a notification telling Monique their message was unclear, and so did somebody whose reply failed because two models were rate limited. Both false, on the single most important notification this system sends. Each reason now says what it is, and each still names the reference so the push can be acted on from the lock screen.
+
+**One notification changed meaning rather than wording.** The push for a question, written earlier the same day, ended "No job, nothing for you to do." That was written to defend the job list from clutter and it read as "ignore this". A question from a stranger is the top of the funnel and she had just asked to be told about it, so it names where to read it instead of dismissing it.
+
+**A bug of this session's own making, caught before it ran.** Making `intake_threads.job_id` nullable that afternoon put `String(prior.job_id)` on the held-thread path into reach of a null, and `String(null)` is the string `"null"`. Replying from the desk sets `human_handling` and never touches `job_id`, so the moment she answered somebody who had only asked a question, that thread was held with no job: the next message from them would have filed any photograph against a job id of `"null"` and failed the foreign key, and pushed `null: waiting on you` to her phone. It is `s()` now, media is only kept when there is a job to hang it on, and the push omits the reference rather than inventing one. It was on the exact path she was about to test.
+
+---
+
 ## 2026-09-06 · The writer runs whether or not the classifier did, and a question is not a job
 
 **Found by the founder sending one real voice note to the Yaadly number, for the second time in two days.** Her words back from her: *"the WhatsApp voice note feature is not working"*, and separately, *"People should be able to contact me on WhatsApp and get help. Not only just load a job."* The two turned out to be one root cause.

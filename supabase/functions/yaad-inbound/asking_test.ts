@@ -164,3 +164,94 @@ Deno.test("the honest placeholder and the handover wording still carry no promis
   }
   assertEquals(body.includes("escrow"), false);
 });
+
+// ── 6 September 2026, being told, and being able to act on it ────────────
+//
+// Founder: "how am I being informed people need help, I should get a
+// notification on my phone stating to check the dashboard."
+//
+// She WAS being told. Five separate pushes already fired. What none of them
+// did was go anywhere: `desk_url` had been in app_settings the whole time,
+// read by the admin email and by nothing else, so a notification arrived on a
+// phone saying something was waiting and then had to be acted on by putting
+// the phone down and finding a laptop.
+
+Deno.test("there is one push path, and it carries the link", () => {
+  // Five copies of the same fetch had already drifted in tone and priority.
+  // The link belongs in the one place none of them can forget it.
+  const calls = src.match(/fetch\(`https:\/\/ntfy\.sh\//g) ?? [];
+  assertEquals(calls.length, 1,
+    "a phone push is being sent outside pushToDesk, so it will not open the " +
+    "desk when she taps it");
+  const at = src.indexOf("async function pushToDesk(");
+  assert(at > 0, "pushToDesk is gone or renamed");
+  const body = src.slice(at, at + 1800);
+  assert(body.includes('headers.Click = cfg.desk_url'),
+    "the push no longer sets ntfy's Click header, so tapping the notification " +
+    "does nothing, which is the entire complaint this was built for");
+  assert(/\.in\("key", \["ntfy_topic", "desk_url"\]\)/.test(body),
+    "pushToDesk is no longer reading desk_url alongside the topic");
+  assert(body.includes("if (!cfg.ntfy_topic) return;"),
+    "pushToDesk no longer bails out when no topic is configured");
+});
+
+Deno.test("nothing about the client travels in the notification link", () => {
+  // The desk is behind Cloudflare Access and the link is the same every time,
+  // so a notification on a lock screen carries no name, number or address.
+  const at = src.indexOf("async function pushToDesk(");
+  const body = src.slice(at, at + 1800);
+  assert(!/headers\.Click = .*\$\{/.test(body),
+    "the notification link is being built with interpolation, so something " +
+    "about the conversation is travelling in a URL on a lock screen");
+});
+
+Deno.test("an urgent push says why it is waiting, not one line for three reasons", () => {
+  // handingOver fires for three reasons and this used to describe only the
+  // third. Somebody typing "can I speak to a person" produced a notification
+  // saying their message was unclear.
+  const at = src.indexOf("const waiting =");
+  assert(at > 0, "the handover push is back to one sentence for every reason");
+  const decl = src.slice(at, at + 700);
+  assert(decl.includes("wantsHuman"), "asking for a person is no longer named in the push");
+  assert(decl.includes("modelSaidNothing"),
+    "a client nothing could answer no longer gets their own reason in the push");
+  assert(decl.includes("agentsPaused"), "a paused assistant is no longer named in the push");
+  assert(decl.includes("still not clear"), "the three turn case lost its wording");
+  // Every branch names the job, so the push can be acted on from a lock screen.
+  assertEquals(decl.match(/\$\{jobId\}/g)?.length, 4,
+    "not every reason names the reference any more");
+});
+
+Deno.test("a question push points somewhere instead of dismissing itself", () => {
+  // Comments stripped before searching. The comment above this branch quotes
+  // the old wording to explain why it changed, and a plain substring search
+  // reads the explanation as the thing it warns about.
+  const code = src.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+  const at = code.indexOf("const pushToPhone");
+  assert(at > 0, "the phone push is gone");
+  const push = code.slice(at, at + 2400);
+  assert(!push.includes("nothing for you to do"),
+    "the question push tells her to ignore it again, which is the opposite of " +
+    "what she asked for");
+  assert(push.includes("Open Conversations"),
+    "the question push no longer says where to read it");
+});
+
+Deno.test("a held thread with no job does not push the word null", () => {
+  // Replying from the desk sets human_handling and never touches job_id, so
+  // the moment she answers somebody who only asked a question, that thread is
+  // held with job_id null. String(null) is the string "null".
+  const at = src.indexOf("if (prior?.human_handling === true) {");
+  assert(at > 0, "the held thread branch is gone");
+  // Wide enough to reach the push at the bottom of the branch.
+  const body = src.slice(at, at + 4000);
+  assert(body.includes("const heldJobId = s(prior.job_id);"),
+    "heldJobId is back to String(), which turns a null job into the literal " +
+    'string "null" in a foreign key and in a notification');
+  assert(body.includes("if (msg.media.length && heldJobId)"),
+    "media on a held thread is being filed against a job id that may not exist");
+  assert(body.includes("job_id: heldJobId || null,"),
+    "the held thread is writing an empty string where the column wants null");
+  assert(body.includes("heldJobId ? `${heldJobId}: ` : \"\""),
+    "the held push prints a reference even when there is no job behind it");
+});

@@ -1272,6 +1272,57 @@ type SettingsReader = {
   };
 };
 
+/** Every phone push goes through here, and every one of them opens the desk.
+ *
+ *  Founder, 6 September 2026: "how am I being informed people need help, I
+ *  should get a notification on my phone stating to check the dashboard."
+ *
+ *  She was being told. Four different pushes already fired: first message on a
+ *  thread, handed to a person, job finished, and they wrote again while it was
+ *  held. What none of them did was go anywhere. `desk_url` has been sitting in
+ *  app_settings the whole time, read by the admin EMAIL and by nothing else,
+ *  so a notification arrived on a phone, said something was waiting, and then
+ *  had to be acted on by putting the phone down and finding a laptop. ntfy
+ *  carries a Click header for exactly this: the notification becomes a link.
+ *
+ *  Written as one function rather than a fourth copy of the same fetch. There
+ *  were three, they had drifted in tone and priority, and the next one would
+ *  have drifted further. A push that cannot be tapped is the failure being
+ *  fixed, so the link belongs in the one place none of them can forget it.
+ *
+ *  Best effort throughout, same as the copies it replaces: a notification that
+ *  will not send must never cost somebody their message. */
+async function pushToDesk(
+  supabase: SettingsReader,
+  note: { title: string; body: string; priority?: "default" | "high" | "urgent"; tags?: string },
+  trace: Trace,
+): Promise<void> {
+  try {
+    const { data: rows } = await supabase.from("app_settings")
+      .select("key,value").in("key", ["ntfy_topic", "desk_url"]);
+    const cfg = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
+    if (!cfg.ntfy_topic) return;
+    await trace.span("ntfy.push", SpanKind.CLIENT, {
+      "server.address": "ntfy.sh", "yaadly.push.linked": !!cfg.desk_url,
+    }, async (sp) => {
+      const headers: Record<string, string> = {
+        Title: note.title,
+        Priority: note.priority ?? "default",
+        Tags: note.tags ?? "speech_balloon",
+      };
+      // Tapping it opens the desk. Nothing about the conversation travels in
+      // the URL: the desk is behind Cloudflare Access and the link is the
+      // same one every time, so a notification on a lock screen carries no
+      // client's name, number or address.
+      if (cfg.desk_url) headers.Click = cfg.desk_url;
+      const r = await fetch(`https://ntfy.sh/${cfg.ntfy_topic}`, {
+        method: "POST", headers, body: note.body, signal: AbortSignal.timeout(4000),
+      });
+      sp.setAttributes({ "http.response.status_code": r.status });
+    });
+  } catch (_) { /* never let a notification break intake */ }
+}
+
 async function notifyAdmin(
   supabase: SettingsReader,
   job: { id: string; trade: string; parish: string; title: string; urgency: string;
@@ -1470,18 +1521,15 @@ async function syncLeadToHubspot(
 async function alertDeskBlocked(findings: { guidance: string }[], trace: Trace, where = "WhatsApp") {
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-    const { data: st } = await supabase.from("app_settings")
-      .select("value").eq("key", "ntfy_topic").maybeSingle();
-    if (!st?.value) return;
-    await fetch(`https://ntfy.sh/${st.value}`, {
-      method: "POST",
-      headers: { Title: "Reply held back", Priority: "high", Tags: "warning" },
+    await pushToDesk(supabase as unknown as SettingsReader, {
+      title: "Reply held back",
+      priority: "high",
+      tags: "warning",
       body: `A ${where} reply failed the language screen and was not sent. The client got a `
         + "holding message and is waiting on a person. Reason: "
         + [...new Set(findings.map((f) => f.guidance))].join(" ")
         + " The draft is in the yaad-inbound function log.",
-      signal: AbortSignal.timeout(4000),
-    });
+    }, trace);
   } catch (e) {
     // A failed notification must never become a failed reply. The block itself
     // already happened and is already in the log and on the span.
@@ -2723,33 +2771,41 @@ Deno.serve(async (req: Request) => {
     // outliving the window is the point. Only the desk's "Hand back to the
     // assistant" button clears it; nothing in this function ever does.
     if (prior?.human_handling === true) {
-      const heldJobId = String(prior.job_id);
+      // s(), not String(). A held thread can now have no job at all: replying
+      // from the desk sets human_handling and never touches job_id, so the
+      // moment Monique answers somebody who only asked a question, this thread
+      // is held with job_id null. String(null) is the string "null", which
+      // would have gone into keepMedia as a job id and failed the foreign key
+      // on any photo they sent, and into the push below as "null: waiting on
+      // you". Introduced the same afternoon job_id became nullable and caught
+      // before it ran, on the path she was about to test.
+      const heldJobId = s(prior.job_id);
       const before = String(prior.transcript ?? "");
       const heldRepeat = before.trimEnd().endsWith(thisTurn.trim()) && thisTurn.trim().length > 0;
       const heldTranscript = heldRepeat ? before.slice(-8000) : `${before}\n\n${thisTurn}`.slice(-8000);
-      if (msg.media.length) {
+      // Only when there is a job to hang it on. An evidence row keyed to a
+      // job that does not exist is rejected outright, and the photograph is
+      // lost either way; the message itself still reaches her on the thread,
+      // which is the part that matters. A held conversation with no job is one
+      // she is already answering herself.
+      if (msg.media.length && heldJobId) {
         await keepMedia(supabase as unknown as MediaWriter, heldJobId, msg.media, Number(prior.turns) * 10, trace, msg.channel, deadline);
       }
       await supabase.from("intake_threads").upsert({
         channel: threadKey.channel,
         from_addr: threadKey.from_addr,
-        job_id: heldJobId,
+        job_id: heldJobId || null,
         transcript: heldTranscript,
         turns: Number(prior.turns) + 1,
         stage: String(prior.stage ?? "gathering"),
         last_at: new Date().toISOString(),
       }, { onConflict: "channel,from_addr" });
-      try {
-        const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
-        if (st?.value) {
-          await fetch(`https://ntfy.sh/${st.value}`, {
-            method: "POST",
-            headers: { Title: `They wrote again: ${msg.channel}`, Priority: "high", Tags: "raising_hand" },
-            body: `${heldJobId}: waiting on you. The assistant is standing down until the desk hands the thread back.`,
-            signal: AbortSignal.timeout(4000),
-          });
-        }
-      } catch (_) { /* never let a notification break intake */ }
+      await pushToDesk(supabase as unknown as SettingsReader, {
+        title: `They wrote again: ${msg.channel}`,
+        priority: "high",
+        tags: "raising_hand",
+        body: `${heldJobId ? `${heldJobId}: ` : ""}waiting on you. The assistant is standing down until the desk hands the thread back.`,
+      }, trace);
       root.setAttributes({ "yaadly.inbound.outcome": "held_for_human", "yaadly.job.id": heldJobId });
       if (isTwilio) {
         return twiml("Someone at Yaadly has this and is coming back to you. I have added your message so they see it.");
@@ -2825,17 +2881,12 @@ Deno.serve(async (req: Request) => {
             if (msg.media.length) {
               await keepMedia(supabase as unknown as MediaWriter, ref, msg.media, Number(webThread.turns) * 10, trace, msg.channel, deadline);
             }
-            try {
-              const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single();
-              if (st?.value) {
-                await fetch(`https://ntfy.sh/${st.value}`, {
-                  method: "POST",
-                  headers: { Title: "Your web chat moved to WhatsApp", Priority: "high", Tags: "raising_hand" },
-                  body: `${ref}: the person you were replying to on the website has carried on by WhatsApp. The whole conversation is on the thread, held for you.`,
-                  signal: AbortSignal.timeout(4000),
-                });
-              }
-            } catch (_) { /* never let a notification break intake */ }
+            await pushToDesk(supabase as unknown as SettingsReader, {
+              title: "Your web chat moved to WhatsApp",
+              priority: "high",
+              tags: "raising_hand",
+              body: `${ref}: the person you were replying to on the website has carried on by WhatsApp. The whole conversation is on the thread, held for you.`,
+            }, trace);
             return twiml(`Thanks, I have your chat from the website here as ${ref}, so there is no need to say any of it again. Someone at Yaadly was already on this one and will come back to you on this number.`);
           }
 
@@ -3213,17 +3264,12 @@ Deno.serve(async (req: Request) => {
       // Monique is told, because this is the one failure nobody else will
       // notice: the client has been answered politely and their job does not
       // exist.
-      try {
-        const { data: st } = await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").maybeSingle();
-        if (st?.value) {
-          await fetch(`https://ntfy.sh/${st.value}`, {
-            method: "POST",
-            headers: { Title: "A job did not save", Priority: "urgent", Tags: "rotating_light" },
-            body: `${jobId}: somebody wrote in on ${msg.channel} and the job row would not write. The conversation is kept and they have been told you will pick it up. Nothing else will chase this.`,
-            signal: AbortSignal.timeout(4000),
-          });
-        }
-      } catch (_) { /* the record is already safe; a failed push must not undo that */ }
+      await pushToDesk(supabase as unknown as SettingsReader, {
+        title: "A job did not save",
+        priority: "urgent",
+        tags: "rotating_light",
+        body: `${jobId}: somebody wrote in on ${msg.channel} and the job row would not write. The conversation is kept and they have been told you will pick it up. Nothing else will chase this.`,
+      }, trace);
 
       const sorry = "Thanks, I have got your message and I have kept it. Something went wrong writing it up at our end, "
         + "so someone at Yaadly is picking this one up rather than me. You will not have to say any of it twice.";
@@ -3327,35 +3373,46 @@ Deno.serve(async (req: Request) => {
     // for yet. The push still happens, through the same waitUntil the admin
     // summary email already used, so the reply no longer waits behind it.
     const pushToPhone = (async () => {
-    try {
-      const { data: st } = worthTelling
-        ? await supabase.from("app_settings").select("value").eq("key", "ntfy_topic").single()
-        : { data: null };
-      if (st?.value) {
-        await fetch(`https://ntfy.sh/${st.value}`, {
-          method: "POST",
-          headers: {
-            Title: stage === "done"
-              ? `New ${msg.channel} job`
-              : handingOver ? `Needs you: ${msg.channel}`
-              : justAsking ? `A question on ${msg.channel}`
-              : `Someone writing in on ${msg.channel}`,
-            Priority: stage === "done" || handingOver ? "high" : "default",
-            Tags: stage === "done" ? "house" : handingOver ? "raising_hand" : "speech_balloon",
-          },
-          body: stage === "done"
-            ? `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`
-            : handingOver
-              ? `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`
-              // No reference, because there is no job and there is no row. The
-              // whole thing is under Conversations on the desk if you want it.
-              : justAsking
-                ? `Somebody asked a question rather than describing work, and the assistant is answering it. No job, nothing for you to do. It is under Conversations if you want to read it.`
-                : `${jobId}: not enough to act on yet. The assistant has asked what is missing.`,
-          signal: AbortSignal.timeout(4000),
-        });
-      }
-    } catch (_) { /* never let a notification break intake */ }
+      if (!worthTelling) return;
+
+      // WHY IT IS WAITING, not one sentence for three different situations.
+      //
+      // handingOver fires for three reasons and this push used to describe
+      // only the third: "N messages and still not clear". So somebody who
+      // typed "can I speak to a person" produced a notification saying their
+      // message was unclear, and so did somebody whose reply failed because
+      // two models were rate limited. Both are false, and both are the most
+      // urgent notification this system sends: a real person is waiting.
+      //
+      // Ordered most urgent first, and every one of them names the door and
+      // the reference, so the push can be acted on from the lock screen.
+      const waiting =
+        wantsHuman   ? `${jobId}: they asked to speak to a person. Everything they said is saved, so they do not have to repeat it.`
+      : modelSaidNothing ? `${jobId}: nothing could answer them just now, so it came straight to you. Their words are on the thread in full.`
+      : agentsPaused ? `${jobId}: the assistant is paused at the desk, so this one is yours.`
+      : `${jobId}: ${turns} messages and still not clear. They have been told you will read it yourself.`;
+
+      await pushToDesk(supabase as unknown as SettingsReader, {
+        title: stage === "done"
+          ? `New ${msg.channel} job`
+          : handingOver ? `Needs you: ${msg.channel}`
+          : justAsking ? `A question on ${msg.channel}`
+          : `Someone writing in on ${msg.channel}`,
+        priority: stage === "done" || handingOver ? "high" : "default",
+        tags: stage === "done" ? "house" : handingOver ? "raising_hand" : "speech_balloon",
+        body: stage === "done"
+          ? `${jobId}: ${s(card?.trade) || "trade unclear"}, ${s(card?.parish) || "parish not given"}.${spoken ? " Voice note, transcribed." : ""}`
+          : handingOver
+            ? waiting
+            // No reference, because there is no job and there is no row. This
+            // used to end "nothing for you to do", which was written to keep
+            // the job list clean and read as "ignore this". A question from a
+            // stranger is the top of the funnel and she asked to be told about
+            // it, so it says where to read it instead of dismissing it.
+            : justAsking
+              ? `Somebody is asking questions rather than describing work, and the assistant is answering. No job yet. Open Conversations to read it or take it over.`
+              : `${jobId}: not enough to act on yet. The assistant has asked what is missing.`,
+      }, trace);
     })();
     if (rt2?.waitUntil) rt2.waitUntil(pushToPhone); else await pushToPhone;
 
