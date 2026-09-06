@@ -466,7 +466,7 @@ export default async function Board({
                       </div>
                     )}
                     {open && vmode === "worker" && (
-                      <QuotePanel jobId={j.id} draft={draftsByJob.get(j.id) ?? null} />
+                      <QuotePanel jobId={j.id} draft={draftsByJob.get(j.id) ?? null} materialsBy={j.materials_by} />
                     )}
                   </div>
                 );

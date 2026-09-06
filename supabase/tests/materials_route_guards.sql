@@ -14,14 +14,28 @@
 -- desk, from a fixup, or from a form that regresses.
 
 do $$
-declare v_ok boolean; v_msg text; v_lines int; v_outstanding int; v_id uuid;
+declare v_lines int; v_outstanding int; v_id uuid; v_msg text; v_user uuid;
 begin
   create temp table t(n int generated always as identity, name text, result text) on commit drop;
 
+  /* job_quotes.worker_user is NOT NULL and references a real auth user, so the
+     rig borrows an existing one rather than inventing a uuid an FK rejects.
+     Found the hard way on 6 Sep 2026: the first version of this file omitted
+     worker_user, worker_name and earliest_start, every quote insert raised,
+     and the catch-all handlers recorded PASS for tests that never ran. */
+  select worker_user into v_user from public.job_quotes where worker_user is not null limit 1;
+
+  delete from public.price_observations where job_id like 'TEST-ROUTE-%';
   delete from public.quote_materials where quote_id in
     (select id from public.job_quotes where job_id like 'TEST-ROUTE-%');
   delete from public.job_quotes where job_id like 'TEST-ROUTE-%';
   delete from public.jobs where id like 'TEST-ROUTE-%';
+  delete from public.worker_profiles where worker_email = 'rig.worker@example.invalid';
+
+  /* A vetted worker, or enforce_vetted_worker_on_quote is the thing refusing
+     and test 3 passes for the wrong reason: it also raises check_violation. */
+  insert into public.worker_profiles (worker_email, name, active, vetting_state)
+  values ('rig.worker@example.invalid', 'Rig Worker', true, 'verified');
 
   insert into public.jobs (id, title, materials_by)
   values ('TEST-ROUTE-A', 'rig, Yaadly supplies', 'yaadly'),
@@ -46,22 +60,39 @@ begin
 
   -- 3. THE ONE THAT MATTERS. A materials figure on a client-supplied job.
   begin
-    insert into public.job_quotes (job_id, worker_email, worker_name, labour_jmd, materials_jmd, status)
-    values ('TEST-ROUTE-B', 'rig.worker@example.invalid', 'Rig Worker', 30000, 15000, 'submitted');
+    insert into public.job_quotes (job_id, worker_user, worker_email, worker_name,
+                                   labour_jmd, materials_jmd, earliest_start, status)
+    values ('TEST-ROUTE-B', v_user, 'rig.worker@example.invalid', 'Rig Worker',
+            30000, 15000, 'This week', 'withdrawn');
     insert into t(name,result) values ('3. A Route B quote carrying materials money is refused', 'FAIL, it was accepted');
   exception when check_violation then
-    insert into t(name,result) values ('3. A Route B quote carrying materials money is refused', 'PASS');
+    get stacked diagnostics v_msg = message_text;
+    insert into t(name,result) values ('3. A Route B quote carrying materials money is refused',
+      case when v_msg like '%supplying the materials themselves%' then 'PASS'
+           else 'FAIL, refused by something else: '||left(v_msg,80) end);
   end;
 
   -- 4. Labour only on Route B goes through.
   begin
-    insert into public.job_quotes (job_id, worker_email, worker_name, labour_jmd, materials_jmd, status)
-    values ('TEST-ROUTE-B', 'rig.worker@example.invalid', 'Rig Worker', 30000, 0, 'submitted')
+    insert into public.job_quotes (job_id, worker_user, worker_email, worker_name,
+                                   labour_jmd, materials_jmd, earliest_start, status)
+    values ('TEST-ROUTE-B', v_user, 'rig.worker@example.invalid', 'Rig Worker',
+            30000, 0, 'This week', 'withdrawn')
     returning id into v_id;
-    insert into t(name,result) values ('4. A labour only quote on Route B is accepted', 'PASS');
+    insert into t(name,result) values ('4. A labour only quote on Route B is accepted',
+      case when v_id is not null then 'PASS' else 'FAIL, insert returned no row' end);
   exception when others then
-    insert into t(name,result) values ('4. A labour only quote on Route B is accepted', 'FAIL, '||sqlerrm);
+    get stacked diagnostics v_msg = message_text;
+    insert into t(name,result) values ('4. A labour only quote on Route B is accepted', 'FAIL, '||left(v_msg,120));
   end;
+
+  /* Guarded: without this, one failure above leaves v_id null and the next
+     insert dies on a NOT NULL, taking the whole run down and hiding the
+     results of the tests that did complete. */
+  if v_id is null then
+    insert into t(name,result) values ('5. Two lines ordered, one still outstanding', 'SKIPPED, no quote from test 4');
+    insert into t(name,result) values ('6. A blank item is refused', 'SKIPPED, no quote from test 4');
+  else
 
   -- 5. The list is the order, and an unsupplied line is outstanding.
   insert into public.quote_materials (quote_id, sort, item, qty, unit)
@@ -86,24 +117,30 @@ begin
   exception when check_violation then
     insert into t(name,result) values ('6. A blank item is refused', 'PASS');
   end;
+  end if;
 
   -- 7. Route A quotes are untouched by any of this.
   begin
-    insert into public.job_quotes (job_id, worker_email, worker_name, labour_jmd, materials_jmd, status)
-    values ('TEST-ROUTE-A', 'rig.worker@example.invalid', 'Rig Worker', 30000, 45000, 'submitted');
+    insert into public.job_quotes (job_id, worker_user, worker_email, worker_name,
+                                   labour_jmd, materials_jmd, earliest_start, status)
+    values ('TEST-ROUTE-A', v_user, 'rig.worker@example.invalid', 'Rig Worker',
+            30000, 45000, 'This week', 'withdrawn');
     insert into t(name,result) values ('7. A Route A quote still carries materials money', 'PASS');
   exception when others then
-    insert into t(name,result) values ('7. A Route A quote still carries materials money', 'FAIL, '||sqlerrm);
+    get stacked diagnostics v_msg = message_text;
+    insert into t(name,result) values ('7. A Route A quote still carries materials money', 'FAIL, '||left(v_msg,120));
   end;
 
   create table if not exists public._route_out (n int, name text, result text);
   delete from public._route_out;
   insert into public._route_out select n,name,result from t;
 
+  delete from public.price_observations where job_id like 'TEST-ROUTE-%';
   delete from public.quote_materials where quote_id in
     (select id from public.job_quotes where job_id like 'TEST-ROUTE-%');
   delete from public.job_quotes where job_id like 'TEST-ROUTE-%';
   delete from public.jobs where id like 'TEST-ROUTE-%';
+  delete from public.worker_profiles where worker_email = 'rig.worker@example.invalid';
 end $$;
 select name, result from public._route_out order by n;
 drop table public._route_out;

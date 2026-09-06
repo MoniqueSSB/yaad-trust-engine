@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · Step 4 built, both migrations applied, and the guard tests caught themselves passing for the wrong reason
+
+**Founder's instruction was "fix and update", after being told the visible half was done and the working half was not.** Two things were outstanding: the worker had no way to state what a job needs, and neither migration had ever been applied, so the form recorded a materials answer that nothing downstream acted on. Both are now done.
+
+**Step 4: the quote form carries the materials list.** `QuotePanel` takes `materialsBy` from the board and does three things with it. It replaces the materials money field with a plain statement on a client-supplied job, because a worker typing a number into a box that then throws is a worker who thinks the platform is broken. It shows repeatable item/quantity/unit rows on both routes, which is the answer to the wasted journey: a tradesperson who travels to Portmore and finds no blocks on site. And it blocks Send on a client-supplied job with no lines, because telling somebody they are buying the materials without telling them what to buy guarantees the failure the list exists to prevent. `submitQuote` writes the lines after the quote and never inside it: a malformed materials line must not cost the worker his quote, since a quote with no list is still a quote and a lost quote is a lost job.
+
+**Both migrations are applied to the live project.** `20260905c` (the two reconciliation views) and `20260905d` (the route constraint, `quote_materials`, the Route B trigger, `mark_material_supplied`). All twelve guard tests pass against the real database, not a local copy.
+
+**The guard tests were wrong in the way that matters, and the live run is what exposed it.** `materials_route_guards.sql` omitted three NOT NULL columns on `job_quotes`: `worker_user`, `worker_name` and `earliest_start`. Every quote insert raised, and because tests 4 and 7 caught `when others` and test 3 caught `check_violation`, the file reported PASS for tests that had never run. Worse, `enforce_vetted_worker_on_quote` also raises `check_violation`, so test 3 would have passed even with the route trigger deleted. The file now creates a vetted worker profile first, supplies every required column, and test 3 asserts on the message text so it proves which trigger refused. Tests 5 and 6 are guarded on a real quote id rather than dying on a NOT NULL and taking the run down with them. **This is the exact failure mode CLAUDE.md section 3 warns about, arriving as a test that looked green.**
+
+**Two rig details worth keeping.** Quotes are inserted with status `withdrawn` rather than `submitted`, because two AFTER triggers fire a real outbound `http_post` to `yaad-notify-client` on `submitted` and a test must not message anybody; the route trigger never reads status, so the same path is exercised. And the rig borrows an existing `worker_user` rather than inventing a uuid an FK would reject. Rows, the temp output tables and the rig worker profile were all removed after the run, and the database was checked clean.
+
 ## 2026-09-05 · Step 3 reverted the same evening: only the materials list belongs near the quote
 
 **Founder's ruling, and it overturns a change that was built, screenshotted and pushed an hour earlier.** The store question, "where can materials be kept on the property", was moved to the post-a-job form on Route A. Her call: the only addition the quote needs is the materials list, and everything else can be requested after the client confirms. The commit was reverted, the form is back to what step 2 left, and the spec now records step 3 as rejected rather than done.
