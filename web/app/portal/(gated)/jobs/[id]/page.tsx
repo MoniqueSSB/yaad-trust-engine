@@ -202,6 +202,38 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
+  /* The board preview's text, scrubbed by the same Postgres function the
+     public board itself calls, public.board_descr() (20260907090000). It used
+     to be a JavaScript copy of the view's regexp chain living in
+     BoardPreview.tsx, faithfully mirrored and wrong in both places: it missed
+     a plain "Access:" line and had no email pattern at all, so the card told a
+     client her access arrangements and her email were stripped while showing
+     her both. One definition now, and the preview reads it rather than
+     reimplementing it.
+
+     Only for the client, and only fetched when it will be rendered. Scrubbing
+     somebody's name and phone number out of their own description means
+     reading their name and phone number, and there is no reason for a booked
+     worker's session to fetch either. */
+  let boardDescr: string | null = null;
+  if (role === "client") {
+    const { data: own } = await supabase
+      .from("jobs")
+      .select("client_name,client_phone")
+      .eq("id", id)
+      .maybeSingle();
+    const { data: scrubbed } = await supabase.rpc("board_descr", {
+      p_descr: job.descr,
+      p_client_name: own?.client_name ?? null,
+      p_client_email: job.client_email ?? null,
+      p_client_phone: own?.client_phone ?? null,
+    });
+    /* null on any failure, never a fallback to job.descr. BoardPreview shows
+       no description at all in that case and says why. A preview that quietly
+       prints the unscrubbed text is worse than a preview that is missing. */
+    boardDescr = typeof scrubbed === "string" ? scrubbed : null;
+  }
+
   const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }, { data: quotePackRow }, { data: materialsRows }] =
     await Promise.all([
       supabase
@@ -977,6 +1009,7 @@ export default async function JobRoom({
       {role === "client" && !movedOn && !onBoard && (
         <BoardPreview
           job={job}
+          boardDescr={boardDescr}
           signed={signed}
           photos={bp}
           tools={
