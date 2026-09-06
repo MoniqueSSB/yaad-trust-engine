@@ -7,8 +7,8 @@ import * as guardrails from "./guardrails.ts";
 //
 // The report drafting agent. Three of the seven priced services ARE a
 // document: the Deposit Protection Check, the Condition Report and the
-// Technical Sign-off. services.html promises a verdict on page one, normally
-// within 72 hours of the visit. Until now that document was typed by hand,
+// Technical Sign-off. services.html promises a written verdict on page one and
+// puts no timeline on it. Until now that document was typed by hand,
 // which put the ceiling on this business at roughly four reports a week.
 //
 // So this drafts the findings and assembles the document. It does not write

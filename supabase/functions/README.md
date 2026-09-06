@@ -253,7 +253,7 @@ what keeps each request inside the function's timeout.
 
 Three of the seven priced services are a document: the Deposit Protection
 Check, the Condition Report and the Technical Sign-off. `services.html`
-promises a verdict on page one, normally within 72 hours of the visit. Typed by
+promises a written verdict on page one and puts no timeline on it. Typed by
 hand, a £249 report costs an evening, which caps the whole business at roughly
 four reports a week.
 

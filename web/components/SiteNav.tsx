@@ -11,9 +11,15 @@ import Link from "next/link";
  * Fixed 2 Sep 2026: this used to run a shorter menu than the marketing site,
  * "Marketplace" where the site said "Overview" and no "Job board" tab at all,
  * so the header changed shape the moment you crossed from yaadly.co.uk into
- * the app. The tabs are now the same six on both sides. Overview is the story
+ * the app. The tabs are now the same seven on both sides. Overview is the story
  * page and lives on the marketing site; Job board is the live board and lives
  * here, which is why one crosses back and the other does not.
+ *
+ * "How we use AI" was added 6 Sep 2026 on Monique's instruction. It is the
+ * seventh tab and it did not fit: the row was measured to exactly 1100px for
+ * six. The row is 1180px wide now and the portal links hide at 1180px rather
+ * than 1080px, the same two numbers as docs/nav.css, for the reason written
+ * above the button rule there.
  *
  * The portal used to render its own cut-down header instead of this one:
  * logo, email, sign out, and no tabs at all. That is what made signing in
@@ -62,7 +68,7 @@ export function SiteNav({
     "px-[6px] py-1.5 whitespace-nowrap text-[12px] text-dim transition hover:text-purpleb";
   return (
     <nav className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-[14px]">
-      <div className="mx-auto flex min-h-[58px] max-w-[1100px] flex-nowrap items-center px-6 max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2">
+      <div className="mx-auto flex min-h-[58px] max-w-[1180px] flex-nowrap items-center px-6 max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2">
         <a href={SITE} className="mr-auto flex shrink-0 items-center gap-2 font-display text-[18px] font-medium">
           <span className={`grid size-[30px] place-items-center rounded-[8px] text-[16px] font-bold text-white ${GRAD}`}>
             Y
@@ -76,6 +82,7 @@ export function SiteNav({
           <Link href="/jobs" className={tab(here === "market")}>Job board</Link>
           <a href={`${SITE}/services`} className={tab(false)}>Managed services</a>
           <a href={`${SITE}/business`} className={tab(false)}>For business</a>
+          <a href={`${SITE}/how-we-use-ai`} className={tab(false)}>How we use AI</a>
           <a href={`${SITE}/contact`} className={tab(false)}>Contact</a>
           <a href="https://cal.com/yaadly/15min" target="_blank" rel="noopener" className={tab(false)}>Book a call</a>
         </div>
@@ -85,7 +92,7 @@ export function SiteNav({
             a signed-in person is there for, and keeping all of it would push
             the row past the page edge. */}
         {signOut ? null : (
-          <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1080px]:hidden">
+          <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1180px]:hidden">
             <Link href="/portal/client" className={quiet + (here === "client" ? " font-semibold text-purpleb" : "")}>Client portal</Link>
             <Link href="/portal/worker" className={quiet + (here === "worker" ? " font-semibold text-purpleb" : "")}>Worker portal</Link>
             <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a pro</Link>

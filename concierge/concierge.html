@@ -1041,7 +1041,7 @@ const VIEWS = [
             placeholder:"What you would do and why, in your own words. No model has seen this field." },
         ],
         args:(r, v) => ({ p_report:r.id, p_line:v.line, p_verdict:v.verdict }),
-        says:() => "Writes the verdict on page one. services.html promises the client this within 72 hours of the visit, and it is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
+        says:() => "Writes the verdict on page one. services.html promises the client a written verdict and deliberately puts no timeline on it, and this is the one part of the document nothing here can draft for you. The database refuses a verdict that states a measurement." },
       { label:"Issue it", cls:"",
         when:r => r.status !== "issued" && r.unrated === 0 && !r.needs_verdict,
         rpc:"issue_report",

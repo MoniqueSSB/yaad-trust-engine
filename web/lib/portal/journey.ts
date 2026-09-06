@@ -49,7 +49,7 @@ export const STAGES = [
 export const SERVICE_TRACK = [
   { name: "Booked and paid", detail: "Portal link and code sent the moment payment cleared" },
   { name: "Intake", detail: "What is needed from you before the clock starts" },
-  { name: "Documents received", detail: "The 72 hour turnaround starts here, not at payment" },
+  { name: "Documents received", detail: "The desk work starts here, not at payment" },
   { name: "Desk work", detail: "Checked against real material costs and day rates" },
   { name: "Draft with you", detail: "You read it first. A wrong fact gets fixed before it is final" },
   { name: "Delivered", detail: "PDF, signed, yours to keep" },
