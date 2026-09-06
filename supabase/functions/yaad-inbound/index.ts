@@ -13,7 +13,7 @@ import { priceFigureGuard } from "./price-figures.ts";
 import { TRADES_PROMPT_LINE } from "./trades.ts";
 import { stripPromises, unkeepableSentences } from "./promises.ts";
 import { shouldEscapeLane, wantsAPerson } from "./escape-hatch.ts";
-import { samePhone } from "./phone.ts";
+import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
 import { replyFromCard } from "./reply-from-card.ts";
@@ -1297,6 +1297,38 @@ async function readSettings(supabase: SettingsReader, keys: string[]): Promise<R
     [r.key, String(r.value ?? "").trim().replace(/^"(.*)"$/, "$1")]));
 }
 
+/** Point her phone at the conversation she has just been alerted about.
+ *
+ *  A bare reply from her own WhatsApp has to land somewhere, and the one thing
+ *  she cannot see from a phone is which thread it would land in. So every
+ *  alert that names a conversation also records it as the one she is on, and a
+ *  reply with no number in front of it goes there. Starting a message with
+ *  somebody else's number moves it; "who" reads it back.
+ *
+ *  Stored in wa_intake_sessions, which is already the "what is this number in
+ *  the middle of" table for workers, keyed the same way, on the _lane marker
+ *  every other session in this file uses. Best effort: a target that fails to
+ *  save costs her a bare reply, not the alert. */
+async function rememberDeskTarget(
+  supabase: { from: (t: string) => { upsert: (row: Record<string, unknown>) => Promise<unknown> } },
+  deskPhone: string, channel: string, fromAddr: string,
+): Promise<void> {
+  if (!deskPhone || !fromAddr) return;
+  try {
+    await supabase.from("wa_intake_sessions").upsert({
+      // digitsOf, the same normalisation samePhone uses, so the key this
+      // writes and the key the desk lane reads are derived the same way from
+      // whatever shape the number was typed in on the Settings page.
+      wa_id: `desk:${digitsOf(deskPhone)}`,
+      answers: { _lane: "desk", channel, from_addr: fromAddr },
+      photo_count: 0,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    console.error("rememberDeskTarget: threw, the alert still went:", String(e).slice(0, 200));
+  }
+}
+
 /** Message Monique's own WhatsApp, with the client's actual words in it.
  *
  *  Founder, 6 September 2026, after I proposed SMS and she pushed back on it:
@@ -1381,11 +1413,23 @@ async function pushToDesk(
      *  means the push is informational and nothing reaches her WhatsApp.
      *  See alertHerPhone. */
     alsoText?: string;
+    /** The conversation this alert is about. Recorded as the one her phone is
+     *  on, so a reply with no number in front of it goes to the right person.
+     *  Absent on alerts that name no single thread. */
+    target?: { channel: string; from_addr: string };
   },
   trace: Trace,
 ): Promise<void> {
   try {
     const cfg = await readSettings(supabase, ["ntfy_topic", "desk_url", "desk_phone"]);
+    // Recorded before the send, so a bare reply from her phone lands on this
+    // conversation even if the alert itself does not get through.
+    if (note.target && cfg.desk_phone) {
+      await rememberDeskTarget(
+        supabase as unknown as Parameters<typeof rememberDeskTarget>[0],
+        cfg.desk_phone, note.target.channel, note.target.from_addr,
+      );
+    }
     // The text goes first and independently of the push. They fail for
     // different reasons (a missing topic, a missing Twilio number) and neither
     // should be able to take the other down with it, which is the mistake
@@ -1883,6 +1927,139 @@ Deno.serve(async (req: Request) => {
       const flush = flushPendingDeskReplies(supabase, msg.from, msg.channel, trace);
       const rt0 = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
       if (rt0?.waitUntil) rt0.waitUntil(flush); else await flush;
+    }
+
+    // ── Monique, writing in from her own phone ───────────────────────────
+    //
+    // Founder, 6 September 2026: "make everything in whatsapp." The alert
+    // already reaches her WhatsApp with the client's own words in it. This is
+    // the other half: she answers in the same thread, on the same phone, and
+    // it goes to the client from the Yaadly number.
+    //
+    // FIRST, before every lane below it, because she is not a client and
+    // every one of those lanes assumes an inbound message is one. Without
+    // this her reply would be read as a stranger describing a job.
+    //
+    // WHAT AUTHENTICATES IT is the sending number, and nothing else. Twilio's
+    // signature proves the request came from Twilio, and WhatsApp reports the
+    // sender. That is the same standing the desk has, where the gate is
+    // Cloudflare Access plus is_admin(), and it is worth naming rather than
+    // burying: her words go to a client as Yaadly. The mitigation is that
+    // this lane can only ever send a message. It cannot approve a stage,
+    // release a payable, publish a worker or change a job. Everything
+    // consequential still happens where a person is signed in.
+    //
+    // THE COST, accepted knowingly: her own number can no longer act as a
+    // test client, because this lane claims it first. Testing the client side
+    // now needs a second phone.
+    if ((msg.channel === "whatsapp" || msg.channel === "sms") && msg.from) {
+      const { desk_phone: deskPhone } = await readSettings(supabase as unknown as SettingsReader, ["desk_phone"]);
+      if (deskPhone && samePhone(msg.from, deskPhone)) {
+        const said = msg.text.trim();
+        // Keyed on her number as recorded, never on msg.from, so the two
+        // sides cannot disagree about formatting. Prefixed "desk:" so this
+        // row can never collide with a worker session on the same number.
+        const deskKey = `desk:${digitsOf(deskPhone)}`;
+        const sess = await supabase.from("wa_intake_sessions")
+          .select("answers").eq("wa_id", deskKey).maybeSingle();
+        const a = (sess.data?.answers ?? {}) as Record<string, unknown>;
+        let target = String(a._lane ?? "") === "desk"
+          ? { channel: String(a.channel ?? ""), from_addr: String(a.from_addr ?? "") }
+          : null;
+
+        // "who" is the one command, because the one thing she cannot see from
+        // her phone is which conversation a bare reply would land in.
+        if (/^\s*who\b/i.test(said)) {
+          return twiml(target?.from_addr
+            ? `You are answering ${target.from_addr} on ${target.channel}. Send a message and it goes to them from this number. To answer somebody else, start with their number.`
+            : `You are not on a conversation yet. Start a message with somebody's number to answer them, or open the desk.`);
+        }
+
+        // A leading number switches who she is talking to, and the rest of
+        // the line is the message. Same shape as the worker lanes, which
+        // already answer a code with the thing the code names.
+        const switched = said.match(/^\s*(\+?\d[\d\s().-]{7,}\d)\s*[:,-]?\s*([\s\S]*)$/);
+        let body = said;
+        if (switched) {
+          const wanted = switched[1].trim();
+          const { data: found } = await supabase.from("intake_threads")
+            .select("channel,from_addr").order("last_at", { ascending: false }).limit(200);
+          const hit = (found ?? []).find((t: { from_addr: string }) => samePhone(t.from_addr, wanted));
+          if (!hit) return twiml(`No conversation here from ${wanted}. Check the number, or open the desk.`);
+          target = { channel: hit.channel, from_addr: hit.from_addr };
+          body = switched[2].trim();
+          await supabase.from("wa_intake_sessions").upsert({
+            wa_id: deskKey, answers: { _lane: "desk", ...target },
+            photo_count: 0, updated_at: new Date().toISOString(),
+          });
+          if (!body) return twiml(`Now answering ${hit.from_addr} on ${hit.channel}. Send your message and it goes to them from this number.`);
+        }
+
+        if (!target?.from_addr) {
+          return twiml(`I do not know who that is for. Start the message with their number, or open the desk.`);
+        }
+        if (!body) {
+          // Photographs and voice notes are not carried. Sending a client a
+          // photo she has not seen rendered, from a lane with no preview, is
+          // a different decision and it is not this one.
+          return twiml(`Send it as words and I will pass it on. This lane carries text only; anything else goes from the desk.`);
+        }
+
+        const t = target;
+        const { data: thread } = await supabase.from("intake_threads")
+          .select("job_id,transcript,first_human_reply_at")
+          .eq("channel", t.channel).eq("from_addr", t.from_addr).maybeSingle();
+        if (!thread) return twiml(`That conversation is not here any more. Open the desk.`);
+
+        // Sent exactly as typed. No model touches it, the same promise the
+        // desk's own reply button makes, because these are her words going to
+        // a client under Yaadly's name.
+        let delivered = false;
+        let note = "";
+        if (t.channel === "whatsapp") {
+          delivered = await sendWhatsAppTo(t.from_addr, body, trace);
+          if (!delivered) {
+            // Meta's 24 hour window, almost always. Queued rather than lost,
+            // into the same table the desk uses, and flushed by the lane at
+            // the top of this function the moment they write back.
+            const { error: qErr } = await supabase.from("pending_desk_replies").insert({
+              channel: t.channel, to_addr: t.from_addr, job_id: thread.job_id ?? "", body,
+            });
+            note = qErr
+              ? " It could not be queued either, so it is not saved. Send it from the desk."
+              : " WhatsApp would not carry it right now, so it is saved and goes the moment they write back.";
+          }
+        } else if (t.channel === "web") {
+          const { error: wErr } = await supabase.from("web_chat_replies").insert({
+            visitor_key: t.from_addr, job_id: thread.job_id ?? null, body,
+          });
+          delivered = !wErr;
+          note = delivered ? " They see it while that page is open." : " It would not save. Send it from the desk.";
+        } else {
+          return twiml(`That conversation came in by ${t.channel}, which this lane cannot answer. Open the desk.`);
+        }
+
+        // Recorded exactly as yaad-desk-reply records its own: labelled as
+        // hers, the thread claimed so the assistant stands down, and the
+        // reply clock stamped once and never overwritten.
+        const firstReply = thread.first_human_reply_at ? {} : { first_human_reply_at: new Date().toISOString() };
+        await supabase.from("intake_threads").update({
+          transcript: `${String(thread.transcript ?? "")}\n\nYaadly (from the desk): ${body}`.slice(-8000),
+          human_handling: true,
+          last_at: new Date().toISOString(),
+          awaiting_human_since: null,
+          ...firstReply,
+        }).eq("channel", t.channel).eq("from_addr", t.from_addr);
+
+        root.setAttributes({
+          "yaadly.desk_whatsapp.delivered": delivered,
+          "yaadly.desk_whatsapp.channel": t.channel,
+          "yaadly.job.id": String(thread.job_id ?? ""),
+        });
+        return twiml(delivered
+          ? `Sent to ${t.from_addr}.${note} They are yours now, the assistant will not answer them until you hand it back on the desk.`
+          : `Not sent.${note}`);
+      }
     }
 
     // ── the website chat door ────────────────────────────────────────────
@@ -2895,6 +3072,7 @@ Deno.serve(async (req: Request) => {
         last_at: new Date().toISOString(),
       }, { onConflict: "channel,from_addr" });
       await pushToDesk(supabase as unknown as SettingsReader, {
+        target: threadKey,
         title: `They wrote again: ${msg.channel}`,
         priority: "high",
         tags: "raising_hand",
@@ -2979,6 +3157,7 @@ Deno.serve(async (req: Request) => {
               await keepMedia(supabase as unknown as MediaWriter, ref, msg.media, Number(webThread.turns) * 10, trace, msg.channel, deadline);
             }
             await pushToDesk(supabase as unknown as SettingsReader, {
+              target: threadKey,
               title: "Your web chat moved to WhatsApp",
               priority: "high",
               tags: "raising_hand",
@@ -3379,6 +3558,7 @@ Deno.serve(async (req: Request) => {
       // notice: the client has been answered politely and their job does not
       // exist.
       await pushToDesk(supabase as unknown as SettingsReader, {
+        target: threadKey,
         title: "A job did not save",
         priority: "urgent",
         tags: "rotating_light",
@@ -3519,6 +3699,7 @@ Deno.serve(async (req: Request) => {
       const said = msg.text.trim().slice(0, 700);
       const who = msg.channel === "web" ? "the website chat" : (msg.from || "an unknown sender");
       await pushToDesk(supabase as unknown as SettingsReader, {
+        target: threadKey,
         alsoText: handingOver
           ? `Yaadly needs you.\n\n${waiting}\n\nThey said:\n"${said}"\n\nFrom ${who} on ${msg.channel}.${reference ? ` Job ${reference}.` : ""} Reply from the desk and it goes back from this number.`
           : undefined,

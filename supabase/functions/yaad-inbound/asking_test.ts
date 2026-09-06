@@ -27,6 +27,22 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 
 const src = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
 
+/** A whole top-level function body, rather than a guessed number of bytes.
+ *
+ *  Three assertions in this file have gone red for the wrong reason already,
+ *  each time because a fixed `slice(at, at + N)` window stopped reaching the
+ *  line it was checking once a comment or a block was added above it. A test
+ *  that fails when the code is right teaches people to widen the number, and
+ *  the fourth time nobody looks. Bounded by the next top-level declaration
+ *  instead, so it grows with the function. */
+function fnBody(name: string): string {
+  const at = src.indexOf(`async function ${name}(`);
+  if (at < 0) throw new Error(`${name} is gone or renamed`);
+  const rest = src.slice(at + 10);
+  const next = rest.search(/\n(?:async function |function |const [A-Z_]+ =|Deno\.serve)/);
+  return next < 0 ? src.slice(at) : src.slice(at, at + 10 + next);
+}
+
 Deno.test("the classifier is asked whether this is a question at all", () => {
   const prompt = src.slice(src.indexOf("const CLASSIFY_SYSTEM"), src.indexOf("/** Extraction only."));
   assert(prompt.length > 200, "CLASSIFY_SYSTEM is gone or renamed");
@@ -214,9 +230,7 @@ Deno.test("there is one push path, and it carries the link", () => {
   assertEquals(calls.length, 1,
     "a phone push is being sent outside pushToDesk, so it will not open the " +
     "desk when she taps it");
-  const at = src.indexOf("async function pushToDesk(");
-  assert(at > 0, "pushToDesk is gone or renamed");
-  const body = src.slice(at, at + 1800);
+  const body = fnBody("pushToDesk");
   assert(body.includes('headers.Click = cfg.desk_url'),
     "the push no longer sets ntfy's Click header, so tapping the notification " +
     "does nothing, which is the entire complaint this was built for");
@@ -229,8 +243,7 @@ Deno.test("there is one push path, and it carries the link", () => {
 Deno.test("nothing about the client travels in the notification link", () => {
   // The desk is behind Cloudflare Access and the link is the same every time,
   // so a notification on a lock screen carries no name, number or address.
-  const at = src.indexOf("async function pushToDesk(");
-  const body = src.slice(at, at + 1800);
+  const body = fnBody("pushToDesk");
   assert(!/headers\.Click = .*\$\{/.test(body),
     "the notification link is being built with interpolation, so something " +
     "about the conversation is travelling in a URL on a lock screen");
@@ -305,9 +318,9 @@ Deno.test("a setting is not trusted to have been written cleanly", () => {
   // yaad-enquiry had already found this, named desk_url in a comment, and
   // stripped the quotes in its own copy. The two places that actually read
   // desk_url kept reading it raw.
-  const at = src.indexOf("async function readSettings(");
-  assert(at > 0, "readSettings is gone, so the settings readers can drift apart again");
-  const body = src.slice(at, at + 400);
+  assert(src.includes("async function readSettings("),
+    "readSettings is gone, so the settings readers can drift apart again");
+  const body = fnBody("readSettings");
   assert(/replace\(\/\^"\(\.\*\)"\$\/, "\$1"\)/.test(body),
     "readSettings no longer strips a surrounding pair of quotes, so a value " +
     "written as JSON breaks every link built from it");
@@ -357,9 +370,9 @@ Deno.test("the alert carries what they actually said", () => {
 Deno.test("a blocked reply reaches her without quoting anything a model wrote", () => {
   // What was blocked is the DRAFT. The guidance strings are a fixed closed
   // set, which is the rule alertDeskBlocked has always followed for its push.
-  const at = src.indexOf("async function alertDeskBlocked(");
-  assert(at > 0, "alertDeskBlocked is gone");
-  const body = src.slice(at, at + 1400);
+  assert(src.includes("async function alertDeskBlocked("),
+    "alertDeskBlocked is gone");
+  const body = fnBody("alertDeskBlocked");
   assert(body.includes("alsoText:"), "a held back reply no longer texts her, and the client is waiting");
   assert(!/alsoText[\s\S]{0,400}msg\.text/.test(body),
     "the blocked reply text is quoting the message, where the thing that was " +
@@ -372,9 +385,9 @@ Deno.test("the alert goes to her WhatsApp, on the sender Yaadly already owns", (
   // reply on another is a context switch on every single message, and the data
   // protection argument for SMS did not apply: WhatsApp is the same Twilio
   // account on a sender Yaadly already owns.
-  const at = src.indexOf("async function alertHerPhone(");
-  assert(at > 0, "alertHerPhone is gone, or the alert went back to SMS");
-  const body = src.slice(at, at + 2200);
+  assert(src.includes("async function alertHerPhone("),
+    "alertHerPhone is gone, or the alert went back to SMS");
+  const body = fnBody("alertHerPhone");
   assert(body.includes("await sendWhatsAppTo(to, body.slice(0, 1500), trace)"),
     "the alert is no longer sent over WhatsApp, or is unbounded");
   assert(body.includes('const to = (cfg.desk_phone ?? "").trim();'),
@@ -394,8 +407,7 @@ Deno.test("the WhatsApp alert and the push cannot take each other down", () => {
   // yaad-enquiry's own comment records making this mistake: the push was
   // fetched first and returned early when no topic was configured, which took
   // the email with it. They fail for different reasons.
-  const at = src.indexOf("async function pushToDesk(");
-  const body = src.slice(at, at + 2600);
+  const body = fnBody("pushToDesk");
   const textAt = body.indexOf("await alertHerPhone(");
   const bailAt = body.indexOf("if (!cfg.ntfy_topic) return;");
   assert(textAt > 0 && bailAt > 0, "one of the two notification paths is gone");

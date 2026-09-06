@@ -466,6 +466,38 @@ It sends nothing and tells the client nothing.
 
 ---
 
+## 10g. Answering a client from your own WhatsApp
+
+Reply to a Yaadly alert in WhatsApp and your words go to the client from the Yaadly number. Nothing else needed, no desk, no app.
+
+**Which conversation it goes to.** The one the last alert was about. Every alert that names a conversation points your phone at it, so a plain reply lands there.
+
+- **`who`** tells you which conversation you are on.
+- **Start with a number** to answer somebody else: `+447700900123 I can be there Thursday`. The rest of the line is the message. Send just the number to switch without sending anything.
+
+**What you get back.** A one line confirmation from the Yaadly number saying it went, and that the thread is yours now, so the assistant will not answer over the top of you. Hand it back from the desk when you are done.
+
+**Text only.** Photographs and voice notes are not carried. Sending a client a photo from a lane with no preview is a different decision and it has not been taken. Send those from the desk.
+
+**Outside WhatsApp's 24 hour window**, your words are saved rather than lost and go the moment the client writes back, using the same queue the desk's reply button uses. You are told which of the two happened.
+
+**Your own number cannot act as a test client any more.** This lane claims it first, which is the point. To test the client side, use a second phone.
+
+### If it does not work
+
+- **"I do not know who that is for."** No conversation is recorded against your phone yet, which happens if you reply to something other than an alert. Start the message with the client's number.
+- **"No conversation here from ..."** The number does not match a thread. It is compared with `samePhone`, so a missing country code is fine, but a wrong digit is not.
+- **Your message was read as a new job.** The lane did not claim it, so `desk_phone` does not match the number you sent from. Check Settings on the desk; it must be the number WhatsApp actually sends from, in full international form.
+- **Nothing happened at all.** Check the `yaad-inbound` logs for the request. The lane runs before every client lane, so if it did not fire, `desk_phone` is the thing to look at.
+
+### What it deliberately cannot do
+
+It can send a message and nothing else. It cannot approve a stage, release a payable, publish a worker, book a worker or change a job, and `desk-reply-lane_test.ts` asserts that by name.
+
+That is not caution for its own sake. The only thing authenticating these messages is the number they came from, which is a weaker gate than the desk's Cloudflare Access plus `is_admin()`. A message can be corrected. A released payable cannot. Anything consequential stays where a person is signed in, which is CLAUDE.md §2.
+
+---
+
 ## Publishing a worker profile
 
 **The profile row is created the moment Phase 1 is submitted, and it is created hidden.** `active = false`, `vetting_state = 'probation'`. It exists from the first sitting so the desk can see and work on it, and nothing unvetted is ever publicly listed.

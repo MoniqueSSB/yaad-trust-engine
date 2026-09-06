@@ -6,6 +6,26 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · She answers a client from her own WhatsApp, and that lane may only send a message
+
+**Founder:** *"make everything in whatsapp."* The alert already reached her WhatsApp with the client's own words in it. This is the other half: she replies in the same thread, on the same phone, and it goes to the client from the Yaadly number.
+
+**A message from `desk_phone` is claimed before every other lane**, because every lane below it reads an inbound message as a client describing a job. Without that placement her reply becomes a stranger describing work, and the assistant answers her.
+
+**What authenticates it is the sending number and nothing else, and that is the whole design constraint.** Twilio's signature proves the request came from Twilio, and WhatsApp reports the sender. That is a weaker gate than the desk, which is Cloudflare Access plus `is_admin()` plus RLS. So the mitigation is structural rather than procedural: **this lane can only ever send a message.** It cannot approve a stage, release a payable, publish a worker, book a worker or change a job, and `desk-reply-lane_test.ts` asserts that by naming each one. A message that goes wrong can be corrected in the next message; a released payable cannot. Everything consequential stays where a person is signed in, which is CLAUDE.md §2 doing exactly the job it was written for.
+
+**Routing, without asking her to remember a code.** The one thing she cannot see from a phone is which conversation a bare reply would land in, so every alert that names a conversation records it as the one her phone is on, and a plain reply goes there. Starting a message with a number moves it and the rest of the line is the message; `who` reads it back. The target lives in `wa_intake_sessions`, which is already the "what is this number in the middle of" table, under a `desk:` prefixed key so it can never collide with a worker session on the same number. Both sides derive that key through `digitsOf()`, and a test asserts they agree, because if they ever drift every bare reply answers "I do not know who that is for" and nothing in the logs says why.
+
+**Her words go out exactly as typed**, the same promise the desk's own reply button makes. No model touches them: they are her words going to a client under Yaadly's name, and a guardrail screen over the named human's own sentence would be the machine second-guessing the person the rule exists to protect. Recorded on the transcript as `Yaadly (from the desk):`, the thread claimed so the assistant stands down, and the reply clock stamped once and never overwritten, all identical to `yaad-desk-reply` so the two cannot drift into meaning different things.
+
+**Text only, and it says so to her face.** Sending a client a photograph from a lane with no preview is a different decision and it has not been taken. Outside Meta's 24 hour window her words are queued into the same `pending_desk_replies` table the desk uses and flushed when the client writes back, so a reply is never silently lost.
+
+**The accepted cost, stated because she will hit it.** Her own number can no longer act as a test client: this lane claims it first. Testing the client side now needs a second phone.
+
+**A note on how the tests in this area were fixed.** Three assertions had gone red for the wrong reason, each because a fixed `slice(at, at + N)` window stopped reaching the line it checked once a comment was added above it. Widening the number is the obvious fix and it is how the fourth failure gets ignored, so the windows were replaced with a `fnBody()` helper bounded by the next top-level declaration. A test that fails when the code is right is worse than no test.
+
+---
+
 ## 2026-09-06 · A conversation becomes a job when she says so, and not before
 
 **Founder:** *"What if i want to turn this person into a job, can i do that, be saying, attached a job to this, as i dont want it To attach automatically to every single question that's asked."*
