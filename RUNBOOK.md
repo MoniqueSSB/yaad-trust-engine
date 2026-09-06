@@ -4120,3 +4120,54 @@ Nothing this endpoint writes is public. `board_ok` is false on every row it
 creates and there is no input that can change it, so publishing to
 `app.yaadly.co.uk/jobs` stays a decision at the desk.
 
+
+---
+
+## 27. Somebody picked a trade or a parish on /marketplace and the job form asked again
+
+The "Trade and parish" card at the top of `docs/marketplace.html` sends both
+answers to `/jobs/new` as query parameters. `/jobs/new` checks each one against
+`web/lib/taxonomy.ts` and **silently drops anything that is not on the list**,
+because a hand-typed parameter must not be able to put an unknown trade on a
+job. There is deliberately no error: to the person it just looks like the form
+forgot.
+
+**Reproduce it before touching anything.** Open the link the card builds and
+look at the chips:
+
+```bash
+open "https://app.yaadly.co.uk/jobs/new?trade=Roofing&parish=Portland"
+```
+
+The trade chip should read `✓ Roofing` and the parish chip `✓ Portland`.
+
+**Almost always the cause is a display label sitting in a value attribute.**
+The taxonomy values are not the words on screen: it is `Painting &
+Decorating`, not `Painting`; `Drainage & Septic`, not `Drainage`; `Grille &
+Gate Welding`, not `Grille`; and `St Catherine`, not `St Catherine (incl.
+Portmore)`. All four of those wrong forms have been live at some point. Run
+the check that names the offender:
+
+```bash
+cd web && npm test -- --test-name-pattern="marketplace|two answers"
+```
+
+That reads `docs/marketplace.html` directly and fails with the bad value in
+the message. Fix the `value=` or the `href=` on the page, not the test.
+
+**If the values are right and it still does not prefill,** the parameter is
+not being read. `parish` is threaded through `web/app/jobs/new/page.tsx` into
+`PostJob.tsx` alongside `trade`; both go through `askedFor` in
+`web/lib/jobs/new-form.ts`. A new parameter added to the card without being
+added to `page.tsx` behaves exactly like a wrong value.
+
+**A saved draft wins over the link, and that is intended.** `restoreFields`
+runs on mount and only falls back to the query parameters for a field the
+draft left empty. Somebody who half filled the form yesterday and clicks a
+tile today keeps yesterday's answers. To tell the two apart, clear
+`localStorage` for the origin and reload.
+
+**The "outside our first parishes" note** shows for any parish that is not
+Kingston, St Andrew or St Catherine. That list is `LAUNCH_PARISHES`, and the
+copy of it in the page script is asserted against the real one by the same
+test file. It is a note, never a block: the job can still be posted.
