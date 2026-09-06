@@ -187,7 +187,9 @@ Booking link is `https://cal.com/yaadly/15min` everywhere. Not `cal.com/yaadly`.
 
 **"A person replies within one working day."** That is the promise. WhatsApp may be described as the fastest channel, but no page may promise "any time", "day or night", or "within 24 hours", because those are three different promises and one of them will be broken at 2am on a Sunday.
 
-Reports are delivered **within 72 hours of the visit**, and that must be written as a target with its condition attached, not as a bare statistic.
+**No page puts a timeline on a report.** The deliverable is described as a **written verdict**, and that is all. No turnaround time, no target, no comparative speed claim, anywhere a client reads it.
+
+This paragraph used to require the opposite: a 72 hour target with its condition attached. Founder instruction, 5 September 2026, removed it from the hero stat bar, the trail step and the Deposit Protection Check card on `services.html`, and from the service track in the client portal. A rule mandating the promise while the pages no longer make it is how the promise walks back on, so the rule was inverted in the same change rather than left standing.
 
 ---
 
