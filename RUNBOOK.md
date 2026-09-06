@@ -4395,3 +4395,84 @@ test file. It is a note, never a block: the job can still be posted.
 **Since 6 Sep 2026 `npm run typecheck` is immune to this**, because it runs against `web/tsconfig.typecheck.json`, which is `tsconfig.json` with build output excluded. If you are on that version and still see it, you are running bare `tsc` rather than the script, or something has put the `.next` globs back. Confirm which with `npx tsc --noEmit -p tsconfig.typecheck.json` from `web/`.
 
 **The first check on any "this module does not exist" error is whether it exists.** `git ls-files <path>` and `git log --oneline -- <path>`. If git can see it, do not delete the import. `rm -rf web/.next` and run the typecheck again.
+
+---
+
+## Somebody wants to join, change or leave the job alert list
+
+**The list is `job_alert_subscribers`. Being on it is permission to be told
+about work, never permission to quote.** Only a vetted worker can quote, and
+the desk shows which is which: People → Alert list, "vetted worker" or "lead".
+`can_quote` there is resolved live, so somebody who finishes vetting next month
+flips on their own with nothing to backfill.
+
+**To join, they message the Yaadly WhatsApp number.** `ALERTS` on its own is
+enough. The lane then asks two questions, trades and then parishes, and they
+answer in their own words: "plumbing, tiling and a likkle bit of masonry" and
+"Portmore and Kingston 8" both read correctly, because the answers go through
+`trade_key()` and `parish_key()`, the same normalisers the matcher uses. Saying
+`ANYWHERE` for parishes takes all fourteen.
+
+**Sending ALERTS again is also how somebody changes what they are on for.**
+There is no second command. Sending `STOP` takes them off.
+
+**Nothing is being sent to this list yet.** Joining is deliberately built cold.
+Alerting is `yaad-match`, which has no WhatsApp channel and nothing calling it
+when a job opens, both by design until the matcher is fixed.
+
+### They say they joined and they are not on the list
+
+Check what actually arrived, then what it was read as:
+
+```sql
+select phone, name, trades, trade_keys, parishes, parish_keys, listening, stopped_at
+from job_alert_subscribers order by created_at desc limit 20;
+```
+
+- **No row at all.** The opener was not recognised. `ALERTS_EXACT` in
+  `supabase/functions/yaad-inbound/job-alerts.ts` takes `ALERTS`, `alerts`,
+  `job alerts`, `start alerts` and `subscribe`. The looser phrasings
+  (`ALERTS_PHRASE`) are only acted on from a number with **no job conversation
+  already running**, on purpose, so a client asking about their own job is never
+  dragged into the worker lane. A tradesperson who has previously posted a job
+  from the same number therefore has to send the exact word.
+- **A row, `listening` false, empty arrays.** They joined and never answered the
+  two questions, or answered them with something nothing recognised. The lane
+  asks twice and then lets go rather than swallowing every later message. They
+  hear nothing until they send ALERTS again, which is correct, not a fault.
+- **A row with `stopped_at` set.** They sent STOP. Rejoining lifts it.
+
+### Taking somebody off by hand
+
+There is no button for this yet, deliberately: the desk is read-only on this
+table while the list is small. If somebody asks to come off by telephone:
+
+```sql
+select stop_job_alerts('18765550123');
+```
+
+Digits only, no plus. It returns `true` if they were on the list. **It does not
+delete the row**, and must not be changed to: "did this person ask us to stop"
+is a question you have to be able to answer years later, and a deleted row
+answers it with silence.
+
+### The consent, if it is ever questioned
+
+Every row carries `consent_words` (what they actually sent), `consent_at`, and
+`consent_version`. The version names the sentence they were shown in reply,
+which is `ALERT_TERMS` in `job-alerts.ts`. **Change that wording and bump
+`ALERT_CONSENT_VERSION` in the same commit.** A consent is worth exactly what
+the sentence that earned it said, and editing the copy without moving the
+version silently reinterprets everybody's existing answer as agreement to the
+new one. Same rule as `AI_CONSENT_VERSION` in `web/app/apply/JoinFlow.tsx`.
+
+### Proving the whole thing still holds
+
+```bash
+deno test --allow-read supabase/functions/yaad-inbound/
+```
+
+and `supabase/tests/job_alert_list_guards.sql` against the database, which
+checks eighteen things including that none of the four functions is reachable
+from the open internet and that the desk view still reads through row level
+security rather than round it.

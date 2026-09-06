@@ -8,6 +8,10 @@ import { pickJobChoice } from "./job-match.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
+import {
+  ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_EXACT, ALERTS_PHRASE, ALERTS_STOP,
+  ALERTS_MAX_TRIES, sayList,
+} from "./job-alerts.ts";
 import { FAQ_FACTS } from "./faq.ts";
 import { priceFigureGuard } from "./price-figures.ts";
 import { TRADES_PROMPT_LINE } from "./trades.ts";
@@ -2231,6 +2235,137 @@ Deno.serve(async (req: Request) => {
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
+
+      // ── the job alert list ──────────────────────────────────────────────
+      //
+      // Ahead of every other lane on purpose. A number joining the alert list
+      // is very often a complete stranger, and everything below this point
+      // assumes an inbound message is a client describing a job or a worker
+      // filing evidence. Neither is true here.
+      //
+      // ALERTS is the only verb. Sending it again is also how somebody changes
+      // what they are on for, so there is no second command to remember and no
+      // way to end up with a half-changed list.
+      //
+      // Nothing in this block sends an alert to anybody.
+      const alertsSession = sess && String((sess.answers as any)?._lane ?? "").startsWith("alerts_") ? sess : null;
+      const alertsSaid = msg.text.trim();
+
+      if (!deskHasThisNumber && alertsSaid) {
+        const endAlerts = () => supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+        const holdAlerts = (answers: Record<string, unknown>) =>
+          supabase.from("wa_intake_sessions").upsert({
+            wa_id: msg.from, answers, photo_count: 0, updated_at: new Date().toISOString(),
+          });
+
+        // STOP, answered with or without a session open. It falls through
+        // untouched when the number is not on the list, because "stop" from a
+        // client in the middle of their own job means something else entirely
+        // and must not be swallowed here.
+        if (ALERTS_STOP.test(alertsSaid)) {
+          const { data: wasOn } = await supabase.rpc("stop_job_alerts", { p_phone: msg.from });
+          if (wasOn === true) {
+            if (alertsSession) await endAlerts();
+            root.setAttributes({ "yaadly.alerts.outcome": "stopped" });
+            return twiml("Done. No more job alerts to this number. Any job you are already on carries on exactly as it was, nothing there changes. Send ALERTS if you ever want them back.");
+          }
+        }
+
+        if (alertsSession) {
+          const a = alertsSession.answers as Record<string, unknown>;
+          const askingTrades = String(a._lane) === "alerts_trades";
+          const tries = Number(a.tries ?? 0) + 1;
+
+          const { data, error } = await supabase.rpc(
+            askingTrades ? "set_job_alert_trades" : "set_job_alert_parishes",
+            { p_phone: msg.from, p_said: alertsSaid },
+          );
+          if (error) {
+            root.setAttributes({ "yaadly.alerts.outcome": "rpc_failed" });
+            return twiml("That did not save. Send it again in a moment and it will go through.");
+          }
+          const row = (Array.isArray(data) ? data[0] : data) as
+            { matched: string[]; unmatched: string[]; listening: boolean } | null;
+          const matched = row?.matched ?? [];
+          const unmatched = row?.unmatched ?? [];
+
+          if (!matched.length) {
+            // Nothing recognised. Ask again once, then let go. A lane that
+            // holds on forever would swallow every message this number sends
+            // afterwards, a real job description included, which is a far
+            // worse failure than not capturing somebody's trades first time.
+            if (tries >= ALERTS_MAX_TRIES) {
+              await endAlerts();
+              root.setAttributes({ "yaadly.alerts.outcome": "gave_up", "yaadly.alerts.step": String(a._lane) });
+              return twiml("I could not read that one either, so I will leave it there rather than keep asking. You are on the list, and nothing will reach you until we have your trades and your parishes. Send ALERTS whenever you have a minute and we will pick it up from the start.");
+            }
+            await holdAlerts({ ...a, tries });
+            root.setAttributes({ "yaadly.alerts.outcome": "not_understood", "yaadly.alerts.step": String(a._lane) });
+            return twiml(askingTrades
+              ? "I did not recognise a trade in that. Write them plainly, separated by commas, like: plumbing, tiling, roofing."
+              : "I did not recognise a parish in that. Write them separated by commas, like: St Catherine, Kingston. Or say ANYWHERE if you travel island wide.");
+          }
+
+          // Said out loud rather than silently dropped. Somebody who names a
+          // trade we do not route on has told us something true about
+          // themselves, and finding out months later that half their answer
+          // was ignored is how you lose them.
+          const dropped = unmatched.length
+            ? ` I could not place ${sayList(unmatched)}, so that part is not on there.`
+            : "";
+
+          if (askingTrades) {
+            await holdAlerts({ _lane: "alerts_parishes" });
+            root.setAttributes({ "yaadly.alerts.outcome": "trades_set", "yaadly.alerts.trades": matched.length });
+            return twiml(`Got it: ${sayList(matched)}.${dropped} Now the parishes. Which will you travel to? Separate them with commas, or say ANYWHERE if you go island wide.`);
+          }
+
+          await endAlerts();
+
+          // can_quote is the vetting gate resolved live, the same one
+          // match_workers_for_job applies. Being on the list is not being
+          // vetted, and the person is told that here, at the moment they join,
+          // rather than the first time a job they cannot take arrives.
+          const { data: sub } = await supabase
+            .from("v_job_alert_subscribers")
+            .select("trades,parishes,can_quote")
+            .eq("phone", msg.from.replace(/\D/g, ""))
+            .maybeSingle();
+          const appBase = Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk";
+          const onFor = sub?.trades?.length && sub?.parishes?.length
+            ? `, for ${sayList(sub.trades)} in ${sayList(sub.parishes)}`
+            : "";
+          root.setAttributes({ "yaadly.alerts.outcome": "joined", "yaadly.alerts.can_quote": sub?.can_quote === true });
+          return twiml(
+            `You are on the list${onFor}.${dropped} ${ALERT_TERMS}`
+            + (sub?.can_quote === true ? "" :
+               ` One thing worth knowing now rather than later: this means you hear about the work. Before you can quote for any of it you have to finish being checked, which is here: ${appBase}/apply`),
+          );
+        }
+
+        // Joining, or changing what they are on for. Both are ALERTS.
+        if (ALERTS_EXACT.test(alertsSaid) || (ALERTS_PHRASE.test(alertsSaid) && !prior)) {
+          const { data, error } = await supabase.rpc("subscribe_to_job_alerts", {
+            p_phone: msg.from,
+            p_words: alertsSaid,
+            p_version: ALERT_CONSENT_VERSION,
+            p_name: msg.name || null,
+          });
+          if (error) {
+            root.setAttributes({ "yaadly.alerts.outcome": "subscribe_failed" });
+            return twiml("That did not go through. Send ALERTS again in a moment.");
+          }
+          const row = (Array.isArray(data) ? data[0] : data) as
+            { already: boolean; listening: boolean; trades: string[]; parishes: string[] } | null;
+
+          await holdAlerts({ _lane: "alerts_trades" });
+          root.setAttributes({ "yaadly.alerts.outcome": row?.already ? "rejoined" : "subscribed" });
+
+          return twiml(row?.listening
+            ? `You are already on the list, for ${sayList(row.trades)} in ${sayList(row.parishes)}. To change that, tell me your trades now, separated by commas. Send STOP instead if you want to come off altogether.`
+            : `You are on the list. ${ALERT_TERMS} First, which trades do you take? Write them separated by commas, like: plumbing, tiling, roofing.`);
+        }
+      }
 
       // A worker answering the "send this draft, or write your own"
       // prompt. "1" means send exactly what was drafted; anything else

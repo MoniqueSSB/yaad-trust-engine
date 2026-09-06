@@ -1519,6 +1519,25 @@ const VIEWS = [
         call: deskUnpublishShowcase },
     ]},
 
+  { k:"alertlist", g:"People", label:"Alert list", icon:"phone",
+    title:"Job alert list", table:"v_job_alert_subscribers",
+    sub:"Everybody who asked to be told when a job opens. Being on this list is permission to be told, never permission to quote: only a vetted worker can do that. Somebody showing as a lead is the point rather than a fault, they heard about the work and have not finished being checked, and the alert they get says so. They joined by messaging ALERTS to the Yaadly WhatsApp number, which is what proves both the number and the consent. Nothing on this screen sends anything, and no alerts are being sent at all yet.",
+    select:"*",
+    order:"created_at", search:["phone","name","worker_email"],
+    empty:["Nobody on the list yet","A tradesperson who sends ALERTS to the WhatsApp number lands here."],
+    cols:[
+      {h:"Number", f:r => id_("+" + (r.phone || "")) + sub_(r.name || "no name given")},
+      {h:"Trades", f:r => (r.trades || []).length ? esc((r.trades || []).join(", ")) : mute_("not said yet")},
+      {h:"Parishes", f:r => (r.parishes || []).length ? esc((r.parishes || []).join(", ")) : mute_("not said yet")},
+      {h:"State", f:r => r.stopped_at ? chip_("crit", "stopped " + ago_(r.stopped_at) + " ago")
+                       : r.listening   ? chip_("ok", "listening")
+                       : chip_("warn", "joined, nothing chosen")},
+      {h:"Can quote", f:r => r.can_quote ? chip_("ok", "vetted worker") : chip_("warn", "lead")},
+      {h:"Worker", f:r => r.worker_email ? esc(r.worker_email) : mute_("no profile")},
+      {h:"Consent", f:r => esc(r.consent_version || "") + sub_(day_(r.consent_at))},
+      {h:"Joined", f:r => mute_(ago_(r.created_at))},
+    ]},
+
   { k:"clients", g:"People", label:"Clients", icon:"home",
     title:"Clients", table:"client_profiles",
     sub:"Score comes from workers who actually did their jobs. A first-timer shows as a first-timer, never as a low score they never earned.",
