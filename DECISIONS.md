@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · Materials become their own invoice, and the client can tick the order off
+
+**Founder: build the two things the workflow marked as not built, and make it live.** Both are done and both are applied to the live project.
+
+**Materials as their own invoice, raised and paid before anything is bought.** `raise_job_materials_invoice()` raises the materials portion on its own at `stage = 0`, so the money exists to release to the worker before he buys. It refuses a client-supplied job by name, a quote with no materials, and a second raise. `stage IS NULL` still means the whole-job bill, so the existing uniqueness test is untouched, and 1..n stay the per-stage fee invoices from `20260901v`.
+
+**The thing that must never happen is a double bill, and both directions are guarded.** Two documents can now carry the same materials figure. `raise_job_client_invoice()` was rewritten in full rather than patched, because it is a money function and a reader should see the whole thing in one place: it now drops its materials line and says so in its own notes when a live stage 0 document exists. The materials function refuses once the all-in bill has gone out. `supabase/tests/materials_invoice_guards.sql` asserts both directions, and that a job which never split still bills exactly as it did before.
+
+**Two things the invoice test rig has to do, both learned the hard way.** It sets `request.jwt.claims` to a real admin email for the block, because both functions are admin only and read `auth.jwt()`, and a service-role connection has no JWT at all: without it every call raises 28000 and a catch-all handler records PASS for a test that never ran, which is exactly the trap the route guards fell into the same day. And it records `invoice_seq` before the run and rewinds it after, because sequences do not roll back and testing would otherwise leave permanent gaps in a real business's invoice numbering. The rewind is guarded on the invoices table being back to its starting count, so it cannot rewind over a number something else took. Verified: seven passes, sequence back to 20, nothing left behind.
+
+**The client can now fill the order.** `MaterialsOrder` on the portal's materials tab shows the worker's list for the winning quote with a tick against each line, calling `mark_material_supplied()`. Ticking is offered only to the client and only on a client-supplied job; the worker sees the same rows read-only, which is the point: an outstanding line is visible to both sides, so a late start is never an argument about who was at fault. It renders above the store panel because on a client-supplied job it is the thing with something to do on it.
+
+**Not deployed by this session, and deliberately.** `yaad-quote-pack` and `yaad-quote-pack-check` carry the materials-route change from earlier today and are still running their old code. There is no Supabase CLI in this container, and §12 of `CLAUDE.md` forbids pasting function bodies into a deploy tool because that has silently shipped a different intake flow before. They need `supabase functions deploy` from disk, by hand.
+
 ## 2026-09-06 · The quote pack reads the materials route, so a worker stops getting a draft that contradicts his job
 
 **Found while mapping the workflow for the founder, and it was a gap the route change itself created.** `yaad-quote-pack` had no reference to `materials_by` at all. The pack is the worker's starting draft and it becomes his quote, so on a client-supplied job it could write scope, inclusions and payment stages assuming Yaadly buys the materials, and the worker would open a pre-filled draft that contradicted the job in front of him. Adding the route at posting without teaching the pack about it made the pack confidently wrong rather than merely silent.

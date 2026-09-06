@@ -11,6 +11,7 @@ import { VideoEvidenceUpload } from "@/components/portal/VideoEvidenceUpload";
 import { WalkthroughPanel } from "@/components/portal/WalkthroughPanel";
 import { ArrivalCheckIn } from "@/components/portal/ArrivalCheckIn";
 import { MaterialsStore } from "@/components/portal/MaterialsStore";
+import { MaterialsOrder, type MaterialLine } from "@/components/portal/MaterialsOrder";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
 import { PortalCard } from "@/components/portal/PortalCard";
@@ -162,7 +163,7 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
-  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }, { data: quotePackRow }, { data: materialsRows }] =
+  const [{ data: evidence }, { data: quotes }, { data: packs }, { data: msgRows }, { data: disputeRow }, { data: intakeRow }, { data: boardPhotos }, { data: arrivals }, { data: invoiceRows }, { data: quotePackRow }, { data: materialsRows }, { data: quoteMaterialRows }] =
     await Promise.all([
       supabase
         .from("evidence")
@@ -227,6 +228,14 @@ export default async function JobRoom({
         .select("amount_jmd,released_at,stage,receipt_ref")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
+      /* What the worker said the job needs, per quote. On a client-supplied
+         job this is the order the client fills and ticks off; on a Yaadly
+         supplied one it is what the money is released against. RLS returns
+         rows to the quote's own worker and the job's client only. */
+      supabase
+        .from("quote_materials")
+        .select("id,quote_id,item,qty,unit,supplied_at")
+        .order("sort", { ascending: true }),
     ]);
 
   const { data: myReview } = await supabase
@@ -503,6 +512,16 @@ export default async function JobRoom({
     .filter((m) => m.released_at)
     .reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
   const materialsQuoted = won?.materials_jmd ?? 0;
+
+  /* The worker's list of what the job needs, for the quote that won. Before a
+     quote is chosen there is no single list to show: every quote carries its
+     own, and rendering all of them would be four shopping lists for one job. */
+  const orderLines: MaterialLine[] = ((quoteMaterialRows ?? []) as {
+    id: string; quote_id: string; item: string; qty: number | null;
+    unit: string | null; supplied_at: string | null;
+  }[])
+    .filter((m) => won?.id && m.quote_id === won.id)
+    .map((m) => ({ id: m.id, item: m.item, qty: m.qty, unit: m.unit, supplied_at: m.supplied_at }));
   const isClient = role === "client";
   const otherSideLabel = isClient ? "The worker" : "The client";
 
@@ -1366,6 +1385,15 @@ export default async function JobRoom({
 
       {tab === "materials" && (
         <>
+      {/* The order comes first on this tab, because on a client-supplied job
+          it is the thing with something to do on it. The store question below
+          only applies where Yaadly is buying. */}
+      <MaterialsOrder
+        jobId={job.id}
+        lines={orderLines}
+        canTick={isClient && job.materials_by === "client"}
+      />
+
       <MaterialsStore
         jobId={job.id}
         role={role}
