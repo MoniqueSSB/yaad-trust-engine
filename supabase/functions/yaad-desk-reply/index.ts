@@ -187,7 +187,11 @@ Deno.serve(async (req: Request) => {
     // nothing gets sent to anybody.
     const q = `intake_threads?channel=eq.${encodeURIComponent(channel)}&from_addr=eq.${encodeURIComponent(fromAddr)}&select=job_id,transcript,turns,first_human_reply_at`;
     const tr = await db(req, q);
-    const rows = tr.ok ? await tr.json() as { job_id: string; transcript: string; turns: number; first_human_reply_at: string | null }[] : [];
+    // job_id is nullable from 6 September 2026: a conversation that is only a
+    // question never writes a job row, so the desk can be answering a thread
+    // that has no job behind it. The inserts below already coalesce it; this
+    // type was the last thing still claiming it could not be null.
+    const rows = tr.ok ? await tr.json() as { job_id: string | null; transcript: string; turns: number; first_human_reply_at: string | null }[] : [];
     if (!rows.length) return json({ error: "That conversation is not in intake_threads any more. Reload the desk." }, 404);
     const thread = rows[0];
 

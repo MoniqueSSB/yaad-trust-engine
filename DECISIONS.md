@@ -6,6 +6,134 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-06 · The client is told she cannot see their photographs, and a photograph is never just a question
+
+**Founder:** *"Add this as a note so the person is also aware i am unable to see photo before i started this conversation, if they want me to see photos they will have to send it to me when i respond to them."*
+
+**The gap she is describing is real and invisible from inside the conversation.** She answers from a phone, out of an alert that carries text. The client's photographs are in the `intake` bucket and on the job, where the desk and a worker can see them and she cannot. Neither she nor the client has any way of knowing that, so a client who sent a photo of a cracked wall reasonably assumes the person now replying has looked at it.
+
+**One sentence, in her voice, on her first reply, and only when photographs exist.** `first_human_reply_at` is already read two lines further down for the reply clock, so "has a person answered here before" is the same fact asked twice rather than new state. Repeating it on every message would read as a system talking over her.
+
+**Appended, never woven in, and she is told.** Her words go out exactly as typed; the note is a separate sentence after them and the confirmation says it was added. A guard that silently edits the named human's own message is worse than no guard, and this codebase has already paid for one silent editor.
+
+**All four paths carry the same words**, asserted by a test: the send, the queue for outside Meta's 24 hour window, the website chat insert, and the transcript. A transcript missing the appended sentence would leave a client quoting something back with no trace of it, which is the exact failure the transcript recording was built to prevent.
+
+**A photograph is never just a question, found while building the above.** `job_photos` has no foreign key to `jobs`. This afternoon's rule wrote no job row for a conversation the classifier read as a question, and `keepMedia` still ran with the job id minted for that turn, which was never written, and a fresh id is minted on every turn of a jobless thread. So a photo sent during a question conversation reached the bucket and its row pointed at nothing, scattered across as many ids as there were turns. Nothing failed, nothing logged, and the photo was simply unfindable.
+
+The fix is to force a job when real photographs arrive, rather than to patch the orphan afterwards, because it is also the right answer on its own terms: somebody who photographs a wall is showing you a property, not asking how the service works, and a photograph is the single most useful thing a client can hand a worker. Audio is excluded, because a voice note is how a question arrives rather than evidence of one.
+
+---
+
+## 2026-09-06 · She answers a client from her own WhatsApp, and that lane may only send a message
+
+**Founder:** *"make everything in whatsapp."* The alert already reached her WhatsApp with the client's own words in it. This is the other half: she replies in the same thread, on the same phone, and it goes to the client from the Yaadly number.
+
+**A message from `desk_phone` is claimed before every other lane**, because every lane below it reads an inbound message as a client describing a job. Without that placement her reply becomes a stranger describing work, and the assistant answers her.
+
+**What authenticates it is the sending number and nothing else, and that is the whole design constraint.** Twilio's signature proves the request came from Twilio, and WhatsApp reports the sender. That is a weaker gate than the desk, which is Cloudflare Access plus `is_admin()` plus RLS. So the mitigation is structural rather than procedural: **this lane can only ever send a message.** It cannot approve a stage, release a payable, publish a worker, book a worker or change a job, and `desk-reply-lane_test.ts` asserts that by naming each one. A message that goes wrong can be corrected in the next message; a released payable cannot. Everything consequential stays where a person is signed in, which is CLAUDE.md §2 doing exactly the job it was written for.
+
+**Routing, without asking her to remember a code.** The one thing she cannot see from a phone is which conversation a bare reply would land in, so every alert that names a conversation records it as the one her phone is on, and a plain reply goes there. Starting a message with a number moves it and the rest of the line is the message; `who` reads it back. The target lives in `wa_intake_sessions`, which is already the "what is this number in the middle of" table, under a `desk:` prefixed key so it can never collide with a worker session on the same number. Both sides derive that key through `digitsOf()`, and a test asserts they agree, because if they ever drift every bare reply answers "I do not know who that is for" and nothing in the logs says why.
+
+**Her words go out exactly as typed**, the same promise the desk's own reply button makes. No model touches them: they are her words going to a client under Yaadly's name, and a guardrail screen over the named human's own sentence would be the machine second-guessing the person the rule exists to protect. Recorded on the transcript as `Yaadly (from the desk):`, the thread claimed so the assistant stands down, and the reply clock stamped once and never overwritten, all identical to `yaad-desk-reply` so the two cannot drift into meaning different things.
+
+**Text only, and it says so to her face.** Sending a client a photograph from a lane with no preview is a different decision and it has not been taken. Outside Meta's 24 hour window her words are queued into the same `pending_desk_replies` table the desk uses and flushed when the client writes back, so a reply is never silently lost.
+
+**The accepted cost, stated because she will hit it.** Her own number can no longer act as a test client: this lane claims it first. Testing the client side now needs a second phone.
+
+**A note on how the tests in this area were fixed.** Three assertions had gone red for the wrong reason, each because a fixed `slice(at, at + N)` window stopped reaching the line it checked once a comment was added above it. Widening the number is the obvious fix and it is how the fourth failure gets ignored, so the windows were replaced with a `fnBody()` helper bounded by the next top-level declaration. A test that fails when the code is right is worse than no test.
+
+---
+
+## 2026-09-06 · A question that reaches a person still is not a job
+
+**Founder, reading her own WhatsApp while testing it:** *"yES IT WORKED, BUT IT HAD A JOB CODE, JOB-WA-1788699164893".*
+
+**Handing over forced a job row for about four hours that afternoon**, on my reasoning that a person taking a conversation over needs something to open, and that a reference with no row behind it is worse than no reference. Both halves were wrong, and the second was checkable.
+
+Somebody who asks a question and then asks for a person has not got a job. Minting one so that a notification has something to quote is the tail wagging the dog, and it quietly contradicted her own decision from earlier the same afternoon that a question writes no row at all.
+
+**The claim that a person needs a job to open was simply untrue.** The desk's Conversations view is keyed on `channel` and `from_addr`, not on a job, and renders "no job yet" for a thread without one. `v_waiting_on_you` (migration `20260904q`) selects `from public.intake_threads` with no join to `jobs` anywhere in it. So a person taking one of these over already has the whole conversation, found by the number it came from, which is exactly how she found this one. I had reasoned about the schema instead of reading it.
+
+**What followed from the fix.** `writeJob` is now `!!priorJobId || !justAsking`, and a single `reference` constant decides whether a code may be spoken at all, so a new reply cannot quote one that resolves to nothing. Six client-facing sentences were changed to read it rather than `jobId`. The alerts stopped opening with a code as well: it is the least useful thing in the message, and where a job really exists it is named once, at the end.
+
+---
+
+## 2026-09-06 · A conversation becomes a job when she says so, and not before
+
+**Founder:** *"What if i want to turn this person into a job, can i do that, be saying, attached a job to this, as i dont want it To attach automatically to every single question that's asked."*
+
+**The second half was already true by the time she asked**, which is the point of it: a message the classifier reads as a question, with no scope, trade or parish in it, writes no job row. This is the missing half. Until now the only way to promote a question was to wait for the client to describe the work again on a later turn so the classifier would catch it, which is asking somebody to repeat themselves so a machine can notice. That is the same failure the whole day has been about.
+
+**`attach_job_to_thread(channel, from_addr)`, admin gated, idempotent.** Two taps or two people must not produce two jobs for one conversation, so a thread that already has one gets that id back rather than a second row. It lives in Postgres rather than in the desk's JavaScript for the reason every rule in this schema does: it then holds for anything else that ever needs it, not only for whoever is looking at that page.
+
+**It classifies nothing, deliberately.** No trade, no parish, no urgency, no access note. The transcript is carried into `descr` verbatim with a line saying a person attached this and nothing in it was read by a model. Guessing a trade from an unread conversation puts a job in front of the wrong workers; guessing a parish is the first step of the exact pricing problem the business exists to end (CLAUDE.md §5). The desk writes the brief from their own words.
+
+**A button, not a heuristic, and that is CLAUDE.md §2 rather than a preference.** Deciding that somebody's question is now a job they will be quoted for is a consequential step, so a named human takes it. There is no confidence score and no automatic promotion, and adding one later would be the request §3 exists to refuse.
+
+**A dry run against the live schema found something before it shipped.** The insert was rehearsed inside a transaction that raised at the end so it rolled back, and the row came back `awaiting_client_setup` when `'draft'` had been passed. `sync_job_status` owns that column: with no worker, `open` false, and a client not cleared for go-live, that is where it lands, and it is where every job created by intake lands too. Nothing was wrong with the function; the button's own help text was wrong, and it was corrected to say what the desk will actually see rather than what I assumed. Worth recording because the temptation was to write the copy from the code I had just written rather than from the row the database actually produced.
+
+---
+
+## 2026-09-06 · The alert reaches her own WhatsApp, and only when she has to act
+
+**Founder:** *"a message needs to reach me on my phone than in the desk. But I'm not on the desk all the time."* I offered four routes with a data protection argument and she chose SMS. Then, reading it back: *"why sms WHEN I HAVE TO ANSWER BACK IN WHATSAPP. make everything in whatsapp."* Then, with her own number: *"send all the message that ask for an human or to speak to Monique to 07767171858."*
+
+**She was right and the SMS build was wrong, so it was deleted rather than kept as a fallback.** My reasoning for SMS was that Twilio already carries every one of these messages, so texting adds no new company holding a client's words, where ntfy.sh is a public relay whose topic name is the only thing between a stranger and everything. That argument was sound and it was answering the wrong question. WhatsApp is *also* Twilio, on the sender Yaadly already owns, so it satisfies the same data test at zero cost, needs no number bought, and lands in the app she is going to reply in anyway. An alert on one channel and the reply on another is a context switch on every single message, and I had priced the data question and not that one. The SMS route also required an SMS capable Twilio number that did not exist on the account, so the version I shipped an hour earlier could not have sent anything at all.
+
+**Only five notifications reach her, which is the half of this that will age best.** Somebody asking for a person, nothing being able to answer them, a held thread writing again, a job that would not save, and a reply held back by the language screen. Everything else stays push only. Every message from every stranger is how a phone gets muted, and a muted phone loses a real job later. The rule lives at each call site as `alsoText` rather than as a condition inside `pushToDesk`, so adding a notification means deciding this on purpose instead of inheriting it.
+
+**One of the five deliberately carries no client words.** A reply held back by the guardrail screen is a blocked *draft*, which the model wrote, and `alertDeskBlocked` has always sent only its fixed closed set of guidance strings. The client is still waiting, so she is still alerted; what she is not sent is a sentence Yaadly refused to say.
+
+**The one real limit is Meta's 24 hour window, and it is stated rather than engineered around.** WhatsApp carries a freeform message to her only within 24 hours of her last message to the Yaadly number, exactly as it does for a client. Replying to an alert reopens it, so an active day looks after itself and a quiet week does not. `sendWhatsAppTo` returns false when Twilio refuses and that is logged loudly, because from her side the failure is invisible: a number set, an expectation of messages, nothing arriving. The ntfy push fires either way, so nothing is ever only in this channel. Making it unconditional means a Meta approved template, which this account has done three times already, so the path is known and it is an approval queue rather than an afternoon.
+
+**What this does not do, stated so nobody assumes it.** Replying from her own WhatsApp does not route back to the client. The alert tells her what was said; the answer still goes from the desk, which does work in a phone browser. Recognising a message from `desk_phone` as Monique rather than as a client, and routing her words into the right conversation, is a separate build with a real question in it: her reply is Yaadly speaking to a client, and the only thing authenticating it would be the sending number.
+
+---
+
+## 2026-09-06 · Every phone push opens the desk, and an urgent one says why
+
+**Founder, the same evening:** *"how am I being informed people need help, I should get a notification on my phone stating to check the dashboard."*
+
+**She was already being told, five different ways, and none of them went anywhere.** `yaad-inbound` had five separate `fetch` calls to ntfy: first message on a thread, handed to a person, job finished, they wrote again while held, a reply blocked by the language screen, and a job row that would not write. Every one of them arrived on her phone and then stopped, because `desk_url` had been sitting in `app_settings` since the beginning, read by the admin summary EMAIL and by nothing else. So the notification said something was waiting and the only way to act on it was to put the phone down and find a laptop. ntfy carries a `Click` header for exactly this and it was never set. That is the whole of the complaint, and it was one header.
+
+**They became one function rather than a sixth copy.** `pushToDesk()` reads `ntfy_topic` and `desk_url` together, sets `Click`, and every caller goes through it. Five copies had already drifted in tone and priority and the next one would have drifted further; more to the point, the failure being fixed is a push that cannot be tapped, so the link belongs in the one place no caller can forget it. `asking_test.ts` asserts there is exactly one `fetch` to ntfy in the file.
+
+**Nothing about the conversation travels in that link, and the test asserts that too.** The desk URL is the same string every time, no job id, no number, no name. A notification sits on a lock screen in public, and the desk is behind Cloudflare Access regardless, so a per-conversation deep link would leak more than it saved.
+
+**The urgent push was one sentence describing three different situations.** `handingOver` fires when the client asks for a person, when neither model could produce a reply, when the assistant is paused at the desk, and when three turns have gone by without it becoming clear. The body always said the last one: *"N messages and still not clear."* So somebody typing "can I speak to a person" generated a notification telling Monique their message was unclear, and so did somebody whose reply failed because two models were rate limited. Both false, on the single most important notification this system sends. Each reason now says what it is, and each still names the reference so the push can be acted on from the lock screen.
+
+**One notification changed meaning rather than wording.** The push for a question, written earlier the same day, ended "No job, nothing for you to do." That was written to defend the job list from clutter and it read as "ignore this". A question from a stranger is the top of the funnel and she had just asked to be told about it, so it names where to read it instead of dismissing it.
+
+**A bug of this session's own making, caught before it ran.** Making `intake_threads.job_id` nullable that afternoon put `String(prior.job_id)` on the held-thread path into reach of a null, and `String(null)` is the string `"null"`. Replying from the desk sets `human_handling` and never touches `job_id`, so the moment she answered somebody who had only asked a question, that thread was held with no job: the next message from them would have filed any photograph against a job id of `"null"` and failed the foreign key, and pushed `null: waiting on you` to her phone. It is `s()` now, media is only kept when there is a job to hang it on, and the push omits the reference rather than inventing one. It was on the exact path she was about to test.
+
+---
+
+## 2026-09-06 · The writer runs whether or not the classifier did, and a question is not a job
+
+**Found by the founder sending one real voice note to the Yaadly number, for the second time in two days.** Her words back from her: *"the WhatsApp voice note feature is not working"*, and separately, *"People should be able to contact me on WhatsApp and get help. Not only just load a job."* The two turned out to be one root cause.
+
+**The voice note worked.** This is the part worth stating first, because a day was nearly spent fixing the wrong thing. Whisper transcribed it correctly and the words are in `intake_threads` verbatim: *"I want some work done in my property as there is a leak in the back room in Portmore."* She said the work, the room and the parish. Yaadly then asked her what needs doing, which parish the property is in, and who can let a worker in. The 5 September fix in the entry below this one held: the transcript was kept and reached the pipeline. What failed was everything after it.
+
+**The chain, from the edge logs at 12:52 that day.** The classifier called Mistral, got `429`, waited its retry, got `429` again, failed over to MiniMax and blew its `AbortSignal` at 12:52:44.893 with `classify: threw: TimeoutError`. It returned `null`. The caller read that null as "no card, so nothing to write about" and never ran the writer at all, because the line said `let written = card ? await composeReply(...) : ""`. With no writer output and no card, `replyFromCard` could not run either, and the code fell through to the fixed opener written for a message with no readable content in it.
+
+**The degradation ladder had a rung missing, and it was designed in.** `deadline.ts` and its comments are explicit that the writer is the step to drop under pressure, because it "degrades into something usable on its own (reply-from-card.ts)". True, and only true when there is a card. When the *classifier* is the thing that fails, the fallback the design leans on does not exist and the writer has already been skipped for having nothing to write about. The writer never needed the card: it is handed the entire conversation, and the card only fills an "already understood" block that has always had "nothing understood yet" as its empty case. So `composeReply` now takes `IntakeCard | null` and is called unconditionally. A failed extraction is a thinner job row for a person to finish; a skipped reply is a client ignored. The code was treating those as the same size of loss.
+
+**Underneath it was a plain arithmetic bug that guaranteed the failure.** The writer asks for `deadline.signal(4_000, 1_500, 1_200)`, so it refuses to start with less than 2,700ms left. The classifier was reserving 2,500. A classifier that ran to its full deadline therefore *guaranteed* the writer was skipped, every time, by two hundred milliseconds. Neither number was unreasonable on its own and nobody had ever read them next to each other. The classifier's reserve is now 5,500, the writer's want plus the writer's own reserve, so what is left behind is enough for a good reply rather than merely enough to start one and fail. The cost is that the classifier is now the first thing dropped when a request runs late, which is the right way round. `two-calls_test.ts` asserts the *relationship* rather than the numbers, so it stays true if either step is retuned.
+
+**The transcription retry moved to where the bytes already are.** The logs show `yaad-transcribe` invoked twice for that one note, 2,193ms and 2,479ms. The first came back empty and the second returned the words, so the retry earned its place: without it there would have been no transcript at all. What it did not earn is the cost. The two attempts were two separate calls from the handler's two call sites, and each fetched the same audio from Twilio again first, because an empty transcription leaves `msg.text` empty and every `if (!msg.text)` guard therefore stays open. 5.7 seconds of a 12 second budget for one short voice note, most of it re-downloading a file already in memory. The retry now lives inside `transcribeUrl`, on bytes it holds, and the caller sets `msg.transcribeTried` *before* the attempt so an empty result cannot reopen the next guard. Why the first attempt comes back empty at all is not settled and is deliberately not guessed at here: the Cloudflare Whisper leg of the failover chain can return an empty transcript rather than an error, and chasing that is a provider question, which is Monique's under CLAUDE.md §10.
+
+**Then the second complaint, which is the same assumption one layer up.** Everything below the classifier was built as though an inbound message is work being described. `COMPOSE_SYSTEM` has always had good instructions for greetings, price questions, safety questions and messages that are not about property at all, and then the STATE it was handed was always `gathering`, whose brief opens "ask for AT MOST TWO missing things". So the prompt knew how to help and the state machine would not let it. `how do you choose workers` became a draft job titled "Someone writing in on whatsapp", with a reference number and an admin email whose subject line began "New job". There is one in the database from that morning.
+
+**What was built.** The classifier gains one field, `asking`, explicitly documented as compatible with the job fields, because "my roof is leaking in Portland, how does this work" is both. The writer gains `STATE helping`, told to answer and told in as many words not to ask for a parish. `STATE gathering` gains an override telling it to ignore its own state and help instead when the conversation contains no described work, and that override is the part that matters: it is what makes this survive a failed classification, which is the failure that produced the same day's other bug.
+
+**Founder's two decisions, taken by her.** A question-asker keeps being answered and is never pushed at a person on the third turn; they reach one when they ask, which `wantsAPerson()` catches as a word match as well as a model read, or when nothing can answer them. And a question writes **no job row at all**, which needed `intake_threads.job_id` to stop being `NOT NULL`, since until then a conversation could not physically exist without a job. `web_chat_replies.job_id` came with it: `yaad-desk-reply` inserts `thread.job_id` there with no coalesce, so the first website question she answered from the desk would have failed `23502` and told her only "Could not save the reply".
+
+**Three consequences worth keeping in view.** `justAsking` is deliberately narrow, requiring the classifier to have positively said so *and* scope, trade and parish to all be empty, because its consequences are suppressive and must never fire on a guess. ~~`handingOver` forces the job row regardless, so every reference this file ever speaks aloud has a row behind it and a person taking over has something to open.~~ **That held for about four hours and was wrong; corrected the same evening, see "A question that reaches a person still is not a job" below.** And `writerState` is not the same value as `stage`: the thread keeps recording `gathering`, which is true and which its check constraint requires, while the writer is told `helping`. Widening a database constraint to carry a hint for a prompt would be the tail wagging the dog.
+
+**None of this touches §2 or §3.** No human gate moved. Nothing auto-releases, nothing is adjudicated, no price is quoted, and the banned-language screen, the promise stripper and the price-figure guard all still run on the same output path they always did. The new fixed strings were run through all three before they shipped.
+
+---
+
 ## 2026-09-06 · A photograph is attached on the job form itself, and there is now an anonymous door into the intake bucket
 
 **Founder instruction, in her own words: "it should be in the form to attach a photo and it be included on the job card, the only way i want it do."** The link added earlier the same day was not the answer. It still sent somebody who already had the picture on the phone in their hand away from a half finished form, to a portal that asks for an email first. So `/jobs/new` now has a file picker on stage four, and what it picks lands on the job before anything else is sent.
