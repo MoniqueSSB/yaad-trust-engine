@@ -1195,3 +1195,15 @@ Applies to short jobs taken on manual capture (authorise at booking, capture on 
 **Quotes already in were priced against the old wording.** The form tells the client that. If a change is big enough to move the price, message the workers who quoted; nothing does that automatically.
 
 **"Only the client of this job can change its description" / "A worker is booked on this job":** those are `edit_job_descr_as_me()` (20260903a) refusing, in words, and both are correct. The first means the signed-in email is not the job's `client_email`; the second is the rule above. There is no override in the portal on purpose.
+
+---
+
+## `npm run typecheck` fails on a module that plainly exists
+
+**If tsc reports `TS2307: Cannot find module` for a file you can see on disk and `git ls-files` says is tracked, the errors are almost certainly coming out of `web/.next`, not out of your code.** `next dev` and `next build` write route validators under `.next/types` and `.next/dev/types` that import every route as a `.js` path. A `.next` left behind by a different branch names that branch's routes, which do not exist on yours, so tsc reports a missing module for each one. The modules it names are real. They belong to somebody else's build.
+
+**This tree collects foreign build output as a matter of course.** Worktrees get recycled and reused, sessions run in parallel (CLAUDE.md 12), and `.next` is gitignored, so a branch switch or a recycle carries it over untouched while git reports the tree clean. Caught live on 6 Sep 2026: a report said `web/components/portal/JobPhotoUpload.tsx` had never been committed and the import should be deleted. The file had been committed on 30 Aug in `a4f8db7`, was present on `main`, and was on disk the whole time. The failing typecheck came from a `.next` built forty minutes earlier by a different branch, naming eight routes this branch has never had.
+
+**Since 6 Sep 2026 `npm run typecheck` is immune to this**, because it runs against `web/tsconfig.typecheck.json`, which is `tsconfig.json` with build output excluded. If you are on that version and still see it, you are running bare `tsc` rather than the script, or something has put the `.next` globs back. Confirm which with `npx tsc --noEmit -p tsconfig.typecheck.json` from `web/`.
+
+**The first check on any "this module does not exist" error is whether it exists.** `git ls-files <path>` and `git log --oneline -- <path>`. If git can see it, do not delete the import. `rm -rf web/.next` and run the typecheck again.
