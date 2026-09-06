@@ -189,7 +189,7 @@ Deno.test("there is one push path, and it carries the link", () => {
   assert(body.includes('headers.Click = cfg.desk_url'),
     "the push no longer sets ntfy's Click header, so tapping the notification " +
     "does nothing, which is the entire complaint this was built for");
-  assert(/\.in\("key", \["ntfy_topic", "desk_url"\]\)/.test(body),
+  assert(/readSettings\(supabase, \["ntfy_topic", "desk_url"\]\)/.test(body),
     "pushToDesk is no longer reading desk_url alongside the topic");
   assert(body.includes("if (!cfg.ntfy_topic) return;"),
     "pushToDesk no longer bails out when no topic is configured");
@@ -254,4 +254,26 @@ Deno.test("a held thread with no job does not push the word null", () => {
     "the held thread is writing an empty string where the column wants null");
   assert(body.includes("heldJobId ? `${heldJobId}: ` : \"\""),
     "the held push prints a reference even when there is no job behind it");
+});
+
+Deno.test("a setting is not trusted to have been written cleanly", () => {
+  // Found live, 6 September 2026: desk_url was the 32 character string
+  // `"https://concierge.yaadly.co.uk"`, quote marks included. Not a URL. It
+  // had been breaking the "Open the desk" button in every admin email, which
+  // renders as href=""https://..."", and it would have broken the tap-to-open
+  // notification shipped an hour earlier the same evening.
+  //
+  // yaad-enquiry had already found this, named desk_url in a comment, and
+  // stripped the quotes in its own copy. The two places that actually read
+  // desk_url kept reading it raw.
+  const at = src.indexOf("async function readSettings(");
+  assert(at > 0, "readSettings is gone, so the settings readers can drift apart again");
+  const body = src.slice(at, at + 400);
+  assert(/replace\(\/\^"\(\.\*\)"\$\/, "\$1"\)/.test(body),
+    "readSettings no longer strips a surrounding pair of quotes, so a value " +
+    "written as JSON breaks every link built from it");
+  // Both readers go through it. A raw read is how this came back last time.
+  assertEquals(src.match(/from\("app_settings"\)\s*\n?\s*\.select\("key,value"\)/g)?.length, 1,
+    "app_settings is being read outside readSettings, so one of the readers " +
+    "will trust a value the other one knows better than to trust");
 });

@@ -1272,6 +1272,31 @@ type SettingsReader = {
   };
 };
 
+/** Read app_settings, and do not trust how the value was written.
+ *
+ *  Some rows in this table were written as JSON and carry their quotes. On
+ *  6 September 2026 `desk_url` was, live, the 32 character string
+ *  `"https://concierge.yaadly.co.uk"`, quote marks included. That is not a URL.
+ *  It had been silently breaking the "Open the desk" button in every admin
+ *  email, which renders as `href=""https://..."`, and it would have broken the
+ *  tap-to-open notification shipped an hour earlier the same evening.
+ *
+ *  `yaad-enquiry` already found this, wrote a comment naming `desk_url` as the
+ *  offender, and stripped the quotes in its own copy. The two places that
+ *  actually read `desk_url` kept reading it raw. So the lesson was learned,
+ *  written down, and applied to the one function that did not need it. One
+ *  reader here for the same reason pushToDesk exists: a rule applied in some
+ *  of the places is a rule that will be missed in the next one.
+ *
+ *  The stored value was cleaned at the same time. This strip is the belt: the
+ *  Settings view on the desk writes whatever is typed into it, so somebody
+ *  pasting a quoted URL back in should not silently break the notifications. */
+async function readSettings(supabase: SettingsReader, keys: string[]): Promise<Record<string, string>> {
+  const { data: rows } = await supabase.from("app_settings").select("key,value").in("key", keys);
+  return Object.fromEntries((rows ?? []).map((r) =>
+    [r.key, String(r.value ?? "").trim().replace(/^"(.*)"$/, "$1")]));
+}
+
 /** Every phone push goes through here, and every one of them opens the desk.
  *
  *  Founder, 6 September 2026: "how am I being informed people need help, I
@@ -1298,9 +1323,7 @@ async function pushToDesk(
   trace: Trace,
 ): Promise<void> {
   try {
-    const { data: rows } = await supabase.from("app_settings")
-      .select("key,value").in("key", ["ntfy_topic", "desk_url"]);
-    const cfg = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
+    const cfg = await readSettings(supabase, ["ntfy_topic", "desk_url"]);
     if (!cfg.ntfy_topic) return;
     await trace.span("ntfy.push", SpanKind.CLIENT, {
       "server.address": "ntfy.sh", "yaadly.push.linked": !!cfg.desk_url,
@@ -1333,9 +1356,7 @@ async function notifyAdmin(
   const key = Deno.env.get("RESEND_API_KEY") ?? "";
   if (!key) return;
   try {
-    const { data: rows } = await supabase.from("app_settings")
-      .select("key,value").in("key", ["admin_email", "desk_url"]);
-    const cfg = Object.fromEntries((rows ?? []).map((r) => [r.key, r.value]));
+    const cfg = await readSettings(supabase, ["admin_email", "desk_url"]);
     const to = cfg.admin_email;
     if (!to) return;
     const desk = cfg.desk_url ?? "";
