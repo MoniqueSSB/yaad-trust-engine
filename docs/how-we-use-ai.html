@@ -14,12 +14,16 @@
 <link rel="stylesheet" href="nav.css?v=2">
 <style>
 /* How we use AI. Implemented 6 September 2026 from the Claude Design file
-   "How We Use AI.dc.html". The design's tokens are the site's own (Fraunces,
-   IBM Plex, the purple to amber gradient), so nothing here redefines a
-   colour or a font; it reads the variables yaadly.css already declares.
-   Three deliberate departures from the design file, all recorded in
-   DECISIONS.md: the real site nav and footer are kept, every turnaround
-   figure is left out, and no illustration shows an invented price. */
+   "How We Use AI.dc.html", then revised the same day from that file's second
+   pass. The design's tokens are the site's own (Fraunces, IBM Plex, the
+   purple to amber gradient), so nothing here redefines a colour or a font;
+   it reads the variables yaadly.css already declares.
+   Departures from the design file, all recorded in DECISIONS.md: the real
+   site nav and footer are kept, every turnaround figure is left out, no
+   illustration shows an invented price, and two things the second pass
+   deletes are kept on Monique's instruction, the M1 to M7 and P1 to P6
+   columns (the homepage's four named assistants cite them) and the
+   paragraph under each of the five proofs. */
 .ai{--ai-line:rgba(155,115,245,0.14);--ai-line2:rgba(155,115,245,0.28);--ai-panel:linear-gradient(180deg,rgba(19,19,50,0.75),rgba(12,12,38,0.6));--ai-panel2:linear-gradient(180deg,rgba(19,19,50,0.9),rgba(12,12,38,0.75));--ai-deep:rgba(7,7,26,0.7);--ai-faint:#44446A;--ai-amber:#FBBF24;--ai-green:#34D399;--ai-mute:#7878A8}
 .ai .wrap{max-width:1200px;margin:0 auto;padding:0 32px}
 .ai .kick-m{font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ai-faint);margin-bottom:12px}
@@ -40,29 +44,11 @@
 .ai-hero .lead{margin:24px 0 0;font-size:18px;color:var(--ai-mute);max-width:52ch;text-wrap:pretty}
 .ai-hero .lead b{color:var(--ink);font-weight:600}
 .ai-hero .ctas{display:flex;gap:14px;margin-top:34px;flex-wrap:wrap}
-.thread{background:var(--ai-panel2);border:1px solid var(--ai-line);border-radius:22px;padding:22px 22px 18px;box-shadow:inset 0 1px 0 rgba(238,238,255,0.04)}
-.thread .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ai-faint)}
-.thread .hd span:last-child{letter-spacing:0;font-weight:500;font-size:10.5px;text-transform:none}
-.thread .msgs{display:flex;flex-direction:column;gap:12px}
-.thread .m{display:flex;gap:10px;align-items:flex-start;animation:yFadeUp .6s ease both}
-.thread .m.r{flex-direction:row-reverse}
-.thread .t{font:600 11px var(--mono);color:var(--ai-mute);min-width:44px;padding-top:6px}
-.thread .m.r .t{text-align:right;color:var(--tealb)}
-.thread .m.p .t{color:var(--ai-amber)}
-.thread .b{background:rgba(155,115,245,0.09);border:1px solid var(--ai-line);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:14px;color:var(--ink);max-width:36ch}
-.thread .m.r .b{background:rgba(13,13,40,0.92);border-color:var(--ai-line2);border-radius:14px 14px 4px 14px}
-.thread .m.p .b{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.3)}
-.thread .who{display:block;font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--tealb);margin-bottom:4px}
-.thread .m.p .who{color:var(--ai-amber)}
-.thread .vn{display:inline-flex;align-items:center;gap:5px;color:var(--ai-mute);font:500 12px var(--mono);vertical-align:middle}
-.thread .vn svg{width:13px;height:13px;stroke:var(--ai-mute);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.thread .log{font:500 10.5px var(--mono);color:var(--ai-faint);padding-left:54px;animation:yFadeUp .6s ease 1.7s both}
-.thread .log em{font-style:normal;color:rgba(196,170,255,.62)}
-.thread .cur{display:inline-block;width:6px;height:11px;background:var(--teal);margin-left:4px;vertical-align:-2px;animation:yBlink 1s steps(1) infinite}
-.thread .sun{display:flex;gap:10px;align-items:center;justify-content:center;margin:2px 0;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-amber);animation:yFadeUp .6s ease 2.1s both}
-.thread .sun i{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(245,158,11,.4),transparent)}
-.thread .ft{margin-top:16px;padding-top:14px;border-top:1px solid var(--ai-line);display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--ai-mute)}
-.thread .ft b{color:var(--ink)}
+/* hero panel: one day seen from Kingston */
+.hpanel{position:relative;padding:46px 18px 20px;min-height:262px;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:inset 0 1px 0 rgba(238,238,255,0.04)}
+.hpanel .lbl{position:absolute;top:16px;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-faint)}
+.hpanel .lbl.l{left:20px}.hpanel .lbl.r{right:20px}
+.hpanel .arc{position:static;width:100%;max-width:400px;height:auto;overflow:visible;animation:yFadeUp .7s ease both}
 
 /* three lines */
 .three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:40px 0 64px}
@@ -189,7 +175,6 @@
 .lc h3{font-family:var(--disp);font-weight:300;font-size:26px;letter-spacing:-0.015em;line-height:1.1;margin:0}
 .lc .four{margin-left:auto;font-family:var(--disp);font-weight:200;font-size:72px;line-height:1;color:rgba(196,170,255,0.35)}
 .lc .strike{font-family:var(--disp);font-weight:200;font-size:72px;line-height:1;letter-spacing:-0.03em;color:var(--ai-amber);text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:rgba(245,158,11,.8)}
-.lc .sub{font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-mute);margin:6px 0 16px}
 .lc p{font-size:15px;color:var(--ai-mute);margin:0}
 .lc .ref{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--ai-line);font-size:14.5px}
 .lc .ref:last-of-type{border-bottom:0}
@@ -235,9 +220,28 @@
 .cta .wa{width:18px;height:18px;fill:#25D366}
 .cta .tiny{margin:26px 0 0;font-size:13.5px;color:var(--ai-mute)}
 @keyframes yFadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes yBlink{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes yPulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.45)}60%{box-shadow:0 0 0 10px rgba(245,158,11,0)}}
 @keyframes yGate{0%,35%{transform:scaleY(1)}50%,85%{transform:scaleY(.15)}100%{transform:scaleY(1)}}
+/* card three: an invoice line with nowhere to type a number */
+.invart{position:absolute;inset:16px 18px;display:flex;flex-direction:column;justify-content:center;gap:9px}
+.invart .k{font:600 9px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ai-faint)}
+.invart .ir{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 11px;border:1px solid var(--ai-line);border-radius:9px;background:rgba(19,19,50,.6)}
+.invart .f{font:600 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ai-faint)}
+.invart .fld{font-size:11.5px;color:var(--ink)}
+.invart .fld.no{display:inline-flex;align-items:center;gap:6px;font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ai-amber)}
+.invart .fld.no svg{width:13px;height:13px;fill:none;stroke:var(--ai-amber);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.invart .foot{font:500 9.5px var(--mono);color:var(--ai-mute)}
+
+/* the columns keep their own heading now the section headline is the gate */
+.colhead{max-width:660px;margin:0 auto 30px;text-align:center}
+.colhead .h3{font-size:clamp(20px,2.4vw,25px)}
+
+/* four things that never approve anything */
+.nev{display:grid;gap:1px;background:var(--ai-line);border:1px solid var(--ai-line);border-radius:12px;overflow:hidden;margin:14px 0 6px}
+.nev div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;background:var(--ai-deep);font-size:13.5px}
+.nev span{color:var(--ink)}
+.nev b{font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ai-amber);white-space:nowrap}
+
 @media(prefers-reduced-motion:reduce){.ai *{animation:none!important;transition:none!important}}
 
 /* the design file has no breakpoints; these are ours */
@@ -290,59 +294,39 @@
 <header class="wrap ai-hero">
   <div>
     <span class="tag"><i></i>How we use AI</span>
-    <h1>Assistants draft.<br><em class="grad-text">A named person</em> decides.</h1>
-    <p class="lead">Our assistants read your message at two in the morning, scope the job, draft the paperwork and check the photographs arrived. <b>They decide nothing.</b> Releasing money, ruling on a disagreement, setting a price: a person at Yaadly does that, and the limits are written into the code, not a policy.</p>
+    <h1>AI assistants draft.<br><em class="grad-text">A person</em> decides.</h1>
+    <p class="lead">AI assistants read your message at two in the morning, scope the job and draft the paperwork. <b>They decide nothing.</b> Money, prices and disputes are a person's call, enforced in code.</p>
     <div class="ctas">
       <a class="pillbtn primary" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20question%20about%20how%20you%20use%20AI." target="_blank" rel="noopener">Ask us about this</a>
-      <a class="pillbtn" href="#line">See where the line sits</a>
+      <a class="pillbtn" href="#line">See the gates</a>
     </div>
   </div>
 
-  <!-- One night, one thread. Illustrative, not a transcript. -->
-  <div class="thread" aria-label="Illustration: a message answered overnight, approved by a person in the morning">
-    <div class="hd"><span>One night, one thread</span><span>Kingston · UTC minus 5</span></div>
-    <div class="msgs">
-      <div class="m"><span class="t">02:14</span><div class="b">Bathroom pipe burst, water on the floor. Can somebody go tomorrow? <span class="vn"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>0:41</span></div></div>
-      <div class="m r" style="animation-delay:.9s"><span class="t">02:14</span><div class="b"><span class="who">Assistant</span>Got it. Voice note read: burst pipe, bathroom, urgent. Drafting the job now. A plumber's quote brief will be ready for a person at Yaadly to approve in the morning.</div></div>
-      <div class="log"><em>agent</em> · 02:15 · voice to text · job drafted · nothing approved<span class="cur"></span></div>
-      <div class="sun"><i></i>sunrise · 06:11<i></i></div>
-      <div class="m r p" style="animation-delay:2.6s"><span class="t">08:52</span><div class="b"><span class="who">Yaadly · person</span>Morning. I have read the draft and approved the brief. Two vetted plumbers are quoting. You will see the photos before we ask you to accept anything.</div></div>
-    </div>
-    <div class="ft"><span>Answered <b>straight away</b></span><span>Approved <b>by a person</b></span></div>
+  <!-- One day seen from Kingston. Illustrative: the times are not a promise. -->
+  <div class="hpanel panel2" role="img" aria-label="Illustration of one day: a message arriving at 02:14 is read and answered by an AI assistant, and a person at Yaadly replies at 08:52.">
+    <span class="lbl l">Kingston &#183; 24h</span><span class="lbl r">London +6h</span>
+    <svg class="arc" viewBox="0 0 340 170" aria-hidden="true">
+      <path d="M40 150 A130 130 0 0 1 300 150" fill="none" stroke="rgba(155,115,245,0.14)" stroke-width="10" stroke-linecap="round"/>
+      <path d="M40 150 A130 130 0 0 1 170 20" fill="none" stroke="#7B4FE0" stroke-opacity=".35" stroke-width="10" stroke-linecap="round"/>
+      <text x="40" y="168" fill="#8686B8" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">00:00</text>
+      <text x="170" y="12" fill="#8686B8" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">12:00</text>
+      <text x="300" y="168" fill="#8686B8" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">24:00</text>
+      <circle cx="63" cy="88" r="7" fill="#07071A" stroke="#C4AAFF" stroke-width="2"/>
+      <circle cx="63" cy="88" r="14" fill="none" stroke="#9B73F5" stroke-opacity=".35" stroke-width="1"/>
+      <text x="84" y="84" fill="#C4AAFF" font-family="IBM Plex Mono" font-size="11" font-weight="600">02:14</text>
+      <text x="84" y="98" fill="#9C9CC8" font-family="IBM Plex Sans" font-size="11">answered by AI assistant</text>
+      <circle cx="212" cy="30" r="7" fill="#07071A" stroke="#FBBF24" stroke-width="2"/>
+      <text x="226" y="27" fill="#FBBF24" font-family="IBM Plex Mono" font-size="11" font-weight="600">08:52</text>
+      <text x="226" y="41" fill="#9C9CC8" font-family="IBM Plex Sans" font-size="11">Yaadly replies</text>
+      <rect x="100" y="120" width="140" height="24" rx="12" fill="rgba(155,115,245,0.09)" stroke="rgba(155,115,245,0.28)"/>
+      <text x="170" y="136" fill="#EEEEFF" font-family="IBM Plex Sans" font-size="11" font-weight="600" text-anchor="middle">Voice note &#183; Patois &#183; read</text>
+    </svg>
   </div>
 </header>
 
 <!-- Why this matters to you -->
 <section class="wrap">
   <div class="three">
-    <div class="card3">
-      <div class="art">
-        <span class="lbl l">Kingston · 24h</span><span class="lbl r">London +6h</span>
-        <svg class="arc" viewBox="0 0 340 170" aria-hidden="true">
-          <defs><linearGradient id="nightArc" x1="0" x2="1"><stop offset="0" stop-color="#7B4FE0"/><stop offset=".55" stop-color="#9B73F5"/><stop offset="1" stop-color="#F59E0B"/></linearGradient></defs>
-          <path d="M40 150 A130 130 0 0 1 300 150" fill="none" stroke="rgba(155,115,245,0.14)" stroke-width="10" stroke-linecap="round"/>
-          <path d="M40 150 A130 130 0 0 1 170 20" fill="none" stroke="#7B4FE0" stroke-opacity=".35" stroke-width="10" stroke-linecap="round"/>
-          <text x="40" y="168" fill="#44446A" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">00:00</text>
-          <text x="170" y="12" fill="#44446A" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">12:00</text>
-          <text x="300" y="168" fill="#44446A" font-family="IBM Plex Mono" font-size="10" text-anchor="middle">24:00</text>
-          <circle cx="63" cy="88" r="7" fill="#07071A" stroke="#C4AAFF" stroke-width="2"/>
-          <circle cx="63" cy="88" r="14" fill="none" stroke="#9B73F5" stroke-opacity=".35" stroke-width="1"/>
-          <text x="84" y="84" fill="#C4AAFF" font-family="IBM Plex Mono" font-size="11" font-weight="600">02:14</text>
-          <text x="84" y="98" fill="#7878A8" font-family="IBM Plex Sans" font-size="11">answered by assistant</text>
-          <circle cx="212" cy="30" r="7" fill="#07071A" stroke="#FBBF24" stroke-width="2"/>
-          <text x="226" y="27" fill="#FBBF24" font-family="IBM Plex Mono" font-size="11" font-weight="600">08:52</text>
-          <text x="226" y="41" fill="#7878A8" font-family="IBM Plex Sans" font-size="11">Yaadly replies</text>
-          <rect x="100" y="120" width="140" height="24" rx="12" fill="rgba(155,115,245,0.09)" stroke="rgba(155,115,245,0.28)"/>
-          <text x="170" y="136" fill="#EEEEFF" font-family="IBM Plex Sans" font-size="11" font-weight="600" text-anchor="middle">Voice note · Patois · read</text>
-        </svg>
-      </div>
-      <div class="body">
-        <div class="num">01</div>
-        <h3 class="h3">An answer while Jamaica is asleep</h3>
-        <p>A message, photo or voice note, in Patois if that is easier, is read and answered there and then. A person then picks it up from there. You are never left wondering whether it arrived.</p>
-      </div>
-    </div>
-
     <div class="card3">
       <div class="art">
         <div class="p1" aria-hidden="true">
@@ -358,9 +342,8 @@
         </div>
       </div>
       <div class="body">
-        <div class="num">02</div>
-        <h3 class="h3">A written verdict</h3>
-        <p>A machine drafts the findings. The ratings and the verdict on page one are written by a person: what was found, and what we think you should do.</p>
+        <div class="num">01</div>
+        <h3 class="h3">A verdict written by a person</h3>
       </div>
     </div>
 
@@ -375,9 +358,22 @@
         </div>
       </div>
       <div class="body">
+        <div class="num">02</div>
+        <h3 class="h3">A name on every decision</h3>
+      </div>
+    </div>
+    <div class="card3">
+      <div class="art">
+        <div class="invart" aria-hidden="true">
+          <span class="k">Invoice &#183; new line</span>
+          <div class="ir"><span class="f">Service</span><span class="fld">Plumbing &#183; standard call-out</span></div>
+          <div class="ir"><span class="f">Amount</span><span class="fld no"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>no field</span></div>
+          <span class="foot">&#8594; looked up from the published list</span>
+        </div>
+      </div>
+      <div class="body">
         <div class="num">03</div>
-        <h3 class="h3">A name against every decision</h3>
-        <p>Every step that moves money or changes your property has a real person's name against it. Not "the system". Ask who approved it, and there is an answer.</p>
+        <h3 class="h3">A price nobody can invent</h3>
       </div>
     </div>
   </div>
@@ -387,16 +383,21 @@
 <section id="line" class="sec">
   <div class="head">
     <div class="kick-m">Where the line sits</div>
-    <h2 class="h2">What happens by machine, and what waits for a person.</h2>
+    <h2 class="h2">Every job passes one gate.</h2>
   </div>
 
   <div class="path panel">
     <span class="cap">The path of one job</span>
     <div class="st"><i>02:14</i><span>Your message</span></div><span class="ln"></span>
-    <div class="st"><i>M</i><span>Assistant reads</span></div><span class="ln"></span>
+    <div class="st"><i>M</i><span>AI assistant reads</span></div><span class="ln"></span>
     <div class="st"><i>M</i><span>Draft written</span></div><span class="ln a"></span>
     <div class="st gate"><span class="gate"><b></b><b></b><em></em></span><span>Gate · a named person</span></div><span class="ln b"></span>
     <div class="st g"><i>J$</i><span>Money moves</span></div>
+  </div>
+
+  <div class="colhead">
+    <div class="kick-m">Either side of that gate</div>
+    <h3 class="h3">What happens by machine, and what waits for a person.</h3>
   </div>
 
   <div class="cols" style="max-width:1136px;margin:0 auto">
@@ -432,9 +433,9 @@
       <h3>The tradesperson sees his day's account before you do.</h3>
       <p>He did the work, so it is his account to stand behind. He chooses whether it goes to you as written or in his own words. A protection that only guards the client tells him what we think of him.</p>
     </div>
-    <div class="demo" aria-label="Illustration: the assistant's draft, and the tradesperson's own version that was actually sent">
+    <div class="demo" aria-label="Illustration: the AI assistant's draft, and the tradesperson's own version that was actually sent">
       <span class="ghost" aria-hidden="true">1</span>
-      <div class="bx"><div class="k">Draft · assistant</div><p>Day 3. Old pipe cut out, new PVC run fitted and pressure tested. Tiles around the boxing removed, to be replaced Thursday.</p></div>
+      <div class="bx"><div class="k">Draft · AI assistant</div><p>Day 3. Old pipe cut out, new PVC run fitted and pressure tested. Tiles around the boxing removed, to be replaced Thursday.</p></div>
       <div class="ch"><span class="on">Send as written</span><span>In my own words</span></div>
       <div class="bx sent"><div class="k">Sent · Devon, plumber</div><p>Day 3 done. New pipe in and tested, no leaks. Had to take off four tiles by the boxing. I will put matching ones back Thursday.</p></div>
     </div>
@@ -447,15 +448,15 @@
     <div class="sticky">
       <div class="kick-m">Five things we built, not promised</div>
       <h2 class="h2" style="margin-bottom:16px">Anyone can say a human is in charge.</h2>
-      <p>Five limits in the code and the database, not rules an assistant is asked to remember. Each one is checkable.</p>
+      <p>Five limits in the code and the database, not rules an AI assistant is asked to remember. Each one is checkable.</p>
     </div>
     <div class="list">
 
       <div class="lim panel">
         <span class="big">1</span>
         <div>
-          <h3 class="h3">The invoicing assistant cannot type a number.</h3>
-          <p>It can name a service from our published price list and nothing else. There is no amount field to invent one in, and a line we cannot match to the list cannot be sent until a person prices it.</p>
+          <h3 class="h3">No amount field.</h3>
+          <p>The invoicing AI assistant can name a service from our published price list and nothing else. There is no amount field for it to invent one in, and a line we cannot match to the list cannot be sent until a person prices it.</p>
           <span class="code">invoice.amount → <b>no field</b></span>
         </div>
         <div class="ill" aria-hidden="true">
@@ -469,8 +470,8 @@
       <div class="lim panel">
         <span class="big">2</span>
         <div>
-          <h3 class="h3">Sketches carry no measurements.</h3>
-          <p>A phone video has no scale, and measured drawings for reward are regulated work in Jamaica. Any dimension is stripped, reported to us, and the pack is refused until it is gone.</p>
+          <h3 class="h3">No measurements.</h3>
+          <p>A phone video has no scale, and measured drawings for reward are regulated work in Jamaica. Any dimension in a sketch pack is stripped, reported to us, and the pack is refused until it is gone.</p>
           <span class="code">sketch.dimension → <b>rejected</b></span>
         </div>
         <div class="ill" style="padding:10px" aria-hidden="true">
@@ -482,8 +483,8 @@
       <div class="lim panel">
         <span class="big">3</span>
         <div>
-          <h3 class="h3">The report drafter cannot rate severity.</h3>
-          <p>Severe, moderate or low is the judgment you are paying for, and a person writes it, with the verdict on page one. The database will not issue a report while a finding is unrated or the verdict is empty.</p>
+          <h3 class="h3">No severity rating.</h3>
+          <p>Severe, moderate or low is the judgment you are paying for. The report drafter cannot set it: a person writes it, with the verdict on page one. The database will not issue a report while a finding is unrated or the verdict is empty.</p>
           <span class="code">finding.severity → <b>person only</b></span>
         </div>
         <div class="ill" aria-hidden="true">
@@ -498,7 +499,7 @@
       <div class="lim panel">
         <span class="big">4</span>
         <div>
-          <h3 class="h3">Identity documents never reach a model.</h3>
+          <h3 class="h3">No identity documents.</h3>
           <p>A tradesperson's photo ID, selfie and face video are blocked before the file is even fetched, and no setting turns that off. Their other paperwork is read by a model only where they said yes, and silence counts as no.</p>
           <span class="code">identity.* → <b>blocked</b></span>
         </div>
@@ -513,8 +514,8 @@
       <div class="lim panel">
         <span class="big">5</span>
         <div>
-          <h3 class="h3">A model reads your photos. We say so.</h3>
-          <p>NVIDIA, in the United States. What lands on your phone is the plain description. Any severity line or "call a professional" comes to us first, and reaches you only inside a document a person opened and released. The tradesperson gets the unedited version, because he can go and look again.</p>
+          <h3 class="h3">Photos read in the US.</h3>
+          <p>A model run by NVIDIA reads them, and we say so. What lands on your phone is the plain description. Any severity line or "call a professional" comes to us first, and reaches you only inside a document a person opened and released. The tradesperson gets the unedited version, because he can go and look again.</p>
           <span class="code">photo.severity → <b>to us, not you</b></span>
         </div>
         <div class="ill" aria-hidden="true">
@@ -534,24 +535,29 @@
 <section class="sec">
   <div class="head" style="margin-bottom:44px">
     <div class="kick-m">The limits</div>
-    <h2 class="h2">What no assistant here will ever do.</h2>
+    <h2 class="h2">What no AI assistant will ever do.</h2>
   </div>
   <div class="two" style="max-width:1136px;margin:0 auto">
     <div class="lc panel2">
       <span class="glow"></span>
       <div class="hd">
         <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/><path d="m4 4 16 16"/></svg></span>
-        <h3>Nothing is closed by a countdown.</h3>
+        <h3>Nothing closes on a countdown.</h3>
       </div>
       <div><span class="strike">72:00:00</span></div>
-      <div class="sub">no timer · no auto-approve · no confidence score</div>
+      <div class="nev">
+        <div><span>Timer expiry</span><b>never approves</b></div>
+        <div><span>Confidence score</span><b>never approves</b></div>
+        <div><span>Evidence check</span><b>never approves</b></div>
+        <div><span>Your silence</span><b>never approves</b></div>
+      </div>
       <p>Not a timer, not a confidence score, not an evidence check going green on its own. No stage approves itself because the photos looked right, and nothing moves because you did not reply in time. There is no setting for that, and we are not going to add one.</p>
     </div>
     <div class="lc v panel2">
       <span class="glow"></span>
       <div class="hd">
         <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 20h16M6 20V9l6-5 6 5v11M10 20v-5h4v5"/></svg></span>
-        <h3>Four questions never come to us.</h3>
+        <h3>Four questions go elsewhere.</h3>
         <span class="four" aria-hidden="true">4</span>
       </div>
       <div class="ref"><b>Valuation</b><span>licensed valuer</span></div>
@@ -570,8 +576,8 @@
       <div class="kick-m">Your information</div>
       <h2 class="h2" style="margin-bottom:16px">Where it goes, said plainly.</h2>
       <p class="intro">Every company that touches your information is named, with the country it sits in, on the <a href="privacy.html">privacy page</a>. The list is the honest one, not the flattering one. It even records that our text model sat in China until 4 September 2026, because a page that only describes the present is one you cannot check.</p>
-      <div class="sw"><span class="tog"><i></i></span><div><b>Ask us not to use assistants on your job.</b> We take them out of your thread and answer ourselves. It is slower, and a fair trade to offer you rather than a reason to talk you out of it.</div></div>
-      <div class="sw"><span class="tog a"><i></i></span><div><b>One control switches every assistant off.</b> Your messages and photos are still kept, and you are told a person is reading. Nobody is left talking to silence.</div></div>
+      <div class="sw"><span class="tog"><i></i></span><div><b>Turn the AI assistants off.</b> Ask, and we take them out of your thread and answer you ourselves. It is slower, and a fair trade to offer you rather than a reason to talk you out of it.</div></div>
+      <div class="sw"><span class="tog a"><i></i></span><div><b>A person still reads.</b> One control switches every AI assistant off. Your messages and photos are still kept, and you are told a person is reading. Nobody is left talking to silence.</div></div>
     </div>
     <div class="tbl panel2">
       <div class="r h"><span>What you send</span><span>Read by</span><span>Where</span></div>
@@ -593,11 +599,11 @@
     <div>
       <details class="fq" open>
         <summary><h2>Is a machine deciding whether my money is released?</h2></summary>
-        <div class="ans">No, and it is the one thing we will not build. Approving a stage is the step that releases money, and a named person does it every single time. Nothing releases on a timer, on an evidence check passing, or because an assistant judged itself confident enough.</div>
+        <div class="ans">No, and it is the one thing we will not build. Approving a stage is the step that releases money, and a named person does it every single time. Nothing releases on a timer, on an evidence check passing, or because an AI assistant judged itself confident enough.</div>
       </details>
       <details class="fq">
         <summary><h2>Does AI set my price?</h2></summary>
-        <div class="ans">No. Prices come from our published list, and the invoicing assistant has no field for an amount. Work that is not on the list cannot be invoiced until a person prices it. See <a href="prices.html">what work costs</a>.</div>
+        <div class="ans">No. Prices come from our published list, and the invoicing AI assistant has no field for an amount. Work that is not on the list cannot be invoiced until a person prices it. See <a href="prices.html">what work costs</a>.</div>
       </details>
       <details class="fq">
         <summary><h2>Who actually looks at photographs of my property?</h2></summary>
@@ -605,15 +611,15 @@
       </details>
       <details class="fq">
         <summary><h2>Can I ask you not to use AI on my job at all?</h2></summary>
-        <div class="ans">Yes. Say so and we take the assistants out of your thread and answer you ourselves. It will be slower, and we would rather tell you that than talk you out of asking.</div>
+        <div class="ans">Yes. Say so and we take the AI assistants out of your thread and answer you ourselves. It will be slower, and we would rather tell you that than talk you out of asking.</div>
       </details>
       <details class="fq">
         <summary><h2>What happens when the AI gets something wrong?</h2></summary>
-        <div class="ans">It gets caught at the gate, because the gates are where the consequences are. A wrong draft is a draft a person corrects before it goes anywhere. The decisions that would actually cost you, releasing money, ruling on a disagreement, rating a finding, are not the assistant's to make in the first place, so a mistake there cannot reach you as a decision.</div>
+        <div class="ans">It gets caught at the gate, because the gates are where the consequences are. A wrong draft is a draft a person corrects before it goes anywhere. The decisions that would actually cost you, releasing money, ruling on a disagreement, rating a finding, are not the AI assistant's to make in the first place, so a mistake there cannot reach you as a decision.</div>
       </details>
       <details class="fq">
         <summary><h2>Will I be talking to a bot instead of a person?</h2></summary>
-        <div class="ans">You get an immediate answer from an assistant, and then a person. If you ask to speak to somebody, you get Monique, replying in the same conversation from the same number rather than as a stranger messaging you out of nowhere.</div>
+        <div class="ans">You get an immediate answer from an AI assistant, and then a person. If you ask to speak to somebody, you get Monique, replying in the same conversation from the same number rather than as a stranger messaging you out of nowhere.</div>
       </details>
       <details class="fq">
         <summary><h2>Are tradespeople's identity documents fed into AI?</h2></summary>
