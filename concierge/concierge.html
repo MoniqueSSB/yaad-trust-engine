@@ -89,6 +89,10 @@ h1.vh{font-family:var(--disp);text-transform:uppercase;font-weight:400;font-size
 .tile .v{font-family:var(--disp);font-size:30px;line-height:1.05;margin-top:7px;font-weight:400;font-variant-numeric:tabular-nums}
 .tile.ok .v{color:var(--tealb)} .tile.warn .v{color:var(--mango)} .tile.crit .v{color:var(--coral)}
 .tile .d{font-size:11.5px;color:var(--mute);margin-top:5px;line-height:1.45}
+.tile.go{display:block;width:100%;text-align:left;transition:.14s}
+.tile.go:hover{border-color:var(--softline);background:var(--panel2)}
+.tile.go .tgo{position:absolute;top:12px;right:12px;font-size:15px;line-height:1;color:var(--dim);transition:.14s}
+.tile.go:hover .tgo{color:var(--tealb);transform:translateX(2px)}
 .spark{display:flex;align-items:flex-end;gap:2px;height:22px;margin-top:9px}
 .spark i{flex:1;background:var(--line2);border-radius:1px;min-height:2px}
 .spark i.hi{background:var(--teal)}
@@ -187,6 +191,136 @@ tr.unpriced td{background:rgba(245,158,11,.07)}
 .nu.pend{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.05)}
 .nu.clash{border-color:var(--coral);background:rgba(248,113,113,.1)}
 .calside h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+
+/* ---------- overview: three bands ----------
+   Rebuilt 6 September 2026 from the Claude Design screen "Concierge Overview".
+   The screen it replaced was twenty-four tiles of equal weight, nineteen of
+   them reading zero, with a month calendar taking the top third to say nothing
+   was booked. Every tile was a count and not one was a next action.
+   Three bands now: the day grouped by WHOSE MOVE IT IS, live jobs by the stage
+   they are at, and everything anybody said that wants an answer. The counting
+   tiles are still here, at the bottom, under How the desk is doing: they are
+   measurement rather than work, and several of them were built deliberately
+   and would be a real loss to delete. The colour rule is unchanged, and it is
+   the reason a lane is readable at a glance: purple proven, gold waiting on
+   somebody, coral blocked, mute a neutral fact. */
+.ovhead{display:flex;align-items:flex-end;gap:20px 26px;flex-wrap:wrap;padding:17px 19px;border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(90deg,rgba(155,115,245,.07),rgba(245,158,11,.04))}
+.ovhead .when{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.ovhead .say{font-family:var(--disp);font-weight:300;font-size:clamp(20px,2.6vw,28px);line-height:1.15;margin-top:3px}
+.ovhead .say em{font-style:normal;color:var(--mango)}
+.ovhead .say i{font-style:normal;color:var(--tealb)}
+.ovstat{display:flex;margin-left:auto;flex-wrap:wrap}
+.ovstat div{text-align:right;padding:0 15px;border-right:1px solid var(--line)}
+.ovstat div:last-child{border-right:0;padding-right:0}
+.ovstat .k{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.ovstat .v{font-family:var(--mono);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.ovstat .v.warn{color:var(--mango)}
+
+.ovband{margin:26px 0 0;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.ovband h2{font-family:var(--disp);font-weight:300;font-size:23px;line-height:1.1}
+.ovband .c{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--mute)}
+.ovband .c.warn{color:var(--mango)}
+.ovbnote{font-size:12.5px;color:var(--mute);margin-top:3px;line-height:1.5}
+
+.ovday{display:grid;grid-template-columns:minmax(0,1fr) 336px;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:12px;background:var(--panel)}
+.ovlanes{border-right:1px solid var(--line);min-width:0}
+.ovside{padding:14px;display:flex;flex-direction:column;gap:12px;background:rgba(7,7,26,.4);min-width:0}
+.ovside .cal{width:auto}
+.ovside .calside{margin-top:12px}
+@media(max-width:1020px){.ovday{grid-template-columns:1fr}.ovlanes{border-right:0;border-bottom:1px solid var(--line)}}
+
+.lane{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 16px;border-bottom:1px solid var(--line);color:var(--mute)}
+.lane .tw{font-size:9px;width:10px;flex:0 0 auto;line-height:1}
+.lane .sq{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
+.lane .nm{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;flex:0 0 auto}
+.lane .wh{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.lane .n{font-family:var(--mono);font-size:11px;font-weight:600;margin-left:auto;flex:0 0 auto}
+.lane.you{background:rgba(245,158,11,.07)}.lane.you .tw,.lane.you .nm,.lane.you .n{color:var(--mango)}.lane.you .sq{background:var(--mango)}
+.lane.wrk{background:rgba(155,115,245,.05)}.lane.wrk .tw,.lane.wrk .nm,.lane.wrk .n{color:var(--tealb)}.lane.wrk .sq{background:var(--teal)}
+.lane.cli{background:rgba(248,113,113,.07)}.lane.cli .tw,.lane.cli .nm,.lane.cli .n{color:var(--coral)}.lane.cli .sq{background:var(--coral)}
+.lane.non{background:rgba(196,170,255,.04)}.lane.non .tw,.lane.non .nm,.lane.non .n{color:var(--tealb)}.lane.non .sq{background:var(--tealb)}
+
+.mv{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--line)}
+.mv .tag{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--panel2);color:var(--dim);border:1px solid var(--line);min-width:76px;text-align:center;flex:0 0 auto}
+.mv .tag.warn{background:rgba(245,158,11,.14);color:var(--mango);border-color:rgba(245,158,11,.32)}
+.mv .tag.crit{background:rgba(248,113,113,.14);color:var(--coral);border-color:rgba(248,113,113,.4)}
+.mv .tag.ok{background:rgba(196,170,255,.12);color:var(--tealb);border-color:var(--softline)}
+.mv .wt{flex:1;min-width:0;font-size:13px}
+.mv .wt span{color:var(--mute)}
+.mv .amt{font-family:var(--mono);font-size:12.5px;color:var(--mango);flex:0 0 auto}
+.mv .btn{flex:0 0 auto;font-size:11.5px;padding:7px 14px}
+.clr{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 16px;font-size:12.5px;color:var(--mute);background:rgba(196,170,255,.03);border-bottom:1px solid var(--line)}
+.clr .tw{font-size:9px;width:10px;flex:0 0 auto;color:var(--tealb);line-height:1}
+.clr b{color:var(--tealb);font-weight:600}
+.clrlist{padding:11px 16px 13px 42px;font-size:11.5px;color:var(--mute);line-height:1.7;border-bottom:1px solid var(--line)}
+
+.sc{border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:rgba(7,7,26,.5)}
+.sc.gold{border-color:rgba(245,158,11,.3);background:linear-gradient(160deg,rgba(245,158,11,.09),rgba(155,115,245,.05))}
+.sc h5{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:11px}
+.sc.gold h5{color:var(--mango)}
+.scrow{display:flex;flex-direction:column;gap:11px}
+.sl{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12.5px;color:var(--mute)}
+.sl .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.sl .v.warn{color:var(--mango)}
+.sl .v.ok{color:var(--tealb)}
+.slnote{font-size:11px;color:var(--mute);line-height:1.4;margin-top:2px}
+.sdiv{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:7px}
+.sdiv .sl{font-size:11.5px}
+.sdiv .sl .v{font-size:11.5px;color:var(--mango)}
+
+.ovstages{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:12px;background:var(--panel)}
+@media(max-width:1100px){.ovstages{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:640px){.ovstages{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stgc{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:13px 11px;min-width:0}
+.stgc h6{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--tealb);margin-bottom:3px}
+.stgc .n{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--mute);margin-bottom:11px}
+.stgc.warn{background:rgba(245,158,11,.04)}.stgc.warn h6,.stgc.warn .n{color:var(--mango)}
+.stgc.crit{background:rgba(248,113,113,.04)}.stgc.crit h6,.stgc.crit .n{color:var(--coral)}
+.stgc.done h6,.stgc.done .n{color:var(--tealb)}
+.stgc .cards{display:flex;flex-direction:column;gap:8px}
+.jcard{border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:rgba(7,7,26,.5);display:block;width:100%;text-align:left}
+.jcard.warn{border-color:rgba(245,158,11,.3)}
+.jcard.crit{border-color:rgba(248,113,113,.4)}
+.jcard.ok{border-color:rgba(196,170,255,.25);background:rgba(196,170,255,.04)}
+.jcard .r{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.jcard .jid{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.jcard .qn{font-family:var(--mono);font-size:10px;color:var(--mute);flex:0 0 auto}
+.jcard .qn.warn{color:var(--mango)}
+.jcard .wh{font-size:11px;color:var(--mute);margin-top:3px;line-height:1.35}
+.jcard .st{font-size:11px;margin-top:5px;line-height:1.35;color:var(--mute)}
+.jcard .st.warn{color:var(--mango)}
+.jcard .st.crit{color:var(--coral)}
+.jcard .st.ok{color:var(--tealb)}
+.jcard .pips{display:flex;gap:2px;margin-top:7px}
+.jcard .pips i{flex:0 0 9px;height:3px;border-radius:2px;background:var(--line)}
+.jcard .pips i.on{background:var(--tealb)}
+.jcard .pips i.now{background:var(--mango)}
+.jcard .qb{height:3px;border-radius:2px;margin-top:8px;background:rgba(245,158,11,.5)}
+.jcard .qt{font-family:var(--mono);font-size:9px;font-weight:600;margin-top:4px;color:var(--mango)}
+.jcard.crit .qb{background:var(--coral)}
+.jcard.crit .qt{color:var(--coral)}
+.stgc .none{border:1px dashed var(--line);border-radius:11px;padding:10px;font-size:11px;color:var(--dim);line-height:1.45}
+
+.ovans{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:12px;background:var(--panel)}
+@media(max-width:840px){.ovans{grid-template-columns:1fr}}
+.ansc{padding:15px 16px 18px;border-right:1px solid var(--line);min-width:0}
+.ansc:last-child{border-right:0}
+.ansc h6{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--tealb);margin-bottom:12px}
+.ans{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:rgba(7,7,26,.5);margin-bottom:9px}
+.ans:last-child{margin-bottom:0}
+.ans.warn{border-color:rgba(245,158,11,.3)}
+.ans.crit{border-color:rgba(248,113,113,.4)}
+.ans .num{font-family:var(--mono);font-size:17px;font-weight:600;min-width:26px;text-align:center;flex:0 0 auto;color:var(--mute);font-variant-numeric:tabular-nums}
+.ans.warn .num{color:var(--mango)}
+.ans.crit .num{color:var(--coral)}
+.ans .tag{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:6px;background:var(--panel2);color:var(--dim);border:1px solid var(--line);flex:0 0 auto}
+.ans .tag.warn{background:rgba(245,158,11,.14);color:var(--mango);border-color:rgba(245,158,11,.32)}
+.ans .tag.crit{background:rgba(248,113,113,.14);color:var(--coral);border-color:rgba(248,113,113,.4)}
+.ans .tag.ok{background:rgba(196,170,255,.12);color:var(--tealb);border-color:var(--softline)}
+.ans .tx{flex:1;min-width:0}
+.ans .tx b{display:block;font-size:12.5px;font-weight:600}
+.ans .tx p{font-size:11.5px;color:var(--mute);line-height:1.4}
+.ans .btn{flex:0 0 auto;font-size:11px;padding:7px 14px}
 
 /* ---------- evidence ---------- */
 .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
@@ -432,36 +566,60 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
     <div class="body">
 
 <!-- ============================================ OVERVIEW -->
+<!-- Three bands, rebuilt 6 Sep 2026 from the Claude Design screen. Band one is
+     the day, grouped by whose move it is. Band two is every live job by the
+     stage it is at. Band three is everything anybody said that wants an
+     answer. The counting tiles that used to be the whole screen are now band
+     four, at the bottom, because measurement is not work. The month calendar
+     did not go anywhere: it moved into band one's right column, so it is
+     beside the day rather than on top of it. -->
 <section class="view on" data-view="over">
-  <h1 class="vh" id="ovDate">Overview</h1>
-  <p class="vsub" id="ovSub">Reading your invoices and sketch packs.</p>
-
-  <div class="calband">
-    <div class="cal">
-      <div class="cal-h"><h4 id="calTitle">&nbsp;</h4>
-        <div class="cal-nav"><button id="calPrev" aria-label="Previous month">&lsaquo;</button><button id="calNext" aria-label="Next month">&rsaquo;</button></div></div>
-      <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
-      <div class="cal-grid" id="calGrid"></div>
-      <div class="cal-key">
-        <span><i style="background:rgba(245,158,11,.4)"></i>Booked</span>
-        <span><i style="background:rgba(248,113,113,.35)"></i>Awaiting confirmation</span>
-        <span><i style="background:rgba(248,113,113,.5);box-shadow:0 0 0 1px #F87171"></i>Clash</span>
-        <span><i style="background:transparent;box-shadow:inset 0 0 0 1px #F59E0B"></i>Today</span>
-      </div>
+  <div class="ovhead">
+    <div style="min-width:0">
+      <div class="when" id="ovDate">&nbsp;</div>
+      <div class="say" id="ovSay">Reading the desk.</div>
     </div>
-    <div class="calside">
-      <h5>Every visit, every job</h5>
-      <div class="nextup" id="calSide"></div>
+    <div class="ovstat" id="ovStat"></div>
+  </div>
+
+  <div class="ovband"><h2>The day, whose move is it</h2><span class="c" id="ovDayC">every open move, grouped by who owes it</span></div>
+  <p class="ovbnote">Nothing here is a total. Every line is a move somebody has to make, and the lane it sits in says who. Open a lane to see them.</p>
+
+  <div class="ovday">
+    <div class="ovlanes" id="ovLanes"></div>
+    <div class="ovside">
+      <div id="ovMoney"></div>
+      <div class="sc">
+        <h5>The diary, every visit, every job</h5>
+        <div class="cal">
+          <div class="cal-h"><h4 id="calTitle">&nbsp;</h4>
+            <div class="cal-nav"><button id="calPrev" aria-label="Previous month">&lsaquo;</button><button id="calNext" aria-label="Next month">&rsaquo;</button></div></div>
+          <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="cal-key">
+            <span><i style="background:rgba(245,158,11,.4)"></i>Booked</span>
+            <span><i style="background:rgba(248,113,113,.35)"></i>Awaiting confirmation</span>
+            <span><i style="background:rgba(248,113,113,.5);box-shadow:0 0 0 1px #F87171"></i>Clash</span>
+            <span><i style="background:transparent;box-shadow:inset 0 0 0 1px #F59E0B"></i>Today</span>
+          </div>
+        </div>
+        <div class="calside"><div class="nextup" id="calSide"></div></div>
+      </div>
+      <div id="ovBot"></div>
     </div>
   </div>
 
+  <div class="ovband"><h2>Live jobs, where each one is</h2><span class="c" id="ovJobsC"></span></div>
+  <p class="ovbnote">The bar under a card is how long it has been since anything at all happened on that job.</p>
+  <div class="ovstages" id="ovStages"></div>
+
+  <div class="ovband"><h2>To answer</h2><span class="c" id="ovAnsC"></span></div>
+  <p class="ovbnote">People matters on the left, everything anybody said to you on the right. Nothing here is a job yet.</p>
+  <div class="ovans"><div class="ansc" id="ovPeople"></div><div class="ansc" id="ovWords"></div></div>
+
+  <div class="ovband"><h2>How the desk is doing</h2><span class="c">measurement, not work</span></div>
+  <p class="ovbnote" id="ovSub">Every number here is counted from the table it names. Nothing on this page is a placeholder.</p>
   <div class="tiles" id="ovTiles"></div>
-
-  <div class="sechd">Needs a decision</div>
-  <div id="ovNeeds"></div>
-
-  <div class="sechd">Moving on its own</div>
-  <div id="ovRunning"></div>
 </section>
 
 <!-- ============================================ INVOICES -->
@@ -3281,12 +3439,23 @@ function panelSet(rows){
 // ---------------------------------------------------------------- shell build
 
 function buildRail(){
-  let out = "", group = null;
-  for (const v of VIEWS) {
-    if (v.g !== group) { group = v.g; out += `<div class="rgrp">${esc(group)}</div>`; }
-    out += `<button class="rlink${v.k === currentView ? " on" : ""}" data-v="${v.k}">`
-        +  `<svg viewBox="0 0 24 24">${ICON[v.icon] || ""}</svg>${esc(v.label)}`
-        +  `<span class="cnt hidden" id="cnt-${v.k}"></span></button>`;
+  // Grouped by first appearance, not by walking VIEWS in order. Walking it in
+  // order printed RUN THE DAY and DOCUMENTS & MONEY twice each, because a
+  // couple of entries were added next to the view they related to rather than
+  // next to their own group. A rail that names the same group twice reads as
+  // two different places to look for the same thing. The registry order is
+  // deliberately left alone: this is a drawing fix, not a reshuffle.
+  const groups = [];
+  for (const v of VIEWS) if (!groups.includes(v.g)) groups.push(v.g);
+  let out = "";
+  for (const g of groups) {
+    out += `<div class="rgrp">${esc(g)}</div>`;
+    for (const v of VIEWS) {
+      if (v.g !== g) continue;
+      out += `<button class="rlink${v.k === currentView ? " on" : ""}" data-v="${v.k}">`
+          +  `<svg viewBox="0 0 24 24">${ICON[v.icon] || ""}</svg>${esc(v.label)}`
+          +  `<span class="cnt hidden" id="cnt-${v.k}"></span></button>`;
+    }
   }
   $("railnav").innerHTML = out;
 }
@@ -3836,6 +4005,12 @@ async function loadPriceLog(){
     `</tbody></table></div>`;
 }
 
+// Which lanes of the day band are open. Yours starts open because it is the
+// only lane where nothing at all happens until she acts; the rest are a
+// summary line until she asks for them. Kept out of the render so a toggle
+// does not re-read the database.
+const OVLANE = { you:true, wrk:false, cli:false, non:false, clr:false };
+
 const BESPOKE = { pricecheck: loadPriceCheck, over: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees, materials: loadMaterials };
 let currentView = "over";
 
@@ -3863,6 +4038,16 @@ document.addEventListener("click", (e) => {
     const key = sw.dataset.set, on = sw.classList.contains("on");
     if (key === "agents_paused") { setAgentsPaused(!on); return; }
     writeSetting(key, on ? "false" : "true", sw);
+    return;
+  }
+  const ln = e.target.closest("[data-lane]");
+  if (ln) {
+    const k = ln.dataset.lane;
+    OVLANE[k] = !OVLANE[k];
+    const body = $("lb-" + k);
+    if (body) body.classList.toggle("hidden", !OVLANE[k]);
+    const tw = ln.querySelector(".tw");
+    if (tw) tw.innerHTML = OVLANE[k] ? "&#9660;" : "&#9654;";
     return;
   }
   const r = e.target.closest("[data-v]");
@@ -4079,7 +4264,19 @@ function renderCal(){
     : '<div class="nu"><b>No visits booked</b>Nothing is in the diary. When workers open days and clients take slots, every one of them lands here, across every job, and a worker booked twice in one slot shows as a clash.</div>';
 }
 
-const tile = (cls, k, v, d) => `<div class="tile ${cls}"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d)}</div></div>`;
+// A tile with a view key becomes a button that goes to the rows the number was
+// counted from. One without stays a plain div, and that difference is load
+// bearing: several tiles here are an average or a percentage with no single
+// list behind them, and a tile that invites a click and then lands you
+// somewhere that does not explain the number is worse than a tile you cannot
+// click. Same reasoning as the Jobs badge that was removed for pointing at
+// something other than what it counted.
+const tile = (cls, k, v, d, view) => {
+  const inner = `<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(d)}</div>`;
+  return view
+    ? `<button class="tile go ${cls}" data-v="${esc(view)}">${inner}<span class="tgo" aria-hidden="true">&rsaquo;</span></button>`
+    : `<div class="tile ${cls}">${inner}</div>`;
+};
 const alertRow = (kind, ic, title, text, btn, view) =>
   `<div class="alert ${kind}"><span class="ic">${ic}</span><div><b>${esc(title)}</b><p>${esc(text)}</p></div>` +
   (btn ? `<span class="act"><button class="btn ${kind === "crit" ? "d" : "g"}" data-v="${view}">${esc(btn)}</button></span>` : "") +
@@ -4250,42 +4447,99 @@ async function loadOverview(){
   const turns = (turnRows.data || []).map(r => Number(r.intake_turns) || 0);
   const avgTurns = turns.length ? (turns.reduce((a, b) => a + b, 0) / turns.length).toFixed(1) : "0";
 
+  // ── the rows the three bands are drawn from ────────────────────────────
+  //
+  // Columns named one by one, and budget_band deliberately absent. It is the
+  // client's private figure and the rule is that it never arrives in this page,
+  // not that the page fetches it and declines to draw it. Same rule as Jobs.
+  const [jobQ, quoteQ, invQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
+    sb.from("jobs").select("id,parish,trade,stage,status,open,owed,updated_at").eq("open", true).limit(300),
+    sb.from("job_quotes").select("job_id").limit(600),
+    sb.from("invoices").select("id,job_id,client_name,status,total_pence,created_at").limit(600),
+    sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
+    sb.from("kickoff_packs").select("job_id,status").limit(300),
+    countOf("reviews", q => q.is("reply", null)),
+    countOf("worker_profiles", null),
+  ]);
+  const JOBS = jobQ.data || [];
+  const staleReplies = revNoReply;
+
+  const quotesBy = {};
+  for (const q of (quoteQ.data || [])) quotesBy[q.job_id] = (quotesBy[q.job_id] || 0) + 1;
+  const kickBy = {};
+  for (const p of (kickQ.data || [])) kickBy[p.job_id] = p.status;
+  const DISPUTED = new Set((dispQ.data || []).map(d => d.job_id));
+
+  const INV = invQ.data || [];
+  const sumOf = (a) => a.reduce((t, i) => t + (i.total_pence || 0), 0);
+  const draftsInv = INV.filter(i => i.status === "draft");
+  const sentInv   = INV.filter(i => i.status === "sent");
+  const mKey      = new Date().toISOString().slice(0, 7);
+  const paidM     = INV.filter(i => i.status === "paid" && String(i.created_at || "").slice(0, 7) === mKey);
+  // owed is a text column and is read the same way the Money view reads it.
+  // It is an amount agreed in writing, never a balance and never held.
+  const owedTotal = JOBS.reduce((t, j) => t + (Number(j.owed) || 0), 0);
+
+  const dq = (v) => v ? Math.floor((Date.now() - new Date(v).getTime()) / 86400000) : 0;
+  const boardNoQuotes = JOBS.filter(j => j.status === "open_for_quotes" && !(quotesBy[j.id] || 0));
+  const boardQuiet    = boardNoQuotes.reduce((a, j) => Math.max(a, dq(j.updated_at)), 0);
+  const choosing = JOBS.filter(j => j.status === "quoted");
+  const doneJobs = JOBS.filter(j => j.status === "complete");
+  const signing  = JOBS.filter(j => j.status !== "complete" && Number(j.stage || 0) >= 5);
+  const onSite   = JOBS.filter(j => j.status !== "complete" && Number(j.stage || 0) >= 1 && Number(j.stage || 0) < 5);
+
+  // Which days have one person booked twice in the same slot. Exactly the rule
+  // renderCal() paints a red square with, computed again here so the People
+  // column can say it in words. A clash is a person problem before it is a
+  // calendar one: somebody has to be told their visit moved.
+  const visByDay = {};
+  for (const v of VISITS) (visByDay[String(v.day || "")] = visByDay[String(v.day || "")] || []).push(v);
+  const clashDayList = Object.keys(visByDay).filter(d => {
+    const seen = {};
+    return visByDay[d].some(v => {
+      const key = (v.owner_email || "") + "|" + (v.slot || "");
+      if (seen[key]) return true;
+      seen[key] = true;
+      return false;
+    });
+  }).sort();
+
   $("ovSub").textContent = "Every number here is counted from the table it names. Nothing on this page is a placeholder.";
 
   $("ovTiles").innerHTML = [
-    tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute"),
-    tile(evidWaiting ? "warn" : "ok", "Evidence to check", String(evidWaiting), evidWaiting ? "Waiting on your eyes" : "Nothing waiting"),
-    tile(intakeNew ? "warn" : "ok", "Intake to triage", String(intakeNew), intakeNew ? "Read it and decide" : "Queue is clear"),
-    tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting"),
-    tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held"),
-    tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked"),
-    tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to"),
-    tile(asksNew ? "warn" : "ok", "Questions to publish", String(asksNew), asksNew ? "Waiting on your read" : "Board is clear"),
+    tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute", "jobs"),
+    tile(evidWaiting ? "warn" : "ok", "Evidence to check", String(evidWaiting), evidWaiting ? "Waiting on your eyes" : "Nothing waiting", "evid"),
+    tile(intakeNew ? "warn" : "ok", "Intake to triage", String(intakeNew), intakeNew ? "Read it and decide" : "Queue is clear", "intake"),
+    tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
+    tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held", "quotes"),
+    tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
+    tile(enqNew ? "warn" : "ok", "Enquiries to answer", String(enqNew), enqNew ? "Somebody asked a question" : "All replied to", "enq"),
+    tile(asksNew ? "warn" : "ok", "Questions to publish", String(asksNew), asksNew ? "Waiting on your read" : "Board is clear", "asks"),
     tile((invDraft + pkDraft + pkAppr) ? "warn" : "ok", "Your documents", String(invDraft + pkDraft + pkAppr), "Drafts and packs on you"),
-    tile("", "Jobs on the board", String(jobsOpen), "Open to workers"),
-    tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every job has a client"),
-    tile("", "Waiting list", String(waitN), "People to write to"),
-    tile("", "Feedback", String(fbN), "Unprompted, from the site"),
+    tile("", "Jobs on the board", String(jobsOpen), "Open to workers", "market"),
+    tile(unsigned ? "warn" : "", "Built, never signed", String(unsigned), unsigned ? "A job with nobody behind it" : "Every job has a client", "intake"),
+    tile("", "Waiting list", String(waitN), "People to write to", "waitlist"),
+    tile("", "Feedback", String(fbN), "Unprompted, from the site", "feedback"),
   ].join("");
 
   // A second row, about the assistant rather than about your queue. Nothing
   // here is a task: it is the scoreboard for the thing answering people while
   // you are asleep.
   $("ovTiles").innerHTML += [
-    tile("", "WhatsApp conversations", String(waTotal), "All time, from the assistant"),
-    tile(waDone ? "ok" : "", "Became a real job", String(waDone), waTotal ? `${Math.round((waDone / waTotal) * 100)}% of them` : "None yet"),
-    tile(waHanded ? "warn" : "", "Handed to you", String(waHanded), waTotal ? `${Math.round((waHanded / waTotal) * 100)}% needed a person` : "None yet"),
+    tile("", "WhatsApp conversations", String(waTotal), "All time, from the assistant", "threads"),
+    tile(waDone ? "ok" : "", "Became a real job", String(waDone), waTotal ? `${Math.round((waDone / waTotal) * 100)}% of them` : "None yet", "jobs"),
+    tile(waHanded ? "warn" : "", "Handed to you", String(waHanded), waTotal ? `${Math.round((waHanded / waTotal) * 100)}% needed a person` : "None yet", "threads"),
     tile("", "Messages to finish one", avgTurns, "Average, where it got there"),
-    tile(waWaiting ? "warn" : "", "Replies waiting to send", String(waWaiting), waWaiting ? "Outside the 24 hour window" : "Nothing held"),
-    tile(waFailed ? "crit" : "ok", "Messages that failed", String(waFailed), waFailed ? "Somebody is waiting on nothing" : "All delivered"),
+    tile(waWaiting ? "warn" : "", "Replies waiting to send", String(waWaiting), waWaiting ? "Outside the 24 hour window" : "Nothing held", "waiting"),
+    tile(waFailed ? "crit" : "ok", "Messages that failed", String(waFailed), waFailed ? "Somebody is waiting on nothing" : "All delivered", "delivery"),
     tile(slaPct === null ? "" : slaPct >= 90 ? "ok" : slaPct >= 70 ? "warn" : "crit",
       "Replied within a working day", slaPct === null ? "n/a" : slaPct + "%",
-      answered.length ? `${slaMet} of ${answered.length} conversations` : "Nobody has needed a person yet"),
+      answered.length ? `${slaMet} of ${answered.length} conversations` : "Nobody has needed a person yet", "owed"),
     // Counts the whole queue, conversations and contact form together. An
     // enquiry waiting six days is not a smaller broken promise than a chat.
     tile(owedOldest >= 24 ? "crit" : owedOldest ? "warn" : "ok",
       "Longest anyone is waiting", owedOldest ? (owedOldest >= 48 ? Math.round(owedOldest / 24) + " days" : Math.round(owedOldest) + " hr") : "0",
-      CLOCK.length ? `${CLOCK.length} waiting on a person` : "Nobody is waiting"),
+      CLOCK.length ? `${CLOCK.length} waiting on a person` : "Nobody is waiting", "owed"),
     // Not coloured green at 100%: a tiny sample reading 100 is not good news,
     // it is no news, and colouring it would invite trusting it too early.
     tile(draftPct === null ? "" : drafts.decisions < 5 ? "" : draftPct >= 60 ? "ok" : "warn",
@@ -4295,26 +4549,26 @@ async function loadOverview(){
         : "No drafts decided yet"),
     tile(stalledNow ? (Number(stall.escalated_now || 0) ? "crit" : "warn") : "ok",
       "Jobs gone quiet", String(stalledNow),
-      liveJobs ? `${Math.round((stalledNow / liveJobs) * 100)}% of ${liveJobs} live jobs` : "No live jobs"),
+      liveJobs ? `${Math.round((stalledNow / liveJobs) * 100)}% of ${liveJobs} live jobs` : "No live jobs", "stalled"),
     // Measured from when Yaadly noticed, not from when the job actually went
     // quiet. That earlier moment is not recorded anywhere and a number nobody
     // can point at a row for is worse than no number.
     tile(unstallHrs === null ? "" : unstallHrs <= 24 ? "ok" : unstallHrs <= 72 ? "warn" : "crit",
       "Time to get moving again", unstallHrs === null ? "n/a" : Math.round(unstallHrs) + " hr",
-      unstallN ? `${unstallN} in 30 days, from when we chased` : "Nothing has unstalled yet"),
+      unstallN ? `${unstallN} in 30 days, from when we chased` : "Nothing has unstalled yet", "stalled"),
     // Three separate numbers rather than one completeness score. The gaps have
     // different causes: no evidence is a desk problem, no fingerprint is a
     // plumbing problem, no arrival is a thing workers could not do from a
     // phone until now. One percentage would hide which.
     tile(withEv === null ? "" : withEv === 100 ? "ok" : "crit",
       "Signed off with evidence", withEv === null ? "n/a" : withEv + "%",
-      signoffs ? `${ec.with_any_evidence} of ${signoffs} sign-offs, all time` : "Nothing signed off yet"),
+      signoffs ? `${ec.with_any_evidence} of ${signoffs} sign-offs, all time` : "Nothing signed off yet", "evid"),
     tile(withFp === null ? "" : withFp === 100 ? "ok" : "warn",
       "Bound to the exact files", withFp === null ? "n/a" : withFp + "%",
-      signoffs ? `${ec.fully_fingerprinted} of ${signoffs} carry a fingerprint on every item` : "Nothing signed off yet"),
+      signoffs ? `${ec.fully_fingerprinted} of ${signoffs} carry a fingerprint on every item` : "Nothing signed off yet", "evid"),
     tile(withArr === null ? "" : withArr >= 80 ? "ok" : "warn",
       "Arrival logged first", withArr === null ? "n/a" : withArr + "%",
-      signoffs ? `${ec.with_arrival} of ${signoffs} had the worker on site on record` : "Nothing signed off yet"),
+      signoffs ? `${ec.with_arrival} of ${signoffs} had the worker on site on record` : "Nothing signed off yet", "evid"),
     // Never coloured red. The site promises a before and an after, and until
     // 5 Sep nothing could record which was which, so a low number here is a
     // measure that has only just started rather than workers failing at it.
@@ -4322,7 +4576,7 @@ async function loadOverview(){
       "Before and after on record", withBA === null ? "n/a" : withBA + "%",
       signoffs
         ? `${ec.with_before_and_after} of ${signoffs} had both. ${ec.with_before} marked a before, ${ec.with_after} an after, ${ec.with_during || 0} filed during the work`
-        : "Nothing signed off yet"),
+        : "Nothing signed off yet", "evid"),
     // Never coloured at all, for the reason above the variable: reporting a
     // problem is the worker doing their job, and a green tick on a low number
     // would be an instruction to stop reporting them.
@@ -4331,7 +4585,7 @@ async function loadOverview(){
         ? (issuesRaised
             ? `Across ${signoffsWithIssues} of ${signoffs} sign-offs. Anything that changes price or timeline is agreed in writing first`
             : "None reported since workers could mark one")
-        : "Nothing signed off yet"),
+        : "Nothing signed off yet", "evid"),
     // Never coloured. This is a capacity reading, not a target: a low evening
     // is a quiet week, not a bad one, and a green tick on it would invite
     // treating throughput as the thing to maximise.
@@ -4343,71 +4597,308 @@ async function loadOverview(){
       "Quote packs held", String(held.length),
       held.length
         ? `Longest waiting ${Math.round(heldHrs)} hr, and that client gets no quote`
-        : "Every pack is with the workers"),
+        : "Every pack is with the workers", "qpd"),
   ].join("");
 
-  const needs = [];
-  if (oldestWait >= 24) needs.push(alertRow("crit","!",
-    "Somebody has been waiting " + Math.round(oldestWait) + " hours for a person",
-    "The site promises a person replies within one working day. This one is past that, and it is the most concrete promise Yaadly makes anywhere.", "Answer them", "owed"));
-  else if (waitingNow.length) needs.push(alertRow("warn","?",
-    waitingNow.length + (waitingNow.length === 1 ? " conversation is waiting on you" : " conversations are waiting on you"),
-    "The assistant has handed these over and told them you would come back to them. The clock on the site's promise is running.", "Answer them", "owed"));
-  if (waFailed) needs.push(alertRow("crit","!", waFailed + (waFailed === 1 ? " message never arrived" : " messages never arrived"),
-    "Twilio accepted these and the phone never got them. Somebody is waiting on a message that is not coming, and nothing else in the system knows.", "See them", "delivery"));
-  if (held.length) needs.push(alertRow(heldHrs >= 24 ? "crit" : "warn", "!",
-    held.length + (held.length === 1 ? " quote pack is held and its job cannot be quoted" : " quote packs are held and those jobs cannot be quoted"),
-    "The guardrail flagged wording in the pack and stopped it, which is correct. But the pack is what a worker edits and prices into the quote the client sees, so until you clear or redraft it no worker can read it, no quote gets built, and nothing reaches that client at all. The job still shows as open for quotes. Longest held: " + Math.round(heldHrs) + " hours.",
-    "Open the drafts", "qpd"));
-  if (noEv) needs.push(alertRow("crit","!",
-    noEv + (noEv === 1 ? " stage was signed off with no evidence on file at all" : " stages were signed off with no evidence on file at all"),
-    "An approval with nothing behind it is the one thing this business sells, missing. Worth knowing which, because it is either a test row or a habit forming.", "See sign-offs", "evid"));
-  if (noFp) needs.push(alertRow("warn","?",
-    noFp + (noFp === 1 ? " sign-off is not bound to the exact files" : " sign-offs are not bound to the exact files"),
-    "An evidence item with no sha256 means the approval is attached to a label, not to the bytes. If the file is later swapped, nothing notices.", "See sign-offs", "evid"));
-  if (Number(stall.escalated_now || 0)) needs.push(alertRow("crit","!",
-    stall.escalated_now + (Number(stall.escalated_now) === 1 ? " job has been quiet long enough to escalate" : " jobs have been quiet long enough to escalate"),
-    "The worker was nudged and it did not move it. The client has been told. This is the point where a job stops being late and starts being a job somebody walked away from.", "See them", "stalled"));
-  if (disputesOpen) needs.push(alertRow("crit","!", disputesOpen + (disputesOpen === 1 ? " dispute is open" : " disputes are open"),
-    "Money does not move on a job while its dispute is open. This is the first thing to clear.", "Open jobs", "jobs"));
-  if (evidWaiting) needs.push(alertRow("warn","?", evidWaiting + (evidWaiting === 1 ? " evidence item is unchecked" : " evidence items are unchecked"),
-    "You look before the client does. Signing off binds your approval to the fingerprint of those exact files.", "Review", "evid"));
-  if (enqBreached) needs.push(alertRow("crit","!",
-    enqBreached + (enqBreached === 1 ? " enquiry is" : " enquiries are") + " past one working day",
-    "The oldest has been waiting " + Math.round(enqOldest / 24) + " days. Every page on the site says a person replies within one working day, and the business page sends companies to this form.", "Answer them", "owed"));
-  else if (enqNew) needs.push(alertRow("warn","?", enqNew + (enqNew === 1 ? " enquiry has had no reply" : " enquiries have had no reply"),
-    "Somebody asked a question and is waiting. An unanswered question is the cheapest client you will ever lose.", "Read them", "enq"));
-  if (asksNew) needs.push(alertRow("warn","?", asksNew + (asksNew === 1 ? " question is waiting to be published" : " questions are waiting to be published"),
-    "Somebody asked on the public board and nothing publishes on its own. Read it, check it carries no phone number or address, then publish it or leave it.", "Read them", "asks"));
-  if (intakeNew) needs.push(alertRow("warn","?", intakeNew + (intakeNew === 1 ? " intake is untriaged" : " intakes are untriaged"),
-    "Somebody asked for help and nobody has read it yet. That is the clock people judge you on.", "Open intake", "intake"));
-  if (appsWaiting) needs.push(alertRow("warn","?", appsWaiting + (appsWaiting === 1 ? " application is part way through vetting" : " applications are part way through vetting"),
-    "The agent flags what is missing. A person decides. Nothing auto-passes.", "Open applications", "apps"));
-  if (quotesOut) needs.push(alertRow("warn","?", quotesOut + (quotesOut === 1 ? " quote is sitting with you" : " quotes are sitting with you"),
-    "A worker has priced the job and the client has not seen it yet.", "Open quotes", "quotes"));
-  if (callsNew) needs.push(alertRow("warn","?", callsNew + (callsNew === 1 ? " call is unanswered" : " calls are unanswered"),
-    "Each one names the slots that suit them and the timezone they are in.", "Open calls", "calls"));
-  if (invDraft) needs.push(alertRow("warn","?", invDraft + (invDraft === 1 ? " invoice draft is unsent" : " invoice drafts are unsent"),
-    "Marking one as sent freezes it. It emails nobody, so sending it is still on you.", "Open invoices", "invoices"));
-  if (pkDraft) needs.push(alertRow("warn","?", pkDraft + (pkDraft === 1 ? " sketch pack is unread" : " sketch packs are unread"),
-    "Approving says you have read every room and it matches what you saw. Nothing approves itself.", "Read them", "sketch"));
-  if (pkAppr) needs.push(alertRow("warn","?", pkAppr + (pkAppr === 1 ? " approved pack has not been issued" : " approved packs have not been issued"),
-    "Approved is not sent. The client still cannot see these.", "Issue them", "sketch"));
-  if (kickDraft) needs.push(alertRow("warn","?", kickDraft + (kickDraft === 1 ? " kickoff pack is in draft" : " kickoff packs are in draft"),
-    "Read it before it goes to a client. Approving freezes it.", "Open packs", "kick"));
-  if (unsigned) needs.push(alertRow("warn","?", unsigned + (unsigned === 1 ? " job was built and never signed for" : " jobs were built and never signed for"),
-    "Somebody described the work, chose the parish and stopped at sign-up. It cannot reach the board without a client account, and you still have everything they typed. That is a lead, not a loss.", "Open intake", "intake"));
+  // ── band one: the day, grouped by whose move it is ─────────────────────
+  //
+  // Every row below is a MOVE, not a total, and the lane it sits in says who
+  // owes it. That is the whole point of the rebuild: the screen this replaced
+  // could tell you that six invoices existed and could not tell you that
+  // nothing would happen to any of them until you pressed something.
+  //
+  // A row carries old:true when the thing behind it has been sitting for
+  // seventy-two hours or more. Only the three queues that record an age can
+  // claim that, and the headline counts only those, so it is never a guess.
+  const yours = [], wrk = [], cli = [], non = [], clear = [];
+  let oldOnes = 0;
+  const push = (into, tone, tag, text, note, amt, btn, view, old) => {
+    into.push(`<div class="mv"><span class="tag ${tone}">${esc(tag)}</span>`
+      + `<div class="wt">${esc(text)}${note ? ` <span>&middot; ${esc(note)}</span>` : ""}</div>`
+      + (amt ? `<span class="amt">${esc(amt)}</span>` : "")
+      + (btn ? `<button class="btn g" data-v="${esc(view)}">${esc(btn)}</button>` : "")
+      + `</div>`);
+    if (old) oldOnes++;
+  };
+  const hrs = (h) => h >= 48 ? Math.round(h / 24) + " days" : Math.round(h) + " hr";
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
 
-  $("ovNeeds").innerHTML = needs.length ? needs.join("")
-    : alertRow("ok","✓","Nothing is waiting on you","No open dispute, no unchecked evidence, no untriaged intake, nothing half sent. The rail is clear.",null,null);
+  if (oldestWait >= 24)
+    push(yours, "crit", hrs(oldestWait), "Somebody is waiting on a person, not a reply", "the site promises one working day", null, "Answer", "owed", oldestWait >= 72);
+  else if (waitingNow.length)
+    push(yours, "warn", "Waiting", plural(waitingNow.length, "conversation is", "conversations are") + " waiting on you", "the assistant handed these over", null, "Answer", "owed", false);
+  if (enqBreached)
+    push(yours, "crit", hrs(enqOldest), plural(enqBreached, "enquiry is", "enquiries are") + " past one working day", "the business page sends companies to this form", null, "Answer", "enq", enqOldest >= 72);
+  else if (enqNew)
+    push(yours, "warn", "Unanswered", plural(enqNew, "enquiry has", "enquiries have") + " had no reply", null, null, "Read them", "enq", false);
+  if (waFailed)
+    push(yours, "crit", "Failed", plural(waFailed, "message", "messages") + " never arrived", "somebody is waiting on nothing", null, "See them", "delivery", false);
+  if (held.length)
+    push(yours, heldHrs >= 24 ? "crit" : "warn", "Held", plural(held.length, "quote pack is", "quote packs are") + " held, so those jobs cannot be quoted", "longest " + Math.round(heldHrs) + " hr", null, "Open drafts", "qpd", heldHrs >= 72);
+  if (disputesOpen)
+    push(yours, "crit", "Dispute", plural(disputesOpen, "dispute is", "disputes are") + " open", "money does not move on a job while its dispute is", null, "Open jobs", "jobs", false);
+  if (noEv)
+    push(yours, "crit", "No proof", plural(noEv, "stage was", "stages were") + " signed off with no evidence at all", null, null, "See sign-offs", "evid", false);
+  if (noFp)
+    push(yours, "warn", "No print", plural(noFp, "sign-off is", "sign-offs are") + " not bound to the exact files", null, null, "See sign-offs", "evid", false);
+  if (evidWaiting)
+    push(yours, "warn", "Unchecked", plural(evidWaiting, "evidence item is", "evidence items are") + " unchecked", "you look before the client does", null, "Review", "evid", false);
+  if (intakeNew)
+    push(yours, "warn", "Untriaged", plural(intakeNew, "intake is", "intakes are") + " untriaged", null, null, "Open intake", "intake", false);
+  if (appsWaiting)
+    push(yours, "warn", "Vetting", plural(appsWaiting, "application is", "applications are") + " part way through vetting", "the agent flags, you decide", null, "Open", "apps", false);
+  if (quotesOut)
+    push(yours, "warn", "Decide", plural(quotesOut, "quote is", "quotes are") + " sitting with you", "the client has not seen these", null, "Compare", "quotes", false);
+  if (invDraft)
+    push(yours, "warn", "Unsent", plural(invDraft, "invoice draft is", "invoice drafts are") + " unsent", null, money(sumOf(draftsInv)), "Open invoices", "invoices", false);
+  if (kickDraft)
+    push(yours, "warn", "Draft", plural(kickDraft, "kickoff pack is", "kickoff packs are") + " in draft", "approving freezes it", null, "Open packs", "kick", false);
+  if (pkDraft)
+    push(yours, "warn", "Unread", plural(pkDraft, "sketch pack is", "sketch packs are") + " unread", null, null, "Read them", "sketch", false);
+  if (pkAppr)
+    push(yours, "warn", "Unissued", plural(pkAppr, "approved pack has", "approved packs have") + " not been issued", "approved is not sent", null, "Issue them", "sketch", false);
+  if (asksNew)
+    push(yours, "warn", "Publish", plural(asksNew, "question is", "questions are") + " waiting to be published", "check it carries no phone number or address", null, "Read them", "asks", false);
+  if (callsNew)
+    push(yours, "warn", "Call", plural(callsNew, "call is", "calls are") + " unanswered", null, null, "Open calls", "calls", false);
+  if (AGENTS_PAUSED)
+    push(yours, "warn", "Paused", "Agents are paused", "people who write in are still recorded and still reach your phone", null, "Open settings", "set", false);
 
-  const running = [];
-  if (jobsOpen) running.push(alertRow("ok","✓", jobsOpen + (jobsOpen === 1 ? " job is on the board" : " jobs are on the board"),
-    "Open to workers. The address and the phone number are scrubbed out of that view by the database.", "See the board", "market"));
-  if (invSent) running.push(alertRow("ok","✓", invSent + (invSent === 1 ? " invoice is out and awaiting payment" : " invoices are out and awaiting payment"),
-    "Frozen and with the client. Nothing to do until the money lands.", "Open money", "money"));
-  if (!jobsOpen && !invSent) running.push(alertRow("ok","✓","Nothing in flight","No job on the board and no invoice awaiting payment.",null,null));
-  $("ovRunning").innerHTML = running.join("");
+  if (boardNoQuotes.length)
+    push(wrk, boardQuiet >= 3 ? "warn" : "", boardQuiet >= 3 ? "Quiet " + boardQuiet + "d" : "On the board", plural(boardNoQuotes.length, "job is", "jobs are") + " on the board with no quotes in", null, null, "See the board", "market", false);
+  if (Number(stall.escalated_now || 0))
+    push(wrk, "crit", "Escalated", plural(Number(stall.escalated_now), "job has", "jobs have") + " been quiet long enough to escalate", "the worker was nudged and it did not move it", null, "See them", "stalled", false);
+  const stallWatch = Math.max(0, stalledNow - Number(stall.escalated_now || 0));
+  if (stallWatch)
+    push(wrk, "warn", "Gone quiet", plural(stallWatch, "job has", "jobs have") + " gone quiet and the worker was nudged", null, null, "See them", "stalled", false);
+  if (onSite.length)
+    push(wrk, "", "On site", plural(onSite.length, "job is", "jobs are") + " with a worker, nothing overdue", null, null, "Open jobs", "jobs", false);
+  if (!wrk.length)
+    push(wrk, "ok", "Clear", "Nothing is sitting with a worker", null, null, null, null, false);
+
+  if (unsigned)
+    push(cli, "crit", "Stuck", plural(unsigned, "job was", "jobs were") + " built and never signed for", "a lead, not a loss: you still have everything they typed", null, "Open intake", "intake", false);
+  if (choosing.length)
+    push(cli, "", "Choosing", plural(choosing.length, "job has", "jobs have") + " quotes out with a client", null, null, "Open quotes", "quotes", false);
+  if (signing.length)
+    push(cli, "warn", "Reading", plural(signing.length, "job is", "jobs are") + " waiting on a client sign-off", null, null, "Open jobs", "jobs", false);
+  if (invSent)
+    push(cli, "warn", "With client", plural(invSent, "invoice is", "invoices are") + " out and awaiting payment", null, money(sumOf(sentInv)), "Open money", "money", false);
+  if (waitN)
+    push(cli, "", "Waiting", plural(waitN, "person is", "people are") + " on the waiting list", null, null, "Write to them", "waitlist", false);
+  if (!cli.length)
+    push(cli, "ok", "Clear", "Nothing is sitting with a client", null, null, null, null, false);
+
+  if (doneJobs.length)
+    push(non, "ok", "Proven", plural(doneJobs.length, "job is", "jobs are") + " signed off and complete", null, null, "Open jobs", "jobs", false);
+  if (paidM.length)
+    push(non, "ok", "Paid", plural(paidM.length, "invoice", "invoices") + " paid this month", null, money(sumOf(paidM)), "Open money", "money", false);
+  if (!non.length)
+    push(non, "ok", "Clear", "Nothing is running on its own right now", null, null, null, null, false);
+
+  // The zero queues, named rather than drawn. Nineteen tiles reading zero was
+  // the diagnosis; one line saying which nineteen is the answer to it.
+  const zeroes = [
+    [!disputesOpen, "disputes"], [!evidWaiting, "evidence to check"], [!intakeNew, "intake to triage"],
+    [!appsWaiting, "applications"], [!quotesOut, "quotes to pass on"], [!callsNew, "calls requested"],
+    [!enqNew, "enquiries to answer"], [!asksNew, "questions to publish"], [!invDraft, "invoice drafts"],
+    [!pkDraft && !pkAppr, "sketch packs"], [!kickDraft, "kickoff packs"], [!held.length, "quote packs held"],
+    [!waFailed, "messages that failed"], [!waWaiting, "replies waiting to send"],
+    [!waitingNow.length, "conversations handed over"], [!noEv, "sign-offs with no evidence"],
+    [!noFp, "sign-offs with no fingerprint"], [!stalledNow, "jobs gone quiet"], [!unsigned, "jobs never signed for"],
+  ].filter(z => z[0]).map(z => z[1]);
+
+  const laneHead = (k, cls, name, what, n, tone) =>
+    `<button class="lane ${cls}" data-lane="${k}"><span class="tw">${OVLANE[k] ? "&#9660;" : "&#9654;"}</span>`
+    + `<span class="sq"></span><span class="nm">${esc(name)}</span>`
+    + `<span class="wh">${esc(what)}</span><span class="n">${n}</span></button>`;
+  const laneBody = (k, rows) => `<div id="lb-${k}"${OVLANE[k] ? "" : ' class="hidden"'}>${rows.join("")}</div>`;
+
+  $("ovLanes").innerHTML =
+      laneHead("you", "you", "Yours", yours.length ? "nothing happens until you act" : "nothing is waiting on you", yours.length)
+    + laneBody("you", yours.length ? yours : [`<div class="mv"><span class="tag ok">Clear</span><div class="wt">Nothing is waiting on you<span> &middot; no open dispute, no unchecked evidence, no untriaged intake, nothing half sent</span></div></div>`])
+    + laneHead("wrk", "wrk", "A worker's", boardNoQuotes.length || stalledNow ? plural(stalledNow, "job", "jobs") + " quiet, " + onSite.length + " on site" : onSite.length + " on site, nothing overdue", wrk.length)
+    + laneBody("wrk", wrk)
+    + laneHead("cli", "cli", "A client's", unsigned ? unsigned + " never signed, " + signing.length + " reading a sign-off" : signing.length + " reading a sign-off", cli.length)
+    + laneBody("cli", cli)
+    + laneHead("non", "non", "Nobody's", doneJobs.length + " signed off, " + paidM.length + " invoices paid this month", non.length)
+    + laneBody("non", non)
+    + `<button class="clr" data-lane="clr"><span class="tw">${OVLANE.clr ? "&#9660;" : "&#9654;"}</span>`
+    + `<span><b>${zeroes.length} ${zeroes.length === 1 ? "queue is" : "queues are"} clear.</b> Nothing drawn until one of them is not.</span></button>`
+    + `<div id="lb-clr" class="clrlist${OVLANE.clr ? "" : " hidden"}">${zeroes.length ? esc(zeroes.join(" · ")) + ", all zero." : "None. Every queue on this desk has something in it."}</div>`;
+
+  // Money, both directions. Nothing on this card is a balance and nothing here
+  // is held: an amount agreed in writing is a promise recorded, and an invoice
+  // is a document you raised. Yaadly is the principal contractor, so the client
+  // buys the job from Yaadly at one agreed price and Yaadly pays the worker
+  // separately. Saying anything stronger than that on this card would be the
+  // one claim the guardrail screen cannot catch, because no single word in it
+  // is banned.
+  const namedDrafts = draftsInv.slice(0, 3);
+  $("ovMoney").innerHTML = `
+    <div class="sc gold">
+      <h5>Money, both directions</h5>
+      <div class="scrow">
+        <div>
+          <div class="sl"><span>Agreed in writing</span><span class="v">${esc(jmd(owedTotal))}</span></div>
+          <div class="slnote">Across ${plural(JOBS.length, "open job", "open jobs")}. Yaadly holds none of it.</div>
+        </div>
+        <div>
+          <div class="sl"><span>Invoices raised, unsent</span><span class="v warn">${esc(money(sumOf(draftsInv)))}</span></div>
+          <div class="slnote">${plural(draftsInv.length, "draft", "drafts")} sitting on you.</div>
+        </div>
+        <div>
+          <div class="sl"><span>Out with clients, unpaid</span><span class="v warn">${esc(money(sumOf(sentInv)))}</span></div>
+          <div class="slnote">${plural(sentInv.length, "invoice", "invoices")} sent. Nothing to do until the money lands.</div>
+        </div>
+        ${namedDrafts.length ? `<div class="sdiv">${namedDrafts.map(i =>
+          `<div class="sl"><span>${esc(i.client_name || i.job_id || "unnamed draft")}</span><span class="v">${esc(money(i.total_pence || 0))}</span></div>`).join("")}</div>` : ""}
+        <div class="sdiv"><div class="sl"><span>Paid this month</span><span class="v ok">${esc(money(sumOf(paidM)))}</span></div></div>
+      </div>
+    </div>`;
+
+  $("ovBot").innerHTML = `
+    <div class="sc">
+      <h5>The assistant, all time</h5>
+      <div class="scrow">
+        <div class="sl"><span>Threads handled</span><span class="v">${waTotal}</span></div>
+        <div class="sl"><span>Became a real job</span><span class="v ok">${waDone}${waTotal ? " &middot; " + Math.round((waDone / waTotal) * 100) + "%" : ""}</span></div>
+        <div class="sl"><span>Needed a person</span><span class="v warn">${waHanded}${waTotal ? " &middot; " + Math.round((waHanded / waTotal) * 100) + "%" : ""}</span></div>
+        <div class="sl"><span>Messages to finish one</span><span class="v">${esc(avgTurns)}</span></div>
+      </div>
+      <p class="slnote" style="margin-top:10px">All time, not a rolling window. At this many jobs a window would mostly measure how quiet last week was.</p>
+    </div>`;
+
+  // ── the headline ───────────────────────────────────────────────────────
+  $("ovSay").innerHTML = yours.length
+    ? `${plural(yours.length, "thing wants", "things want")} you.`
+      + (oldOnes ? ` <em>${oldOnes === 1 ? "One is" : oldOnes + " are"} older than three days.</em>` : "")
+    : `<i>Nothing is waiting on you.</i> The rail is clear.`;
+
+  const answerN = enqNew + waitingNow.length + asksNew + callsNew + fbN + waitN;
+  $("ovStat").innerHTML =
+      `<div><div class="k">Live jobs</div><div class="v">${JOBS.length}</div></div>`
+    + `<div><div class="k">To answer</div><div class="v${answerN ? " warn" : ""}">${answerN}</div></div>`
+    + `<div><div class="k">Agreed in writing</div><div class="v${owedTotal ? " warn" : ""}">${esc(jmd(owedTotal))}</div></div>`;
+  $("ovDayC").textContent = yours.length + wrk.length + cli.length + non.length === 0
+    ? "every open move, grouped by who owes it"
+    : plural(yours.length, "move", "moves") + " yours, " + wrk.length + " a worker's, " + cli.length + " a client's";
+
+  // ── band two: every live job, by the stage it is at ────────────────────
+  //
+  // Six columns, and a job is in exactly one. status wins over stage where the
+  // two disagree, because status is what the rest of the system routes on.
+  const colOf = (j) => {
+    if (j.status === "complete") return 5;
+    if (j.status === "open_for_quotes") return 0;
+    if (j.status === "quoted") return 1;
+    const s = Number(j.stage) || 0;
+    if (s >= 5) return 4;
+    if (s <= 1) return 2;
+    return 3;
+  };
+  const COLS = [
+    { h:"1 &middot; On the board", cls:"" }, { h:"2 &middot; Quotes in", cls:"" },
+    { h:"3 &middot; Kickoff", cls:"warn" }, { h:"4 &middot; Working", cls:"" },
+    { h:"5 &middot; Sign-off", cls:"crit" }, { h:"6 &middot; Complete", cls:"done" },
+  ];
+  const buckets = [[], [], [], [], [], []];
+  for (const j of JOBS) buckets[colOf(j)].push(j);
+
+  const jobCard = (j, ci) => {
+    const q = quotesBy[j.id] || 0;
+    const d = dq(j.updated_at);
+    const disputed = DISPUTED.has(j.id);
+    const stage = Number(j.stage) || 0;
+    let state = "", stone = "";
+    if (ci === 0) { state = q ? plural(q, "quote in", "quotes in") : "No quotes in"; if (!q && d >= 3) stone = "warn"; }
+    else if (ci === 1) { state = "Client choosing"; }
+    else if (ci === 2) { const p = kickBy[j.id];
+      state = !p ? "No pack yet" : p === "draft" ? "Pack unsent" : p === "approved" ? "Approved, not issued" : "Pack issued";
+      stone = p === "issued" ? "ok" : "warn"; }
+    else if (ci === 3) { state = "Stage " + stage + " of 5"; }
+    else if (ci === 4) { state = disputed ? "Dispute open" : "Client reading"; stone = disputed ? "crit" : ""; }
+    else { state = "Signed off"; stone = "ok"; }
+    const tone = disputed ? "crit" : ci === 5 ? "ok" : d >= 3 ? "warn" : "";
+    const pips = ci >= 2 && ci <= 5
+      ? `<div class="pips">${[1,2,3,4,5].map(n =>
+          `<i class="${n < stage ? "on" : n === stage ? (ci === 5 ? "on" : "now") : ""}"></i>`).join("")}</div>`
+      : "";
+    return `<button class="jcard ${tone}" data-v="jobs">`
+      + `<div class="r"><span class="jid" title="${esc(j.id)}">${esc(j.id)}</span>`
+      + (ci <= 1 && q ? `<span class="qn${ci === 0 ? " warn" : ""}">${q} in</span>` : "") + `</div>`
+      + `<div class="wh">${esc([j.parish, j.trade].filter(Boolean).join(" · ") || "not classified")}</div>`
+      + (state ? `<div class="st ${stone}">${esc(state)}</div>` : "")
+      + pips
+      + (d >= 3 && ci !== 5 ? `<div class="qb" style="width:${Math.min(100, d * 12)}%"></div><div class="qt">Quiet ${d}d</div>` : "")
+      + `</button>`;
+  };
+
+  const quiet3 = JOBS.filter(j => j.status !== "complete" && dq(j.updated_at) >= 3).length;
+  $("ovJobsC").textContent = plural(JOBS.length, "open", "open") + ", " + quiet3 + " quiet 3 days or more";
+  $("ovStages").innerHTML = COLS.map((c, i) => {
+    const rows = buckets[i];
+    const anyQuiet = rows.some(j => dq(j.updated_at) >= 3);
+    const anyDispute = rows.some(j => DISPUTED.has(j.id));
+    const cls = anyDispute ? "crit" : anyQuiet ? "warn" : i === 5 ? "done" : "";
+    return `<div class="stgc ${cls}"><h6>${c.h}</h6>`
+      + `<div class="n">${rows.length ? plural(rows.length, "job", "jobs") : "none"}</div>`
+      + `<div class="cards">${rows.length
+          ? rows.map(j => jobCard(j, i)).join("")
+          : `<div class="none">Nothing at this stage.</div>`}</div></div>`;
+  }).join("");
+
+  // ── band three: to answer ──────────────────────────────────────────────
+  const ansRow = (tone, lead, isNum, title, note, btn, view) =>
+    `<div class="ans ${tone}">`
+    + (isNum ? `<span class="num">${esc(lead)}</span>` : `<span class="tag ${tone || "mute"}">${esc(lead)}</span>`)
+    + `<div class="tx"><b>${esc(title)}</b><p>${esc(note)}</p></div>`
+    + (btn ? `<button class="btn g" data-v="${esc(view)}">${esc(btn)}</button>` : "")
+    + `</div>`;
+
+  const people = [];
+  if (clashDayList.length)
+    people.push(ansRow("crit", "Clash", false, plural(clashDayList.length, "day has", "days have") + " a worker booked twice",
+      "First is " + clashDayList[0] + ". One of those visits has to move, and the diary beside this says which.", null, null));
+  if (appsWaiting)
+    people.push(ansRow("warn", "Vetting", false, plural(appsWaiting, "application is", "applications are") + " part way through",
+      "The agent flags what is missing. A person decides. Nothing auto-passes.", "Open", "apps"));
+  if (staleReplies)
+    people.push(ansRow("", "Review", false, plural(staleReplies, "review has", "reviews have") + " had no reply",
+      "Both directions are tied to a completed job. Replying is your call.", "Read", "reviews"));
+  if (!appsWaiting)
+    people.push(ansRow("ok", "Clear", false, "Applications and vetting, nothing waiting",
+      plural(workersN, "worker profile", "worker profiles") + " on file. The agent flags, you decide.", null, null));
+  $("ovPeople").innerHTML = `<h6>People</h6>` + (people.length ? people.join("") : ansRow("ok", "Clear", false, "Nothing on the people side", "No vetting outstanding, no diary clash, no review waiting on a reply.", null, null));
+
+  const words = [];
+  if (enqNew)
+    words.push(ansRow(enqBreached ? "crit" : "warn", String(enqNew), true, "Enquiries, nobody replied",
+      enqBreached ? "Oldest has waited " + hrs(enqOldest) + ". Every page on the site says a person replies within one working day."
+                  : "Each one came from the site. An unanswered question is the cheapest client you will ever lose.", "Answer", "enq"));
+  if (waitingNow.length)
+    words.push(ansRow("warn", String(waitingNow.length), true, "Threads handed to you by the assistant",
+      "The client is waiting on a person, not a reply. The clock on the site's promise is running.", "Open", "owed"));
+  if (waWaiting)
+    words.push(ansRow("warn", String(waWaiting), true, "Replies written and not sent",
+      "Outside the 24 hour window, so the message is held until they write again.", "Open", "waiting"));
+  if (waFailed)
+    words.push(ansRow("crit", String(waFailed), true, "Messages that never arrived",
+      "Twilio accepted these and the phone never got them. Nothing else in the system knows.", "See them", "delivery"));
+  if (asksNew)
+    words.push(ansRow("warn", String(asksNew), true, "Questions waiting to be published",
+      "Somebody asked on the public board. Check it carries no phone number or address, then publish it or leave it.", "Read", "asks"));
+  if (callsNew)
+    words.push(ansRow("warn", String(callsNew), true, "Calls requested",
+      "Each one names the slots that suit them and the timezone they are in.", "Open", "calls"));
+  if (fbN)
+    words.push(ansRow("", String(fbN), true, "Feedback, unprompted, from the site",
+      "Nobody asked for it. Worth reading for that reason.", "Read", "feedback"));
+  if (waitN)
+    words.push(ansRow("", String(waitN), true, "On the waiting list",
+      plural(waitN, "person", "people") + " to write to when a slot opens.", "Write", "waitlist"));
+  $("ovAnsC").textContent = answerN ? plural(answerN, "item", "items") : "nothing waiting";
+  $("ovWords").innerHTML = `<h6>Words</h6>` + (words.length ? words.join("") : ansRow("ok", "Clear", false, "Nobody is waiting on a word from you", "No enquiry, no handed-over thread, no question, no call, no feedback unread.", null, null));
 
   setCount("intake", intakeNew, false);
   setCount("apps", appsWaiting, false);
@@ -4417,11 +4908,6 @@ async function loadOverview(){
   setCount("invoices", invDraft, false);
   setCount("sketch", pkDraft + pkAppr, false);
   setCount("kick", kickDraft, false);
-  if (AGENTS_PAUSED) {
-    $("ovRunning").insertAdjacentHTML("afterbegin", alertRow("warn","!","Agents are paused",
-      "Invoice drafting and sketch description are off, and so is the assistant that answers WhatsApp and the website chat. People who write in are still recorded and still reach your phone.",
-      "Open settings","set"));
-  }
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
   // which put a coral badge on a link that does not go to disputes. On this
   // desk a colour is a claim about the thing it sits on, so a badge that means

@@ -932,6 +932,39 @@ select j.id, j.title, j.worker_email, job_silence_hours(j.id) as hours_silent, s
 
 ---
 
+## Reading the Overview after 6 September 2026
+
+The Overview is four bands, not a wall of tiles. Anywhere else in this file
+that says "On the Overview" and names a tile, the tile is still there: it is in
+the fourth band, **How the desk is doing**, at the bottom. Nothing was removed.
+
+1. **The day, whose move is it.** Four lanes: Yours, A worker's, A client's,
+   Nobody's. Yours is open on load, the rest are one summary line until you
+   click them. Every row is a move with a button, never a total. Under the
+   lanes, one row names every queue that is currently clear.
+2. **Live jobs, where each one is.** Every open job as a card in one of six
+   stage columns. The bar under a card is days since anything at all happened
+   on that job. A coral card has an open dispute, a gold one has been quiet
+   three days or more.
+3. **To answer.** People on the left, words on the right.
+4. **How the desk is doing.** The counting tiles, unchanged.
+
+**If a band is empty or the page is blank**, it is the same failure every time
+and it is not a data problem: a `const` declared below the line that first
+reads it, inside `loadOverview()`. Run the check below, which is the CI job
+that catches it, and move the declaration up.
+
+**To look at it without deploying**, serve the folder and sign in with your
+admin address. There is no way to see the real figures without signing in, by
+design: the page reads Postgres directly and row level security is what
+answers.
+
+```bash
+python3 -m http.server 8931 --directory concierge
+```
+
+---
+
 ## The desk script is linted now, and what to do when that job goes red
 
 **`scripts/check-desk-script.mjs`, CI job "Admin desk script".** It pulls the
