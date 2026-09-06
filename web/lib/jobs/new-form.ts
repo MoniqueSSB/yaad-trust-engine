@@ -252,16 +252,33 @@ export function parseDraft(raw: string | null, now: number): StoredDraft | null 
 /** Only values the current lists still offer are restored. A trade removed
  *  from the taxonomy since the draft was written comes back blank and gets
  *  asked again, rather than being posted as a trade no worker can carry. */
+/**
+ * An answer somebody has already given, if it is one we recognise.
+ *
+ * Two places hand this module a value it did not produce: a saved draft out of
+ * localStorage, and the ?trade= and ?parish= parameters on the link from the
+ * starter card on /marketplace. Neither is trustworthy. A value that is not on
+ * the list is dropped rather than repaired, and the person answers the question
+ * in the form, which is what would have happened anyway. That is deliberately
+ * silent: a hand-typed parameter must not be able to put an unknown trade on a
+ * job, and there is nothing useful to say to somebody who did not type it.
+ *
+ * The cost of the silence is that a wrong value looks exactly like a right one,
+ * so what the marketing page emits is asserted against the taxonomy in
+ * tests/marketplace-starter.test.mjs.
+ */
+export const askedFor = (v: string | undefined, list: readonly string[]) =>
+  v && list.includes(v) ? v : "";
+
 export function restoreFields(
   d: StoredDraft,
   lists: { trades: readonly string[]; parishes: readonly string[] },
 ): DraftFields {
-  const inList = (v: string, l: readonly string[]) => (l.includes(v) ? v : "");
   return {
-    trade: inList(d.fields.trade, lists.trades),
-    parish: inList(d.fields.parish, lists.parishes),
+    trade: askedFor(d.fields.trade, lists.trades),
+    parish: askedFor(d.fields.parish, lists.parishes),
     desc: d.fields.desc,
-    urgency: inList(d.fields.urgency, URGENCY.map((u) => u.value)),
-    accessType: inList(d.fields.accessType, ACCESS.map((a) => a.value)),
+    urgency: askedFor(d.fields.urgency, URGENCY.map((u) => u.value)),
+    accessType: askedFor(d.fields.accessType, ACCESS.map((a) => a.value)),
   };
 }

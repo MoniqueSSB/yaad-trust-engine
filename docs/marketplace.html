@@ -17,242 +17,195 @@
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Yaadly. Managed property work in Jamaica.">
 <meta name="twitter:image" content="https://yaadly.co.uk/og.png">
+<link rel="canonical" href="https://yaadly.co.uk/marketplace">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;1,9..144,200;1,9..144,300&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,300;0,9..144,400;1,9..144,200;1,9..144,300;1,9..144,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="nav.css">
 <style>
 :root{
-  --bg:#07071A;--ink:#EEEEFF;--mute:#9E9ECB;--dim:#7C7CA6;
+  --bg:#07071A;
+  /* Text tiers, same three values as docs/index.html, docs/yaadly.css and
+     web/app/globals.css. On --bg: ink 17.4:1, mute 7.8:1, dim 5.0:1. The
+     imported design used #A8A8D0, #9C9CC8, #7878A8 and #44446A for the same
+     four jobs; the last two land at roughly 3.6:1 and 1.9:1, which is the
+     exact regression the 3 Sep retune fixed. Mapped onto these on the way in.
+     Change all four files together or the site drifts against itself. */
+  --ink:#EEEEFF;--mute:#9E9ECB;--dim:#7C7CA6;
   --purple:#9B73F5;--purpleb:#C4AAFF;
   --gold:#F59E0B;--goldb:#FBBF24;--green:#34D399;
-  --line:rgba(155,115,245,0.11);--line2:rgba(155,115,245,0.22);
+  --line:rgba(155,115,245,0.14);--line2:rgba(155,115,245,0.28);
   --grad:linear-gradient(135deg,#7B4FE0,#9B73F5 45%,#F59E0B);
   --spring:cubic-bezier(0.16,1,0.3,1);
   --disp:'Fraunces',Georgia,serif;
   --body:'IBM Plex Sans',-apple-system,sans-serif;
-  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
 }
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-*{box-sizing:border-box;margin:0;padding:0}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--ink);font:14.5px/1.68 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{
+  background:
+    radial-gradient(ellipse 1000px 560px at 8% -14%,rgba(155,115,245,0.18),transparent 62%),
+    radial-gradient(ellipse 760px 520px at 100% 2%,rgba(245,158,11,0.10),transparent 55%),
+    var(--bg);
+  background-attachment:fixed;
+  color:var(--ink);font:16px/1.6 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
 a{color:var(--purpleb);text-decoration:none}
-
-/* ambient orbs */
-.orb{position:fixed;pointer-events:none;z-index:0;border-radius:50%;filter:blur(110px)}
-.o1{width:700px;height:700px;top:-15%;left:-15%;background:radial-gradient(circle,rgba(100,60,200,0.2) 0%,transparent 65%);animation:o1 20s ease-in-out infinite alternate}
-.o2{width:600px;height:600px;bottom:-12%;right:-12%;background:radial-gradient(circle,rgba(200,130,0,0.14) 0%,transparent 65%);animation:o2 16s ease-in-out infinite alternate}
-@keyframes o1{to{transform:translate(50px,40px) scale(1.1)}}
-@keyframes o2{to{transform:translate(-40px,-30px) scale(1.08)}}
-.mesh{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(155,115,245,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(155,115,245,0.022) 1px,transparent 1px);background-size:54px 54px}
-
-/* layout */
-.wrap{max-width:1060px;margin:0 auto;padding:0 22px;position:relative;z-index:1}
+:focus-visible{outline:2px solid var(--goldb);outline-offset:3px;border-radius:4px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 /* reveal */
 .rv{opacity:0;transform:translateY(22px);transition:opacity .55s var(--spring),transform .65s var(--spring)}
 .rv.in{opacity:1;transform:none}
-.rv.sl{transform:translateX(-20px)}
-.rv.sl.in{transform:none}
-.d1{transition-delay:.07s}.d2{transition-delay:.14s}.d3{transition-delay:.21s}.d4{transition-delay:.28s}
+.d1{transition-delay:.07s}.d2{transition-delay:.14s}.d3{transition-delay:.21s}
 
-/* buttons */
-.btn{display:inline-flex;align-items:center;gap:7px;justify-content:center;padding:11px 22px;border-radius:100px;border:0;cursor:pointer;font:600 13.5px var(--body);text-decoration:none;position:relative;overflow:hidden;transition:transform .2s var(--spring),box-shadow .2s}
-.btn::after{content:'';position:absolute;top:0;left:-100%;width:55%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);animation:sh 3.5s ease-in-out infinite}
-@keyframes sh{0%{left:-100%}60%,100%{left:160%}}
+/* shared bits */
+.mono{font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:14px 26px;border-radius:100px;border:0;cursor:pointer;font:700 15px var(--body);text-decoration:none;transition:transform .2s var(--spring),box-shadow .2s}
 .btn:hover{transform:translateY(-2px)}
-.btn-p{background:linear-gradient(135deg,#7B4FE0,#9B73F5);color:#fff;box-shadow:0 0 24px rgba(155,115,245,0.32),0 2px 6px rgba(0,0,0,0.4)}
-.btn-p:hover{box-shadow:0 6px 34px rgba(155,115,245,0.48)}
-.btn-g{background:none;border:1px solid var(--line2);color:var(--ink);box-shadow:none}
-.btn-g::after{display:none}
-.btn-g:hover{border-color:rgba(155,115,245,0.4);color:var(--purpleb)}
-.btn-sm{padding:8px 18px;font-size:13px}
+.btn-p{background:var(--grad);color:#fff;box-shadow:0 0 28px rgba(155,115,245,.3)}
+.btn-p:hover{box-shadow:0 6px 34px rgba(155,115,245,.46)}
+.btn-g{background:none;border:1px solid var(--line2);color:var(--ink);font-weight:600}
+.btn-g:hover{border-color:rgba(155,115,245,.42);color:var(--purpleb)}
+h2.sh{font-family:var(--disp);font-weight:300;font-size:clamp(28px,3.8vw,42px);letter-spacing:-0.02em;line-height:1.1}
+h2.sh em{font-style:italic;color:var(--purpleb)}
+h2.sh em.g{color:var(--goldb)}
 
-/* ═══════════════════════════════════════════
-   HERO
-═══════════════════════════════════════════ */
-.hero{padding:60px 0 0;text-align:center}
+/* ── trust strip, under the nav ─────────────────────────────────────────── */
+.strip{border-bottom:1px solid var(--line);background:rgba(7,7,26,0.5)}
+.strip ul{list-style:none;display:flex;flex-wrap:wrap;gap:8px 26px;padding:10px 0;color:var(--dim)}
+.strip li{font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase}
+.strip li:first-child{color:var(--purpleb)}
+.strip li:last-child{color:var(--goldb)}
 
-.avail-badge{
-  display:inline-flex;align-items:center;gap:7px;
-  background:rgba(155,115,245,0.06);border:1px solid rgba(155,115,245,0.2);
-  border-radius:100px;padding:5px 14px;margin-bottom:20px;
-  font:500 12px var(--body);color:var(--purpleb);
+/* ── hero ───────────────────────────────────────────────────────────────── */
+.hero{padding:56px 0 0}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--purpleb)}
+.eyebrow .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+h1.hero-h{font-family:var(--disp);font-weight:200;font-size:clamp(40px,7.2vw,86px);line-height:.99;letter-spacing:-0.03em;margin-top:22px;max-width:15ch;text-wrap:pretty}
+h1.hero-h em{font-style:italic;font-weight:300;background:linear-gradient(120deg,#C4AAFF,#F59E0B);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:40px 64px;margin-top:42px;align-items:start}
+.hero-lede{min-width:0;max-width:50ch}
+.hero-lede>p:first-child{font-size:clamp(17px,1.7vw,21px);line-height:1.5;color:var(--mute);text-wrap:pretty}
+.hero-lede>p:first-child b{color:var(--ink);font-weight:600}
+
+/* the three promise rows */
+.promises{margin-top:32px;border-top:1px solid var(--line2)}
+.promises>div{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 0;border-bottom:1px solid rgba(155,115,245,0.18)}
+.promises dt{font-size:15.5px;line-height:1.4;color:var(--mute);flex:1;min-width:180px}
+.promises dd{font:600 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;padding:3px 9px;border-radius:20px}
+.promises .pip{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.p-green .pip{background:rgba(52,211,153,.16);border:2px solid var(--green)}
+.p-green dd{color:var(--green);background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3)}
+.p-purple .pip{background:rgba(155,115,245,.18);border:2px solid var(--purple)}
+.p-purple dd{color:var(--purpleb);background:rgba(155,115,245,.1);border:1px solid rgba(155,115,245,.3)}
+.p-gold{border-bottom-color:rgba(245,158,11,0.45)!important;background:linear-gradient(90deg,rgba(245,158,11,.07),transparent 70%)}
+.p-gold .pip{background:rgba(245,158,11,.2);border:2px solid var(--gold)}
+.p-gold dt{color:var(--ink);font-weight:600}
+.p-gold dd{color:var(--goldb);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35)}
+.biz{margin-top:20px;font-size:14.5px;color:var(--dim)}
+
+/* the start card */
+.start{
+  min-width:0;max-width:440px;justify-self:end;
+  border:1px solid rgba(245,158,11,0.32);border-radius:20px;padding:26px 24px 22px;
+  background:linear-gradient(180deg,rgba(21,18,48,0.94),rgba(11,11,34,0.86));
+  box-shadow:0 30px 70px -34px #000;
 }
-.avail-badge .dot{width:5px;height:5px;border-radius:50%;background:var(--purple)}
-
-h1.hero-h{
-  font-family:var(--disp);font-weight:200;
-  font-size:clamp(36px,6vw,70px);
-  line-height:1;letter-spacing:-0.03em;margin-bottom:16px;
+@media(max-width:840px){.start{justify-self:stretch;max-width:none}}
+.start .kicker{font:600 10px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--goldb)}
+.start h2{font-family:var(--disp);font-weight:300;font-size:26px;letter-spacing:-0.015em;line-height:1.15;margin-top:10px}
+.start label{display:block;margin-top:16px}
+.start label span{display:block;font:600 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:7px}
+.start select{
+  width:100%;appearance:none;-webkit-appearance:none;
+  padding:13px 40px 13px 15px;border-radius:11px;
+  border:1px solid var(--line2);background:rgba(7,7,26,0.75);
+  color:var(--ink);font:500 15px var(--body);cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C4AAFF' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;background-size:16px;
 }
-h1.hero-h em{
-  font-style:italic;font-weight:300;
-  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;
-  position:relative;
-}
-h1.hero-h em::after{
-  content:'';position:absolute;bottom:-3px;left:0;right:0;height:1px;
-  background:var(--grad);transform:scaleX(0);transform-origin:left;
-  animation:uline 1.2s var(--spring) 0.8s forwards;
-}
-@keyframes uline{to{transform:scaleX(1)}}
+.start select:hover{border-color:rgba(155,115,245,0.45)}
+.start select option{background:#0D0D28;color:var(--ink)}
+.coverage{margin-top:12px;font-size:12.5px;line-height:1.5;color:var(--goldb)}
+.coverage[hidden]{display:none}
+.start .btn{width:100%;margin-top:18px}
+.start .wa{display:flex;align-items:center;justify-content:center;margin-top:12px;font:600 14.5px var(--body);color:var(--purpleb)}
 
-.hero-sub{font-size:15px;color:var(--mute);max-width:46ch;margin:0 auto 28px;line-height:1.74}
-.hero-sub b{color:var(--ink)}
-.hero-ctas{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
-
-/* ═══════════════════════════════════════════
-   SECTION HEADERS (reused across sections)
-═══════════════════════════════════════════ */
-.eyebrow{font:700 9px var(--body);letter-spacing:2.8px;text-transform:uppercase;color:var(--purpleb);margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.eyebrow::before{content:'';width:16px;height:1px;background:currentColor;opacity:.5}
-h2.sh{font-family:var(--disp);font-weight:200;font-size:clamp(24px,3.8vw,44px);line-height:1.04;letter-spacing:-0.025em}
-h2.sh em{font-style:italic;font-weight:300;color:var(--purpleb)}
-.section-sub{font-size:13.5px;color:var(--mute);line-height:1.74;max-width:58ch;margin-top:10px}
-.section-sub b{color:var(--ink)}
-
-/* ═══════════════════════════════════════════
-   WHAT YOU CAN POST, TRADES
-═══════════════════════════════════════════ */
-.what-section{margin-top:56px}
-.trades{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:20px}
-@media(max-width:740px){.trades{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:440px){.trades{grid-template-columns:1fr}}
+/* ── what we cover ──────────────────────────────────────────────────────── */
+.sec{padding:76px 0 0}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:20px;border-bottom:1px solid var(--line2)}
+.sec-head span{font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.trades{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-top:24px}
 .trade{
-  display:flex;align-items:center;gap:10px;
-  background:rgba(10,10,32,0.55);border:1px solid var(--line);border-radius:12px;
-  padding:12px 13px;color:var(--ink);text-decoration:none;
-  transition:.2s var(--spring);position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:22px 12px;border:1px solid rgba(155,115,245,0.18);border-radius:16px;
+  color:var(--ink);text-decoration:none;
+  transition:border-color .2s,transform .2s var(--spring),background .2s;
 }
-.trade::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(155,115,245,0.08),transparent);
-  opacity:0;transition:.2s;
-}
-.trade:hover{border-color:rgba(155,115,245,0.4);transform:translateY(-3px) scale(1.01);box-shadow:0 6px 22px rgba(155,115,245,0.14)}
-.trade:hover::before{opacity:1}
-.tic{width:34px;height:34px;border-radius:9px;background:rgba(155,115,245,0.07);border:1px solid rgba(155,115,245,0.15);display:grid;place-items:center;flex:0 0 auto;color:var(--purple);transition:.2s var(--spring)}
-.trade:hover .tic{background:rgba(155,115,245,0.18);color:var(--purpleb);transform:rotate(-8deg) scale(1.12)}
-.tic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.trade b{display:block;font:600 13px var(--body);letter-spacing:-0.01em}
+.trade:hover{border-color:rgba(245,158,11,0.55);transform:translateY(-3px);background:rgba(245,158,11,0.05)}
+.trade.more{border-style:dashed;border-color:var(--line2)}
+.trade.more b{color:var(--mute)}
+.trade svg{width:34px;height:34px;fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
+.trade.i-gold svg{stroke:var(--goldb)}
+.trade.i-purple svg{stroke:var(--purpleb)}
+.trade.more svg{stroke:var(--dim)}
+.trade b{font:600 14.5px var(--body);text-align:center}
 
-/* ═══════════════════════════════════════════
-   HOW IT WORKS, ANIMATED FLOW
-═══════════════════════════════════════════ */
-.how-section{margin-top:56px;padding:0 0 56px}
-.flow{margin-top:44px}
-.flow-track{position:relative;display:flex;justify-content:space-between;gap:16px}
-.flow-track::before{
-  content:'';position:absolute;top:20px;left:20px;right:20px;height:2px;
-  background:var(--line2);
-}
-.flow-track::after{
-  content:'';position:absolute;top:20px;left:20px;right:20px;height:2px;
-  background:linear-gradient(90deg,transparent,var(--purpleb) 15%,var(--goldb) 45%,var(--green) 75%,transparent);
-  background-size:220% 100%;
-  animation:flowshimmer 6s linear infinite;
-}
-@keyframes flowshimmer{0%{background-position:120% 0}100%{background-position:-100% 0}}
-.flow-step{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:flex-start;max-width:230px}
-.flow-dot{
-  width:40px;height:40px;border-radius:50%;flex-shrink:0;
-  background:var(--bg);border:2px solid var(--purple);
-  display:grid;place-items:center;
-  font-family:var(--disp);font-weight:300;font-size:15px;color:var(--purpleb);
-  margin-bottom:14px;transition:.3s var(--spring);
-}
-.flow-step:hover .flow-dot{transform:scale(1.12);box-shadow:0 0 16px rgba(155,115,245,0.3)}
-.flow-step.gold .flow-dot{border-color:var(--gold);color:var(--goldb)}
-.flow-step.gold:hover .flow-dot{box-shadow:0 0 16px rgba(245,158,11,0.3)}
-.flow-step.green .flow-dot{border-color:var(--green);color:var(--green)}
-.flow-step.green:hover .flow-dot{box-shadow:0 0 16px rgba(52,211,153,0.3)}
-.step-tag{font:700 8.5px var(--body);letter-spacing:2.5px;text-transform:uppercase;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:10px}
-.st-purple{color:var(--purpleb);background:rgba(155,115,245,0.08);border:1px solid rgba(155,115,245,0.2)}
-.st-gold{color:var(--goldb);background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.18)}
-.st-green{color:var(--green);background:rgba(52,211,153,0.07);border:1px solid rgba(52,211,153,0.18)}
-.flow-step h3{font-family:var(--disp);font-size:clamp(16px,2vw,19px);font-weight:200;letter-spacing:-0.02em;line-height:1.15}
-.flow-step b{color:var(--ink)}
-@media(max-width:780px){
-  .flow-track{flex-direction:column;gap:26px}
-  .flow-track::before,.flow-track::after{top:20px;bottom:20px;left:20px;right:auto;width:2px;height:auto}
-  .flow-track::after{background:linear-gradient(180deg,transparent,var(--purpleb) 15%,var(--goldb) 45%,var(--green) 75%,transparent);background-size:100% 220%;animation:flowshimmerv 6s linear infinite}
-  .flow-step{flex-direction:row;align-items:center;gap:16px;max-width:none}
-  .flow-dot{margin-bottom:0}
-}
-@keyframes flowshimmerv{0%{background-position:0 120%}100%{background-position:0 -100%}}
+/* ── how it works ───────────────────────────────────────────────────────── */
+.stages{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));margin-top:38px}
+.stages li{padding:0 20px 0 0}
+.stages li:last-child{padding-right:0}
+.stages .rail{display:flex;align-items:center;gap:10px}
+.stages .node{width:15px;height:15px;border-radius:50%;flex-shrink:0;border:2px solid var(--purple);background:rgba(155,115,245,.18)}
+.stages .bar{flex:1;height:2px;background:linear-gradient(90deg,var(--purple),rgba(155,115,245,.35))}
+.stages li.gold .node{border-color:var(--gold);background:rgba(245,158,11,.2)}
+.stages li.gold .bar{background:linear-gradient(90deg,var(--gold),rgba(245,158,11,.35))}
+.stages li.done .node{border-color:var(--green);background:var(--green);box-shadow:0 0 18px rgba(52,211,153,.5)}
+.stages li.done .bar{background:rgba(155,115,245,.14)}
+.stages .tag{display:block;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:16px}
+.stages li.gold .tag{color:var(--goldb)}
+.stages li.done .tag{color:var(--green)}
+.stages h3{font-family:var(--disp);font-weight:300;font-size:23px;letter-spacing:-0.015em;margin-top:4px}
+@media(max-width:640px){.stages li{padding:0 0 22px}.stages .bar{display:none}}
 
-/* ═══════════════════════════════════════════
-   TRUST AND PROTECTION
-═══════════════════════════════════════════ */
-.trust-section{
-  margin-top:56px;padding:52px 0;
-  background:linear-gradient(180deg,rgba(80,40,180,0.07) 0%,transparent 100%);
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-}
-.trust-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:28px}
-@media(max-width:680px){.trust-grid{grid-template-columns:1fr}}
-.trust-tile{
-  display:flex;gap:14px;align-items:flex-start;
-  background:rgba(10,10,32,0.55);border:1px solid var(--line);border-left:3px solid var(--purple);
-  border-radius:12px;padding:16px 18px;transition:.2s var(--spring);
-}
-.trust-tile:hover{transform:translateY(-2px);border-color:rgba(155,115,245,0.32);box-shadow:0 6px 20px rgba(155,115,245,0.1)}
-.trust-tile.gold{border-left-color:var(--gold)}
-.trust-tile.green{border-left-color:var(--green)}
-.trust-ico{flex:0 0 auto;width:36px;height:36px;border-radius:10px;background:rgba(155,115,245,0.09);border:1px solid rgba(155,115,245,0.2);display:grid;place-items:center;color:var(--purpleb)}
-.trust-tile.gold .trust-ico{background:rgba(245,158,11,0.09);border-color:rgba(245,158,11,0.22);color:var(--goldb)}
-.trust-tile.green .trust-ico{background:rgba(52,211,153,0.09);border-color:rgba(52,211,153,0.22);color:var(--green)}
-.trust-ico svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.trust-tile h3{font:600 14px var(--body);letter-spacing:-0.01em;margin-bottom:4px}
-.trust-tile p{font-size:12.5px;color:var(--mute);line-height:1.6}
+/* ── real checks ────────────────────────────────────────────────────────── */
+.checks-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:32px 64px;align-items:start}
+.checks-grid>div{min-width:0}
+.checks-grid>div p{margin-top:22px;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.checks{list-style:none;min-width:0;border-top:1px solid var(--line2)}
+.checks li{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:17px 0;border-bottom:1px solid rgba(155,115,245,0.18);font:600 16px var(--body)}
+.checks li span,.checks li a{font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.checks li.t-gold span{color:var(--goldb)}
+.checks li a{color:var(--purpleb)}
 
-/* ═══════════════════════════════════════════
-   GOOD TO KNOW, AVAILABILITY AND WORKERS
-═══════════════════════════════════════════ */
-.info-section{margin-top:52px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
-@media(max-width:680px){.info-grid{grid-template-columns:1fr}}
-.info-card{position:relative;overflow:hidden;border:1px solid var(--line2);border-radius:16px;padding:22px;background:rgba(10,10,32,0.55);transition:.2s var(--spring)}
-.info-card:hover{transform:translateY(-2px);border-color:rgba(155,115,245,0.4)}
-.info-card::before{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(155,115,245,0.16) 0%,transparent 70%);pointer-events:none}
-.info-card.gold::before{background:radial-gradient(circle,rgba(245,158,11,0.16) 0%,transparent 70%)}
-.info-ico{width:38px;height:38px;border-radius:10px;background:rgba(155,115,245,0.09);border:1px solid rgba(155,115,245,0.2);display:grid;place-items:center;color:var(--purpleb);margin-bottom:14px;position:relative}
-.info-card.gold .info-ico{background:rgba(245,158,11,0.09);border-color:rgba(245,158,11,0.22);color:var(--goldb)}
-.info-ico svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.info-card h3{font-family:var(--disp);font-weight:200;font-size:clamp(17px,2.2vw,21px);letter-spacing:-0.02em;margin-bottom:5px;position:relative}
-.info-card p{font-size:12.5px;color:var(--mute);line-height:1.6;position:relative}
-.info-link{display:inline-flex;align-items:center;gap:4px;margin-top:12px;font:600 12px var(--body);color:var(--goldb);position:relative}
-
-/* ═══════════════════════════════════════════
-   CONTACT
-═══════════════════════════════════════════ */
-.contact-section{margin-top:52px;padding-bottom:60px}
-.contact-card{border-radius:18px;padding:32px;background:rgba(10,10,34,0.7);backdrop-filter:blur(18px);position:relative;text-align:center}
-.contact-card::before{content:'';position:absolute;inset:0;border-radius:18px;padding:1px;background:linear-gradient(135deg,rgba(155,115,245,0.45),rgba(245,158,11,0.24) 60%,rgba(52,211,153,0.16));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
-.contact-sub{font-size:14px;color:var(--mute);margin:10px auto 22px}
-.cta-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+/* ── closing cta ────────────────────────────────────────────────────────── */
+.close{margin-top:84px;border-top:1px solid rgba(245,158,11,0.35);background:linear-gradient(160deg,rgba(123,79,224,0.16),rgba(245,158,11,0.07) 85%)}
+.close .wrap{padding-top:64px;padding-bottom:64px;display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap}
+.close h2{font-family:var(--disp);font-weight:200;font-size:clamp(32px,5vw,56px);letter-spacing:-0.025em;line-height:1.02;max-width:18ch}
+.close p{margin-top:12px;font-size:17px;color:var(--mute)}
+.close .cta-row{display:flex;flex-wrap:wrap;gap:12px}
 
 /* footer */
 footer{border-top:1px solid var(--line);padding:32px 0 50px}
 .ft{display:flex;flex-direction:column;gap:7px;font-size:12.5px;color:var(--dim)}
 .ft-links{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
-.ft-links a{color:var(--mute);text-decoration:none;transition:.15s}.ft-links a:hover{color:var(--purpleb)}
+.ft-links a{color:var(--mute);transition:.15s}
+.ft-links a:hover{color:var(--purpleb)}
 
 /* float cta */
-.float-cta{position:fixed;bottom:20px;right:20px;z-index:50;background:linear-gradient(135deg,#7B4FE0,#9B73F5);color:#fff;font:600 13.5px var(--body);padding:11px 20px;border-radius:100px;box-shadow:0 4px 28px rgba(155,115,245,.48),0 2px 6px rgba(0,0,0,.4);text-decoration:none;transform:translateY(90px);opacity:0;pointer-events:none;transition:transform .5s var(--spring),opacity .4s,box-shadow .2s;display:flex;align-items:center;gap:7px;overflow:hidden}
-.float-cta::after{content:'';position:absolute;top:0;left:-100%;width:55%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent);animation:sh 3.5s ease-in-out infinite}
+.float-cta{position:fixed;bottom:20px;right:20px;z-index:50;background:linear-gradient(135deg,#7B4FE0,#9B73F5);color:#fff;font:600 13.5px var(--body);padding:11px 20px;border-radius:100px;box-shadow:0 4px 28px rgba(155,115,245,.48),0 2px 6px rgba(0,0,0,.4);transform:translateY(90px);opacity:0;pointer-events:none;transition:transform .5s var(--spring),opacity .4s,box-shadow .2s;display:flex;align-items:center;gap:7px}
 .float-cta.show{transform:none;opacity:1;pointer-events:auto}
-.float-cta:hover{box-shadow:0 6px 38px rgba(155,115,245,.62);transform:translateY(-2px)}
-.fcdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.7);animation:edotblink 1.4s ease-in-out infinite}
-@keyframes edotblink{0%,100%{opacity:1}50%{opacity:.2}}
+.float-cta:hover{box-shadow:0 6px 38px rgba(155,115,245,.62)}
+.fcdot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.7);animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
 </style>
-<link rel="stylesheet" href="nav.css?v=2">
 </head>
 <body>
-<div class="orb o1"></div>
-<div class="orb o2"></div>
-<div class="mesh"></div>
 
 <a class="float-cta" id="fcta" href="https://app.yaadly.co.uk/jobs/new"><span class="fcdot"></span>Post a job, free</a>
 
@@ -275,130 +228,198 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   <a class="navcta" href="https://app.yaadly.co.uk/jobs/new">Post a job</a>
 </div></nav>
 
-<!-- HERO -->
-<section class="hero" id="hero">
-  <div class="wrap">
-    <div class="avail-badge rv"><span class="dot"></span>Launching in Kingston and Portmore, Jamaica</div>
-    <h1 class="hero-h rv d1">Someone you can <em>trust,</em><br>on your property.</h1>
-    <p class="hero-sub rv d2">Post the job free. <b>You buy the job from Yaadly at one agreed price</b>, and we engage an identity checked tradesperson to carry it out, with evidence at every stage. <a href="/business" style="color:inherit;text-decoration:underline;text-underline-offset:3px">Already have your own contractor?</a></p>
-    <div class="hero-ctas rv d2">
-      <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
-      <a class="btn btn-g" href="#how">How it works</a>
-      <a class="btn btn-g btn-sm" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">Ask on WhatsApp</a>
-    </div>
-  </div>
-</section>
+<!-- TRUST STRIP -->
+<div class="strip"><div class="wrap"><ul>
+  <li>Identity checked</li>
+  <li>Evidence at every stage</li>
+  <li>Reviewed by a named person</li>
+  <li>One agreed price</li>
+</ul></div></div>
 
-<!-- WHAT YOU CAN POST -->
-<section class="what-section"><div class="wrap">
-  <div class="eyebrow rv sl">What you can post</div>
-  <h2 class="sh rv d1">Property repair<br>and <em>maintenance work.</em></h2>
-  <p class="section-sub rv d1">Scoped, quoted and documented, not just listed.</p>
-  <div class="trades rv d2">
-    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Roofing"><span class="tic"><svg viewBox="0 0 24 24"><path d="M2.5 11.5 12 4l9.5 7.5"/><path d="M5 10.5V20h14v-9.5"/><path d="M9 20v-5h6v5"/></svg></span><b>Roof and zinc</b></a>
-    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Plumbing"><span class="tic"><svg viewBox="0 0 24 24"><path d="M7 4v6a4 4 0 0 0 4 4h2a4 4 0 0 1 4 4v2"/><rect x="4" y="2" width="6" height="4" rx="1"/><rect x="14" y="18" width="6" height="4" rx="1"/></svg></span><b>Plumbing</b></a>
-    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Electrical"><span class="tic"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg></span><b>Electrical</b></a>
-    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Painting"><span class="tic"><svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="m14 6.5 3.5 3.5"/></svg></span><b>Painting</b></a>
-    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Drainage"><span class="tic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16M4 12h16"/></svg></span><b>Septic and drainage</b></a>
-    <a class="trade" href="https://app.yaadly.co.uk/jobs/new?trade=Grille"><span class="tic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16M3 12h18M7.5 4v16M16.5 4v16"/></svg></span><b>Grille and gate</b></a>
+<!-- HERO -->
+<header class="hero" id="hero"><div class="wrap">
+  <span class="eyebrow rv"><span class="dot"></span>Kingston and Portmore</span>
+  <h1 class="hero-h rv d1">Someone you can <em>trust,</em> on your property.</h1>
+
+  <div class="hero-grid">
+    <div class="hero-lede rv d2">
+      <p><b>You buy the job from Yaadly at one agreed price.</b> We engage an identity checked tradesperson to carry it out, with photo evidence at every stage.</p>
+
+      <dl class="promises">
+        <div class="p-green">
+          <span class="pip"></span>
+          <dt>You pay Yaadly, never the tradesperson</dt>
+          <dd>One price</dd>
+        </div>
+        <div class="p-purple">
+          <span class="pip"></span>
+          <dt>Every stage filed as evidence</dt>
+          <dd>Photo and video</dd>
+        </div>
+        <div class="p-gold">
+          <span class="pip"></span>
+          <dt>You see the evidence before you accept the work</dt>
+          <dd>Your call</dd>
+        </div>
+      </dl>
+
+      <p class="biz">Own contractor already? <a href="/business">Yaadly for business &rarr;</a></p>
+    </div>
+
+    <aside class="start rv d2">
+      <div class="kicker">Start here &middot; two questions</div>
+      <h2>Trade and parish.</h2>
+
+      <label>
+        <span>Work</span>
+        <select id="trade">
+          <option value="Roofing">Roof and zinc</option>
+          <option value="Plumbing">Plumbing</option>
+          <option value="Electrical">Electrical</option>
+          <option value="Painting &amp; Decorating">Painting and decorating</option>
+          <option value="Drainage &amp; Septic">Septic and drainage</option>
+          <option value="Grille &amp; Gate Welding">Grille and gate welding</option>
+          <option value="Masonry &amp; Concrete">Masonry and concrete</option>
+          <option value="Tiling">Tiling</option>
+          <option value="Carpentry &amp; Joinery">Carpentry and joinery</option>
+          <option value="Windows &amp; Glazing">Windows and glazing</option>
+          <option value="Locks &amp; Security Doors">Locks and security doors</option>
+          <option value="Air Conditioning">Air conditioning</option>
+          <option value="Water Tank &amp; Pump">Water tank and pump</option>
+          <option value="Solar Install">Solar install</option>
+          <option value="CCTV &amp; Alarms">CCTV and alarms</option>
+          <option value="Fencing">Fencing</option>
+          <option value="Landscaping">Landscaping</option>
+          <option value="General Handyman">General handyman</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Parish</span>
+        <select id="parish">
+          <option value="Kingston">Kingston</option>
+          <option value="St Andrew">St Andrew</option>
+          <option value="St Catherine">St Catherine, including Portmore</option>
+          <option value="Clarendon">Clarendon</option>
+          <option value="Manchester">Manchester</option>
+          <option value="St Elizabeth">St Elizabeth</option>
+          <option value="Westmoreland">Westmoreland</option>
+          <option value="Hanover">Hanover</option>
+          <option value="St James">St James</option>
+          <option value="Trelawny">Trelawny</option>
+          <option value="St Ann">St Ann</option>
+          <option value="St Mary">St Mary</option>
+          <option value="Portland">Portland</option>
+          <option value="St Thomas">St Thomas</option>
+        </select>
+      </label>
+
+      <p class="coverage" id="coverage" role="status" hidden>Outside our first parishes. Post it anyway, and we will tell you what we can cover.</p>
+
+      <a class="btn btn-p" id="start" href="https://app.yaadly.co.uk/jobs/new">Continue, free</a>
+      <a class="wa" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">Ask on WhatsApp &rarr;</a>
+    </aside>
+  </div>
+</div></header>
+
+<!-- WHAT WE COVER -->
+<section class="sec"><div class="wrap">
+  <div class="sec-head rv">
+    <h2 class="sh">What we <em>cover.</em></h2>
+    <span>Pick one to start</span>
+  </div>
+  <div class="trades rv d1">
+    <a class="trade i-gold" href="https://app.yaadly.co.uk/jobs/new?trade=Roofing">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12 12 4l10 8"/><path d="M5 12h14"/><path d="M7 16h10"/><path d="M9 20h6"/></svg>
+      <b>Roof and zinc</b></a>
+    <a class="trade i-purple" href="https://app.yaadly.co.uk/jobs/new?trade=Plumbing">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v6a4 4 0 0 0 4 4h4"/><path d="M16 11h4v4h-4z"/><path d="M18 15v4"/><path d="M2 5h4"/></svg>
+      <b>Plumbing</b></a>
+    <a class="trade i-gold" href="https://app.yaadly.co.uk/jobs/new?trade=Electrical">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 6 13h5l-1 8 7-10h-5z"/></svg>
+      <b>Electrical</b></a>
+    <a class="trade i-purple" href="https://app.yaadly.co.uk/jobs/new?trade=Painting%20%26%20Decorating">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13v6H4z"/><path d="M17 7h3v4h-6v3"/><path d="M12 14h4v6h-4z"/></svg>
+      <b>Painting</b></a>
+    <a class="trade i-gold" href="https://app.yaadly.co.uk/jobs/new?trade=Drainage%20%26%20Septic">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8 9h8"/><path d="M7 13h10"/><path d="M9 17h6"/></svg>
+      <b>Septic and drainage</b></a>
+    <a class="trade i-purple" href="https://app.yaadly.co.uk/jobs/new?trade=Grille%20%26%20Gate%20Welding">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3z"/><path d="M9 5v14"/><path d="M15 5v14"/><path d="M3 12h18"/></svg>
+      <b>Grille and gate</b></a>
+    <a class="trade more" href="https://app.yaadly.co.uk/jobs/new">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      <b>Something else</b></a>
   </div>
 </div></section>
 
 <!-- HOW IT WORKS -->
-<section class="how-section" id="how"><div class="wrap">
-  <div class="eyebrow rv sl">How it works</div>
-  <h2 class="sh rv d1">Proven, <em>not promised.</em></h2>
-  <div class="flow rv d1">
-    <div class="flow-track">
-      <div class="flow-step">
-        <span class="flow-dot">1</span>
-        <span class="step-tag st-purple">Describe the job</span>
-        <h3>By web form, or on WhatsApp.</h3>
-      </div>
-      <div class="flow-step gold">
-        <span class="flow-dot">2</span>
-        <span class="step-tag st-gold">Get a price</span>
-        <h3>Priced against real costs.</h3>
-      </div>
-      <div class="flow-step">
-        <span class="flow-dot">3</span>
-        <span class="step-tag st-purple">Work is documented</span>
-        <h3>Photos and video, every stage.</h3>
-      </div>
-      <div class="flow-step green">
-        <span class="flow-dot">4</span>
-        <span class="step-tag st-green">You sign off</span>
-        <h3><b>Nothing's closed until you sign off.</b></h3>
-      </div>
+<section class="sec" id="how"><div class="wrap">
+  <h2 class="sh rv">Proven, <em class="g">not promised.</em></h2>
+  <ol class="stages rv d1">
+    <li>
+      <div class="rail"><span class="node"></span><span class="bar"></span></div>
+      <span class="tag">Stage 01</span>
+      <h3>Describe the job</h3>
+    </li>
+    <li>
+      <div class="rail"><span class="node"></span><span class="bar"></span></div>
+      <span class="tag">Stage 02</span>
+      <h3>Get one price</h3>
+    </li>
+    <li class="gold">
+      <div class="rail"><span class="node"></span><span class="bar"></span></div>
+      <span class="tag">Stage 03</span>
+      <h3>Work documented</h3>
+    </li>
+    <li class="done">
+      <div class="rail"><span class="node"></span><span class="bar"></span></div>
+      <span class="tag">Stage 04 &middot; sign off</span>
+      <h3>You accept the work</h3>
+    </li>
+  </ol>
+</div></section>
+
+<!-- REAL CHECKS -->
+<section class="sec"><div class="wrap">
+  <div class="checks-grid">
+    <div class="rv">
+      <h2 class="sh">Real checks, <em>not promises.</em></h2>
+      <p>Kingston and Portmore first</p>
     </div>
+    <ul class="checks rv d1">
+      <li>Identity checked tradespeople <span>Before they can quote</span></li>
+      <li>Three referees spoken to <span>Over &pound;500</span></li>
+      <li class="t-gold">Work reviewed before the tradesperson is paid <span>Never a timer</span></li>
+      <li>A client in London pays what a client in Portmore pays <span>No overseas markup</span></li>
+      <li>Tradespeople paid by Yaadly on completion <a href="https://app.yaadly.co.uk/apply">Apply to join &rarr;</a></li>
+    </ul>
   </div>
 </div></section>
 
-<!-- TRUST AND PROTECTION -->
-<section class="trust-section"><div class="wrap">
-  <div class="eyebrow rv sl">Trust and protection</div>
-  <h2 class="sh rv d1">Real checks,<br><em>not promises.</em></h2>
-  <div class="trust-grid rv d1">
-    <div class="trust-tile">
-      <span class="trust-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M6 16.3c.5-1.6 1.8-2.3 2.5-2.3s2 .7 2.5 2.3M13 9.5h5M13 13h5"/></svg></span>
-      <div><h3>Identity checked workers</h3><p>Referees spoken to before any job over &pound;500.</p></div>
-    </div>
-    <div class="trust-tile gold">
-      <span class="trust-ico"><svg viewBox="0 0 24 24"><path d="M3 8.5A2 2 0 0 1 5 6.5h2.2l1.2-2h7.2l1.2 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/><circle cx="12" cy="13" r="3.4"/></svg></span>
-      <div><h3>Every job checked before payment</h3><p>By a named person at Yaadly. Never an automatic timer.</p></div>
-    </div>
-    <div class="trust-tile green">
-      <span class="trust-ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9h10M7 13h7M7 17h4"/></svg></span>
-      <div><h3>You pay Yaadly, not the tradesperson</h3><p>One price in writing. We pay them on completion.</p></div>
-    </div>
-    <div class="trust-tile">
-      <span class="trust-ico"><svg viewBox="0 0 24 24"><path d="M4.5 5h15a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4.2 3.2V17H4.5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/></svg></span>
-      <div><h3>Same price, wherever you call from</h3><p>No markup for being overseas.</p></div>
-    </div>
+<!-- CLOSING CTA -->
+<section class="close"><div class="wrap">
+  <div class="rv">
+    <h2>Ready to start?</h2>
+    <p>No account, nothing charged.</p>
   </div>
-</div></section>
-
-<!-- GOOD TO KNOW -->
-<section class="info-section"><div class="wrap">
-  <div class="eyebrow rv sl">Good to know</div>
-  <div class="info-grid rv d1">
-    <div class="info-card">
-      <span class="info-ico"><svg viewBox="0 0 24 24"><path d="M12 21s7-8 7-13a7 7 0 1 0-14 0c0 5 7 13 7 13Z"/><circle cx="12" cy="8" r="2.5"/></svg></span>
-      <h3>Kingston and Portmore first</h3>
-      <p>Not every trade or time slot is covered yet.</p>
-    </div>
-    <div class="info-card gold">
-      <span class="info-ico"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z"/><path d="m8.5 12 2.3 2.3L15.5 9.5"/></svg></span>
-      <h3>Identity checked workers only</h3>
-      <p>Approved and identity checked before any job.</p>
-      <a class="info-link" href="https://app.yaadly.co.uk/apply">Apply to join &rarr;</a>
-    </div>
-  </div>
-</div></section>
-
-<!-- CONTACT -->
-<section class="contact-section"><div class="wrap">
-  <div class="contact-card rv">
-    <h2 class="sh">Ready to start a project?</h2>
-    <p class="contact-sub">No account, nothing charged.</p>
-    <div class="cta-row">
-      <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
-      <a class="btn btn-g btn-sm" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">Ask on WhatsApp</a>
-    </div>
+  <div class="cta-row rv d1">
+    <a class="btn btn-p" href="https://app.yaadly.co.uk/jobs/new">Post a job, free</a>
+    <a class="btn btn-g" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20have%20a%20job%20on%20my%20property%20in%20Jamaica." target="_blank" rel="noopener">WhatsApp</a>
   </div>
 </div></section>
 
 <footer><div class="wrap"><div class="ft">
-  <span>© 2026 Yaadly Ltd · England and Wales · no. 17358077</span>
+  <span>&copy; 2026 Yaadly Ltd &middot; England and Wales &middot; no. 17358077</span>
   <span>Property work across Jamaica. Launching in Kingston and Portmore, more parishes as we grow.</span>
   <div class="ft-links">
     <a href="/">Home</a><a href="https://app.yaadly.co.uk/jobs" target="_blank" rel="noopener">Job board</a>
-    <a href="services.html">Managed services</a><a href="payments.html">How you pay</a>
-    <a href="faq.html">FAQ</a><a href="prices.html">What work costs</a>
-    <a href="business.html">Yaadly for business</a><a href="contact.html">Contact</a>
+    <a href="/services">Managed services</a><a href="/payments">How you pay</a>
+    <a href="/faq">FAQ</a><a href="/prices">What work costs</a>
+    <a href="/business">Yaadly for business</a><a href="/contact">Contact</a>
     <a href="https://app.yaadly.co.uk/portal">Client portal</a><a href="https://app.yaadly.co.uk/apply">Join as a pro</a>
-    <a href="how-we-use-ai.html">How we use AI</a>
-    <a href="privacy.html">Privacy</a><a href="cancellation.html">Cancelling</a><a href="terms.html">Terms</a>
+    <a href="/how-we-use-ai">How we use AI</a>
+    <a href="/privacy">Privacy</a><a href="/cancellation">Cancelling</a><a href="/terms">Terms</a>
   </div>
 </div></div></footer>
 
@@ -416,10 +437,26 @@ footer{border-top:1px solid var(--line);padding:32px 0 50px}
   new IntersectionObserver(function(e){cta.classList.toggle('show',!e[0].isIntersecting)},{threshold:.1}).observe(hero);
 })();
 
-/* nav */
+/* The two question starter.
+   Both answers travel as query parameters to /jobs/new, which reads them and
+   pre-selects the matching chips. The values here are the canonical taxonomy
+   strings from web/lib/taxonomy.ts, not display labels: /jobs/new validates
+   against that list and silently drops anything that is not in it, so a
+   friendly value like "Painting" would arrive and do nothing.
+   LAUNCH is the same three parishes as LAUNCH_PARISHES. */
 (function(){
-  var t=document.getElementById('nt'),v=document.getElementById('nvl');
-  if(t)t.addEventListener('click',function(){v.classList.toggle('open')});
+  var trade=document.getElementById('trade'),parish=document.getElementById('parish'),
+      start=document.getElementById('start'),note=document.getElementById('coverage');
+  if(!trade||!parish||!start)return;
+  var LAUNCH=['Kingston','St Andrew','St Catherine'];
+  function sync(){
+    start.href='https://app.yaadly.co.uk/jobs/new?trade='+encodeURIComponent(trade.value)+
+               '&parish='+encodeURIComponent(parish.value);
+    if(note)note.hidden=LAUNCH.indexOf(parish.value)!==-1;
+  }
+  trade.addEventListener('change',sync);
+  parish.addEventListener('change',sync);
+  sync();
 })();
 </script>
 <script src="chat.js" defer></script>
