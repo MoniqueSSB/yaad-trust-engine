@@ -2,7 +2,7 @@
 
 **Yaad Trust Engine** · Yaadly Ltd (England and Wales, no. 17358077) · Track 02
 
-Companion documents: `submission/PROJECT-OVERVIEW.md`, `submission/COMPLIANCE-AND-RESPONSIBLE-AI.md`.
+Companion documents: `submission/PROJECT-OVERVIEW.md`, `submission/COMPLIANCE-AND-RESPONSIBLE-AI.md`, `specs/Yaad_Trust_Engine_Workflow_v6.svg`.
 
 *Figures rechecked against the live project on 7 September 2026. Where a number in an earlier version of this document has moved, the current one is here and the old one is not preserved, because an inventory is a statement of what is true now. `specs/ARCHITECTURE.md` is a target repository tree from 30 August and is deliberately not cited here: half of it is marked as not yet existing.*
 
@@ -27,20 +27,25 @@ flowchart TD
     K --> L["REPORTING AGENT<br/>plain-English status for the client"]
     L --> M{"HUMAN: worker confirms the draft<br/>send as written, or write their own"}
     M --> N["Client receives evidence<br/>photos inline in WhatsApp"]
-    N --> O{"HUMAN: client approves the stage<br/>portal, WhatsApp reply, or in person"}
-    O -->|approved| P["Stage released<br/>evidence ids + sha256 snapshotted<br/>worker paid within 3 working days"]
-    O -->|disputed| Q{"HUMAN: free dispute process<br/>local surveyor by day 3<br/>human ruling by day 7"}
-    Q --> P
-    P --> R["Yaad Score compounds<br/>portable financial identity"]
+    N --> O{"HUMAN: Yaadly checks the work<br/>THIS is what pays the tradesperson"}
+    O --> P["Worker paid within 3 working days<br/>bank, Lynk or remittance pick up<br/>evidence ids + sha256 snapshotted"]
+    N --> S{"HUMAN: client signs off<br/>portal, WhatsApp reply, or in person"}
+    S -->|accepted| T["Stage closed with Yaadly<br/>balance becomes due to Yaadly"]
+    S -->|complaint| Q{"HUMAN: free complaint process<br/>reviewed by a person, never an algorithm<br/>nothing further paid out while open"}
+    Q --> T
+    T --> R["Yaad Score compounds<br/>portable financial identity"]
 
     style E fill:#ffe8cc
     style H fill:#ffe8cc
     style M fill:#ffe8cc
     style O fill:#ffe8cc
+    style S fill:#ffe8cc
     style Q fill:#ffe8cc
 ```
 
-**The flowchart above is the current diagram.** The standalone vector version, `Yaad_Trust_Engine_Workflow_v5.svg`, was drawn on 22 August and is deliberately not cited as current: it shows a 48 hour auto release on accepted evidence, describes funds as held with a licensed payment provider, and states 10 per cent retention at day 28. All three stopped being true. Nothing auto releases, Yaadly holds nobody's money since the principal structure was settled on 3 September 2026, and retention was cut to 5 per cent on 28 August. Redrawing it is a founder decision, and it is recorded here rather than patched over.
+The vector version of this loop is [`specs/Yaad_Trust_Engine_Workflow_v6.svg`](../specs/Yaad_Trust_Engine_Workflow_v6.svg), redrawn on 7 September 2026 and carrying its own revision note at the foot.
+
+**Why there was a redraw, kept on the record.** v5, drawn on 3 August, contradicted the product on three points: it showed a 48 hour auto release on accepted evidence in three places, it described funds as held with a licensed payment provider, and it stated 10 per cent retention at day 28. Nothing auto releases and a named human makes every payment call. Yaadly holds nobody's money since the principal structure was settled on 3 September 2026, and that phrase is now banned in both runtimes. Retention was cut to 5 per cent, above £500 only, on 28 August. v6 corrects all three and separates the two sign-offs, which v5 drew as a single chain: Yaadly's own check is what pays the tradesperson, and the client's sign-off is what closes the stage with Yaadly. **v5 is kept alongside v6 rather than replaced, so the change is auditable.**
 
 **The rule the diagram encodes.** `yaad/guardrails.py` holds a frozen set of human-only decisions: release funds, withhold funds, refund client, rule on dispute, adjust Yaad Score, suspend worker, approve job. An agent attempting any of them raises rather than proceeds. This is code, not a prompt instruction, and the test suite proves it.
 
