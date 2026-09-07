@@ -4456,3 +4456,55 @@ It is derived, not assumed. The chip renders only when `public_worker_checks` ho
 The TRN was almost certainly checked. What is missing is the record of it on `worker_checks`, which is written at the desk. **So the fix is to write the check, not to change the page.** Do not hard code the chip: it is the strongest sentence on a public profile, and it is worth exactly what the recorded check behind it is worth.
 
 `Identity verified` and `Evidence vetted` beside it are not derived the same way, because the database publish gate (`enforce_profile_publish_checks`) refuses to make a profile active at all unless Persona reads back approved or completed. Every profile the public view can return has cleared that, so those two are structurally true of anything on screen.
+
+---
+
+## ntfy will not stop pushing the same reminder
+
+**First, read the title.** If it says "N kickoff packs waiting on you" or "N quote packs waiting on you", it is not a fault in ntfy or in WhatsApp. It is one of the two approval-queue crons, and the answer is in the queue, not in the notifier.
+
+```sql
+select 'kickoff packs waiting' as queue, count(*) from kickoff_packs where status = 'draft'
+union all
+select 'quote packs waiting', count(*) from quote_pack_drafts where status = 'ready';
+```
+
+Until 7 September 2026 both `yaad-kickoff-check` and `yaad-quote-pack-check` ran **every minute** and pushed whenever their count was above zero, with no memory of having already said so. Four items were waiting, three of them August test rows with no job and no quote attached, so the phone got two pushes a minute, roughly 2,880 a day, for three days. The four were deleted and the notifier was given a memory.
+
+**What it does now.** `should_push_desk_notice(key, count)` decides, and records the decision in the same statement. The phone is told when the queue **grows**, and once every 24 hours while it is still not empty. An empty queue clears the row, so the next arrival is treated as new. Both crons now run every 15 minutes, not every minute.
+
+**To see what the notifier currently believes:**
+
+```sql
+select * from desk_push_state;
+```
+
+`last_count` is what it last saw, `last_push_at` is when it last actually pushed. A row here with a `last_count` above zero and no matching queue rows means something was deleted underneath it; the next run clears the row on its own.
+
+**If the pushes come back every 15 minutes**, the helper is erroring and it fails OPEN on purpose, because a reminder that silently stops is a blocked booking nobody knows about. Look for `should_push_desk_notice(...) failed, pushing anyway` in the function logs and fix the cause; do not "fix" it by making it fail closed.
+
+**To silence one for a while without touching code**, park the row forward, which buys a day of quiet without disabling the reminder:
+
+```sql
+update desk_push_state set last_push_at = now() where notice_key = 'kickoff_packs_awaiting_approval';
+```
+
+**Nothing here approves anything.** The packs still wait for a named human and the pushes are only how often you are told. If a queue is standing still for days, the answer is to clear it at the desk.
+
+---
+
+## A job keeps generating quote packs it does not need
+
+Fixed 7 September 2026, recorded because the symptom is invisible until you look at the row count and the cost is model calls.
+
+`yaad-quote-pack-check` decided a job needed a pack by asking whether it had one at `drafting` or `ready`. An **approved** pack was not on that list, so the job read as having no pack at all and got another drafted on the next poll, then another. One test job collected **163 approved drafts in under seven hours**, a fresh model call about every two minutes, and 307 across twelve jobs in two days. The only thing that stopped it was the unrelated three-failures brake.
+
+It looked fixed on 4 September when auto-approval was removed, because drafts then park at `ready` and `ready` was on the list. It was dormant, not fixed, and would have restarted on the first pack approved by hand.
+
+**Check for it:**
+
+```sql
+select job_id, count(*) from quote_pack_drafts where status = 'approved' group by job_id order by 2 desc limit 5;
+```
+
+More than a handful per job means the skip list has lost `approved` again. The historical rows on the test jobs were left in place as the record of what happened.
