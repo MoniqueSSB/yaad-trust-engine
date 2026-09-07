@@ -2822,3 +2822,13 @@ The job board redesign flagged that `open_jobs` masked `Address:` and `Access co
 **One thing checked and left alone.** `yaad-quote-pack-check` reads raw `jobs.descr` rather than the scrubbed value and feeds it to a model that drafts the pack a quoting worker reads. Every approved pack in the database was checked: none carries an email address. That is the model having summarised rather than echoed, which is luck and not a control, and it is worth pointing at `board_descr()` when somebody is next in that function.
 
 `supabase/migrations/20260907090000_the_board_scrub_becomes_one_function_and_learns_emails.sql`, `web/components/portal/BoardPreview.tsx`, `web/app/portal/(gated)/jobs/[id]/page.tsx`.
+
+## The keep-alive check follows the front door (7 Sep 2026)
+
+`.github/workflows/keepalive.yml` had failed on every scheduled run since 31 August. Its third step still probed `yaad-website-intake` and expected a 401 from the gateway, but Stage 3 had retired that function to a 410 stub the same day, so the check was measuring a door that no longer exists. Nobody noticed for a week, which is precisely what a scheduled check is meant to catch, and the database ping in step one was still passing, so the workflow's actual job was being done while its report said red.
+
+**The check now names the doors that are live.** `yaad-post-job` and `yaad-enquiry` are the two public endpoints a visitor reaches with no account, and both run without the platform token check. A bare GET reaches each function and is refused with 405, which proves the function is deployed and answering without creating a job or sending mail. A 401 there is the real regression: it means a redeploy dropped `--no-verify-jwt` and the form is broken for everyone. The retired stub is kept in the check on purpose, expecting 410 or 404 and failing on anything else, because an unauthenticated endpoint that once wrote job rows is exactly the thing that must not quietly return. `app.yaadly.co.uk` joins the site check, since the app is now the only place a job is created.
+
+**What was rejected.** Deleting the step and keeping only the database ping would have made the workflow green with nothing checked. Pointing it at the new endpoints with the old 401 expectation would have been wrong on day one: these are keyless doors by design and never answer 401. The publishable key the old step carried is gone from the file, because none of the checks need it.
+
+`.github/workflows/keepalive.yml`, `RUNBOOK.md` section 5b.
