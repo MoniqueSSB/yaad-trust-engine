@@ -2,7 +2,9 @@
 
 **Yaad Trust Engine** · Yaadly Ltd (England and Wales, no. 17358077) · Track 02
 
-Companion documents: `submission/PROJECT-OVERVIEW.md`, `submission/COMPLIANCE-AND-RESPONSIBLE-AI.md`, `specs/ARCHITECTURE.md` (repository tree and the decisions behind it).
+Companion documents: `submission/PROJECT-OVERVIEW.md`, `submission/COMPLIANCE-AND-RESPONSIBLE-AI.md`.
+
+*Figures rechecked against the live project on 7 September 2026. Where a number in an earlier version of this document has moved, the current one is here and the old one is not preserved, because an inventory is a statement of what is true now. `specs/ARCHITECTURE.md` is a target repository tree from 30 August and is deliberately not cited here: half of it is marked as not yet existing.*
 
 ---
 
@@ -26,7 +28,7 @@ flowchart TD
     L --> M{"HUMAN: worker confirms the draft<br/>send as written, or write their own"}
     M --> N["Client receives evidence<br/>photos inline in WhatsApp"]
     N --> O{"HUMAN: client approves the stage<br/>portal, WhatsApp reply, or in person"}
-    O -->|approved| P["Stage released<br/>evidence ids + sha256 snapshotted<br/>worker paid within 24h"]
+    O -->|approved| P["Stage released<br/>evidence ids + sha256 snapshotted<br/>worker paid within 3 working days"]
     O -->|disputed| Q{"HUMAN: free dispute process<br/>local surveyor by day 3<br/>human ruling by day 7"}
     Q --> P
     P --> R["Yaad Score compounds<br/>portable financial identity"]
@@ -38,7 +40,7 @@ flowchart TD
     style Q fill:#ffe8cc
 ```
 
-The vector version of this loop is `Yaad_Trust_Engine_Workflow_v5.svg`.
+**The flowchart above is the current diagram.** The standalone vector version, `Yaad_Trust_Engine_Workflow_v5.svg`, was drawn on 22 August and is deliberately not cited as current: it shows a 48 hour auto release on accepted evidence, describes funds as held with a licensed payment provider, and states 10 per cent retention at day 28. All three stopped being true. Nothing auto releases, Yaadly holds nobody's money since the principal structure was settled on 3 September 2026, and retention was cut to 5 per cent on 28 August. Redrawing it is a founder decision, and it is recorded here rather than patched over.
 
 **The rule the diagram encodes.** `yaad/guardrails.py` holds a frozen set of human-only decisions: release funds, withhold funds, refund client, rule on dispute, adjust Yaad Score, suspend worker, approve job. An agent attempting any of them raises rather than proceeds. This is code, not a prompt instruction, and the test suite proves it.
 
@@ -57,8 +59,8 @@ flowchart LR
         CD["concierge.yaadly.co.uk<br/>staff desk, Cloudflare Access"]
     end
     subgraph Backend
-        EF["31 Supabase Edge Functions<br/>external callers and all AI"]
-        PG["Postgres<br/>47 tables, RLS on every one<br/>invariants live here"]
+        EF["35 Supabase Edge Functions<br/>external callers and all AI"]
+        PG["Postgres<br/>72 tables, RLS on every one<br/>invariants live here"]
         ST["Storage<br/>private vetting + intake buckets"]
     end
     subgraph Engine
@@ -101,14 +103,16 @@ flowchart LR
 
 | Model / service | Used for | Region | Status |
 |---|---|---|---|
-| **MiniMax M2.7** | Intake, conversation, drafting across eight functions | China | Current, while all data is synthetic |
-| **Mistral** | The same, replacing MiniMax | **EU** | Code landed 30 Aug 2026. One secret away. Switch trigger is real data, not a date |
+| **Mistral** (`mistral-small-latest`) | Intake, conversation and drafting across every text caller | **EU** | **Live since 4 September 2026.** Replaced MiniMax ahead of any real client data |
+| **MiniMax** | The same, but only on a fallback call | China | **Fallback only, reinstated 5 September 2026** for a refused Mistral key or a rate limit that survives the retries. `MINIMAX_API_KEY` is unset today, so nothing routes there, and any call that ever does writes its own log line |
 | **NVIDIA hosted** | Document review, job photo vision | US | Live. Identity documents deliberately withheld from it |
-| **Transcription chain** | Voice notes: Cloudflare, then OpenAI, Deepgram, ElevenLabs, AssemblyAI | Global / US | Live, sequential fallback |
-| **OpenRouter** | Job text, `yaad-kickoff` only | US, routes onward | Live |
+| **Transcription chain** | Voice notes: Cloudflare Workers AI Whisper, then OpenAI, Deepgram, ElevenLabs Scribe, AssemblyAI | Global / US | Live, sequential fallback |
+| **OpenRouter** | Nothing | US, routes onward | **Removed 5 September 2026** with `yaad-kickoff`'s own provider picker. Listed so the row is not silently forgotten |
 | **Persona** | Identity verification (not a language model) | US | Live. The only recipient of ID images |
 
-The engine speaks the OpenAI chat completions API, so it is provider agnostic by design. All eight AI functions read one shared setting, and CI fails the build if an endpoint is hard-coded. Every model call carries its region in telemetry, so where data went is checkable rather than assumed. With no API key the engine runs in deterministic mock mode and every mocked line is labelled `(mock)`.
+The engine speaks the OpenAI chat completions API, so it is provider agnostic by design. Every text caller reads one shared setting, `supabase/functions/_shared/textmodel.ts`, and CI fails the build if any function hard-codes an endpoint. That is what made the China to EU move a configuration change rather than a rewrite. Every model call carries its region in telemetry, so where data went is checkable rather than assumed. With no API key the engine runs in deterministic mock mode and every mocked line is labelled `(mock)`.
+
+Two things still leave the European Union and are named rather than glossed: photographs go to NVIDIA in the United States, and voice notes go to the transcription chain above. `docs/privacy.html` says so on the public page.
 
 ---
 
@@ -116,7 +120,7 @@ The engine speaks the OpenAI chat completions API, so it is provider agnostic by
 
 | Tool | Role |
 |---|---|
-| **Supabase** | Postgres, 31 Edge Functions, private storage buckets, auth |
+| **Supabase** | Postgres in eu-west-3 (Paris), 35 Edge Functions, private storage buckets, auth |
 | **Next.js** | Client and worker portals at `app.yaadly.co.uk` |
 | **Cloudflare** | Workers, Pages, and Zero Trust Access on the staff desk |
 | **GitHub Pages** | The static marketing site and public price guide |
@@ -126,8 +130,8 @@ The engine speaks the OpenAI chat completions API, so it is provider agnostic by
 | **Persona** | Identity and document verification |
 | **pg_cron** | Deletion clocks, evidence quiet timers, job health checks |
 | **ntfy.sh** | Operational alerts. Payload deliberately carries no contact details |
-| **OpenTelemetry** | Spans, counters, and a bounded audit event for every money and guardrail decision. Attribute cardinality is bounded, and never carries free text, a client message or a person's name |
-| **pytest** | 31 tests, including tests that prove the guardrails hold |
+| **OpenTelemetry** | Spans, counters, and a bounded audit event for every money and guardrail decision. Attribute cardinality is bounded, and never carries free text, a client message or a person's name. **Stated honestly: no exporter endpoint is configured, so the tracer is inert today and the spans go nowhere.** Where a fact has had to be proved, it has been proved from the function logs instead |
+| **pytest** | 52 tests, including tests that prove the guardrails hold. A second Deno suite asserts the same banned phrases in the live runtime, so a pattern loosened on one side fails CI on the other |
 
 ---
 
