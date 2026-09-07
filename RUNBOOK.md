@@ -110,6 +110,18 @@ If the whole row has wrapped onto two lines, something in it grew. With IBM Plex
 
 ---
 
+## 5b. The keep-alive workflow is red
+
+`.github/workflows/keepalive.yml` runs every second day. It exists so Supabase's free plan never pauses the project for inactivity, and it checks the public surfaces while it is there. Read the failed step's name first; each one points at a different fault.
+
+1. **Touch the database.** A non-200 means Supabase is paused, over quota, or down: open the dashboard. A non-empty body means the anon role can read `waitlist`, which is a row-level security fault, see section 7.
+2. **Live site and app.** `yaadly.co.uk` is section 5, `app.yaadly.co.uk` is section 4.
+3. **Public front doors.** `yaad-post-job` and `yaad-enquiry` must answer a bare GET with 405. A 401 means somebody redeployed one of them without `--no-verify-jwt`, and the form behind it is broken for every visitor, because visitors have no token. A 404 means it was deleted. Redeploy from disk, section 3. `yaad-website-intake` must answer 410 (or 404): it was retired on 31 Aug 2026 and used to create jobs with no authentication, so any other answer means it has come back to life and the alarm is correct.
+
+If you retire or rename one of the endpoints this step names, change the step in the same commit. Between 31 Aug and 7 Sep 2026 the workflow failed on every run because it was still checking the retired intake, and nobody noticed for a week, which is the failure mode a check is supposed to prevent.
+
+---
+
 ## 6. A key has been exposed
 
 1. Rotate it at the provider now. Before anything else, before working out how it happened.
