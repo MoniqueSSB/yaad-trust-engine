@@ -80,6 +80,34 @@ async function pingDesk(admin: any, title: string, body: string): Promise<void> 
   } catch (_) { /* never let a notification break a scheduled run */ }
 }
 
+/** Should this reminder actually go to the phone right now?
+ *
+ *  The count alone is the wrong question. This function runs on a schedule
+ *  and the queue it counts is normally NOT empty, so "push when the count is
+ *  above zero" means "push on every single poll", which is what it did: two
+ *  pushes a minute for days, against four items, three of them August test
+ *  rows nobody was ever going to approve.
+ *
+ *  should_push_desk_notice() (20260907140000) holds the memory in one place
+ *  rather than in two Deno files that would drift, and answers the real
+ *  question: has the queue GROWN, or has a day passed with it still not
+ *  empty. Nothing about the approval gate changes; only how often the phone
+ *  says so.
+ *
+ *  Fails OPEN. If the call errors the push still goes, because a reminder
+ *  arriving too often is a nuisance and a reminder that silently stops is a
+ *  booking nobody knows is blocked. */
+async function shouldPushDeskNotice(admin: any, key: string, count: number): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("should_push_desk_notice", { p_key: key, p_count: count });
+    if (error) { console.error(`should_push_desk_notice(${key}) failed, pushing anyway: ${error.message}`); return true; }
+    return data === true;
+  } catch (e) {
+    console.error(`should_push_desk_notice(${key}) threw, pushing anyway: ${String(e).slice(0, 200)}`);
+    return true;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -131,8 +159,26 @@ Deno.serve(async (req: Request) => {
       .eq("open", true).eq("stage", 0) as { data: (Job & { worker_email: string | null })[] | null };
     const jobs = (jobRows ?? []).filter((j) => !j.worker_email || !j.worker_email.trim());
 
+    // 'approved' counts as HAVING a pack, and leaving it out was a runaway.
+    //
+    // A job whose pack was approved dropped straight back out of this set and
+    // read as a job with no pack at all, so the next poll drafted another
+    // one, and the poll after that another. On 1 September one test job
+    // collected 163 approved drafts in under seven hours, a fresh model call
+    // roughly every two minutes; 307 across twelve jobs in two days. The only
+    // thing that ever stopped it was the three-failures brake below, which
+    // was never meant to be the brake.
+    //
+    // It went quiet on 4 September for the wrong reason: auto-approval was
+    // removed, so drafts now park at 'ready', which IS in this set. That made
+    // it dormant rather than fixed, and it would have restarted on the first
+    // pack Monique approved by hand. Found 7 September while stopping the
+    // ntfy spam, which is the same missing memory wearing a different hat.
+    //
+    // A job that genuinely needs a second pack gets one from the desk, which
+    // calls yaad-quote-pack directly and never passes through this filter.
     const { data: draftRows } = await admin.from("quote_pack_drafts").select("job_id,status");
-    const hasActiveOrReadyDraft = new Set((draftRows ?? []).filter((d) => d.status === "drafting" || d.status === "ready").map((d) => d.job_id));
+    const hasActiveOrReadyDraft = new Set((draftRows ?? []).filter((d) => d.status === "drafting" || d.status === "ready" || d.status === "approved").map((d) => d.job_id));
     const failedCounts = new Map<string, number>();
     for (const d of draftRows ?? []) if (d.status === "failed") failedCounts.set(d.job_id, (failedCounts.get(d.job_id) ?? 0) + 1);
 
@@ -190,9 +236,10 @@ Deno.serve(async (req: Request) => {
       return Boolean(g.price_language_detected) || Boolean(g.banned_language_detected);
     }).length;
 
-    // Told once per poll, and only when something is actually waiting, so the
-    // queue cannot quietly become the bottleneck the audit warned it could.
-    if (heldForReview > 0) {
+    // Told when the queue GROWS, and once a day while it is still not empty,
+    // so the queue cannot quietly become the bottleneck the audit warned it
+    // could without becoming an alarm that rings every poll and gets muted.
+    if (heldForReview > 0 && await shouldPushDeskNotice(admin, "quote_packs_awaiting_approval", heldForReview)) {
       await pingDesk(admin,
         `${heldForReview} quote pack${heldForReview === 1 ? "" : "s"} waiting on you`,
         `${heldForReview} draft${heldForReview === 1 ? " is" : "s are"} ready and no worker can see ${heldForReview === 1 ? "it" : "them"} until you approve. `
