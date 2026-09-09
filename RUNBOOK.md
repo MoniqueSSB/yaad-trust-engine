@@ -4469,7 +4469,9 @@ All four counts must be zero. They were, on all 8 open jobs, after the fix.
 
 `20260905a` redefines `open_jobs` **without** `board_descr()`. Applying it alone silently reopens the identifier leak above, and `20260907090000` will not re-run to undo it because its name is already in production's migration history.
 
-**So: apply `20260905a`, then immediately re-apply the `open_jobs` and `my_requested_jobs` definitions from `20260907090000`, then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it.
+**So: apply `20260905a`, then immediately re-apply `20260909150000` (which redefines `open_jobs` with `board_descr()` AND the `is_test` clause, and builds the first-refusal clause conditionally so it lands once `20260905a` is in), then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it. Before 9 September the instruction here was to re-apply `20260907090000`; that would now bring the identifier leak fix back and drop the test-row filter, so it is superseded.
+
+**`20260905b` is in the same state.** Found 9 September 2026 while applying `20260909150000`: production has no `worker_showcase` table, no `worker_profiles.showcase_consent` and no `public_worker_showcase` view. The desk's Workers view and `web/app/workers/[slug]` both read those, and fail soft. `20260909150000` skips the showcase view when the table is absent, so it is safe to apply either side of `20260905b`; if `20260905b` is applied later, re-apply `20260909150000` after it for the same reason as above.
 
 ---
 
@@ -4555,3 +4557,25 @@ select value from app_settings where key = 'worker_guidelines_version';
 ```
 
 The trigger function should contain neither figure and should name `raise_job_stage_worker_payable`. If `raise_job_worker_pay_invoice` or `raise_job_stage_worker_pay_invoice` still exist afterwards, the migration did not run to the end.
+
+## A test job or a test worker is showing on the public board, or a real one is missing
+
+Since 9 September 2026 (`20260909150000`) the public board at app.yaadly.co.uk/jobs and the worker directory beside it leave out any row a person has marked as a test. The mark is `jobs.is_test` and `worker_profiles.is_test`, false by default, set only by a person from the desk, and every press is written to `agent_actions` with who pressed it. Nothing is deleted and nothing else about the row changes: the conversation, the evidence, the quotes and the money are untouched, and the desk still shows the row with a grey "test" chip.
+
+**To take a test row off the board:** desk, Jobs, open the row, "That was me testing". For a worker: desk, Workers, open the row, same button. It leaves the public page the moment it saves. The automatic Quote Kickoff Pack trigger (`yaad-quote-pack-check`) also stops drafting for a marked job; a pack for a test job is requested from the desk instead.
+
+**To put a real one back:** same drawer, "This one is real". If the job is open for quotes with no worker chosen it is on the board again straight away; a worker comes back to the directory if they are active.
+
+**What was marked on 9 September, and on what basis.** Two sources only, and the migration header lists both: rows that say so on their own record (source `test`, an id beginning `JOB-TEST-`, a "Test Client" or "TEST QA" name, a worker name or email containing the word test or QA, or an `@example.com` address), and the six founder-run jobs that were open on the board under her own email, named one by one from the Data Room note of 7 September. 19 of 44 jobs and all 8 worker profiles. The 25 closed jobs were left unmarked because the board can never show them. `JOB-DEMO-PHOTOS` was deliberately not marked: it is the display listing, it says DEMO LISTING in its own title, and hiding it is a separate decision. The Data Room carries a matching addendum in `04 Real world validation`.
+
+**Check it:**
+
+```sql
+select id, title from open_jobs;                                   -- what the public sees
+select id, title, is_test from jobs where open order by updated_at desc;  -- what the desk sees
+select actor, action, summary, at from agent_actions where action like '%_test' order by at desc limit 10;
+```
+
+A marked row appearing in the first query means a later migration redefined `open_jobs` without the clause. `supabase/tests/public_board_test_rows_guards.sql` proves the clause on both views and that the two marker functions refuse without an admin session; run it before and after touching either view.
+
+**Do not** add a filter in `web/app/jobs/page.tsx` to do this job. The page reads the view and must keep reading the view, or "This one is real" stops meaning what it says.
