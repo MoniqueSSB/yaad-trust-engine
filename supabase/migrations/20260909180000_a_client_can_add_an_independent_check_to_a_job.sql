@@ -7,17 +7,17 @@
 -- free video walkthrough, stage_approvals.confirmed_method is how the client
 -- confirmed. Neither says whether somebody independent attended.
 --
--- PRICING. These are the MARKETPLACE in-job rungs from the Operational
--- Blueprint section 5 (ledger 23 and 30 July 2026): a looker's Basic Visual
--- Check, and a Technical Inspection and Sign-off. They are NOT the £149
--- professional Visual Check on the services page, which is a standalone
--- product with its own catalogue row ('eyes-on-it'). Monique said so on
--- 9 September 2026, and the two must not be merged. The seed figures below
--- are the blueprint's for the visual check (£45 full, £25 founding) and
--- Monique's own for the technical check (£149 full, £100 founding, set on
--- 9 September 2026 in place of the blueprint's £50 and £45). Both are hers
--- to confirm before this file is applied. They live in service_catalogue so
--- changing them is an UPDATE, never a deploy.
+-- PRICING. Monique, 9 and 10 September 2026: these are the SAME checks as
+-- the Visual Check and Technical Sign-off on the services page, offered at
+-- a lower price to a client who has already bought a job from Yaadly. Not
+-- a different product, a returning-client price. They get their own
+-- catalogue rows because the price differs from the standalone rows
+-- ('eyes-on-it', 'technical-signoff') and the catalogue trigger prices a
+-- line from exactly one row. Seeds: visual £45 full, £25 founding (the
+-- blueprint's looker rung); technical £149 full, £100 founding (hers, in
+-- place of the blueprint's £50 and £45). Both are hers to confirm before
+-- this file is applied. They live in service_catalogue so changing them is
+-- an UPDATE, never a deploy.
 --
 -- MONEY. The check is billed as its own one-line GBP invoice, priced by the
 -- catalogue trigger (catalogue_full or catalogue_founding, never a typed
@@ -47,11 +47,11 @@
 -- --------------------------------------------------------------- catalogue
 
 insert into public.service_catalogue (id, name, blurb, founding_pence, full_pence, recurring, unit_label, sort) values
-  ('job-visual-check',    'Basic Visual Check, on a job',
-   'An independent looker attends the finished stage, confirms it is visibly done and basically works, and files timestamped photos. Visual and basic function only. They record. They do not rate, advise or certify.',
+  ('job-visual-check',    'Visual Check, on a job you booked with us',
+   'The same Visual Check as on the services page, at a lower price because you already have a job with Yaadly. Somebody independent of the worker attends the finished stage, confirms it is visibly done and basically works, and files timestamped photos. They record. They do not rate, advise or certify.',
    2500, 4500, false, 'visit', 12),
-  ('job-technical-check', 'Technical Inspection and Sign-off, on a job',
-   'A technically trained inspector reviews the stage against the agreed scope and the trade standard, and signs it off or lists what to put right. Pre-booked at scope agreed.',
+  ('job-technical-check', 'Technical Sign-off, on a job you booked with us',
+   'The same Technical Sign-off as on the services page, at a lower price because you already have a job with Yaadly. A qualified trade inspector reviews the stage against the agreed scope and the trade standard, and signs it off or lists what to put right. Pre-booked at scope agreed.',
    10000, 14900, false, 'stage', 13)
 on conflict (id) do nothing;
 
@@ -153,7 +153,7 @@ begin
   end if;
 
   if v_level is null or v_level not in ('visual', 'technical') then
-    raise exception 'Choose a Basic Visual Check or a Technical Inspection and Sign-off.'
+    raise exception 'Choose a Visual Check or a Technical Sign-off.'
       using errcode = 'check_violation';
   end if;
 

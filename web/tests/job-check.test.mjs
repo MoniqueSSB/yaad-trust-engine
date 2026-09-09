@@ -110,7 +110,7 @@ describe("the small helpers agree with the database", () => {
     assert.equal(m.isCheckLevel(null), false);
   });
 
-  test("each level maps to its own catalogue row, never the professional Visual Check", () => {
+  test("each level maps to its own returning-client catalogue row, not the standalone one", () => {
     assert.equal(m.CHECK_CATALOGUE_ID.visual, "job-visual-check");
     assert.equal(m.CHECK_CATALOGUE_ID.technical, "job-technical-check");
     assert.notEqual(m.CHECK_CATALOGUE_ID.visual, "eyes-on-it");

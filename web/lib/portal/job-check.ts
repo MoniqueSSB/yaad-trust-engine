@@ -28,8 +28,8 @@ export const CHECK_CATALOGUE_ID: Record<CheckLevel, string> = {
 };
 
 export const CHECK_LABEL: Record<CheckLevel, string> = {
-  visual: "Basic Visual Check",
-  technical: "Technical Inspection and Sign-off",
+  visual: "Visual Check",
+  technical: "Technical Sign-off",
 };
 
 /** What the picker should show for this job, for this reader. */

@@ -4586,7 +4586,7 @@ A marked row appearing in the first query means a later migration redefined `ope
 
 The optional independent check at sign-off (20260909180000). The client chooses it on the **Approvals** tab of their job, from the moment a worker is on the job until somebody files evidence on the final stage. After that the portal locks the choice and tells them to message you: the spec's rule is "Visits not agreed at the start are chargeable", and a late request is a conversation, not a silent line on a bill.
 
-**The two prices are the marketplace rungs, not the £149 Visual Check.** `service_catalogue` rows `job-visual-check` and `job-technical-check`. The professional Visual Check on the services page is `eyes-on-it` and is a different product. Change a price with an `UPDATE` on the catalogue row; nothing is deployed for a price change.
+**The two prices are the returning-client prices.** The same Visual Check and Technical Sign-off as the services page, cheaper because the client already booked a job: `service_catalogue` rows `job-visual-check` and `job-technical-check`. The standalone rows (`eyes-on-it`, `technical-signoff`) keep the full standalone price. Change a price with an `UPDATE` on the catalogue row; nothing is deployed for a price change.
 
 **The desk view is Independent checks, under Documents & money.** It lists every job with a check chosen, with the invoice and the report beside it. Three actions:
 

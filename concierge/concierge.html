@@ -1246,13 +1246,13 @@ const VIEWS = [
 
   { k:"checks", g:"Documents & money", label:"Independent checks", icon:"case",
     title:"Independent checks", table:"v_job_checks",
-    sub:"Jobs where the client added an independent check at sign-off (20260909180000). A check is a record for their sign-off, not a ruling: choosing one changes who attends, never who approves, and the Approve button never reads it. Prices are the MARKETPLACE rungs in service_catalogue, job-visual-check and job-technical-check, not the £149 professional Visual Check on the services page. The checker is never the worker on the job; the database refuses that name.",
+    sub:"Jobs where the client added an independent check at sign-off (20260909180000). A check is a record for their sign-off, not a ruling: choosing one changes who attends, never who approves, and the Approve button never reads it. They are the same checks as the services page at a lower price, because the client already has a job with Yaadly: catalogue rows job-visual-check and job-technical-check. The checker is never the worker on the job; the database refuses that name.",
     select:"*", order:"check_chosen_at",
     search:["id","title","client_name","worker_name","check_assigned_to"],
     empty:["No checks booked","A client adds one from the Approvals tab of their job, once a worker is on it and before the final stage's evidence is filed. After that it is a WhatsApp conversation and you set it here."],
     cols:[
       {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
-      {h:"Check", f:r => esc(r.check_level === "visual" ? "Basic Visual Check" : "Technical Inspection and Sign-off")
+      {h:"Check", f:r => esc(r.check_level === "visual" ? "Visual Check" : "Technical Sign-off")
                         + sub_("chosen " + ago_(r.check_chosen_at) + (r.check_chosen_by ? " by " + r.check_chosen_by : ""))},
       {h:"Client & worker", f:r => esc(r.client_name || r.client_email || "") + sub_(r.worker_name ? "worker: " + r.worker_name : "no worker")},
       {h:"Attending", f:r => r.check_assigned_to ? esc(r.check_assigned_to) + sub_(ago_(r.check_assigned_at)) : chip_("warn","not yet assigned")},

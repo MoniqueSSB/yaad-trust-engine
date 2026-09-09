@@ -10,8 +10,9 @@ import { gbp } from "@/lib/money";
  * beside the Approve button and never in front of it.
  *
  * Prices come from service_catalogue, read by the page, never typed here.
- * These are the MARKETPLACE rungs (job-visual-check, job-technical-check),
- * not the £149 professional Visual Check on the services page.
+ * They are the same checks as the services page, at a lower price for a
+ * client who already has a job with Yaadly (job-visual-check and
+ * job-technical-check are those returning-client rows).
  *
  * Server component: both actions are Postgres functions and the panel
  * re-renders from the row they wrote.
@@ -87,7 +88,8 @@ export function JobCheckPanel({
       <p className="mt-1 text-[12px] leading-relaxed text-dim">
         Optional. By default you approve each stage yourself from the evidence, and that costs nothing.
         If you would rather somebody independent of the worker attended the finished stage and filed what
-        they saw, choose a level here. <b className="text-ink">It is a record for your sign-off, not a ruling</b>:
+        they saw, choose a level here. These are the same checks as on our services page, at a lower price
+        because you have booked a job with us. <b className="text-ink">It is a record for your sign-off, not a ruling</b>:
         you still press Approve yourself, and nothing here moves any payment.
       </p>
 
@@ -103,8 +105,8 @@ export function JobCheckPanel({
                   <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
                     {p?.blurb ??
                       (k === "visual"
-                        ? "An independent looker confirms it is visibly done and basically works. They record. They do not rate, advise or certify."
-                        : "A technically trained inspector reviews the stage against the agreed scope and the trade standard.")}
+                        ? "Somebody independent confirms it is visibly done and basically works. They record. They do not rate, advise or certify."
+                        : "A qualified trade inspector reviews the stage against the agreed scope and the trade standard.")}
                   </p>
                   <form action={chooseJobCheck} className="mt-2.5">
                     <input type="hidden" name="jobId" value={jobId} />
