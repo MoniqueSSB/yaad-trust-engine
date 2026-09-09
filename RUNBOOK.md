@@ -802,7 +802,7 @@ select j.id, j.status, q.labour_jmd, q.materials_jmd, q.status as quote_status
  where j.worker_email = 'them@example.com';
 ```
 
-`round(labour_jmd * 0.88) + materials_jmd` is the figure shown, the same 88% every other money panel in this repository uses. A job with no `accepted` row shows nothing on the money page at all, correctly: there is no money to show yet.
+`round(labour_jmd * 0.95) + materials_jmd` is the figure shown, the same 95% every other money panel in this repository uses (the worker side came down from 12% to 5% on 9 September 2026). A job with no `accepted` row shows nothing on the money page at all, correctly: there is no money to show yet.
 
 **Held versus Released is `jobs.status <> 'complete'` versus `= 'complete'`, nothing finer.** A job does not partially release as stages complete; the whole figure moves at once, when `sync_job_status()` marks the job complete. If a worker expects a partial figure for a partially finished multi-stage job, that expectation is ahead of what this repository tracks today: no per-stage money split exists anywhere.
 
