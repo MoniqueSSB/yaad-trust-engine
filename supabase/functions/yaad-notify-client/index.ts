@@ -1102,7 +1102,7 @@ Deno.serve(async (req: Request) => {
       // documents no partial release, the whole figure moves at once at
       // completion), the same moment raise_job_worker_pay_invoice() becomes
       // raisable. Deliberately does not name a figure: the worker's own
-      // pay is labour_jmd * 0.88 plus materials, and stating it here risks
+      // pay is labour_jmd * 0.95 plus materials, and stating it here risks
       // drifting from whatever the money page actually shows if either
       // changes independently.
       subject = `${job.title} is signed off`;

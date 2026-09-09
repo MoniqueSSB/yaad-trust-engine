@@ -106,7 +106,7 @@ If one page's header does not match the rest:
 2. Check nobody has put nav rules back into the page or into `yaadly.css`: `grep -n "\.vbtn\|\.views\|\.quiet-links\|site-nav" docs/*.html docs/yaadly.css` should return nothing but the markup lines. A nav rule anywhere other than `nav.css` is the fault.
 3. Check the markup matches. It is identical on all eight pages; only the `on` class moves to the current page's tab.
 
-If the whole row has wrapped onto two lines, something in it grew. With IBM Plex loaded, the header fills its 1100px exactly, so a longer label, more padding or an extra link pushes "Post a job" out. Shorten it, or take something out of the row: do not let it wrap on desktop, because a two-line header on one page and a one-line header on the next is the exact problem this file exists to prevent.
+If the whole row has wrapped onto two lines, something in it grew. Since 9 Sep 2026 the row is full width with 40px of padding each side, and its contents measure about 1120px on the marketing site and about 1150px in the app, which is why the three portal links hide below 1240px in both files. A longer label, more padding or an extra link pushes "Post a job" out past the padding on screens just above that breakpoint. Shorten it, or take something out of the row: do not let it wrap on desktop, because a two-line header on one page and a one-line header on the next is the exact problem this file exists to prevent. If you change the breakpoint, change it in both `docs/nav.css` and `SiteNav.tsx`, or the two headers will hide the links at different widths.
 
 ---
 
@@ -3270,6 +3270,8 @@ This also part-answers the open question about the invoice being the evidence of
 
 ## The worker's 12% is displayed but never collected, and the two sides contradict
 
+*Historical, kept for the reasoning. The margin on the tradesperson's side is 5% from 9 September 2026, and the section "Changing the worker margin" at the end of this file is the current map of where it lives.*
+
 Found 3 September 2026 while answering "how do I take my fees from the worker". **Needs a founder ruling before any code moves.** Nothing has been changed except the description on `docs/payments.html`.
 
 **What the two sides are currently told, on the same job:**
@@ -4530,3 +4532,26 @@ select job_id, count(*) from quote_pack_drafts where status = 'approved' group b
 ```
 
 More than a handful per job means the skip list has lost `approved` again. The historical rows on the test jobs were left in place as the record of what happened.
+
+## Changing the worker margin, or any fee percentage
+
+The tradesperson's side is **5% on labour** from 9 September 2026 (was 12%); the client side is 15%; blended 20%. The number is not stored once. It lives in every one of these, and on 3 September the screens said 12% while the database collected nothing, so a change that misses one of them recreates that fault. Change all of them in the same commit:
+
+1. `yaad/benchmarks.py` (`WORKER_FEE`) and the assertion in `tests/test_engine.py::test_fees_never_touch_materials`.
+2. Postgres: `raise_job_worker_payable()` and `raise_job_stage_worker_payable()`. Write a new migration that restates both bodies with the new figure (`20260909120000_the_worker_margin_is_five_per_cent.sql` is the shape), never edit an applied file.
+3. Worker-facing screens: `web/components/QuotePanel.tsx`, `web/components/portal/FeeBreakdown.tsx`, `web/components/portal/MoneyPanel.tsx`, `web/app/portal/(gated)/jobs/[id]/page.tsx`, `web/app/portal/(gated)/worker/page.tsx`, `web/app/trades/page.tsx`. Grep for `0.95` and `5%` rather than trusting this list.
+4. The signed text: `web/lib/legal-copy.json` section 1, bump `WG_VERSION` and `WG_DATE`, add an amendment note in the section, and set `worker_guidelines_version` in `app_settings` in the same migration as step 2. Count the live signatures at the outgoing version first and tell the founder how many people will have to re-sign, before applying.
+5. The desk: `concierge/concierge.html` ("Worker gets" column, the accept-quote confirmation, the "Fee model in force" card), then copy it into `concierge-deploy/public/index.html`.
+6. Copy: `docs/payments.html`, `docs/prices.html` fee table, `docs/COPY-GUIDELINES.md` §3 "Fees, stated the same way everywhere", `preview/index.html` and `preview/README.md`, `specs/PRICING.md`, `specs/ADMIN-DESK-VISUAL-SPEC.md`.
+
+Then sweep: `grep -rn "0.88\|less 12%\|keep 88\|27% blended" web docs preview concierge specs yaad` should return only CSS alpha values and history comments.
+
+**Applying the migration.** One file, by hand, per "Apply one migration, not all of them" above. Before it: `select doc_version, count(*) from doc_signatures group by 1` and say the number out loud. After it, prove it took, against the live schema and not the file:
+
+```sql
+select proname, prosrc like '%0.05%' as five, prosrc like '%0.12%' as twelve
+  from pg_proc where proname in ('raise_job_worker_payable','raise_job_stage_worker_payable','raise_worker_pay_invoice_on_stage_approval');
+select value from app_settings where key = 'worker_guidelines_version';
+```
+
+The trigger function should contain neither figure and should name `raise_job_stage_worker_payable`. If `raise_job_worker_pay_invoice` or `raise_job_stage_worker_pay_invoice` still exist afterwards, the migration did not run to the end.

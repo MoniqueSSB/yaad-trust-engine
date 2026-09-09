@@ -755,7 +755,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ JOB INVOICES -->
 <section class="view" data-view="jobinv">
   <h1 class="vh">Job Invoices</h1>
-  <p class="vsub">One row per booked job. Raises the client's single all-in invoice: the labour price, Yaadly's 15% Guarantee &amp; Support fee, and materials at cost. The client buys the whole job from Yaadly and is never billed for the worker. What Yaadly owes the tradesperson, their quoted labour less the agreed 12% plus materials, is a separate payable raised once the job is complete.</p>
+  <p class="vsub">One row per booked job. Raises the client's single all-in invoice: the labour price, Yaadly's 15% Guarantee &amp; Support fee, and materials at cost. The client buys the whole job from Yaadly and is never billed for the worker. What Yaadly owes the tradesperson, their quoted labour less the agreed 5% plus materials, is a separate payable raised once the job is complete.</p>
   <div id="jiMsg"></div>
   <div id="jiBody"><div class="empty"><b>Reading your booked jobs&hellip;</b></div></div>
 
@@ -1399,7 +1399,7 @@ const VIEWS = [
 
   { k:"quotes", g:"Run the day", label:"Quotes", icon:"money",
     title:"Quotes", table:"job_quotes",
-    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 12%, materials at cost. Materials are never fee'd on either side.",
+    sub:"Submitted quotes waiting to reach a client. Client sees labour plus 15%, materials at cost. Worker keeps labour minus 5%, materials at cost. Materials are never fee'd on either side.",
     select:"*",
     order:"created_at", search:["job_id","worker_name","worker_email"],
     empty:["No quotes in","Workers quote from the board. Nothing has been submitted yet."],
@@ -1410,14 +1410,14 @@ const VIEWS = [
       {h:"Labour", n:true, f:r => jmd(r.labour_jmd)},
       {h:"Materials", n:true, f:r => jmd(r.materials_jmd)},
       {h:"Client sees", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 1.15) + Number(r.materials_jmd||0))},
-      {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.88) + Number(r.materials_jmd||0))},
+      {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.95) + Number(r.materials_jmd||0))},
       {h:"Against the others", f:r => quoteBand(r, ROWS.quotes || [])},
       {h:"State", f:r => tone_(r.status)},
     ],
     actions:[
       { label:"Accept this quote", cls:"", when:r => r.status === "submitted",
         set:{ status:"accepted" },
-        says:r => `Accepts ${r.worker_name || "this worker"} for job ${r.job_id}. The client sees J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)}, the worker keeps J$${Math.round(Number(r.labour_jmd||0)*0.88)+Number(r.materials_jmd||0)}. Materials are not fee'd on either side.` },
+        says:r => `Accepts ${r.worker_name || "this worker"} for job ${r.job_id}. The client sees J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)}, the worker keeps J$${Math.round(Number(r.labour_jmd||0)*0.95)+Number(r.materials_jmd||0)}. Materials are not fee'd on either side.` },
       { label:"Decline it", cls:"d", when:r => r.status === "submitted",
         set:{ status:"declined" },
         says:() => "Declines this quote. The worker is not told by this button." },
@@ -4950,8 +4950,8 @@ async function loadMoney(){
     <div class="card">
       <div class="kv">
         <span class="k2">Client, Guarantee and Support</span><span class="v2">15% on labour</span>
-        <span class="k2">Worker</span><span class="v2">engaged at quote less 12%</span>
-        <span class="k2">Blended</span><span class="v2">27%</span>
+        <span class="k2">Worker</span><span class="v2">engaged at quote less 5%</span>
+        <span class="k2">Blended</span><span class="v2">20%</span>
         <span class="k2">Materials</span><span class="v2">never fee'd</span>
         <span class="k2">Yaadly Remote, digital</span><span class="v2">10%</span>
         <span class="k2">Founding Pros, 90 days</span><span class="v2" style="color:var(--tealb)">worker side 0%</span>

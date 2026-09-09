@@ -308,7 +308,7 @@ Use `ledger()`, plus an operator summary the client version does not need:
 HELD          J$412,300   across 6 jobs        mango
 DUE OUT       J$158,400   approved, unpaid     mango
 PAID, 30 DAYS J$680,100                        teal
-FEES, 30 DAYS J$91,800    27% blended          teal
+FEES, 30 DAYS J$91,800    20% blended          teal
 ```
 
 **Never show a client's budget band in this view.** It exists nowhere on the platform except the

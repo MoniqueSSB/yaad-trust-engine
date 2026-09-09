@@ -34,6 +34,9 @@ import { SiteNav } from "@/components/SiteNav";
  * of legal/subcontractor-agreement-DRAFT.md. Same arithmetic, different
  * money: see DECISIONS.md for why the difference is legal rather than tonal.
  *
+ * 9 Sep 2026: the margin on the tradesperson's side came down from 12% to
+ * 5%, founder instruction. Same framing, smaller number.
+ *
  * The opening paragraph went the same way on her instruction the same day.
  * "Yaadly connects vetted tradespeople with property owners" is the venue
  * again, in the first sentence a tradesperson reads. Yaadly takes the work
@@ -51,8 +54,8 @@ const BENEFITS: { h: string; p: string }[] = [
     p: "Nothing to join, nothing per quote, nothing per lead, win or lose. You're never charged for a job you don't get.",
   },
   {
-    h: "Your price, less 12%",
-    p: "You set your labour price and Yaadly engages you at that price less 12%. Remote digital work is 10%. Nothing comes out of money of yours: you're Yaadly's subcontractor, so the client's payment was never yours. Materials are never fee'd, at cost is at cost, and there's no subscription.",
+    h: "Your price, less 5%",
+    p: "You set your labour price and Yaadly engages you at that price less 5%. Remote digital work is 10%. Nothing comes out of money of yours: you're Yaadly's subcontractor, so the client's payment was never yours. Materials are never fee'd, at cost is at cost, and there's no subscription.",
   },
   {
     h: "You set your own price",
@@ -155,7 +158,7 @@ export default function TradesInfo() {
         <div className="mt-5 grid grid-cols-1 gap-3.5 md:grid-cols-2">
           <div className="rounded-2xl border border-line bg-panel p-5 text-[13.5px] leading-relaxed text-mute">
             <b className="text-ink">What you’re paid:</b> you set your labour price, and Yaadly
-            engages you at that price less 12%. Remote digital work is 10% instead. You see both
+            engages you at that price less 5%. Remote digital work is 10% instead. You see both
             figures, your price and what Yaadly pays you, in writing before you accept anything, and
             neither moves afterwards. Materials carry no fee at all: they’re paid to you at cost
             against a receipt.
