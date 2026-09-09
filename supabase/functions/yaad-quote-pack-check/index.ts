@@ -152,11 +152,16 @@ Deno.serve(async (req: Request) => {
     }
     if (!allowed) return json({ error: "Not authorised." }, 403);
 
-    // Live, unassigned, stage 0: exactly open_jobs' own definition
-    // (COALESCE(worker_email,'') = '').
+    // Live, unassigned, stage 0, and not marked as a test: exactly open_jobs'
+    // own definition (COALESCE(worker_email,'') = ''). The is_test clause
+    // arrived with 20260909150000: a job a person has marked as their own
+    // test is off the public board, so drafting a Quote Kickoff Pack for it
+    // is a model call for a worker who will never see it. A test job that
+    // genuinely needs a pack gets one from the desk, which calls
+    // yaad-quote-pack directly and never passes through this filter.
     const { data: jobRows } = await admin.from("jobs")
       .select("id,title,parish,descr,trade,urgency,access_type,worker_email")
-      .eq("open", true).eq("stage", 0) as { data: (Job & { worker_email: string | null })[] | null };
+      .eq("open", true).eq("stage", 0).eq("is_test", false) as { data: (Job & { worker_email: string | null })[] | null };
     const jobs = (jobRows ?? []).filter((j) => !j.worker_email || !j.worker_email.trim());
 
     // 'approved' counts as HAVING a pack, and leaving it out was a runaway.
