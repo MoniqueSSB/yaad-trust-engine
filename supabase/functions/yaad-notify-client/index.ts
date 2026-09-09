@@ -1107,7 +1107,7 @@ Deno.serve(async (req: Request) => {
       // changes independently.
       subject = `${job.title} is signed off`;
       line = `${job.title} (${job.id}) is signed off, every stage approved. ` +
-        `You're owed your labour and materials for it, paid directly by the client, off-platform, the way you already agreed with them. ` +
+        `Yaadly owes you your labour and materials for it, and Yaadly pays you for the work. ` +
         `Check your own figure any time in your Yaadly portal.`;
     } else if (kind === "evidence_landed") {
       // Founder's own requirement, 31 Aug 2026, and a real change from how
