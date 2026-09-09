@@ -1,7 +1,7 @@
 # Yaadly copy guidelines
 
 The single source of truth for customer facing wording on `docs/` and on the app surfaces in `web/app/`.
-Written 4 September 2026. If a page and this document disagree, this document is right and the page is a bug.
+Written 4 September 2026, section 2 rewritten 9 September 2026. If a page and this document disagree, this document is right and the page is a bug.
 
 Two rules before anything else.
 
@@ -14,42 +14,40 @@ Two rules before anything else.
 
 ## 1. What Yaadly is, in one paragraph
 
-Yaadly is for people who own property in Jamaica and cannot stand in front of it, most of them living in the UK, the United States or Canada. It arranges property repair, maintenance and property care in Jamaica, and it documents the work so an owner four thousand miles away can see what was actually done. It is not a directory: a directory hands you a phone number and steps back, where Yaadly scopes the job, prices it against real material costs and real day rates, puts an identity checked tradesperson on it, and reviews the finished work. **On a managed job Yaadly is the principal contractor: you buy the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson as its subcontractor.** You never contract with them and you never pay them, so if the work is wrong you come to Yaadly, not to a stranger in Jamaica.
+Yaadly is for people who own property in Jamaica and cannot stand in front of it, most of them living in the UK, the United States or Canada. It arranges property repair, maintenance and property care in Jamaica, and it documents the work so an owner four thousand miles away can see what was actually done. It is not a directory: a directory hands you a phone number and steps back, where Yaadly scopes the job, prices it against real material costs and real day rates, puts an identity checked tradesperson on it, and reviews the finished work. **On every job Yaadly is the principal contractor: you buy the job from Yaadly at one agreed price, and Yaadly engages and pays the tradesperson as its subcontractor.** You never contract with them and you never pay them, so if the work is wrong you come to Yaadly, not to a stranger in Jamaica.
 
 **Yaadly Ltd**, registered in England and Wales, company number **17358077**.
 
 ---
 
-## 2. The two lanes
+## 2. One money story
 
-This is the most important section in this document. The site has two true offers, and almost every contradiction found in the Stage 1 audit came from a page reaching for the wrong one.
+This is the most important section in this document, and it has been rewritten once, so read the history at the end of it before trusting an older page.
 
-**Every page must make its lane obvious before it mentions money.**
+**The client pays Yaadly. Yaadly pays the tradesperson. There is no arrangement in which a client pays a tradesperson directly on a Yaadly job.**
 
-| | **Managed job** | **Oversight only** |
+| | **A job** (property work) | **A check, a report or a retainer** |
 |---|---|---|
-| Who engages the tradesperson | Yaadly | You do, and they stay yours |
-| Who you pay for the work | Yaadly, one agreed price | Your contractor, directly |
-| Who pays the tradesperson | Yaadly, on completion, as subcontractor | You do. Yaadly never touches it |
-| What Yaadly sells | The job | The eyes: attendance, inspection, the written report |
-| If the work is wrong | Yaadly's to put right | Your contractor's to put right. Yaadly evidences it and says so plainly |
+| What you buy from Yaadly | The job, at one agreed price | The service, at the published price |
+| Who engages the tradesperson | Yaadly, as its subcontractor | Not applicable. Any property work then commissioned through Yaadly is a job |
+| Who pays the tradesperson | Yaadly, on completion | Yaadly, if a job follows |
+| If the work is wrong | Yaadly's to put right | The report says so plainly. Putting the work right is a job |
 
-**Where each lane lives**
+**Every page must make clear, before it mentions money, that the client is paying Yaadly.** The one sentence that covers it:
 
-- **Managed job:** the homepage, the marketplace overview, the job board, Full Project Management.
-- **Oversight only:** Yaadly for business, and six of the seven priced services (Deposit Protection Check, Visual Check, Condition Report, Technical Sign-off, Oversight Retainer, Property Care).
+> You pay Yaadly one agreed price. Yaadly engages and pays the tradesperson.
 
-**The one nuance that must not be dropped.** On the oversight lane Yaadly still invoices its own fee, and on Property Care the person attending is Yaadly's, not the client's contractor. So the sentence is:
+Never the bare "Yaadly holds none of your money", because the client is holding an invoice from Yaadly while they read it. Say "Yaadly does not operate an escrow service and does not hold money on your behalf" if the escrow worry needs answering.
 
-> On an oversight engagement, **Yaadly holds none of the money for the building work.** You pay your contractor directly. Yaadly's own fee is invoiced separately.
+**History, so the old sentence does not come back.** From 4 to 9 September 2026 this section described two lanes: a managed job, and "oversight only", where the client kept their own contractor, paid them directly, Yaadly held none of the money for the building work, sold "the eyes" and invoiced its own fee separately. That lane was written down on the strength of a copy audit answer and was published on the services hero, the business page, the FAQ, the payments page, the terms and the homepage. **On 9 September 2026 Monique said it is untrue and had it removed from every page.** The 3 September ledger entries had already said Yaadly is principal on every lane; the 4 September rewrite overrode that, and this correction puts it back. The wording of the old lane is on the banned list in section 3 and in the words to avoid in section 6, and `RUNBOOK.md` carries a sweep for it. If a design import, a pasted draft or a future session brings back "keep your own contractor and pay them directly", it is wrong, whatever the page.
 
-Never the bare "Yaadly holds none of your money", because the client is holding an invoice from Yaadly while they read it.
+"Own contractor already?" style pointers to the business page are also gone. A company is pointed at `/business` for checklists, site visits and written reports under its brand, with no claim about who pays whom.
 
 ---
 
 ## 3. Payment and completion
 
-### Managed job
+### Every job
 
 Use these:
 
@@ -68,6 +66,7 @@ Never use these:
 - "The worker is not paid until you release the money."
 - "Nobody is paid until you sign off."
 - Anything that makes the client's approval the trigger that moves a subcontractor's pay.
+- "You pay your contractor directly." "Your contractor stays yours." "Yaadly holds none of the money for the building work." "Yaadly sells the eyes." "Yaadly's own fee is invoiced separately." The oversight-only lane, removed 9 September 2026, see section 2.
 
 **Why the last four are banned, and it is not only tone.** Under the principal contractor model the client does not contract with the tradesperson, so they have no power to release that person's pay and it is wrong to tell them they do. What the client actually does is **accept the work**. Yaadly then pays its subcontractor. Two different acts, and the site used to collapse them into one.
 
@@ -87,11 +86,11 @@ Describe it from Yaadly's side, not the client's:
 - Good: "A named person at Yaadly checks the work before the tradesperson is paid. Never an automatic timer."
 - Bad: "Nothing moves without your say so."
 
-### Oversight only
+### A check, a report or a retainer
 
-- "You pay your contractor directly, on your own terms with them."
-- "Yaadly's fee is invoiced separately."
-- "We attend, we record, and we write it up. We do not pay your contractor and we do not hold your money for the work."
+- "You buy the service from Yaadly at the published price."
+- "Somebody qualified attends, records against a checklist, and writes it up."
+- "Any property work you then commission through Yaadly is a job."
 
 ### How money actually reaches Yaadly, as at 5 September 2026
 
@@ -131,9 +130,9 @@ One definition, used identically everywhere. Where a page needs the short form, 
 
 ### Independence, and why the site does not claim it
 
-**Never claim Yaadly is independent of the contractor.** Not "independent of every contractor on the job", not "never pricing, supplying or managing the trade being assessed", not "never a contractor marking their own work". Those were published on the business page and were wrong: on a managed job, and on Property Care, the person doing the work IS Yaadly's, so a blanket independence claim describes only one of the two lanes and gets caught the moment an insurer's risk team reads the other one.
+**Never claim Yaadly is independent of the contractor.** Not "independent of every contractor on the job", not "never pricing, supplying or managing the trade being assessed", not "never a contractor marking their own work". Those were published on the business page and were wrong: on a job, and on Property Care, the person doing the work is Yaadly's subcontractor, so a blanket independence claim describes a structure that is not Yaadly's and gets caught the moment an insurer's risk team reads it.
 
-**Claim the separation instead, because it is true on both lanes.** Founder decision, 5 September 2026:
+**Claim the separation instead, because it is true on a job and on a check alike.** Founder decision, 5 September 2026:
 
 > The person who assesses the work is never the person who did it. Both are named on the report.
 
@@ -205,7 +204,7 @@ This paragraph used to require the opposite: a 72 hour target with its condition
 
 ### Words to avoid
 
-escrow · held in escrow · held safely with a licensed provider · you release the funds · nobody is paid until you sign off · 100% · fully protected · risk free · zero fraud · removes all fraud · guaranteed · fully vetted · verified (as a bare claim) · seamless · effortless · revolutionary · trusted by thousands
+escrow · held in escrow · held safely with a licensed provider · you release the funds · nobody is paid until you sign off · you pay your contractor directly · your contractor stays yours · Yaadly holds none of the money · Yaadly sells the eyes · 100% · fully protected · risk free · zero fraud · removes all fraud · guaranteed · fully vetted · verified (as a bare claim) · seamless · effortless · revolutionary · trusted by thousands
 
 ### Preferred phrases
 
