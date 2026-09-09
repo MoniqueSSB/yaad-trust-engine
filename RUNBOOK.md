@@ -106,7 +106,7 @@ If one page's header does not match the rest:
 2. Check nobody has put nav rules back into the page or into `yaadly.css`: `grep -n "\.vbtn\|\.views\|\.quiet-links\|site-nav" docs/*.html docs/yaadly.css` should return nothing but the markup lines. A nav rule anywhere other than `nav.css` is the fault.
 3. Check the markup matches. It is identical on all eight pages; only the `on` class moves to the current page's tab.
 
-If the whole row has wrapped onto two lines, something in it grew. With IBM Plex loaded, the header fills its 1100px exactly, so a longer label, more padding or an extra link pushes "Post a job" out. Shorten it, or take something out of the row: do not let it wrap on desktop, because a two-line header on one page and a one-line header on the next is the exact problem this file exists to prevent.
+If the whole row has wrapped onto two lines, something in it grew. Since 9 Sep 2026 the row is full width with 40px of padding each side, and its contents measure about 1120px on the marketing site and about 1150px in the app, which is why the three portal links hide below 1240px in both files. A longer label, more padding or an extra link pushes "Post a job" out past the padding on screens just above that breakpoint. Shorten it, or take something out of the row: do not let it wrap on desktop, because a two-line header on one page and a one-line header on the next is the exact problem this file exists to prevent. If you change the breakpoint, change it in both `docs/nav.css` and `SiteNav.tsx`, or the two headers will hide the links at different widths.
 
 ---
 
