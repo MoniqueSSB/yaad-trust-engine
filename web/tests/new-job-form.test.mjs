@@ -1,5 +1,5 @@
 /**
- * Tests for lib/jobs/new-form.ts, the rules behind the six-stage "Post a job"
+ * Tests for lib/jobs/new-form.ts, the rules behind the seven-stage "Post a job"
  * form.
  *
  * Why this file exists, and it is not really about the form.
@@ -50,6 +50,7 @@ const full = () => ({
   desc: "Zinc lifted off the back roof and water is coming in",
   urgency: "Urgent, within 48 hours",
   accessType: "No inside access needed, outside work only",
+  workerChoice: "yaadly",
   name: "Test Client",
   contact: "test@example.com",
 });
@@ -137,9 +138,26 @@ describe("the validation carried over from the three-screen version", () => {
 });
 
 describe("a stage is complete or it is not", () => {
-  test("six stages, in the founder's order", () => {
+  test("seven stages, in the founder's order", () => {
     assert.deepEqual(m.STAGES.map((s) => s.key),
-      ["work", "property", "urgency", "evidence", "reach", "review"]);
+      ["work", "property", "urgency", "choose", "evidence", "reach", "review"]);
+  });
+
+  /* 9 Sep 2026. The question is pre-answered with the managed route, so it
+     never blocks the form; it only blocks if something outside the module
+     writes a value that is neither of the two the database accepts. */
+  test("who picks is pre-answered as Yaadly, and only the two known answers count", () => {
+    assert.equal(m.EMPTY_FIELDS.workerChoice, "yaadly");
+    assert.equal(m.stageComplete("choose", m.EMPTY_FIELDS), true);
+    assert.equal(m.stageComplete("choose", { ...full(), workerChoice: "client" }), true);
+    assert.equal(m.stageComplete("choose", { ...full(), workerChoice: "monique" }), false);
+    assert.deepEqual(m.WORKER_CHOICE.map((c) => c.value), ["yaadly", "client"]);
+  });
+
+  test("neither answer promises a price or a timeline", () => {
+    for (const c of m.WORKER_CHOICE) {
+      assert.doesNotMatch(c.title + " " + c.note, /J\$|£|\bprice\b.*\bguarantee|within \d+ (days|hours)/i, c.value);
+    }
   });
 
   test("the work stage wants a trade and enough words", () => {
@@ -192,7 +210,18 @@ describe("the saved draft keeps the work and none of the person", () => {
     assert.doesNotMatch(raw, /Test Client/);
     assert.doesNotMatch(raw, /test@example\.com/);
     assert.deepEqual(Object.keys(JSON.parse(raw).fields).sort(),
-      ["accessType", "desc", "parish", "trade", "urgency"]);
+      ["accessType", "desc", "parish", "trade", "urgency", "workerChoice"]);
+  });
+
+  test("a draft from before the who-picks question comes back with the default, and a bad value is not kept", () => {
+    const old = JSON.stringify({ v: 1, jobId: "JOB-WEB-9", at: NOW, fields: {
+      trade: "Roofing", parish: "Kingston", desc: "Zinc lifted", urgency: "Urgent, within 48 hours", accessType: "No inside access needed, outside work only",
+    } });
+    assert.equal(m.parseDraft(old, NOW).fields.workerChoice, "yaadly");
+    const bad = JSON.stringify({ v: 1, jobId: "JOB-WEB-9", at: NOW, fields: { trade: "Roofing", workerChoice: "auto" } });
+    assert.equal(m.parseDraft(bad, NOW).fields.workerChoice, "yaadly");
+    const kept = JSON.stringify({ v: 1, jobId: "JOB-WEB-9", at: NOW, fields: { trade: "Roofing", workerChoice: "client" } });
+    assert.equal(m.parseDraft(kept, NOW).fields.workerChoice, "client");
   });
 
   test("what is written comes back", () => {

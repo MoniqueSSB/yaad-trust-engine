@@ -63,7 +63,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PhotoAttach } from "./PhotoAttach";
 import { TRADES, PARISHES, LAUNCH_PARISHES } from "@/lib/taxonomy";
 import {
-  ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY, askedFor,
+  ACCESS, DRAFT_KEY, EMPTY_FIELDS, STAGES, URGENCY, WORKER_CHOICE, askedFor,
   draftFields, firstIncomplete, looksLikeEmail, looksLikePhone,
   parseDraft, restoreFields, serialiseDraft, stageComplete, worthKeeping,
   type Fields, type StageKey,
@@ -209,6 +209,10 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
            enforce_vetted_worker_on_quote. See lib/jobs/new-form.ts. */
         urgency: f.urgency,
         accessType: f.accessType,
+        /* Who picks the tradesperson: 'yaadly' or 'client'. Lands on
+           jobs.worker_choice and decides whether the client sees every quote
+           or one recommended price. */
+        workerChoice: f.workerChoice,
         /* Who they asked for, as a slug. The function resolves it to an
            active worker itself and holds the job for that person for 48
            hours, which is the difference between the sentence on the
@@ -227,11 +231,11 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
     }
   }
 
-  /** Forward. The three stages that change the job card save on the way out;
+  /** Forward. The four stages that change the job card save on the way out;
    *  photos and contact have nothing to save. */
   async function forward() {
     if (!canAdvance) return;
-    if (key === "work" || key === "property" || key === "urgency") {
+    if (key === "work" || key === "property" || key === "urgency" || key === "choose") {
       const ok = await saveDraft();
       if (!ok) return;
     }
@@ -268,6 +272,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
           (requestedWorker ? `Client asked for: ${requestedWorker}\n` : "") +
           `Trade: ${f.trade}\nParish: ${f.parish}\n` +
           `Urgency: ${f.urgency}\nAccess: ${f.accessType}\n` +
+          `Who picks the tradesperson: ${f.workerChoice === "client" ? "the client, from the quotes" : "Yaadly, one recommended price"}\n` +
           (photoCount ? `Photos attached on the form: ${photoCount}\n` : "") +
           `\n${f.desc.trim()}` +
           (joinLink ? `\n\nSet up your portal: ${joinLink}\nJob code, if asked: ${portalCode}` : ""),
@@ -421,7 +426,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
         <b className="text-ink">What we ask you for, and nothing else.</b>{" "}
         What the work is and what is happening, which parish the property is in
         and who can let a worker in, how soon you need it, and one way to reach
-        you. Six short screens, about two minutes.{" "}
+        you. Seven short screens, about two minutes.{" "}
         <b className="text-ink">No address, no account, no card.</b>
       </div>
 
@@ -675,7 +680,45 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
             </div>
           )}
 
-          {/* ── 4. photos and evidence ──────────────────────────────────── */}
+          {/* ── 4. who picks the tradesperson ───────────────────────────
+              Added 9 Sep 2026. "Yaadly picks" is pre-selected: it is the
+              managed route the product is sold on, and it is the ledger's
+              default from 31 July. The other one is a tap away. Neither
+              option says a word about price, because no worker has quoted
+              yet and nothing here is allowed to promise one. */}
+          {key === "choose" && (
+            <div className="fgroup" style={{ marginBottom: 0 }}>
+              <label className="fl" id="lbl-choose">
+                Who picks the tradesperson{" "}
+                <span className="src ok">Chosen</span>
+              </label>
+              <div className="grid gap-2" role="group" aria-labelledby="lbl-choose">
+                {WORKER_CHOICE.map((c) => (
+                  <button key={c.value} type="button" aria-pressed={f.workerChoice === c.value}
+                    onClick={() => set("workerChoice", c.value)}
+                    className={
+                      "rounded-xl border px-4 py-3 text-left transition " +
+                      (f.workerChoice === c.value
+                        ? "border-teal bg-soft"
+                        : "border-line bg-bg hover:border-teal")
+                    }>
+                    <b className={"block text-[13.5px] " + (f.workerChoice === c.value ? "text-tealb" : "text-ink")}>
+                      {c.title}
+                    </b>
+                    <span className="mt-0.5 block text-[12.5px] leading-relaxed text-dim">{c.note}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
+                Either way the tradesperson sets their own price, a person at
+                Yaadly reads every quote before it reaches you, and you agree
+                the price yourself before anybody is booked. Whichever you
+                choose, you can change your mind by messaging us.
+              </p>
+            </div>
+          )}
+
+          {/* ── 5. photos and evidence ──────────────────────────────────── */}
           {key === "evidence" && (
             <div className="grid gap-3">
               {/* "Saved" was printed here whether or not anything saved. A
@@ -847,6 +890,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
                   { k: "property" as StageKey, t: "Parish", v: f.parish },
                   { k: "property" as StageKey, t: "Who lets a worker in", v: f.accessType },
                   { k: "urgency" as StageKey, t: "How soon", v: f.urgency },
+                  { k: "choose" as StageKey, t: "Who picks the tradesperson", v: WORKER_CHOICE.find((c) => c.value === f.workerChoice)?.title ?? "" },
                   { k: "reach" as StageKey, t: "Your name", v: f.name.trim() },
                   { k: "reach" as StageKey, t: "Reach you on", v: f.contact.trim() },
                 ].map((r, i) => (

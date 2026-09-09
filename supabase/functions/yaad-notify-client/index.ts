@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -78,6 +78,27 @@ type Kind = (typeof KINDS)[number];
 const SERVICE_KINDS: readonly Kind[] = ["service_booked", "service_confirmed", "service_live"];
 
 const money = (n: number | null) => (n == null ? "" : "J$" + Number(n).toLocaleString("en-JM"));
+
+/** The client's all-in price, built exactly the way raise_job_client_invoice
+ *  builds the invoice: labour, plus 15% Guarantee & Support on labour only,
+ *  plus materials at cost. If that function's arithmetic changes, this must
+ *  change with it, or the message and the bill disagree again. */
+function allInPrice(labour: number, materials: number): { total: number; breakdown: string } {
+  const l = Math.round(Number(labour) || 0);
+  const m = Math.round(Number(materials) || 0);
+  const fee = Math.round(l * 0.15);
+  const parts = [`the work ${money(l)}`, `Yaadly's Guarantee & Support 15% ${money(fee)}`];
+  if (m > 0) parts.push(`materials at cost ${money(m)}`);
+  return { total: l + fee + m, breakdown: parts.join(", ") };
+}
+
+/** A person's name from their admin email, for "Monique has chosen". The
+ *  address itself never goes into a client message. */
+function personName(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  const first = local.split(/[._-]/)[0] ?? "";
+  return first ? first.charAt(0).toUpperCase() + first.slice(1) : "A person at Yaadly";
+}
 
 async function sha256Hex(s: string): Promise<string> {
   const bytes = new TextEncoder().encode(s);
@@ -999,9 +1020,15 @@ Deno.serve(async (req: Request) => {
         .select("worker_name, labour_jmd, materials_jmd, note")
         .eq("job_id", jobId).eq("status", "submitted")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      const total = (q?.labour_jmd ?? 0) + (q?.materials_jmd ?? 0);
+      // 9 Sep 2026, founder's instruction: "fix this so it is clear from
+      // WhatsApp what people are paying." This used to quote labour plus
+      // materials with no fee on it, and the invoice then charged labour plus
+      // 15%. The client agreement promises the fee is itemised before they
+      // agree to anything, so the number in this message is the number on
+      // the invoice, built the same way raise_job_client_invoice builds it.
+      const bill = allInPrice(q?.labour_jmd ?? 0, q?.materials_jmd ?? 0);
       const workerName = q?.worker_name ?? "A tradesperson";
-      const priceText = money(total);
+      const priceText = money(bill.total);
       subject = `A price on your job: ${job.title}`;
       // Stage 6, continued: a client with a phone on file can book straight
       // from this message rather than needing to open the link at all. The
@@ -1027,8 +1054,8 @@ Deno.serve(async (req: Request) => {
         ? `Reply ${job.id} to confirm you're happy with this price. Once ${workerName} confirms it too, reply ${job.id} once more to book them. Or `
         : "";
       line = `A price has come in on your Yaadly job, ${job.title}. ` +
-        `${workerName} quoted ${priceText}, labour and materials itemised separately.${scopeLine} ` +
-        `Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
+        `${workerName} quoted it and your all-in price from Yaadly is ${priceText}: ${bill.breakdown}.${scopeLine} ` +
+        `You pay Yaadly, never the tradesperson. Nothing is booked and nothing is charged until you choose. ${bookHint}see it here: ${codeLink}`;
       const contentSid = Deno.env.get("TWILIO_CONTENT_SID_QUOTE") ?? "";
       if (contentSid) {
         waTemplate = {
@@ -1036,6 +1063,30 @@ Deno.serve(async (req: Request) => {
           vars: { "1": String(job.title ?? "your job"), "2": String(workerName), "3": priceText, "4": codeLink },
         };
       }
+    } else if (kind === "quote_recommended") {
+      // 9 Sep 2026. The client asked Yaadly to pick. A named admin has put
+      // one price to them (recommend_quote), and this is the first they hear
+      // of any price at all: quote_arrived does not fire on a yaadly-picks
+      // job. Same reply-to-confirm shape as quote_arrived, same all-in
+      // number the invoice will carry, plus the name of the person who chose
+      // and their reason, in their own words. Nothing here books anybody.
+      const { data: q } = await admin.from("job_quotes")
+        .select("worker_name, labour_jmd, materials_jmd, note, recommended_by, recommended_reason")
+        .eq("id", quoteId ?? "").maybeSingle();
+      const bill = allInPrice(q?.labour_jmd ?? 0, q?.materials_jmd ?? 0);
+      const workerName = q?.worker_name ?? "A tradesperson";
+      const chooser = personName(String(q?.recommended_by ?? ""));
+      const why = String(q?.recommended_reason ?? "").trim();
+      const whyLine = why ? ` ${chooser}'s reason: "${why.slice(0, 300)}"` : "";
+      const proposal = String(q?.note ?? "").trim();
+      const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
+      subject = `Yaadly has chosen your tradesperson: ${job.title}`;
+      const bookHint = clientPhone
+        ? `Reply ${job.id} to confirm you're happy with this price. Once ${workerName} confirms it too, reply ${job.id} once more to book them. Or `
+        : "";
+      line = `You asked Yaadly to pick the tradesperson for ${job.title}. ${chooser} has read the quotes and chosen ${workerName}.${whyLine}${scopeLine} ` +
+        `Your all-in price from Yaadly is ${money(bill.total)}: ${bill.breakdown}. ` +
+        `You pay Yaadly, never the tradesperson. Nothing is booked and nothing is charged until you agree this price. ${bookHint}see it here: ${codeLink}`;
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of

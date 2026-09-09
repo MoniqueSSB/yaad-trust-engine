@@ -69,13 +69,22 @@ Deno.serve(async (req) => {
   }
 
   // ---- input ----------------------------------------------------------
-  let body: { job_id?: string; limit?: number; dry_run?: boolean };
+  let body: { job_id?: string; limit?: number; dry_run?: boolean; only?: unknown };
   try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
 
   const jobId = (body.job_id ?? "").trim();
   if (!jobId) return json({ error: "job_id required" }, 400);
   const limit  = Math.min(Math.max(body.limit ?? 25, 1), 100);
   const dryRun = body.dry_run === true;
+  // 9 Sep 2026: the shortlist. When the desk invites from job_shortlists it
+  // names who, and only those hear. Anybody named who is not in the ranked
+  // list is silently not alerted: the ranking is the vetting bar (active,
+  // guidelines signed, trade or parish match) and a name cannot skip it.
+  const only = new Set(
+    (Array.isArray(body.only) ? body.only : [])
+      .map((e) => String(e ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
 
   // ---- the job, and whether it is genuinely open -----------------------
   const { data: job, error: jobErr } = await admin
@@ -101,7 +110,8 @@ Deno.serve(async (req) => {
     .rpc("match_workers_for_job", { p_job: jobId, p_limit: limit });
 
   if (matchErr) return json({ error: "match failed", detail: matchErr.message }, 500);
-  const list = (matches ?? []) as Match[];
+  const ranked = (matches ?? []) as Match[];
+  const list = only.size ? ranked.filter((w) => only.has(w.worker_email.toLowerCase())) : ranked;
 
   if (dryRun) {
     return json({ ok: true, dry_run: true, job_id: jobId, would_alert: list.length, matches: list });
@@ -189,6 +199,16 @@ You are getting this because ${w.match_reason} matched your published profile.
   const { error: insErr } = await admin
     .from("job_alerts")
     .upsert(rows, { onConflict: "job_id,worker_email,channel", ignoreDuplicates: true });
+
+  // The shortlist row, if there is one, records that its person was asked.
+  // Best effort and after the alerts: a shortlist row that fails to update is
+  // a stale chip on the desk, not a lost alert, and the desk can re-invite.
+  const sentTo = results.filter((r) => r.status === "sent").map((r) => r.worker_email);
+  if (sentTo.length) {
+    await admin.from("job_shortlists")
+      .update({ invited_at: new Date().toISOString() })
+      .eq("job_id", jobId).in("worker_email", sentTo).is("invited_at", null);
+  }
 
   if (insErr) {
     // The alerts went out. Say so loudly rather than pretending they did not.
