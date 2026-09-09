@@ -1250,11 +1250,11 @@ const VIEWS = [
     // Every column except budget_band, named one by one on purpose. "*" plus a
     // hide list would still fetch the client's private figure into this page
     // and merely decline to draw it. The rule is that it never arrives.
-    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency,requested_worker_email,requested_at,request_state",
+    select:"id,title,parish,client_name,client_email,client_phone,worker_name,worker_email,worker_phone,worker_lane,descr,stage,owed,pay_method,pay_ref,open,updated_at,portal_code,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,overview_req,pack_tier,addr,access_contact,scored,status,client_user,worker_user,trade,trade_source,job_type,size_band,access_type,materials_by,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,urgency,requested_worker_email,requested_at,request_state,is_test",
     order:"updated_at", search:["id","title","parish","client_name","client_phone","worker_name","trade","descr","requested_worker_email"],
     empty:["No jobs yet","A job appears here once somebody writes in by WhatsApp, email or the website form."],
     cols:[
-      {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
+      {h:"Job", f:r => id_(r.id) + (r.is_test ? " " + chip_("mute","test") : "") + sub_(r.title || "")},
       {h:"Where", f:r => esc(r.parish || "") + sub_(r.trade || "")},
       {h:"Client", f:r => esc(r.client_name || "none") + sub_(r.client_phone || r.client_email || "no way to reply")},
       {h:"In their own words", f:r => ownWords(r.descr)},
@@ -1288,6 +1288,21 @@ const VIEWS = [
       { label:"Take it off the board", cls:"g", when:r => r.open === true,
         set:{ status:"awaiting_client_setup", open:false },
         says:() => "Removes it from the public board. Existing quotes stay on the record." },
+      // The board's sibling of "That was me testing" on the reply queue.
+      // Every job on app.yaadly.co.uk/jobs on 9 September 2026 was the
+      // founder's own test, and the public read them as demand. Nothing
+      // infers: a person presses this, the ledger records who, and the
+      // public board and worker directory leave the row out. Everything else
+      // about the job (its conversation, evidence, quotes, money) is
+      // untouched, and the button underneath reverses it.
+      { label:"That was me testing", cls:"g", when:r => !r.is_test,
+        rpc:"mark_job_test",
+        args:(r) => ({ p_job:r.id, p_is_test:true }),
+        says:r => `Marks ${esc(r.id)} as your own test. It leaves the public board straight away and the automatic Quote Kickoff Pack trigger stops drafting for it. The job, its conversation, its evidence and any money on it stay exactly as they are, and it stays here in the desk with a test chip. Recorded in the ledger as your decision.` },
+      { label:"This one is real", cls:"g", when:r => r.is_test === true,
+        rpc:"mark_job_test",
+        args:(r) => ({ p_job:r.id, p_is_test:false }),
+        says:r => `Takes the test mark off ${esc(r.id)}. If it is open for quotes with no worker chosen it is back on the public board the moment this saves. Recorded in the ledger as your decision.` },
       { label:"Cancel this job", cls:"d", when:r => r.status !== "cancelled",
         set:{ status:"cancelled", open:false },
         says:r => `Marks ${r.id} cancelled and takes it off the board. The row stays on the record.` },
@@ -1497,9 +1512,19 @@ const VIEWS = [
       {h:"Jobs done", n:true, f:r => String(r.jobs_completed ?? 0)},
       {h:"Guidelines", f:r => guidelinesChip(r.worker_email, "worker_guidelines", "WG")},
       {h:"Public profile", f:r => showcaseCell(r)},
-      {h:"State", f:r => r.active ? chip_("ok","active") : chip_("warn","cannot quote")},
+      {h:"State", f:r => (r.is_test ? chip_("mute","test") + " " : "") + (r.active ? chip_("ok","active") : chip_("warn","cannot quote"))},
     ],
     actions:[
+      // Same button as on Jobs, for the directory. The six workers on
+      // app.yaadly.co.uk/jobs on 9 September 2026 were all seed and QA rows.
+      { label:"That was me testing", cls:"g", when:r => !r.is_test,
+        rpc:"mark_worker_test",
+        args:(r) => ({ p_email:r.worker_email, p_is_test:true }),
+        says:r => `Marks ${esc(r.name || r.worker_email)} as a test profile. They leave the public directory and their public profile page stops resolving, straight away. They stay here in the desk with a test chip, can still be booked and paid, and nothing else about them changes. Recorded in the ledger as your decision.` },
+      { label:"This one is real", cls:"g", when:r => r.is_test === true,
+        rpc:"mark_worker_test",
+        args:(r) => ({ p_email:r.worker_email, p_is_test:false }),
+        says:r => `Takes the test mark off ${esc(r.name || r.worker_email)}. If they are active they are back in the public directory the moment this saves. Recorded in the ledger as your decision.` },
       { label:"Record their answer about a public profile", cls:"g",
         says:() => "Writes down whether this worker agreed that their photograph, their introduction video and their work photos may go on a page anyone can open. It publishes nothing by itself. Set it to declined and their profile empties on the next page load, before any file has been deleted. Applicants answer this on the last screen of /apply; use this for the workers who joined before the question existed, and only after you have actually asked them.",
         ask:[
@@ -1746,8 +1771,8 @@ const VIEWS = [
 
   { k:"market", g:"Services", label:"Marketplace", icon:"board",
     title:"Marketplace board", table:"jobs",
-    sub:"What a worker sees when they open the board. The address and the phone number are scrubbed out of this view by the database, not by this page.",
-    select:"id,title,parish,trade,stage,open,status,updated_at",
+    sub:"What a worker sees when they open the board. The address and the phone number are scrubbed out of this view by the database, not by this page. A row with a test chip is open but hidden from the public: somebody marked it as their own test under Jobs, and the database leaves it out of the board. Press This one is real on the job to put it back.",
+    select:"id,title,parish,trade,stage,open,status,updated_at,is_test",
     order:"updated_at", filter:["open", true], search:["id","title","parish","trade"],
     empty:["Nothing on the board","A job reaches the board when it is opened to workers."],
     cols:[
@@ -1755,6 +1780,7 @@ const VIEWS = [
       {h:"Trade", f:r => esc(r.trade || "not classified")},
       {h:"Parish", f:r => esc(r.parish || "")},
       {h:"Stage", f:r => stageBar(r.stage)},
+      {h:"Public", f:r => r.is_test ? chip_("mute","test, hidden") : mute_("not marked")},
       {h:"State", f:r => tone_(r.status || "open")},
     ]},
 
