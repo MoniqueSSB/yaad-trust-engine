@@ -31,6 +31,8 @@ import { BoardPreview } from "@/components/portal/BoardPreview";
 import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { ApproveButton } from "@/components/portal/ApproveButton";
+import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
+import { CHECK_CATALOGUE_ID, finalStageCountFrom, isCheckLevel, jobCheckState } from "@/lib/portal/job-check";
 import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
@@ -158,7 +160,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_call_notes,walk_notes_confirmed_at,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_call_notes,walk_notes_confirmed_at,check_level,check_chosen_at,check_invoice_id,check_assigned_to,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
     )
     .eq("id", id)
     .maybeSingle();
@@ -524,6 +526,42 @@ export default async function JobRoom({
     : quotePackStages.length
       ? "quote"
       : null;
+
+  /* The independent check at sign-off (20260909180000). Two reads the panel
+     needs and nothing else on the page does: the two MARKETPLACE catalogue
+     rows, so the price shown is the catalogue's and never typed here, and
+     the check's own invoice, which carries no job_id on purpose (the job
+     points at it, see the migration header) so the invoices query above
+     cannot have found it. RLS shows a client their invoice once it is sent,
+     and nothing while it is a draft, same as every other invoice. */
+  const checkLevel = isCheckLevel(job.check_level) ? job.check_level : null;
+  const [{ data: checkRows }, { data: checkInvoiceRow }] = await Promise.all([
+    job.worker_email || checkLevel
+      ? supabase
+          .from("service_catalogue")
+          .select("id,name,blurb,full_pence,founding_pence")
+          .in("id", [CHECK_CATALOGUE_ID.visual, CHECK_CATALOGUE_ID.technical])
+      : Promise.resolve({ data: null }),
+    job.check_invoice_id
+      ? supabase
+          .from("invoices")
+          .select("id,status,total_pence,currency")
+          .eq("id", job.check_invoice_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const checkPrices = {
+    visual: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.visual) ?? null,
+    technical: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.technical) ?? null,
+  };
+  const checkInvoice = (checkInvoiceRow ?? null) as CheckInvoice | null;
+  const check = jobCheckState({
+    workerEmail: job.worker_email,
+    status: job.status,
+    checkLevel,
+    finalStageCount: finalStageCountFrom(packStages.length),
+    evidenceStages: ev.map((e) => e.stage),
+  });
 
   /* THE GO LIVE GATES.
      Read off the triggers, in the order Postgres applies them, so the list a
@@ -1259,6 +1297,21 @@ export default async function JobRoom({
 
       {tab === "approvals" && (
         <>
+        {/* The optional independent check, beside the Approve button and
+            never in front of it. Offered from scope agreed until the final
+            stage's evidence is filed, the same window choose_job_check()
+            allows; the desk can still set it after that. */}
+        <JobCheckPanel
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          state={check.state}
+          canChange={check.canChange}
+          level={checkLevel}
+          chosenAt={job.check_chosen_at ?? null}
+          assignedTo={job.check_assigned_to ?? null}
+          invoice={checkInvoice}
+          prices={checkPrices}
+        />
         {/* The button the product is named after: what unlocks the money,
             next to the money itself. Client only, and only while a stage is
             genuinely waiting on a decision. */}
