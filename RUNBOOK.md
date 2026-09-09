@@ -4581,3 +4581,23 @@ select actor, action, summary, at from agent_actions where action like '%_test' 
 A marked row appearing in the first query means a later migration redefined `open_jobs` without the clause. `supabase/tests/public_board_test_rows_guards.sql` proves the clause on both views and that the two marker functions refuse without an admin session; run it before and after touching either view.
 
 **Do not** add a filter in `web/app/jobs/page.tsx` to do this job. The page reads the view and must keep reading the view, or "This one is real" stops meaning what it says.
+
+## A client wants an independent check on a job, or one is booked and nothing is happening
+
+The optional independent check at sign-off (20260909180000). The client chooses it on the **Approvals** tab of their job, from the moment a worker is on the job until somebody files evidence on the final stage. After that the portal locks the choice and tells them to message you: the spec's rule is "Visits not agreed at the start are chargeable", and a late request is a conversation, not a silent line on a bill.
+
+**The two prices are the marketplace rungs, not the £149 Visual Check.** `service_catalogue` rows `job-visual-check` and `job-technical-check`. The professional Visual Check on the services page is `eyes-on-it` and is a different product. Change a price with an `UPDATE` on the catalogue row; nothing is deployed for a price change.
+
+**The desk view is Independent checks, under Documents & money.** It lists every job with a check chosen, with the invoice and the report beside it. Three actions:
+
+1. **Assign the checker.** Type the name. The database refuses the worker's own name or email (`assign_job_checker`). The client sees the name on their job.
+2. **Raise the invoice.** One GBP line, priced by the catalogue trigger at the full or founding rate. It lands as a **draft**; send it from **Invoices** like any other. It deliberately carries **no `job_id`**: the job points at it through `jobs.check_invoice_id`. If you ever see a check invoice with a `job_id`, that is a bug, because `sync_job_status()`, `start_job_on_agency_fee_paid()` and `raise_job_client_invoice()` all read "the stage-less invoice payable to Yaadly on this job" as the agency fee.
+3. **Remove the check.** Refused while an invoice for it stands. Void the invoice first, then remove.
+
+**The report.** The checker's write-up is a `reports` row of kind `visual_check` or `technical_signoff` with the job's id in `job_id`, drafted from the Reports view as usual. The Independent checks view shows the latest one for the job once it exists.
+
+**A late request after the final evidence is in.** Set it from the desk: `select public.choose_job_check('JOB-0001', 'visual');` as a signed-in admin works past the lock; the portal cannot. Then assign and invoice as above.
+
+**Nothing here moves money or approval.** `approve_stage()` never reads `check_level`. A check that came back bad is a reason for the client not to press Approve and to raise a dispute; it is not a ruling. If somebody asks for the check to release or block a payment on its own, that is the request `CLAUDE.md` section 3 exists to refuse.
+
+**Prove the guards hold:** run `supabase/tests/job_check_guards.sql` with `execute_sql`. Ten lines, all PASS.

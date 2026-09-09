@@ -46,7 +46,7 @@ the `VIEWS` registry in `concierge.html` if the count here matters to you.
 |---|---|
 | Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes |
 | People | Applications, Workers, Clients, Reviews |
-| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money, Reports |
+| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money, Reports, Independent checks |
 | Services | Services, Marketplace, Job photos |
 | Inbox | Conversations, Mid-chat, Calls, Enquiries, Waiting list, Feedback, Questions |
 | System | Settings, Health |
