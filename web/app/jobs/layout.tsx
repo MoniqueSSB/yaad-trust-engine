@@ -5,7 +5,7 @@ export default function JobsLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <>
-      <SiteNav active="market" />
+      <SiteNav active="market" wide />
       {children}
     </>
   );

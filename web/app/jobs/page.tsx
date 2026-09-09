@@ -28,6 +28,16 @@ export const dynamic = "force-dynamic";
  * and sort, and a sticky right rail that lifts "how quoting works" and the
  * join panel out of the page footer where nobody scrolled to them.
  *
+ * The comp's 1240px centred column came off on 9 September 2026, on
+ * Monique's instruction, because on a wide monitor it left 280px of flat
+ * purple either side and read as a page that had not finished loading. The
+ * header, filter bar, board and join strip now run edge to edge with 40px of
+ * side padding, and the nav bar above them is asked to do the same (the
+ * `wide` prop on SiteNav, set in layout.tsx). Line length is held by the
+ * pieces themselves, not the page: the description is capped at 80ch, the
+ * intro at 56ch, and the right rail at 316px, so the card column is what
+ * takes the extra room.
+ *
  * FOUR THINGS IN THE COMP WERE NOT BUILT, and they are recorded here so the
  * next pass does not helpfully restore them:
  *
@@ -309,7 +319,7 @@ export default async function Board({
   return (
     <>
       {/* ── HEAD ───────────────────────────────────────────────── */}
-      <header className="mx-auto max-w-[1240px] px-7 pt-11 max-[820px]:px-5">
+      <header className="px-10 pt-11 max-[820px]:px-5">
         <div className="flex flex-wrap items-end justify-between gap-7">
           <div className="max-w-[640px]">
             <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/[0.09] px-3.5 py-1.5 font-mono-app text-[11px] font-semibold uppercase tracking-[0.14em] text-goldb">
@@ -412,7 +422,7 @@ export default async function Board({
           which is the one screen a worker actually reads the board on. */}
       {!showWorkers && (
         <div className="z-30 border-b border-line bg-bg/90 backdrop-blur-[10px] min-[821px]:sticky min-[821px]:top-[58px]">
-          <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-3.5 px-7 py-3.5 max-[820px]:px-5">
+          <div className="flex flex-wrap items-center gap-3.5 px-10 py-3.5 max-[820px]:px-5">
             {/* A plain GET form, no client bundle. The board is force-dynamic
                 and the whole page is a server component, so search costs a
                 navigation and nothing else. The hidden fields are what stop a
@@ -464,7 +474,7 @@ export default async function Board({
       )}
 
       {/* ── BOARD ──────────────────────────────────────────────── */}
-      <main className="mx-auto flex max-w-[1240px] flex-wrap items-start gap-7 px-7 pb-16 pt-7 max-[820px]:px-5">
+      <main className="flex flex-wrap items-start gap-7 px-10 pb-16 pt-7 max-[820px]:px-5">
         {showWorkers ? (
           <>
             <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-4.5">
@@ -863,7 +873,7 @@ export default async function Board({
 
       {/* ── JOIN ───────────────────────────────────────────────── */}
       <section className="border-t border-line bg-purple/[0.04]">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-8 px-7 py-14 max-[820px]:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-8 px-10 py-14 max-[820px]:px-5">
           <div className="max-w-[520px]">
             <h2 className="font-display text-[clamp(28px,3.4vw,40px)] font-extralight leading-[1.1] tracking-[-0.02em]">
               Want to be{" "}

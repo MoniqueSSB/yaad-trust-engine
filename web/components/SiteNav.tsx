@@ -38,10 +38,19 @@ export function SiteNav({
   active,
   email,
   signOut,
+  wide = false,
 }: {
   active?: "market" | "client" | "worker" | "join";
   email?: string | null;
   signOut?: () => Promise<void>;
+  /* The job board runs edge to edge (9 Sep 2026, Monique: "it needs to be
+     around the whole page"). A 1180px centred bar above a full width page
+     puts the logo 300px in from the edge on a wide monitor while the board's
+     own header starts at 40px, which reads as two pages stacked. So the
+     /jobs layout asks for the bar to match. Everywhere else keeps the
+     marketing site's 1180px so the header does not move when you cross
+     from yaadly.co.uk into the app. */
+  wide?: boolean;
 }) {
   /* The layout renders this once for every /portal route, so it cannot know
      which tab to light. The URL can. An explicit `active` still wins, for the
@@ -68,7 +77,12 @@ export function SiteNav({
     "px-[6px] py-1.5 whitespace-nowrap text-[12px] text-dim transition hover:text-purpleb";
   return (
     <nav className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-[14px]">
-      <div className="mx-auto flex min-h-[58px] max-w-[1180px] flex-nowrap items-center px-6 max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2">
+      <div
+        className={
+          "mx-auto flex min-h-[58px] flex-nowrap items-center max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2 " +
+          (wide ? "max-w-none px-10" : "max-w-[1180px] px-6")
+        }
+      >
         <a href={SITE} className="mr-auto flex shrink-0 items-center gap-2 font-display text-[18px] font-medium">
           <span className={`grid size-[30px] place-items-center rounded-[8px] text-[16px] font-bold text-white ${GRAD}`}>
             Y
