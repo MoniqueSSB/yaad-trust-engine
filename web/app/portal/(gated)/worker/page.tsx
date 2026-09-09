@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
  *
  * Stage 5.6: this page has said "what you are owed" in its own copy since it
  * was written and never once shown a figure. It now leads with one, the same
- * 88%-plus-materials arithmetic FeeBreakdown.tsx already shows per job,
+ * 95%-plus-materials arithmetic FeeBreakdown.tsx already shows per job,
  * summed across every job this worker has actually won.
  */
 /* A title of its own, so a client with three tabs open can tell them apart.
@@ -97,7 +97,7 @@ export default async function WorkerPortal() {
     .map((j) => {
       const won = wonByJob.get(j.id);
       if (!won || won.labour_jmd == null) return null;
-      const takeHome = Math.round(won.labour_jmd * 0.88) + (won.materials_jmd ?? 0);
+      const takeHome = Math.round(won.labour_jmd * 0.95) + (won.materials_jmd ?? 0);
       return {
         id: j.id,
         title: j.title,

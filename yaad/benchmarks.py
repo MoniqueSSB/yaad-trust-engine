@@ -94,8 +94,9 @@ JOB_BANDS: dict[str, PriceBand] = {
 }
 
 # Fees, from the locked decisions. Labour only, never materials.
+# Worker side cut from 12% to 5% on 9 September 2026, founder instruction.
 CLIENT_FEE = 0.15
-WORKER_FEE = 0.12
+WORKER_FEE = 0.05
 CARD_RATE = 0.025
 PAYOUT_FEE_GBP = 3.0
 

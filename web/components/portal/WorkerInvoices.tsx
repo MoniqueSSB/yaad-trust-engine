@@ -1,7 +1,7 @@
 /**
  * Founder's instruction, 2 Sep 2026: "there should be a place in the portal
  * where they can review the money of jobs and what is pending." Everything
- * in WorkerMoneyPanel is a computed estimate (88% of labour, held or
+ * in WorkerMoneyPanel is a computed estimate (95% of labour, held or
  * released off whether the whole job is complete); this is the real
  * document trail instead, the actual invoices raised in the worker's own
  * name (20260902n), one row per stage, job by job.
