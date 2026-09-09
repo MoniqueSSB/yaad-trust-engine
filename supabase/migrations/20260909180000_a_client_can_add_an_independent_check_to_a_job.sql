@@ -13,9 +13,11 @@
 -- professional Visual Check on the services page, which is a standalone
 -- product with its own catalogue row ('eyes-on-it'). Monique said so on
 -- 9 September 2026, and the two must not be merged. The seed figures below
--- are the blueprint's (visual £45 full, £25 founding; technical £50 full,
--- £45 founding) and are hers to confirm before this file is applied. They
--- live in service_catalogue so changing them is an UPDATE, never a deploy.
+-- are the blueprint's for the visual check (£45 full, £25 founding) and
+-- Monique's own for the technical check (£149 full, £100 founding, set on
+-- 9 September 2026 in place of the blueprint's £50 and £45). Both are hers
+-- to confirm before this file is applied. They live in service_catalogue so
+-- changing them is an UPDATE, never a deploy.
 --
 -- MONEY. The check is billed as its own one-line GBP invoice, priced by the
 -- catalogue trigger (catalogue_full or catalogue_founding, never a typed
@@ -50,7 +52,7 @@ insert into public.service_catalogue (id, name, blurb, founding_pence, full_penc
    2500, 4500, false, 'visit', 12),
   ('job-technical-check', 'Technical Inspection and Sign-off, on a job',
    'A technically trained inspector reviews the stage against the agreed scope and the trade standard, and signs it off or lists what to put right. Pre-booked at scope agreed.',
-   4500, 5000, false, 'stage', 13)
+   10000, 14900, false, 'stage', 13)
 on conflict (id) do nothing;
 
 -- ------------------------------------------------------------- jobs columns
