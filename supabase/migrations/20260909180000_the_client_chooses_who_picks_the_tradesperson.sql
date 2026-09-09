@@ -47,6 +47,18 @@
 --      confirm" lands on the recommended price and not on whichever quote
 --      happened to be first.
 --
+-- ONE MORE RULE, same day, founder's own words: "When a worker sends their
+-- quote the only person that needs to accept is the client for it to go
+-- live." So the worker's quote IS the worker's agreement. There is no second
+-- "reply to confirm your price" step for the worker any more: the client
+-- accepting an open quote books it, in one action, through the same
+-- _do_choose_worker gate as before. This supersedes the quote-level dual
+-- agreement of 2 September (agree_quote_via_whatsapp, 20260831zzzz, and its
+-- portal twin agree_quote_as_me, 20260906000200). The Kickoff Pack route is
+-- untouched: a client who asks for the fuller document still gets a pack
+-- both sides confirm before booking, because that document is new terms
+-- the worker has not yet seen, whereas their quote is their own words.
+--
 -- WHAT THIS IS NOT. Not a change to who sets the price (the tradesperson
 -- quotes it, always). Not a model in the booking: the agent's output is a
 -- list of people to ASK, and it never touches job_quotes. Not auto-release
@@ -344,6 +356,48 @@ grant execute on function public.recommend_quote(uuid, text) to authenticated;
 comment on function public.recommend_quote(uuid, text) is
   'A signed-in admin puts one open quote to the client of a yaadly-picks job, with their name and reason on it. Books nothing: the client still agrees the price and the worker still confirms theirs.';
 
+-- The client can change their mind from the portal, until a worker is
+-- booked. Switching to 'client' reveals every open quote; switching back to
+-- 'yaadly' hides the un-recommended ones again. Neither touches a quote, an
+-- agreement or a booking. The job form's own copy promises "you can change
+-- your mind", and the portal is where that promise is kept without a
+-- message to Yaadly.
+create or replace function public.set_worker_choice_as_me(p_job text, p_choice text)
+returns text
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_email text := lower(nullif(btrim(auth.jwt() ->> 'email'), ''));
+  v_job   public.jobs%rowtype;
+begin
+  if v_email is null then
+    raise exception 'Sign in to change who picks your tradesperson.' using errcode = '28000';
+  end if;
+  if p_choice not in ('yaadly', 'client') then
+    raise exception 'Who picks must be yaadly or client.';
+  end if;
+
+  select * into v_job from public.jobs where id = p_job for update;
+  if v_job.id is null then raise exception 'No such job.'; end if;
+  if lower(coalesce(v_job.client_email, '')) <> v_email then
+    raise exception 'Only the client of this job may change who picks.' using errcode = '28000';
+  end if;
+  if coalesce(v_job.worker_email, '') <> '' then
+    raise exception 'A tradesperson is already booked on this job, so there is nobody left to pick.';
+  end if;
+
+  update public.jobs set worker_choice = p_choice, updated_at = now() where id = p_job;
+  return p_choice;
+end;
+$function$;
+revoke all on function public.set_worker_choice_as_me(text, text) from public, anon;
+grant execute on function public.set_worker_choice_as_me(text, text) to authenticated;
+
+comment on function public.set_worker_choice_as_me(text, text) is
+  'The signed-in client of a job switches between Yaadly picking the tradesperson and choosing from the quotes themselves. Allowed until a worker is booked. Touches nothing else.';
+
 -- ── 4. every client surface reads the same rule ────────────────────────────
 
 -- The no-account quotes page. Same filter as the RLS policy, plus the three
@@ -388,12 +442,16 @@ $$;
 revoke all on function public.job_for_code(text, text) from public;
 grant execute on function public.job_for_code(text, text) to anon, authenticated;
 
--- "Reply JOB-123 to confirm" from the client's phone. Live body from
--- 20260904f, with one change in the client branch: only a quote the client
+-- "Reply JOB-123 to accept" from the client's phone. Live body from
+-- 20260904f, with two changes in the client branch. Only a quote the client
 -- may see counts as open, so on a yaadly-picks job with three quotes in, the
--- reply confirms the recommended one and not "more than one price is open".
--- The worker branch is untouched: a worker confirms their own price whether
--- or not it has been put to the client yet.
+-- reply lands on the recommended one and not on "more than one price is
+-- open". And the client's acceptance BOOKS: the worker's quote is their
+-- agreement (founder, 9 Sep 2026), so the quote goes to quote_confirmed and
+-- straight through _do_choose_worker in the same call. The worker branch is
+-- kept so a worker who replies with the code is answered rather than
+-- ignored; it records their agreement and changes nothing else, because
+-- nothing else needs their reply now.
 create or replace function public.agree_quote_via_whatsapp(p_job text, p_phone text)
 returns table(agreed_side text, both_confirmed boolean, out_job_id text, out_quote_id uuid)
 language plpgsql
@@ -454,25 +512,30 @@ begin
   values (v_quote.id, v_side, v_email)
   on conflict (quote_id, side) do nothing;
 
-  select (count(*) filter (where side = 'client') > 0) and (count(*) filter (where side = 'worker') > 0)
-    into v_both
-    from public.quote_agreements where quote_id = v_quote.id;
-
-  if v_both then
+  if v_side = 'client' then
+    -- The client's word books it. quote_confirmed first, because that is
+    -- the state _do_choose_worker accepts, then the booking itself, which
+    -- locks the job row and refuses if somebody is already on it.
     perform set_config('yaadly.choosing', '1', true);
     update public.job_quotes set status = 'quote_confirmed', updated_at = now() where id = v_quote.id;
     perform set_config('yaadly.choosing', '', true);
+    perform public._do_choose_worker(p_job, v_quote.id);
+    v_both := true;
+  else
+    v_both := false;
   end if;
 
-  return query select v_side, coalesce(v_both, false), p_job, v_quote.id;
+  return query select v_side, v_both, p_job, v_quote.id;
 end;
 $function$;
 revoke all on function public.agree_quote_via_whatsapp(text, text) from anon, authenticated, public;
 grant execute on function public.agree_quote_via_whatsapp(text, text) to service_role;
 
--- The portal's own "confirm this price" door refuses a quote the client
--- cannot see. RLS already hides it from the page, but a quote id in a URL is
--- not a page, and the same rule has to hold at the function.
+-- The portal's own "accept this price" door. Two changes from 20260906000200:
+-- it refuses a quote the client cannot see (RLS already hides it from the
+-- page, but a quote id in a URL is not a page, and the same rule has to hold
+-- at the function), and the client's acceptance books, same as the WhatsApp
+-- door above, because the worker's quote is their agreement.
 create or replace function public.agree_quote_as_me(p_quote uuid)
 returns table(agreed_side text, both_confirmed boolean, job_id text, quote_id uuid)
 language plpgsql
@@ -522,22 +585,69 @@ begin
   values (v_quote.id, v_side, v_email)
   on conflict (quote_id, side) do nothing;
 
-  select (count(*) filter (where side = 'client') > 0)
-     and (count(*) filter (where side = 'worker') > 0)
-    into v_both
-    from public.quote_agreements where quote_id = v_quote.id;
-
-  if v_both then
+  if v_side = 'client' then
     perform set_config('yaadly.choosing', '1', true);
     update public.job_quotes set status = 'quote_confirmed', updated_at = now() where id = v_quote.id;
     perform set_config('yaadly.choosing', '', true);
+    perform public._do_choose_worker(v_job.id, v_quote.id);
+    v_both := true;
+  else
+    v_both := false;
   end if;
 
-  return query select v_side, coalesce(v_both, false), v_job.id, v_quote.id;
+  return query select v_side, v_both, v_job.id, v_quote.id;
 end;
 $function$;
 revoke all on function public.agree_quote_as_me(uuid) from public, anon;
 grant execute on function public.agree_quote_as_me(uuid) to authenticated;
+
+comment on function public.agree_quote_as_me(uuid) is
+  'The signed-in client accepts an open price and that books the job (founder, 9 Sep 2026: the worker''s quote is their agreement). Refuses a quote the client may not see. A worker calling it records their agreement and nothing else.';
+
+-- The worker is no longer asked to reply and confirm their own price. The
+-- trigger that sent that message is dropped; the notify kind it used stays
+-- in yaad-notify-client so an in-flight call does not fail, but nothing
+-- fires it now. What the worker hears instead is that they are booked, from
+-- the trigger below.
+drop trigger if exists trg_notify_worker_quote_confirm on public.job_quotes;
+
+-- ── both sides hear they are booked ────────────────────────────────────────
+-- yaad-notify-client has carried a quote_accepted message since 31 August,
+-- and its own comment says it fires "from the jobs row itself the moment
+-- worker_email is first set". Read live on 9 September 2026: no trigger on
+-- jobs sends it, and nothing at all tells the worker. Neither side has ever
+-- been told a booking happened by the system. That mattered less while the
+-- worker confirmed their price by hand; it matters now, so this adds the
+-- trigger the comment described, and a worker kind beside it.
+create or replace function public.notify_on_booking()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+    begin
+      if coalesce(new.worker_email, '') <> '' and coalesce(old.worker_email, '') = '' then
+        perform net.http_post(
+          url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
+          body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.id, 'kind', 'quote_accepted'),
+          headers := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz'),
+          timeout_milliseconds := 15000
+        );
+        perform net.http_post(
+          url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
+          body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.id, 'kind', 'booked_worker'),
+          headers := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz'),
+          timeout_milliseconds := 15000
+        );
+      end if;
+      return new;
+    end;
+$function$;
+
+drop trigger if exists trg_notify_on_booking on public.jobs;
+create trigger trg_notify_on_booking
+  after update of worker_email on public.jobs
+  for each row execute function public.notify_on_booking();
 
 -- ── the client hears at the right moment ───────────────────────────────────
 -- On a 'client' job the client is told the moment a quote lands, as before.
@@ -573,7 +683,7 @@ as $function$
       if new.recommended_at is not null and old.recommended_at is null then
         perform net.http_post(
           url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
-          body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.job_id, 'kind', 'quote_recommended', 'quoteId', new.id),
+          body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.job_id, 'kind', 'quote_recommended', 'meta', jsonb_build_object('quoteId', new.id)),
           headers := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz'),
           timeout_milliseconds := 15000
         );

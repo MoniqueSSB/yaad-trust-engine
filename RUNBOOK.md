@@ -4616,3 +4616,5 @@ pressed on the Shortlist view. If a worker says they were alerted and the
 row says "not yet asked", the alert came from somewhere else: the public
 board, or the older Open it to the board button, which alerts nobody either
 but makes the job visible to every vetted worker.
+
+**Since 9 September 2026 the client's acceptance books.** If a client says they accepted and nothing happened, check `jobs.worker_email` first: set means booked and the next thing is the invoice under Money. Blank with the quote at `quote_confirmed` means the booking call was refused after the agreement was recorded; Postgres says why in the function's error (almost always "a worker is already chosen"). The worker no longer confirms their price, so "waiting on the worker" is never the answer.
