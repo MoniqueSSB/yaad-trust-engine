@@ -17,9 +17,19 @@ import Link from "next/link";
  *
  * "How we use AI" was added 6 Sep 2026 on Monique's instruction. It is the
  * seventh tab and it did not fit: the row was measured to exactly 1100px for
- * six. The row is 1180px wide now and the portal links hide at 1180px rather
- * than 1080px, the same two numbers as docs/nav.css, for the reason written
- * above the button rule there.
+ * six, so the row went to 1180px and the portal links hid at 1180px.
+ *
+ * Full width since 9 Sep 2026, on Monique's instruction. The job board went
+ * edge to edge that day and a 1180px centred bar above it put the logo 310px
+ * in from the edge while the board's own header started at 40px. Widening
+ * the bar on the board alone moved the jump to the board's boundary instead
+ * of removing it, so the bar is full width everywhere, here and in
+ * docs/nav.css in the same commit, with the board's 40px side padding. The
+ * portal links now hide at 1240px rather than 1180px: the row's contents
+ * measure about 1150px here (about 30px more than the same markup on the
+ * marketing site, measured, not guessed), and with 80px of padding rather
+ * than 48px they need a 1240px window to fit. Same number in docs/nav.css so
+ * the two headers still hide the links at the same width.
  *
  * The portal used to render its own cut-down header instead of this one:
  * logo, email, sign out, and no tabs at all. That is what made signing in
@@ -38,19 +48,10 @@ export function SiteNav({
   active,
   email,
   signOut,
-  wide = false,
 }: {
   active?: "market" | "client" | "worker" | "join";
   email?: string | null;
   signOut?: () => Promise<void>;
-  /* The job board runs edge to edge (9 Sep 2026, Monique: "it needs to be
-     around the whole page"). A 1180px centred bar above a full width page
-     puts the logo 300px in from the edge on a wide monitor while the board's
-     own header starts at 40px, which reads as two pages stacked. So the
-     /jobs layout asks for the bar to match. Everywhere else keeps the
-     marketing site's 1180px so the header does not move when you cross
-     from yaadly.co.uk into the app. */
-  wide?: boolean;
 }) {
   /* The layout renders this once for every /portal route, so it cannot know
      which tab to light. The URL can. An explicit `active` still wins, for the
@@ -77,12 +78,7 @@ export function SiteNav({
     "px-[6px] py-1.5 whitespace-nowrap text-[12px] text-dim transition hover:text-purpleb";
   return (
     <nav className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur-[14px]">
-      <div
-        className={
-          "mx-auto flex min-h-[58px] flex-nowrap items-center max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2 " +
-          (wide ? "max-w-none px-10" : "max-w-[1180px] px-6")
-        }
-      >
+      <div className="flex min-h-[58px] flex-nowrap items-center px-10 max-[820px]:flex-wrap max-[820px]:gap-y-2 max-[820px]:px-[18px] max-[820px]:py-2">
         <a href={SITE} className="mr-auto flex shrink-0 items-center gap-2 font-display text-[18px] font-medium">
           <span className={`grid size-[30px] place-items-center rounded-[8px] text-[16px] font-bold text-white ${GRAD}`}>
             Y
@@ -106,7 +102,7 @@ export function SiteNav({
             a signed-in person is there for, and keeping all of it would push
             the row past the page edge. */}
         {signOut ? null : (
-          <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1180px]:hidden">
+          <div className="ml-2.5 flex items-center border-l border-line pl-2.5 max-[1240px]:hidden">
             <Link href="/portal/client" className={quiet + (here === "client" ? " font-semibold text-purpleb" : "")}>Client portal</Link>
             <Link href="/portal/worker" className={quiet + (here === "worker" ? " font-semibold text-purpleb" : "")}>Worker portal</Link>
             <Link href="/apply" className={quiet + (here === "join" ? " font-semibold text-purpleb" : "")}>Join as a pro</Link>

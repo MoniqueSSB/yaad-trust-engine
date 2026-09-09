@@ -32,8 +32,9 @@ export const dynamic = "force-dynamic";
  * Monique's instruction, because on a wide monitor it left 280px of flat
  * purple either side and read as a page that had not finished loading. The
  * header, filter bar, board and join strip now run edge to edge with 40px of
- * side padding, and the nav bar above them is asked to do the same (the
- * `wide` prop on SiteNav, set in layout.tsx). Line length is held by the
+ * side padding, and the nav bar (SiteNav, and docs/nav.css on the marketing
+ * site) went full width with the same padding so the logo lines up with the
+ * heading and the header no longer jumps between pages. Line length is held by the
  * pieces themselves, not the page: the description is capped at 80ch, the
  * intro at 56ch, and the right rail at 316px, so the card column is what
  * takes the extra room.
