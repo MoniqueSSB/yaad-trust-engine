@@ -7,7 +7,7 @@ import { jmd } from "@/lib/money";
 /**
  * Stage 5.6. The worker portal's own header has promised "what you are
  * owed" since it was written and never once shown a number. This is that
- * number, job by job: the same 88%-plus-materials arithmetic
+ * number, job by job: the same 95%-plus-materials arithmetic
  * FeeBreakdown.tsx already shows on a single job, held while the job is
  * live and released once it is complete.
  *

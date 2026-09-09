@@ -103,7 +103,7 @@ Describe it from Yaadly's side, not the client's:
 ### Fees, stated the same way everywhere
 
 - **15% Guarantee and Support fee** on the client side, on labour, never on materials.
-- **12%** on the tradesperson's side. Their price is agreed with them in writing before they accept, and Yaadly engages them at that price less 12%. Nothing is deducted from money of theirs.
+- **5%** on the tradesperson's side (was 12% until 9 September 2026). Their price is agreed with them in writing before they accept, and Yaadly engages them at that price less 5%. Nothing is deducted from money of theirs.
 - Materials at cost, receipt filed against the job. **5% admin charge** only where Yaadly advances cash for materials, disclosed on the quote.
 - Small job minimum **J$3,500 to J$4,500** depending on trade, on the quote before acceptance.
 - Paying from abroad carries an exchange rate margin of about **2%**. Paying in J$ from Jamaica avoids it.

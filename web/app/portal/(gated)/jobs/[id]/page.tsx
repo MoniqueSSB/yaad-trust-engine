@@ -502,7 +502,7 @@ export default async function JobRoom({
 
   const labour = won?.labour_jmd ?? null;
   const allIn = labour == null ? null : Math.round(labour * 1.15) + (won?.materials_jmd ?? 0);
-  const takeHome = labour == null ? null : Math.round(labour * 0.88) + (won?.materials_jmd ?? 0);
+  const takeHome = labour == null ? null : Math.round(labour * 0.95) + (won?.materials_jmd ?? 0);
 
   const jobBase = "/portal/jobs/" + encodeURIComponent(job.id);
 
