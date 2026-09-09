@@ -640,7 +640,7 @@ export default async function JobRoom({
     outstanding.push({
       who: "yaadly",
       title: "Yaadly is choosing your tradesperson",
-      detail: "You asked Yaadly to pick. Quotes are in, a person is reading them against what the job needs, and one price will appear here with their name and reason on it. Nothing is charged until you agree it.",
+      detail: "You asked Yaadly to pick. Quotes are in, a person at Yaadly is reading them against what the job needs, and one price will appear here with the reason Yaadly chose it. Nothing is charged until you agree it.",
       href: jobBase + "?tab=scope",
       cta: "Who picks",
     });
@@ -1087,7 +1087,7 @@ export default async function JobRoom({
           </h2>
           <p className="max-w-[62ch] text-[13px] leading-relaxed text-mute">
             {yaadlyPicks
-              ? "You asked Yaadly to pick. A few vetted tradespeople are asked to quote, a person at Yaadly reads the quotes against what the job needs, and you get one price here with their name and reason on it. You still agree that price yourself, and nothing is booked or charged until you do."
+              ? "You asked Yaadly to pick. A few vetted tradespeople are asked to quote, a person at Yaadly reads the quotes against what the job needs, and you get one price here with the reason Yaadly chose it. You still agree that price yourself, and nothing is booked or charged until you do."
               : "You asked to see the quotes and choose. Every quote lands here as it comes in, the whole price you would pay Yaadly on each, and you pick."}
           </p>
           <form action={setWorkerChoice} className="mt-3 flex flex-wrap items-center gap-2.5">
@@ -1129,7 +1129,10 @@ export default async function JobRoom({
               const packReady = myPack?.status === "approved";
               const packConfirmed = !!myPack?.both_confirmed_at;
               const bill = clientBill(q.labour_jmd, q.materials_jmd);
-              const chooser = personName(q.recommended_by);
+              /* "Chosen by Yaadly", never by a named person. Founder's
+                 instruction, 10 Sep 2026. Who chose stays on the quote row
+                 (recommended_by) for the desk and for a dispute. */
+              const chooser = "Yaadly";
               return (
               <li
                 key={q.id}
@@ -1169,7 +1172,7 @@ export default async function JobRoom({
                     <p className="text-[10px] font-bold uppercase tracking-[.14em] text-tealb">Why {chooser} chose {q.worker_name ?? "this tradesperson"}</p>
                     <p className="mt-1 text-mute">
                       {q.recommended_reason?.trim()
-                        || `${chooser} read every quote on this job against what it needs and put this one forward.`}
+                        || `A person at Yaadly read every quote on this job against what it needs and put this one forward.`}
                     </p>
                   </div>
                 )}
@@ -1357,7 +1360,7 @@ export default async function JobRoom({
               <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
                 {onBoard
                   ? (role === "client" && yaadlyPicks
-                    ? "Your job is on the board and quotes are being asked for. A person at Yaadly reads them against what the job needs, and one price appears here with their name and reason. Nothing is charged until you agree it."
+                    ? "Your job is on the board and quotes are being asked for. A person at Yaadly reads them against what the job needs, and one price appears here with the reason Yaadly chose it. Nothing is charged until you agree it."
                     : "Your job is on the board. Identity checked workers can see it and quotes land here as they come in.")
                   : movedOn
                     ? "This job moved on without quotes being recorded here."
@@ -1764,13 +1767,4 @@ function PriceContextNote({
       <p className="mt-2 text-[11.5px] leading-relaxed text-dim">{PRICE_CAVEAT}</p>
     </div>
   );
-}
-
-/** The first name off an admin email, for "Chosen by Monique". The address
- *  itself is never printed to a client. Same helper as the no-account quotes
- *  page and yaad-notify-client, kept in step by hand. */
-function personName(email: string | null | undefined): string {
-  const local = String(email ?? "").split("@")[0] ?? "";
-  const first = local.split(/[._-]/)[0] ?? "";
-  return first ? first.charAt(0).toUpperCase() + first.slice(1) : "a person at Yaadly";
 }

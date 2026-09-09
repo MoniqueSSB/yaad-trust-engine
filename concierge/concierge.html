@@ -1443,7 +1443,7 @@ const VIEWS = [
             placeholder:"Roofer in the parish, four proven jobs on Yaadly, scope covers the whole leak not just the patch." },
         ],
         args:(r, v) => ({ p_quote:r.id, p_reason:v.reason }),
-        says:r => `Puts ${r.worker_name || "this worker"}'s price to the client of ${r.job_id} as Yaadly's choice, with your name and your reason on it. They see J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)} all in, and nothing else on this job. It books nobody: they still have to agree the price, and ${r.worker_name || "the worker"} still has to confirm theirs. You can change your mind until the client agrees.` },
+        says:r => `Puts ${r.worker_name || "this worker"}'s price to the client of ${r.job_id} as Yaadly's choice, with your reason on it. The client reads "chosen by Yaadly", never your name; who chose is stamped on the row for the desk. They see J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)} all in, and nothing else on this job. Their acceptance books it, and you can change your mind until they accept.` },
       { label:"Accept this quote", cls:"", when:r => r.status === "submitted",
         set:{ status:"accepted" },
         says:r => `Accepts ${r.worker_name || "this worker"} for job ${r.job_id}. The client sees J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)}, the worker keeps J$${Math.round(Number(r.labour_jmd||0)*0.95)+Number(r.materials_jmd||0)}. Materials are not fee'd on either side.` },

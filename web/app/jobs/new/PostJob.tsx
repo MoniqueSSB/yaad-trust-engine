@@ -378,7 +378,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
         <div className="mt-6 max-w-[62ch] rounded-2xl border border-softline bg-soft p-6 text-[14.5px] leading-relaxed text-mute">
           <b className="text-ink">What happens next, in order.</b>
           <p className="mt-3">
-            <b className="text-ink">Monique reads this herself and comes back
+            <b className="text-ink">A person at Yaadly reads this and comes back
             within one working day.</b> Not a queue and not an auto reply.
           </p>
           <p className="mt-3">
@@ -609,7 +609,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
                   call. The WhatsApp route has always asked it; this form
                   never did. Deliberately NOT a name and a number: that is a
                   third person's personal details and this form has not even
-                  asked for yours yet. Monique picks the details up in the
+                  asked for yours yet. Yaadly picks the details up in the
                   reply. */}
               <div className="fgroup" style={{ marginBottom: 0 }}>
                 <label className="fl" id="lbl-access">
@@ -977,7 +977,7 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
         </div>
 
         <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
-          A person, Monique, reads every job and replies within one working day.
+          A person at Yaadly reads every job and replies within one working day.
         </p>
       </div>
     </>

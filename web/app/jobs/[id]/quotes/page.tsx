@@ -42,7 +42,7 @@ export const metadata = {
  * 'yaadly', the default) sees no quotes at all until a named person at
  * Yaadly recommends one; the database hides the rest (quotes_for_code and
  * the RLS policy both apply client_may_see_quote). What they then see is one
- * price, with that person's name and reason on it, and the same Accept
+ * price, marked as Yaadly's choice with the reason on it, and the same Accept
  * button. A client who asked to choose sees every quote, as before.
  */
 export default async function Quotes({
@@ -128,7 +128,7 @@ export default async function Quotes({
             You asked us to pick. A few vetted tradespeople in your parish are
             being asked to quote, a person at Yaadly reads every quote against
             what the job needs, and then you get one price on this page, with
-            the name of the person who chose and why.
+            the reason Yaadly chose them.
           </p>
           <p className="mt-2">
             Nothing is booked and nothing is charged until you agree that
@@ -143,7 +143,7 @@ export default async function Quotes({
         <div className="mt-6 max-w-[62ch] rounded-2xl border border-line bg-panel p-6 text-[14.5px] leading-relaxed text-mute">
           <b className="text-ink">No quotes on this job yet.</b>
           <p className="mt-2">
-            Monique reads every job herself and comes back within one working
+            A person at Yaadly reads every job and comes back within one working
             day. When a price lands it appears on this page, and the link keeps
             working, so keep it.
           </p>
@@ -178,7 +178,11 @@ export default async function Quotes({
               const bill = clientBill(q.labour_jmd, q.materials_jmd);
               const isAccepted = q.status === "accepted";
               const kickoffRequested = q.status === "kickoff_requested";
-              const chooser = personName(q.recommended_by);
+              /* "Chosen by Yaadly", never by a named person. Founder's
+                 instruction, 10 Sep 2026: her name comes off the product.
+                 The person who chose is still recorded on the quote
+                 (recommended_by) for the desk and for a dispute. */
+              const chooser = "Yaadly";
               return (
                 <div key={q.id}
                   className={"rounded-2xl border p-5 " + (isAccepted ? "border-teal bg-soft" : "border-line bg-panel")}>
@@ -212,7 +216,7 @@ export default async function Quotes({
                       <p className="text-[10.5px] font-bold uppercase tracking-[.15em] text-tealb">Why {chooser} chose {q.worker_name}</p>
                       <p className="mt-1 text-mute">
                         {q.recommended_reason?.trim()
-                          || `${chooser} read every quote on this job against what it needs and put this one forward.`}
+                          || `A person at Yaadly read every quote on this job against what it needs and put this one forward.`}
                       </p>
                     </div>
                   )}
@@ -320,12 +324,4 @@ export default async function Quotes({
       )}
     </div>
   );
-}
-
-/** The first name off an admin email, for "Chosen by Monique". The address
- *  itself is never printed on a public page. */
-function personName(email: string | null | undefined): string {
-  const local = String(email ?? "").split("@")[0] ?? "";
-  const first = local.split(/[._-]/)[0] ?? "";
-  return first ? first.charAt(0).toUpperCase() + first.slice(1) : "a person at Yaadly";
 }

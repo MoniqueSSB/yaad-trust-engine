@@ -92,14 +92,6 @@ function allInPrice(labour: number, materials: number): { total: number; breakdo
   return { total: l + fee + m, breakdown: parts.join(", ") };
 }
 
-/** A person's name from their admin email, for "Monique has chosen". The
- *  address itself never goes into a client message. */
-function personName(email: string): string {
-  const local = email.split("@")[0] ?? "";
-  const first = local.split(/[._-]/)[0] ?? "";
-  return first ? first.charAt(0).toUpperCase() + first.slice(1) : "A person at Yaadly";
-}
-
 async function sha256Hex(s: string): Promise<string> {
   const bytes = new TextEncoder().encode(s);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -1070,16 +1062,17 @@ Deno.serve(async (req: Request) => {
       // one price to them (recommend_quote), and this is the first they hear
       // of any price at all: quote_arrived does not fire on a yaadly-picks
       // job. Same reply-to-confirm shape as quote_arrived, same all-in
-      // number the invoice will carry, plus the name of the person who chose
-      // and their reason, in their own words. Nothing here books anybody.
+      // number the invoice will carry, plus Yaadly's reason in the chooser's
+      // own words. "Chosen by Yaadly", never by a named person: founder's
+      // instruction, 10 Sep 2026. Who chose stays on the row for the desk.
       const { data: q } = await admin.from("job_quotes")
-        .select("worker_name, labour_jmd, materials_jmd, note, recommended_by, recommended_reason")
+        .select("worker_name, labour_jmd, materials_jmd, note, recommended_reason")
         .eq("id", quoteId ?? "").maybeSingle();
       const bill = allInPrice(q?.labour_jmd ?? 0, q?.materials_jmd ?? 0);
       const workerName = q?.worker_name ?? "A tradesperson";
-      const chooser = personName(String(q?.recommended_by ?? ""));
+      const chooser = "Yaadly";
       const why = String(q?.recommended_reason ?? "").trim();
-      const whyLine = why ? ` ${chooser}'s reason: "${why.slice(0, 300)}"` : "";
+      const whyLine = why ? ` Why: "${why.slice(0, 300)}"` : "";
       const proposal = String(q?.note ?? "").trim();
       const scopeLine = proposal ? ` They propose: "${proposal.slice(0, 300)}"` : "";
       subject = `Yaadly has chosen your tradesperson: ${job.title}`;
