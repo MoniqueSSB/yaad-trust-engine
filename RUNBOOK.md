@@ -3771,10 +3771,10 @@ A worker who sends photographs over WhatsApp and then never answers the
 questions leaves those files staged in the evidence bucket under `_pending/`.
 The session is dropped after 48 hours and the files are not. This predates the
 before/after step, which adds one more place a worker can walk away mid-flow.
-Nothing cleans `_pending/` on a schedule yet. It is storage cost and clutter
-rather than a data protection problem, since the bucket is private and nothing
-outside it links to those objects, but it should be swept eventually. Look at
-what is sitting there with:
+`yaad-evidence-sweep` clears it nightly at 04:23 UTC (20260906013700), and since
+10 Sep 2026 it sweeps the `job-files` bucket's `_pending/` the same way. Anything
+under 72 hours old, or named by a live session, is left alone. Look at what is
+sitting there with:
 
 ```bash
 supabase storage ls ss:///evidence/_pending --project-ref leffyisvfvjwzilydlwf
@@ -4626,6 +4626,6 @@ Since 10 Sep 2026 `yaad-inbound` files documents (PDF, .doc, .docx) into `job_fi
 
 **Wrong job.** The sender can take it back from the Files card on the job (their own file, while the job is not complete) and send it again with the right code in the caption. The desk can remove any file from Job files.
 
-**Unclaimed staged documents.** A `_pending/` object in `job-files` that nobody answered for is litter after 72 hours. There is no automatic sweep yet: list `_pending/` in Storage and remove anything older than three days. Nothing points at those objects, so removing them breaks nothing.
+**Unclaimed staged documents.** A `_pending/` object in `job-files` that nobody answered for is swept by `yaad-evidence-sweep` nightly at 04:23 UTC, the same job that sweeps the evidence bucket, once it is over 72 hours old and no live session names it. Pass `{"dry_run": true}` to that function to see what it would take.
 
 **Deploy:** from disk, `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`, after `20260910120000` is applied and after fetching main. The function tolerates the table being absent (the sender gets "did not save"), but do not run it that way on purpose.

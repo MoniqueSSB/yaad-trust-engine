@@ -2923,6 +2923,6 @@ Founder: "build this", on the note that a PDF over WhatsApp had nowhere to go. T
 
 **Not evidence, still.** Nothing in this lane touches the evidence table, a stage, a status or the independent check. `supabase/tests/job_files_guards.sql` test 10 keeps that true at the database.
 
-**Left honest:** there is no automatic sweep of `_pending/` in the job-files bucket; the runbook carries the manual one.
+**The nightly sweep covers it.** `yaad-evidence-sweep` was extended the same day to list both buckets' `_pending/` and both staging lanes' sessions, with the same 72-hour and live-session rules, rather than adding a second cron job that could drift from the first.
 
 Verified: `deno check` clean, `deno test` 159 passed with 8 new in `job-file-lane_test.ts`.
