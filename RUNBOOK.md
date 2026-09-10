@@ -3771,10 +3771,10 @@ A worker who sends photographs over WhatsApp and then never answers the
 questions leaves those files staged in the evidence bucket under `_pending/`.
 The session is dropped after 48 hours and the files are not. This predates the
 before/after step, which adds one more place a worker can walk away mid-flow.
-Nothing cleans `_pending/` on a schedule yet. It is storage cost and clutter
-rather than a data protection problem, since the bucket is private and nothing
-outside it links to those objects, but it should be swept eventually. Look at
-what is sitting there with:
+`yaad-evidence-sweep` clears it nightly at 04:23 UTC (20260906013700), and since
+10 Sep 2026 it sweeps the `job-files` bucket's `_pending/` the same way. Anything
+under 72 hours old, or named by a live session, is left alone. Look at what is
+sitting there with:
 
 ```bash
 supabase storage ls ss:///evidence/_pending --project-ref leffyisvfvjwzilydlwf
@@ -4581,3 +4581,51 @@ select actor, action, summary, at from agent_actions where action like '%_test' 
 A marked row appearing in the first query means a later migration redefined `open_jobs` without the clause. `supabase/tests/public_board_test_rows_guards.sql` proves the clause on both views and that the two marker functions refuse without an admin session; run it before and after touching either view.
 
 **Do not** add a filter in `web/app/jobs/page.tsx` to do this job. The page reads the view and must keep reading the view, or "This one is real" stops meaning what it says.
+
+## A client wants an independent check on a job, or one is booked and nothing is happening
+
+The optional independent check at sign-off (20260909180000). The client chooses it on the **Approvals** tab of their job, from the moment a worker is on the job until somebody files evidence on the final stage. After that the portal locks the choice and tells them to message you: the spec's rule is "Visits not agreed at the start are chargeable", and a late request is a conversation, not a silent line on a bill.
+
+**The two prices are the returning-client prices.** The same Visual Check and Technical Sign-off as the services page, cheaper because the client already booked a job: `service_catalogue` rows `job-visual-check` and `job-technical-check`. The standalone rows (`eyes-on-it`, `technical-signoff`) keep the full standalone price. Change a price with an `UPDATE` on the catalogue row; nothing is deployed for a price change.
+
+**The desk view is Independent checks, under Documents & money.** It lists every job with a check chosen, with the invoice and the report beside it. Three actions:
+
+1. **Assign the checker.** Type the name. The database refuses the worker's own name or email (`assign_job_checker`). The client sees the name on their job.
+2. **Raise the invoice.** One GBP line, priced by the catalogue trigger at the full or founding rate. It lands as a **draft**; send it from **Invoices** like any other. It deliberately carries **no `job_id`**: the job points at it through `jobs.check_invoice_id`. If you ever see a check invoice with a `job_id`, that is a bug, because `sync_job_status()`, `start_job_on_agency_fee_paid()` and `raise_job_client_invoice()` all read "the stage-less invoice payable to Yaadly on this job" as the agency fee.
+3. **Remove the check.** Refused while an invoice for it stands. Void the invoice first, then remove.
+
+**The report.** The checker's write-up is a `reports` row of kind `visual_check` or `technical_signoff` with the job's id in `job_id`, drafted from the Reports view as usual. The Independent checks view shows the latest one for the job once it exists.
+
+**A late request after the final evidence is in.** Set it from the desk: `select public.choose_job_check('JOB-0001', 'visual');` as a signed-in admin works past the lock; the portal cannot. Then assign and invoice as above.
+
+**Nothing here moves money or approval.** `approve_stage()` never reads `check_level`. A check that came back bad is a reason for the client not to press Approve and to raise a dispute; it is not a ruling. If somebody asks for the check to release or block a payment on its own, that is the request `CLAUDE.md` section 3 exists to refuse.
+
+**Prove the guards hold:** run `supabase/tests/job_check_guards.sql` with `execute_sql`. Ten lines, all PASS.
+
+## Files on a job: a client or worker wants to attach a document, or one has gone wrong
+
+Either side attaches documents and pictures to a job from the **Overview** tab of the job room: receipts, quotes on letterhead, permits, plans, certificates, warranties (20260910120000). PDF, JPEG, PNG, WebP or Word, up to 25MB. Not evidence: a file here never changes the job's status, never lands in a stage approval, and never locks the independent-check picker. Photos of the work itself still go on the Progress evidence tab.
+
+**Who can do what.** The client and the worker on the job both read every file on it. Each adds under their own side, `client/<job>/` or `worker/<job>/`, and `job_party_side()` is the one function the table policy and the storage policy both ask. The uploader can take their own file back until the job is complete; after that everything on the job is fixed. Nothing is ever updated in place: a changed document is a new row. No model reads a job file.
+
+**On the desk:** Documents and money, **Job files**. Every file on every job, with a signed link good for an hour, who sent it and when. "Remove this file" deletes the row and then the object; if the object lingers, the message names its path so you can remove it from Storage by hand.
+
+**"That did not go through" on the portal.** The sentence under the form is the reason: wrong type, too large, or "refused". Refused means Postgres said no: the person is not on that job, the path was not under their own side, or the job is complete or cancelled. Check `select public.job_party_side('JOB-0001')` as that user, and the job's status.
+
+**A file with no row, or a row with no file.** The action uploads first, inserts second, and removes the upload if the insert is refused; removal deletes the row first and the object second. So a stray object with no row is the harmless failure and the storage policy lets its uploader clear it. A row whose object is missing shows as a name with no link; delete the row from the desk.
+
+**Prove the guards hold:** run `supabase/tests/job_files_guards.sql` with `execute_sql`. Ten lines, all PASS, and the view returns no rows to a session with no JWT.
+
+## A PDF or Word file sent over WhatsApp did not land on the job, or landed on the wrong one
+
+Since 10 Sep 2026 `yaad-inbound` files documents (PDF, .doc, .docx) into `job_files`, the same table as the portal's Files card, under the sender's own side. Worker first: a number linked to a published worker with live jobs. Then client: a number on a live job (open for quotes, quoted, awaiting payment, in progress, evidence, disputed). Photos and videos in the same message still go to the evidence lane, untouched.
+
+**One live job:** filed at once, reply names the job. **Several:** the document is staged under `_pending/` in the `job-files` bucket and the code is asked for, the same prompt evidence uses; the reply is matched by code, never a bare "yes". A code in the caption files it without asking. **Nobody on any job:** the message falls through to the intake pipeline as before, and the document is not kept.
+
+**It did not land.** Check the trace for `yaadly.job_file.filed` and `yaadly.job_file.job`. Zero filed with a job named means the move or the row insert failed: the table is missing (migration 20260910120000 not applied), the bucket refused the type, or the file was over 25MB. The sender was told "That did not save properly".
+
+**Wrong job.** The sender can take it back from the Files card on the job (their own file, while the job is not complete) and send it again with the right code in the caption. The desk can remove any file from Job files.
+
+**Unclaimed staged documents.** A `_pending/` object in `job-files` that nobody answered for is swept by `yaad-evidence-sweep` nightly at 04:23 UTC, the same job that sweeps the evidence bucket, once it is over 72 hours old and no live session names it. Pass `{"dry_run": true}` to that function to see what it would take.
+
+**Deploy:** from disk, `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`, after `20260910120000` is applied and after fetching main. The function tolerates the table being absent (the sender gets "did not save"), but do not run it that way on purpose.
