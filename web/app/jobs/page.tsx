@@ -77,6 +77,12 @@ export const dynamic = "force-dynamic";
  * Also dropped: the comp's Save star, which nothing stores, and its "Display
  * and test listings" block, which put internal WhatsApp and wizard test jobs
  * on a public page.
+ *
+ * Since 9 September 2026 the test rows are kept off this page by Postgres,
+ * not by anything here: open_jobs and public_worker_profiles both exclude
+ * rows a person has marked is_test from the desk (20260909150000). This page
+ * needs no filter of its own and must not grow one, or the desk's "This one
+ * is real" button would stop meaning what it says.
  */
 
 type OpenJob = {

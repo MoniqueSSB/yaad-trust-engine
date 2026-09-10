@@ -1,3 +1,10 @@
+-- Stamped 20260910130000, not 20260909180000 as first written. Production had
+-- already recorded 20260909180000 and 20260910090000 from another session's
+-- work (an independent check on a job, and the client guidelines that price
+-- it), neither of them in the repository when this was merged. Two different
+-- migrations under one version number is the collision CLAUDE.md section 12
+-- exists to prevent, and this is the file that moved.
+--
 -- The client chooses who picks the tradesperson, and Yaadly can pick for them.
 --
 -- Founder instruction, 9 September 2026: "there should be a step where the
@@ -74,8 +81,14 @@
 begin;
 
 -- ── 1. who picks ───────────────────────────────────────────────────────────
+-- Every job that already exists was posted under "see every quote and
+-- choose", and its client may be looking at quotes today. So existing rows
+-- are backfilled 'client' by the add, and only then does the default become
+-- 'yaadly' for jobs created from here on. Doing it the other way round would
+-- hide live quotes from clients mid-decision the moment this ran.
 alter table public.jobs
-  add column if not exists worker_choice text not null default 'yaadly';
+  add column if not exists worker_choice text not null default 'client';
+alter table public.jobs alter column worker_choice set default 'yaadly';
 alter table public.jobs drop constraint if exists jobs_worker_choice_chk;
 alter table public.jobs
   add constraint jobs_worker_choice_chk check (worker_choice in ('yaadly', 'client'));

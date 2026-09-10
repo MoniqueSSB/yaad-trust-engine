@@ -860,10 +860,22 @@ Deno.serve(async (req: Request) => {
       svc = data;
     } else {
       const { data } = await admin.from("jobs")
-        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email, requested_worker_email")
+        .select("id, title, parish, stage, status, portal_code, client_email, client_phone, worker_email")
         .eq("id", jobId).maybeSingle();
       if (!data) return json({ error: "No such job." }, 404);
       job = data;
+      // requested_worker_email comes from migration 20260905a, which is not
+      // applied to production as of 10 Sep 2026 (RUNBOOK, "Applying migration
+      // 20260905a to production"). It used to sit in the select above, and a
+      // select naming a column the table does not have is refused outright,
+      // so every job notification of every kind came back "No such job." for
+      // want of a column only one kind reads. Now only that kind asks for it,
+      // and a refusal leaves it blank rather than failing the message.
+      if (kind === "worker_requested") {
+        const { data: req } = await admin.from("jobs")
+          .select("requested_worker_email").eq("id", jobId).maybeSingle();
+        job.requested_worker_email = req?.requested_worker_email ?? null;
+      }
     }
 
     const who = isService ? svc : job;
@@ -1174,7 +1186,7 @@ Deno.serve(async (req: Request) => {
       // changes independently.
       subject = `${job.title} is signed off`;
       line = `${job.title} (${job.id}) is signed off, every stage approved. ` +
-        `You're owed your labour and materials for it, paid directly by the client, off-platform, the way you already agreed with them. ` +
+        `Yaadly owes you your labour and materials for it, and Yaadly pays you for the work. ` +
         `Check your own figure any time in your Yaadly portal.`;
     } else if (kind === "evidence_landed") {
       // Founder's own requirement, 31 Aug 2026, and a real change from how
