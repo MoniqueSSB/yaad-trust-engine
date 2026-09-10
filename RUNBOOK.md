@@ -4615,3 +4615,17 @@ Either side attaches documents and pictures to a job from the **Overview** tab o
 **A file with no row, or a row with no file.** The action uploads first, inserts second, and removes the upload if the insert is refused; removal deletes the row first and the object second. So a stray object with no row is the harmless failure and the storage policy lets its uploader clear it. A row whose object is missing shows as a name with no link; delete the row from the desk.
 
 **Prove the guards hold:** run `supabase/tests/job_files_guards.sql` with `execute_sql`. Ten lines, all PASS, and the view returns no rows to a session with no JWT.
+
+## A PDF or Word file sent over WhatsApp did not land on the job, or landed on the wrong one
+
+Since 10 Sep 2026 `yaad-inbound` files documents (PDF, .doc, .docx) into `job_files`, the same table as the portal's Files card, under the sender's own side. Worker first: a number linked to a published worker with live jobs. Then client: a number on a live job (open for quotes, quoted, awaiting payment, in progress, evidence, disputed). Photos and videos in the same message still go to the evidence lane, untouched.
+
+**One live job:** filed at once, reply names the job. **Several:** the document is staged under `_pending/` in the `job-files` bucket and the code is asked for, the same prompt evidence uses; the reply is matched by code, never a bare "yes". A code in the caption files it without asking. **Nobody on any job:** the message falls through to the intake pipeline as before, and the document is not kept.
+
+**It did not land.** Check the trace for `yaadly.job_file.filed` and `yaadly.job_file.job`. Zero filed with a job named means the move or the row insert failed: the table is missing (migration 20260910120000 not applied), the bucket refused the type, or the file was over 25MB. The sender was told "That did not save properly".
+
+**Wrong job.** The sender can take it back from the Files card on the job (their own file, while the job is not complete) and send it again with the right code in the caption. The desk can remove any file from Job files.
+
+**Unclaimed staged documents.** A `_pending/` object in `job-files` that nobody answered for is litter after 72 hours. There is no automatic sweep yet: list `_pending/` in Storage and remove anything older than three days. Nothing points at those objects, so removing them breaks nothing.
+
+**Deploy:** from disk, `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`, after `20260910120000` is applied and after fetching main. The function tolerates the table being absent (the sender gets "did not save"), but do not run it that way on purpose.

@@ -2908,3 +2908,21 @@ Founder's own words: "worker and client should be able to upload documents and p
 **Not built, and said so:** a PDF sent over WhatsApp still has nowhere to land. Routing those into `job_files` is a change to `yaad-inbound`, separate from this.
 
 Verified: `npm run typecheck`, `npm run lint` and `npm test` (291, 14 new) clean; the migration dry-run against production inside one rolled-back block and every probe answered as expected; nothing persisted.
+
+## A document sent over WhatsApp lands on the job, not on the floor (10 Sep 2026)
+
+Founder: "build this", on the note that a PDF over WhatsApp had nowhere to go. The evidence lane takes images and video only, and the intake bucket refuses non-images at the storage layer, so a receipt sent as a PDF was fetched and dropped without a word.
+
+**Same table as the portal, same side, same rules.** `yaad-inbound` writes into `job_files` under `<side>/<job>/`, the path shape the portal's own policies expect, so a document that arrived on WhatsApp is readable by both sides and removable by its sender from the Files card exactly as one added there. The function runs as the service role, so RLS is not what protects this; the sender is identified the way every other WhatsApp lane identifies them (`worker_profiles.phone` for a worker, `jobs.client_phone` for a client, matched on the last nine digits), and the row records who.
+
+**Worker first, then client, then nobody.** The order every lane in the function already uses: a number linked to a published worker is a worker. A client is any number on a live job, and "live" is wider here than the evidence lane's list on purpose, since a quote or a permit belongs on a job before any work stage exists (`isFileableStatus`, tested). A number on no job falls through to the intake pipeline as before, and the document is not kept: filing paperwork against a job that does not exist yet would mean inventing the job.
+
+**One job files, several ask, a code in the caption answers.** With one live job there is nothing to ask. With several, the document is staged and the code prompt goes out, the same words evidence uses, and the reply is matched by `pickJobChoice`, code first, never a bare "yes". The kind is guessed only from a caption that plainly names it ("receipt", "quote", "permit", "drawing", "warranty"); anything else is 'other' rather than a wrong guess.
+
+**Photos in the same message are untouched.** The document lane only ever looks at the three document types and only returns early when the message was documents alone. A worker who sends a receipt and two after photos together gets the receipt filed and the photos into the evidence lane as before.
+
+**Not evidence, still.** Nothing in this lane touches the evidence table, a stage, a status or the independent check. `supabase/tests/job_files_guards.sql` test 10 keeps that true at the database.
+
+**Left honest:** there is no automatic sweep of `_pending/` in the job-files bucket; the runbook carries the manual one.
+
+Verified: `deno check` clean, `deno test` 159 passed with 8 new in `job-file-lane_test.ts`.
