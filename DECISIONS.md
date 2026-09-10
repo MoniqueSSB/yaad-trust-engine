@@ -2892,3 +2892,19 @@ The 30 July sign-off modes said a client abroad approves from the evidence with 
 **What did not change.** `approve_stage()` and `_do_approve_stage()` do not read `check_level` and never will. Choosing a check changes who attends, never who approves. The invoice is raised by a signed-in admin, priced by the catalogue trigger, and sent from the desk like every other; the client cannot mint it from the portal.
 
 Verified by a dry run of the whole migration against production inside a single block that ends by raising, so it rolled back: every function refused a caller with no session or no admin, the view answered, and a follow-up query confirmed no column, row or function persisted. `npm run typecheck`, `npm test` (277, 13 new) and `npm run lint` clean.
+
+## A job carries its own files, and they are not evidence (10 Sep 2026)
+
+Founder's own words: "worker and client should be able to upload documents and pictures to their portal job." Pictures had two routes already, evidence and the client's photographs of the job. Documents had none, and both existing routes refuse anything that is not an image, the intake bucket at the storage layer as well. A supplier receipt, a permit, a plan, a warranty had nowhere to go.
+
+**Why a new table and bucket rather than a new `kind` on `evidence`.** Any evidence row flips the job to 'evidence' in `sync_job_status()`, is snapshotted into the stage approval by `_do_approve_stage()`, and since 9 September locks the independent-check picker through `job_check_locked()`. A PDF permit is not evidence of work, and putting it in that table would have made a client's paperwork move the job's state. `job_files` and the private `job-files` bucket are read by none of those three, and `supabase/tests/job_files_guards.sql` test 10 asserts that stays true.
+
+**One function answers "which side are you" for both the table and the bucket.** `job_party_side(job)` returns client, worker or null from the caller's JWT. The insert policy on the table requires `side = job_party_side(job_id)`, the path to sit under that side's folder, the name on the row to be the caller's own, and the job to be open. The storage insert policy requires the folder's first segment to equal `job_party_side(second segment)`. The same question, asked once, so the two layers cannot drift apart the way separate predicates would.
+
+**Mutable by the uploader until completion, then frozen.** Evidence is immutable because a fingerprint has to mean something; a photograph of the job can be taken back because somebody who sent a picture of the inside of their house to the wrong place must be able to. Files sit between: your own file, until the job is complete, then nothing moves. There is deliberately no update policy. The sha256 is computed on the server from the exact bytes stored, and a JPEG has its APP1 segment stripped first, the same rule as the other two upload paths.
+
+**Word is in.** The founder was asked whether to accept Word files and said build; PDF, JPEG, PNG, WebP and Word are the bucket's allowed types, HEIC and video are not. Size cap 25MB, under the bucket's 26214400 and the Server Action body limit already in place.
+
+**Not built, and said so:** a PDF sent over WhatsApp still has nowhere to land. Routing those into `job_files` is a change to `yaad-inbound`, separate from this.
+
+Verified: `npm run typecheck`, `npm run lint` and `npm test` (291, 14 new) clean; the migration dry-run against production inside one rolled-back block and every probe answered as expected; nothing persisted.

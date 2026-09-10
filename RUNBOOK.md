@@ -4601,3 +4601,17 @@ The optional independent check at sign-off (20260909180000). The client chooses 
 **Nothing here moves money or approval.** `approve_stage()` never reads `check_level`. A check that came back bad is a reason for the client not to press Approve and to raise a dispute; it is not a ruling. If somebody asks for the check to release or block a payment on its own, that is the request `CLAUDE.md` section 3 exists to refuse.
 
 **Prove the guards hold:** run `supabase/tests/job_check_guards.sql` with `execute_sql`. Ten lines, all PASS.
+
+## Files on a job: a client or worker wants to attach a document, or one has gone wrong
+
+Either side attaches documents and pictures to a job from the **Overview** tab of the job room: receipts, quotes on letterhead, permits, plans, certificates, warranties (20260910120000). PDF, JPEG, PNG, WebP or Word, up to 25MB. Not evidence: a file here never changes the job's status, never lands in a stage approval, and never locks the independent-check picker. Photos of the work itself still go on the Progress evidence tab.
+
+**Who can do what.** The client and the worker on the job both read every file on it. Each adds under their own side, `client/<job>/` or `worker/<job>/`, and `job_party_side()` is the one function the table policy and the storage policy both ask. The uploader can take their own file back until the job is complete; after that everything on the job is fixed. Nothing is ever updated in place: a changed document is a new row. No model reads a job file.
+
+**On the desk:** Documents and money, **Job files**. Every file on every job, with a signed link good for an hour, who sent it and when. "Remove this file" deletes the row and then the object; if the object lingers, the message names its path so you can remove it from Storage by hand.
+
+**"That did not go through" on the portal.** The sentence under the form is the reason: wrong type, too large, or "refused". Refused means Postgres said no: the person is not on that job, the path was not under their own side, or the job is complete or cancelled. Check `select public.job_party_side('JOB-0001')` as that user, and the job's status.
+
+**A file with no row, or a row with no file.** The action uploads first, inserts second, and removes the upload if the insert is refused; removal deletes the row first and the object second. So a stray object with no row is the harmless failure and the storage policy lets its uploader clear it. A row whose object is missing shows as a name with no link; delete the row from the desk.
+
+**Prove the guards hold:** run `supabase/tests/job_files_guards.sql` with `execute_sql`. Ten lines, all PASS, and the view returns no rows to a session with no JWT.

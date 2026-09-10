@@ -32,6 +32,7 @@ import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { ApproveButton } from "@/components/portal/ApproveButton";
 import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
+import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
 import { CHECK_CATALOGUE_ID, finalStageCountFrom, isCheckLevel, jobCheckState } from "@/lib/portal/job-check";
 import legal from "@/lib/legal-copy.json";
 import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
@@ -562,6 +563,28 @@ export default async function JobRoom({
     finalStageCount: finalStageCountFrom(packStages.length),
     evidenceStages: ev.map((e) => e.stage),
   });
+
+  /* Files on the job (20260910120000): receipts, quotes, permits, plans,
+     certificates, from either side. Not evidence, so a separate table and
+     bucket. RLS returns rows to the job's own client and worker only, and
+     each link is a short-lived signed URL minted here, the same treatment
+     as the evidence and the client's photographs above. */
+  const { data: fileRows } = await supabase
+    .from("job_files")
+    .select("id,side,uploaded_by,kind,label,mime,bytes,created_at,storage_path")
+    .eq("job_id", id)
+    .order("created_at", { ascending: true });
+  const jobFiles: JobFile[] = ((fileRows ?? []) as (Omit<JobFile, "url"> & { storage_path: string })[]).map((f) => ({
+    id: f.id, side: f.side, uploaded_by: f.uploaded_by, kind: f.kind, label: f.label,
+    mime: f.mime, bytes: f.bytes, created_at: f.created_at, url: null,
+  }));
+  if (fileRows?.length) {
+    const { data: signedFiles } = await supabase.storage
+      .from("job-files")
+      .createSignedUrls(fileRows.map((f) => f.storage_path), 300);
+    const byPath = new Map((signedFiles ?? []).map((r) => [r.path, r.signedUrl]));
+    fileRows.forEach((f, i) => { jobFiles[i].url = byPath.get(f.storage_path) ?? null; });
+  }
 
   /* THE GO LIVE GATES.
      Read off the triggers, in the order Postgres applies them, so the list a
@@ -1362,6 +1385,14 @@ export default async function JobRoom({
       {tab === "overview" && (
         <>
       <DocStrip docs={docs} />
+
+      <JobFiles
+        jobId={job.id}
+        role={role === "worker" ? "worker" : "client"}
+        viewerEmail={email}
+        jobStatus={job.status ?? null}
+        files={jobFiles}
+      />
 
       {(pk.length > 0 || qs.some((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))) && (
         <section className="mt-8">
