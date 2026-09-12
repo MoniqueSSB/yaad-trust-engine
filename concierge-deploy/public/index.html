@@ -1246,6 +1246,77 @@ const VIEWS = [
         says:r => `Mints the number and records that you issued it, which is what makes it readable in the client's portal. Refused while any finding is unrated, while the verdict is empty, or while a sentence states a measurement.` },
     ]},
 
+  { k:"jobfiles", g:"Documents & money", label:"Job files", icon:"case",
+    title:"Job files", table:"v_job_files",
+    sub:"Documents and pictures either side attached to a job (20260910120000): receipts, quotes, permits, plans, certificates. Not evidence: nothing in the approval, status or check path reads these. The uploader can take their own back until the job is complete; after that only you can remove one. Links are signed for an hour. No model ever reads a job file.",
+    select:"*", order:"created_at",
+    search:["job_id","title","label","uploaded_by","client_name","worker_name","kind"],
+    empty:["No files yet","A client or worker attaches one from the Overview tab of their job."],
+    pre: async (rows) => {
+      const items = (rows || []).filter(r => r.storage_path);
+      if (!items.length) return;
+      try {
+        const { data, error } = await sb.storage.from("job-files").createSignedUrls(items.map(r => r.storage_path), 3600);
+        if (error || !data) return;
+        const byPath = new Map(data.map(d => [d.path, d.signedUrl]));
+        for (const r of items) r.url = byPath.get(r.storage_path) || null;
+      } catch (_) { /* a file nobody can sign is a gap to show, not a crash */ }
+    },
+    cols:[
+      {h:"Job", f:r => id_(r.job_id) + sub_(r.title || "")},
+      {h:"File", f:r => (r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.label || r.kind)}</a>` : esc(r.label || r.kind))
+                       + sub_((r.kind || "") + " · " + (r.mime || "") + " · " + (r.bytes ? Math.max(1, Math.round(r.bytes / 1000)) + " KB" : ""))},
+      {h:"Sent by", f:r => esc(r.side === "client" ? (r.client_name || "the client") : (r.worker_name || "the worker")) + sub_((r.side || "") + " · " + (r.uploaded_by || ""))},
+      {h:"When", f:r => mute_(ago_(r.created_at))},
+      {h:"Job state", f:r => tone_(r.job_status)},
+    ],
+    actions:[
+      { label:"Remove this file", cls:"",
+        says:r => "Deletes the row. The file itself is removed by the storage policy once nothing points at it; if it lingers, remove it from Storage by path: " + (r.storage_path || ""),
+        call: async (r) => {
+          const { error } = await sb.from("job_files").delete().eq("id", r.id);
+          if (error) throw new Error(error.message);
+          const { error: e2 } = await sb.storage.from("job-files").remove([r.storage_path]);
+          if (e2) throw new Error("Row removed; the file is still in Storage at " + r.storage_path);
+        } },
+    ]},
+
+  { k:"checks", g:"Documents & money", label:"Independent checks", icon:"case",
+    title:"Independent checks", table:"v_job_checks",
+    sub:"Jobs where the client added an independent check at sign-off (20260909180000). A check is a record for their sign-off, not a ruling: choosing one changes who attends, never who approves, and the Approve button never reads it. They are the same checks as the services page at a lower price, because the client already has a job with Yaadly: catalogue rows job-visual-check and job-technical-check. The checker is never the worker on the job; the database refuses that name.",
+    select:"*", order:"check_chosen_at",
+    search:["id","title","client_name","worker_name","check_assigned_to"],
+    empty:["No checks booked","A client adds one from the Approvals tab of their job, once a worker is on it and before the final stage's evidence is filed. After that it is a WhatsApp conversation and you set it here."],
+    cols:[
+      {h:"Job", f:r => id_(r.id) + sub_(r.title || "")},
+      {h:"Check", f:r => esc(r.check_level === "visual" ? "Visual Check" : "Technical Sign-off")
+                        + sub_("chosen " + ago_(r.check_chosen_at) + (r.check_chosen_by ? " by " + r.check_chosen_by : ""))},
+      {h:"Client & worker", f:r => esc(r.client_name || r.client_email || "") + sub_(r.worker_name ? "worker: " + r.worker_name : "no worker")},
+      {h:"Attending", f:r => r.check_assigned_to ? esc(r.check_assigned_to) + sub_(ago_(r.check_assigned_at)) : chip_("warn","not yet assigned")},
+      {h:"Invoice", f:r => r.invoice_id
+        ? id_(r.invoice_id) + sub_((r.invoice_status || "") + (r.invoice_total_pence != null ? " · £" + (r.invoice_total_pence / 100).toFixed(2) : ""))
+        : chip_("warn","not raised")},
+      {h:"Report", f:r => r.report_number ? id_(r.report_number) + sub_(r.report_status || "") : mute_("none yet")},
+      {h:"Job state", f:r => tone_(r.status) + sub_("stage " + (r.stage ?? 0) + " of " + r.final_stage + (r.locked ? ", final evidence in" : ""))},
+    ],
+    actions:[
+      { label:"Assign the checker", cls:"", rpc:"assign_job_checker",
+        says:r => "Who attends the finished stage. Never the worker on the job: assign_job_checker() refuses that name and that email.",
+        ask:[{ k:"name", label:"Who is attending", placeholder:"Name, as the client should see it", from:r => r.check_assigned_to || "" }],
+        args:(r, v) => ({ p_job:r.id, p_name:v.name }) },
+      { label:"Raise the invoice", cls:"",
+        when:r => !r.invoice_id || r.invoice_status === "void",
+        rpc:"raise_job_check_invoice",
+        says:r => "One GBP line, priced by the catalogue trigger, never typed. It lands as a draft; send it from Invoices. It carries no job_id on purpose, so it is never mistaken for the agency fee.",
+        ask:[{ k:"source", label:"Which rate", options:[["catalogue_full","Full rate"],["catalogue_founding","Founding rate"]] }],
+        args:(r, v) => ({ p_job:r.id, p_source:v.source || "catalogue_full" }) },
+      { label:"Remove the check", cls:"",
+        when:r => !r.invoice_id || r.invoice_status === "void",
+        rpc:"clear_job_check",
+        says:r => "Clears the client's choice and any assignment. Refused while an invoice for it stands; void that first.",
+        args:(r) => ({ p_job:r.id }) },
+    ]},
+
   { k:"jobs", g:"Run the day", label:"Jobs", icon:"case",
     title:"Jobs", table:"jobs",
     sub:"Every job and where it has got to, including everything that arrives by WhatsApp, email and the website form. What somebody actually typed is under In their own words, kept exactly as they wrote it. Hover to read the whole thing. A budget band is the client's private figure and is never shown here. Materials store is where the client said materials are to be kept: until that is answered the database will not let a materials tranche or materials evidence be recorded at all.",
