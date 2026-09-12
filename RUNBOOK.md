@@ -4558,6 +4558,69 @@ select value from app_settings where key = 'worker_guidelines_version';
 
 The trigger function should contain neither figure and should name `raise_job_stage_worker_payable`. If `raise_job_worker_pay_invoice` or `raise_job_stage_worker_pay_invoice` still exist afterwards, the migration did not run to the end.
 
+## 28. A client says they have no quotes, and the desk shows three
+
+Almost always the client asked Yaadly to pick. Check the job's
+`worker_choice` column (the Who picks column on the desk's Quotes view says
+it in words). On a `yaadly` job the client sees **no** quote until a
+signed-in admin has put one to them: the quotes page, the portal, and the
+"reply with the code" WhatsApp path all read the same rule,
+`client_may_see_quote()`, so all three agree. Nothing is wrong. Open Quotes,
+find the job, press **Choose this one for the client**, write the reason in
+the box (the client reads it), and the client gets the message with the
+all-in price. The other quotes stay on the desk.
+
+**If the button is missing** on a quote, one of three things: the job is a
+`client` job (they already see everything), the quote is not `submitted`
+(only an open price can be put forward), or a worker is already booked.
+Postgres refuses each of these with its own sentence; the desk shows it as
+said.
+
+**If the button is there and Postgres refuses it** with "already agreed a
+price", the client has confirmed a different quote through some door. Talk
+to them before changing anything.
+
+**To check the rule directly**, as the project's service role:
+
+```sql
+select id, worker_choice from jobs where id = 'JOB-...';
+select id, worker_name, status, recommended_at, recommended_by from job_quotes where job_id = 'JOB-...';
+```
+
+A `yaadly` job with every `recommended_at` null is a job waiting on a
+person. That is the design, not a fault.
+
+## 29. The shortlist agent named nobody, or named the wrong trade
+
+**Nobody.** The candidate pool is `shortlist_candidates_for_job`, which
+applies the same bar as the job alert: profile active, current Worker
+Guidelines signed, trade or parish match, not a test row. On a bench of
+twelve a job in a trade nobody carries is an empty list, and the desk says
+so. Nothing to fix in the agent; either the trade is wrong on the job (set it
+under Jobs, Correct what this job says does not set the trade) or the bench
+has nobody for it.
+
+**Wrong trade.** The agent only orders what the database hands it, so a
+plumber on a roofing shortlist means the plumber's profile matched on
+parish alone. Read the reason column: "parish, related trade" is the
+database saying exactly that. Drop them. If it keeps happening for a parish,
+the bench is thin there, not the agent wrong.
+
+**"Picked by: ranking" when you expected the agent.** The function fell
+back on purpose. Reasons, in the order it checks them: fewer candidates than
+the shortlist size (nothing to choose between), agents paused on the desk,
+no text provider configured, or the model did not answer in usable JSON. The
+last one is logged; check the function's logs for `yaad-shortlist`. A
+ranked list is still a correct list, it is just not a judgement.
+
+**Nobody has been told**, whichever way it was built, until Invite is
+pressed on the Shortlist view. If a worker says they were alerted and the
+row says "not yet asked", the alert came from somewhere else: the public
+board, or the older Open it to the board button, which alerts nobody either
+but makes the job visible to every vetted worker.
+
+**Since 9 September 2026 the client's acceptance books.** If a client says they accepted and nothing happened, check `jobs.worker_email` first: set means booked and the next thing is the invoice under Money. Blank with the quote at `quote_confirmed` means the booking call was refused after the agreement was recorded; Postgres says why in the function's error (almost always "a worker is already chosen"). The worker no longer confirms their price, so "waiting on the worker" is never the answer.
+
 Applied 9 September 2026 and all of the above checked true. If the migration tool is refused by the permission classifier, the file runs safely as three ordered batches through plain SQL: the two payable definitions, then the trigger repoint with the drops and the column comment, then the two updates. Insert the version into `supabase_migrations.schema_migrations` afterwards so `list_migrations` and the drift script see it.
 
 ## A test job or a test worker is showing on the public board, or a real one is missing

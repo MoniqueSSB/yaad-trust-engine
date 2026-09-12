@@ -868,6 +868,8 @@ const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
 const REPLY_FN = SUPABASE_URL + "/functions/v1/yaad-desk-reply";
 const AGENT_FN = SUPABASE_URL + "/functions/v1/yaad-agent";
+const SHORT_FN = SUPABASE_URL + "/functions/v1/yaad-shortlist";
+const MATCH_FN = SUPABASE_URL + "/functions/v1/yaad-match";
 
 // The Conversations reply lane. Monique's words, typed here, sent from the
 // Yaadly number by yaad-desk-reply so they continue the chat the client
@@ -1353,6 +1355,17 @@ const VIEWS = [
           const j = await agentFn({ mode:"summarise", text:String(r.descr || "").slice(0, 12000), job_id:r.id });
           return renderThreadSummary(j && j.result);
         } },
+      // 9 Sep 2026. The shortlist agent. Reads the job as the board shows it
+      // and the candidates' published profiles, and names a few to be ASKED
+      // to quote. It alerts nobody: the names land under Shortlist, where
+      // you invite them. A read action, so no confirm and no reload: the
+      // answer is the point.
+      { label:"Shortlist who to ask", cls:"g",
+        when:r => !r.worker_email && Number(r.stage || 0) === 0,
+        read:async r => {
+          const j = await shortlistFn({ job_id:r.id });
+          return renderShortlist(j);
+        } },
       { label:"Open it to the board", cls:"", when:r => r.status !== "open_for_quotes",
         set:{ status:"open_for_quotes", open:true },
         says:r => `Puts this on the public board. Vetted workers in ${r.parish || "this parish"} can see it and quote. The address and phone stay hidden from them. If the client has not signed the Client Guidelines the database will refuse this, and that refusal is the gate working.` },
@@ -1498,15 +1511,75 @@ const VIEWS = [
       {h:"Client sees", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 1.15) + Number(r.materials_jmd||0))},
       {h:"Worker gets", n:true, f:r => jmd(Math.round(Number(r.labour_jmd||0) * 0.95) + Number(r.materials_jmd||0))},
       {h:"Against the others", f:r => quoteBand(r, ROWS.quotes || [])},
+      {h:"Who picks", f:r => whoPicksChip(r)},
       {h:"State", f:r => tone_(r.status)},
     ],
+    pre: preQuotes,
     actions:[
+      // 9 Sep 2026. The client asked Yaadly to pick. This puts ONE price to
+      // them with your name and reason on it, and hides the others from
+      // their page. It books nobody: they still agree the price, the worker
+      // still confirms theirs, and _do_choose_worker is untouched. Postgres
+      // refuses it on a job where the client asked to choose themselves.
+      { label:"Choose this one for the client", cls:"",
+        when:r => r.status === "submitted" && !r.recommended_at && JOB_CHOICE[r.job_id] !== "client",
+        rpc:"recommend_quote",
+        ask:[
+          { k:"reason", label:"Why this one, in a sentence the client will read", type:"long",
+            placeholder:"Roofer in the parish, four proven jobs on Yaadly, scope covers the whole leak not just the patch." },
+        ],
+        args:(r, v) => ({ p_quote:r.id, p_reason:v.reason }),
+        says:r => `Puts ${r.worker_name || "this worker"}'s price to the client of ${r.job_id} as Yaadly's choice, with your reason on it. The client reads "chosen by Yaadly", never your name; who chose is stamped on the row for the desk. They see J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)} all in, and nothing else on this job. Their acceptance books it, and you can change your mind until they accept.` },
       { label:"Accept this quote", cls:"", when:r => r.status === "submitted",
         set:{ status:"accepted" },
         says:r => `Accepts ${r.worker_name || "this worker"} for job ${r.job_id}. The client sees J$${Math.round(Number(r.labour_jmd||0)*1.15)+Number(r.materials_jmd||0)}, the worker keeps J$${Math.round(Number(r.labour_jmd||0)*0.95)+Number(r.materials_jmd||0)}. Materials are not fee'd on either side.` },
       { label:"Decline it", cls:"d", when:r => r.status === "submitted",
         set:{ status:"declined" },
         says:() => "Declines this quote. The worker is not told by this button." },
+    ]},
+
+  // 9 Sep 2026. Who the shortlist agent named to be ASKED to quote, and
+  // whether they have been. Not a score: a worker on this list who was not
+  // invited, or invited and not chosen, is marked down nowhere, and the
+  // Yaad Score never reads it. The agent writes it; you invite from it.
+  { k:"shortlist", g:"Run the day", label:"Shortlist", icon:"people",
+    title:"Shortlist", table:"job_shortlists",
+    sub:"Who the shortlist agent picked to be asked to quote on each open job, with its reason. Nobody here has been told anything until you press Invite: that sends the job alert to that one person, and only then. 'model' means the agent chose and wrote the reason; 'rank' means the database ordering stood in (too few candidates to choose between, agents paused, or the model did not answer usably) and the reason is the plain match. Dropping somebody records that you did, and tells them nothing.",
+    select:"*",
+    order:"created_at", search:["job_id","worker_name","worker_email"],
+    empty:["No shortlist yet","Open a job under Jobs and press Shortlist who to ask."],
+    cols:[
+      {h:"Job", f:r => id_(r.job_id)},
+      {h:"#", n:true, f:r => String(r.rank || "")},
+      {h:"Worker", f:r => esc(r.worker_name || r.worker_email || "unknown") + sub_(r.worker_email || "")},
+      {h:"Why", f:r => esc(r.reason || "")},
+      {h:"Picked by", f:r => r.source === "model" ? chip_("ok", "agent") + sub_(r.model || "") : chip_("mute", "ranking")},
+      {h:"State", f:r => r.dropped_at ? chip_("mute", "dropped") + sub_((r.dropped_by || "").split("@")[0] + ", " + ago_(r.dropped_at))
+                       : r.invited_at ? chip_("ok", "invited") + sub_(ago_(r.invited_at))
+                       : chip_("warn", "not yet asked")},
+    ],
+    actions:[
+      { label:"Invite this one to quote", cls:"",
+        when:r => !r.invited_at && !r.dropped_at,
+        call:async r => { await inviteFn({ job_id:r.job_id, only:[r.worker_email] }); },
+        says:r => `Sends ${r.worker_name || r.worker_email} the job alert for ${r.job_id}: trade, parish and a link to the board, nothing personal about the client. The job has to be open on the board first (Jobs, then Open it to the board), or the alert function refuses. Quoting is free for them, and nothing about this books anybody.` },
+      { label:"Invite everyone not yet asked", cls:"",
+        when:r => !r.invited_at && !r.dropped_at,
+        call:async r => {
+          const mates = (ROWS.shortlist || []).filter(x => x.job_id === r.job_id && !x.invited_at && !x.dropped_at).map(x => x.worker_email);
+          await inviteFn({ job_id:r.job_id, only:mates });
+        },
+        says:r => `Sends the job alert for ${r.job_id} to every shortlisted person on it who has not been asked or dropped. Same alert, same rules, in one go.` },
+      { label:"Drop this one", cls:"d",
+        when:r => !r.invited_at && !r.dropped_at,
+        call:async r => {
+          const { data } = await sb.auth.getUser();
+          const { error } = await sb.from("job_shortlists")
+            .update({ dropped_at:new Date().toISOString(), dropped_by:(data && data.user && data.user.email) || "admin" })
+            .eq("id", r.id);
+          if (error) throw new Error(error.message);
+        },
+        says:r => `Takes ${r.worker_name || r.worker_email} off the shortlist for ${r.job_id}, stamped against you. They are not told, and it counts against them nowhere.` },
     ]},
 
   { k:"apps", g:"People", label:"Applications", icon:"people",
@@ -3000,6 +3073,26 @@ function quoteBand(r, all){
   return chip_("mute", "middle of " + (peers.length + 1));
 }
 
+// ---- Quotes: who picks on each job. Loaded beside the quotes rather than
+// joined, the same shape as preApps, so the quotes view's own select stays
+// "*" on one table. JOB_CHOICE is read by the Who picks column and by the
+// "Choose this one for the client" button's when().
+const JOB_CHOICE = {};
+async function preQuotes(rows){
+  const ids = [...new Set((rows || []).map(r => r.job_id).filter(Boolean))].slice(0, 200);
+  for (const k in JOB_CHOICE) delete JOB_CHOICE[k];
+  if (!ids.length) return;
+  const { data } = await sb.from("jobs").select("id,worker_choice").in("id", ids);
+  for (const j of data || []) JOB_CHOICE[j.id] = j.worker_choice || "yaadly";
+}
+
+function whoPicksChip(r){
+  const c = JOB_CHOICE[r.job_id];
+  if (c === "client") return chip_("mute", "client chooses") + sub_("they see every quote");
+  if (r.recommended_at) return chip_("ok", "put to the client") + sub_((r.recommended_by || "").split("@")[0] + ", " + ago_(r.recommended_at));
+  return chip_("warn", "Yaadly picks") + sub_("client sees nothing until you choose");
+}
+
 function panelQuotes(rows){
   if (!(rows || []).length) return "";
   const jobs = new Set(rows.map(r => r.job_id));
@@ -3591,9 +3684,25 @@ async function loadTableView(k){
   const v = VIEW[k];
   const host = $("v-" + k);
   host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
-  let q = sb.from(v.table).select(v.select).order(v.order, { ascending: !!v.asc }).limit(200);
-  if (v.filter) q = q.eq(v.filter[0], v.filter[1]);
-  const { data, error } = await q;
+  // A column this page names that the live database does not have (a
+  // migration in the repo not yet applied there, 20260905a being the case
+  // that prompted this on 10 Sep 2026) used to blank the whole view, because
+  // Postgres refuses a select naming a missing column outright. Now that one
+  // column is dropped and the read tried again, at most four times, and the
+  // view says which it had to leave out. Every cell renderer already treats a
+  // missing field as empty, so nothing below needs to know.
+  let cols = String(v.select || "*"), dropped = [], data = null, error = null;
+  for (let tries = 0; tries < 5; tries++) {
+    let q = sb.from(v.table).select(cols).order(v.order, { ascending: !!v.asc }).limit(200);
+    if (v.filter) q = q.eq(v.filter[0], v.filter[1]);
+    ({ data, error } = await q);
+    const miss = error && /column\s+(?:\w+\.)?(\w+)\s+does not exist/i.exec(error.message || "");
+    if (!miss || cols === "*") break;
+    const left = cols.split(",").map(c => c.trim()).filter(c => c && c !== miss[1]);
+    if (left.length === cols.split(",").length) break;
+    dropped.push(miss[1]); cols = left.join(",");
+  }
+  if (dropped.length) console.warn(v.table + ": read without " + dropped.join(", ") + ", not in this database yet");
   if (error) {
     host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>${esc(v.table)} could not be read</b><p>${esc(error.message)}</p></div></div>`;
     return;
@@ -4210,6 +4319,58 @@ async function agentFn(payload){
   const j = await r.json().catch(() => ({ error: "the agent returned something unreadable" }));
   if (!r.ok) throw new Error(j.error || ("http " + r.status));
   return j;
+}
+
+// The shortlist agent and the alert it feeds. Both admin-JWT calls, same
+// headers as agentFn. Shortlisting respects the agents switch (the function
+// itself reads app_settings.agents_paused and falls back to the ranking), so
+// it is not blocked here: a paused desk still gets a ranked list, marked as
+// such. Inviting is not a model call and is never blocked by the switch.
+async function shortlistFn(payload){
+  const r = await fetch(SHORT_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the shortlist agent returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  return j;
+}
+async function inviteFn(payload){
+  const r = await fetch(MATCH_FN, {
+    method: "POST",
+    headers: { "Content-Type":"application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json().catch(() => ({ error: "the alert function returned something unreadable" }));
+  if (!r.ok) throw new Error(j.error || ("http " + r.status));
+  // A silent "nothing sent" reads as sent. The two honest reasons are the
+  // job's own: it is not open on the board yet (yaad-match refuses, above),
+  // or this person was already told about it and the alert log will not
+  // tell them twice. Either way the row must not turn to "invited".
+  if (!Number(j.alerted || 0)) {
+    throw new Error(j.note === "nobody new to tell"
+      ? "Nothing sent: this person has already been alerted about this job, or the ranking no longer includes them (profile inactive, or guidelines unsigned)."
+      : ("Nothing was sent. " + (j.warning || j.note || "Check the job is open on the board and the alert channels are configured.")));
+  }
+  return j;
+}
+
+function renderShortlist(j){
+  const picks = (j && j.picks) || [];
+  const how = String((j && j.how) || "");
+  const byModel = how === "model";
+  const head = byModel
+    ? `<b>The agent picked ${picks.length} of ${j.candidates} candidates.</b>`
+    : `<b>${picks.length} named by the ranking, not by the agent</b> <span class="mute">(${esc(how.replace("rank:", "").replace(/_/g, " ") || "ranking")})</span>`;
+  if (!picks.length) {
+    return `<div class="msg warn">${head}<br>${esc((j && j.note) || "Nobody on the vetted bench matches this trade or parish yet.")}</div>`;
+  }
+  const rows = picks.map(p =>
+    `<li><b>${esc(p.worker_name || p.worker_email)}</b> <span class="mute">${esc(p.worker_email)}</span><br><span class="mute">${esc(p.reason || "")}</span></li>`
+  ).join("");
+  return `<div class="msg ok">${head}<ol style="margin:8px 0 0 18px;padding:0">${rows}</ol>` +
+    `<p class="mute" style="margin-top:8px">Nobody has been told. Open <b>Shortlist</b> in the rail to invite them, one by one or all at once.</p></div>`;
 }
 
 /** yaad-agent hands back the model's raw text in .result. Parse the JSON out of

@@ -2854,12 +2854,14 @@ Deno.serve(async (req: Request) => {
           // Named the real, working alternative rather than a vague
           // "ask Yaadly": the portal button next to this exact price is
           // the only place that request can actually be made from here.
+          // 9 Sep 2026, founder: "the only person that needs to accept is
+          // the client." The client's reply books; agree_quote_via_whatsapp
+          // returns both_confirmed = true only on the client's side now,
+          // because the worker's quote already was their agreement.
           if (row?.both_confirmed) {
-            return twiml(row.agreed_side === "client"
-              ? `Confirmed. Both sides have agreed the price for ${quoteTarget.title}. Reply ${quoteTarget.id} again to book them, no Kickoff Pack needed. Want the fuller document first instead? Sign in to your Yaadly portal and tap "Get a Kickoff Pack first" next to this price.`
-              : `Confirmed. Both sides have agreed the price for ${quoteTarget.title}, ready for the client to book.`);
+            return twiml(`Booked. ${quoteTarget.title} is on. A message with the price and how payment works is coming through next. Nothing starts until your invoice from Yaadly is paid.`);
           }
-          return twiml(`Confirmed on your side for ${quoteTarget.title}. Waiting on ${row?.agreed_side === "worker" ? "the client" : "the worker"} to reply the same code before this can move on.`);
+          return twiml(`Noted for ${quoteTarget.title}. Your quote was already your word on the price, so nothing more is needed from you: the client accepts it, and you will get a message on this number the moment they do.`);
         }
       }
 

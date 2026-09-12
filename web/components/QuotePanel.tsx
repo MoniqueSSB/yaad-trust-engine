@@ -71,7 +71,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           Your quote is with the client, scope, timeline and payment stages
           included. They see your Yaad Score, jobs completed and evidence
           from past work alongside it. If they accept, the Kickoff Pack is
-          drafted from it, then Monique reviews before anything is signed.
+          drafted from it, then Yaadly reviews before anything is signed.
         </p>
       </div>
     );
@@ -262,7 +262,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
       <p className="mt-3 text-[11.5px] leading-relaxed text-dim">
         This is your quote to the client, scope, timeline and stages
         included. If they accept, the Kickoff Pack and its own payment
-        schedule are drafted from it, then Monique reviews before anything
+        schedule are drafted from it, then Yaadly reviews before anything
         is signed.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
