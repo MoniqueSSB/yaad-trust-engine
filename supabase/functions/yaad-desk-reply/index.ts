@@ -211,12 +211,16 @@ Deno.serve(async (req: Request) => {
       // Best effort throughout: not knowing what happened to a delivered
       // message is a smaller problem than refusing to send one.
       if (sent.sid) {
-        await db(req, "message_deliveries", {
+        // Through record_desk_delivery(), not straight into the table. The
+        // table has no insert policy, so the direct write this used to make
+        // was refused every time and nobody saw it (found 11 Sep 2026). Still
+        // best effort: not knowing whether a reply arrived is a smaller
+        // problem than refusing to send one.
+        await db(req, "rpc/record_desk_delivery", {
           method: "POST",
-          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify({
-            message_sid: sent.sid, to_addr: fromAddr, channel,
-            kind: "desk_reply", job_id: thread.job_id ?? "", status: "accepted",
+            p_sid: sent.sid, p_to_addr: fromAddr, p_channel: channel,
+            p_kind: "desk_reply", p_job: thread.job_id ?? "",
           }),
         }).catch(() => { /* never let bookkeeping cost a delivered reply */ });
       }

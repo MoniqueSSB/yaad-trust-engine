@@ -4692,3 +4692,70 @@ Since 10 Sep 2026 `yaad-inbound` files documents (PDF, .doc, .docx) into `job_fi
 **Unclaimed staged documents.** A `_pending/` object in `job-files` that nobody answered for is swept by `yaad-evidence-sweep` nightly at 04:23 UTC, the same job that sweeps the evidence bucket, once it is over 72 hours old and no live session names it. Pass `{"dry_run": true}` to that function to see what it would take.
 
 **Deploy:** from disk, `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`, after `20260910120000` is applied and after fetching main. The function tolerates the table being absent (the sender gets "did not save"), but do not run it that way on purpose.
+
+---
+
+## The desk Overview is charts now: where everything went, and turning on your calendar link
+
+Changed 10 September 2026. See DECISIONS.md for why.
+
+**Where things went.** Nothing was deleted.
+
+1. The Overview is one screen of eight widgets. Every bar, row and number on it opens the view behind it.
+2. The lists that used to be the Overview (whose move it is, jobs by stage, to answer) are on **The day**, the second link under Run the day.
+3. The counting tiles are on **How the desk is doing**, under System.
+4. Opening a job shows its page and the "Agreed and signed off" record. The raw fields are under **Every field, as stored**, at the foot of the page.
+
+**The Overview scrolls, or a widget is cut off.** It is sized for a laptop screen of about 1280 by 800 or larger. Below 1180 pixels wide the widgets stack and scroll on purpose. If it scrolls on a normal laptop, the likeliest cause is a widget whose content grew: check the Waiting on you list first, which scrolls inside itself and should never push the page.
+
+**The dashboard says it could not be drawn.** The message under it is the database error, word for word. The dashboard reads `intake_threads`, `intakes`, `enquiries` and `jobs` on top of what the old Overview read, all admin readable under `is_admin()`. The lists on The day are drawn by the same loader and are unaffected by a dashboard failure.
+
+**A job page says part of its record could not be read.** It names the table. The record reads `stage_approvals`, `kickoff_packs`, `job_quotes`, `invoices` and `evidence`. A step that says "no sign-off on record" means no row exists in `stage_approvals` for that stage: it is a prompt to look, not a ruling.
+
+**Turning on the calendar link in enquiry drafts.** The "Reach them" card puts your calendar page into every WhatsApp and email draft it opens, but only once the setting exists. It is plain text: store the address bare, with no quote marks around it, the same lesson as `desk_url`.
+
+```sql
+insert into app_settings (key, value)
+values ('booking_link', 'https://calendar.app.google/your-page')
+on conflict (key) do update set value = excluded.value;
+```
+
+Check it by opening any enquiry with a phone number: the draft should end with "pick a time that suits you here" and your link. To switch it off, delete the row; the drafts then stop mentioning a call.
+
+---
+
+## Messaging a client or a worker from a job, and turning "Send from Yaadly" on
+
+Built 11 September 2026. **The migration is applied (12 September 2026); the functions are not deployed yet.** "Open in my own app" on the job page works as soon as the desk is deployed. "Send from Yaadly" also needs `yaad-desk-message` deployed, on the founder's word.
+
+1. Apply the migration by hand: `supabase/migrations/20260911090000_the_desk_can_message_a_live_job.sql`. One function, `record_desk_message()`, nothing else. Prove it took:
+
+```sql
+select proname, prosecdef from pg_proc where proname = 'record_desk_message';
+```
+
+2. Deploy the function from disk, **without** `--no-verify-jwt`. It checks `is_admin()` itself and the platform check stays on:
+
+```bash
+supabase functions deploy yaad-desk-message --project-ref leffyisvfvjwzilydlwf
+```
+
+3. Check it refuses a stranger: a POST with no token should return 401 from the platform.
+
+**The same migration fixes the delivery log for conversation replies.** It adds `record_desk_delivery()`, and `yaad-desk-reply` now writes its "did it arrive" row through it. Until both are live, desk replies still send but are never logged. After applying, redeploy `yaad-desk-reply` the same way (platform auth kept, no `--no-verify-jwt`), then send one reply from Conversations and check it:
+
+```sql
+select kind, status, created_at from message_deliveries where kind = 'desk_reply' order by created_at desc limit 3;
+```
+
+**PR #159 merged on 12 September 2026**, so main is no longer behind the live desk. Before any deploy, still fetch main and confirm this branch contains it: `git merge-base --is-ancestor origin/main HEAD && echo contains main`.
+
+**"WhatsApp will not carry this".** Twilio code 63016: more than 24 hours since that person last messaged the Yaadly number. Send it by email, or use "Open in my own app", which sends from her own WhatsApp and has no such window. Nothing is queued.
+
+**"Sent, but it could not be written to the job's record".** The message went. `record_desk_message()` is missing or refused. Apply step 1, and note what was sent on the job so the record is complete.
+
+**Where a sent message is recorded.** `agent_actions`, action `desk_message`, under her email, with the text. A WhatsApp send also gets a row in `message_deliveries`, so Did it arrive shows whether it reached the phone.
+
+## Health says what to do next
+
+Every Health finding now carries a next step and a button. The steps are matched on each finding's wording in `HEALTH_NEXT` in `concierge.html`. A new Health check with no matching rule shows without a step. Add a rule beside it; never borrow another check's step.
