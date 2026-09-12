@@ -1240,7 +1240,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
           <h2 class="wq" id="w4h">Create your account</h2>
           <p class="wsub" id="w4s">Your job is already saved as a draft. This is the account it belongs to, and it is what lets workers reply to you.</p>
           <div class="grid g2c">
-            <div class="fgroup"><label class="fl" for="nm">Your name</label><input class="f" id="nm" value="Monique Sewell-Bennett"></div>
+            <div class="fgroup"><label class="fl" for="nm">Your name</label><input class="f" id="nm" value="Andrea Palmer"></div>
             <div class="fgroup"><label class="fl" for="em">Email</label><input class="f" id="em" value="monique@example.com"></div>
           </div>
           <div class="fgroup"><label class="fl" for="ph">Phone or WhatsApp</label><input class="f" id="ph" value="+44 7767 171858">
@@ -1357,7 +1357,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 <section class="screen" id="s-done">
   <div class="wrap">
     <div class="pills" style="margin-bottom:14px"><span class="pill">JB-4471 live in the marketplace</span><span class="pill m">Guidelines v1.3 signed</span><span class="pill n">Plumbing · Kingston 8, Barbican</span></div>
-    <h2 class="hx">Hello Monique,<br>your job is live.</h2>
+    <h2 class="hx">Hello Andrea,<br>your job is live.</h2>
     <p class="lead">Your signature on the Client Guidelines is what took it out of draft. Your <b>Plumbing</b> job is now in the marketplace and we'll help you find available workers near <b>Barbican, Kingston 8</b>.</p>
 
     <div class="card" style="margin-top:26px">
@@ -1520,7 +1520,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 
     <div class="modebar" style="margin-top:22px">
       <span class="ml">Signed in as</span>
-      <button class="mbtn on" data-portal="client">Client · Monique</button>
+      <button class="mbtn on" data-portal="client">Client · Andrea</button>
       <button class="mbtn" data-portal="worker">Worker · Delroy</button>
       <button class="mbtn" data-portal="service">Service client · Karlene</button>
       <span class="modenote" id="ponote">Your job, your money, the evidence waiting on you, and every document with your signature on it.</span>
@@ -1623,7 +1623,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
     <div class="modebar">
       <span class="ml">Profile</span>
       <button class="mbtn on" data-pmode="wk">Worker · Delroy</button>
-      <button class="mbtn" data-pmode="cl">Client · Monique</button>
+      <button class="mbtn" data-pmode="cl">Client · Andrea</button>
       <span class="modenote" id="pnote">Reviews written by clients he actually worked for. One per completed job, tied to the evidence they signed off.</span>
     </div>
 
@@ -1755,9 +1755,9 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
     <div id="pane-cl" style="display:none">
       <div class="card" style="margin-top:16px">
         <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-          <div class="av" style="width:64px;height:64px;font-size:26px;background:linear-gradient(135deg,#F59E0B,#F87171)">MS</div>
+          <div class="av" style="width:64px;height:64px;font-size:26px;background:linear-gradient(135deg,#F59E0B,#F87171)">AP</div>
           <div style="flex:1;min-width:220px">
-            <h2 class="hx" style="font-size:30px">Monique S.</h2>
+            <h2 class="hx" style="font-size:30px">Andrea P.</h2>
             <p class="muted" style="font-size:14px;margin-top:4px">Barbican, Kingston 8 · posting from London · client since Apr 2026</p>
             <div class="pills" style="margin-top:12px">
               <span class="pill">Email verified</span><span class="pill">Guidelines v1.3 signed</span><span class="pill m">3 jobs completed</span><span class="pill n">0 stages disputed</span>
@@ -1789,7 +1789,7 @@ footer{border-top:1px solid var(--line);margin-top:70px;padding:24px 0 40px;font
 
       <div class="card" style="margin-top:16px;border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.04)" id="crevform">
         <p class="kick m" style="margin-bottom:4px">Your turn, worker side</p>
-        <h3 class="hx" style="font-size:21px">Review Monique for JB-4390</h3>
+        <h3 class="hx" style="font-size:21px">Review Andrea for JB-4390</h3>
         <p class="tiny" style="margin-top:8px;font-size:13px">Bathroom re-pipe, Barbican · completed 14 Aug 2026 · Yaadly paid your stage 14 Aug. You worked this job, so you can review this client. Once.</p>
 
         <div style="margin-top:18px">
@@ -2215,7 +2215,7 @@ var CREVIEWS=[
 S('#crevlist').innerHTML=CREVIEWS.map(function(v){
  return '<div class="rev"><div class="rev-h">'+starsHtml(v.r)+'<b>'+esc(v.n)+'</b><span class="pill">Worked this job</span></div>'+
   '<p>'+esc(v.t)+'</p>'+
-  (v.reply?'<div style="margin-top:11px;padding-left:14px;border-left:2px solid var(--softline)"><p style="font-size:12.5px"><b style="color:var(--mango)">Monique replied:</b> '+esc(v.reply)+'</p></div>':'')+
+  (v.reply?'<div style="margin-top:11px;padding-left:14px;border-left:2px solid var(--softline)"><p style="font-size:12.5px"><b style="color:var(--mango)">Andrea replied:</b> '+esc(v.reply)+'</p></div>':'')+
   '<div class="rmeta"><span>'+esc(v.a)+'</span><span>'+esc(v.job)+'</span><span>'+esc(v.d)+'</span><span>stage signed off</span></div></div>';
 }).join('');
 
@@ -2341,8 +2341,8 @@ var LADDER=[
  ['C1','Property Care \u2014 standard','A trained checker','Same checklist every visit, so change is visible.','\u00a375','\u00a395','UK periodic inspection \u00a380+VAT'],
  ['C2','Property Care \u2014 large or rental','A trained checker','Bigger property, longer visit.','\u00a3110','\u00a3135','\u2014'],
  ['C3','Property Care \u2014 villa','A trained checker','Grounds, pool, outbuildings.','\u00a3145','\u00a3175','\u2014'],
- ['C4','Oversight Retainer \u2014 <b>fortnightly</b>','Monique','2 documented visits a month, report, accountability call.','\u00a3495/mo','\u00a3595/mo','UK monitoring surveyor \u00a3500\u20131,500 <b>per visit</b>'],
- ['C5','Oversight Retainer \u2014 <b>weekly</b>','Monique','4 documented visits a month. Same everything, double the frequency.','\u00a3895/mo','\u00a31,095/mo','\u2014']
+ ['C4','Oversight Retainer \u2014 <b>fortnightly</b>','Yaadly','2 documented visits a month, report, accountability call.','\u00a3495/mo','\u00a3595/mo','UK monitoring surveyor \u00a3500\u20131,500 <b>per visit</b>'],
+ ['C5','Oversight Retainer \u2014 <b>weekly</b>','Yaadly','4 documented visits a month. Same everything, double the frequency.','\u00a3895/mo','\u00a31,095/mo','\u2014']
 ];
 function marketTable(){
  return '<div class="pk legal" style="margin-top:14px"><div class="dochd"><div><h3>The ladder, and what it mirrors</h3>'+
@@ -3014,19 +3014,19 @@ function jobCardHtml(editable){
 /* ================= playable WhatsApp workflow ================= */
 var waMode='manual', waStep=0;
 var WA_STEPS=[
- {n:'1 · The message', who:{manual:'Monique reads it',auto:'yaad-agent reads it'},
+ {n:'1 · The message', who:{manual:'A person at Yaadly reads it',auto:'yaad-agent reads it'},
   note:{manual:'It lands on your phone at 19:42. You open it, listen to the voice note and look at the photos. Nothing else has happened yet.',
         auto:'The webhook fires the moment it lands. yaad-agent transcribes the voice note, reads the photos through yaad-vision and starts a draft card.'},
   msgs:[['them','<span class="clip">▶ 0:38 voice note</span>Evening. Di zinc lift at mi mother place inna Portmore an water a come in. Mi deh a foreign so mi cyaa go look.','19:42'],
         ['them','<span class="clip">📷 3 photos</span>','19:43']]},
- {n:'2 · The gaps', who:{manual:'Monique asks',auto:'yaad-agent asks'},
+ {n:'2 · The gaps', who:{manual:'A person at Yaadly asks',auto:'yaad-agent asks'},
   note:{manual:'You know from seven years of this exactly what a roofer will come back and ask. You ask it now, in one message, so nobody wastes a day.',
         auto:'The agent compares what it extracted against the required fields for roofing and asks only about what is missing or uncertain. One message, never a form.'},
   msgs:[['me','Got it. Before I write this up, is the back bedroom the only room taking water, and is anybody in the house now?','19:47']]},
  {n:'3 · The answer', who:{manual:'She replies',auto:'She replies'},
   note:{manual:'Two sentences. That is enough to fill the last of the fields.',auto:'Two sentences. The agent parses them straight into the card.'},
   msgs:[['them','Just di back room. Mi mother deh deh, she can open di gate.','19:51']]},
- {n:'4 · The card is built', who:{manual:'Monique fills the card',auto:'yaad-agent fills the card'},
+ {n:'4 · The card is built', who:{manual:'A person at Yaadly fills the card',auto:'yaad-agent fills the card'},
   note:{manual:'You open the job card on the site and fill it from the dropdowns. Ninety seconds. The dropdowns are why it takes ninety seconds and not fifteen minutes, and why every roofing job on the board is described the same way.',
         auto:'The agent writes into the same card, same dropdowns, same options. It marks anything it inferred rather than heard in amber, and leaves anything it cannot know blank.'},
   build:true,
@@ -3059,7 +3059,7 @@ function waReset(){
 }
 function drawWa(){
  var rail=S('#warail'); if(!rail)return;
- rail.innerHTML='<button data-wamode="manual" class="'+(waMode==='manual'?'on':'')+'">Manual, Monique runs it</button>'+
+ rail.innerHTML='<button data-wamode="manual" class="'+(waMode==='manual'?'on':'')+'">Manual, a person runs it</button>'+
    '<button data-wamode="auto" class="'+(waMode==='auto'?'on':'')+'">Automated, the agent runs it</button>'+
    '<span style="width:14px"></span>'+
    WA_STEPS.map(function(st,i){
@@ -3073,7 +3073,7 @@ function drawWa(){
   });
  }
  var st=WA_STEPS[waStep];
- S('#wast').textContent = waMode==='manual' ? 'Monique · replying herself' : 'yaad-agent · automatic';
+ S('#wast').textContent = waMode==='manual' ? 'Yaadly · a person replying' : 'yaad-agent · automatic';
  S('#wanote').innerHTML='<b style="color:var(--ink)">'+esc(st.who[waMode])+'.</b> '+esc(st.note[waMode])+
    (waStep<WA_STEPS.length-1?' <button class="btn ghost sm" data-wastep="'+(waStep+1)+'" style="margin-top:10px;display:block">Next step →</button>':'');
 
@@ -3264,7 +3264,7 @@ var pview='journey';
 /* =================== CALENDAR ===================
    One calendar, three ways of using it. The worker owns their
    availability; the client can only ask for a day the worker has
-   opened; a service client books Monique's own diary.
+   opened; a service client books Yaadly's diary.
    Reference date is fixed at 26 Aug 2026 so the demo is deterministic. */
 var CAL_TODAY = {y:2026, m:7, d:26};              // m is 0-based: 7 = August
 var calY = 2026, calM = 7, calSel = null, calSlot = null;
@@ -3281,7 +3281,7 @@ var visits = [
  {k:'2026-8-2',  t:'13:00 to 15:00', job:'JB-4468', what:'Stage 3, sign-off walkthrough', who:'Everton Blake', where:'Liguanea, Kingston 6', state:'pending'}
 ];
 var svcVisits = [
- {k:'2026-7-28', t:'15:00 to 15:30', job:'SV-0114', what:'Deposit Protection Check, findings call', who:'Monique', where:'WhatsApp video', state:'confirmed'}
+ {k:'2026-7-28', t:'15:00 to 15:30', job:'SV-0114', what:'Deposit Protection Check, findings call', who:'Yaadly', where:'WhatsApp video', state:'confirmed'}
 ];
 
 function key(y,m,d){return y+'-'+m+'-'+d}
@@ -3361,7 +3361,7 @@ function calPanel(){
  var open = !!avail[calSel];
  if(!open){
   return head+'<p class="cs">'+(pside==='service'
-    ? 'Monique has not opened this day. Pick one of the days shown in teal.'
+    ? 'Yaadly has not opened this day. Pick one of the days shown in teal.'
     : 'Delroy has not opened this day. Pick one of the days shown in teal, those are the ones he has said he can work.')+'</p>';
  }
  return head+'<p class="cs">'+(pside==='service'?'Pick how long you need.':'Pick a window. He confirms it before it is fixed, nothing is booked by you alone.')+'</p>'+
@@ -3445,12 +3445,12 @@ function drawCalendar(){
  var intro = pside==='worker'
   ? 'Your diary. Open the days you can work, and confirm the requests that come in. Nobody can book you without you saying yes.'
   : pside==='service'
-  ? 'Monique\'s diary. Teal days are open. Pick one and choose how long you need, a call, or a visit.'
+  ? 'Yaadly\'s diary. Teal days are open. Pick one and choose how long you need, a call, or a visit.'
   : 'Delroy has opened the teal days. Pick one, choose a window, and he confirms it. You never see his other clients\' jobs, only yours.';
 
  S('#poview').innerHTML =
   '<div class="jhead"><span class="jbadge n">'+(pside==='worker'?'Your availability':'Book a time')+'</span>'+
-  '<h3>'+(pside==='service'?'Book time with Monique':pside==='worker'?'Your diary':'The job calendar')+'</h3><p>'+esc(intro)+'</p></div>'+
+  '<h3>'+(pside==='service'?'Book time with Yaadly':pside==='worker'?'Your diary':'The job calendar')+'</h3><p>'+esc(intro)+'</p></div>'+
   '<div class="calwrap">'+
    '<div class="cal"><div class="cal-h"><h4>'+MONTHS[calM]+' '+calY+'</h4>'+
     '<div class="cal-nav"><button data-cmv="-1" aria-label="Previous month">‹</button><button data-cmv="1" aria-label="Next month">›</button></div></div>'+
@@ -3882,7 +3882,7 @@ function jobChat(){
   var who = pside==='client' ? (c[0]==='me'?'them':'me') : c[0];
   return '<div class="cm '+who+'">'+esc(c[1])+'<em>'+esc(c[2])+' · <span class="wa">✓ delivered</span></em></div>';
  }).join('');
- var other = pside==='client' ? 'Delroy' : 'Monique';
+ var other = pside==='client' ? 'Delroy' : 'Andrea';
  return '<div class="chat"><div class="chat-h"><b>Job chat · JB-4471</b><span class="pill n">On Yaadly only</span>'+
   '<span class="sp">Ask for an update any time</span></div>'+
   '<div class="relay"><span>📲</span><div><b>Sent from Yaadly, never from '+esc(other)+'\'s own number.</b> They get it on whichever channel is live for them, email and SMS today, WhatsApp once Meta approves, and their reply lands back in this thread automatically. Neither of you ever sees the other\'s number.</div></div>'+
@@ -3968,7 +3968,7 @@ function disputeWorkerBlock(){
    '<p>Not Yaadly, and not a review, her, straight to you, in the portal and on your phone, with 48 hours to answer or put it right. Most close the same day and never become a dispute at all. Your pay comes from Yaadly, not from her, and raising something does not take it away. The stage is simply not signed off until it is sorted.</p></div>';
 
  if(dstate==='direct')
-  return '<div class="disp">'+dPills('<span class="pill m">Monique raised something · 19:44</span><span class="pill n">Answer by 27 Aug</span>')+
+  return '<div class="disp">'+dPills('<span class="pill m">Andrea raised something · 19:44</span><span class="pill n">Answer by 27 Aug</span>')+
    '<h4 style="color:var(--mango)">She says the after photo does not show the base out</h4>'+
    '<p style="margin-bottom:10px;color:var(--ink)">"The cupboard base is still in place in the after photo. The agreement said it comes out."</p>'+
    '<p>Straight from her, not from us, Yaadly has not been brought in. Answer it or fix it in the next 48 hours and it closes between the two of you, with nothing on your record. Ignore it and it escalates to a review on its own.</p>'+
@@ -4013,7 +4013,7 @@ function scopeDoc(i){
   '<div class="sdrow"><span class="sk">Money</span><span class="sv">£345.00 all in, agreed with Yaadly.<small>You buy the job from Yaadly. A stage closes when you have seen the evidence and agreed the work is right. Yaadly engages and pays the tradesperson separately, so nobody is waiting on you for their wages.</small></span></div>'+
   '<div class="sdrow"><span class="sk">If it changes</span><span class="sv">Nobody does extra work and asks after.<small>A variation is written, priced and agreed here before a tool is lifted on it.</small></span></div>'+
   '<div class="sigrow">'+
-   '<div class="sigbox'+(scopeClient?' done':'')+'"><b>'+(scopeClient?'✓ You agreed · 25 Aug 19:20':'You have not agreed yet')+'</b><span>Monique S., client</span></div>'+
+   '<div class="sigbox'+(scopeClient?' done':'')+'"><b>'+(scopeClient?'✓ You agreed · 25 Aug 19:20':'You have not agreed yet')+'</b><span>Andrea P., client</span></div>'+
    '<div class="sigbox'+(scopeWorker?' done':'')+'"><b>'+(scopeWorker?'✓ '+esc(q.n.split(" ")[0])+' agreed · 25 Aug 19:18':esc(q.n.split(" ")[0])+' has not agreed yet')+'</b><span>'+esc(q.n)+', worker</span></div>'+
   '</div>'+
   '<div class="wnav" style="margin-top:14px">'+
@@ -4228,7 +4228,7 @@ function drawJourney(){
    ledger(1)+(pside==='client'?disputeBlock():disputeWorkerBlock())+jobChat();
  else if(d.x==='ledger-2'){pkCtx='job';extra=completionReport('job')+ledger(2);}
  else if(d.x==='rev-c')extra=reviewBox('Delroy','Leak repair, Barbican · two stages, both signed off by you · closed 27 Aug.');
- else if(d.x==='rev-w')extra=reviewBox('Monique','Leak repair, Barbican · two stages, both paid on time · closed 27 Aug.');
+ else if(d.x==='rev-w')extra=reviewBox('Andrea','Leak repair, Barbican · two stages, both paid on time · closed 27 Aug.');
 
  S('#poview').innerHTML=
   '<div class="jhead"><span class="jbadge'+(/Nothing|Done|Paid/.test(d.b)?' n':'')+'">'+esc(d.b)+'</span>'+
@@ -4419,8 +4419,8 @@ document.addEventListener('click',function(e){
  if(e.target.closest('[data-book]')){
   var sset = pside==='service'?SLOTS_SVC:SLOTS_JOB;
   var rec = {k:calSel, t:sset[calSlot][0], job: pside==='service'?'SV-0114':'JB-4471',
-    what: pside==='service'?'Booked with Monique':'Requested visit',
-    who: pside==='service'?'Monique':'Delroy Campbell',
+    what: pside==='service'?'Booked with Yaadly':'Requested visit',
+    who: pside==='service'?'Yaadly':'Delroy Campbell',
     where: pside==='service'?'WhatsApp video':'Barbican, Kingston 8',
     state: pside==='service'?'confirmed':'pending'};
   (pside==='service'?svcVisits:visits).push(rec);
@@ -4438,7 +4438,7 @@ document.addEventListener('click',function(e){
  }
  if(e.target.closest('#cpostrev')){
    if(cStars<1)return;
-   S('#crevform').innerHTML='<p class="kick m" style="margin-bottom:6px">Sealed</p><h3 class="hx" style="font-size:21px">Written, and held</h3><p class="tiny" style="margin-top:10px;font-size:13.5px">Tied to JB-4390 and to your signed off stage. It publishes the moment Monique writes hers, or in fourteen days if she does not. Neither of you can see the other\'s until then.</p>';
+   S('#crevform').innerHTML='<p class="kick m" style="margin-bottom:6px">Sealed</p><h3 class="hx" style="font-size:21px">Written, and held</h3><p class="tiny" style="margin-top:10px;font-size:13.5px">Tied to JB-4390 and to your signed off stage. It publishes the moment Andrea writes hers, or in fourteen days if she does not. Neither of you can see the other\'s until then.</p>';
    return;
  }
  var st=e.target.closest('[data-star]');
@@ -4484,7 +4484,7 @@ document.addEventListener('click',function(e){
  var sb=e.target.closest('[data-send]');
  if(sb){
    var pid=sb.dataset.send;
-   S('#q-'+pid).innerHTML='<div class="aout"><div class="ah">✦ quote sent</div><p>Your quote is with the client. They see your Yaad Score, jobs completed and evidence from past work alongside it. If they accept, the Kickoff Pack and payment stages are drafted from your figures, then Monique reviews before anything is signed.</p></div>';
+   S('#q-'+pid).innerHTML='<div class="aout"><div class="ah">✦ quote sent</div><p>Your quote is with the client. They see your Yaad Score, jobs completed and evidence from past work alongside it. If they accept, the Kickoff Pack and payment stages are drafted from your figures, then Yaadly reviews before anything is signed.</p></div>';
    return;
  }
  var md=e.target.closest('[data-mode]');

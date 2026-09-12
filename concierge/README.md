@@ -38,23 +38,81 @@ curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/
 
 ## What is in it
 
-Thirty-one views, six groups, every one reading Postgres directly. This table
+Thirty-two views, six groups, every one reading Postgres directly. This table
 is written by hand and had drifted to twenty-two by 3 September 2026, so read
 the `VIEWS` registry in `concierge.html` if the count here matters to you.
 
 | Group | Views |
 |---|---|
-| Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes |
+| Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes, Shortlist |
+
+| Run the day | Overview, The day, Intake, Jobs, Evidence, Stalled jobs, Quotes |
 | People | Applications, Workers, Clients, Reviews |
-| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money, Reports |
+| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money, Reports, Job files, Independent checks |
 | Services | Services, Marketplace, Job photos |
 | Inbox | Conversations, Mid-chat, Calls, Enquiries, Waiting list, Feedback, Questions |
-| System | Settings, Health |
+| System | Settings, How the desk is doing, Health |
 
 Three views own their markup and their own logic: **Overview**, **Invoices**
 and **Sketch packs**. Two more are built from the registry but filled by hand:
 **Money** and **Health**. The rest are generated entirely from the `VIEWS`
 registry, including their rail link, heading, table, search and empty state.
+
+## The Overview is one screen, and the lists are one tab down
+
+Rebuilt 10 September 2026. The Overview is eight widgets sized to fit a laptop
+screen without scrolling: four big numbers, what came in by day, a ranked
+"waiting on you" list, live jobs by stage, whose move it is, money in three
+states, and today's diary. Every figure is one `loadOverview()` already counts;
+the dashboard adds four timestamp reads for the two time charts and nothing
+else. The three bands it replaced are on **The day**, unchanged, and the
+counting tiles are on **How the desk is doing**. `loadOverview()` fills all
+three tabs.
+
+Two rules came from checking the design against how service desks and trade
+tools build a first screen, and both are load bearing:
+
+- **No pie, no donut, no percentage gauge.** Lengths read accurately, angles do
+  not, and a percentage off two conversations is noise. The one working day
+  promise is shown as a count of people past it.
+- **Colour is state only**, the same rule as the table further down.
+
+The rail folds by group, and a closed group shows the sum of its counts. The
+group holding the view you are on always opens.
+
+## Every table view opens with a picture
+
+A strip drawn from the rows already loaded: the count, arrivals by day, and a
+split by state or category. Clicking a bar filters the table underneath, never
+the picture, and clicking it again clears the filter. The fields are guessed
+from the rows; a view names its own with `viz:{date, state, cat}`, and
+`viz:false` turns the strip off (Settings has it off). Quotes draw each job's
+quotes as bars on one scale, with the cheapest marked and nothing marked best.
+
+## How the desk is doing has no boxes
+
+Four open sections, a hairline between them, bars and lines only: what is
+waiting by queue, promises and pace, the assistant, evidence at sign-off. The
+founder found the old grid of thirty tiles overwhelming (11 Sep 2026). The
+tiles still render into a hidden `#ovTiles`, because `loadOverview()` writes
+them; do not delete that element without moving the writes. Money and Invoices
+each carry one bar split by where the money is, in place of boxed tiles.
+
+## The client reviews evidence
+
+The founder's rule from 10 September 2026: the client reviews and approves each
+stage in their portal, and she steps in on an issue. Unchecked evidence sits in
+the client's lane, not hers. A job page shows its own evidence photographs by
+stage, signed for an hour, loaded only when that page opens.
+
+## A view can own its drawer
+
+A registry entry can set `page: (row) => html` to draw the whole drawer itself,
+with the raw fields folded under "Every field, as stored". Jobs does this: the
+job, four cards, and the ten step "Agreed and signed off" record, read from
+five tables once per load by `preJobs`. `detailTop: (row) => html` draws a block
+above the plain fields instead; Enquiries uses it for "Reach them". `titleOf`
+names the drawer. None of these writes anything.
 
 ## A table is the floor, not the view
 

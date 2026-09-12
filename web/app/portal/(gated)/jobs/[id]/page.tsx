@@ -31,10 +31,14 @@ import { BoardPreview } from "@/components/portal/BoardPreview";
 import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { ApproveButton } from "@/components/portal/ApproveButton";
+import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
+import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
+import { CHECK_CATALOGUE_ID, finalStageCountFrom, isCheckLevel, jobCheckState } from "@/lib/portal/job-check";
 import legal from "@/lib/legal-copy.json";
-import { chooseQuote, requestKickoff } from "@/app/portal/job-actions";
+import { agreePrice, chooseQuote, requestKickoff, setWorkerChoice } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
 import { jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
+import { clientBill } from "@/lib/jobs/client-bill";
 import { whenDate, whenDateTime } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +102,9 @@ type Quote = {
   excluded_note: string | null;
   timeline_note: string | null;
   payment_stage_note: string | null;
+  recommended_at: string | null;
+  recommended_by: string | null;
+  recommended_reason: string | null;
 };
 
 type Pack = {
@@ -158,7 +165,7 @@ export default async function JobRoom({
   const { data: job } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_call_notes,walk_notes_confirmed_at,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency",
+      "id,title,trade,parish,stage,status,descr,open,client_email,worker_email,worker_name,updated_at,signoff_method,walk_platform,walk_link,walk_date,walk_who,walk_notes,walk_call_notes,walk_notes_confirmed_at,check_level,check_chosen_at,check_invoice_id,check_assigned_to,portal_code,materials_store,materials_store_type,materials_store_set_at,materials_store_set_by,job_type,size_band,access_type,materials_by,urgency,worker_choice",
     )
     .eq("id", id)
     .maybeSingle();
@@ -244,7 +251,7 @@ export default async function JobRoom({
       supabase
         .from("job_quotes")
         .select(
-          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note",
+          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason",
         )
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
@@ -356,6 +363,12 @@ export default async function JobRoom({
   const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
   const chooseOpen = !job.worker_email && job.status !== "complete";
+  /* Who picks the tradesperson. 'yaadly' is the default and the managed
+     route; 'client' means they see every quote and choose. Set on the job
+     form, changeable here until a worker is booked (set_worker_choice_as_me).
+     On a 'yaadly' job the database hides open quotes from the client until
+     a person has recommended one, so qs can be empty while quotes are in. */
+  const yaadlyPicks = String(job.worker_choice ?? "yaadly") !== "client";
   /* A client can confirm a still-'submitted' quote over WhatsApp before the
      worker's side lands, and status only flips to 'quote_confirmed' once
      BOTH sides are in. Found live, 2 Sep 2026: without this check, "Get a
@@ -525,6 +538,64 @@ export default async function JobRoom({
       ? "quote"
       : null;
 
+  /* The independent check at sign-off (20260909180000). Two reads the panel
+     needs and nothing else on the page does: the two MARKETPLACE catalogue
+     rows, so the price shown is the catalogue's and never typed here, and
+     the check's own invoice, which carries no job_id on purpose (the job
+     points at it, see the migration header) so the invoices query above
+     cannot have found it. RLS shows a client their invoice once it is sent,
+     and nothing while it is a draft, same as every other invoice. */
+  const checkLevel = isCheckLevel(job.check_level) ? job.check_level : null;
+  const [{ data: checkRows }, { data: checkInvoiceRow }] = await Promise.all([
+    job.worker_email || checkLevel
+      ? supabase
+          .from("service_catalogue")
+          .select("id,name,blurb,full_pence,founding_pence")
+          .in("id", [CHECK_CATALOGUE_ID.visual, CHECK_CATALOGUE_ID.technical])
+      : Promise.resolve({ data: null }),
+    job.check_invoice_id
+      ? supabase
+          .from("invoices")
+          .select("id,status,total_pence,currency")
+          .eq("id", job.check_invoice_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const checkPrices = {
+    visual: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.visual) ?? null,
+    technical: ((checkRows ?? []) as CheckPrice[]).find((r) => r.id === CHECK_CATALOGUE_ID.technical) ?? null,
+  };
+  const checkInvoice = (checkInvoiceRow ?? null) as CheckInvoice | null;
+  const check = jobCheckState({
+    workerEmail: job.worker_email,
+    status: job.status,
+    checkLevel,
+    finalStageCount: finalStageCountFrom(packStages.length),
+    evidenceStages: ev.map((e) => e.stage),
+  });
+
+  /* Files on the job (20260910120000): receipts, quotes, permits, plans,
+     certificates, from either side. Not evidence, so a separate table and
+     bucket. RLS returns rows to the job's own client and worker only, and
+     each link is a short-lived signed URL minted here, the same treatment
+     as the evidence and the client's photographs above. */
+  const { data: fileRows } = await supabase
+    .from("job_files")
+    .select("id,side,uploaded_by,kind,label,mime,bytes,created_at,storage_path")
+    .eq("job_id", id)
+    .order("created_at", { ascending: true });
+  const jobFiles: JobFile[] = ((fileRows ?? []) as (Omit<JobFile, "url"> & { storage_path: string })[]).map((f) => ({
+    id: f.id, side: f.side, uploaded_by: f.uploaded_by, kind: f.kind, label: f.label,
+    mime: f.mime, bytes: f.bytes, created_at: f.created_at, url: null,
+  }));
+  if (fileRows?.length) {
+    const { data: signedFiles } = await supabase.storage
+      .from("job-files")
+      .createSignedUrls(fileRows.map((f) => f.storage_path), 300);
+    const byPath = new Map((signedFiles ?? []).map((r) => [r.path, r.signedUrl]));
+    fileRows.forEach((f, i) => { jobFiles[i].url = byPath.get(f.storage_path) ?? null; });
+  }
+
   /* THE GO LIVE GATES.
      Read off the triggers, in the order Postgres applies them, so the list a
      client works through is the list the database is actually holding them
@@ -622,15 +693,33 @@ export default async function JobRoom({
       cta: "Publish",
     });
   }
+  /* On a yaadly-picks job the database hides every open quote from the
+     client until a person has put one forward, so qs is empty for them even
+     while quotes are in. That is a wait on Yaadly, not on the client, and it
+     is said so rather than shown as "nothing yet". */
+  if (job.status === "quoted" && chooseOpen && qs.length === 0 && isClient && yaadlyPicks) {
+    outstanding.push({
+      who: "yaadly",
+      title: "Yaadly is choosing your tradesperson",
+      detail: "You asked Yaadly to pick. Quotes are in, a person at Yaadly is reading them against what the job needs, and one price will appear here with the reason Yaadly chose it. Nothing is charged until you agree it.",
+      href: jobBase + "?tab=scope",
+      cta: "Who picks",
+    });
+  }
   if (job.status === "quoted" && chooseOpen && qs.length > 0) {
+    const recommended = isClient && yaadlyPicks && qs.some((q) => !!q.recommended_at);
     outstanding.push({
       who: isClient ? "you" : "them",
-      title: isClient ? "Choose a quote" : "The client is deciding between quotes",
+      title: isClient
+        ? (recommended ? "Agree the price Yaadly put to you" : "Choose a quote")
+        : "The client is deciding between quotes",
       detail: isClient
-        ? qs.length + " quote" + (qs.length === 1 ? " is" : "s are") + " in. Nothing is charged until you pick one."
+        ? (recommended
+          ? "A person at Yaadly has chosen your tradesperson. Read the price and the reason, then accept it, which books them, or tell us why not. Nothing is charged until your invoice."
+          : qs.length + " quote" + (qs.length === 1 ? " is" : "s are") + " in. Accepting one books that tradesperson. Nothing is charged until your invoice.")
         : "Nothing is owed by either side until a quote is accepted.",
       href: isClient ? jobBase + "?tab=scope" : undefined,
-      cta: isClient ? "See quotes" : undefined,
+      cta: isClient ? (recommended ? "See the price" : "See quotes") : undefined,
     });
   }
   if (job.status === "awaiting_payment") {
@@ -1046,6 +1135,35 @@ export default async function JobRoom({
 
       {tab === "scope" && (
         <>
+      {/* Who picks, in the portal. The job form asked this once; here the
+          client can read what they chose and change it, until somebody is
+          booked. The same two answers as the form, in the same words. On a
+          yaadly-picks job it also explains why the quote list may be empty
+          while quotes are in. Added 9 Sep 2026 so the journey runs signed
+          in as well as from the WhatsApp link. */}
+      {role === "client" && chooseOpen && (
+        <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
+          <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
+            Who picks the tradesperson
+          </h2>
+          <p className="max-w-[62ch] text-[13px] leading-relaxed text-mute">
+            {yaadlyPicks
+              ? "You asked Yaadly to pick. A few vetted tradespeople are asked to quote, a person at Yaadly reads the quotes against what the job needs, and you get one price here with the reason Yaadly chose it. You still agree that price yourself, and nothing is booked or charged until you do."
+              : "You asked to see the quotes and choose. Every quote lands here as it comes in, the whole price you would pay Yaadly on each, and you pick."}
+          </p>
+          <form action={setWorkerChoice} className="mt-3 flex flex-wrap items-center gap-2.5">
+            <input type="hidden" name="jobId" value={job.id} />
+            <input type="hidden" name="choice" value={yaadlyPicks ? "client" : "yaadly"} />
+            <button className="rounded-full border border-line2 px-3.5 py-1.5 text-[12px] font-bold text-mute transition hover:border-teal hover:text-tealb">
+              {yaadlyPicks ? "Show me every quote instead, I will choose" : "Let Yaadly pick for me instead"}
+            </button>
+            <span className="text-[11.5px] leading-snug text-dim">
+              You can switch back until a tradesperson is booked.
+            </span>
+          </form>
+        </section>
+      )}
+
       {chooseOpen && qs.length > 0 && (
         <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
           <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -1053,8 +1171,10 @@ export default async function JobRoom({
           </h2>
           <p className="max-w-[62ch] text-[13px] leading-relaxed text-mute">
             {role === "client"
-              ? "Ask any price below for a Kickoff Pack: scope of work and payment terms, written against that worker's own quote. You can do this for more than one at once and compare the documents. Choosing unlocks once you and that worker have both confirmed a pack."
-              : "Once the client asks for a Kickoff Pack against your price, it is drafted here and you confirm your side. They can compare more than one before choosing."}
+              ? (yaadlyPicks
+                ? "The price below is the one a person at Yaadly chose for you, with their reason. Accepting it books the tradesperson: their quote is their word on the price. Want the fuller project document first? Ask for a Kickoff Pack against it instead, which both of you confirm before booking."
+                : "Accepting a price below books that tradesperson: their quote is their word on it, and nothing more is needed from their side. Or ask for a Kickoff Pack first: scope of work and payment terms written against that worker's own quote, which you can do for more than one and compare before booking.")
+              : "Your quote is your word on the price: the client accepting it books you, and you will hear on WhatsApp the moment they do. If they ask for a Kickoff Pack against it first, you confirm that document here before anything is booked."}
           </p>
         </section>
       )}
@@ -1069,10 +1189,15 @@ export default async function JobRoom({
               const myPack = pk.find((p) => p.quote_id === q.id);
               const packReady = myPack?.status === "approved";
               const packConfirmed = !!myPack?.both_confirmed_at;
+              const bill = clientBill(q.labour_jmd, q.materials_jmd);
+              /* "Chosen by Yaadly", never by a named person. Founder's
+                 instruction, 10 Sep 2026. Who chose stays on the quote row
+                 (recommended_by) for the desk and for a dispute. */
+              const chooser = "Yaadly";
               return (
               <li
                 key={q.id}
-                className="rounded-2xl border border-line bg-panel p-4"
+                className={"rounded-2xl border p-4 " + (q.recommended_at && role === "client" ? "border-teal bg-soft" : "border-line bg-panel")}
               >
                 <div className="flex flex-wrap items-center gap-3">
                   <b className="text-[14.5px]">{q.worker_name ?? "Worker"}</b>
@@ -1081,12 +1206,39 @@ export default async function JobRoom({
                       {q.status}
                     </span>
                   )}
+                  {q.recommended_at && role === "client" && (
+                    <span className="rounded-full border border-softline bg-soft px-2.5 py-1 text-[10.5px] font-bold text-tealb">
+                      Chosen by {chooser}
+                    </span>
+                  )}
+                  {/* The client reads the whole price they would pay Yaadly,
+                      the same figure as the invoice. The worker reads their
+                      own labour figure, which is what they quoted. */}
                   <span className="ml-auto text-[15px] font-bold text-tealb">
-                    {jmd(q.labour_jmd) ?? "No labour figure"}
+                    {role === "client"
+                      ? (q.labour_jmd == null ? "No price yet" : jmd(bill.total))
+                      : (jmd(q.labour_jmd) ?? "No labour figure")}
                   </span>
                 </div>
+                {role === "client" && q.labour_jmd != null && (
+                  <div className="mt-2 grid gap-1 text-[12.5px]">
+                    <div className="flex justify-between gap-4"><span className="text-dim">The work</span><span className="font-mono-app text-mute">{jmd(bill.labour)}</span></div>
+                    <div className="flex justify-between gap-4"><span className="text-dim">Yaadly&rsquo;s Guarantee &amp; Support, 15% of the work</span><span className="font-mono-app text-mute">{jmd(bill.fee)}</span></div>
+                    <div className="flex justify-between gap-4"><span className="text-dim">Materials{q.materials_at_cost ? ", at cost, nothing added" : ""}</span><span className="font-mono-app text-mute">{jmd(bill.materials)}</span></div>
+                    <div className="flex justify-between gap-4 border-t border-line pt-1 font-bold"><span>You pay Yaadly</span><span className="font-mono-app">{jmd(bill.total)}</span></div>
+                  </div>
+                )}
+                {q.recommended_at && role === "client" && (
+                  <div className="mt-3 rounded-xl border border-softline bg-panel px-3.5 py-2.5 text-[12.5px] leading-relaxed">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-tealb">Why {chooser} chose {q.worker_name ?? "this tradesperson"}</p>
+                    <p className="mt-1 text-mute">
+                      {q.recommended_reason?.trim()
+                        || `A person at Yaadly read every quote on this job against what it needs and put this one forward.`}
+                    </p>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-3.5 text-[12.5px] text-dim">
-                  {q.materials_jmd != null && (
+                  {role !== "client" && q.materials_jmd != null && (
                     <span>
                       Materials {jmd(q.materials_jmd)}
                       {q.materials_at_cost ? ", at cost" : ""}
@@ -1148,14 +1300,33 @@ export default async function JobRoom({
                   </p>
                 )}
 
+                {/* Two doors, and which is the plain button is the point,
+                    the same shape as AcceptPanel.tsx on the no-account page
+                    since 4 Sep 2026: accepting the price is the button, the
+                    Kickoff Pack is the quieter addition for bigger work.
+                    Until 9 Sep 2026 this room only had the pack button, so
+                    a signed-in client could not accept a price without
+                    ordering a ten section document. */}
                 {role === "client" && chooseOpen && q.status === "submitted" && !clientAlreadyConfirming.has(q.id) && (
-                  <form action={requestKickoff} className="mt-3">
-                    <input type="hidden" name="jobId" value={job.id} />
-                    <input type="hidden" name="quoteId" value={q.id} />
-                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
-                      Get a Kickoff Pack for this price
-                    </button>
-                  </form>
+                  <div className="mt-3">
+                    <form action={agreePrice}>
+                      <input type="hidden" name="jobId" value={job.id} />
+                      <input type="hidden" name="quoteId" value={q.id} />
+                      <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand">
+                        Accept this price from {q.worker_name ?? "this tradesperson"}
+                      </button>
+                    </form>
+                    <p className="mt-1.5 max-w-[52ch] text-[11.5px] leading-snug text-dim">
+                      This books {q.worker_name ?? "them"} at this price: their quote is their word on it, so nothing more is needed from their side. Other quotes on this job stop being available once you do. Nothing is charged until your invoice from Yaadly, and nothing starts until it is paid.
+                    </p>
+                    <form action={requestKickoff} className="mt-2">
+                      <input type="hidden" name="jobId" value={job.id} />
+                      <input type="hidden" name="quoteId" value={q.id} />
+                      <button className="text-[12px] font-bold text-tealb underline underline-offset-2 transition hover:brightness-110">
+                        Ask for full project documentation first
+                      </button>
+                    </form>
+                  </div>
                 )}
 
                 {/* Both sides confirmed the price itself over WhatsApp (2 Sep
@@ -1172,12 +1343,12 @@ export default async function JobRoom({
                       confirmLabel={"Yes, book " + q.worker_name + " for this job"}
                       explain={
                         "This books the job with " + q.worker_name + " at " +
-                        (jmd(q.labour_jmd) ?? "the quoted price") +
+                        (q.labour_jmd == null ? "the quoted price" : jmd(bill.total) + " all in, paid to Yaadly") +
                         ". Other quotes on this job stop being available once you do, and this cannot be undone."
                       }
                     />
                     <p className="mt-1.5 max-w-[46ch] text-[11.5px] leading-snug text-dim">
-                      Both sides already confirmed this price over WhatsApp. This books the job on that alone.
+                      Both sides have confirmed this price. This books the job on that alone.
                     </p>
                   </div>
                 )}
@@ -1244,10 +1415,14 @@ export default async function JobRoom({
 
           {qs.length === 0 && (
             <div className="mt-4 rounded-2xl border border-dashed border-line2 bg-bg/30 px-5 py-8 text-center">
-              <b className="mb-1 block text-[14px] font-semibold text-ink">No quotes yet</b>
+              <b className="mb-1 block text-[14px] font-semibold text-ink">
+                {role === "client" && yaadlyPicks && onBoard ? "Yaadly is choosing your tradesperson" : "No quotes yet"}
+              </b>
               <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
                 {onBoard
-                  ? "Your job is on the board. Identity checked workers can see it and quotes land here as they come in."
+                  ? (role === "client" && yaadlyPicks
+                    ? "Your job is on the board and quotes are being asked for. A person at Yaadly reads them against what the job needs, and one price appears here with the reason Yaadly chose it. Nothing is charged until you agree it."
+                    : "Your job is on the board. Identity checked workers can see it and quotes land here as they come in.")
                   : movedOn
                     ? "This job moved on without quotes being recorded here."
                     : "Quotes appear here once the job is on the marketplace."}
@@ -1259,6 +1434,21 @@ export default async function JobRoom({
 
       {tab === "approvals" && (
         <>
+        {/* The optional independent check, beside the Approve button and
+            never in front of it. Offered from scope agreed until the final
+            stage's evidence is filed, the same window choose_job_check()
+            allows; the desk can still set it after that. */}
+        <JobCheckPanel
+          jobId={job.id}
+          role={role === "worker" ? "worker" : "client"}
+          state={check.state}
+          canChange={check.canChange}
+          level={checkLevel}
+          chosenAt={job.check_chosen_at ?? null}
+          assignedTo={job.check_assigned_to ?? null}
+          invoice={checkInvoice}
+          prices={checkPrices}
+        />
         {/* The button the product is named after: what unlocks the money,
             next to the money itself. Client only, and only while a stage is
             genuinely waiting on a decision. */}
@@ -1309,6 +1499,14 @@ export default async function JobRoom({
       {tab === "overview" && (
         <>
       <DocStrip docs={docs} />
+
+      <JobFiles
+        jobId={job.id}
+        role={role === "worker" ? "worker" : "client"}
+        viewerEmail={email}
+        jobStatus={job.status ?? null}
+        files={jobFiles}
+      />
 
       {(pk.length > 0 || qs.some((q) => ["quote_confirmed", "kickoff_requested", "accepted"].includes(q.status ?? ""))) && (
         <section className="mt-8">
