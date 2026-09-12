@@ -171,6 +171,7 @@ export const DEAL_PROPERTIES = {
     "Condition Report",
     "Technical Sign-off",
     "Oversight Retainer",
+    "Oversight Retainer, weekly",
     "Oversight Retainer, On The Ground",
     "Property Care, standard home",
     "Property Care, large home",

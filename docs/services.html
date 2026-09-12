@@ -365,7 +365,7 @@ footer {
           <span class="svc-price"><span class="price-main">£95</span> <span class="price-unit">per visit</span></span>
           <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20book%20a%20Visual%20Check%20at%20the%20%C2%A395%20founding%20rate." target="_blank" rel="noopener">Book this<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="price-alt">Founding rate, first five clients. Standard £125.</div>
+        <div class="price-alt">Founding rate, first five clients. Standard £149.</div>
       </div>
 
       <!-- Condition Report -->
@@ -421,16 +421,16 @@ footer {
         <span class="svc-badge">Popular</span>
         <h3 class="svc-title">Oversight Retainer</h3>
         <div class="svc-list">
-          <div><i></i><span>Documented site attendance, twice monthly</span></div>
+          <div><i></i><span>Documented site attendance, fortnightly or weekly</span></div>
           <div><i></i><span>Monthly cost and progress report</span></div>
           <div><i></i><span>A scheduled accountability call each month</span></div>
           <div><i></i><span>A direct WhatsApp escalation line to Monique</span></div>
         </div>
         <div class="svc-foot">
-          <span class="svc-price"><span class="price-main">£395</span> <span class="price-unit">a month</span></span>
+          <span class="svc-price"><span class="price-main">£495</span> <span class="price-unit">a month</span></span>
           <a class="svc-cta" href="https://wa.me/447878877567?text=Hello%20Yaadly%2C%20I%20would%20like%20to%20enquire%20about%20the%20Oversight%20Retainer." target="_blank" rel="noopener">Enquire<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </div>
-        <div class="price-alt">Founding rate, first five clients. Standard £495. Monthly subscription, 30 days notice to stop.</div>
+        <div class="price-alt">Fortnightly, founding rate for the first five clients: standard £595, a monthly card subscription. Weekly: £895 founding, £1,095 standard, invoiced monthly. 30 days notice to stop.</div>
       </div>
 
       <!-- Full Project Management. The other lane: on this one the client
@@ -458,7 +458,7 @@ footer {
     <div class="panel rv" id="book">
       <div class="kick">Book a service</div>
       <h3 class="heading" style="font-size:clamp(22px,2.6vw,28px);margin-bottom:12px">Nothing is <em>charged now.</em></h3>
-      <p style="font-size:14.5px;color:var(--mute);line-height:1.65;margin-bottom:16px">Every fixed-fee service on this page can be paid by card, and the card button appears here the moment your booking is registered. Nothing is taken at that point: on a one-off service your card is authorised and only charged once the work is done and you have accepted it. You have 14 days to <a href="/cancellation">cancel</a>.</p>
+      <p style="font-size:14.5px;color:var(--mute);line-height:1.65;margin-bottom:16px">Every one-off service on this page can be paid by card, and the card button appears here the moment your booking is registered. Nothing is taken at that point: on a one-off service your card is authorised and only charged once the work is done and you have accepted it. You have 14 days to <a href="/cancellation">cancel</a>.</p>
       <div class="form-row">
         <div class="fgroup"><label for="bk-svc">Which service</label>
           <select id="bk-svc">
@@ -476,6 +476,13 @@ footer {
             <option value="standard">Standard, £45 a visit</option>
             <option value="large">Large or rental, £70 a visit</option>
             <option value="villa">Villa, £95 a visit</option>
+          </select>
+        </div>
+        <div class="fgroup" id="bk-ret-tier-row" style="display:none">
+          <label for="bk-ret-tier">How often</label>
+          <select id="bk-ret-tier">
+            <option value="fortnightly">Fortnightly, £495 a month</option>
+            <option value="weekly">Weekly, £895 a month</option>
           </select>
         </div>
         <div class="fgroup"><label for="bk-name">Your name</label><input id="bk-name" autocomplete="name"></div>
@@ -506,7 +513,7 @@ footer {
     </div>
 
     <!-- HOW YOU PAY -->
-    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every fixed-fee service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. You have 14 days to <a href="/cancellation">cancel</a>. <b>Yaadly does not operate an escrow service and does not hold money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
+    <div class="note rv"><b>How you pay:</b> payment terms are agreed in writing for each job, before anything starts. Above £500 the job is invoiced and paid by bank transfer in GBP, USD or CAD. At or under £500, which is every one-off service on this page, you can pay by card: your card is authorised at booking and charged once the work is done and accepted. The fortnightly Oversight Retainer is a monthly card subscription instead, billed from the day you start, with 30 days notice to stop. The weekly retainer is over £500 a month, so it is invoiced monthly. You have 14 days to <a href="/cancellation">cancel</a>. <b>Yaadly does not operate an escrow service and does not hold money on your behalf.</b> <a href="/payments">Full payment terms.</a></div>
 
     <!-- WHAT THIS IS NOT -->
     <div class="note rv"><b>Inspection and oversight, not a guarantee.</b> Yaadly records condition, judges workmanship against the standard for that trade, and oversees progress. Yaadly does not guarantee an outcome, and four things always go out to a named professional in writing rather than being guessed at: <b>valuation</b> to a licensed valuer, <b>title and legal opinion</b> to an attorney, <b>structural engineering</b> to a PERB registered engineer, and <b>boundaries</b> to a commissioned land surveyor. The same boundaries in full are on <a href="/business">Yaadly for business</a>.</div>
@@ -659,9 +666,19 @@ const CARE_LABELS = {
   villa:    "Property Care, villa, £95 a visit"
 };
 
+/* The Oversight Retainer is two separately priced services behind one
+   option, the same way Property Care is three. Weekly is over £500 a month,
+   so it has no card link and is invoiced; only fortnightly is a subscription. */
+const RET_KEYS = { fortnightly: "retainer", weekly: "retainer-weekly" };
+const RET_LABELS = {
+  fortnightly: "Oversight Retainer, fortnightly, £495 a month",
+  weekly:      "Oversight Retainer, weekly, £895 a month"
+};
+
 const CTA_KEYS = [["Deposit%20Protection","deposit"],["Visual%20Check","visual"],["Condition%20Report","condition"],["Technical%20Sign-off","signoff"],["Property%20Care","care"],["Oversight%20Retainer","retainer"]];
 function updateCareTierRow(){
   $id("bk-care-tier-row").style.display = $id("bk-svc").value === "care" ? "" : "none";
+  $id("bk-ret-tier-row").style.display = $id("bk-svc").value === "retainer" ? "" : "none";
 }
 $id("bk-svc").addEventListener("change", updateCareTierRow);
 document.querySelectorAll(".svc-cta").forEach(el => {
@@ -689,10 +706,12 @@ async function sendBooking(){
      was recorded at the standard £45 while the pay button asked for £95. The
      tier picks the catalogue row, the pay link and the label, all from here. */
   const tier = $id("bk-care-tier").value || "standard";
-  const service = sel.value === "care" ? CARE_KEYS[tier] : sel.value;
-  const label = sel.value === "care"
-    ? CARE_LABELS[tier]
-    : (sel.dataset.label || sel.options[sel.selectedIndex].text);
+  const freq = $id("bk-ret-tier").value || "fortnightly";
+  const service = sel.value === "care" ? CARE_KEYS[tier]
+                : sel.value === "retainer" ? RET_KEYS[freq] : sel.value;
+  const label = sel.value === "care" ? CARE_LABELS[tier]
+              : sel.value === "retainer" ? RET_LABELS[freq]
+              : (sel.dataset.label || sel.options[sel.selectedIndex].text);
   const startNow = $id("bk-start-now").checked;
   const b = { service, label,
               name: g("bk-name"), email: g("bk-email"), phone: g("bk-phone"),

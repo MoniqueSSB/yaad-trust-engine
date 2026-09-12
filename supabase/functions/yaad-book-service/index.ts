@@ -45,6 +45,7 @@ const BOOKABLE: Record<string, string> = {
   condition: "condition-report",
   signoff: "technical-signoff",
   retainer: "retainer",
+  "retainer-weekly": "retainer-weekly",
   "retainer-ground": "retainer-ground",
   care: "care-standard",
   "care-large": "care-large",
