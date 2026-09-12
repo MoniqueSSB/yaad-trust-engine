@@ -4726,7 +4726,7 @@ Check it by opening any enquiry with a phone number: the draft should end with "
 
 ## Messaging a client or a worker from a job, and turning "Send from Yaadly" on
 
-Built 11 September 2026. **The migration is applied (12 September 2026); the functions are not deployed yet.** "Open in my own app" on the job page works as soon as the desk is deployed. "Send from Yaadly" also needs `yaad-desk-message` deployed, on the founder's word.
+Built 11 September 2026. **Live since 12 September 2026:** the migration, the desk, `yaad-desk-message` v1 and `yaad-desk-reply` v30. Steps 1 to 3 below are what was done; follow them again only to redeploy.
 
 1. Apply the migration by hand: `supabase/migrations/20260911090000_the_desk_can_message_a_live_job.sql`. One function, `record_desk_message()`, nothing else. Prove it took:
 
