@@ -89,10 +89,14 @@ export function AcceptPanel({
         starts earning its keep: approving the evidence, holding the invoice,
         and carrying the record of this property between jobs.
       </p>
+      {/* Founder, 9 Sep 2026: "the only person that needs to accept is the
+          client." The worker's quote is their word on the price, so this
+          button books. It used to say the worker would confirm too and the
+          client could accept more than one; both were true for one week. */}
       <p className="mt-2 text-[12px] font-bold leading-relaxed text-ink">
-        This does not book {workerName} on its own. {workerName} confirms the
-        same price from their side, and then you choose. You can accept more
-        than one price and compare before you choose.
+        This books {workerName} at this price. Nothing is charged until your
+        invoice from Yaadly arrives, and nothing starts until it is paid.
+        Other quotes on this job stop being available once you accept.
       </p>
 
       {/* The pack, as an addition rather than the route. Founder's
@@ -113,7 +117,8 @@ export function AcceptPanel({
           For bigger work. {workerName} writes a Kickoff Pack against their own
           price: scope of works, what is and is not included, the programme,
           the payment stages and what evidence proves each one. Both of you
-          confirm the pack before anything is booked. It takes longer, and for
+          confirm the pack before anything is booked, because it is new terms
+          rather than the price they already gave. It takes longer, and for
           a straightforward repair the quote and its scope summary usually say
           enough.
         </p>
