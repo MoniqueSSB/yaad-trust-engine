@@ -2960,3 +2960,13 @@ Founder: "build this", on the note that a PDF over WhatsApp had nowhere to go. T
 **The nightly sweep covers it.** `yaad-evidence-sweep` was extended the same day to list both buckets' `_pending/` and both staging lanes' sessions, with the same 72-hour and live-session rules, rather than adding a second cron job that could drift from the first.
 
 Verified: `deno check` clean, `deno test` 159 passed with 8 new in `job-file-lane_test.ts`.
+
+## The signed-off message tells the tradesperson Yaadly pays them (9 Sep 2026)
+
+The `stage_released_worker` branch of `supabase/functions/yaad-notify-client/index.ts` is the one message a tradesperson gets when a job goes to `complete`, and until today it said their labour and materials were "paid directly by the client, off-platform, the way you already agreed with them". That sentence was written on 2 September, the day before the principal structure was settled, and nobody re-read it when the structure changed. Under that structure (3 Sep 2026, and `docs/COPY-GUIDELINES.md` section 2) the client pays Yaadly and Yaadly pays the tradesperson, and the fourth sweep added to `RUNBOOK.md` on 9 September bans any copy saying a client pays a tradesperson directly. The sweep's grep did not catch this one because it only covers `docs/`, `web/` and the WhatsApp facts file, and because the phrasing ("paid directly by the client") is not in its pattern list. It was found by reading the branch, not by the tool.
+
+**One line changed.** It now reads "Yaadly owes you your labour and materials for it, and Yaadly pays you for the work." Still no figure: the comment above the line explains that the worker's pay is derived from `labour_jmd` and materials and stating it in the message risks drifting from whatever the portal actually shows. Nothing else in the branch moved, and no promise of timing was added, because the worker payable is raised by a named human at Yaadly and only once the job is `complete` (see `raise_job_worker_payable` in `20260903a`). The line passes `guardrails.scan`, which this function already runs over every outbound message before sending.
+
+**Deployed from disk** with the CLI and `--no-verify-jwt`, after reading the live setting first (`verify_jwt: false`, version 84) and after merging `origin/main` into the branch so the deploy carried the 9 September fee-cut comment (0.95, not 0.88) rather than reverting it. Live afterwards: version 85, `verify_jwt` still false, so the function's place on the section 12 list in `CLAUDE.md` is unchanged.
+
+`supabase/functions/yaad-notify-client/index.ts`.
