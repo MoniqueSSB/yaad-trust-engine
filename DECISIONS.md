@@ -3008,3 +3008,15 @@ The `stage_released_worker` branch of `supabase/functions/yaad-notify-client/ind
 **Deployed from disk** with the CLI and `--no-verify-jwt`, after reading the live setting first (`verify_jwt: false`, version 84) and after merging `origin/main` into the branch so the deploy carried the 9 September fee-cut comment (0.95, not 0.88) rather than reverting it. Live afterwards: version 85, `verify_jwt` still false, so the function's place on the section 12 list in `CLAUDE.md` is unchanged.
 
 `supabase/functions/yaad-notify-client/index.ts`.
+
+## The retainer and the Visual Check move to the pricing spec, and the retainer becomes two rows (12 Sep 2026)
+
+On Monique's instruction ("match to prototype"), the Visual Check standard price goes from £125 to £149 and the Oversight Retainer from £395/£495 to £495/£595 fortnightly, with a new weekly tier at £895/£1,095. None of these figures is new. `specs/PRICING.md`, the clickable prototype and the 30 August ledger ruling already agreed on them; `docs/services.html` and `service_catalogue` were the copies left behind, and the £125 was a conservative placeholder a 4 September session chose and flagged back to her.
+
+**Two rows, not one with a frequency column.** RUNBOOK section 17 left "one row or two" open. Two, because every other priced variant in the catalogue already works that way (Property Care is three rows behind one page option), `raise_service_invoice()` prices off a row, and the booking allowlist names rows. The fortnightly row keeps the id `retainer` and its name, so existing bookings, the Stripe link metadata and the CRM value still resolve. The page shows one option with a "How often" choice, exactly as Property Care shows "Which home".
+
+**Weekly has no card link, on purpose.** At £895 a month it is over the £500 line, so it is invoiced monthly. The pages that said every service is under £500 now say every one-off service is, which stays true.
+
+**The WhatsApp assistant's figure list moved in the same commit.** `price-figures.ts` gained £595, £895 and £1,095 and lost £125, because a figure no page publishes must not be sayable, and `faq.ts` now quotes the retainer from £495.
+
+**Not done here, and why.** The live Stripe retainer link still charges £395; changing it is a change to a live payment account, so it is Monique's step, and the page must not merge before it. The migration is not applied and the two functions are not redeployed. The admin desk's October Gate sentence still says "three at £395" and is left for a desk change with a demo first.
