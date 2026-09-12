@@ -390,8 +390,8 @@ export function PostJob({ initialTrade, initialParish, requestedWorker, requeste
           </p>
           <p className="mt-3">
             The work is then <b className="text-ink">proven with timestamped
-            evidence</b> at every stage, and nobody is paid for a stage until
-            you have approved it.
+            evidence</b> at every stage, and each stage is yours to approve
+            before the job moves on to the next.
           </p>
           <p className="mt-3">
             <b className="text-ink">You do not need an account yet.</b> One is

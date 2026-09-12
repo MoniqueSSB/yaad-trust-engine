@@ -354,8 +354,8 @@ function JoinForm() {
       {job && (
         <p className="mb-5 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[13px] leading-relaxed text-mute">
           Finishing <b className="font-mono text-tealb">{job}</b>, the job you
-          described on WhatsApp. Everything you told us is already saved. This
-          is only the account it belongs to.
+          described to us. Everything you told us is already saved. This is
+          only the account it belongs to.
         </p>
       )}
 
