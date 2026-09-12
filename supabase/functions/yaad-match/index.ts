@@ -69,13 +69,22 @@ Deno.serve(async (req) => {
   }
 
   // ---- input ----------------------------------------------------------
-  let body: { job_id?: string; limit?: number; dry_run?: boolean };
+  let body: { job_id?: string; limit?: number; dry_run?: boolean; only?: unknown };
   try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
 
   const jobId = (body.job_id ?? "").trim();
   if (!jobId) return json({ error: "job_id required" }, 400);
   const limit  = Math.min(Math.max(body.limit ?? 25, 1), 100);
   const dryRun = body.dry_run === true;
+  // 9 Sep 2026: the shortlist. When the desk invites from job_shortlists it
+  // names who, and only those hear. Anybody named who is not in the ranked
+  // list is silently not alerted: the ranking is the vetting bar (active,
+  // guidelines signed, trade or parish match) and a name cannot skip it.
+  const only = new Set(
+    (Array.isArray(body.only) ? body.only : [])
+      .map((e) => String(e ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  );
 
   // ---- the job, and whether it is genuinely open -----------------------
   const { data: job, error: jobErr } = await admin
@@ -93,7 +102,7 @@ Deno.serve(async (req) => {
   if (!job.trade) {
     // Loud on purpose. A job with no trade can only match on parish, which
     // is how you spam a plumber about a roof.
-    return json({ error: "job has no trade set — matching would be parish-only", job_id: jobId }, 422);
+    return json({ error: "job has no trade set, so matching would be parish-only", job_id: jobId }, 422);
   }
 
   // ---- who should hear about it ---------------------------------------
@@ -101,7 +110,8 @@ Deno.serve(async (req) => {
     .rpc("match_workers_for_job", { p_job: jobId, p_limit: limit });
 
   if (matchErr) return json({ error: "match failed", detail: matchErr.message }, 500);
-  const list = (matches ?? []) as Match[];
+  const ranked = (matches ?? []) as Match[];
+  const list = only.size ? ranked.filter((w) => only.has(w.worker_email.toLowerCase())) : ranked;
 
   if (dryRun) {
     return json({ ok: true, dry_run: true, job_id: jobId, would_alert: list.length, matches: list });
@@ -123,24 +133,6 @@ Deno.serve(async (req) => {
   const results: { worker_email: string; channel: string; status: string; detail?: string }[] = [];
 
   for (const w of list) {
-    // ---- ntfy ---------------------------------------------------------
-    if (ntfyTopic) {
-      try {
-        const r = await fetch(`https://ntfy.sh/${ntfyTopic}`, {
-          method: "POST",
-          headers: {
-            "Title": `New ${job.trade} job — ${area}`,
-            "Tags": "hammer",
-            "Click": link,
-          },
-          body: `${jobId} · ${short}\nQuoting is free. Open the board to see it.`,
-        });
-        results.push({ worker_email: w.worker_email, channel: "ntfy", status: r.ok ? "sent" : "failed", detail: r.ok ? undefined : `http ${r.status}` });
-      } catch (e) {
-        results.push({ worker_email: w.worker_email, channel: "ntfy", status: "failed", detail: String(e) });
-      }
-    }
-
     // ---- email ---------------------------------------------------------
     if (RESEND_KEY) {
       try {
@@ -150,13 +142,13 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             from: `Yaadly <${FROM_EMAIL}>`,
             to: [w.worker_email],
-            subject: `New ${job.trade} job in ${area} — ${jobId}`,
+            subject: `New ${job.trade} job in ${area}, ${jobId}`,
             text:
 `${w.name},
 
 A new job just opened on the board that matches your trade and your area.
 
-  ${jobId} — ${job.title ?? short}
+  ${jobId} · ${job.title ?? short}
   ${short}
 
 Quoting is free and always will be. You are never charged to see a job,
@@ -177,6 +169,38 @@ You are getting this because ${w.match_reason} matched your published profile.
     }
   }
 
+  // ---- the desk push, once for the job --------------------------------
+  //
+  // ntfy_topic is ONE topic, and it is Monique's own phone rather than any
+  // worker's. Until 7 September 2026 this sat inside the loop above, so a job
+  // matching twelve workers sent twelve identical pushes to the same handset.
+  //
+  // The second half of that bug was the worse one and is the reason this is no
+  // longer written to job_alerts at all. Every push also wrote a row claiming
+  // that worker had been told by ntfy, and match_workers_for_job strikes off
+  // anybody holding a 'sent' row on ANY channel, so a worker whose email
+  // bounced was still excluded from the next run by a notification that never
+  // went near them. job_alerts is one row per worker per job per channel; a
+  // push to the desk is none of those three things and does not belong in it.
+  // It is reported in the response instead.
+  let deskPush = ntfyTopic ? "failed" : "not configured";
+  if (ntfyTopic) {
+    try {
+      const r = await fetch(`https://ntfy.sh/${ntfyTopic}`, {
+        method: "POST",
+        headers: {
+          "Title": `New ${job.trade} job, ${area}`,
+          "Tags": "hammer",
+          "Click": link,
+        },
+        body: `${jobId} · ${short}\n${list.length} ${list.length === 1 ? "worker" : "workers"} matched. Quoting is free. Open the board to see it.`,
+      });
+      deskPush = r.ok ? "sent" : `failed: http ${r.status}`;
+    } catch (e) {
+      deskPush = `failed: ${String(e).slice(0, 120)}`;
+    }
+  }
+
   // ---- record it. upsert, because the unique index is the dedupe. ------
   const rows = results.map((r) => ({
     job_id: jobId,
@@ -190,13 +214,23 @@ You are getting this because ${w.match_reason} matched your published profile.
     .from("job_alerts")
     .upsert(rows, { onConflict: "job_id,worker_email,channel", ignoreDuplicates: true });
 
+  // The shortlist row, if there is one, records that its person was asked.
+  // Best effort and after the alerts: a shortlist row that fails to update is
+  // a stale chip on the desk, not a lost alert, and the desk can re-invite.
+  const sentTo = results.filter((r) => r.status === "sent").map((r) => r.worker_email);
+  if (sentTo.length) {
+    await admin.from("job_shortlists")
+      .update({ invited_at: new Date().toISOString() })
+      .eq("job_id", jobId).in("worker_email", sentTo).is("invited_at", null);
+  }
+
   if (insErr) {
     // The alerts went out. Say so loudly rather than pretending they did not.
     return json({
       ok: false,
       job_id: jobId,
       alerted: results.filter((r) => r.status === "sent").length,
-      warning: "alerts sent but not all were recorded — a retry could double-send",
+      warning: "alerts sent but not all were recorded, so a retry could double-send",
       detail: insErr.message,
     }, 207);
   }
@@ -208,6 +242,7 @@ You are getting this because ${w.match_reason} matched your published profile.
     alerted: results.filter((r) => r.status === "sent").length,
     failed: results.filter((r) => r.status === "failed").length,
     skipped: results.filter((r) => r.status === "skipped").length,
-    channels: { ntfy: !!ntfyTopic, email: !!RESEND_KEY },
+    desk_push: deskPush,
+    channels: { email: !!RESEND_KEY },
   });
 });

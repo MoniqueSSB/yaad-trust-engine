@@ -5,6 +5,7 @@ import { chatWithFailover, pickTextProvider, providerAttrs } from "./textmodel.t
 import * as guardrails from "./guardrails.ts";
 import { checkTwilioSignature } from "./twilio-signature.ts";
 import { pickJobChoice } from "./job-match.ts";
+import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
@@ -349,6 +350,79 @@ const PHASE_SAID: Record<PhaseAnswer, string> = {
 // ("Sent on WhatsApp" when nothing was said), but that fallback text is not
 // context, and the dispatch loop needs to tell the two apart to know
 // whether to ask.
+/* ── documents over WhatsApp: the job_files lane ──────────────────────────
+ *
+ * 10 Sep 2026. A PDF or a Word file sent over WhatsApp used to be dropped:
+ * the evidence lane only takes images and video, and the intake bucket
+ * refuses non-images at the storage layer. These land in job_files
+ * (20260910120000), the same table the portal's Files card writes, under
+ * the sender's own side of the job, so the portal's own rules (read by both
+ * sides, removable by the uploader until the job is complete) apply to a
+ * document whichever way it arrived.
+ *
+ * NOT EVIDENCE. Nothing here touches the evidence table, a stage, a status
+ * or the independent check. A receipt is not proof of work.
+ *
+ * Same staging shape as evidence: downloaded to _pending/, then moved onto
+ * the job once the job is known. With one live job the job is known. With
+ * several, the code is asked for, and the reply is matched by pickJobChoice
+ * exactly as evidence is. A _pending/ object nothing claims within 72 hours
+ * is litter; RUNBOOK carries the sweep.
+ */
+const JOB_FILES_BUCKET = "job-files";
+const JOB_FILE_MAX_BYTES = 25_000_000;
+
+type PendingFile = { path: string; mime: string; bytes: number; sha256: string; label: string; kind: string };
+
+async function downloadAndStageJobFile(admin: any, url: string, mime: string, caption: string, deadline?: Deadline): Promise<PendingFile | null> {
+  const clean = (mime || "").split(";")[0].trim().toLowerCase();
+  const ext = docExt(clean);
+  if (!ext) return null;
+  const got = await fetchMedia(url, deadline ? deadline.signal(9_000, 2_500, 1_500) : undefined);
+  if (!got || got.bytes.byteLength === 0 || got.bytes.byteLength > JOB_FILE_MAX_BYTES) return null;
+  const path = `_pending/${crypto.randomUUID()}.${ext}`;
+  const { error } = await admin.storage.from(JOB_FILES_BUCKET).upload(path, got.bytes, { contentType: clean, upsert: false });
+  if (error) return null;
+  const sha256 = await evidenceSha256(got.bytes.buffer as ArrayBuffer);
+  return { path, mime: clean, bytes: got.bytes.byteLength, sha256, label: fileLabel(caption), kind: guessFileKind(caption) };
+}
+
+/** Moves a staged document onto the job under the sender's side and writes
+ *  the row. The path shape, <side>/<job>/..., is the one the portal's own
+ *  policies expect, so the sender can take it back from the portal too. */
+async function finalizeJobFile(admin: any, jobId: string, side: "client" | "worker", uploadedBy: string, item: PendingFile): Promise<boolean> {
+  const ext = item.path.split(".").pop();
+  const finalPath = `${side}/${jobId}/wa-${crypto.randomUUID()}.${ext}`;
+  const { error: moveErr } = await admin.storage.from(JOB_FILES_BUCKET).move(item.path, finalPath);
+  if (moveErr) return false;
+  const { error: insErr } = await admin.from("job_files").insert({
+    job_id: jobId, side, uploaded_by: uploadedBy, kind: item.kind, label: item.label,
+    storage_path: finalPath, mime: item.mime, bytes: item.bytes, sha256: item.sha256,
+  });
+  if (insErr) {
+    await admin.storage.from(JOB_FILES_BUCKET).remove([finalPath]);
+    return false;
+  }
+  return true;
+}
+
+/** Every live job this client's number is on, newest first. Wider than the
+ *  worker's evidence list on purpose: a quote or a permit belongs on a job
+ *  before any work stage exists. */
+async function lookupClientJobsForFiles(admin: any, from: string): Promise<{ email: string; jobs: { id: string; title: string; stage: number }[] } | null> {
+  if (from.replace(/\D/g, "").length < 9) return null;
+  const { data } = await admin.from("jobs")
+    .select("id, title, stage, status, client_phone, client_email")
+    .not("client_phone", "is", null)
+    .order("updated_at", { ascending: false });
+  const mine = (data ?? []).filter((j: any) => samePhone(j.client_phone, from) && isFileableStatus(j.status));
+  if (!mine.length) return null;
+  const email = String(mine.find((j: any) => j.client_email)?.client_email ?? "").toLowerCase() || `whatsapp:${digitsOf(from)}`;
+  return { email, jobs: mine.map((j: any) => ({ id: j.id, title: j.title ?? j.id, stage: Number(j.stage ?? 0) })) };
+}
+
+const FILED_NOTICE = "It is under Files on the job, for you, the other side and Yaadly. It is not evidence: photos of the work still go through the usual route.";
+
 type PendingEvidence = { path: string; mime: string; bytes: number; sha256: string; label: string; hasCaption: boolean; phase?: PhaseAnswer | null; pairsWith?: string | null };
 
 // Twilio's MediaUrl is already fetchable, unlike Meta's media id, so this is
@@ -2229,6 +2303,8 @@ Deno.serve(async (req: Request) => {
       const { data: sess } = await supabase.from("wa_intake_sessions")
         .select("wa_id,answers,photo_count,updated_at").eq("wa_id", msg.from).maybeSingle();
       const evSession = sess && String((sess.answers as any)?._lane ?? "") === "evidence" ? sess : null;
+      // A document (PDF or Word) waiting on "which job", from either side.
+      const fileSession = sess && String((sess.answers as any)?._lane ?? "") === "job_file" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
 
@@ -2346,6 +2422,42 @@ Deno.serve(async (req: Request) => {
         return twiml(error
           ? "That did not save properly. Try again."
           : `Got it, on record for ${pick.id} (${pick.title}). The client hears about it once it is drafted. If you need a person instead, just say so.`);
+      }
+
+      // ── a document waiting on "which job", answered ───────────────────────
+      //
+      // The reply to codePrompt() for a staged document, from a worker or a
+      // client. Matched by pickJobChoice exactly as evidence is: the code
+      // first, never a bare "yes". A fresh document arriving mid-answer joins
+      // the batch rather than starting a second one.
+      if (!deskHasThisNumber && fileSession) {
+        const answers = fileSession.answers as any;
+        const pending: PendingFile[] = answers.pending ?? [];
+        const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
+        const side: "client" | "worker" = answers.side === "client" ? "client" : "worker";
+        const email: string = String(answers.email ?? "");
+        const moreDocs = msg.media.filter((m) => isDocMime(m.mime));
+
+        if (moreDocs.length) {
+          const items = (await Promise.all(moreDocs.map((m) => downloadAndStageJobFile(supabase, m.url, m.mime, msg.text, deadline)))).filter(Boolean) as PendingFile[];
+          const next = [...pending, ...items];
+          await supabase.from("wa_intake_sessions")
+            .update({ answers: { ...answers, pending: next }, photo_count: next.length, updated_at: new Date().toISOString() })
+            .eq("wa_id", msg.from);
+          return twiml(items.length ? `Got that too, ${next.length} so far. ${codePrompt(choices)}` : `That one did not come through. ${codePrompt(choices)}`);
+        }
+
+        if (!msg.media.length && msg.text.trim()) {
+          const pick = pickJobChoice(msg.text, choices);
+          if (!pick) return twiml(`Sorry, that did not match a job. ${codePrompt(choices)}`);
+          let filed = 0;
+          for (const item of pending) if (await finalizeJobFile(supabase, pick.id, side, email, item)) filed++;
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.job_file.job": pick.id, "yaadly.job_file.side": side, "yaadly.job_file.filed": filed });
+          return twiml(filed
+            ? `Filed on ${pick.id} (${pick.title}): ${filed} document${filed === 1 ? "" : "s"}. ${FILED_NOTICE}`
+            : "That did not save properly. Try sending it again.");
+        }
       }
 
       if (!deskHasThisNumber && evSession) {
@@ -2553,6 +2665,54 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // ── documents, from either side, into job_files ───────────────────────
+      //
+      // A PDF or a Word file. Worker first, because a number linked to a
+      // published worker is a worker, the same order every lane above uses;
+      // then a client whose number is on a live job. One live job: filed on
+      // it now. Several: staged and the code asked for, answered by the
+      // fileSession branch above. Nobody on any job: left to the intake
+      // pipeline below, as before. Photos and videos in the same message are
+      // untouched and carry on to the evidence lane exactly as they did.
+      const docMedia = msg.media.filter((m) => isDocMime(m.mime));
+      if (!deskHasThisNumber && docMedia.length) {
+        const onlyDocs = docMedia.length === msg.media.length;
+        const asWorker = await lookupWorkerWithActiveJobs(supabase, msg.from);
+        const party = asWorker
+          ? { side: "worker" as const, email: asWorker.email, jobs: asWorker.jobs }
+          : await (async () => {
+              const c = await lookupClientJobsForFiles(supabase, msg.from);
+              return c ? { side: "client" as const, email: c.email, jobs: c.jobs } : null;
+            })();
+        if (party) {
+          const items = (await Promise.all(docMedia.map((m) => downloadAndStageJobFile(supabase, m.url, m.mime, msg.text, deadline)))).filter(Boolean) as PendingFile[];
+          if (!items.length) {
+            if (onlyDocs) return twiml("That did not come through properly. Try sending it again, or add it from the Files card on the job in the portal.");
+          } else {
+            // One live job, or a code in the caption, names the job. Otherwise ask.
+            const target = party.jobs.length === 1 ? party.jobs[0] : pickJobChoice(msg.text, party.jobs);
+            if (target) {
+              let filed = 0;
+              for (const item of items) if (await finalizeJobFile(supabase, target.id, party.side, party.email, item)) filed++;
+              root.setAttributes({ "yaadly.job_file.job": target.id, "yaadly.job_file.side": party.side, "yaadly.job_file.filed": filed });
+              if (onlyDocs) {
+                return twiml(filed
+                  ? `Filed on ${target.id} (${target.title}): ${filed} document${filed === 1 ? "" : "s"}. ${FILED_NOTICE}`
+                  : "That did not save properly. Try sending it again.");
+              }
+            } else {
+              await supabase.from("wa_intake_sessions").upsert({
+                wa_id: msg.from,
+                answers: { _lane: "job_file", side: party.side, email: party.email, pending: items, job_choices: party.jobs },
+                photo_count: items.length,
+                updated_at: new Date().toISOString(),
+              });
+              return twiml(`Got the document. ${codePrompt(party.jobs)} It is not on a job until you answer, and an unfiled document is deleted after 72 hours.`);
+            }
+          }
+        }
+      }
+
       const evidenceMedia = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
       if (!deskHasThisNumber && evidenceMedia.length) {
         const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
@@ -2694,12 +2854,14 @@ Deno.serve(async (req: Request) => {
           // Named the real, working alternative rather than a vague
           // "ask Yaadly": the portal button next to this exact price is
           // the only place that request can actually be made from here.
+          // 9 Sep 2026, founder: "the only person that needs to accept is
+          // the client." The client's reply books; agree_quote_via_whatsapp
+          // returns both_confirmed = true only on the client's side now,
+          // because the worker's quote already was their agreement.
           if (row?.both_confirmed) {
-            return twiml(row.agreed_side === "client"
-              ? `Confirmed. Both sides have agreed the price for ${quoteTarget.title}. Reply ${quoteTarget.id} again to book them, no Kickoff Pack needed. Want the fuller document first instead? Sign in to your Yaadly portal and tap "Get a Kickoff Pack first" next to this price.`
-              : `Confirmed. Both sides have agreed the price for ${quoteTarget.title}, ready for the client to book.`);
+            return twiml(`Booked. ${quoteTarget.title} is on. A message with the price and how payment works is coming through next. Nothing starts until your invoice from Yaadly is paid.`);
           }
-          return twiml(`Confirmed on your side for ${quoteTarget.title}. Waiting on ${row?.agreed_side === "worker" ? "the client" : "the worker"} to reply the same code before this can move on.`);
+          return twiml(`Noted for ${quoteTarget.title}. Your quote was already your word on the price, so nothing more is needed from you: the client accepts it, and you will get a message on this number the moment they do.`);
         }
       }
 

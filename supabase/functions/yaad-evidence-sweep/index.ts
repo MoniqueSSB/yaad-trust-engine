@@ -50,7 +50,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const CRON_SECRET  = Deno.env.get("YAAD_CRON_SECRET") ?? "";
 
-const BUCKET = "evidence";
+// The buckets are listed in TARGETS below; both stage under this prefix.
 const PREFIX = "_pending";
 const MIN_AGE_MS = 72 * 3600_000;
 
@@ -86,11 +86,13 @@ const pendingPaths = (row: SessionRow): string[] => {
 // Deleting the row with them means that worker is simply read fresh, which is
 // what the 48 hour rule was written to do in the first place.
 //
-// Only the evidence lane. The other lanes hold no staged files and are not
-// this function's business.
-const staleEvidenceSessions = (rows: SessionRow[], cutoff: number): SessionRow[] =>
+// Only the two lanes that hold staged files: evidence, and job_file (a
+// document waiting on "which job", 10 Sep 2026). The other lanes stage
+// nothing and are not this function's business.
+const STAGING_LANES = new Set(["evidence", "job_file"]);
+const staleSessions = (rows: SessionRow[], cutoff: number): SessionRow[] =>
   rows.filter((r) =>
-    String((r.answers as { _lane?: unknown })?._lane ?? "") === "evidence" &&
+    STAGING_LANES.has(String((r.answers as { _lane?: unknown })?._lane ?? "")) &&
     new Date(r.updated_at).getTime() < cutoff);
 
 Deno.serve(async (req: Request) => {
@@ -179,74 +181,100 @@ Deno.serve(async (req: Request) => {
       if (new Date(r.updated_at).getTime() >= cutoff) for (const p of pendingPaths(r)) held.add(p);
     }
 
-    // ── everything sitting in the staging prefix ──────────────────────────
-    const staged: { path: string; created: number }[] = [];
-    let truncated = false;
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const { data: objs, error: lsErr } = await admin.storage.from(BUCKET)
-        .list(PREFIX, { limit: PAGE, offset: page * PAGE, sortBy: { column: "created_at", order: "asc" } });
-      if (lsErr) {
-        root.recordError(lsErr.message);
-        return json({ error: lsErr.message }, 500);
-      }
-      const batch = objs ?? [];
-      for (const o of batch) {
-        // A folder placeholder is not an object. Storage returns those with a
-        // null id, and the one Supabase creates itself is dot-prefixed.
-        if (!o.id || o.name.startsWith(".")) continue;
-        staged.push({ path: `${PREFIX}/${o.name}`, created: new Date(o.created_at ?? o.updated_at ?? 0).getTime() });
-      }
-      if (batch.length < PAGE) break;
-      if (page === MAX_PAGES - 1) truncated = true;
-    }
-
-    const old = staged.filter((s) => s.created > 0 && s.created < cutoff && !held.has(s.path));
-
-    // ── the belt: is any of this actually filed evidence? ─────────────────
+    // ── each staging prefix, one bucket at a time ─────────────────────────
     //
-    // It should never be, because finalising renames the object out of this
-    // prefix. If it ever is, the object is live and this function has no
-    // business near it.
-    const filed = new Set<string>();
-    for (let i = 0; i < old.length; i += 100) {
-      const chunk = old.slice(i, i + 100).map((s) => s.path);
-      const { data: rows, error: evErr } = await admin
-        .from("evidence").select("storage_path").in("storage_path", chunk);
-      if (evErr) {
-        root.recordError(evErr.message);
-        return json({ error: evErr.message }, 500);
+    // Two buckets stage under _pending/: evidence (photos and video from the
+    // evidence lane) and job-files (documents from the job_file lane,
+    // 20260910120000, 10 Sep 2026). The same rule for both: older than 72
+    // hours, not held by a live session, and not filed in the table that
+    // would make it live. Nothing else in either bucket is ever touched.
+    const TARGETS = [
+      { bucket: "evidence", table: "evidence" },
+      { bucket: "job-files", table: "job_files" },
+    ] as const;
+    let stagedCount = 0;
+    let filedCount = 0;
+    let truncated = false;
+    const doomed: { bucket: string; path: string }[] = [];
+
+    for (const t of TARGETS) {
+      const staged: { path: string; created: number }[] = [];
+      let listed = true;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const { data: objs, error: lsErr } = await admin.storage.from(t.bucket)
+          .list(PREFIX, { limit: PAGE, offset: page * PAGE, sortBy: { column: "created_at", order: "asc" } });
+        if (lsErr) {
+          // One bucket failing to list (not created yet, say) is recorded and
+          // must not cost the other its sweep.
+          root.recordError(`${t.bucket}: ${lsErr.message}`);
+          listed = false;
+          break;
+        }
+        const batch = objs ?? [];
+        for (const o of batch) {
+          // A folder placeholder is not an object. Storage returns those with a
+          // null id, and the one Supabase creates itself is dot-prefixed.
+          if (!o.id || o.name.startsWith(".")) continue;
+          staged.push({ path: `${PREFIX}/${o.name}`, created: new Date(o.created_at ?? o.updated_at ?? 0).getTime() });
+        }
+        if (batch.length < PAGE) break;
+        if (page === MAX_PAGES - 1) truncated = true;
       }
-      for (const r of rows ?? []) filed.add(String(r.storage_path));
+      if (!listed) continue;
+      stagedCount += staged.length;
+
+      const old = staged.filter((s) => s.created > 0 && s.created < cutoff && !held.has(s.path));
+
+      // ── the belt: is any of this actually filed? ────────────────────────
+      //
+      // It should never be, because finalising renames the object out of this
+      // prefix. If it ever is, the object is live and this function has no
+      // business near it.
+      const filed = new Set<string>();
+      for (let i = 0; i < old.length; i += 100) {
+        const chunk = old.slice(i, i + 100).map((s) => s.path);
+        const { data: rows, error: tErr } = await admin
+          .from(t.table).select("storage_path").in("storage_path", chunk);
+        if (tErr) {
+          root.recordError(`${t.table}: ${tErr.message}`);
+          return json({ error: tErr.message }, 500);
+        }
+        for (const r of rows ?? []) filed.add(String(r.storage_path));
+      }
+      filedCount += filed.size;
+      for (const s of old) if (!filed.has(s.path)) doomed.push({ bucket: t.bucket, path: s.path });
     }
 
-    const doomed = old.filter((s) => !filed.has(s.path)).map((s) => s.path);
-    const stale = staleEvidenceSessions(sessions, cutoff);
+    const stale = staleSessions(sessions, cutoff);
 
     if (dryRun) {
       root.setAttributes({
         "yaadly.sweep.dry_run": true,
-        "yaadly.sweep.staged": staged.length,
+        "yaadly.sweep.staged": stagedCount,
         "yaadly.sweep.would_delete": doomed.length,
       });
       return json({
         ok: true, dry_run: true, truncated,
-        staged: staged.length, held_by_live_session: held.size, filed_elsewhere: filed.size,
+        staged: stagedCount, held_by_live_session: held.size, filed_elsewhere: filedCount,
         would_delete: doomed.length, would_drop_sessions: stale.length,
         sample: doomed.slice(0, 10),
       });
     }
 
     let deleted = 0;
-    for (let i = 0; i < doomed.length; i += 100) {
-      const chunk = doomed.slice(i, i + 100);
-      const { error: rmErr } = await admin.storage.from(BUCKET).remove(chunk);
-      // A file that has already gone still counts. The point is that it is not
-      // there any more, not that this run is the one that removed it.
-      if (rmErr && !/not found/i.test(rmErr.message)) {
-        root.recordError(`${chunk.length} objects: ${rmErr.message}`);
-        continue;
+    for (const t of TARGETS) {
+      const mine = doomed.filter((d) => d.bucket === t.bucket).map((d) => d.path);
+      for (let i = 0; i < mine.length; i += 100) {
+        const chunk = mine.slice(i, i + 100);
+        const { error: rmErr } = await admin.storage.from(t.bucket).remove(chunk);
+        // A file that has already gone still counts. The point is that it is not
+        // there any more, not that this run is the one that removed it.
+        if (rmErr && !/not found/i.test(rmErr.message)) {
+          root.recordError(`${t.bucket}, ${chunk.length} objects: ${rmErr.message}`);
+          continue;
+        }
+        deleted += chunk.length;
       }
-      deleted += chunk.length;
     }
 
     // Sessions last, so a failed delete above never orphans a row from the
@@ -259,14 +287,14 @@ Deno.serve(async (req: Request) => {
     }
 
     root.setAttributes({
-      "yaadly.sweep.staged": staged.length,
+      "yaadly.sweep.staged": stagedCount,
       "yaadly.sweep.deleted": deleted,
       "yaadly.sweep.sessions_dropped": droppedSessions,
       "yaadly.sweep.truncated": truncated,
     });
     return json({
       ok: true, truncated,
-      staged: staged.length, held_by_live_session: held.size, filed_elsewhere: filed.size,
+      staged: stagedCount, held_by_live_session: held.size, filed_elsewhere: filedCount,
       deleted, sessions_dropped: droppedSessions,
     });
   } catch (e) {

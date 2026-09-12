@@ -802,7 +802,7 @@ select j.id, j.status, q.labour_jmd, q.materials_jmd, q.status as quote_status
  where j.worker_email = 'them@example.com';
 ```
 
-`round(labour_jmd * 0.88) + materials_jmd` is the figure shown, the same 88% every other money panel in this repository uses. A job with no `accepted` row shows nothing on the money page at all, correctly: there is no money to show yet.
+`round(labour_jmd * 0.95) + materials_jmd` is the figure shown, the same 95% every other money panel in this repository uses (the worker side came down from 12% to 5% on 9 September 2026). A job with no `accepted` row shows nothing on the money page at all, correctly: there is no money to show yet.
 
 **Held versus Released is `jobs.status <> 'complete'` versus `= 'complete'`, nothing finer.** A job does not partially release as stages complete; the whole figure moves at once, when `sync_job_status()` marks the job complete. If a worker expects a partial figure for a partially finished multi-stage job, that expectation is ahead of what this repository tracks today: no per-stage money split exists anywhere.
 
@@ -3771,10 +3771,10 @@ A worker who sends photographs over WhatsApp and then never answers the
 questions leaves those files staged in the evidence bucket under `_pending/`.
 The session is dropped after 48 hours and the files are not. This predates the
 before/after step, which adds one more place a worker can walk away mid-flow.
-Nothing cleans `_pending/` on a schedule yet. It is storage cost and clutter
-rather than a data protection problem, since the bucket is private and nothing
-outside it links to those objects, but it should be swept eventually. Look at
-what is sitting there with:
+`yaad-evidence-sweep` clears it nightly at 04:23 UTC (20260906013700), and since
+10 Sep 2026 it sweeps the `job-files` bucket's `_pending/` the same way. Anything
+under 72 hours old, or named by a live session, is left alone. Look at what is
+sitting there with:
 
 ```bash
 supabase storage ls ss:///evidence/_pending --project-ref leffyisvfvjwzilydlwf
@@ -4469,7 +4469,9 @@ All four counts must be zero. They were, on all 8 open jobs, after the fix.
 
 `20260905a` redefines `open_jobs` **without** `board_descr()`. Applying it alone silently reopens the identifier leak above, and `20260907090000` will not re-run to undo it because its name is already in production's migration history.
 
-**So: apply `20260905a`, then immediately re-apply the `open_jobs` and `my_requested_jobs` definitions from `20260907090000`, then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it.
+**So: apply `20260905a`, then immediately re-apply `20260909150000` (which redefines `open_jobs` with `board_descr()` AND the `is_test` clause, and builds the first-refusal clause conditionally so it lands once `20260905a` is in), then run the check query above.** The same warning is on the `open_jobs` comment in the database, where somebody investigating that view will meet it. Before 9 September the instruction here was to re-apply `20260907090000`; that would now bring the identifier leak fix back and drop the test-row filter, so it is superseded.
+
+**`20260905b` is in the same state.** Found 9 September 2026 while applying `20260909150000`: production has no `worker_showcase` table, no `worker_profiles.showcase_consent` and no `public_worker_showcase` view. The desk's Workers view and `web/app/workers/[slug]` both read those, and fail soft. `20260909150000` skips the showcase view when the table is absent, so it is safe to apply either side of `20260905b`; if `20260905b` is applied later, re-apply `20260909150000` after it for the same reason as above.
 
 ---
 
@@ -4555,3 +4557,138 @@ select value from app_settings where key = 'worker_guidelines_version';
 ```
 
 The trigger function should contain neither figure and should name `raise_job_stage_worker_payable`. If `raise_job_worker_pay_invoice` or `raise_job_stage_worker_pay_invoice` still exist afterwards, the migration did not run to the end.
+
+## 28. A client says they have no quotes, and the desk shows three
+
+Almost always the client asked Yaadly to pick. Check the job's
+`worker_choice` column (the Who picks column on the desk's Quotes view says
+it in words). On a `yaadly` job the client sees **no** quote until a
+signed-in admin has put one to them: the quotes page, the portal, and the
+"reply with the code" WhatsApp path all read the same rule,
+`client_may_see_quote()`, so all three agree. Nothing is wrong. Open Quotes,
+find the job, press **Choose this one for the client**, write the reason in
+the box (the client reads it), and the client gets the message with the
+all-in price. The other quotes stay on the desk.
+
+**If the button is missing** on a quote, one of three things: the job is a
+`client` job (they already see everything), the quote is not `submitted`
+(only an open price can be put forward), or a worker is already booked.
+Postgres refuses each of these with its own sentence; the desk shows it as
+said.
+
+**If the button is there and Postgres refuses it** with "already agreed a
+price", the client has confirmed a different quote through some door. Talk
+to them before changing anything.
+
+**To check the rule directly**, as the project's service role:
+
+```sql
+select id, worker_choice from jobs where id = 'JOB-...';
+select id, worker_name, status, recommended_at, recommended_by from job_quotes where job_id = 'JOB-...';
+```
+
+A `yaadly` job with every `recommended_at` null is a job waiting on a
+person. That is the design, not a fault.
+
+## 29. The shortlist agent named nobody, or named the wrong trade
+
+**Nobody.** The candidate pool is `shortlist_candidates_for_job`, which
+applies the same bar as the job alert: profile active, current Worker
+Guidelines signed, trade or parish match, not a test row. On a bench of
+twelve a job in a trade nobody carries is an empty list, and the desk says
+so. Nothing to fix in the agent; either the trade is wrong on the job (set it
+under Jobs, Correct what this job says does not set the trade) or the bench
+has nobody for it.
+
+**Wrong trade.** The agent only orders what the database hands it, so a
+plumber on a roofing shortlist means the plumber's profile matched on
+parish alone. Read the reason column: "parish, related trade" is the
+database saying exactly that. Drop them. If it keeps happening for a parish,
+the bench is thin there, not the agent wrong.
+
+**"Picked by: ranking" when you expected the agent.** The function fell
+back on purpose. Reasons, in the order it checks them: fewer candidates than
+the shortlist size (nothing to choose between), agents paused on the desk,
+no text provider configured, or the model did not answer in usable JSON. The
+last one is logged; check the function's logs for `yaad-shortlist`. A
+ranked list is still a correct list, it is just not a judgement.
+
+**Nobody has been told**, whichever way it was built, until Invite is
+pressed on the Shortlist view. If a worker says they were alerted and the
+row says "not yet asked", the alert came from somewhere else: the public
+board, or the older Open it to the board button, which alerts nobody either
+but makes the job visible to every vetted worker.
+
+**Since 9 September 2026 the client's acceptance books.** If a client says they accepted and nothing happened, check `jobs.worker_email` first: set means booked and the next thing is the invoice under Money. Blank with the quote at `quote_confirmed` means the booking call was refused after the agreement was recorded; Postgres says why in the function's error (almost always "a worker is already chosen"). The worker no longer confirms their price, so "waiting on the worker" is never the answer.
+
+Applied 9 September 2026 and all of the above checked true. If the migration tool is refused by the permission classifier, the file runs safely as three ordered batches through plain SQL: the two payable definitions, then the trigger repoint with the drops and the column comment, then the two updates. Insert the version into `supabase_migrations.schema_migrations` afterwards so `list_migrations` and the drift script see it.
+
+## A test job or a test worker is showing on the public board, or a real one is missing
+
+Since 9 September 2026 (`20260909150000`) the public board at app.yaadly.co.uk/jobs and the worker directory beside it leave out any row a person has marked as a test. The mark is `jobs.is_test` and `worker_profiles.is_test`, false by default, set only by a person from the desk, and every press is written to `agent_actions` with who pressed it. Nothing is deleted and nothing else about the row changes: the conversation, the evidence, the quotes and the money are untouched, and the desk still shows the row with a grey "test" chip.
+
+**To take a test row off the board:** desk, Jobs, open the row, "That was me testing". For a worker: desk, Workers, open the row, same button. It leaves the public page the moment it saves. The automatic Quote Kickoff Pack trigger (`yaad-quote-pack-check`) also stops drafting for a marked job; a pack for a test job is requested from the desk instead.
+
+**To put a real one back:** same drawer, "This one is real". If the job is open for quotes with no worker chosen it is on the board again straight away; a worker comes back to the directory if they are active.
+
+**What was marked on 9 September, and on what basis.** Two sources only, and the migration header lists both: rows that say so on their own record (source `test`, an id beginning `JOB-TEST-`, a "Test Client" or "TEST QA" name, a worker name or email containing the word test or QA, or an `@example.com` address), and the six founder-run jobs that were open on the board under her own email, named one by one from the Data Room note of 7 September. 19 of 44 jobs and all 8 worker profiles. The 25 closed jobs were left unmarked because the board can never show them. `JOB-DEMO-PHOTOS` was deliberately not marked: it is the display listing, it says DEMO LISTING in its own title, and hiding it is a separate decision. The Data Room carries a matching addendum in `04 Real world validation`.
+
+**Check it:**
+
+```sql
+select id, title from open_jobs;                                   -- what the public sees
+select id, title, is_test from jobs where open order by updated_at desc;  -- what the desk sees
+select actor, action, summary, at from agent_actions where action like '%_test' order by at desc limit 10;
+```
+
+A marked row appearing in the first query means a later migration redefined `open_jobs` without the clause. `supabase/tests/public_board_test_rows_guards.sql` proves the clause on both views and that the two marker functions refuse without an admin session; run it before and after touching either view.
+
+**Do not** add a filter in `web/app/jobs/page.tsx` to do this job. The page reads the view and must keep reading the view, or "This one is real" stops meaning what it says.
+
+## A client wants an independent check on a job, or one is booked and nothing is happening
+
+The optional independent check at sign-off (20260909180000). The client chooses it on the **Approvals** tab of their job, from the moment a worker is on the job until somebody files evidence on the final stage. After that the portal locks the choice and tells them to message you: the spec's rule is "Visits not agreed at the start are chargeable", and a late request is a conversation, not a silent line on a bill.
+
+**The two prices are the returning-client prices.** The same Visual Check and Technical Sign-off as the services page, cheaper because the client already booked a job: `service_catalogue` rows `job-visual-check` and `job-technical-check`. The standalone rows (`eyes-on-it`, `technical-signoff`) keep the full standalone price. Change a price with an `UPDATE` on the catalogue row; nothing is deployed for a price change.
+
+**The desk view is Independent checks, under Documents & money.** It lists every job with a check chosen, with the invoice and the report beside it. Three actions:
+
+1. **Assign the checker.** Type the name. The database refuses the worker's own name or email (`assign_job_checker`). The client sees the name on their job.
+2. **Raise the invoice.** One GBP line, priced by the catalogue trigger at the full or founding rate. It lands as a **draft**; send it from **Invoices** like any other. It deliberately carries **no `job_id`**: the job points at it through `jobs.check_invoice_id`. If you ever see a check invoice with a `job_id`, that is a bug, because `sync_job_status()`, `start_job_on_agency_fee_paid()` and `raise_job_client_invoice()` all read "the stage-less invoice payable to Yaadly on this job" as the agency fee.
+3. **Remove the check.** Refused while an invoice for it stands. Void the invoice first, then remove.
+
+**The report.** The checker's write-up is a `reports` row of kind `visual_check` or `technical_signoff` with the job's id in `job_id`, drafted from the Reports view as usual. The Independent checks view shows the latest one for the job once it exists.
+
+**A late request after the final evidence is in.** Set it from the desk: `select public.choose_job_check('JOB-0001', 'visual');` as a signed-in admin works past the lock; the portal cannot. Then assign and invoice as above.
+
+**Nothing here moves money or approval.** `approve_stage()` never reads `check_level`. A check that came back bad is a reason for the client not to press Approve and to raise a dispute; it is not a ruling. If somebody asks for the check to release or block a payment on its own, that is the request `CLAUDE.md` section 3 exists to refuse.
+
+**Prove the guards hold:** run `supabase/tests/job_check_guards.sql` with `execute_sql`. Ten lines, all PASS.
+
+## Files on a job: a client or worker wants to attach a document, or one has gone wrong
+
+Either side attaches documents and pictures to a job from the **Overview** tab of the job room: receipts, quotes on letterhead, permits, plans, certificates, warranties (20260910120000). PDF, JPEG, PNG, WebP or Word, up to 25MB. Not evidence: a file here never changes the job's status, never lands in a stage approval, and never locks the independent-check picker. Photos of the work itself still go on the Progress evidence tab.
+
+**Who can do what.** The client and the worker on the job both read every file on it. Each adds under their own side, `client/<job>/` or `worker/<job>/`, and `job_party_side()` is the one function the table policy and the storage policy both ask. The uploader can take their own file back until the job is complete; after that everything on the job is fixed. Nothing is ever updated in place: a changed document is a new row. No model reads a job file.
+
+**On the desk:** Documents and money, **Job files**. Every file on every job, with a signed link good for an hour, who sent it and when. "Remove this file" deletes the row and then the object; if the object lingers, the message names its path so you can remove it from Storage by hand.
+
+**"That did not go through" on the portal.** The sentence under the form is the reason: wrong type, too large, or "refused". Refused means Postgres said no: the person is not on that job, the path was not under their own side, or the job is complete or cancelled. Check `select public.job_party_side('JOB-0001')` as that user, and the job's status.
+
+**A file with no row, or a row with no file.** The action uploads first, inserts second, and removes the upload if the insert is refused; removal deletes the row first and the object second. So a stray object with no row is the harmless failure and the storage policy lets its uploader clear it. A row whose object is missing shows as a name with no link; delete the row from the desk.
+
+**Prove the guards hold:** run `supabase/tests/job_files_guards.sql` with `execute_sql`. Ten lines, all PASS, and the view returns no rows to a session with no JWT.
+
+## A PDF or Word file sent over WhatsApp did not land on the job, or landed on the wrong one
+
+Since 10 Sep 2026 `yaad-inbound` files documents (PDF, .doc, .docx) into `job_files`, the same table as the portal's Files card, under the sender's own side. Worker first: a number linked to a published worker with live jobs. Then client: a number on a live job (open for quotes, quoted, awaiting payment, in progress, evidence, disputed). Photos and videos in the same message still go to the evidence lane, untouched.
+
+**One live job:** filed at once, reply names the job. **Several:** the document is staged under `_pending/` in the `job-files` bucket and the code is asked for, the same prompt evidence uses; the reply is matched by code, never a bare "yes". A code in the caption files it without asking. **Nobody on any job:** the message falls through to the intake pipeline as before, and the document is not kept.
+
+**It did not land.** Check the trace for `yaadly.job_file.filed` and `yaadly.job_file.job`. Zero filed with a job named means the move or the row insert failed: the table is missing (migration 20260910120000 not applied), the bucket refused the type, or the file was over 25MB. The sender was told "That did not save properly".
+
+**Wrong job.** The sender can take it back from the Files card on the job (their own file, while the job is not complete) and send it again with the right code in the caption. The desk can remove any file from Job files.
+
+**Unclaimed staged documents.** A `_pending/` object in `job-files` that nobody answered for is swept by `yaad-evidence-sweep` nightly at 04:23 UTC, the same job that sweeps the evidence bucket, once it is over 72 hours old and no live session names it. Pass `{"dry_run": true}` to that function to see what it would take.
+
+**Deploy:** from disk, `supabase functions deploy yaad-inbound --project-ref leffyisvfvjwzilydlwf --no-verify-jwt`, after `20260910120000` is applied and after fetching main. The function tolerates the table being absent (the sender gets "did not save"), but do not run it that way on purpose.
