@@ -16,7 +16,7 @@
 
   <rect width="1200" height="2168" fill="#0E0C08"/>
   <text x="60" y="48" fill="#F7F1E3" font-size="26" font-weight="bold">THE YAAD TRUST ENGINE · Agentic Workflow v6</text>
-  <text x="60" y="71" fill="#98917E" font-size="12">Revision 6, 7 September 2026. Supersedes v5 of 3 August 2026, which is kept alongside it. AI coordinates, verifies and drafts. A named human decides every money and trust step.</text>
+  <text x="60" y="71" fill="#98917E" font-size="12">Revision 6, 7 September 2026, amended 13 September for the decisions of 9 September. Supersedes v5 of 3 August, kept alongside it. A named human decides every money and trust step.</text>
   <text x="60" y="87" fill="#98917E" font-size="12">Three structural corrections in this revision, marked <tspan fill="#E5655B" font-weight="bold">NEW IN v6</tspan> where they appear: Yaadly is the principal contractor · nothing auto releases · the two sign-offs are separated. Full note at the foot.</text>
 
   <rect x="760" y="26" width="14" height="14" rx="4" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
@@ -92,8 +92,8 @@
   <text x="80" y="650" fill="#E5655B" font-size="13.5" font-weight="bold">THE STRUCTURE, SETTLED 3 SEPTEMBER 2026: YAADLY IS THE PRINCIPAL CONTRACTOR AND HOLDS NOBODY'S MONEY.</text>
   <text x="80" y="673" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">A MANAGED JOB.</tspan> The client buys the job from Yaadly at one agreed price. Yaadly engages an identity checked tradesperson as its own subcontractor and pays him under its own</text>
   <text x="80" y="690" fill="#E8E2D3" font-size="11">separate agreement. The client never contracts with him and never pays him. If the work is wrong the client comes to Yaadly, not to a stranger in Jamaica, and putting it right is Yaadly's.</text>
-  <text x="80" y="713" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">OVERSIGHT ONLY.</tspan> The client's own contractor stays theirs and they pay him directly. Yaadly holds none of the money for the building work and never pays that contractor. What the</text>
-  <text x="80" y="730" fill="#E8E2D3" font-size="11">client buys is the eyes: somebody qualified attends, records what is there against a checklist, and writes it up. Yaadly's own fee for that is invoiced separately.</text>
+  <text x="80" y="713" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">ONE MONEY STORY, ON EVERY LANE.</tspan> The client pays Yaadly on every job and every service, an inspection or an oversight visit included. A client never</text>
+  <text x="80" y="730" fill="#E8E2D3" font-size="11">pays a tradesperson directly on a Yaadly job. An earlier draft of v6 drew an "oversight only" lane in which they did. That lane was removed on 9 September 2026.</text>
   <text x="80" y="753" fill="#98917E" font-size="10.5">There is no account with a client's money sitting in it waiting for a button to be pressed. v5 drew this box as "funds held with a licensed payment provider" and that was the single largest error in it.</text>
   <text x="80" y="768" fill="#98917E" font-size="10.5">Yaadly does not operate an escrow service. The word is banned in both runtimes, along with any wording that implies Yaadly holds money for anybody, and the language screen checks every outbound message.</text>
 
@@ -109,7 +109,7 @@
   <text x="303" y="825" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · The client accepts the quote</text>
   <text x="303" y="843" fill="#E8E2D3" font-size="10.5">One price, agreed in writing before anything starts, already including the</text>
   <text x="303" y="858" fill="#E8E2D3" font-size="10.5">15% Guarantee and Support fee, on labour only and never on materials.</text>
-  <text x="303" y="873" fill="#E8E2D3" font-size="10.5">Yaadly engages the worker at his own agreed price less 12%, written into his</text>
+  <text x="303" y="873" fill="#E8E2D3" font-size="10.5">Yaadly engages the worker at his own agreed price less 5%, written into his</text>
   <text x="303" y="888" fill="#98917E" font-size="10.5">engagement note before he accepts. Both figures shown before either agrees.</text>
 
   <rect x="696" y="802" width="200" height="96" rx="12" fill="#1E1A12" stroke="#E5655B" stroke-width="1.5"/>
