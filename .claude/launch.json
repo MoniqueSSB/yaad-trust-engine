@@ -72,6 +72,20 @@
         "concierge"
       ],
       "port": 8935
+    },
+    {
+      "name": "yaad-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "web",
+        "--",
+        "--port",
+        "3111"
+      ],
+      "port": 3111
     }
   ]
 }
