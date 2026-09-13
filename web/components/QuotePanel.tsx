@@ -85,12 +85,11 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
         setBusy(true);
         setError(null);
         try {
-          await submitQuote(fd);
-          setSent(true);
+          const res = await submitQuote(fd);
+          if (res.ok) setSent(true);
+          else setError(res.error);
         } catch {
-          setError(
-            "The database refused this quote. Quoting needs a published worker profile, a signed Worker Guidelines, and a job that is still open.",
-          );
+          setError("This quote did not go through. Check your connection and try again.");
         }
         setBusy(false);
       }}

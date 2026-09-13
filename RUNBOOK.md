@@ -5007,3 +5007,45 @@ job and its hash have drifted apart: do not rotate anything, tell Monique.
 
 **If 503s come every minute for more than a few minutes**, the database API is
 down for real. Check status.supabase.com before touching anything here.
+
+## A worker sent a quote, saw "quote sent", and it is not in their portal
+
+The quote was refused by the database and, until 13 September 2026, the form
+said it had gone anyway. It now shows the refusal. The usual cause is the
+Worker Guidelines: the database only accepts a quote from a worker whose
+signature is on the CURRENT version, and a worker who signed an older one
+is refused.
+
+1. Find the worker and what they signed:
+
+```sql
+select p.worker_email, p.active,
+  current_doc_version('worker_guidelines') as current_version,
+  (select string_agg(ds.doc_version, ',') from doc_signatures ds
+    where ds.doc_type = 'worker_guidelines' and ds.signer_user = p.worker_user) as signed
+from worker_profiles p where lower(p.worker_email) = lower('<their email>');
+```
+
+2. If `signed` does not include `current_version`, they sign the new version
+   at `/portal/guidelines?read=worker_guidelines`. The job board now tells them
+   this on every open job instead of showing the quote form.
+3. If `active` is false, the profile is not published. That is a vetting
+   decision, not a fix.
+4. Do not backdate or copy a signature onto the new version. A signature is
+   only worth the words it was given against.
+
+## A worker's WhatsApp number is refused as "not a real phone number"
+
+`yaad-phone-check` asks Twilio, and Twilio reads a number with no plus sign
+as a Jamaican local number. Since 13 September 2026 a number of eleven or more
+digits typed without a plus gets one added before the check, because no
+Jamaican local number is that long. So 447767171858 is checked as
++447767171858.
+
+1. Ask the worker to type it with the country code and a plus: +1 876 for
+   Jamaica, +44 for the UK.
+2. If it is still refused with the plus, Twilio genuinely does not recognise
+   it. Check the digits with them.
+3. The fix lives in the function, so it is only live once `yaad-phone-check`
+   is redeployed from disk after merge (§12 of CLAUDE.md). It runs WITH
+   platform auth: do not add `--no-verify-jwt`.

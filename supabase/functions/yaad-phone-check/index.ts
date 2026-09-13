@@ -74,7 +74,18 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
-    const raw = String(body.phone ?? "").trim();
+    const typed = String(body.phone ?? "").trim();
+    // A number typed without its plus. Twilio reads bare digits as a LOCAL
+    // number in CountryCode, so 447767171858 (a UK mobile with the 44 but no
+    // +) was parsed as a Jamaican number and refused as not real, 13 Sep
+    // 2026. No Jamaican local number has more than ten digits (876 XXX XXXX),
+    // so eleven or more digits with no plus can only be a country code that
+    // lost its sign: give it back. Ten digits or fewer are left alone and
+    // still read as Jamaican.
+    const digits = typed.replace(/[^\d+]/g, "");
+    const raw = !digits.startsWith("+") && digits.replace(/\D/g, "").length >= 11
+      ? `+${digits.replace(/\D/g, "")}`
+      : typed;
     // Jamaica by default, because that is where every worker is. A number
     // already in E.164 ignores this entirely.
     const country = (String(body.country ?? "JM").trim().toUpperCase() || "JM").slice(0, 2);
@@ -111,7 +122,7 @@ Deno.serve(async (req: Request) => {
       root.setAttributes({ "yaadly.lookup.valid": false });
       return json({
         ok: true, valid: false, e164: "", lineType: "", unreachable: true,
-        note: "That does not look like a real phone number. Check it and try again.",
+        note: "That does not look like a real phone number. Check it and try again, with the country code first: +1 876 for Jamaica, +44 for the UK.",
       } satisfies Verdict);
     }
     if (!r.ok) {
@@ -146,7 +157,7 @@ Deno.serve(async (req: Request) => {
       lineType,
       unreachable,
       note: !valid
-        ? "That does not look like a real phone number. Check it and try again."
+        ? "That does not look like a real phone number. Check it and try again, with the country code first: +1 876 for Jamaica, +44 for the UK."
         : lineType === "landline"
         ? "That looks like a landline. WhatsApp needs a mobile, and everything Yaadly sends you goes there."
         : lineType === "mobile"
