@@ -14,6 +14,7 @@ import { ArrivalCheckIn } from "@/components/portal/ArrivalCheckIn";
 import { MaterialsStore } from "@/components/portal/MaterialsStore";
 import { ChatThread } from "@/components/portal/ChatThread";
 import { DisputePanel } from "@/components/portal/DisputePanel";
+import { ContactYaadly } from "@/components/portal/ContactYaadly";
 import { PortalCard } from "@/components/portal/PortalCard";
 import { JobBrief } from "@/components/portal/JobBrief";
 import { IntakeThread } from "@/components/portal/IntakeThread";
@@ -1713,9 +1714,18 @@ export default async function JobRoom({
       ) : (
         <p className="mt-6 max-w-[58ch] text-[13.5px] leading-relaxed text-mute">
           Nothing to raise yet: a dispute needs a worker booked on the job.
-          If you are stuck before then, use the WhatsApp link in the sidebar.
+          If you are stuck before then, message Yaadly below.
         </p>
       )}
+      {/* id="contact" is where the rail's "Message Yaadly" button lands.
+          Shown with or without a worker booked: a problem before booking
+          still needs a person. */}
+      <div id="contact">
+        <ContactYaadly
+          jobId={job.id}
+          otherSide={role === "client" ? (job.worker_name ?? "the tradesperson") : "the client"}
+        />
+      </div>
         </>
       )}
 
