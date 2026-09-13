@@ -1,5 +1,5 @@
 -- Proof that a quoting worker reads the tender pack and not the job
--- (20260913225614). Run against the project with execute_sql, or psql.
+-- (20260913230642). Run against the project with execute_sql, or psql.
 -- Reads only, creates nothing. Checks 9 to 11 act as a real worker who has
 -- quoted and is not booked, using a local setting that ends with this
 -- statement, and print counts only, never a value.
@@ -64,7 +64,7 @@ begin
   select count(*) into v from pg_trigger
    where tgrelid = 'public.job_quotes'::regclass and tgname = 'trg_notify_worker_quote_not_selected' and tgenabled <> 'D';
   select pg_get_functiondef('public.notify_worker_quote_not_selected()'::regprocedure) into q;
-  t := t || '8b. a declined quote tells its worker, by id and never by text (20260913225714): '
+  t := t || '8b. a declined quote tells its worker, by id and never by text (20260913230742): '
        || case when v = 1 and q ilike '%quote_not_selected%' and q ilike '%notify_trigger_secret()%' then 'PASS' else 'FAIL' end || E'\n';
 
   select q2.worker_user, q2.worker_email into w_uid, w_mail

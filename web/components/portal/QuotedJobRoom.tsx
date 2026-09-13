@@ -7,7 +7,7 @@ import { jmdOrNull as jmd } from "@/lib/money";
 
 /** One row of my_quoted_jobs(): the tender pack. These are all the columns
  *  there are. There is no address, no client detail and no job code to add,
- *  because the function does not return them (20260913225614). */
+ *  because the function does not return them (20260913230642). */
 export type Tender = {
   id: string;
   title: string | null;
