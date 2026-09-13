@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -936,12 +936,21 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       quoteWorkerEmail = q?.worker_email ?? "";
     }
-    if (kind === "quote_awaiting_worker_confirm" && quoteWorkerEmail) {
+    // quote_not_selected goes to the worker who wrote this quote, read off the
+    // quote for the same reason: jobs.worker_email is now the worker who WAS
+    // chosen. Only while the quote is still declined, so a trigger that fires
+    // twice, or a desk correction back to live, cannot tell somebody they
+    // lost when they did not. (20260913230742)
+    if (kind === "quote_not_selected" && quoteId) {
+      const { data: q } = await admin.from("job_quotes").select("worker_email, status").eq("id", quoteId).eq("job_id", jobId).maybeSingle();
+      if (q?.status === "declined") quoteWorkerEmail = q.worker_email ?? "";
+    }
+    if ((kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected") && quoteWorkerEmail) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1164,6 +1173,17 @@ Deno.serve(async (req: Request) => {
         `Reply with the code ${job.id} to confirm it. ` +
         `The client is being asked to confirm the same price; once you have both replied, ` +
         `they can book you straight away, or ask for a fuller Kickoff Pack first if they want one.`;
+    } else if (kind === "quote_not_selected") {
+      // Founder, 13 Sep 2026: a worker whose quote closed because somebody
+      // else was booked still sees the job, and this tells them so rather
+      // than leaving them to find out. It says that another tradesperson was
+      // booked and not why: the client's reasons and the other price are not
+      // this worker's to read, and a price that lost is not a failure. The
+      // link is their own view of the job, board level only (20260913230642).
+      // Free text, no approved template, the same as every other worker kind.
+      subject = `Not selected this time: ${job.title}`;
+      line = `Thank you for pricing ${job.id} (${job.title}). Another tradesperson has been booked for this one, so it is closed for you and there is nothing more for you to do. ` +
+        `The job and your price stay in your portal: ${roomLink}`;
     } else if (kind === "request_declined") {
       // The other half of the promise on the job wizard's confirmation
       // screen. Goes to the CLIENT, so it is not in the worker-recipient
