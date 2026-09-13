@@ -1,0 +1,287 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2168" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8A8578"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#2FAD6E"/>
+    </marker>
+    <marker id="arrY" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#F2A900"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#E5655B"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="2168" fill="#0E0C08"/>
+  <text x="60" y="48" fill="#F7F1E3" font-size="26" font-weight="bold">THE YAAD TRUST ENGINE · Agentic Workflow v6</text>
+  <text x="60" y="71" fill="#98917E" font-size="12">Revision 6, 7 September 2026, amended 13 September for the decisions of 9 September. Supersedes v5 of 3 August, kept alongside it. A named human decides every money and trust step.</text>
+  <text x="60" y="87" fill="#98917E" font-size="12">Three structural corrections in this revision, marked <tspan fill="#E5655B" font-weight="bold">NEW IN v6</tspan> where they appear: Yaadly is the principal contractor · nothing auto releases · the two sign-offs are separated. Full note at the foot.</text>
+
+  <rect x="760" y="26" width="14" height="14" rx="4" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
+  <text x="780" y="37" fill="#98917E" font-size="11">AI Agent</text>
+  <rect x="846" y="26" width="14" height="14" rx="4" fill="#1E1A12" stroke="#2FAD6E" stroke-width="1.5"/>
+  <text x="866" y="37" fill="#98917E" font-size="11">Human decides</text>
+  <rect x="960" y="26" width="14" height="14" rx="4" fill="#1E1A12" stroke="#5A83C9" stroke-width="1.5"/>
+  <text x="980" y="37" fill="#98917E" font-size="11">Data / API</text>
+  <rect x="1046" y="26" width="14" height="14" rx="4" fill="#1E1A12" stroke="#E5655B" stroke-width="1.5"/>
+  <text x="1066" y="37" fill="#98917E" font-size="11">Changed in v6</text>
+
+  <!-- ROW 0: LIVE SURFACES -->
+  <rect x="60" y="104" width="1080" height="58" rx="12" fill="#171307" stroke="#3A331F"/>
+  <text x="80" y="127" fill="#F7F1E3" font-size="12.5" font-weight="bold">LIVE SURFACES, ONE SPINE:</text>
+  <text x="310" y="127" fill="#98917E" font-size="11">WhatsApp over Twilio, the conversation (client thread and worker thread, never shared) · app.yaadly.co.uk, client and worker portals</text>
+  <text x="80" y="147" fill="#98917E" font-size="11">yaadly.co.uk, the public site and the published price guide · concierge.yaadly.co.uk, the admin desk behind Cloudflare Access, where a named person takes every consequential decision</text>
+
+  <!-- ROW 1: INTAKE -->
+  <rect x="60" y="186" width="236" height="80" rx="12" fill="#1E1A12" stroke="#3A331F"/>
+  <text x="75" y="209" fill="#F7F1E3" font-size="13" font-weight="bold">INPUT · Client</text>
+  <text x="75" y="227" fill="#98917E" font-size="10.5">WhatsApp, web form, email or portal.</text>
+  <text x="75" y="242" fill="#98917E" font-size="10.5">Text, photos, or a Patois voice note,</text>
+  <text x="75" y="257" fill="#98917E" font-size="10.5">transcribed. JDPA and UK GDPR consent.</text>
+
+  <rect x="316" y="186" width="206" height="80" rx="12" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
+  <text x="331" y="209" fill="#FFC53D" font-size="13" font-weight="bold">1 · INTAKE AGENT</text>
+  <text x="331" y="227" fill="#E8E2D3" font-size="10.5">Voice, photo or text to a Job Card</text>
+  <text x="331" y="242" fill="#E8E2D3" font-size="10.5">+ JOB TYPE assigned at intake</text>
+  <text x="331" y="257" fill="#98917E" font-size="10.5">3 questions max. No price, no date.</text>
+
+  <rect x="582" y="186" width="206" height="80" rx="12" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
+  <text x="597" y="209" fill="#FFC53D" font-size="13" font-weight="bold">2 · PRICING AGENT</text>
+  <text x="597" y="227" fill="#E8E2D3" font-size="10.5">Fair price band per service and parish.</text>
+  <text x="597" y="242" fill="#E8E2D3" font-size="10.5">A lookup, never a generated number.</text>
+  <text x="597" y="257" fill="#98917E" font-size="10.5">"No public price exists" is a full answer</text>
+
+  <rect x="848" y="186" width="292" height="80" rx="12" fill="#1E1A12" stroke="#5A83C9" stroke-width="1.5"/>
+  <text x="863" y="209" fill="#9FBCE8" font-size="13" font-weight="bold">DATA · Price bands + supply registry</text>
+  <text x="863" y="227" fill="#98917E" font-size="10.5">Bands researched and seeded · every reviewed quote is</text>
+  <text x="863" y="242" fill="#98917E" font-size="10.5">kept, so the price database fills at the rate the business</text>
+  <text x="863" y="257" fill="#98917E" font-size="10.5">runs · registry: all three lanes, tiers, ratings, availability</text>
+
+  <line x1="296" y1="226" x2="312" y2="226" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="522" y1="226" x2="578" y2="226" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="844" y1="226" x2="792" y2="226" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ROW 2: JOB TYPE REGISTRY -->
+  <rect x="60" y="292" width="1080" height="104" rx="14" fill="#171307" stroke="#5A83C9" stroke-width="1.2"/>
+  <text x="80" y="316" fill="#9FBCE8" font-size="13.5" font-weight="bold">JOB TYPE REGISTRY, the workflow is data and not code (type = state chain + evidence checklist + release trigger + aftercare rule)</text>
+  <text x="80" y="337" fill="#E8E2D3" font-size="11">REPAIR AND BUILD: the full loop below, 28 day warranty window &#160;·&#160; INSPECTION AND REPORT: the report IS the deliverable, and the client confirms RECEIPT AND COVERAGE,</text>
+  <text x="80" y="354" fill="#E8E2D3" font-size="11">never the verdict &#160;·&#160; PROPERTY CARE: recurring inspection visits, the same zone checklist every time, issues raise a child Repair job</text>
+  <text x="80" y="371" fill="#E8E2D3" font-size="11">PM AND OVERSIGHT: judgment work (scope, sequencing, quote shape, evidence), never price estimation, which is quantity surveying and sits outside the service boundary</text>
+  <text x="80" y="389" fill="#98917E" font-size="10.5">Types COMPOSE: an inspection point on a Repair or Project job is a child Inspection track job, with its own independent inspector, its own checklist and its own payment. A new service is a new registry row, not a new build.</text>
+
+  <!-- ROW 3: SUPPLY -->
+  <rect x="60" y="424" width="1080" height="110" rx="14" fill="#171307" stroke="#2FAD6E" stroke-width="1.2"/>
+  <text x="80" y="448" fill="#4CCB8A" font-size="13.5" font-weight="bold">SUPPLY, THREE LANES, ONE TRUST CURRENCY (skills first, papers only where the law demands)</text>
+  <text x="80" y="469" fill="#E8E2D3" font-size="11">TRADESPEOPLE (do). Certified: credential verified against the issuing body (HEART, licensing) and regulated trades unlocked · Uncertified: identity checked, then a sandbox tier of</text>
+  <text x="80" y="486" fill="#E8E2D3" font-size="11">micro jobs rising on rated work, where a dip retrains rather than banishes. Both lanes file exactly the same evidence.</text>
+  <text x="80" y="503" fill="#E8E2D3" font-size="11">INSPECTORS (see). Independent by rule: never the worker on the job they check · certification free, recovered through commission · paid on report delivery, never on the verdict</text>
+  <text x="80" y="520" fill="#E8E2D3" font-size="11">PROFESSIONALS (judge). Qualified PMs vetted against founder built playbooks · per PM cover · the guarantee boundary travels with the lane · a Yaad Score variant per lane</text>
+
+  <!-- ROW 3b: IDENTITY -->
+  <rect x="60" y="550" width="1080" height="46" rx="12" fill="#171307" stroke="#3A331F"/>
+  <text x="80" y="573" fill="#F7F1E3" font-size="12" font-weight="bold">IDENTITY:</text>
+  <text x="152" y="573" fill="#98917E" font-size="11">the government photo ID, the live selfie and the face video go to Persona and to a named person at Yaadly, and to nothing else. No model ever sees them, enforced in code before the file is</text>
+  <text x="80" y="589" fill="#98917E" font-size="11">fetched from storage, with no override. Supporting paperwork reaches a model only where the applicant gave explicit consent, and a blank answer counts as declined.</text>
+
+  <!-- ROW 4: THE STRUCTURE, NEW IN v6 -->
+  <rect x="60" y="624" width="1080" height="150" rx="14" fill="#1A1109" stroke="#E5655B" stroke-width="2"/>
+  <rect x="1012" y="634" width="118" height="20" rx="6" fill="#E5655B"/>
+  <text x="1071" y="648" fill="#1A1109" font-size="11" font-weight="bold" text-anchor="middle">NEW IN v6</text>
+  <text x="80" y="650" fill="#E5655B" font-size="13.5" font-weight="bold">THE STRUCTURE, SETTLED 3 SEPTEMBER 2026: YAADLY IS THE PRINCIPAL CONTRACTOR AND HOLDS NOBODY'S MONEY.</text>
+  <text x="80" y="673" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">A MANAGED JOB.</tspan> The client buys the job from Yaadly at one agreed price. Yaadly engages an identity checked tradesperson as its own subcontractor and pays him under its own</text>
+  <text x="80" y="690" fill="#E8E2D3" font-size="11">separate agreement. The client never contracts with him and never pays him. If the work is wrong the client comes to Yaadly, not to a stranger in Jamaica, and putting it right is Yaadly's.</text>
+  <text x="80" y="713" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">ONE MONEY STORY, ON EVERY LANE.</tspan> The client pays Yaadly on every job and every service, an inspection or an oversight visit included. A client never</text>
+  <text x="80" y="730" fill="#E8E2D3" font-size="11">pays a tradesperson directly on a Yaadly job. An earlier draft of v6 drew an "oversight only" lane in which they did. That lane was removed on 9 September 2026.</text>
+  <text x="80" y="753" fill="#98917E" font-size="10.5">There is no account with a client's money sitting in it waiting for a button to be pressed. v5 drew this box as "funds held with a licensed payment provider" and that was the single largest error in it.</text>
+  <text x="80" y="768" fill="#98917E" font-size="10.5">Yaadly does not operate an escrow service. The word is banned in both runtimes, along with any wording that implies Yaadly holds money for anybody, and the language screen checks every outbound message.</text>
+
+  <!-- ROW 5: PRICE AND INSTRUMENT -->
+  <rect x="60" y="802" width="212" height="96" rx="12" fill="#1E1A12" stroke="#5A83C9" stroke-width="1.5"/>
+  <text x="75" y="825" fill="#9FBCE8" font-size="13" font-weight="bold">API · Payment rails</text>
+  <text x="75" y="843" fill="#98917E" font-size="10.5">At or under £500: card authorised at</text>
+  <text x="75" y="858" fill="#98917E" font-size="10.5">booking, charged once the work is done</text>
+  <text x="75" y="873" fill="#98917E" font-size="10.5">and accepted · Above £500: invoice and</text>
+  <text x="75" y="888" fill="#98917E" font-size="10.5">bank transfer · payout by bank or Lynk</text>
+
+  <rect x="288" y="802" width="392" height="96" rx="12" fill="#1E1A12" stroke="#2FAD6E" stroke-width="1.5"/>
+  <text x="303" y="825" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · The client accepts the quote</text>
+  <text x="303" y="843" fill="#E8E2D3" font-size="10.5">One price, agreed in writing before anything starts, already including the</text>
+  <text x="303" y="858" fill="#E8E2D3" font-size="10.5">15% Guarantee and Support fee, on labour only and never on materials.</text>
+  <text x="303" y="873" fill="#E8E2D3" font-size="10.5">Yaadly engages the worker at his own agreed price less 5%, written into his</text>
+  <text x="303" y="888" fill="#98917E" font-size="10.5">engagement note before he accepts. Both figures shown before either agrees.</text>
+
+  <rect x="696" y="802" width="200" height="96" rx="12" fill="#1E1A12" stroke="#E5655B" stroke-width="1.5"/>
+  <text x="711" y="825" fill="#E5655B" font-size="13" font-weight="bold">DECISION · Routing</text>
+  <text x="711" y="843" fill="#E8E2D3" font-size="10.5">Split by value, duration and</text>
+  <text x="711" y="858" fill="#E8E2D3" font-size="10.5">job type. AI ranks, a person</text>
+  <text x="711" y="873" fill="#98917E" font-size="10.5">picks. Never pay for placement,</text>
+  <text x="711" y="888" fill="#98917E" font-size="10.5">and never a charge to quote.</text>
+
+  <rect x="912" y="802" width="228" height="96" rx="12" fill="#1E1A12" stroke="#5A83C9" stroke-width="1.5"/>
+  <text x="927" y="825" fill="#9FBCE8" font-size="13" font-weight="bold">DATA · The written terms</text>
+  <text x="927" y="843" fill="#98917E" font-size="10.5">Payment terms are agreed in writing for</text>
+  <text x="927" y="858" fill="#98917E" font-size="10.5">each job before anything starts: what</text>
+  <text x="927" y="873" fill="#98917E" font-size="10.5">each stage covers, and what has to be</text>
+  <text x="927" y="888" fill="#98917E" font-size="10.5">finished for that stage to count as done.</text>
+
+  <line x1="272" y1="850" x2="284" y2="850" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="680" y1="850" x2="692" y2="850" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ROW 6: THE STAGED LADDER -->
+  <rect x="60" y="926" width="1080" height="140" rx="14" fill="#171307" stroke="#F2A900" stroke-width="1.5"/>
+  <rect x="1012" y="936" width="118" height="20" rx="6" fill="#E5655B"/>
+  <text x="1071" y="950" fill="#1A1109" font-size="11" font-weight="bold" text-anchor="middle">NEW IN v6</text>
+  <text x="80" y="951" fill="#FFC53D" font-size="13.5" font-weight="bold">THE STAGED LADDER, matched to real trade practice (founder decision, 28 August 2026).</text>
+  <text x="80" y="974" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">A0 · one to two days, materials nil or trivial.</tspan> NOTHING up front. Paid in full on completion against approved evidence. No retention. If there is nothing to buy, do not take a deposit.</text>
+  <text x="80" y="993" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">FAST TRACK, at or under £500.</tspan> Materials on receipt, then 100% of the labour on approved evidence. No retention. This is the December pilot scope.</text>
+  <text x="80" y="1012" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">£500 to £2,000.</tspan> Materials on receipt · 40% of the labour at a signed off midpoint · 60% on completion · 5% retention, released on day 28 as the warranty window closes.</text>
+  <text x="80" y="1031" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">PROJECT TRACK, £2,000 and above.</tspan> Sub milestones capped at £500 to £1,000 · materials per milestone · an inspection point before each release.</text>
+  <text x="80" y="1052" fill="#98917E" font-size="10.5">Materials always pass through at cost, against a receipt, and are never marked up. Retention is 5% and only above £500, where v5 said 10%: it is the worker's own money and it is skin in the game, not a repair fund.</text>
+
+  <!-- ROW 7: ARRIVAL LOG -->
+  <rect x="60" y="1094" width="1080" height="96" rx="14" fill="#171307" stroke="#E5655B" stroke-width="1.2"/>
+  <text x="80" y="1118" fill="#E5655B" font-size="13.5" font-weight="bold">THE ARRIVAL LOG AND SITE MATCH GATE (before a tool is lifted, and it is the worker's first protection, not the client's)</text>
+  <text x="80" y="1139" fill="#E8E2D3" font-size="11">The worker or inspector arrives, files a wide pan video, close ups and a location he chooses to share, BEFORE touching anything. That arms the guarantee and defeats a false damage claim. Then a choice:</text>
+  <text x="80" y="1157" fill="#E8E2D3" font-size="11">SITE MATCHES, which unlocks the materials tranche if there is one and work begins &#160;|&#160; DOESN'T MATCH, which raises a variation with video grounds, and the client approves the true price,</text>
+  <text x="80" y="1175" fill="#98917E" font-size="10.5">or the worker cancels penalty free, no strike and no mark, plus a flat call out fee. It is never the worker's job to finish a job that lied about itself. Arrival is checked against the job's parish, never geocoded to the street address.</text>
+
+  <line x1="350" y1="1066" x2="290" y2="1090" stroke="#8A8578" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <line x1="850" y1="1066" x2="910" y2="1090" stroke="#8A8578" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+
+  <!-- ROW 8: EVIDENCE + INSPECTION POINT -->
+  <rect x="60" y="1222" width="240" height="98" rx="12" fill="#1E1A12" stroke="#3A331F"/>
+  <text x="75" y="1245" fill="#F7F1E3" font-size="13" font-weight="bold">INPUT · Midnight Work-Log</text>
+  <text x="75" y="1263" fill="#98917E" font-size="10.5">No daytime tracking. One package by</text>
+  <text x="75" y="1278" fill="#98917E" font-size="10.5">11:59pm JA: pan, close up anchors, text</text>
+  <text x="75" y="1293" fill="#98917E" font-size="10.5">summary, materials receipts. Filed straight</text>
+  <text x="75" y="1308" fill="#98917E" font-size="10.5">from WhatsApp, no portal visit needed.</text>
+
+  <rect x="316" y="1222" width="240" height="98" rx="12" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
+  <text x="331" y="1245" fill="#FFC53D" font-size="13" font-weight="bold">3 · VERIFICATION AGENT</text>
+  <text x="331" y="1263" fill="#E8E2D3" font-size="10.5">Checks completeness, sequencing and</text>
+  <text x="331" y="1278" fill="#E8E2D3" font-size="10.5">plausibility across the whole chain, against</text>
+  <text x="331" y="1293" fill="#E8E2D3" font-size="10.5">the JOB TYPE's own checklist. Assembles a</text>
+  <text x="331" y="1308" fill="#98917E" font-size="10.5">pack for a person. Flags only. Never rules.</text>
+
+  <rect x="572" y="1222" width="568" height="98" rx="12" fill="#1E1A12" stroke="#5A83C9" stroke-width="1.5"/>
+  <text x="587" y="1245" fill="#9FBCE8" font-size="13" font-weight="bold">INSPECTION POINT (optional, per milestone): an independent critique of the work itself</text>
+  <text x="587" y="1263" fill="#E8E2D3" font-size="10.5">A child Inspection track job on the parent. An independent inspector visits and critiques the work against the scope.</text>
+  <text x="587" y="1278" fill="#E8E2D3" font-size="10.5">Visual £40 to £60 · technical £50 · in depth certified £250 to £400 per milestone at scale stage. The client pays for it.</text>
+  <text x="587" y="1293" fill="#E8E2D3" font-size="10.5">The checker is NEVER the worker on that job, and the inspector is paid on delivering the report, never on its verdict.</text>
+  <text x="587" y="1308" fill="#98917E" font-size="10.5">On the Project Track a milestone can be gated on this sign off. An audit is a system raised inspection point.</text>
+
+  <line x1="300" y1="1270" x2="312" y2="1270" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="556" y1="1270" x2="568" y2="1270" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="600" y1="1190" x2="600" y2="1218" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ROW 9: THE TWO SIGN-OFFS -->
+  <rect x="60" y="1352" width="240" height="104" rx="12" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
+  <text x="75" y="1375" fill="#FFC53D" font-size="13" font-weight="bold">5 · REPORTING AGENT</text>
+  <text x="75" y="1393" fill="#E8E2D3" font-size="10.5">Drafts the Completion or Inspection</text>
+  <text x="75" y="1408" fill="#E8E2D3" font-size="10.5">Report PDF from the evidence: summary,</text>
+  <text x="75" y="1423" fill="#E8E2D3" font-size="10.5">photographs in their sections, verification</text>
+  <text x="75" y="1438" fill="#98917E" font-size="10.5">record. The doer writes no paperwork.</text>
+  <text x="75" y="1451" fill="#98917E" font-size="10.5">It describes, and it never approves.</text>
+
+  <rect x="316" y="1352" width="240" height="104" rx="12" fill="#1E1A12" stroke="#2FAD6E" stroke-width="1.5"/>
+  <text x="331" y="1375" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · The doer confirms</text>
+  <text x="331" y="1393" fill="#E8E2D3" font-size="10.5">The worker or inspector reads the draft:</text>
+  <text x="331" y="1408" fill="#E8E2D3" font-size="10.5">"what is written is what was done", then</text>
+  <text x="331" y="1423" fill="#E8E2D3" font-size="10.5">confirms. His name, his word. Nothing</text>
+  <text x="331" y="1438" fill="#98917E" font-size="10.5">travels in his name without it. Timeout,</text>
+  <text x="331" y="1451" fill="#98917E" font-size="10.5">chase and escalation are all to a person.</text>
+
+  <rect x="572" y="1352" width="272" height="104" rx="12" fill="#12200F" stroke="#2FAD6E" stroke-width="2"/>
+  <text x="587" y="1375" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · Yaadly checks the work</text>
+  <text x="587" y="1393" fill="#E8E2D3" font-size="10.5">A named person at Yaadly checks the evidence</text>
+  <text x="587" y="1408" fill="#E8E2D3" font-size="10.5">against the agreed scope and makes the payment</text>
+  <text x="587" y="1423" fill="#E8E2D3" font-size="10.5">call. <tspan font-weight="bold" fill="#F7F1E3">THIS is what pays the tradesperson.</tspan></text>
+  <text x="587" y="1437" fill="#98917E" font-size="10.5">He is Yaadly's subcontractor, so he is never left</text>
+  <text x="587" y="1450" fill="#98917E" font-size="10.5">waiting on a client abroad for his own money.</text>
+
+  <rect x="860" y="1352" width="280" height="104" rx="12" fill="#12200F" stroke="#2FAD6E" stroke-width="2"/>
+  <text x="875" y="1375" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · The client signs off</text>
+  <text x="875" y="1393" fill="#E8E2D3" font-size="10.5">From the portal, a logged WhatsApp reply, or a</text>
+  <text x="875" y="1408" fill="#E8E2D3" font-size="10.5">tap carrying that job's own code. <tspan font-weight="bold" fill="#F7F1E3">THIS closes the</tspan></text>
+  <text x="875" y="1423" fill="#E8E2D3" font-size="10.5"><tspan font-weight="bold" fill="#F7F1E3">stage with Yaadly</tspan> and makes the balance due to</text>
+  <text x="875" y="1437" fill="#98917E" font-size="10.5">Yaadly. On an inspection it confirms receipt and</text>
+  <text x="875" y="1450" fill="#98917E" font-size="10.5">coverage of the report, never its verdict.</text>
+
+  <line x1="300" y1="1400" x2="312" y2="1400" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="556" y1="1400" x2="568" y2="1400" stroke="#2FAD6E" stroke-width="1.5" marker-end="url(#arrG)"/>
+  <line x1="844" y1="1400" x2="856" y2="1400" stroke="#8A8578" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <line x1="180" y1="1320" x2="180" y2="1348" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <rect x="60" y="1472" width="1080" height="86" rx="14" fill="#1A1109" stroke="#E5655B" stroke-width="2"/>
+  <rect x="1012" y="1482" width="118" height="20" rx="6" fill="#E5655B"/>
+  <text x="1071" y="1496" fill="#1A1109" font-size="11" font-weight="bold" text-anchor="middle">NEW IN v6</text>
+  <text x="80" y="1497" fill="#E5655B" font-size="13.5" font-weight="bold">TWO SIGN-OFFS, TWO DIFFERENT JOBS. v5 drew them as one chain, and that is the correction that matters most in this revision.</text>
+  <text x="80" y="1519" fill="#E8E2D3" font-size="11">Yaadly's check is what pays the tradesperson, within 3 working days, by bank transfer, Lynk wallet or remittance pick up &#160;·&#160; the client's sign off is what closes the stage with Yaadly and</text>
+  <text x="80" y="1536" fill="#E8E2D3" font-size="11">makes the balance due &#160;·&#160; the two are deliberately decoupled, because a worker in Portmore should not wait on a client in London to be paid for work that has already been checked.</text>
+  <text x="80" y="1552" fill="#FFC53D" font-size="11" font-weight="bold">NOTHING AUTO RELEASES. v5 showed a 48 hour auto release in three places. It is gone. Nothing is paid because a countdown ran out, a score passed, or a check went green.</text>
+
+  <!-- ROW 10: DISPUTE -->
+  <rect x="60" y="1590" width="240" height="92" rx="12" fill="#1E1A12" stroke="#E5655B" stroke-width="1.2"/>
+  <text x="75" y="1613" fill="#E5655B" font-size="13" font-weight="bold">BRANCH · Free complaint</text>
+  <text x="75" y="1631" fill="#98917E" font-size="10.5">No cost to raise, and raised before the</text>
+  <text x="75" y="1646" fill="#98917E" font-size="10.5">client accepts the work. Nothing further</text>
+  <text x="75" y="1661" fill="#98917E" font-size="10.5">is paid out on the job while it is open.</text>
+  <text x="75" y="1675" fill="#98917E" font-size="10.5">Defects pinned to specific evidence.</text>
+
+  <rect x="316" y="1590" width="240" height="92" rx="12" fill="#1E1A12" stroke="#2FAD6E" stroke-width="1.5"/>
+  <text x="331" y="1613" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · Day 3 site survey</text>
+  <text x="331" y="1631" fill="#E8E2D3" font-size="10.5">An independent ground partner on site</text>
+  <text x="331" y="1646" fill="#E8E2D3" font-size="10.5">by day 3: unedited macro video of the</text>
+  <text x="331" y="1661" fill="#E8E2D3" font-size="10.5">pinned zone. The fee is fronted from</text>
+  <text x="331" y="1675" fill="#98917E" font-size="10.5">Yaadly's own guarantee reserve.</text>
+
+  <rect x="572" y="1590" width="272" height="92" rx="12" fill="#1E1A12" stroke="#2FAD6E" stroke-width="1.5"/>
+  <text x="587" y="1613" fill="#4CCB8A" font-size="13" font-weight="bold">HUMAN · Day 7 ruling</text>
+  <text x="587" y="1631" fill="#E8E2D3" font-size="10.5">Reviewed by a person, never by an algorithm. The</text>
+  <text x="587" y="1646" fill="#E8E2D3" font-size="10.5">tradesperson gets a fair chance to make it right first.</text>
+  <text x="587" y="1661" fill="#E8E2D3" font-size="10.5">On a managed job, putting it right is Yaadly's</text>
+  <text x="587" y="1675" fill="#98917E" font-size="10.5">responsibility. A worker never owes Yaadly money.</text>
+
+  <rect x="860" y="1590" width="280" height="92" rx="12" fill="#1E1A12" stroke="#F2A900" stroke-width="1.5"/>
+  <text x="875" y="1613" fill="#FFC53D" font-size="13" font-weight="bold">4 · EVIDENCE AGENT</text>
+  <text x="875" y="1631" fill="#E8E2D3" font-size="10.5">Assembles the pack the ruling is made from, and</text>
+  <text x="875" y="1646" fill="#E8E2D3" font-size="10.5">drafts neutral, dignity preserving worker comms.</text>
+  <text x="875" y="1661" fill="#98917E" font-size="10.5">A pack is a recommendation and never a ruling.</text>
+  <text x="875" y="1675" fill="#98917E" font-size="10.5">Dispute ruling logic does not exist, by design.</text>
+
+  <line x1="300" y1="1636" x2="312" y2="1636" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="556" y1="1636" x2="568" y2="1636" stroke="#8A8578" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="180" y1="1558" x2="180" y2="1586" stroke="#E5655B" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arrR)"/>
+
+  <!-- ROW 11: OUTPUTS -->
+  <rect x="60" y="1714" width="1080" height="100" rx="14" fill="#171307" stroke="#2FAD6E" stroke-width="1.2"/>
+  <text x="84" y="1738" fill="#4CCB8A" font-size="13.5" font-weight="bold">OUTPUTS, what every verified job produces:</text>
+  <text x="84" y="1759" fill="#E8E2D3" font-size="11.5">Payment within 3 working days · a signed Completion Report PDF (the doer's confirmation, the client's approval and the payment record, the client's permanent copy) · a row in the price database</text>
+  <text x="84" y="1778" fill="#98917E" font-size="11">· two way blind reviews · and the <tspan fill="#FFC53D" font-weight="bold">YAAD SCORE</tspan>, one trust currency with three ways to earn it: a tradesperson's completed jobs, an inspector's accepted reports, a PM's delivered engagements.</text>
+  <text x="84" y="1796" fill="#98917E" font-size="11">A portable financial record, exported only with the worker's consent, for credit unions, banks and mortgages. Yaadly is the data source, never the lender. Not computed yet: out of scope until after the pilot.</text>
+
+  <!-- FOOTER -->
+  <text x="60" y="1846" fill="#FFC53D" font-size="12.5" font-weight="bold">THE DATA FLYWHEEL:</text>
+  <text x="222" y="1846" fill="#98917E" font-size="11.5">a verified job makes a complete record, which makes better bands, matching and verification, and so more trust and more jobs. Lead generation rivals never see the transaction.</text>
+
+  <text x="60" y="1874" fill="#6E6857" font-size="10.5">GOVERNING RULES: AI intakes, prices, verifies, drafts and ranks. It never releases money, rules on a dispute, or alters a reputation, and a named human confirms every consequential step. Seven actions are reserved to a</text>
+  <text x="60" y="1891" fill="#6E6857" font-size="10.5">person in code, not in a prompt: release funds, withhold funds, refund client, rule on dispute, adjust Yaad Score, suspend worker, approve job · Yaadly is the principal contractor and holds nobody's money · the client funds</text>
+  <text x="60" y="1908" fill="#6E6857" font-size="10.5">materials at cost, never marked up · logging delays never punish workers, it is a reminder and a grace period · a worker can lose a job's earnings but can never owe the platform money · skills first entry, papers only where</text>
+  <text x="60" y="1925" fill="#6E6857" font-size="10.5">the law demands · no one outranks the evidence · JDPA and UK GDPR consent, export and erasure built into the core · every report is AI drafted, doer confirmed and human reviewed, in that order, always.</text>
+
+  <text x="60" y="1951" fill="#FFC53D" font-size="10.5" font-weight="bold">MIRROR RULE:</text>
+  <text x="150" y="1951" fill="#6E6857" font-size="10.5">every protection has a named counterpart. The worker is paid within 3 working days of Yaadly's own check ↔ the client owes Yaadly nothing until they have seen the evidence and said the work is right ·</text>
+  <text x="60" y="1968" fill="#6E6857" font-size="10.5">the worker walks away penalty free from a site that was mis-sold ↔ a no show is a strike and an instant client rematch · no worker debt ↔ a client gets the fault put right first, free · nothing travels in the doer's name</text>
+  <text x="60" y="1985" fill="#6E6857" font-size="10.5">without his word ↔ his silence never stalls somebody else's money · the inspector is paid on delivery and coverage, never on the verdict ↔ the checker is never the worker. Nobody carries the risk alone.</text>
+
+  <!-- REVISION NOTE -->
+  <rect x="60" y="2008" width="1080" height="130" rx="14" fill="#1A1109" stroke="#E5655B" stroke-width="2"/>
+  <text x="80" y="2033" fill="#E5655B" font-size="13.5" font-weight="bold">WHAT CHANGED FROM v5 (3 August 2026) TO v6 (7 September 2026). v5 is kept alongside this drawing rather than replaced, so the change is auditable.</text>
+  <text x="80" y="2056" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">1. The structure.</tspan> v5 said funds were "held with a licensed payment provider" and drew a client funding step before work. From 3 September 2026 Yaadly is the principal contractor and holds nobody's</text>
+  <text x="80" y="2073" fill="#E8E2D3" font-size="11">money. That phrase is now banned in both runtimes, and it is the one banned idea a word list could not catch, because no single word in it is banned.</text>
+  <text x="80" y="2092" fill="#E8E2D3" font-size="11"><tspan font-weight="bold" fill="#F7F1E3">2. The auto release.</tspan> v5 showed a 48 hour auto release on accepted evidence, in three places. Nothing auto releases. A named person makes every payment call, and no countdown, confidence score or</text>
+  <text x="80" y="2109" fill="#E8E2D3" font-size="11">green check does it instead. <tspan font-weight="bold" fill="#F7F1E3">3. The two sign-offs.</tspan> v5 drew one chain in which client approval paid the worker. They are now separate: Yaadly's check pays the worker, the client's sign-off</text>
+  <text x="80" y="2126" fill="#E8E2D3" font-size="11">closes the stage with Yaadly. <tspan font-weight="bold" fill="#F7F1E3">Also corrected:</tspan> retention 10% becomes 5% and only above £500 · payout "24 hours" becomes 3 working days · the staged ladder now matches the 28 August decision.</text>
+</svg>
