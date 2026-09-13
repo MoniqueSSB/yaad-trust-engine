@@ -1087,6 +1087,7 @@ export default async function JobRoom({
           cal={cal}
           sel={d}
           viewerEmail={email}
+          stageNames={packStages.map((s) => s.stage)}
         />
       )}
 
