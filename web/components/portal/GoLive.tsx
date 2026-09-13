@@ -46,7 +46,7 @@ export function GoLive({
      screen forever would bury the one thing still worth a click. */
   if (live) {
     return (
-      <section className="mt-5 rounded-2xl border border-softline bg-soft p-5">
+      <section id="go-live" className="mt-5 scroll-mt-6 rounded-2xl border border-softline bg-soft p-5">
         <h2 className="mb-2 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
           This job is live
         </h2>
@@ -72,7 +72,7 @@ export function GoLive({
   const ready = outstanding.length === 0;
 
   return (
-    <section className="mt-5 rounded-2xl border border-mango/30 bg-mango/10 p-5">
+    <section id="go-live" className="mt-5 scroll-mt-6 rounded-2xl border border-mango/30 bg-mango/10 p-5">
       <h2 className="font-display text-[17px] uppercase leading-none">
         {ready
           ? "This job is ready for the marketplace"
