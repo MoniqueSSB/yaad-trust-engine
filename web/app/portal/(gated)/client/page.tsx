@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
+import { WorkerPipeline, WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
 import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";
 import {
   jobGates,
@@ -139,6 +140,44 @@ export default async function ClientPortal() {
   const live = jobs.filter((j) => j.status !== "complete");
   const closed = jobs.filter((j) => j.status === "complete");
 
+  /* The dashboard's figure row, 13 Sep 2026. Every number is a count of rows
+     this page already rendered as lists; nothing new is fetched. There is no
+     money card because this page has never loaded a money figure, and a
+     dashboard is not a reason to start guessing one. "Waiting on you" counts
+     live jobs whose status tone is waiting (quotes in, evidence to review,
+     portal setup), the same gold the pills below use. */
+  const waitingOnYou = live.filter((j) => CLIENT_STATUS[j.status]?.tone === "waiting").length;
+  const cards: StatCard[] = [
+    {
+      label: "Live jobs",
+      value: String(live.length),
+      tone: live.length > 0 ? "moving" : "idle",
+      icon: "live",
+      note: live.length === 0 ? "Nothing on the go" : "Set up with Yaadly and not closed",
+    },
+    {
+      label: "Waiting on you",
+      value: String(waitingOnYou),
+      tone: waitingOnYou > 0 ? "waiting" : "idle",
+      icon: "todo",
+      note: waitingOnYou === 0 ? "Nothing needs you right now" : "Quotes or evidence to look at",
+    },
+    {
+      label: "Closed",
+      value: String(closed.length),
+      tone: closed.length > 0 ? "done" : "idle",
+      icon: "done",
+      note: closed.length === 0 ? "None closed yet" : "Approved and finished",
+    },
+    {
+      label: "Services",
+      value: String(services.length),
+      tone: services.length > 0 ? "moving" : "idle",
+      icon: "service",
+      note: services.length === 0 ? "No checks or reports booked" : "Checks and reports you booked",
+    },
+  ];
+
   return (
     <>
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -161,6 +200,8 @@ export default async function ClientPortal() {
           Could not load your jobs: {error.message}
         </p>
       )}
+
+      <WorkerStatCards cards={cards} />
 
       {/*
         The list, at the top, on the way in.
@@ -270,56 +311,67 @@ export default async function ClientPortal() {
         Within each group the recency order is kept, because among live jobs
         the most recently moved genuinely is the most interesting one.
       */}
-      {hasPortfolio && (
-        <Link
-          href="/portal/properties"
-          className="mt-6 flex flex-wrap items-baseline gap-x-2 rounded-2xl border border-line bg-panel px-5 py-4 transition hover:border-line2"
-        >
-          <b className="text-[14px] text-ink">See all {properties.length} of your properties</b>
-          <span className="text-[12.5px] text-dim">every job on each one, in one place</span>
-          <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
-        </Link>
-      )}
+      <WorkerPipeline jobs={live} labels={CLIENT_STATUS} />
 
-      <JobList
-        title={closed.length > 0 ? "Live jobs" : "Your jobs"}
-        jobs={live}
-        labels={CLIENT_STATUS}
-        empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
-      />
+      {/* Two columns on a wide screen: the jobs on the left, the property
+          link and the professional services beside them. On a phone they
+          stack, jobs first. */}
+      <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <div>
+          <JobList
+            title={closed.length > 0 ? "Live jobs" : "Your jobs"}
+            jobs={live}
+            labels={CLIENT_STATUS}
+            rail
+            empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
+          />
 
-      {closed.length > 0 && (
-        <JobList title="Closed" jobs={closed} labels={CLIENT_STATUS} />
-      )}
+          {closed.length > 0 && (
+            <JobList title="Closed" jobs={closed} labels={CLIENT_STATUS} rail />
+          )}
+        </div>
 
-      {services.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
-            Professional services
-          </h2>
-          <ul className="grid gap-3">
-            {services.map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={"/portal/services/" + encodeURIComponent(s.id)}
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-line2"
-                >
-                  <b className="text-[14.5px]">{s.type ?? "Service"}</b>
-                  <span className="text-[12.5px] text-dim">{s.id}</span>
-                  {s.parish && (
-                    <span className="text-[12.5px] text-dim">{s.parish}</span>
-                  )}
-                  {s.price && (
-                    <span className="ml-auto text-[13px] font-bold text-tealb">
-                      {s.price}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        <aside>
+          {hasPortfolio && (
+            <Link
+              href="/portal/properties"
+              className="mt-8 flex flex-wrap items-baseline gap-x-2 rounded-2xl border border-line bg-panel px-5 py-4 transition hover:border-line2"
+            >
+              <b className="text-[14px] text-ink">See all {properties.length} of your properties</b>
+              <span className="text-[12.5px] text-dim">every job on each one, in one place</span>
+              <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
+            </Link>
+          )}
+          {services.length > 0 && (
+            <section className="mt-8">
+              <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
+                Professional services
+              </h2>
+              <ul className="grid gap-3">
+                {services.map((s) => (
+                  <li key={s.id}>
+                    <Link
+                      href={"/portal/services/" + encodeURIComponent(s.id)}
+                      className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-line2"
+                    >
+                      <b className="text-[14.5px]">{s.type ?? "Service"}</b>
+                      <span className="text-[12.5px] text-dim">{s.id}</span>
+                      {s.parish && (
+                        <span className="text-[12.5px] text-dim">{s.parish}</span>
+                      )}
+                      {s.price && (
+                        <span className="ml-auto text-[13px] font-bold text-tealb">
+                          {s.price}
+                        </span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </aside>
+      </div>
     </>
   );
 }
