@@ -151,17 +151,6 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           />
         </label>
       </div>
-      <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.13em] text-dim">
-          What is included
-        </span>
-        <textarea
-          name="note"
-          rows={3}
-          placeholder="Be specific about what is and is not in the price. Vague quotes get skipped."
-          className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
-        />
-      </label>
 
       <div className="mt-4 border-t border-line2 pt-3.5">
         <p className="mb-2.5 text-[10.5px] font-bold uppercase tracking-[.18em] text-tealb">
