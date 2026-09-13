@@ -47,7 +47,10 @@
 -- client still approves every stage; a named human still decides every
 -- release. No model is involved: the schedule is what two people agreed.
 --
--- Applied to production: not yet. Waiting on Monique's "apply".
+-- Applied to production: 13 Sep 2026, on Monique's "merge and deploy", with
+-- execute_sql in one transaction, and recorded in schema_migrations as
+-- 20260913230001. The worker payable restatement was rebased onto
+-- 20260913223042 first, which another session had applied the same evening.
 
 begin;
 
@@ -307,9 +310,11 @@ begin
 end;
 $function$;
 
--- As live, with two changes: the Quote Pack read takes the newest approved
--- one, and with no schedule at all stage 1 is the whole job (founder
--- decision, 13 Sep 2026), matching job_final_stage_count()'s one stage.
+-- As 20260913223042 left it, line for line, with two changes: the Quote Pack
+-- read takes the newest approved one, and with no schedule at all stage 1 is
+-- the whole job (founder decision, 13 Sep 2026), matching
+-- job_final_stage_count()'s one stage. 223042's hold point (no recorded stage
+-- approval, no payable) and its revoke are kept exactly.
 create or replace function public.raise_job_stage_worker_payable(p_job text, p_stage integer)
 returns table(invoice_id text, total_jmd integer)
 language plpgsql
@@ -331,12 +336,22 @@ declare
   v_id            text;
   v_desc          text;
 begin
+  -- The hold point. A payable follows a named human approving the stage and
+  -- nothing else, so without the approval on record there is nothing to raise.
+  if not exists (
+    select 1 from stage_approvals s where s.job_id = p_job and s.stage = p_stage
+  ) then
+    return;
+  end if;
+
   select * into v_job from jobs where id = p_job;
   if v_job.id is null then return; end if;
 
   select * into v_quote from job_quotes where job_id = p_job and status = 'accepted';
   if v_quote.id is null then return; end if;
 
+  -- The worker has to be nameable, because invoices_worker_read is how he
+  -- reads his own payable.
   if coalesce(v_quote.worker_email, '') = '' then return; end if;
 
   if exists (
@@ -374,10 +389,16 @@ begin
     end if;
   end if;
 
+  -- The stage's share of his quoted labour, then the agreed 5%. Rounding is
+  -- applied to the stage amount rather than to the whole job, so the stages
+  -- sum to the same figure the whole-job payable would produce, give or take
+  -- a dollar of rounding on each.
   v_labour_amt := round(coalesce(v_quote.labour_jmd, 0) * v_pct / 100);
   v_margin     := round(v_labour_amt * 0.05);
   v_rate       := v_labour_amt - v_margin;
 
+  -- Unchanged: materials land in full on whichever stage filed the receipt,
+  -- at cost, never reduced by the 5%. The margin is on labour only.
   select exists (
     select 1 from evidence e
      where e.job_id = p_job and coalesce(e.stage, 1) = p_stage and e.kind = 'materials'
@@ -405,10 +426,15 @@ begin
     values (v_id, null, 'Materials, at cost, nothing deducted', 1, v_materials_amt, 'manual');
   end if;
 
+  -- Lines first, then sent: the order 20260902m had to fix once already.
   update public.invoices set status = 'sent' where id = v_id;
 
   return query select v_id, v_amount;
 end $function$;
+
+-- 223042's door, restated so this file never reopens it: only the
+-- stage-approval trigger runs this, never a caller over the API.
+revoke all on function public.raise_job_stage_worker_payable(text, integer) from public, anon, authenticated;
 
 -- ── repair: booked, unfinished jobs with no schedule ───────────────────────
 do $$
