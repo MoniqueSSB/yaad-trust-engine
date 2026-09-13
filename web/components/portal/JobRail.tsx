@@ -23,6 +23,7 @@ export function JobRail({
   workerName,
   jobBase,
   moneyHref,
+  check = null,
 }: {
   side: "client" | "worker";
   money: (n: number | null | undefined) => string | null;
@@ -34,6 +35,8 @@ export function JobRail({
   workerName: string | null;
   jobBase: string;
   moneyHref: string;
+  /** The independent check the client added, already included in allIn. */
+  check?: { label: string; jmd: number } | null;
 }) {
   const headline = side === "client" ? allIn : takeHome;
   const initials = (workerName ?? "")
@@ -75,6 +78,12 @@ export function JobRail({
               <span className="text-mute">Yaadly fee, 15%</span>
               <span className="font-mono-app text-[11.5px] text-ink">{money(fee)}</span>
             </div>
+            {side === "client" && check && (
+              <div className="flex justify-between text-[12px]">
+                <span className="text-mute">{check.label}</span>
+                <span className="font-mono-app text-[11.5px] text-ink">{money(check.jmd)}</span>
+              </div>
+            )}
           </div>
         )}
 

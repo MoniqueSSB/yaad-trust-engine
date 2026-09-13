@@ -1,6 +1,13 @@
 import { chooseJobCheck, clearJobCheck } from "@/app/portal/job-check-actions";
-import { CHECK_LABEL, type CheckLevel, type CheckState } from "@/lib/portal/job-check";
-import { gbp } from "@/lib/money";
+import {
+  CHECK_LABEL,
+  checkChargePence,
+  isCheckOffered,
+  penceToJmd,
+  type CheckLevel,
+  type CheckState,
+} from "@/lib/portal/job-check";
+import { gbp, jmd } from "@/lib/money";
 
 /**
  * The independent check at sign-off, PORTALS-BUILD-SPEC section 5.11 given a
@@ -13,6 +20,12 @@ import { gbp } from "@/lib/money";
  * They are the same checks as the services page, at a lower price for a
  * client who already has a job with Yaadly (job-visual-check and
  * job-technical-check are those returning-client rows).
+ *
+ * Only the Visual Check can be chosen (founder, 13 Sep 2026). The Technical
+ * Sign-off card stays in view as coming soon, with no button, and the
+ * database refuses it from a client too. A chosen check joins the job's
+ * total the moment it is added: the page converts it at the rate it names
+ * and adds it to "What this job costs".
  *
  * Server component: both actions are Postgres functions and the panel
  * re-renders from the row they wrote.
@@ -33,13 +46,18 @@ export type CheckInvoice = {
   currency: string | null;
 };
 
-function priceLine(p: CheckPrice | null): string {
-  if (!p || p.full_pence == null) return "price on request";
-  const full = gbp(p.full_pence);
+/** Full price struck through beside the founding rate, the way every pilot
+ *  price is shown: a visible discount, never a low list price. */
+function PriceTag({ p }: { p: CheckPrice | null }) {
+  if (!p || p.full_pence == null) return <>price on request</>;
   if (p.founding_pence != null && p.founding_pence !== p.full_pence) {
-    return full + ", " + gbp(p.founding_pence) + " at the founding rate";
+    return (
+      <>
+        <s className="font-normal text-dim">{gbp(p.full_pence)}</s> {gbp(p.founding_pence)} at the founding rate
+      </>
+    );
   }
-  return full;
+  return <>{gbp(p.full_pence)}</>;
 }
 
 export function JobCheckPanel({
@@ -52,6 +70,7 @@ export function JobCheckPanel({
   assignedTo,
   invoice,
   prices,
+  jmdPerGbp,
 }: {
   jobId: string;
   role: "client" | "worker";
@@ -62,6 +81,8 @@ export function JobCheckPanel({
   assignedTo: string | null;
   invoice: CheckInvoice | null;
   prices: Record<CheckLevel, CheckPrice | null>;
+  /** The rate the page converts the check at, named on screen beside the figure. */
+  jmdPerGbp: number;
 }) {
   if (state === "not_yet") return null;
 
@@ -82,13 +103,16 @@ export function JobCheckPanel({
     );
   }
 
+  const rate = "J$" + jmdPerGbp.toLocaleString("en-JM") + " to £1";
+  const chosenPence = level ? checkChargePence(prices[level], invoice) : null;
+
   return (
     <section id="check" className="mt-4 rounded-2xl border border-line bg-panel p-4">
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Independent check at sign-off</p>
       <p className="mt-1 text-[12px] leading-relaxed text-dim">
         Optional. By default you approve each stage yourself from the evidence, and that costs nothing.
         If you would rather somebody independent of the worker attended the finished stage and filed what
-        they saw, choose a level here. These are the same checks as on our services page, at a lower price
+        they saw, add a check here. It is the same check as on our services page, at a lower price
         because you have booked a job with us. <b className="text-ink">It is a record for your sign-off, not a ruling</b>:
         you still press Approve yourself, and nothing here moves any payment.
       </p>
@@ -98,23 +122,53 @@ export function JobCheckPanel({
           <ul className="mt-3 grid gap-2.5 sm:grid-cols-2">
             {(["visual", "technical"] as CheckLevel[]).map((k) => {
               const p = prices[k];
+              const offered = isCheckOffered(k);
+              const pence = checkChargePence(p, null);
               return (
-                <li key={k} className="rounded-xl border border-line bg-bg px-3.5 py-3">
-                  <p className="text-[13.5px] font-bold text-ink">{CHECK_LABEL[k]}</p>
-                  <p className="mt-0.5 text-[12.5px] font-semibold text-tealb">{priceLine(p)}</p>
+                <li
+                  key={k}
+                  className={
+                    "rounded-xl border px-3.5 py-3 " +
+                    (offered ? "border-line bg-bg" : "border-dashed border-line2 bg-bg/40 opacity-70")
+                  }
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-[13.5px] font-bold text-ink">{CHECK_LABEL[k]}</p>
+                    {!offered && (
+                      <span className="rounded-full border border-line2 bg-panel2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[.12em] text-mute">
+                        Coming soon
+                      </span>
+                    )}
+                  </div>
+                  {offered && (
+                    <p className="mt-0.5 text-[12.5px] font-semibold text-tealb">
+                      <PriceTag p={p} />
+                    </p>
+                  )}
                   <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
                     {p?.blurb ??
                       (k === "visual"
                         ? "Somebody independent confirms it is visibly done and basically works. They record. They do not rate, advise or certify."
                         : "A qualified trade inspector reviews the stage against the agreed scope and the trade standard.")}
                   </p>
-                  <form action={chooseJobCheck} className="mt-2.5">
-                    <input type="hidden" name="jobId" value={jobId} />
-                    <input type="hidden" name="level" value={k} />
-                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand">
-                      Add this
-                    </button>
-                  </form>
+                  {offered ? (
+                    <form action={chooseJobCheck} className="mt-2.5">
+                      <input type="hidden" name="jobId" value={jobId} />
+                      <input type="hidden" name="level" value={k} />
+                      <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand">
+                        Add to my job
+                      </button>
+                      {pence != null && (
+                        <p className="mt-1.5 text-[11.5px] leading-snug text-dim">
+                          Adds {jmd(penceToJmd(pence, jmdPerGbp))} to your job total, at {rate}.
+                        </p>
+                      )}
+                    </form>
+                  ) : (
+                    <p className="mt-2.5 text-[11.5px] leading-snug text-mute">
+                      Not bookable yet. We will add it here when it is ready.
+                    </p>
+                  )}
                 </li>
               );
             })}
@@ -143,10 +197,19 @@ export function JobCheckPanel({
             {assignedTo ? "Attending: " + assignedTo + "." : "Yaadly is arranging who attends. You will see the name here."}
           </p>
           <p className="mt-1 text-[12.5px] text-dim">
-            {invoice
-              ? "Invoice " + invoice.id + (invoice.total_pence != null && invoice.currency === "GBP" ? ", " + gbp(invoice.total_pence) : "") + ", " + (invoice.status ?? "raised") + "."
-              : "Priced at " + priceLine(prices[level]) + ". The invoice follows from Yaadly, separately from the job itself."}
+            {invoice ? (
+              "Invoice " + invoice.id + (invoice.total_pence != null && invoice.currency === "GBP" ? ", " + gbp(invoice.total_pence) : "") + ", " + (invoice.status ?? "raised") + "."
+            ) : (
+              <>
+                Priced at <PriceTag p={prices[level]} />. Yaadly invoices it in pounds, separately from the job itself.
+              </>
+            )}
           </p>
+          {chosenPence != null && (
+            <p className="mt-1 text-[12.5px] font-semibold text-ink">
+              Added to your job total: {jmd(penceToJmd(chosenPence, jmdPerGbp))}, at {rate}.
+            </p>
+          )}
           {canChange && !assignedTo && !invoice ? (
             <form action={clearJobCheck} className="mt-2">
               <input type="hidden" name="jobId" value={jobId} />

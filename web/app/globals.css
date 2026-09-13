@@ -294,3 +294,24 @@ body {
   li, tr, .doc-body .callout { break-inside: avoid; page-break-inside: avoid; }
   h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
 }
+
+/* Landing on a section from the job room's "Everything outstanding" list.
+   The link opens a tab and scrolls to the #section; a short gold ring says
+   "this is the thing" so the reader is not left hunting the page for it.
+   .yaad-landed is set by components/portal/LandingLink.tsx, because tab
+   switches use pushState and browsers leave :target stale on pushState.
+   :target stays for a full load, such as a link opened in a new tab. */
+@media screen {
+  :target, .yaad-landed {
+    scroll-margin-top: 1.5rem;
+    animation: yaad-target 2.4s ease-out 1;
+    border-radius: 1rem;
+  }
+}
+@keyframes yaad-target {
+  0%, 35% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 70%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :target, .yaad-landed { animation: none; }
+}

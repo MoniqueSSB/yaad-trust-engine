@@ -1,4 +1,4 @@
--- Proof that the quote change request guards hold (20260913215547). Run
+-- Proof that the quote change request guards hold (20260913230000). Run
 -- against the project with execute_sql, or psql. Reads only; creates nothing.
 --
 -- The session running this has no JWT, which is the point: the only write
