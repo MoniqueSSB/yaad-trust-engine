@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { STATUS_TONE, type StatusLabel, type StatusTone } from "./statusTone";
+import { STATUS_RAIL, STATUS_TONE, type StatusLabel, type StatusTone } from "./statusTone";
 import { whenDate } from "@/lib/date";
 
 /**
@@ -75,11 +75,15 @@ export function JobList({
   jobs,
   labels,
   empty,
+  rail = false,
 }: {
   title: string;
   jobs: Job[];
   labels: Record<string, StatusLabel>;
   empty?: string;
+  /** A coloured left edge in the status tone, so the card reads before the
+   *  pill does. Off by default: the client portal keeps its existing rows. */
+  rail?: boolean;
 }) {
   return (
     <section className="mt-8">
@@ -99,7 +103,10 @@ export function JobList({
               <li key={j.id}>
                 <Link
                   href={"/portal/jobs/" + encodeURIComponent(j.id)}
-                  className="block rounded-2xl border border-line bg-panel p-4 transition hover:border-line2"
+                  className={
+                    "block rounded-2xl border border-line bg-panel p-4 transition hover:border-line2" +
+                    (rail ? " border-l-4 " + STATUS_RAIL[s.tone] : "")
+                  }
                 >
                   <div className="flex flex-wrap items-start gap-3">
                     <b className="min-w-[200px] flex-1 text-[15.5px] leading-snug">

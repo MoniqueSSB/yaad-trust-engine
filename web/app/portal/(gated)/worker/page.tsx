@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, WORKER_STATUS, type Job } from "@/components/portal/JobList";
-import { PortalTiles, type Tile } from "@/components/portal/PortalTiles";
+import { MoneySplit, WorkerPipeline, WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
@@ -177,23 +177,45 @@ export default async function WorkerPortal() {
         ? `Waiting on sign-off for ${heldJobs[0].title ?? "this job"}`
         : `Waiting on sign-off for ${heldJobs.length} jobs. See job by job below.`;
 
-  const tiles: Tile[] = [
+  /* The dashboard's figure row, 13 Sep 2026. The two money cards carry the
+     same values and the same notes the old two-tile strip carried, word for
+     word. The two job counts are the lengths of the lists further down. */
+  const cards: StatCard[] = [
+    ...(moneyJobs.length > 0
+      ? ([
+          {
+            label: "Held right now",
+            value: jmd(held),
+            tone: held > 0 ? "waiting" : "idle",
+            icon: "held",
+            note: heldNote,
+          },
+          {
+            label: "Released",
+            /* "Paid off-platform" was honest and meant nothing to the person
+               reading it. Say the thing itself: how it comes, and how long.
+               Nothing here claims the money has moved; WorkerInvoices says
+               that, carefully. */
+            value: jmd(released),
+            tone: released > 0 ? "done" : "idle",
+            icon: "released",
+            note: "Paid straight to you by bank transfer, Lynk or cash, within 3 working days",
+          },
+        ] satisfies StatCard[])
+      : []),
     {
-      label: "Held right now",
-      value: jmd(held),
-      held: held > 0,
-      note: heldNote,
+      label: "Live jobs",
+      value: String(live.length),
+      tone: live.length > 0 ? "moving" : "idle",
+      icon: "live",
+      note: live.length === 0 ? "Nothing on the go" : "Matched to you or quoted on",
     },
     {
-      label: "Released",
-      /* "Paid off-platform" was honest and meant nothing to the person
-         reading it. A tradesperson does not know what a platform is, let
-         alone what being off one implies about when money arrives. Say the
-         thing itself: how it comes, and how long. The 3 working days figure
-         is unchanged, and nothing here claims the money has moved, which is
-         WorkerInvoices' job and is worded carefully there. */
-      value: jmd(released),
-      note: "Paid straight to you by bank transfer, Lynk or cash, within 3 working days",
+      label: "Completed",
+      value: String(done.length),
+      tone: done.length > 0 ? "done" : "idle",
+      icon: "done",
+      note: done.length === 0 ? "None closed yet" : "Paid and closed",
     },
   ];
 
@@ -219,24 +241,47 @@ export default async function WorkerPortal() {
         </p>
       )}
 
-      {moneyJobs.length > 0 && <PortalTiles tiles={tiles} />}
+      <WorkerStatCards cards={cards} />
 
-      <LinkWorkerPhone phone={profile?.phone ?? null} />
-
-      <WorkerMoneyPanel jobs={moneyJobs} />
-
-      <WorkerInvoices jobs={invoiceJobs} />
-
-      <JobList
-        title="Live work"
-        jobs={live}
-        labels={WORKER_STATUS}
-        empty="Nothing live right now. Jobs you are matched to or have quoted on appear here."
+      <MoneySplit
+        held={held}
+        released={released}
+        heldLabel="Held"
+        releasedLabel="Released"
       />
 
-      {done.length > 0 && (
-        <JobList title="Completed" jobs={done} labels={WORKER_STATUS} />
-      )}
+      <WorkerPipeline jobs={live} labels={WORKER_STATUS} />
+
+      {/* Two columns on a wide screen: the work on the left, because that is
+          what changes day to day, and the money trail on the right beside it.
+          On a phone they stack in the same order, work first. */}
+      <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <div>
+          <JobList
+            title="Live work"
+            jobs={live}
+            labels={WORKER_STATUS}
+            rail
+            empty="Nothing live right now. Jobs you are matched to or have quoted on appear here."
+          />
+
+          {done.length > 0 && (
+            <JobList title="Completed" jobs={done} labels={WORKER_STATUS} rail />
+          )}
+        </div>
+
+        <aside>
+          <WorkerMoneyPanel jobs={moneyJobs} />
+
+          <WorkerInvoices jobs={invoiceJobs} />
+
+          {/* LinkWorkerPhone brings its own mt-4; together that is the mt-8
+              every other section in this column starts with. */}
+          <div className="mt-4">
+            <LinkWorkerPhone phone={profile?.phone ?? null} />
+          </div>
+        </aside>
+      </div>
     </>
   );
 }

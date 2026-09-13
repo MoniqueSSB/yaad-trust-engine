@@ -33,3 +33,23 @@ export const STATUS_TONE: Record<StatusTone, string> = {
   done: "border-green/35 bg-green/10 text-green",
   idle: "border-line bg-panel2 text-mute",
 };
+
+/**
+ * The same four tones as a solid accent rather than a pill: a left rail on a
+ * card, a dot beside a count. Added 13 Sep 2026 for the worker dashboard so
+ * a card can carry its tone before the pill is read. Same colours, same
+ * meaning; a fifth tone goes in all three maps or in none.
+ */
+export const STATUS_RAIL: Record<StatusTone, string> = {
+  waiting: "border-l-gold",
+  moving: "border-l-purple",
+  done: "border-l-green",
+  idle: "border-l-line2",
+};
+
+export const STATUS_DOT: Record<StatusTone, string> = {
+  waiting: "bg-gold",
+  moving: "bg-purple",
+  done: "bg-green",
+  idle: "bg-dim",
+};
