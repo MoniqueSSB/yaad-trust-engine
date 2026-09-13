@@ -4967,3 +4967,43 @@ alert record is touched:
 ```sql
 delete from job_alerts where channel = 'ntfy';
 ```
+
+## A cron check answered 403 "Not authorised." or 503 "Could not check the secret"
+
+Applies to `yaad-evidence-landed-check`, `yaad-kickoff-check`,
+`yaad-quote-pack-check` and `yaad-job-health`. pg_cron calls each one with its
+own secret, and the function checks it against a hash in `app_settings`.
+
+**503 "Could not check the secret, try again." is the database being
+unreachable, not a bad caller.** The function could not read its hash in time,
+usually a Gateway Timeout on the way back from Supabase's edge to the database,
+and it refused rather than guess. Until 13 September 2026 this showed up as a
+403, which read like somebody with the wrong secret. A few a day heal
+themselves on the next tick: a minute for evidence-landed, fifteen for kickoff
+and quote-pack. For `yaad-job-health` a miss means that day's stall check did
+not run, so if one lands at 13:00 UTC, run it by hand from the desk.
+
+**A 403 from these four now means the secret really did not match.** See what
+pg_net got back (it keeps about six hours):
+
+```sql
+select created, status_code, headers->>'x-sb-edge-region' region,
+  left(regexp_replace(coalesce(content,''), '[0-9a-f]{64}', '<64HEX>', 'g'), 80) body
+from net._http_response where status_code in (403, 500, 503) order by created desc limit 50;
+```
+
+Then check each cron job's secret still hashes to its own row, without ever
+printing the secret:
+
+```sql
+select j.jobname,
+  (select string_agg(s.key, ',') from public.app_settings s
+     where s.value = encode(extensions.digest(substring(j.command from '''secret'', ''([0-9a-f]{64})'''), 'sha256'), 'hex')) as matches
+from cron.job j order by j.jobname;
+```
+
+Every row should name its own `*_cron_secret_sha256` key. A blank means that
+job and its hash have drifted apart: do not rotate anything, tell Monique.
+
+**If 503s come every minute for more than a few minutes**, the database API is
+down for real. Check status.supabase.com before touching anything here.
