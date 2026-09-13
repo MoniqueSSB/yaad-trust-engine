@@ -349,8 +349,14 @@ begin
   if new.status = 'submitted' then
     perform net.http_post(
       url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
+        -- ROTATED 3 Sep 2026. The value that used to sit here was committed to a
+        -- public repository and is burnt; git history still has it, which is why
+        -- rotation, not deletion, is the fix. The live function no longer carries
+        -- a literal at all: it reads Vault through public.notify_trigger_secret()
+        -- (20260903a). This file is history, kept only so the migration list stays
+        -- true. Do not re-run it.
       body := jsonb_build_object(
-        'secret', '4cfc0fc962b534f961e3d2dbdc30b1996c273340c361b3dd9992742718d65613',
+        'secret', 'ROTATED_3_SEP_2026_SEE_20260903a_NOTIFY_TRIGGER_SECRET_IN_VAULT',
         'jobId', new.job_id,
         'kind', 'quote_awaiting_worker_confirm',
         'meta', jsonb_build_object('quoteId', new.id)

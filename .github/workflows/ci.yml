@@ -349,10 +349,9 @@ jobs:
       # repository, twice. Rotation fixed the exposure; this step is what
       # stops the third time.
       #
-      # The two historical migrations are excluded by path on purpose. They
-      # are applied history: editing them would not remove the value from git
-      # history and rewriting applied migrations is its own hazard. The value
-      # in them is dead. See DECISIONS.md.
+      # The two historical migrations that carried the value were excluded by
+      # path until 13 Sep 2026. They now hold a placeholder instead, so there
+      # is no carve out left: every tracked file is scanned. See DECISIONS.md.
       - name: Scan tracked files for bare hex secrets
         run: |
           set -e
@@ -364,8 +363,6 @@ jobs:
             ':!.github/workflows/ci.yml' \
             ':!**/package-lock.json' \
             ':!**/*.lock' \
-            ':!supabase/migrations/20260901g_workers_couldnt_reach_their_own_kickoff_pack.sql' \
-            ':!supabase/migrations/20260902c_quote_pack_dual_agreement.sql' \
             | grep -viE 'sha-?256|sha-?512|checksum|integrity|digest|[^a-z]hash|fingerprint|commit|placeholder|example|redacted|x{8,}' || true)
           if [ -n "$matches" ]; then
             echo "$matches"

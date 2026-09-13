@@ -22,11 +22,12 @@
 -- authenticated: it returns the plaintext, so a grant to a browser role
 -- would be worse than the problem it fixes.
 --
--- ON THE TWO HISTORICAL FILES. They are left exactly as they are. Editing
--- an applied migration is its own hazard and does not remove anything from
--- git history in any case. Rotation was the fix, and it has happened: the
--- published value no longer matches app_settings and is refused. See
--- DECISIONS.md.
+-- ON THE TWO HISTORICAL FILES. Rotation was the fix, and it happened when
+-- this migration first ran on 3 September: the published value no longer
+-- matches app_settings and is refused. On 13 September the literal in both
+-- files was replaced with a placeholder and a note, on founder instruction,
+-- so the scanner needs no carve out. Git history still holds the old value,
+-- which is why rotation, not the edit, is what closed it. See DECISIONS.md.
 
 -- ── the lookup ────────────────────────────────────────────────────────
 create or replace function public.notify_trigger_secret()
@@ -61,7 +62,7 @@ begin
     insert into public.app_settings(key, value)
     values ('notify_trigger_secret_sha256', encode(extensions.digest(s, 'sha256'), 'hex'))
     on conflict (key) do update set value = excluded.value;
-    raise notice 'Minted a new notify_trigger_secret. YAAD_CRON_SECRET on yaad-job-health must be set to match.';
+    raise notice 'Minted a new notify_trigger_secret. The cron notifiers read it over RPC, nothing else to set.';
   end if;
 end
 $do$;
