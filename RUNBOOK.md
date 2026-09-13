@@ -4967,3 +4967,15 @@ alert record is touched:
 ```sql
 delete from job_alerts where channel = 'ntfy';
 ```
+
+## Supabase "Deploy to production" must stay off, and what the "Supabase Preview" check on `main` means
+
+**The rule.** Migrations reach production by hand, one at a time, applied deliberately and recorded (see the "Applied to production" header every migration file carries). Nothing applies them because a branch was merged. So in the Supabase dashboard, Project Settings → Integrations → GitHub, **Deploy to production must be off**. As of 13 Sep 2026 it was still on, pending a click in Monique's account: open `https://supabase.com/dashboard/project/leffyisvfvjwzilydlwf/settings/integrations`, open the GitHub connection's configuration, and switch **Deploy to production** off. Leave the GitHub connection itself in place, and do not change the production branch name. With it on, every push or merge to GitHub `main` makes Supabase run the repo's migration files against the production database by itself; the docs say it also deploys Edge Functions and storage buckets declared in `supabase/config.toml`, which this repo does not have.
+
+**How to check it, any time.** Open the project's Integrations page and look at the GitHub section. Or, from a terminal signed in to Supabase, `supabase branches list --project-ref leffyisvfvjwzilydlwf`: the `main` row is the production project itself, and it should not be receiving deploys. On GitHub, a "Supabase Preview" check on a commit to `main` that says **skipped** ("not associated with any Supabase Branch") is the healthy state. One that says **"Waiting for branch action run"** or fails with **"Remote migration versions not found in local migrations directory"** means the link is on again.
+
+**Why it failed harmlessly until now, and why that is not a safeguard.** Production's migration ledger (`supabase_migrations.schema_migrations`) records timestamp versions from the MCP tool, and the files in `supabase/migrations/` are named differently, so every automatic attempt stopped at the first mismatch. That mismatch was the only thing standing between a merge and an unreviewed change to the live database. If anyone ever tidies the ledger to match the files, with the link still on, the next merge to `main` changes production on its own.
+
+**Never "fix" the red check by making it pass.** Making it green means reconciling the ledger with the link on, which switches on automatic production deploys. The fix is the toggle, off.
+
+**Do not use `DELETE /v1/projects/{ref}/branches` ("Disables preview branching") or `supabase branches delete` on the `main` row to get the same effect.** The `main` row is the production project; the docs do not say what either does to it.
