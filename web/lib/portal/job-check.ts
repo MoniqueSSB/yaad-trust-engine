@@ -70,6 +70,47 @@ export function isCheckLevel(x: unknown): x is CheckLevel {
   return x === "visual" || x === "technical";
 }
 
+/**
+ * The levels a client can choose from the portal today. Founder's
+ * instruction, 13 Sep 2026: the Visual Check is the only check on offer, and
+ * the Technical Sign-off is shown as coming soon and cannot be chosen.
+ * choose_job_check() refuses it for anybody but an admin (20260913150000), so
+ * this list and that refusal move together. A Technical Sign-off the desk has
+ * already set on a job still shows as booked.
+ */
+export const OFFERED_LEVELS: readonly CheckLevel[] = ["visual"];
+
+export function isCheckOffered(level: CheckLevel): boolean {
+  return OFFERED_LEVELS.includes(level);
+}
+
+/**
+ * What the check costs the client, in pence. Once Yaadly has invoiced it in
+ * pounds, the invoice is the figure. Before that, the founding rate where the
+ * catalogue has one, else the full price: the page shows the full price struck
+ * through beside it, so the discount is visible rather than a low list price.
+ */
+export function checkChargePence(
+  price: { full_pence: number | null; founding_pence: number | null } | null,
+  invoice: { total_pence: number | null; currency: string | null; status: string | null } | null,
+): number | null {
+  if (
+    invoice &&
+    invoice.status !== "void" &&
+    invoice.total_pence != null &&
+    (invoice.currency ?? "GBP").toUpperCase() === "GBP"
+  ) {
+    return invoice.total_pence;
+  }
+  if (!price) return null;
+  return price.founding_pence ?? price.full_pence ?? null;
+}
+
+/** Pence to whole J$ at the rate given. The caller names the rate on screen. */
+export function penceToJmd(pence: number, jmdPerGbp: number): number {
+  return Math.round((pence / 100) * jmdPerGbp);
+}
+
 export function jobCheckState(input: CheckInput): { state: CheckState; canChange: boolean } {
   const level = isCheckLevel(input.checkLevel) ? input.checkLevel : null;
   if (!input.workerEmail) {

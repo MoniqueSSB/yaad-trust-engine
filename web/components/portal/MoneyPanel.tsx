@@ -1,4 +1,5 @@
-import { amount } from "@/lib/money";
+import type { ReactNode } from "react";
+import { amount, gbp } from "@/lib/money";
 import { whenDate } from "@/lib/date";
 
 /**
@@ -29,6 +30,18 @@ export type InvoiceRow = {
   issue_date: string | null;
   paid_at: string | null;
   period_label: string | null;
+};
+
+/** The independent check, once a client has added one, as a line in the job
+ *  total. Priced and invoiced in pounds; jmd is the page's conversion at the
+ *  rate named in jmdPerGbp. Client side only: it is never the worker's money. */
+export type CheckTotalLine = {
+  label: string;
+  jmd: number;
+  pence: number;
+  fullPence: number | null;
+  invoiced: boolean;
+  jmdPerGbp: number;
 };
 
 /* amount() moved to lib/money.ts, unchanged apart from the null case, which
@@ -65,6 +78,7 @@ export function MoneyPanel({
   invoices,
   money,
   materialsReleased,
+  check = null,
 }: {
   side: "client" | "worker";
   labour: number | null;
@@ -76,8 +90,11 @@ export function MoneyPanel({
   money: (n: number | null | undefined) => string | null;
   /** J$ of the materials line already paid out against a receipt; 0 if none */
   materialsReleased: number;
+  /** The check the client added, already included in allIn. */
+  check?: CheckTotalLine | null;
 }) {
   const agreed = labour != null;
+  const showCheck = side === "client" && check != null;
 
   return (
     <>
@@ -137,6 +154,32 @@ export function MoneyPanel({
                     : "Yaadly's cut, taken from the labour price rather than invoiced to you."
                 }
               />
+              {showCheck && check && (
+                <MoneyRow
+                  colour="bg-teal"
+                  label={check.label}
+                  value={money(check.jmd) ?? "not set"}
+                  width={
+                    allIn != null && allIn > 0 ? Math.max(Math.round((check.jmd / allIn) * 100), 6) : 6
+                  }
+                  caption={
+                    <>
+                      {check.invoiced ? (
+                        <>Invoiced at {gbp(check.pence)}</>
+                      ) : check.fullPence != null && check.fullPence !== check.pence ? (
+                        <>
+                          <s>{gbp(check.fullPence)}</s> {gbp(check.pence)} at the founding rate
+                        </>
+                      ) : (
+                        <>{gbp(check.pence)}</>
+                      )}
+                      , shown here at J${check.jmdPerGbp.toLocaleString("en-JM")} to £1. Added from the
+                      Approvals tab. Yaadly invoices it in pounds, separately from the job, and it moves
+                      no payment to the worker.
+                    </>
+                  }
+                />
+              )}
             </div>
             <div className="mt-4 flex items-baseline justify-between border-t border-line2 pt-3.5">
               <span className="text-[13px] font-semibold text-ink">
@@ -247,7 +290,7 @@ function MoneyRow({
   label: string;
   value: string;
   width: number;
-  caption: string;
+  caption: ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">

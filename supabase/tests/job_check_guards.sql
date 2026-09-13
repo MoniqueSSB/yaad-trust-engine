@@ -67,5 +67,15 @@ begin
    where i.job_id is not null;
   t := t || '10. no check invoice carries a job_id: ' || case when v = 0 then 'PASS' else 'FAIL, ' || v || ' do' end || E'\n';
 
+  -- 11. the Technical Sign-off is coming soon: choose_job_check() refuses it
+  --     for anybody but an admin (20260913150000). Read from the function
+  --     itself, because this session has no JWT and would be refused earlier,
+  --     at "Not signed in", before reaching the line being checked.
+  select count(*) into v
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'choose_job_check'
+     and pg_get_functiondef(p.oid) like '%v_level = ''technical'' and not public.is_admin()%';
+  t := t || '11. choose_job_check refuses a client a Technical Sign-off: ' || case when v = 1 then 'PASS' else 'FAIL, 20260913150000 not applied' end || E'\n';
+
   raise notice '%', t;
 end $$;
