@@ -18,6 +18,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-13 · Only the Visual Check is bookable on a job, and a chosen check joins the job total in J$
+
+**Founder:** "the visual check should be the only check added now, the technical check should be on coming soon and not being able to client. Also where you click the check it should automatically add to the total build." The Technical Sign-off card stays in view, marked coming soon, with no button. Hiding a button is not a gate, so `20260913150000` makes `choose_job_check()` refuse `technical` to anybody but an admin. `OFFERED_LEVELS` in `web/lib/portal/job-check.ts` is the screen's copy of that rule, and the two move together.
+
+**The currency was her call.** The job total is in J$ and the check is priced and invoiced in pounds. Three options were put to her: a pound line under the J$ total, one converted J$ figure, or putting the check on the job's own invoice. She chose one J$ figure, with the founding price shown against the full price struck through. The conversion uses `jmd_per_gbp` from `yaad/benchmarks.py`, the only GBP to J$ rate in the repository, rather than a new constant or a live rate feed, and the rate is printed beside every converted figure so nobody reads it as the invoice amount. Once the check is invoiced, the invoice's pound total replaces the catalogue price.
+
+**What deliberately did not change.** The check's invoice is still its own pound invoice with no `job_id`. Putting it on the job invoice would make three live money functions read it as the agency fee (see the 20260909180000 header), and the job invoice is usually already sent by the time the check can be chosen. The worker's figures never include the check. The Client Guidelines v1.5 still say a client can choose either check at £149 for the Technical Sign-off; changing a signed document means a version bump that makes every existing signature stale, so that is left to her.
+
+---
+
 ## 2026-09-13 · The portal says where the job is, and only to the two people who go there
 
 **Founder:** "on the portal it should be clear exactly where the job is", and the stage the job is at should be in bold. The job room had shown the parish only, and said so in a comment: it never queried `jobs.addr`, so there was nothing more private to leak. The portal lists showed the stage as a small pill and the parish in the grey footer. Both now read as two labelled lines on every job card and at the top of the job room: **Stage**, in bold, and **Where**, the street address and parish. While work is under way the room adds the stage number ("Work under way, stage 2 of 3").

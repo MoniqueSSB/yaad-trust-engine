@@ -4663,6 +4663,10 @@ The optional independent check at sign-off (20260909180000). The client chooses 
 
 **The two prices are the returning-client prices.** The same Visual Check and Technical Sign-off as the services page, cheaper because the client already booked a job: `service_catalogue` rows `job-visual-check` and `job-technical-check`. The standalone rows (`eyes-on-it`, `technical-signoff`) keep the full standalone price. Change a price with an `UPDATE` on the catalogue row; nothing is deployed for a price change.
 
+**Only the Visual Check can be booked from the portal (13 Sep 2026).** The Technical Sign-off card shows as coming soon with no button, and `choose_job_check()` refuses `technical` for anybody but an admin (`20260913150000`). A job the desk already set to Technical keeps it. To offer it again, drop the refusal in a new migration and put `technical` back in `OFFERED_LEVELS` (`web/lib/portal/job-check.ts`) in the same change. **The migration is not live until you apply it**; until then the button is hidden but a client calling the API directly could still choose it. Check with `job_check_guards.sql`, line 11.
+
+**The check joins the client's job total as soon as it is added.** "What this job costs" and the side rail show it as its own line in J$, converted at the benchmark rate (`jmd_per_gbp` in `yaad/benchmarks.py`, J$210 to £1 as of 13 Sep 2026), with the rate named beside it. Before the invoice it counts the founding rate with the full price struck through; once invoiced, the invoice figure. This is a display figure only. The check is still invoiced separately, in pounds, with no `job_id`. If a client says the J$ figure does not match what their bank took for the £ invoice, that is the exchange rate, and the page says which rate it used. Change the rate in `yaad/benchmarks.py` and regenerate with `python3 scripts/gen_price_benchmarks.py`.
+
 **The desk view is Independent checks, under Documents & money.** It lists every job with a check chosen, with the invoice and the report beside it. Three actions:
 
 1. **Assign the checker.** Type the name. The database refuses the worker's own name or email (`assign_job_checker`). The client sees the name on their job.
@@ -4675,7 +4679,7 @@ The optional independent check at sign-off (20260909180000). The client chooses 
 
 **Nothing here moves money or approval.** `approve_stage()` never reads `check_level`. A check that came back bad is a reason for the client not to press Approve and to raise a dispute; it is not a ruling. If somebody asks for the check to release or block a payment on its own, that is the request `CLAUDE.md` section 3 exists to refuse.
 
-**Prove the guards hold:** run `supabase/tests/job_check_guards.sql` with `execute_sql`. Ten lines, all PASS.
+**Prove the guards hold:** run `supabase/tests/job_check_guards.sql` with `execute_sql`. Eleven lines, all PASS.
 
 ## Files on a job: a client or worker wants to attach a document, or one has gone wrong
 
