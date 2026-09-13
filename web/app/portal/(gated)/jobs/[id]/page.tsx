@@ -31,6 +31,7 @@ import { JobRail } from "@/components/portal/JobRail";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
+import { AskForChange } from "@/components/portal/AskForChange";
 import { ApproveButton } from "@/components/portal/ApproveButton";
 import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
 import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
@@ -383,6 +384,23 @@ export default async function JobRoom({
   const clientAlreadyConfirming = new Set(
     (partialAgreements ?? []).filter((a) => a.side === "client").map((a) => a.quote_id),
   );
+  /* A client's open "can you change..." on a quote (13 Sep 2026). RLS
+     returns these to the job's client and to the worker whose quote it is,
+     nobody else. Newest first, so the first open one per quote is the live
+     request. An error (the table not yet applied) reads as none. */
+  const { data: changeRows } = qs.length
+    ? await supabase
+        .from("quote_change_requests")
+        .select("quote_id,request_text,status,created_at")
+        .eq("job_id", id)
+        .order("created_at", { ascending: false })
+    : { data: [] as { quote_id: string; request_text: string; status: string; created_at: string }[] };
+  const openChange = new Map<string, { text: string; at: string }>();
+  for (const r of changeRows ?? []) {
+    if (r.status === "open" && !openChange.has(r.quote_id)) {
+      openChange.set(r.quote_id, { text: scrub(r.request_text).clean, at: whenDateTime(r.created_at) ?? "" });
+    }
+  }
   const chat = (msgRows ?? []).map((m) => ({
     id: m.id,
     mine: m.sender_email.toLowerCase() === email,
@@ -1327,6 +1345,26 @@ export default async function JobRoom({
                         Ask for full project documentation first
                       </button>
                     </form>
+                    {!openChange.has(q.id) && (
+                      <AskForChange jobId={job.id} quoteId={q.id} workerName={q.worker_name ?? "the tradesperson"} />
+                    )}
+                  </div>
+                )}
+
+                {/* A client's open change request on this quote, 13 Sep 2026.
+                    Shown to both sides: RLS only returns it to this job's
+                    client and to the worker whose quote it is. */}
+                {openChange.has(q.id) && (
+                  <div className="mt-3 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[12.5px] leading-relaxed">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-tealb">
+                      Change asked for{openChange.get(q.id)!.at ? ", " + openChange.get(q.id)!.at : ""}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-ink">{openChange.get(q.id)!.text}</p>
+                    <p className="mt-1.5 text-dim">
+                      {role === "client"
+                        ? (q.worker_name ?? "The tradesperson") + " has this. They can update their quote or keep it as it is. You can still accept this price as it stands."
+                        : "The client has asked for this change to your quote. Nothing on your quote has changed."}
+                    </p>
                   </div>
                 )}
 

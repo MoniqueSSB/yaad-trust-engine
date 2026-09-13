@@ -292,6 +292,18 @@ export default async function Quotes({
                   {!booked && q.status === "submitted" && (
                     <AcceptPanel jobId={job.id} code={code} quoteId={q.id} workerName={q.worker_name} />
                   )}
+                  {/* Asking for a change needs the client signed in, the
+                      same as accepting: holding the link is enough to read a
+                      price, never enough to send anything to the worker. The
+                      button itself lives on the portal job page. */}
+                  {!booked && q.status === "submitted" && (
+                    <p className="mt-3 text-[12.5px] leading-relaxed text-mute">
+                      Want something changed before you accept?{" "}
+                      <Link href={"/portal/jobs/" + encodeURIComponent(job.id)} className="font-bold text-tealb">
+                        Sign in to ask {q.worker_name} for a change &rarr;
+                      </Link>
+                    </p>
+                  )}
                   {!booked && kickoffRequested && (
                     <p className="mt-4 border-t border-line pt-4 text-[13px] leading-relaxed text-mute">
                       {q.worker_name} is writing their Kickoff Pack. Sign in to
