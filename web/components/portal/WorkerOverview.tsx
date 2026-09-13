@@ -2,7 +2,11 @@ import { STATUS_DOT, type StatusLabel, type StatusTone } from "./statusTone";
 import type { Job } from "./JobList";
 
 /**
- * The top of the worker dashboard, 13 Sep 2026.
+ * The top of the worker and client dashboards, 13 Sep 2026. The client
+ * portal uses the cards and the job strip; it has no money figures of its
+ * own, so it does not use the money bar.
+ *
+ * Originally the top of the worker dashboard.
  *
  * Three small pieces that turn the page from a stack of lists into something
  * a tradesperson can read at a glance on a phone between jobs: a row of
@@ -22,7 +26,7 @@ export type StatCard = {
   value: string;
   note?: string;
   tone: StatusTone;
-  icon: "held" | "released" | "live" | "done";
+  icon: "held" | "released" | "live" | "done" | "todo" | "service";
 };
 
 const CARD_ACCENT: Record<StatusTone, string> = {
@@ -64,6 +68,22 @@ function Icon({ kind }: { kind: StatCard["icon"] }) {
         <svg viewBox="0 0 24 24" className={common} strokeLinecap="round" strokeLinejoin="round">
           <path d="m14 6 4 4-9 9-4-4z" />
           <path d="m12 8 4-4 4 4-4 4" />
+        </svg>
+      );
+    case "todo":
+      // a bell: something is waiting on the reader
+      return (
+        <svg viewBox="0 0 24 24" className={common} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+          <path d="M10 21h4" />
+        </svg>
+      );
+    case "service":
+      // a clipboard: a professional check or report
+      return (
+        <svg viewBox="0 0 24 24" className={common} strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="4" width="14" height="17" rx="2" />
+          <path d="M9 4h6v3H9zM8.5 12h7M8.5 16h5" />
         </svg>
       );
     case "done":
