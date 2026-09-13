@@ -26,7 +26,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 // through public.notify_trigger_secret(), executable by the service role and
 // by triggers only, never from this function's environment. Changed 3 Sep
 // 2026 after the old value was committed to the public repository and
-// rotated (20260903a). Cached per isolate; a 401 from the hub clears the
+// rotated (20260903a). Cached per isolate; the hub's 403 refusal clears the
 // cache so a rotation is picked up on the next call without a redeploy.
 let notifySecretCache = "";
 async function notifySecret(): Promise<string> {
@@ -56,7 +56,7 @@ async function reRunEvidenceLanded(jobId: string, trace: Trace): Promise<boolean
         body: JSON.stringify({ secret: await notifySecret(), jobId, kind: "evidence_landed" }),
         signal: AbortSignal.timeout(45000),
       });
-      if (r.status === 401) notifySecretCache = "";
+      if (r.status === 403) notifySecretCache = "";
       return r.ok;
     });
   } catch (_) { return false; }
