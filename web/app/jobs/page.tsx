@@ -5,6 +5,7 @@ import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/comp
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
 import { QuotePanel } from "@/components/QuotePanel";
+import legal from "@/lib/legal-copy.json";
 import { RequestedJobs, type RequestedJob } from "@/components/RequestedJobs";
 
 export const dynamic = "force-dynamic";
@@ -164,15 +165,23 @@ export default async function Board({
   const user = await getUser();
 
   // vmode is a real auth state: signed in, published profile, guidelines
-  // signed. The same three things jq_insert_vetted checks in Postgres.
+  // signed AT THE CURRENT VERSION. The same three things jq_insert_vetted
+  // checks in Postgres. The version matters: on 13 Sep 2026 this test
+  // accepted any signature while the database insisted on the current one,
+  // so a worker signed on 1.3 with 1.6 live was shown the quote form, sent
+  // a quote, was told it went, and nothing was saved. staleGuidelines is
+  // that exact worker: active profile, real signature, wrong version.
   let vmode: "visitor" | "worker" = "visitor";
+  let staleGuidelines = false;
   if (user?.email) {
     const email = user.email.toLowerCase();
-    const [{ data: wp }, { data: sig }] = await Promise.all([
+    const [{ data: wp }, { data: sigs }] = await Promise.all([
       supabase.from("worker_profiles").select("worker_email").eq("worker_email", email).eq("active", true).maybeSingle(),
-      supabase.from("doc_signatures").select("id").eq("doc_type", "worker_guidelines").ilike("signer_email", email).limit(1).maybeSingle(),
+      supabase.from("doc_signatures").select("doc_version").eq("doc_type", "worker_guidelines").ilike("signer_email", email),
     ]);
-    if (wp && sig) vmode = "worker";
+    const current = (sigs ?? []).some((s) => s.doc_version === legal.WG_VERSION);
+    if (wp && current) vmode = "worker";
+    else if (wp && (sigs ?? []).length) staleGuidelines = true;
   }
 
   /* Jobs a client asked THIS worker for by name, still inside the 48 hour
@@ -775,7 +784,15 @@ export default async function Board({
                           )}
                         </div>
 
-                        {open && vmode !== "worker" && (
+                        {open && staleGuidelines && (
+                          <div className="mt-3.5 rounded-xl border border-mango/30 bg-mango/5 p-4 text-[13px] leading-relaxed text-mute">
+                            <b className="font-semibold text-ink">The Worker Guidelines have changed since you signed them.</b>{" "}
+                            Version {legal.WG_VERSION} is live and your signature is on an older one. Read and sign
+                            the new version, then come back: quoting opens the moment it is signed.{" "}
+                            <Link href="/portal/guidelines?read=worker_guidelines" className="font-semibold text-tealb underline underline-offset-2">Sign the current Worker Guidelines</Link>
+                          </div>
+                        )}
+                        {open && vmode !== "worker" && !staleGuidelines && (
                           <div className="mt-3.5 rounded-xl border border-gold/25 bg-gold/[0.05] p-4 text-[13px] leading-relaxed text-mute">
                             <b className="font-semibold text-goldb">Quoting is for approved workers.</b>{" "}
                             A published worker profile, a signed Worker Guidelines, and a job that is genuinely open:

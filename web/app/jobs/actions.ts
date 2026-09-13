@@ -9,7 +9,9 @@ import { createClient } from "@/lib/supabase/server";
  * gate (published profile + signed Worker Guidelines + genuinely open job),
  * so a bug here is a refusal message, not an unvetted quote.
  */
-export async function submitQuote(formData: FormData): Promise<void> {
+export type SubmitQuoteResult = { ok: true } | { ok: false; error: string };
+
+export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult> {
   const user = await requireUser();
   const jobId = String(formData.get("jobId") ?? "");
   const labour = parseInt(String(formData.get("labour") ?? ""), 10);
@@ -22,7 +24,9 @@ export async function submitQuote(formData: FormData): Promise<void> {
   const excludedNote = String(formData.get("excludedNote") ?? "").trim() || null;
   const timelineNote = String(formData.get("timelineNote") ?? "").trim() || null;
   const paymentStageNote = String(formData.get("paymentStageNote") ?? "").trim() || null;
-  if (!jobId || !Number.isFinite(labour) || labour <= 0) return;
+  if (!jobId || !Number.isFinite(labour) || labour <= 0) {
+    return { ok: false, error: "Put a labour price in before sending." };
+  }
 
   const supabase = await createClient();
   const email = (user.email ?? "").toLowerCase();
@@ -32,7 +36,13 @@ export async function submitQuote(formData: FormData): Promise<void> {
     .eq("worker_email", email)
     .maybeSingle();
 
-  await supabase.from("job_quotes").insert({
+  /* The insert's answer is read, not dropped. Until 13 Sep 2026 this line
+     discarded `error`, so a quote the database refused (an active profile
+     with a Worker Guidelines signature on an old version was the real case)
+     came back to the form as "quote sent" with nothing saved. A refusal from
+     jq_insert_vetted arrives as a row-level security error; the message the
+     worker sees names the three things it checks. */
+  const { error } = await supabase.from("job_quotes").insert({
     job_id: jobId,
     worker_user: user.id,
     worker_email: email,
@@ -50,6 +60,15 @@ export async function submitQuote(formData: FormData): Promise<void> {
     payment_stage_note: paymentStageNote,
     status: "submitted",
   });
+  if (error) {
+    console.error("submitQuote refused:", error.code, error.message);
+    return {
+      ok: false,
+      error: /row-level security|violates|permission/i.test(error.message)
+        ? "The database refused this quote. Quoting needs an active worker profile, the CURRENT Worker Guidelines signed (if you signed a while ago, a newer version may be waiting for you under Guidelines in your portal), and a job that is still open."
+        : "This quote did not save. Try again, and if it happens twice tell Yaadly.",
+    };
+  }
 
   /* Telling the client a price has landed is now a database trigger
      (notify_client_quote_arrived, fired on this same insert), not something
@@ -57,6 +76,7 @@ export async function submitQuote(formData: FormData): Promise<void> {
      never the click. See 20260831i_notify_client_from_the_state_change.sql. */
 
   revalidatePath("/jobs");
+  return { ok: true };
 }
 
 /**

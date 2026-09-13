@@ -64,7 +64,7 @@ export function LinkWorkerPhone({ phone }: { phone: string | null }) {
           <input
             name="phone"
             required
-            placeholder="Your WhatsApp number"
+            placeholder="WhatsApp number, e.g. +1 876 555 0123"
             defaultValue={phone ?? ""}
             className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
           />
