@@ -21,6 +21,8 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+// This function's own inbound admin secret. It no longer has to match what
+// yaad-notify-client expects; see notifySecret() below.
 const CRON_SECRET = Deno.env.get("YAAD_CRON_SECRET") ?? "";
 const APP_URL = Deno.env.get("YAAD_APP_URL") ?? "https://app.yaadly.co.uk";
 
@@ -70,15 +72,35 @@ async function sendTwilioWhatsApp(to: string, body: string, trace: Trace) {
   });
 }
 
+// The secret yaad-notify-client checks a caller against is read from Vault
+// through public.notify_trigger_secret(), executable by the service role and
+// by triggers only, never from this function's environment. Changed 3 Sep
+// 2026 after the old value was committed to the public repository and
+// rotated (20260903a). Cached per isolate; a 401 from the hub clears the
+// cache so a rotation is picked up on the next call without a redeploy.
+let notifySecretCache = "";
+async function notifySecret(): Promise<string> {
+  if (notifySecretCache) return notifySecretCache;
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data, error } = await admin.rpc("notify_trigger_secret");
+  if (error || !data) {
+    console.error(`notify_trigger_secret rpc failed: ${error?.message ?? "empty"}`);
+    return "";
+  }
+  notifySecretCache = String(data);
+  return notifySecretCache;
+}
+
 async function notifyClient(jobId: string, kind: string, trace: Trace) {
   try {
     return await trace.span("notify-client", SpanKind.INTERNAL, { "yaadly.notify.kind": kind }, async () => {
       const r = await fetch(`${SUPABASE_URL}/functions/v1/yaad-notify-client`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: CRON_SECRET, jobId, kind }),
+        body: JSON.stringify({ secret: await notifySecret(), jobId, kind }),
         signal: AbortSignal.timeout(15000),
       });
+      if (r.status === 401) notifySecretCache = "";
       return r.ok;
     });
   } catch (_) { return false; }

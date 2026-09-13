@@ -97,7 +97,9 @@ Before touching DNS, check the Cloudflare record still exists and note what it w
 3. Update wherever it actually lives: `wrangler secret put NAME` for the Worker, Supabase project secrets for Edge Functions, `.env` locally.
 4. Assume anything already pushed to a public repository is public forever. Rotation is the fix. Deleting the commit is not.
 
-One key on this project has already been exposed and rotated. The CI secrets job is a cheap backstop, not a substitute for care.
+5. If the exposed value is a shared secret a database trigger sends (the notify trigger secret was, 3 Sep 2026), rotate it in Vault, not in a migration: `select vault.update_secret(id, encode(extensions.gen_random_bytes(32),'hex')) from vault.secrets where name = 'notify_trigger_secret';` then resync the hash with the query under "The notify trigger secret gets out of sync (again)". No function body needs rewriting; they all read the Vault at fire time through `public.notify_trigger_secret()`.
+
+Two keys on this project have been exposed and rotated: an API key in 2026, and the notify trigger secret, committed as a literal in two migrations on 1 and 2 Sep 2026 and rotated 3 Sep. The CI secrets job is a cheap backstop, not a substitute for care; it now also catches a quoted 64-character hex string, the shape the second one had.
 
 ---
 
@@ -391,7 +393,7 @@ select id, created, status_code, content::text
 
 **None of this fires twice for the same event.** `evidence_landed`'s trigger condition is a transition (`old.status IS DISTINCT FROM 'evidence' AND new.status = 'evidence'`), not a state, so a second evidence item filed against a stage that already flipped the status does not notify again. If a client reports being told the same thing twice, that is two genuinely separate events, most likely two different stages, not a repeat.
 
-**The shared secret lives only as a hash.** `app_settings.notify_trigger_secret_sha256` stores the SHA-256, never the plaintext. The plaintext is baked into the three trigger function bodies (`notify_client_quote_arrived`, `notify_client_on_job_change`, `notify_client_dispute_raised`) at the point they were created. If it ever needs rotating, regenerate it the way `20260831i` did and rewrite all three function bodies together; a mismatch between what a trigger sends and what the hash expects fails closed; `yaad-notify-client` returns 401 rather than notifying on a bad secret.
+**The shared secret lives in Vault, and only its hash is anywhere else.** Since 3 Sep 2026 (`20260903a`) the plaintext is one Supabase Vault entry, `notify_trigger_secret`, generated inside Postgres. Every function that calls `yaad-notify-client` (nine of them today, plus the three cron notifiers over RPC) reads it at fire time through `public.notify_trigger_secret()`, which anon and authenticated cannot execute. `app_settings.notify_trigger_secret_sha256` stores the SHA-256 the hub compares against. Nothing is baked into any function body any more, so rotating it is a Vault update plus a hash resync (§6 above), never a function rewrite. A mismatch still fails closed: `yaad-notify-client` returns 401 rather than notifying on a bad secret, and that 401 is visible in `net._http_response`.
 
 **`yaad-quote-landed` is retired.** It answers 410 and names where the work went. If something still calls it, `console.warn` inside the stub logs the referer, visible in that function's logs.
 
@@ -682,6 +684,28 @@ select wa_id, answers->>'job_id', answers->>'draft_text', answers->>'ai_summary'
 
 ## The notify trigger secret gets out of sync (again)
 
+**As of 3 Sep 2026 this cannot happen the old way, and the old procedure below is history.** `20260903a` moved the plaintext into the Vault entry `notify_trigger_secret` and rewrote all nine callers to read it through `public.notify_trigger_secret()` at fire time. A new trigger that needs to call the hub writes `'secret', public.notify_trigger_secret()` and nothing else. Do not extract anything from `prosrc`; there is no literal there to extract, and the migration itself refuses to apply if one is left behind. The three cron notifiers (`yaad-job-health`, `yaad-followup-check`, `yaad-evidence-landed-check`) call the same helper over RPC with the service role key, so `YAAD_CRON_SECRET` is now only those functions' inbound admin secret and no longer has to match anything here. It was rotated to an unrelated value the same day.
+
+**To check everything agrees, right now:**
+
+```sql
+select
+  (select value from app_settings where key = 'notify_trigger_secret_sha256')
+    = encode(extensions.digest(public.notify_trigger_secret(), 'sha256'), 'hex') as hash_matches_vault,
+  (select count(*) from pg_proc where prosrc like '%yaad-notify-client%'
+     and prosrc not like '%public.notify_trigger_secret()%') as callers_not_using_the_helper,
+  (select count(*) from pg_proc where prosrc like '%yaad-notify-client%'
+     and prosrc ~ '[0-9a-f]{64}') as callers_still_carrying_a_literal;
+```
+
+`true, 0, 0` is healthy. `false` means someone rotated the Vault entry without resyncing the hash: run the `insert ... on conflict` from step 3 of `20260903a`. Either count above zero means a migration since then reintroduced the old pattern; fix the function to call the helper.
+
+**To rotate it deliberately:** `select vault.update_secret(id, encode(extensions.gen_random_bytes(32),'hex')) from vault.secrets where name = 'notify_trigger_secret';` then the hash resync. The cron notifiers cache the value per isolate and drop the cache on a 401, so they pick a rotation up on their next call without a redeploy.
+
+---
+
+*Everything below this line describes the pre-3 Sep 2026 design, kept because it explains the incidents. Do not follow it.*
+
 **Never generate a fresh secret when adding a new trigger function that calls `yaad-notify-client`.** This mistake happened twice in one afternoon before being caught both times. The correct pattern, every time:
 
 ```sql
@@ -836,7 +860,7 @@ select job_id, stage, created_at, due_at, fired_at from evidence_landed_pending
 
 `fired_at is null` means still waiting out the quiet window (or waiting on the once-a-minute check to notice it has elapsed, up to a minute past `due_at`). `fired_at` set with no `evidence_landed` having reached anyone means `due_evidence_landed_notifies()` found the stage no longer worth notifying about at check time, evidence landed but the stage was approved, disputed, or moved past in the meantime, the same "real activity already answered it" clearing `job_followups` does; this is correct behaviour, not a dropped notification.
 
-**If a timer fires (`fired_at` set) but nobody was actually told**, check `yaad-evidence-landed-check`'s own logs for a `403` from `yaad-notify-client` first: `YAAD_CRON_SECRET` not matching `notify_trigger_secret_sha256` (see "The notify trigger secret gets out of sync (again)", above) is a live, confirmed cause as of 31 Aug 2026, not hypothetical. If that check comes back clean, the fault is downstream in `yaad-notify-client` itself (no worker phone on file, an AI review failure, a Twilio send failure), the same causes as `evidence_landed`'s existing failure modes elsewhere in this file, not anything specific to the debounce.
+**If a timer fires (`fired_at` set) but nobody was actually told**, check `yaad-evidence-landed-check`'s own logs for a `403` from `yaad-notify-client` first: `YAAD_CRON_SECRET` not matching `notify_trigger_secret_sha256` was a live, confirmed cause on 31 Aug 2026; since 3 Sep 2026 the function reads the secret from Vault over RPC instead (see "The notify trigger secret gets out of sync (again)", above), so a 401 there now means the `notify_trigger_secret` RPC itself failed, which the function logs as `notify_trigger_secret rpc failed`. If that check comes back clean, the fault is downstream in `yaad-notify-client` itself (no worker phone on file, an AI review failure, a Twilio send failure), the same causes as `evidence_landed`'s existing failure modes elsewhere in this file, not anything specific to the debounce.
 
 **Retuning the 90 second window** is one constant, `interval '90 seconds'` in `schedule_evidence_landed_notify()`, plus the cron cadence itself if the check needs to run more or less often than once a minute (`cron.schedule('yaad-evidence-landed-check', ...)`, `20260831zzzz7`). Both need a new migration, not a dashboard edit, same as every other constant in this file that has one.
 

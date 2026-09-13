@@ -21,11 +21,25 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-// The same secret yaad-job-health already uses to call yaad-notify-client
-// from outside a database trigger; both are HTTP callers rather than
-// pg_net triggers, so both need the plaintext yaad-notify-client checks
-// against notify_trigger_secret_sha256, not a cron-only secret of their own.
-const NOTIFY_SECRET = Deno.env.get("YAAD_CRON_SECRET") ?? "";
+
+// The secret yaad-notify-client checks a caller against is read from Vault
+// through public.notify_trigger_secret(), executable by the service role and
+// by triggers only, never from this function's environment. Changed 3 Sep
+// 2026 after the old value was committed to the public repository and
+// rotated (20260903a). Cached per isolate; a 401 from the hub clears the
+// cache so a rotation is picked up on the next call without a redeploy.
+let notifySecretCache = "";
+async function notifySecret(): Promise<string> {
+  if (notifySecretCache) return notifySecretCache;
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data, error } = await admin.rpc("notify_trigger_secret");
+  if (error || !data) {
+    console.error(`notify_trigger_secret rpc failed: ${error?.message ?? "empty"}`);
+    return "";
+  }
+  notifySecretCache = String(data);
+  return notifySecretCache;
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -39,9 +53,10 @@ async function reRunEvidenceLanded(jobId: string, trace: Trace): Promise<boolean
       const r = await fetch(`${SUPABASE_URL}/functions/v1/yaad-notify-client`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: NOTIFY_SECRET, jobId, kind: "evidence_landed" }),
+        body: JSON.stringify({ secret: await notifySecret(), jobId, kind: "evidence_landed" }),
         signal: AbortSignal.timeout(45000),
       });
+      if (r.status === 401) notifySecretCache = "";
       return r.ok;
     });
   } catch (_) { return false; }

@@ -2773,7 +2773,7 @@ function jobSheet(){
  '<div class="pksec"><h5>Signatures</h5>'+
  '<div class="pkgrid"><p><b style="color:var(--tealb)">\u2713 You</b><br>Accepted the quote 26 Aug 2026, 21:02.</p>'+
  '<p><b style="color:var(--tealb)">\u2713 '+esc(A.who)+'</b><br>Confirmed the scope 26 Aug 2026, 21:19.</p></div>'+
- '<p class="hashline">sha256 \u00b7 9d3f71ba0c58e2461fa7c093be5218d7460ac9f31e85b06d2c4a7f9e83b15d20</p>'+
+ '<p class="hashline">sha256 \u00b7 9d3f71ba0c58…7f9e83b15d20</p>'+
  '<p class="tiny" style="margin-top:9px">A change from here creates rev 2 and you both re-sign. Rev 1 stays readable forever.</p></div></div>';
 }
 
@@ -2837,7 +2837,7 @@ function kickoffPack(){
  var foot='<div class="pksec"><h5>Signatures</h5>'+
   '<div class="pkgrid"><p><b style="color:var(--tealb)">\u2713 Client</b><br>Signed 26 Aug 2026, 20:07. Immutable.</p>'+
   '<p><b style="color:var(--tealb)">\u2713 Worker</b><br>Signed 26 Aug 2026, 21:14. Immutable.</p></div>'+
-  '<p class="hashline">sha256 \u00b7 4b17e0c9a2f83d5e61bb047c9de2a318f5c60d97ab34e128d0f6a7b95e3c412d</p>'+
+  '<p class="hashline">sha256 \u00b7 4b17e0c9a2f8…a7b95e3c412d</p>'+
   '<p class="tiny" style="margin-top:9px">A change after this point creates rev 2 and both sides re-sign. Rev 1 stays readable forever.</p></div>';
 
  return head + why + scope + money + ev + qa + extra + major + foot + '</div>';
@@ -2864,7 +2864,7 @@ function completionReport(kind){
  '<p>Every file, when it was taken, and its fingerprint. The fingerprint is what makes it provable rather than merely photographic \u2014 change one pixel and it stops matching.</p>'+
  '<div class="sdrow"><span class="sk">Stage 1</span><span class="sv">6 files \u00b7 27 Aug<small>3 arrival photos geotagged, damaged area, purlin underneath, materials with receipt</small></span></div>'+
  '<div class="sdrow"><span class="sk">Stage 2</span><span class="sv">5 files \u00b7 28 Aug<small>Sheets laid and fixed, wide shot, walk-round clip, ceiling made good \u00d72</small></span></div>'+
- '<p class="hashline">bundle sha256 \u00b7 c81f5a90d7be24361ac0f9e5b7d3128e64ab0f27c95d3e10b8a6f4d29c073e5b</p></div>'+
+ '<p class="hashline">bundle sha256 \u00b7 c81f5a90d7be…f4d29c073e5b</p></div>'+
 
  '<div class="pksec"><h5>4 \u00b7 Variations</h5>'+
  '<p>One raised, one agreed. <b style="color:var(--ink)">V1:</b> a second purlin found soft once the sheets were off. Photographed, priced at J$8,400, sent to the client, accepted in writing 27 Aug 14:02 before the work was done. No unagreed work was carried out and none is charged for.</p></div>'+
@@ -4179,10 +4179,10 @@ function drawJourney(){
  else if(d.x==='svc-scope')extra=reviewPicker()+scopeDoc(0);
  else if(d.x==='svc-kickoff'){pkCtx='svc';extra=msEditor()+docsX([['✓','Service Agreement','Signed by both · immutable'],['📄','Kickoff Pack, rev 1','Scope, milestones, evidence checklist each','kickoff'],['📄','What I am held to','The QA sheet, my side'],['○','Completion Report','Written when the service closes','completion-svc']])+svcLedger(0);}
  else if(d.x==='svc-m1-live')extra=evGrid(SVC_SHAPES[svcShape].ms[0].got.slice(0,2),'Milestone 1 · uploaded so far')+svcLedger(0)+jobChat();
- else if(d.x==='svc-m1-ev')extra=evGrid(SVC_SHAPES[svcShape].ms[0].got,'Milestone 1 evidence')+fingerprint('M1','4b17e0c9a2f83d5e61bb047c9de2a318f5c60d97ab34e128d0f6a7b95e3c412d')+svcLedger(0)+disputeBlock()+jobChat();
+ else if(d.x==='svc-m1-ev')extra=evGrid(SVC_SHAPES[svcShape].ms[0].got,'Milestone 1 evidence')+fingerprint('M1','4b17e0c9a2f8…a7b95e3c412d')+svcLedger(0)+disputeBlock()+jobChat();
  else if(d.x==='svc-led-1')extra=svcLedger(1);
  else if(d.x==='svc-m2-live')extra=evGrid(SVC_SHAPES[svcShape].ms[1].got.slice(0,3),'Milestone 2 · uploaded so far')+svcLedger(1)+jobChat();
- else if(d.x==='svc-m2-ev')extra=evGrid(SVC_SHAPES[svcShape].ms[1].got,'Milestone 2 evidence')+fingerprint('M2','c81f5a90d7be24361ac0f9e5b7d3128e64ab0f27c95d3e10b8a6f4d29c073e5b')+svcLedger(1)+disputeBlock()+jobChat();
+ else if(d.x==='svc-m2-ev')extra=evGrid(SVC_SHAPES[svcShape].ms[1].got,'Milestone 2 evidence')+fingerprint('M2','c81f5a90d7be…f4d29c073e5b')+svcLedger(1)+disputeBlock()+jobChat();
  else if(d.x==='svc-m3-ev')extra=reviewPicker()+evGrid((SVC_SHAPES[svcShape].ms[2]||SVC_SHAPES[svcShape].ms[0]).got,'Milestone 3 evidence')+svcReport()+svcLedger(2)+jobChat();
  else if(d.x==='svc-led-3')extra=completionReport('svc')+svcLedger(3)+portalCard();
  else if(d.x==='svc-next')extra=svcNext();
@@ -4196,12 +4196,12 @@ function drawJourney(){
  else if(d.x==='docs-worker')extra=docs([['✓','Worker Guidelines v1.1','Signed 25 Aug · immutable'],['✓','Vetting complete','ID, TRN, references, walkthrough call'],['📄','QA Sheet, JB-4471','8 items across 2 stages'],['📄','Your public profile','Published on the board']])+ledger(0);
  else if(d.x==='stage1-live')extra=evGrid(['arrival-1.jpg','arrival-2.jpg','arrival-3.jpg'],'Stage one · uploaded so far, timestamped 09:41')+ledger(0)+jobChat()+relayHow();
  else if(d.x==='stage1-ev')extra=evGrid(SHAPES[shape].st[0].got,'Stage one evidence · six items')+
-   '<div class="card soft" style="margin-top:12px"><p style="font-size:13px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">Stage one fingerprint</b><br><span class="mono" style="word-break:break-all;color:var(--dim)">sha256 · 4b17e0c9a2f83d5e61bb047c9de2a318f5c60d97ab34e128d0f6a7b95e3c412d</span></p></div>'+
+   '<div class="card soft" style="margin-top:12px"><p style="font-size:13px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">Stage one fingerprint</b><br><span class="mono" style="word-break:break-all;color:var(--dim)">sha256 · 4b17e0c9a2f8…a7b95e3c412d</span></p></div>'+
    ledger(0)+(pside==='client'?disputeBlock():disputeWorkerBlock())+jobChat();
  else if(d.x==='ledger-1')extra=ledger(1);
  else if(d.x==='stage2-live')extra=evGrid(['base-before.jpg','cupboard-empty.jpg'],'Stage two · uploaded so far, timestamped 08:55')+ledger(1)+jobChat();
  else if(d.x==='stage2-ev')extra=reviewPicker()+evGrid((SHAPES[shape].st[1]||SHAPES[shape].st[0]).got,'Stage two evidence · four items')+
-   '<div class="card soft" style="margin-top:12px"><p style="font-size:13px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">Stage two fingerprint</b><br><span class="mono" style="word-break:break-all;color:var(--dim)">sha256 · c81f5a90d7be24361ac0f9e5b7d3128e64ab0f27c95d3e10b8a6f4d29c073e5b</span></p></div>'+
+   '<div class="card soft" style="margin-top:12px"><p style="font-size:13px;color:var(--mute);line-height:1.6"><b style="color:var(--ink)">Stage two fingerprint</b><br><span class="mono" style="word-break:break-all;color:var(--dim)">sha256 · c81f5a90d7be…f4d29c073e5b</span></p></div>'+
    ledger(1)+(pside==='client'?disputeBlock():disputeWorkerBlock())+jobChat();
  else if(d.x==='ledger-2'){pkCtx='job';extra=completionReport('job')+ledger(2);}
  else if(d.x==='rev-c')extra=reviewBox('Delroy','Leak repair, Barbican · two stages, both signed off by you · closed 27 Aug.');

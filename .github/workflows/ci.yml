@@ -189,13 +189,19 @@ jobs:
           # Documentation placeholders (nvapi-xxxxxxxx, <your-key>) are not leaks.
           # Filtering them out is what keeps this check trustworthy: a scanner
           # that cries wolf is a scanner people start ignoring.
+          # A quoted run of exactly 64 hex characters is a 32-byte shared secret
+          # pasted as a literal (openssl rand -hex 32 makes one). The notify
+          # trigger secret was committed to this public repository in that
+          # exact shape in September 2026 and this scan did not see it; hence
+          # the last alternative. Real hashes are never quoted into source here,
+          # they are computed, so the pattern has no legitimate hit to allow.
           matches=$(git grep -nIE \
-            '(sk-[A-Za-z0-9_-]{16,}|nvapi-[A-Za-z0-9_-]{16,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,})' \
+            "(sk-[A-Za-z0-9_-]{16,}|nvapi-[A-Za-z0-9_-]{16,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|['\"][0-9a-f]{64}['\"])" \
             -- . ':!.github/workflows/ci.yml' \
             | grep -viE 'x{8,}|<[^>]*>|your[-_ ]?(api[-_ ]?)?(key|token|secret)|placeholder|example|redacted|\.\.\.' || true)
           if [ -n "$matches" ]; then
             echo "$matches"
-            echo "::error::A string shaped like an API key or JWT is committed. Rotate it, then remove it."
+            echo "::error::A string shaped like an API key, JWT or 64-hex shared secret is committed. Rotate it, then remove it."
             exit 1
           fi
           echo "No key-shaped strings found in tracked files."
