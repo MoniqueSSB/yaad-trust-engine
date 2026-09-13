@@ -48,23 +48,27 @@ export default async function PortalDoor() {
 
   const { data: svc } = await supabase.from("services").select("id");
 
-  // A live quote with no booking still makes someone a worker on this door:
+  // A quote with no booking still makes someone a worker on this door:
   // since 1 Sep 2026 a client can request a Kickoff Pack well before
   // choosing anyone, and jobs.worker_email alone no longer says that.
+  // Counted from job_quotes itself, not from the jobs rows above: since
+  // 13 Sep 2026 a worker who has only quoted gets no jobs row at all.
   const { data: myQuotes } = await supabase
     .from("job_quotes")
     .select("job_id")
     .eq("worker_user", user.id);
-  const quotedJobIds = new Set((myQuotes ?? []).map((q) => q.job_id));
 
   const email = (user.email ?? "").toLowerCase();
   const jobs = (data ?? []) as Job[];
   const asClient = jobs.filter((j) => j.client_email?.toLowerCase() === email);
-  const asWorker = jobs.filter((j) => j.worker_email?.toLowerCase() === email || quotedJobIds.has(j.id));
+  const workerJobIds = new Set([
+    ...jobs.filter((j) => j.worker_email?.toLowerCase() === email).map((j) => j.id),
+    ...(myQuotes ?? []).map((q) => q.job_id as string),
+  ]);
   const hasServices = (svc ?? []).length > 0;
 
   const isClient = asClient.length > 0 || hasServices;
-  const isWorker = asWorker.length > 0;
+  const isWorker = workerJobIds.size > 0;
 
   // One role only: skip the door entirely.
   if (isClient && !isWorker) redirect("/portal/client");
@@ -114,7 +118,7 @@ export default async function PortalDoor() {
             What you are on, what each one is waiting for, and what you are owed.
           </p>
           <p className="mt-3 text-[12.5px] text-dim">
-            {asWorker.length} job{asWorker.length === 1 ? "" : "s"}
+            {workerJobIds.size} job{workerJobIds.size === 1 ? "" : "s"}
           </p>
         </Link>
       </div>

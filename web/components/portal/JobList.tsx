@@ -100,6 +100,11 @@ export const WORKER_STATUS: Record<string, StatusLabel> = {
   in_progress: { label: "On site", tone: "moving" },
   evidence: { label: "Evidence with the client", tone: "moving" },
   complete: { label: "Paid and closed", tone: "done" },
+  /* Not job statuses. The worker portal sets these on a job this worker quoted
+     on when their own quote closed, so the row says what happened to them
+     rather than what is happening on a job that is now somebody else's. */
+  not_selected: { label: "Not selected this time", tone: "idle" },
+  withdrawn: { label: "You withdrew your price", tone: "idle" },
 };
 
 export type { StatusLabel, StatusTone };

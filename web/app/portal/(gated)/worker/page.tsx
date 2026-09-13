@@ -6,6 +6,7 @@ import { MoneySplit, WorkerPipeline, WorkerStatCards, type StatCard } from "@/co
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
+import { LIVE_QUOTE, type Tender } from "@/components/portal/QuotedJobRoom";
 import { jmd } from "@/lib/money";
 
 // Never cached. A portal showing a stale job is worse than a slow one.
@@ -57,30 +58,51 @@ export default async function WorkerPortal() {
     .eq("worker_user", user.id)
     .maybeSingle();
 
-  // A live quote with no booking is not nothing: since 1 Sep 2026 a client
-  // can accept it (ask for a Kickoff Pack) well before choosing anyone, and
-  // that worker has real work to do in the meantime (read it, confirm it).
-  // jobs.worker_email alone used to be the whole story; it no longer is.
-  // Only submitted/kickoff_requested/accepted count as this worker's stake:
-  // withdrawn or declined means someone else's job now, and jobs.status
-  // never says so on its own once another worker is chosen.
-  const { data: myQuotes } = await supabase
-    .from("job_quotes")
-    .select("job_id")
-    .eq("worker_user", user.id)
-    .in("status", ["submitted", "kickoff_requested", "accepted"]);
-  const quotedJobIds = new Set((myQuotes ?? []).map((q) => q.job_id));
+  /* A quote with no booking is not nothing: since 1 Sep 2026 a client can
+     accept it (ask for a Kickoff Pack) well before choosing anyone, and that
+     worker has real work to do in the meantime (read it, confirm it).
+
+     Since 13 Sep 2026 those jobs do not come from the jobs query above at
+     all. Row level security returns a jobs row to the booked worker and
+     nobody else, so the jobs this worker has only quoted on come from
+     my_quoted_jobs(), the tender pack: title, parish, trade, status, and no
+     address or client column to leak. Founder's decision the same day: a
+     worker whose quote closed still sees the job, listed on its own as a
+     closed quote, so it reads as what happened to them rather than as live
+     work on a job that is now somebody else's. */
+  const { data: tenderRows } = await supabase.rpc("my_quoted_jobs");
 
   const email = (user.email ?? "").toLowerCase();
-  /* The street address is for the worker who is booked on the job, because
-     they have to turn up there. A worker who has only quoted gets the parish,
-     the same as the public board, and the address is blanked here, on the
-     server, so it never reaches the page they are looking at. */
-  const jobs = ((data ?? []) as (Job & { pay_method: string | null; pay_ref: string | null })[])
-    .filter((j) => j.worker_email?.toLowerCase() === email || quotedJobIds.has(j.id))
-    .map((j) =>
-      j.worker_email?.toLowerCase() === email ? j : { ...j, addr: null, addr_hidden: true },
-    );
+  type WorkerJob = Job & { pay_method: string | null; pay_ref: string | null };
+  // The filter stays although RLS already scopes the query: an admin, or a
+  // worker who is also somebody's client, gets rows here that are not work.
+  const booked = ((data ?? []) as WorkerJob[]).filter((j) => j.worker_email?.toLowerCase() === email);
+  const bookedIds = new Set(booked.map((j) => j.id));
+  const quoted: WorkerJob[] = ((tenderRows ?? []) as Tender[])
+    .filter((t) => !bookedIds.has(t.id))
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      trade: t.trade,
+      parish: t.parish,
+      stage: t.stage,
+      status: LIVE_QUOTE.has(t.quote_status ?? "")
+        ? t.status
+        : t.quote_status === "withdrawn"
+          ? "withdrawn"
+          : "not_selected",
+      client_email: null,
+      worker_email: null,
+      updated_at: t.updated_at,
+      addr: null,
+      addr_hidden: true,
+      pay_method: null,
+      pay_ref: null,
+    }));
+  const closedQuotes = quoted.filter((j) => j.status === "not_selected" || j.status === "withdrawn");
+  const jobs = [...booked, ...quoted.filter((j) => !closedQuotes.includes(j))].sort((a, b) =>
+    String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")),
+  );
 
   const live = jobs.filter((j) => j.status !== "complete");
   const done = jobs.filter((j) => j.status === "complete");
@@ -273,6 +295,10 @@ export default async function WorkerPortal() {
 
           {done.length > 0 && (
             <JobList title="Completed" jobs={done} labels={WORKER_STATUS} rail />
+          )}
+
+          {closedQuotes.length > 0 && (
+            <JobList title="Quotes that closed" jobs={closedQuotes} labels={WORKER_STATUS} rail />
           )}
         </div>
 
