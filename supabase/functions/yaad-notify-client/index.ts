@@ -940,7 +940,7 @@ Deno.serve(async (req: Request) => {
     // quote for the same reason: jobs.worker_email is now the worker who WAS
     // chosen. Only while the quote is still declined, so a trigger that fires
     // twice, or a desk correction back to live, cannot tell somebody they
-    // lost when they did not. (20260913160100)
+    // lost when they did not. (20260913225714)
     if (kind === "quote_not_selected" && quoteId) {
       const { data: q } = await admin.from("job_quotes").select("worker_email, status").eq("id", quoteId).eq("job_id", jobId).maybeSingle();
       if (q?.status === "declined") quoteWorkerEmail = q.worker_email ?? "";
@@ -1179,7 +1179,7 @@ Deno.serve(async (req: Request) => {
       // than leaving them to find out. It says that another tradesperson was
       // booked and not why: the client's reasons and the other price are not
       // this worker's to read, and a price that lost is not a failure. The
-      // link is their own view of the job, board level only (20260913160000).
+      // link is their own view of the job, board level only (20260913225614).
       // Free text, no approved template, the same as every other worker kind.
       subject = `Not selected this time: ${job.title}`;
       line = `Thank you for pricing ${job.id} (${job.title}). Another tradesperson has been booked for this one, so it is closed for you and there is nothing more for you to do. ` +
