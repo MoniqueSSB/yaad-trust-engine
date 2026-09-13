@@ -3169,6 +3169,18 @@ Decision: the link comes off, by turning **Deploy to production** off in the pro
 
 **Flagged, not fixed here.** The cron jobs' own inbound calls to `yaad-evidence-landed-check`, `yaad-kickoff-check` and `yaad-quote-pack-check` are refused with a 403 a few times a day while most succeed. Those use their own per function cron secrets, not this one, and nothing in this change touches them.
 
+## 2026-09-13 · A client can ask for a change to a quote before accepting it
+
+**Why.** Founder instruction, 13 Sep 2026: a client should be able to respond to a quote and ask for a revision. Until now a client's only moves on an open quote were accept or ignore, and messages on a job only open once a worker is booked, so "can the price include the whole rail?" had nowhere to go on the platform.
+
+**Built in three pieces, each checkable on its own.** Piece 1 (`20260913230000`): the client writes what they want changed, and it is saved against that one quote in `quote_change_requests` with a copy of the quote as it stood (`quote_before`). Piece 2: the worker is told and answers, update or keep; the worker is allowed to say no (the Mirror Rule), and the client sees "was / now" from `quote_before`. Piece 3: a revised quote that Yaadly had chosen loses the recommendation and goes back to the desk.
+
+**Two founder decisions, 13 Sep 2026.** On a "Choose for me" job the request goes straight to the worker, not to the desk first; the desk reads a copy. And a revised quote Yaadly had chosen is re-chosen by a named person, never left carrying a recommendation made on the old number. That second one is the governing rule applied: the recommendation is a human judgment on a specific price, so a new price needs a new judgment.
+
+**Asking is not committing.** A request changes nothing on the quote: it stays `submitted` and the client can still accept it as it stands. One open request per quote, enforced by a partial unique index, so a worker is never revising against two lists. After booking a change is a variation to agreed work and money, and this deliberately does not cover it; the database refuses a request on a booked job.
+
+**Writes only through `request_quote_change_as_me()`,** which runs the same checks as `agree_quote_as_me()`. The browser roles have read access only, and only to their own rows; write privileges are revoked as well as absent from RLS. The request text is scrubbed of contact details before it is saved and again before it is shown, because it goes straight to the worker. No model touches it.
+
 ## A stage payable needs a recorded stage approval, and nobody outside the database can raise one (13 Sep 2026)
 
 **What was found.** `raise_job_stage_worker_payable()` is `SECURITY DEFINER` and, unlike `raise_job_client_invoice()` and `raise_job_worker_payable()`, had no `is_admin()` check. Live, `anon`, `authenticated` and `service_role` all held EXECUTE on it. So anyone with the publishable key, signed in or not, could call it over the API with a job id and a stage number and get a worker payable, marked sent, for a stage no client had approved. Checked before changing anything: nobody had. The three stage payables in production are on TEST jobs and each has its stage approval.
