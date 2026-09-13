@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-13 · The job calendar records when each stage happened
+
+**Founder:** "the calendar on the client and worker portal should be updating with the live project to track when each stage took place." The calendar band on the job room (`web/components/portal/CalBand.tsx`) marked one kind of stage event, the arrival check-in. It now also marks evidence filed, a stage approved, a stage invoice paid, materials released, and the Kickoff Pack confirmed by both sides, as coloured dots on the day. Tapping a day lists what happened with the Jamaica time, and a Stage history under the grid gives each stage its first on-site, first evidence, approved, paid and materials dates, each a link that jumps the calendar to that day.
+
+**Read only, from what already exists.** No table, no migration, no RLS change. The dates are read from `arrival_log`, `evidence`, `stage_approvals`, `invoices`, `materials_releases` and `kickoff_packs`, as the viewer, under the policies those tables already have. The invoice query also names the viewer's side (`payable_to = 'yaadly'` for the client, `'worker'` for the worker) so neither side is ever shown the other's invoice, even though RLS already keeps worker payables away from the client through the sentinel `client_email`. A void invoice and a stage-less invoice (the agency fee, a job check) are left off rather than filed against a stage they do not belong to. The calendar records steps a named human already took; it decides nothing and nothing in it can move a stage on.
+
+**The Jamaica day, everywhere.** Every timestamp is placed on the Jamaica calendar day at fixed UTC-5, the rule `log_arrival()` already uses for `arrived_on`, so a client approving at 2:30 am London time lands on the evening before in Portmore and the calendar agrees with the arrival log. The grouping lives in `web/lib/portal/stage-timeline.ts`, a pure module with its own test (`web/tests/stage-timeline.test.mjs`), so the day boundary is proved without a database.
+
+**Not done, deliberately.** "Live" means current on every page load and after every action, not pushed onto an open screen; a realtime subscription is a bigger change and was left out. Jobs carry no completion date, so the last stage approval stands in as the finish. Past days with no events stay dimmed, and a past day can no longer be opened or requested, which only became reachable once history made past days clickable.
+
+---
+
 ## 2026-09-13 · The portal says where the job is, and only to the two people who go there
 
 **Founder:** "on the portal it should be clear exactly where the job is", and the stage the job is at should be in bold. The job room had shown the parish only, and said so in a comment: it never queried `jobs.addr`, so there was nothing more private to leak. The portal lists showed the stage as a small pill and the parish in the grey footer. Both now read as two labelled lines on every job card and at the top of the job room: **Stage**, in bold, and **Where**, the street address and parish. While work is under way the room adds the stage number ("Work under way, stage 2 of 3").
