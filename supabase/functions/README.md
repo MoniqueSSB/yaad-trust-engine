@@ -88,6 +88,7 @@ behaviour on the live number until it is set.
 | `HUBSPOT_LEAD_WEBHOOK_SECRET` | a confirmed job becoming a HubSpot contact and deal | already set, both sides |
 | `TWILIO_CONTENT_SID_APPROVE` | the tap-to-approve button on the message asking a client to approve | needs a Quick Reply template |
 | `TWILIO_CONTENT_SID_DESK_REPLY` | the nudge sent when a desk reply lands outside the 24 hour window | needs a Utility template |
+| `TWILIO_CONTENT_SID_DESK_ALERT` | `yaad-notify-client` kind `desk_alert`: Monique's own alert (portal message to Yaadly, dispute raised, dispute escalated) when her WhatsApp window has closed. Two variables: what happened, the job title | needs the Utility template `yaadly_desk_alert`; unset means free text only, then SMS if `TWILIO_SMS_FROM` is set |
 | `TWILIO_STATUS_CALLBACK_URL` | Twilio reporting whether a message was delivered, read or failed | needs `yaad-message-status` deployed |
 
 Full instructions for each are in RUNBOOK.md. Nothing here is a code change:

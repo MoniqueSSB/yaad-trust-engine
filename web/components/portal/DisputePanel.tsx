@@ -33,6 +33,16 @@ export function DisputePanel({
   const [body, setBody] = useState("");
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
+  // The actions used to be wrapped in an empty catch, so a refused send
+  // looked exactly like a button that did nothing. Say so instead.
+  const [err, setErr] = useState("");
+  const fail = "That did not go through. Try again, or use Message Yaadly below.";
+  const act = async (fn: () => Promise<void>) => {
+    setBusy(true); setErr("");
+    try { await fn(); router.refresh(); } catch { setErr(fail); }
+    setBusy(false);
+  };
+  const tooShort = body.trim().length < 5;
 
   const box = "mt-6 rounded-2xl border border-coral/30 bg-coral/5 p-4";
 
@@ -41,9 +51,10 @@ export function DisputePanel({
       return (
         <div className="mt-6 rounded-2xl border border-line bg-panel p-4 text-[13px] leading-relaxed text-mute">
           <b className="text-mute">If they raise something, you hear it first.</b>{" "}
-          Not Yaadly, and not a review: them, straight to you, with 48 hours
-          to answer or put it right. Your money is not taken away and not
-          handed over either; it sits still until it is sorted.
+          It comes to you on WhatsApp, straight from them, with 48 hours to
+          answer or put it right. Yaadly gets a copy and steps in only if they
+          escalate. Nothing on the job is approved until it is sorted, and
+          nothing is taken off you either.
         </div>
       );
     if (!open)
@@ -53,7 +64,8 @@ export function DisputePanel({
           <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
             Approving is a signature, so do not approve something you are not
             happy with. Most things are a missing photo or a misunderstanding
-            and get sorted the same day. Your money stays held either way.
+            and get sorted the same day. Nothing on the job can be approved
+            while it is open, so nothing is paid out for it.
           </p>
           <button onClick={() => setOpen(true)} className="mt-3 rounded-full border border-coral/50 px-4 py-2 text-[13px] font-bold text-coral hover:bg-coral/10">
             Something is not right
@@ -74,18 +86,27 @@ export function DisputePanel({
             );
           })}
         </div>
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={2000}
+        <textarea value={body} onChange={(e) => { setBody(e.target.value); setErr(""); }} rows={3} maxLength={2000}
           placeholder="What did you expect, and what did you get instead?"
           className="mt-2.5 w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[13.5px] text-ink outline-none focus:border-teal" />
+        {tooShort && (
+          /* The database refuses anything under 5 characters. Before this
+             line the button just stayed grey with no reason given, which is
+             how "klk" read as a broken form on 13 Sep 2026. */
+          <p className="mt-1 text-[11.5px] text-dim">
+            A sentence is enough: say what you expected and what you got.
+          </p>
+        )}
         <div className="mt-2.5 flex flex-wrap items-center gap-3">
-          <button disabled={busy || body.trim().length < 5}
-            onClick={async () => { setBusy(true); try { await raiseDispute(jobId, picked, body); router.refresh(); } catch {} setBusy(false); }}
+          <button disabled={busy || tooShort}
+            onClick={() => act(() => raiseDispute(jobId, picked, body))}
             className="rounded-full border border-coral/50 px-4 py-2 text-[13px] font-bold text-coral hover:bg-coral/10 disabled:opacity-40">
-            Send it to {workerName}
+            {busy ? "Sending" : `Send it to ${workerName}`}
           </button>
-          <button onClick={() => setOpen(false)} className="rounded-full border border-line2 px-4 py-2 text-[13px] text-ink">Cancel</button>
-          <span className="text-[11.5px] text-dim">Goes to them now. Yaadly is not involved yet.</span>
+          <button onClick={() => { setOpen(false); setErr(""); }} className="rounded-full border border-line2 px-4 py-2 text-[13px] text-ink">Cancel</button>
+          <span className="text-[11.5px] text-dim">Goes to them now on WhatsApp. Yaadly gets a copy and steps in only if you escalate.</span>
         </div>
+        {err && <p className="mt-2 text-[12.5px] text-coral">{err}</p>}
       </div>
     );
   }
@@ -131,7 +152,7 @@ export function DisputePanel({
               placeholder="Answer it, or say how you will put it right"
               className="min-w-[240px] flex-1 rounded-xl border border-line bg-bg px-3 py-2 text-[13px] text-ink outline-none focus:border-teal" />
             <button disabled={busy || reply.trim().length < 2}
-              onClick={async () => { setBusy(true); try { await moveDispute(dispute.id, jobId, "reply", reply); router.refresh(); } catch {} setBusy(false); }}
+              onClick={() => act(() => moveDispute(dispute.id, jobId, "reply", reply))}
               className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand disabled:opacity-40">
               Reply
             </button>
@@ -140,12 +161,12 @@ export function DisputePanel({
         {role === "client" && (
           <>
             <button disabled={busy}
-              onClick={async () => { setBusy(true); try { await moveDispute(dispute.id, jobId, "resolved"); router.refresh(); } catch {} setBusy(false); }}
+              onClick={() => act(() => moveDispute(dispute.id, jobId, "resolved"))}
               className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand disabled:opacity-40">
               That sorts it
             </button>
             <button disabled={busy}
-              onClick={async () => { setBusy(true); try { await moveDispute(dispute.id, jobId, "escalated"); router.refresh(); } catch {} setBusy(false); }}
+              onClick={() => act(() => moveDispute(dispute.id, jobId, "escalated"))}
               className="rounded-full border border-coral/50 px-4 py-2 text-[13px] font-bold text-coral hover:bg-coral/10 disabled:opacity-40">
               Escalate to Yaadly
             </button>
@@ -153,6 +174,7 @@ export function DisputePanel({
         )}
         <span className="text-[11.5px] text-dim">Nothing releases while this is open.</span>
       </div>
+      {err && <p className="mt-2 text-[12.5px] text-coral">{err}</p>}
     </div>
   );
 }

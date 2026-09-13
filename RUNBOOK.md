@@ -456,6 +456,16 @@ Everything else is push only. Every message from every stranger is how a phone g
 
 **What is NOT built yet.** Replying from your own WhatsApp does not route back to the client. Right now the alert tells you what was said and you answer from the desk, which works on a phone browser. Routing your reply from your own number back into the right client thread is a separate build.
 
+**Alerts from a live job (since 13 September 2026).** Three more things reach you, from `yaad-notify-client` kind `desk_alert` rather than from `yaad-inbound`: a client or worker pressing **Message Yaadly** on a job page (row in `portal_contacts`), a client raising a dispute, and a client escalating one. Each goes to your WhatsApp with the full message, to `admin_email` in full, and as a push. If WhatsApp refuses because the 24 hour window has closed, the approved template goes instead, but only once `TWILIO_CONTENT_SID_DESK_ALERT` is set:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_DESK_ALERT='HX...' --project-ref leffyisvfvjwzilydlwf
+```
+
+The template is `yaadly_desk_alert`, SID `HXa91bbabe4e13f462bd31b26aed2bbfd3`, Utility, English (GB), submitted to WhatsApp on 13 September 2026 and set as the secret the same day. Its body is fixed: "Yaadly alert: {{1}} on the job "{{2}}". Open the desk at https://concierge.yaadly.co.uk to see it and reply." Until Meta approves it, a send with it is refused and the next rung runs; check its status under Messaging, Templates in the Twilio console.
+
+If WhatsApp fails outright, a short text goes to the same number, but only if `TWILIO_SMS_FROM` is set; unset, that rung is skipped and the email and push still land. To see what actually happened to one: `select * from net._http_response order by created desc limit 5;` shows the function's reply, where `told`, `emailed` and `whatsapp.via` say which rungs worked. A 404 "No such message on this job" means the row id and the job id did not match, which should never happen from the trigger.
+
 ---
 
 ## 10f. Turning a conversation into a job

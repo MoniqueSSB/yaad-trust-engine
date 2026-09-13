@@ -169,6 +169,30 @@ export async function raiseDispute(
   revalidatePath("/portal/jobs/" + jobId);
 }
 
+/** A message to Yaadly from inside a job, by that job's client or worker.
+ *  Only writes the row: the trigger on portal_contacts (20260913130000) is
+ *  what alerts Monique, so the alert cannot be skipped by any other path.
+ *  RLS re-checks the side and caps it at five an hour per sender. Not
+ *  scrubbed, unlike party-to-party chat: a number or an address is exactly
+ *  what somebody may need to give Yaadly. */
+export async function contactYaadly(jobId: string, body: string): Promise<void> {
+  const user = await requireUser();
+  const email = (user.email ?? "").toLowerCase();
+  const text = body.trim().slice(0, 2000);
+  if (text.length < 5) throw new Error("too short");
+  const supabase = await createClient();
+  const { data: job } = await supabase.from("jobs")
+    .select("client_email, worker_email").eq("id", jobId).maybeSingle();
+  if (!job) throw new Error("refused");
+  const role = (job.client_email ?? "").toLowerCase() === email ? "client"
+    : (job.worker_email ?? "").toLowerCase() === email ? "worker" : null;
+  if (!role) throw new Error("refused");
+  const { error } = await supabase.from("portal_contacts").insert({
+    job_id: jobId, sender_email: email, sender_role: role, body: text,
+  });
+  if (error) throw new Error("refused");
+}
+
 export async function moveDispute(
   id: string, jobId: string,
   move: "reply" | "resolved" | "escalated",

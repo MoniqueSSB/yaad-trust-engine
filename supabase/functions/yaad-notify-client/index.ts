@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -91,6 +91,12 @@ function allInPrice(labour: number, materials: number): { total: number; breakdo
   if (m > 0) parts.push(`materials at cost ${money(m)}`);
   return { total: l + fee + m, breakdown: parts.join(", ") };
 }
+
+const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n).trimEnd() + " [continues in your email]" : s);
+// WhatsApp template variables refuse newlines, tabs and long runs of spaces.
+const oneLine = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n) || "a job";
+const escHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 async function sha256Hex(s: string): Promise<string> {
   const bytes = new TextEncoder().encode(s);
@@ -902,7 +908,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -935,7 +941,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -972,6 +978,12 @@ Deno.serve(async (req: Request) => {
     // not be delivered. approveButton is an ADDITION: it follows a message
     // that was delivered, carrying the one thing free text cannot, a button.
     let approveButton: { sid: string; vars: Record<string, string> } | undefined;
+    // Set only by desk_alert. html replaces the default email body, because
+    // that one puts line into HTML unescaped and a desk alert carries
+    // somebody's own typed words. smsText replaces line on the SMS rung, so a
+    // text to her phone is one or two segments, not fourteen.
+    let html = "";
+    let smsText = "";
 
     if (kind === "service_booked") {
       // Fires the moment an enquiry is converted in the desk. A receipt with
@@ -1339,11 +1351,121 @@ Deno.serve(async (req: Request) => {
     } else if (kind === "dispute_raised") {
       // A receipt, not a ping about somebody else's action: only the client
       // may raise a dispute today (see the RLS policy on disputes), so this
-      // confirms it landed and is being read, the same shape as an enquiry
-      // receipt.
+      // confirms it landed. It used to say it was "with a person, not a
+      // queue" while nothing told any person at all. Since 20260913130000
+      // the worker (dispute_raised_worker) and Monique (desk_alert) really
+      // are told, and this says exactly that and no more.
       subject = `We have your dispute: ${job.title}`;
-      line = `Your message about ${job.title} is with a person, not a queue. ` +
-        `Nothing more is paid on this job while it is open. See it and add anything here: ${roomLink}`;
+      line = `Your message about ${job.title} has gone to the tradesperson, and Yaadly has a copy. ` +
+        `They answer first. If it cannot be sorted between you, press Escalate to Yaadly on the job. ` +
+        `Nothing on this job can be approved while it is open. See it and add anything here: ${roomLink}`;
+    } else if (kind === "dispute_raised_worker") {
+      // The worker's panel has always said "you hear it first". Until
+      // 20260913130000 they only heard it if they happened to open the
+      // portal. The body was scrubbed on insert (raiseDispute), the same as
+      // chat, and is read here by id, never passed in by the caller.
+      const { data: d } = await admin.from("disputes")
+        .select("body").eq("id", String(meta.id ?? "")).eq("job_id", jobId).maybeSingle();
+      if (!d) return json({ error: "No such dispute on this job." }, 404);
+      recipientEmail = String(job.worker_email ?? "").trim();
+      subject = `The client has raised something: ${job.title}`;
+      line = `On ${job.title}, the client has raised something with you, before anybody else:\n\n` +
+        `"${String(d.body ?? "").slice(0, 1000)}"\n\n` +
+        `Answer it, or say how you will put it right, here: ${roomLink}\n\n` +
+        `Nothing on the job is approved until it is sorted. If it cannot be sorted between you, the client can ask Yaadly to look at it.`;
+    } else if (kind === "desk_alert") {
+      // Monique, not a party. Founder, 13 Sep 2026: a problem on a job
+      // "comes directly to my whatsapp and email". Fired by the triggers in
+      // 20260913130000 for a portal message to Yaadly, a dispute raised, and
+      // a dispute escalated. Her number and address come from app_settings,
+      // never from the caller, so this can only ever reach her.
+      //
+      // Order, set by her: WhatsApp free text first (full detail); if that
+      // is refused for the 24 hour window, the approved desk alert template
+      // (TWILIO_CONTENT_SID_DESK_ALERT) when set; if WhatsApp fails outright,
+      // a short SMS, only when TWILIO_SMS_FROM is set. Email and the phone
+      // push go regardless. No model anywhere in this branch: the words are
+      // the sender's own, forwarded.
+      const event = String(meta.event ?? "");
+      const rowId = String(meta.id ?? "");
+      const { data: cfgRows } = await admin.from("app_settings")
+        .select("key, value").in("key", ["desk_phone", "admin_email", "ntfy_topic", "desk_url"]);
+      const cfg: Record<string, string> = {};
+      for (const r of (cfgRows ?? []) as { key: string; value: string | null }[]) cfg[r.key] = String(r.value ?? "").trim();
+      recipientEmail = cfg.admin_email ?? "";
+      recipientPhone = cfg.desk_phone ?? "";
+      const deskUrl = cfg.desk_url || "https://concierge.yaadly.co.uk";
+      const title = String(job.title ?? job.id);
+
+      let what = "";
+      let pushTitle = "";
+      let detail = (_limit: number) => "";
+      if (event === "contact") {
+        const { data: c } = await admin.from("portal_contacts")
+          .select("sender_email, sender_role, body").eq("id", rowId).eq("job_id", jobId).maybeSingle();
+        if (!c) return json({ error: "No such message on this job." }, 404);
+        const isClient = c.sender_role === "client";
+        let phone = isClient ? clientPhone : "";
+        if (!isClient && job.worker_email) {
+          const { data: w } = await admin.from("worker_profiles")
+            .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
+          phone = String(w?.phone ?? "").trim();
+        }
+        what = isClient ? "a client has messaged Yaadly" : "a worker has messaged Yaadly";
+        pushTitle = "Yaadly: a message from the portal";
+        detail = (limit) => `${isClient ? "The client" : "The worker"} on ${title} wrote to Yaadly from the portal:\n\n` +
+          `"${clip(String(c.body ?? ""), limit)}"\n\nFrom: ${c.sender_email}${phone ? `, ${phone}` : ""}`;
+      } else if (event === "dispute_raised" || event === "dispute_escalated") {
+        const { data: d } = await admin.from("disputes")
+          .select("kinds, body, reply").eq("id", rowId).eq("job_id", jobId).maybeSingle();
+        if (!d) return json({ error: "No such dispute on this job." }, 404);
+        const kinds = Array.isArray(d.kinds) ? (d.kinds as unknown[]).map(String).join("; ") : "";
+        if (event === "dispute_raised") {
+          what = "a client has raised a problem";
+          pushTitle = "Yaadly: a dispute was raised";
+          detail = (limit) => `The client on ${title} has raised a problem with the worker.` +
+            `${kinds ? `\n\nWhat: ${kinds}` : ""}\n\n"${clip(String(d.body ?? ""), limit)}"\n\n` +
+            `The worker has been sent it and answers first. Nothing on the job can be approved while it is open.`;
+        } else {
+          what = "a client has escalated a dispute";
+          pushTitle = "Yaadly: a dispute was escalated";
+          detail = (limit) => `The client on ${title} has escalated their dispute to Yaadly. It needs a person now.\n\n` +
+            `They raised: "${clip(String(d.body ?? ""), limit)}"\n\n` +
+            (d.reply ? `The worker replied: "${clip(String(d.reply), limit)}"` : "The worker has not replied.") +
+            `\n\nNothing on the job can be approved while it is open.`;
+        }
+      } else {
+        return json({ error: "Unknown desk alert." }, 400);
+      }
+
+      const tail = `\n\nJob ${job.id}: ${roomLink}\nDesk: ${deskUrl}`;
+      subject = `Yaadly alert: ${what}, ${title}`;
+      // WhatsApp free text through Twilio stops at 1600 characters, so the
+      // message there is clipped and the email carries it in full.
+      line = detail(900) + tail;
+      html = `<div style="white-space:pre-wrap;font-family:system-ui,sans-serif;font-size:15px;line-height:1.5">${escHtml(detail(4000) + tail)}</div>`;
+      smsText = `Yaadly alert: ${what} on "${clip(title, 60)}". The detail is in your email and on the desk: ${deskUrl}`;
+      const alertSid = Deno.env.get("TWILIO_CONTENT_SID_DESK_ALERT") ?? "";
+      if (alertSid) waTemplate = { sid: alertSid, vars: { "1": oneLine(what, 100), "2": oneLine(title, 100) } };
+
+      // The push is anonymous on purpose, the same rule as yaad-inbound's:
+      // ntfy.sh is a public relay, so nothing about the person or the job
+      // travels in it. Tapping it opens the desk.
+      if (cfg.ntfy_topic) {
+        try {
+          await fetch(`https://ntfy.sh/${cfg.ntfy_topic}`, {
+            method: "POST",
+            headers: {
+              Title: pushTitle,
+              Priority: event === "dispute_escalated" ? "high" : "default",
+              Tags: "rotating_light",
+              Click: deskUrl,
+            },
+            body: "Somebody on a live job needs you. The detail is in your email and on the desk.",
+            signal: AbortSignal.timeout(4000),
+          });
+        } catch (_) { /* the push never costs the WhatsApp or the email */ }
+      }
     } else if (kind === "stage_released") {
       const { data: approval } = await admin.from("stage_approvals")
         .select("stage, approved_at")
@@ -1441,7 +1563,7 @@ Deno.serve(async (req: Request) => {
             headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
               from: `Yaadly <${FROM_EMAIL}>`, to: [recipientEmail], reply_to: REPLY_TO,
-              subject, text: line, html: `<p>${line.replace(codeLink, `<a href="${codeLink}">${codeLink}</a>`).replace(roomLink, `<a href="${roomLink}">${roomLink}</a>`)}</p>`,
+              subject, text: line, html: html || `<p>${line.replace(codeLink, `<a href="${codeLink}">${codeLink}</a>`).replace(roomLink, `<a href="${roomLink}">${roomLink}</a>`)}</p>`,
             }),
             signal: AbortSignal.timeout(15000),
           });
@@ -1476,7 +1598,7 @@ Deno.serve(async (req: Request) => {
         const metaResult = await sendMetaWhatsApp(recipientPhone, line, trace);
         if (metaResult.sent) wa = { ...metaResult, via: "meta whatsapp" };
         else {
-          const sms = await sendTwilio(recipientPhone, line, "sms", trace);
+          const sms = await sendTwilio(recipientPhone, smsText || line, "sms", trace);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
       }
