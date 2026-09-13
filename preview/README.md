@@ -39,7 +39,7 @@ No signature, no listing, whichever door they came through.
 **Agents are locked until signature.** No AI touches a client's work until they have
 signed and have a profile. The first job is a fully manual intake.
 
-**Yaadly does not price work.** No price band is shown to a worker, ever. The client's
+**Yaadly does not estimate or quote the trade work.** No price band is shown to a worker, ever. The client's
 budget band is client-side only and carries a "never shown to workers" marker. Yaadly
 does project management and oversight, not price estimation.
 
@@ -76,7 +76,7 @@ minimum £2,500
 Founding prices for the first five run below each full price and are shown as a real,
 dated discount off a price that is genuinely purchasable, required under DMCCA 2024 s226.
 
-Marketplace fee is unchanged: 27% blended on labour only, never on materials, 15% client, 12% worker, worker keeps 88%.
+Marketplace fee: 20% blended on labour only, never on materials, 15% client, 5% worker, worker keeps 95% (worker side cut from 12% on 9 September 2026).
 
 ## Removed, deliberately
 

@@ -1,7 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
+import { missingSections, verdictFor } from "./quote-pack-verdict.ts";
 
 // Quote Kickoff Pack agent, 1 Sep 2026.
 //
@@ -28,10 +29,10 @@ const SYSTEM = `You are the Quote Kickoff Pack agent for Yaadly, a trust-first p
 WHO YOU ARE WRITING FOR: a tradesperson deciding whether and how to quote on this job. They see this before they have entered a price. Write plain, direct English, addressed to them.
 
 ABSOLUTE RULES, these override everything else:
-1. NEVER state, estimate, guess or imply a price, cost, rate, valuation or budget figure, in any currency, in any form. The worker adds their own price separately; you never see it and must never guess at one. Where money must be described, describe the STRUCTURE only: stage names and what evidence must exist before that stage is released, as a percentage of an unnamed total. Never an amount.
-2. Never use the word escrow, in any form. If payment holding must be described, say "held safely with a licensed payment provider".
+1. NEVER state, estimate, guess or imply a price, cost, rate, valuation or budget figure, in any currency, in any form. The worker adds their own price separately; you never see it and must never guess at one. Where money must be described, describe the STRUCTURE only: stage names and what evidence must be filed and signed off before that stage is complete, as a percentage of an unnamed total. Never an amount.
+2. Never use the word escrow, in any form, and never say money is held on anyone's behalf, with a payment provider or otherwise. Yaadly holds nothing. Yaadly is the principal contractor: the client buys the job from Yaadly, and Yaadly separately engages you and pays you under its own agreement with you. Say that plainly where it helps, because it is the best thing about working this way: your money does not wait on a client abroad approving anything.
 3. Never invent facts about this specific job. If the intake does not say, write the summary around what is known rather than guessing at what is not.
-4. Payment stages are tied to evidence, never to elapsed time.
+4. Payment stages are tied to evidence, never to elapsed time. A stage completes when the evidence is filed and a named person at Yaadly has signed it off. Never write that a client's approval is what pays you.
 
 Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
 {
@@ -132,27 +133,24 @@ async function runDraft(draftId: string, job: Record<string, unknown>, trace: Tr
       "gen_ai.request.temperature": 0.3,
       "yaadly.agent.name": "quote-pack",
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model,
-          temperature: 0.3,
-          max_tokens: 3000,
-          messages: [
-            { role: "system", content: SYSTEM },
-            { role: "user", content: jobToPrompt(job).slice(0, 4000) },
-          ],
-        }),
-        signal: AbortSignal.timeout(120_000),
-      });
-      const j = await r.json();
+      // Retries, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0.3,
+        max_tokens: 3000,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: jobToPrompt(job).slice(0, 4000) },
+        ],
+      }, { timeoutMs: 120_000, retries: 2, maxRetryWaitMs: 15_000 });
+      let j: any = {};
+      try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
       s.setAttributes({
+        ...providerAttrs(provider),
         "http.response.status_code": r.status,
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) { s.recordError(`${prov.name} http ${r.status}`); throw new Error(`model call failed (${prov.name} ${r.status})`); }
+      if (!r.ok) { s.recordError(`${provider.name} http ${r.status}`); throw new Error(`model call failed (${provider.name} ${r.status})`); }
       finishReason = j?.choices?.[0]?.finish_reason ?? "";
       return j?.choices?.[0]?.message?.content ?? "";
     });
@@ -163,29 +161,24 @@ async function runDraft(draftId: string, job: Record<string, unknown>, trace: Tr
       await fail(finishReason === "length" ? "ran out of room before it finished" : "did not return usable JSON");
       return;
     }
-    const missing = ["scope_summary", "included", "excluded", "rough_timeline", "payment_stages"].filter((k) => !(k in docs));
+    const missing = missingSections(docs);
     if (missing.length) { await fail(`Missing sections: ${missing.join(", ")}`); return; }
 
     // Same guardrail discipline as yaad-kickoff: the model is told never to
     // price and never to say escrow, this checks whether it did anyway.
-    const blob = JSON.stringify(docs);
-    const priceHits = [
-      ...(blob.match(/(?:J?\$|£|€|USD|JMD|GBP)\s?[\d,]+(?:\.\d+)?/gi) ?? []),
-      ...(blob.match(/\b\d[\d,]{2,}(?:\.\d{2})?\s?(?:dollars|pounds|JMD|USD|GBP)\b/gi) ?? []),
-    ];
-    const priced = priceHits.length > 0;
-    const bannedHits = guardrails.scan(blob);
+    //
+    // The verdict moved into _shared/quote-pack-verdict.ts on 5 September 2026
+    // when yaad-quote-pack-rescan became the second thing that decides whether
+    // a pack is clean. If the drafter and the rescan door ever computed it
+    // differently, correcting a pack could clear a flag the drafter would
+    // still have raised, and the flag would stop meaning anything.
+    const verdict = verdictFor(docs, guardrails.scan);
 
     const up = await draftsWrite("PATCH", `?id=eq.${draftId}`, {
       status: "ready",
       docs,
       model: prov.model,
-      guardrail: {
-        price_language_detected: priced,
-        samples: priceHits.slice(0, 5),
-        banned_language_detected: bannedHits.length > 0,
-        banned_samples: [...new Set(bannedHits.map((f) => f.term))].slice(0, 5),
-      },
+      guardrail: verdict,
       finished_at: new Date().toISOString(),
     });
     if (!up.ok) await fail(`Draft finished but could not be saved (db ${up.status}).`);

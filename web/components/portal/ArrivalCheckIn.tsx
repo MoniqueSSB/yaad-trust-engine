@@ -86,7 +86,7 @@ export function ArrivalCheckIn({
               <input type="hidden" name="jobId" value={jobId} />
               <button
                 disabled={state === "busy"}
-                className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {state === "busy" ? "Checking in…" : "I'm on site"}
               </button>

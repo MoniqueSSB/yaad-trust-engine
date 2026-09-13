@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import legal from "@/lib/legal-copy.json";
+import { PrintReport } from "@/components/portal/PrintReport";
+import { phaseBadge } from "@/lib/portal/evidence-sections";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,18 @@ export const dynamic = "force-dynamic";
  * decided text, verbatim. Renders only once the job is complete: a report
  * for unfinished work would be fiction.
  */
+
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return { title: `Completion · ${id} · Yaadly` };
+}
 
 export default async function Completion({ params }: { params: Promise<{ id: string }> }) {
   const user = await getUser();
@@ -30,7 +44,7 @@ export default async function Completion({ params }: { params: Promise<{ id: str
 
   const { data: evidence } = await supabase
     .from("evidence")
-    .select("label,created_at,sha256,stage,ok")
+    .select("label,created_at,sha256,stage,ok,phase,kind")
     .eq("job_id", id).order("created_at");
 
   const { data: approvals } = await supabase
@@ -50,7 +64,10 @@ export default async function Completion({ params }: { params: Promise<{ id: str
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-6">
-      <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link href={"/portal/jobs/" + encodeURIComponent(id)} className="text-[13px] text-tealb underline-offset-2 hover:underline">&larr; Back to the job</Link>
+        <PrintReport />
+      </div>
       <div className="mt-3 border-b-2 border-teal pb-4">
         <h1 className="font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Completion Report</h1>
         <p className="mt-1 text-[12px] text-dim">{job.id} · {job.trade ?? ""} {job.parish ? "· " + job.parish : ""} · closed {String(job.updated_at).slice(0, 10)}</p>
@@ -72,6 +89,14 @@ export default async function Completion({ params }: { params: Promise<{ id: str
           {ev.map((e, i) => (
             <li key={i} className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[12.5px] text-mute">
               <b className="text-ink">{e.label}</b>
+              {/* The worker's own declaration of which part of the job this
+                  belongs to, printed on the record the client keeps. Absent on
+                  items filed before 5 Sep 2026 and on anything nobody marked,
+                  which is the honest reading: not marked, rather than not a
+                  before. */}
+              {phaseBadge(e.phase, e.kind) && (
+                <span className="text-ink"> · {phaseBadge(e.phase, e.kind)}</span>
+              )}
               {e.stage != null && <span> · Stage {e.stage}</span>}
               <span> · {String(e.created_at).slice(0, 16).replace("T", " ")}</span>
               {e.sha256 && <span className="mt-1 block break-all font-mono text-[9px] text-dim">sha256 · {e.sha256}</span>}

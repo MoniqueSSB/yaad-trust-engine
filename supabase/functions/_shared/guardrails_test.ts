@@ -1,6 +1,6 @@
 // Deno mirror of the guardrail tests in tests/test_engine.py.
 //
-// The phrases below are the SAME five the Python side asserts, deliberately.
+// The phrases below are the SAME seven the Python side asserts, deliberately.
 // Two copies of a rule drift, and a rule that holds in one runtime and not the
 // other is worse than no rule because it reads as covered. If somebody loosens
 // a pattern in one file, one of these two suites goes red.
@@ -16,6 +16,17 @@ const BANNED_PHRASES = [
   "You are 100% protected.",
   "Every job is fully covered.",
   "We hold your money safely.",
+  // The passive. Added 4 Sep 2026, because the active-voice pattern above was
+  // the only one there and this is the form the model actually writes.
+  "Your money is held and released stage by stage.",
+  "We are holding your money until the work is proven.",
+  // Added 5 Sep 2026. Until today this exact sentence was the PRESCRIBED
+  // replacement for "escrow" in CLAUDE.md section 8, in both guardrail
+  // runtimes' guidance strings, and in the Reporting agent's own prompt, so
+  // the screen was clean while the instructions handed the model the one claim
+  // the screen exists to stop.
+  "Money is held safely with a licensed payment provider.",
+  "Your payment is held safely until the work is signed off.",
 ];
 
 Deno.test("banned language is caught, same phrases as the Python suite", () => {
@@ -26,9 +37,26 @@ Deno.test("banned language is caught, same phrases as the Python suite", () => {
 });
 
 Deno.test("approved language passes", () => {
+  // Same fixture and same reasoning as the Python suite, changed in the same
+  // commit. The old sentence ("held safely with a licensed payment provider
+  // and released to the worker within 24 hours of your approval") passes the
+  // screen but describes escrow, and this test is the worked example of GOOD
+  // copy, so the wrong sentence sat here as the thing to imitate.
   assert(isClean(
-    "Payment is held safely with a licensed payment provider and released to the worker "
-    + "within 24 hours of your approval. Work is protected up to the guarantee limit.",
+    "You buy the job from Yaadly, and a stage closes once you have seen the evidence "
+    + "and agreed the work is right. The tradesperson is engaged and paid by Yaadly under "
+    + "its own separate agreement. Work is protected up to the guarantee limit.",
+  ));
+});
+
+Deno.test("the principal wording the assistant now uses passes", () => {
+  // The replacement for the retired "money is held" fact. If a future edit
+  // widens the passive pattern far enough to catch this, the screen would
+  // block the very sentence it is meant to leave standing.
+  assert(isClean(
+    "You pay Yaadly, not the tradesperson. Yaadly sells you the job at one agreed price, "
+    + "engages a vetted tradesperson and pays them directly. Payment terms are agreed in "
+    + "writing for each job, and a named person approves every release.",
   ));
 });
 
@@ -97,7 +125,7 @@ Deno.test("yaad-inbound still screens inside the one path to a client", () => {
 });
 
 Deno.test("the draft producers still flag banned language", () => {
-  for (const fn of ["yaad-completion", "yaad-kickoff"]) {
+  for (const fn of ["yaad-completion", "yaad-kickoff", "yaad-report"]) {
     const src = Deno.readTextFileSync(new URL(`../${fn}/index.ts`, import.meta.url));
     assert(src.includes("guardrails.scan("), `${fn} no longer screens its draft`);
   }

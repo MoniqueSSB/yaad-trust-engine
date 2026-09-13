@@ -38,21 +38,81 @@ curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/
 
 ## What is in it
 
-Twenty-two views, six groups, every one reading Postgres directly.
+Thirty-two views, six groups, every one reading Postgres directly. This table
+is written by hand and had drifted to twenty-two by 3 September 2026, so read
+the `VIEWS` registry in `concierge.html` if the count here matters to you.
 
 | Group | Views |
 |---|---|
-| Run the day | Overview, Intake, Jobs, Evidence, Quotes |
+| Run the day | Overview, Intake, Jobs, Evidence, Stalled jobs, Quotes, Shortlist |
+
+| Run the day | Overview, The day, Intake, Jobs, Evidence, Stalled jobs, Quotes |
 | People | Applications, Workers, Clients, Reviews |
-| Documents & money | Kickoff packs, Invoices, Sketch packs, Signatures, Money |
-| Services | Services, Marketplace |
-| Inbox | Conversations, Calls, Waiting list, Feedback |
-| System | Settings, Health |
+| Documents & money | Kickoff packs, Quote Pack Drafts, Kickoff Drafts, Invoices, Job Invoices, Agency Fees, Materials tranches, Signatures, Money, Reports, Job files, Independent checks |
+| Services | Services, Marketplace, Job photos |
+| Inbox | Conversations, Mid-chat, Calls, Enquiries, Waiting list, Feedback, Questions |
+| System | Settings, How the desk is doing, Health |
 
 Three views own their markup and their own logic: **Overview**, **Invoices**
 and **Sketch packs**. Two more are built from the registry but filled by hand:
 **Money** and **Health**. The rest are generated entirely from the `VIEWS`
 registry, including their rail link, heading, table, search and empty state.
+
+## The Overview is one screen, and the lists are one tab down
+
+Rebuilt 10 September 2026. The Overview is eight widgets sized to fit a laptop
+screen without scrolling: four big numbers, what came in by day, a ranked
+"waiting on you" list, live jobs by stage, whose move it is, money in three
+states, and today's diary. Every figure is one `loadOverview()` already counts;
+the dashboard adds four timestamp reads for the two time charts and nothing
+else. The three bands it replaced are on **The day**, unchanged, and the
+counting tiles are on **How the desk is doing**. `loadOverview()` fills all
+three tabs.
+
+Two rules came from checking the design against how service desks and trade
+tools build a first screen, and both are load bearing:
+
+- **No pie, no donut, no percentage gauge.** Lengths read accurately, angles do
+  not, and a percentage off two conversations is noise. The one working day
+  promise is shown as a count of people past it.
+- **Colour is state only**, the same rule as the table further down.
+
+The rail folds by group, and a closed group shows the sum of its counts. The
+group holding the view you are on always opens.
+
+## Every table view opens with a picture
+
+A strip drawn from the rows already loaded: the count, arrivals by day, and a
+split by state or category. Clicking a bar filters the table underneath, never
+the picture, and clicking it again clears the filter. The fields are guessed
+from the rows; a view names its own with `viz:{date, state, cat}`, and
+`viz:false` turns the strip off (Settings has it off). Quotes draw each job's
+quotes as bars on one scale, with the cheapest marked and nothing marked best.
+
+## How the desk is doing has no boxes
+
+Four open sections, a hairline between them, bars and lines only: what is
+waiting by queue, promises and pace, the assistant, evidence at sign-off. The
+founder found the old grid of thirty tiles overwhelming (11 Sep 2026). The
+tiles still render into a hidden `#ovTiles`, because `loadOverview()` writes
+them; do not delete that element without moving the writes. Money and Invoices
+each carry one bar split by where the money is, in place of boxed tiles.
+
+## The client reviews evidence
+
+The founder's rule from 10 September 2026: the client reviews and approves each
+stage in their portal, and she steps in on an issue. Unchecked evidence sits in
+the client's lane, not hers. A job page shows its own evidence photographs by
+stage, signed for an hour, loaded only when that page opens.
+
+## A view can own its drawer
+
+A registry entry can set `page: (row) => html` to draw the whole drawer itself,
+with the raw fields folded under "Every field, as stored". Jobs does this: the
+job, four cards, and the ten step "Agreed and signed off" record, read from
+five tables once per load by `preJobs`. `detailTop: (row) => html` draws a block
+above the plain fields instead; Enquiries uses it for "Reach them". `titleOf`
+names the drawer. None of these writes anything.
 
 ## A table is the floor, not the view
 
@@ -96,21 +156,37 @@ this desk makes to a model goes through the one guard behind it, in `fn()` and
 `skFn()`. Paused means invoice drafting and sketch description refuse to send
 anything.
 
-**It does not reach everything, and it names what it misses.** `yaad-inbound`
-calls a model without this desk starting it: woken by an incoming message, it
-has replied to somebody before the desk knows the message exists, and it does
-not read `agents_paused`. Settings says so, Health says so, and the Overview
-says so while the pause is on. (`yaad-whatsapp-webhook` shared this gap until
-1 Sep 2026; it spoke to Meta's Cloud API directly, never received real
-traffic, and was deleted, see DECISIONS.md. `yaad-inbound`, over Twilio, is
-the one live WhatsApp path now.)
+**It reaches `yaad-inbound` too, since 4 September 2026.** That one is woken by
+an incoming message rather than by this desk, so it had replied to somebody
+before the desk knew the message existed, and it did not read `agents_paused`.
+It was the only agent talking to clients unsupervised at night, which made it
+the one a kill switch is actually for. It now reads the row itself, in
+`agentsPaused()`, before the text provider is chosen, so no path through that
+function can produce a model call while the switch is on.
 
-Reading that row at the top of that one is the whole remaining job. There is
-already a per-person gate, `may_use_agents(email)`, which `yaad-agent` and
-`yaad-vision` both call, so a global pause folded into it would reach further
-still. Until that is done, the desk is precise about its reach rather than
-quiet about it, because **a switch that claims more than it does is worse than
-no switch.**
+What paused looks like from the client's side: their message is recorded, their
+photographs and voice notes are kept, they are told a person is reading it, and
+the thread is handed to Monique on their **first** message rather than after
+three turns of a generic opener. Nobody is left in silence.
+
+**The scope is narrower than "everything stops", and that is deliberate.**
+Transcription and media storage keep running while paused, because they build
+the record a person then reads. Settings, Health and the Overview all say this
+in those words. The rule that produced the old honesty still holds: **a switch
+that claims more than it does is worse than no switch**, and that cuts both
+ways now, so do not widen this copy without widening the code.
+
+The read **fails closed**. If `app_settings` cannot be read at all, inbound
+treats itself as paused and hands the conversation over. Handing a client to a
+person is the product. A switch that silently stops working is not.
+
+A per-person gate, `may_use_agents(email)`, also exists and is called by
+`yaad-agent` and `yaad-vision`. It is not the mechanism here and cannot be:
+it authorises a signed-in person, and an inbound webhook has no signed-in
+person to authorise. (`yaad-whatsapp-webhook` shared the old gap until 1 Sep
+2026; it spoke to Meta's Cloud API directly, never received real traffic, and
+was deleted, see DECISIONS.md. `yaad-inbound`, over Twilio, is the one live
+WhatsApp path now.)
 
 ## Settings read empty for a while, and the table was full
 
@@ -162,15 +238,19 @@ A view that needs its own logic sets `bespoke:true` and gets a loader in
 
 ## Colour means something
 
-Three tones, and they are claims about state, not decoration.
+Three tones, and they are claims about state, not decoration. Realigned onto
+the shared Yaadly brand palette 3 Sep 2026 (purple in place of teal, gold in
+place of mango), the meaning is unchanged, only the hue is. The `--teal` and
+`--mango` variable names in `concierge.html` are also unchanged, they now
+just point at different values.
 
 | Tone | Means |
 |---|---|
-| teal | Proven. Signed off, released, verified, passed |
-| mango | Held. Waiting on somebody, money not yet moved |
+| purple | Proven. Signed off, released, verified, passed |
+| gold | Held. Waiting on somebody, money not yet moved |
 | coral | Blocked. Risk, failed, needs attention |
 
-A rail with no colour means the day is clear. Do not use mango or coral for
+A rail with no colour means the day is clear. Do not use gold or coral for
 anything else. A guidelines chip is coral when somebody is behind the version
 in force, because the database refuses to let them quote: that is a block, not
 a wait.
@@ -214,3 +294,30 @@ curl -s -o /dev/null -w "%{http_code}\n" https://concierge.yaadly.co.uk/
 ```
 
 See `../concierge-deploy/README.md` for why it is a separate origin.
+
+## Finishing a report
+
+`Reports` is where a drafted report becomes a client's report. `yaad-report`
+writes the findings; it has no severity field and no verdict field, so what
+lands in this view is deliberately unfinished.
+
+Three buttons, in order:
+
+1. **Rate a finding.** By its number, Severe, Moderate or Low. Stamped with
+   your email and the time. Nothing drafts this.
+2. **Write the verdict.** The one line for page one, and the paragraph under
+   it. No model has seen that field.
+3. **Issue it.** Only appears once every finding is rated and the verdict is
+   written, and the database refuses it anyway if either is missing or if a
+   sentence states a measurement.
+
+All three go through Postgres functions rather than column writes, so the rule
+is checked in the database whoever is calling and this page is only the form in
+front of it. Each one writes to `agent_actions` as you, by name, which is how
+the ledger can later show that the drafting was a machine and the judgment was
+a person.
+
+**The "Measurements pulled" column is worth reading.** It counts what the
+scrubber removed from the draft before it was saved. A high number means the
+notes from the visit were full of dimensions, which is worth knowing before you
+sign a document that says Yaadly does not measure.

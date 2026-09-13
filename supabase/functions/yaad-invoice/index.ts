@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 
 // yaad-invoice
 //
@@ -388,27 +388,32 @@ Deno.serve(async (req) => {
       "gen_ai.operation.name": "chat",
       "gen_ai.request.temperature": 0,
     }, async (s) => {
-      const r = await fetch(prov.api, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-        body: JSON.stringify({
-          model: prov.model,
-          temperature: 0,
-          messages: [
-            { role: "system", content: `${SYSTEM}\n\nCATALOGUE (the only permitted catalogue_id values, plus "UNKNOWN"):\n${catalogueForPrompt}` },
-            { role: "user", content: text },
-          ],
-        }),
-      });
-      const j = await r.json();
+      // Retries, then the failover, 6 September 2026. See _shared/textmodel.ts.
+      const { provider, res: r } = await chatWithFailover(prov, {
+        temperature: 0,
+        messages: [
+          { role: "system", content: `${SYSTEM}\n\nCATALOGUE (the only permitted catalogue_id values, plus "UNKNOWN"):\n${catalogueForPrompt}` },
+          { role: "user", content: text },
+        ],
+      }, { timeoutMs: 60_000, retries: 2, maxRetryWaitMs: 15_000 });
+      let j: any = {};
+      try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
       s.setAttributes({
+        ...providerAttrs(provider),
         "http.response.status_code": r.status,
         "gen_ai.response.model": j?.model,
         "gen_ai.response.finish_reasons": j?.choices?.[0]?.finish_reason,
         "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
         "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
       });
-      if (!r.ok) s.recordError(`${prov.name} http ${r.status}`);
+      // Without this the caller sees only "did not return a usable draft",
+      // which reads the same for a wrong key, a dead model id and a genuinely
+      // confused prompt. The span carried the status and the span goes
+      // nowhere until an OTLP endpoint exists. Added 4 Sep 2026.
+      if (!r.ok) {
+        const msg = `yaad-invoice: ${provider.name} http ${r.status}: ${JSON.stringify(j).slice(0, 200)}`;
+        s.recordError(msg); console.error(msg);
+      }
       return j?.choices?.[0]?.message?.content ?? "";
     });
 

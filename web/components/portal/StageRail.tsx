@@ -76,7 +76,7 @@ export function StageRail({
         {viewing < stages.length - 1 && (
           <Link
             href={`${base}?s=${viewing + 1}`}
-            className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-[#04211D] transition hover:brightness-110"
+            className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand transition hover:brightness-110"
           >
             Next step &rarr;
           </Link>

@@ -54,6 +54,41 @@ export async function agreeKickoffPack(formData: FormData): Promise<void> {
   revalidatePath("/portal/jobs/" + jobId + "/pack");
 }
 
+/** Agreeing a price, no Kickoff Pack. The portal twin of the no-account
+ *  page's Accept button (AcceptPanel.tsx), added 9 Sep 2026 so the same
+ *  journey runs signed in: until now the room's only button on an open
+ *  quote ordered a Kickoff Pack, which the founder took out of the flow on
+ *  4 Sep. Runs entirely inside agree_quote_as_me() in Postgres, which
+ *  refuses a quote the client may not see (a yaadly-picks job before a
+ *  person has chosen) and records only this side's agreement: the worker
+ *  confirms theirs, and only then does the quote become bookable. */
+export async function agreePrice(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  const quoteId = String(formData.get("quoteId") ?? "");
+  if (!jobId || !quoteId) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("agree_quote_as_me", { p_quote: quoteId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal/jobs/" + jobId);
+}
+
+/** Who picks the tradesperson: Yaadly, or the client from the quotes. The
+ *  job form asks this once; this is the client changing their mind from
+ *  the portal. set_worker_choice_as_me() checks it is their job and that
+ *  nobody is booked yet, and touches nothing but the one column. */
+export async function setWorkerChoice(formData: FormData): Promise<void> {
+  await requireUser();
+  const jobId = String(formData.get("jobId") ?? "");
+  const choice = String(formData.get("choice") ?? "");
+  if (!jobId || !["yaadly", "client"].includes(choice)) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_worker_choice_as_me", { p_job: jobId, p_choice: choice });
+  if (error) throw new Error(error.message);
+  revalidatePath("/portal/jobs/" + jobId);
+  revalidatePath("/portal/client");
+}
+
 /** Choosing runs entirely inside choose_worker() in Postgres. */
 export async function chooseQuote(formData: FormData): Promise<void> {
   await requireUser();

@@ -9,20 +9,34 @@ import Link from "next/link";
  * happening", "what is the proof", "where is my paperwork", "what is my
  * link") were answered by scrolling past the other three.
  *
+ * Seven areas now, one per question a client actually asks (founder's brief,
+ * 3 Sep 2026): Overview, Scope and quote, Progress evidence, Materials,
+ * Messages, Approvals, Help. Nothing was deleted to get there; documents and
+ * the portal link moved into Overview, and money/invoices moved into
+ * Approvals, next to the button that actually unlocks them.
+ *
  * A search param rather than client state, so every tab is a real address
  * that survives a reload and can be linked to, and so the page stays a server
  * component with no hydration for what is ultimately navigation.
  */
 
-export type TabKey = "job" | "quotes" | "evidence" | "money" | "documents" | "info";
+export type TabKey =
+  | "overview"
+  | "scope"
+  | "evidence"
+  | "materials"
+  | "messages"
+  | "approvals"
+  | "help";
 
 export const TABS: { key: TabKey; label: string }[] = [
-  { key: "job", label: "The job" },
-  { key: "quotes", label: "Quotes" },
-  { key: "evidence", label: "Evidence" },
-  { key: "money", label: "Money & invoices" },
-  { key: "documents", label: "Documents" },
-  { key: "info", label: "Link & settings" },
+  { key: "overview", label: "Overview" },
+  { key: "scope", label: "Scope and quote" },
+  { key: "evidence", label: "Progress evidence" },
+  { key: "materials", label: "Materials" },
+  { key: "messages", label: "Messages" },
+  { key: "approvals", label: "Approvals" },
+  { key: "help", label: "Help" },
 ];
 
 export function TabBar({
@@ -46,7 +60,7 @@ export function TabBar({
         return (
           <Link
             key={t.key}
-            href={base + (t.key === "job" ? "" : "?tab=" + t.key)}
+            href={base + (t.key === "overview" ? "" : "?tab=" + t.key)}
             aria-current={on ? "page" : undefined}
             className={
               "-mb-px rounded-t-xl border-b-2 px-3.5 py-2.5 text-[13px] font-bold transition " +

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { nominateMaterialsStore } from "@/app/portal/materials-actions";
+import { whenDate } from "@/lib/date";
 
 /**
  * The nominated materials store, PORTAL side of the 28 August 2026 rule.
@@ -73,7 +74,7 @@ export function MaterialsStore({
           )}
           <p className="mt-2 text-[12px] text-dim">
             {setBy ? "Named by " + setBy : "Named on this job"}
-            {setAt ? " on " + setAt.slice(0, 10) : ""}
+            {setAt ? " on " + (whenDate(setAt) ?? setAt) : ""}
           </p>
           <p className="mt-3 max-w-[62ch] text-[13px] leading-relaxed text-mute">
             {storeType === "none_available"
@@ -100,7 +101,7 @@ export function MaterialsStore({
                 "mt-3 rounded-full px-4 py-2 text-[13px] font-bold transition " +
                 (named
                   ? "border border-line2 text-ink hover:border-teal"
-                  : "bg-linear-to-r from-teal to-mango text-[#04211D] hover:brightness-110")
+                  : "bg-linear-to-r from-teal to-mango text-onbrand hover:brightness-110")
               }
             >
               {named ? "Change where they are kept" : "Say where they are kept"}
@@ -157,7 +158,7 @@ export function MaterialsStore({
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   disabled={state === "busy"}
-                  className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-[#04211D] transition hover:brightness-110 disabled:opacity-40"
+                  className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40"
                 >
                   {state === "busy" ? "Recording..." : "Record it"}
                 </button>

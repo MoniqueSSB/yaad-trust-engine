@@ -1,102 +1,83 @@
--- The shared secret every trigger sends to yaad-notify-client used to be
--- baked into nine trigger function bodies as a literal, and two migrations
--- in this public repository (20260901g and 20260902c) pasted the real value
--- into the file instead of extracting it from the live function. Treat that
--- value as public: git history keeps it forever, so rotation, not deletion,
--- is the fix (RUNBOOK.md §6, "A key has been exposed").
+-- RECOVERED 4 September 2026. This migration was applied to production on
+-- 3 September (version 20260903083651, name
+-- "20260903a_the_notify_secret_lives_in_the_vault_not_the_trigger_body")
+-- but the file was never committed. The database and the repository had
+-- drifted apart on the one thing this file is about, which meant a rebuild
+-- from migrations would have recreated the OLD plaintext trigger bodies
+-- carrying a secret that no longer works, and every client notification
+-- would have failed a 403 silently. Recovered by reading the live
+-- definitions back with pg_get_functiondef and committing them verbatim.
 --
--- Where it lives now: ONE Supabase Vault entry, notify_trigger_secret,
--- generated INSIDE Postgres so the plaintext never leaves the database, and
--- ONE locked helper, public.notify_trigger_secret(), that reads it. The nine
--- functions below call the helper at fire time; their bodies are otherwise
--- the exact live bodies read back from pg_proc before this was written
--- (RUNBOOK.md: read the live source back, every time). The three Edge
--- Functions that call the hub from outside a trigger (yaad-job-health,
--- yaad-followup-check, yaad-evidence-landed-check) call the same helper over
--- RPC with the service role key, so YAAD_CRON_SECRET no longer has to equal
--- this value and the "environment secret drifted from the hash" failure
--- recorded in RUNBOOK.md cannot recur.
+-- WHAT IT DOES. Until now the shared secret that trigger functions present
+-- to yaad-notify-client was baked into each function body as plaintext.
+-- That is readable by anyone who can call pg_get_functiondef, and it has
+-- twice ended up in a Claude Code session's tool output and from there into
+-- committed migration files in a PUBLIC repository (20260901g line 110 and
+-- 20260902c line 353, both still carrying the dead value as history).
 --
--- This file contains no secret and never will. A new trigger that needs to
--- call yaad-notify-client writes   'secret', public.notify_trigger_secret()
--- and nothing else. Never extract a value from prosrc again: there is nothing
--- there to extract.
+-- The secret now lives in Supabase Vault. Each trigger calls
+-- public.notify_trigger_secret() to fetch it at call time, so no function
+-- body contains it and dumping a definition reveals nothing. EXECUTE on
+-- that function is granted to service_role only, never to anon or
+-- authenticated: it returns the plaintext, so a grant to a browser role
+-- would be worse than the problem it fixes.
+--
+-- ON THE TWO HISTORICAL FILES. Rotation was the fix, and it happened when
+-- this migration first ran on 3 September: the published value no longer
+-- matches app_settings and is refused. On 13 September the literal in both
+-- files was replaced with a placeholder and a note, on founder instruction,
+-- so the scanner needs no carve out. Git history still holds the old value,
+-- which is why rotation, not the edit, is what closed it. See DECISIONS.md.
 
-create extension if not exists supabase_vault with schema vault;
-
--- ── 1. The safe. Create the entry only if it is not there already, so a
---       re-run never silently rotates a working secret. ────────────────────
-do $do$
-begin
-  if not exists (select 1 from vault.secrets where name = 'notify_trigger_secret') then
-    perform vault.create_secret(
-      encode(extensions.gen_random_bytes(32), 'hex'),
-      'notify_trigger_secret',
-      'Shared secret the notify triggers and the cron notifiers send to yaad-notify-client. '
-      || 'Created 3 Sep 2026 after the previous value was committed to the public repository. '
-      || 'To rotate: update this entry with a fresh value, then re-run the hash sync in RUNBOOK.md '
-      || '("The notify trigger secret gets out of sync"). Nothing else needs touching.'
-    );
-  end if;
-end $do$;
-
--- ── 2. The one key to the safe. SECURITY DEFINER so a trigger (which runs
---       as the row's writer) can read the Vault through it; executable by
---       the service role, which the three cron notifiers hold, and by nobody
---       who reaches the database from a browser. ───────────────────────────
+-- ── the lookup ────────────────────────────────────────────────────────
 create or replace function public.notify_trigger_secret()
 returns text
 language sql
 stable
 security definer
-set search_path = ''
-as $$
+set search_path to ''
+as $function$
   select decrypted_secret
     from vault.decrypted_secrets
    where name = 'notify_trigger_secret'
    limit 1
-$$;
+$function$;
 
 revoke all on function public.notify_trigger_secret() from public, anon, authenticated;
 grant execute on function public.notify_trigger_secret() to service_role;
 
-comment on function public.notify_trigger_secret() is
-  'The plaintext yaad-notify-client checks a caller against, read from Vault. '
-  'Callable by triggers and the service role only. Never grant to anon or authenticated. '
-  'See 20260903a.';
-
-do $do$
-begin
-  if has_function_privilege('anon', 'public.notify_trigger_secret()', 'EXECUTE')
-     or has_function_privilege('authenticated', 'public.notify_trigger_secret()', 'EXECUTE') then
-    raise exception 'notify_trigger_secret() must not be executable by anon or authenticated.';
-  end if;
-end $do$;
-
--- ── 3. The hash the Edge Function compares against, resynced from the
---       Vault value in the same transaction that switches the triggers, so
---       there is no moment where a trigger sends one value and the hub
---       expects another. ─────────────────────────────────────────────────────
+-- ── bootstrap, for a rebuilt database only ────────────────────────────
+-- A no-op against production, where the secret already exists. On a fresh
+-- rebuild it mints one and stores its hash, so notifications work without a
+-- human having to remember this step. It never overwrites an existing
+-- secret, so it cannot silently rotate a live one.
 do $do$
 declare
-  s text := public.notify_trigger_secret();
+  s text;
 begin
-  if s is null or length(s) < 32 then
-    raise exception 'notify_trigger_secret is missing from Vault. Refusing to switch the triggers to it.';
+  if not exists (select 1 from vault.secrets where name = 'notify_trigger_secret') then
+    s := encode(extensions.gen_random_bytes(32), 'hex');
+    perform vault.create_secret(s, 'notify_trigger_secret',
+                                'Shared secret presented by trigger functions to yaad-notify-client.');
+    insert into public.app_settings(key, value)
+    values ('notify_trigger_secret_sha256', encode(extensions.digest(s, 'sha256'), 'hex'))
+    on conflict (key) do update set value = excluded.value;
+    raise notice 'Minted a new notify_trigger_secret. The cron notifiers read it over RPC, nothing else to set.';
   end if;
-  insert into public.app_settings (key, value)
-  values ('notify_trigger_secret_sha256', encode(extensions.digest(s, 'sha256'), 'hex'))
-  on conflict (key) do update set value = excluded.value;
-end $do$;
+end
+$do$;
 
--- ── 4. The nine callers, live bodies verbatim, literal replaced. ──────────
+-- ── the nine callers, verbatim from production ────────────────────────
+-- Read back with pg_get_functiondef on 4 Sep 2026. Note that
+-- notify_client_on_job_change no longer carries an evidence_landed branch:
+-- that moved to the debounce in "evidence_landed_belongs_to_the_debounce_now".
 
 create or replace function public.notify_client_quote_arrived()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     begin
       if new.status = 'submitted' then
         perform net.http_post(
@@ -108,14 +89,14 @@ as $fn$
       end if;
       return new;
     end;
-$fn$;
+$function$;
 
 create or replace function public.notify_client_on_job_change()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     begin
       if coalesce(new.stage,0) > coalesce(old.stage,0)
          and exists (select 1 from public.stage_approvals a where a.job_id = new.id and a.stage = new.stage - 1)
@@ -150,14 +131,14 @@ as $fn$
 
       return new;
     end;
-$fn$;
+$function$;
 
 create or replace function public.notify_client_dispute_raised()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     begin
       perform net.http_post(
         url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
@@ -167,14 +148,31 @@ as $fn$
       );
       return new;
     end;
-$fn$;
+$function$;
+
+create or replace function public.notify_client_worker_arrived()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+    begin
+      perform net.http_post(
+        url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
+        body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.job_id, 'kind', 'worker_on_site'),
+        headers := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz'),
+        timeout_milliseconds := 15000
+      );
+      return new;
+    end;
+$function$;
 
 create or replace function public.notify_client_service_change()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     declare
       v_kind text := null;
     begin
@@ -201,31 +199,14 @@ as $fn$
 
       return new;
     end;
-$fn$;
-
-create or replace function public.notify_client_worker_arrived()
-returns trigger
-language plpgsql
-security definer
-set search_path to 'public'
-as $fn$
-    begin
-      perform net.http_post(
-        url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
-        body := jsonb_build_object('secret', public.notify_trigger_secret(), 'jobId', new.job_id, 'kind', 'worker_on_site'),
-        headers := jsonb_build_object('Content-Type','application/json','apikey','sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz','Authorization','Bearer '||'sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz'),
-        timeout_milliseconds := 15000
-      );
-      return new;
-    end;
-$fn$;
+$function$;
 
 create or replace function public.notify_worker_kickoff_pack_ready()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     begin
       if coalesce(old.status,'') is distinct from 'approved' and new.status = 'approved' then
         perform net.http_post(
@@ -242,14 +223,14 @@ as $fn$
       end if;
       return new;
     end;
-$fn$;
+$function$;
 
 create or replace function public.notify_worker_of_portal_comment()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     begin
       if new.from_role = 'client' and new.origin = 'portal' then
         perform net.http_post(
@@ -261,14 +242,14 @@ as $fn$
       end if;
       return new;
     end;
-$fn$;
+$function$;
 
 create or replace function public.notify_worker_quote_awaits_confirm()
 returns trigger
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
 begin
   if new.status = 'submitted' then
     perform net.http_post(
@@ -285,16 +266,14 @@ begin
   end if;
   return new;
 end;
-$fn$;
+$function$;
 
--- Not a trigger: called by yaad-inbound over RPC with the service role key
--- once a worker confirms the drafted report. Same secret, same helper.
 create or replace function public.relay_confirmed_report(p_job text, p_override_text text, p_ai_summary text)
 returns void
 language plpgsql
 security definer
 set search_path to 'public'
-as $fn$
+as $function$
     begin
       perform net.http_post(
         url := 'https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-notify-client',
@@ -306,36 +285,4 @@ as $fn$
         timeout_milliseconds := 28000
       );
     end;
-$fn$;
-
--- ── 5. Prove it: no function that talks to the hub still carries a
---       64-character hex literal, and every one of them now names the
---       helper. A migration that leaves one behind must fail here, loudly.
-do $do$
-declare
-  leftover text;
-  missing  text;
-begin
-  select string_agg(proname, ', ') into leftover
-    from pg_proc
-   where prosrc like '%yaad-notify-client%'
-     and prosrc ~ '''secret'', ''[0-9a-f]{64}''';
-  if leftover is not null then
-    raise exception 'Still carrying a secret literal: %', leftover;
-  end if;
-
-  select string_agg(proname, ', ') into missing
-    from pg_proc
-   where prosrc like '%yaad-notify-client%'
-     and prosrc not like '%public.notify_trigger_secret()%';
-  if missing is not null then
-    raise exception 'Calls yaad-notify-client without the helper: %', missing;
-  end if;
-end $do$;
-
-comment on table public.app_settings is
-  'Small operational settings. The *_secret_sha256 rows are hashes, never the secret. '
-  'notify_trigger_secret_sha256 is the hash of the Vault entry notify_trigger_secret, '
-  'read through public.notify_trigger_secret(); see 20260903a. The cron-only secrets '
-  '(purge, job_health, followup, evidence_landed_check, kickoff_check, quote_pack_check, '
-  'daily_checkin) keep their plaintext in the matching cron.job command only.';
+$function$;

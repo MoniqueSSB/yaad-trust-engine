@@ -15,15 +15,25 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //    definition of "live", see the migration) with no draft yet, gets one
 //    requested.
 //
-// 2. A finished, guardrail-clean draft is auto-approved directly, the
-//    automatic half of what approve_quote_pack_draft() does by hand for
-//    the admin desk - same shape as yaad-kickoff-check's own Phase 2 for
-//    the big pack. A dirty draft is left exactly where it is, visible in
-//    the desk's own Quote Pack Drafts view, for a human to notice and
-//    fix; nothing here ever approves flagged content, the same hard rule
-//    the manual door enforces. QuotePanel.tsx's own usableDraft() check
-//    is a courtesy, not the gate: RLS is what actually keeps an
-//    unapproved draft off a worker's screen (20260901r).
+// 2. NOTHING is approved here. Every finished draft waits at 'ready' for a
+//    person in the desk's Quote Pack Drafts view, and the desk is pushed
+//    when any are waiting.
+//
+//    This function DID auto-approve anything the guardrail passed, until
+//    4 September 2026, when roadmap item 7 of the agent audit removed it.
+//    The guardrail is a banned-word scan and a currency regex: it knows
+//    whether the draft said "escrow" or wrote a price, and it cannot know
+//    whether the scope is right or the stages run in the order the building
+//    demands. A clean scan was standing in for a judgement it never made.
+//    The founder's own 1 September correction ("I never saw when the small
+//    pack was issued for review") was already pointing here: a review step
+//    existed and phase 2 approved past it.
+//
+//    The drafting is untouched, which is the part that saves the time.
+//    QuotePanel.tsx's own usableDraft() check is a courtesy, not the gate:
+//    RLS is what actually keeps an unapproved draft off a worker's screen
+//    (20260901r), and a worker with no pack can still quote, so this delays
+//    a courtesy rather than stalling the board.
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -51,6 +61,51 @@ function jobToPrompt(j: Job): Record<string, string> {
   if (j.urgency) out.timing = j.urgency;
   if (j.access_type) out.access = j.access_type;
   return out;
+}
+
+/** One push to Monique's phone. A local helper rather than a shared module,
+ *  matching this repository's house style for small per-function helpers
+ *  (yaad-portal-code's header calls that out as deliberate). Never throws: a
+ *  notification must never break the poll it rides on. */
+async function pingDesk(admin: any, title: string, body: string): Promise<void> {
+  try {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "ntfy_topic").single();
+    if (!st?.value) return;
+    await fetch(`https://ntfy.sh/${st.value}`, {
+      method: "POST",
+      headers: { Title: title.slice(0, 120), Priority: "high", Tags: "eyes" },
+      body,
+      signal: AbortSignal.timeout(4000),
+    });
+  } catch (_) { /* never let a notification break a scheduled run */ }
+}
+
+/** Should this reminder actually go to the phone right now?
+ *
+ *  The count alone is the wrong question. This function runs on a schedule
+ *  and the queue it counts is normally NOT empty, so "push when the count is
+ *  above zero" means "push on every single poll", which is what it did: two
+ *  pushes a minute for days, against four items, three of them August test
+ *  rows nobody was ever going to approve.
+ *
+ *  should_push_desk_notice() (20260907140000) holds the memory in one place
+ *  rather than in two Deno files that would drift, and answers the real
+ *  question: has the queue GROWN, or has a day passed with it still not
+ *  empty. Nothing about the approval gate changes; only how often the phone
+ *  says so.
+ *
+ *  Fails OPEN. If the call errors the push still goes, because a reminder
+ *  arriving too often is a nuisance and a reminder that silently stops is a
+ *  booking nobody knows is blocked. */
+async function shouldPushDeskNotice(admin: any, key: string, count: number): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("should_push_desk_notice", { p_key: key, p_count: count });
+    if (error) { console.error(`should_push_desk_notice(${key}) failed, pushing anyway: ${error.message}`); return true; }
+    return data === true;
+  } catch (e) {
+    console.error(`should_push_desk_notice(${key}) threw, pushing anyway: ${String(e).slice(0, 200)}`);
+    return true;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -97,15 +152,38 @@ Deno.serve(async (req: Request) => {
     }
     if (!allowed) return json({ error: "Not authorised." }, 403);
 
-    // Live, unassigned, stage 0: exactly open_jobs' own definition
-    // (COALESCE(worker_email,'') = '').
+    // Live, unassigned, stage 0, and not marked as a test: exactly open_jobs'
+    // own definition (COALESCE(worker_email,'') = ''). The is_test clause
+    // arrived with 20260909150000: a job a person has marked as their own
+    // test is off the public board, so drafting a Quote Kickoff Pack for it
+    // is a model call for a worker who will never see it. A test job that
+    // genuinely needs a pack gets one from the desk, which calls
+    // yaad-quote-pack directly and never passes through this filter.
     const { data: jobRows } = await admin.from("jobs")
       .select("id,title,parish,descr,trade,urgency,access_type,worker_email")
-      .eq("open", true).eq("stage", 0) as { data: (Job & { worker_email: string | null })[] | null };
+      .eq("open", true).eq("stage", 0).eq("is_test", false) as { data: (Job & { worker_email: string | null })[] | null };
     const jobs = (jobRows ?? []).filter((j) => !j.worker_email || !j.worker_email.trim());
 
+    // 'approved' counts as HAVING a pack, and leaving it out was a runaway.
+    //
+    // A job whose pack was approved dropped straight back out of this set and
+    // read as a job with no pack at all, so the next poll drafted another
+    // one, and the poll after that another. On 1 September one test job
+    // collected 163 approved drafts in under seven hours, a fresh model call
+    // roughly every two minutes; 307 across twelve jobs in two days. The only
+    // thing that ever stopped it was the three-failures brake below, which
+    // was never meant to be the brake.
+    //
+    // It went quiet on 4 September for the wrong reason: auto-approval was
+    // removed, so drafts now park at 'ready', which IS in this set. That made
+    // it dormant rather than fixed, and it would have restarted on the first
+    // pack Monique approved by hand. Found 7 September while stopping the
+    // ntfy spam, which is the same missing memory wearing a different hat.
+    //
+    // A job that genuinely needs a second pack gets one from the desk, which
+    // calls yaad-quote-pack directly and never passes through this filter.
     const { data: draftRows } = await admin.from("quote_pack_drafts").select("job_id,status");
-    const hasActiveOrReadyDraft = new Set((draftRows ?? []).filter((d) => d.status === "drafting" || d.status === "ready").map((d) => d.job_id));
+    const hasActiveOrReadyDraft = new Set((draftRows ?? []).filter((d) => d.status === "drafting" || d.status === "ready" || d.status === "approved").map((d) => d.job_id));
     const failedCounts = new Map<string, number>();
     for (const d of draftRows ?? []) if (d.status === "failed") failedCounts.set(d.job_id, (failedCounts.get(d.job_id) ?? 0) + 1);
 
@@ -132,27 +210,54 @@ Deno.serve(async (req: Request) => {
       if (!errMsg) requested++; else { requestFailed++; requestErrors.push(errMsg); }
     }
 
-    // ── Phase 2: a finished, guardrail-clean draft is approved directly.
-    // A dirty one is left at 'ready' for a human in the concierge desk's
-    // Quote Pack Drafts view. ──────────────────────────────────────────
+    // ── Phase 2: NOTHING IS APPROVED HERE ANY MORE. ────────────────────
+    //
+    // Until 4 September 2026 a guardrail-clean draft was approved by this
+    // function and went straight to a worker. Removed by roadmap item 7 of
+    // the agent audit, and the reason is worth stating plainly: the guardrail
+    // is a banned-word scan and a currency regex. It can tell whether the
+    // draft said "escrow" or wrote a price. It cannot tell whether the SCOPE
+    // is right, whether the exclusions protect the trade, or whether the
+    // payment stages make sense in the order the building actually demands.
+    // A clean scan was standing in for a judgement it never made.
+    //
+    // The founder's own correction of 1 September was already pointing here,
+    // live: "I never saw when the small pack was issued for review." A review
+    // step was added and then phase 2 auto-approved anything clean, so in
+    // practice a clean pack still went out unread. This closes that.
+    //
+    // What is NOT removed is the drafting. The model still writes the pack
+    // within a poll of the job going live, which is the part that saves the
+    // time. All that changed is that a person decides it may be seen.
+    //
+    // Cost of getting this wrong in the other direction: a worker with no
+    // approved pack simply sees no scoping document (RLS, 20260901r). He can
+    // still quote. So this delays a courtesy, it does not stall the board.
     const { data: readyDrafts } = await admin.from("quote_pack_drafts")
-      .select("id,guardrail").eq("status", "ready");
-    let approved = 0, heldForReview = 0, approveFailed = 0;
-    for (const d of readyDrafts ?? []) {
+      .select("id,job_id,guardrail").eq("status", "ready");
+    const heldForReview = (readyDrafts ?? []).length;
+    const dirty = (readyDrafts ?? []).filter((d) => {
       const g = (d.guardrail ?? {}) as Record<string, unknown>;
-      const dirty = Boolean(g.price_language_detected) || Boolean(g.banned_language_detected);
-      if (dirty) { heldForReview++; continue; }
-      const { error: updErr } = await admin.from("quote_pack_drafts").update({
-        status: "approved",
-        approved_by: "system: auto-issued, guardrail-clean",
-        approved_at: new Date().toISOString(),
-      }).eq("id", d.id).eq("status", "ready"); // second poll caught it mid-flight
-      if (updErr) { console.error(`yaad-quote-pack-check: approve failed for draft ${d.id}: ${updErr.message}`); approveFailed++; }
-      else approved++;
+      return Boolean(g.price_language_detected) || Boolean(g.banned_language_detected);
+    }).length;
+
+    // Told when the queue GROWS, and once a day while it is still not empty,
+    // so the queue cannot quietly become the bottleneck the audit warned it
+    // could without becoming an alarm that rings every poll and gets muted.
+    if (heldForReview > 0 && await shouldPushDeskNotice(admin, "quote_packs_awaiting_approval", heldForReview)) {
+      await pingDesk(admin,
+        `${heldForReview} quote pack${heldForReview === 1 ? "" : "s"} waiting on you`,
+        `${heldForReview} draft${heldForReview === 1 ? " is" : "s are"} ready and no worker can see ${heldForReview === 1 ? "it" : "them"} until you approve. `
+          + `${dirty > 0 ? `${dirty} flagged by the guardrail. ` : "None flagged. "}`
+          + `Desk, Quote Pack Drafts.`);
     }
 
-    root.setAttributes({ "yaadly.quote_pack_check.requested": requested, "yaadly.quote_pack_check.approved": approved });
-    return json({ ok: true, requested, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors, approved, heldForReview, approveFailed });
+    root.setAttributes({
+      "yaadly.quote_pack_check.requested": requested,
+      "yaadly.quote_pack_check.held_for_review": heldForReview,
+      "yaadly.quote_pack_check.flagged": dirty,
+    });
+    return json({ ok: true, requested, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors, heldForReview, flagged: dirty });
   } catch (e) {
     root.recordError(e);
     return json({ error: String(e).slice(0, 200) }, 500);

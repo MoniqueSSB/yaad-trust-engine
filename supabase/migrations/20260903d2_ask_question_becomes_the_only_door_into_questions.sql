@@ -1,0 +1,16 @@
+-- RECONSTRUCTED 3 Sep 2026 by the post-optimisation regression audit. This ran
+-- against production and was never committed, so the migrations folder and the
+-- live database disagreed about a public route. Written back verbatim from
+-- supabase_migrations.schema_migrations so a rebuild reproduces what actually
+-- happened, including the part that went wrong. See 20260903d3, which reverted
+-- it within the hour, and 20260903j, which does it again and explains why it
+-- is safe the third time.
+--
+-- Phase two of 20260903d. Held back until the web app was deployed, because
+-- the previously deployed server action inserted directly and dropping this
+-- first would have broken /ask for the length of a deploy.
+--
+-- After this, `questions` has no INSERT policy for anon at all, and the only
+-- way a member of the public creates a row is ask_question(), which carries
+-- the length floor, both caps, the throttle, and published = false.
+drop policy if exists "anyone may ask" on public.questions;

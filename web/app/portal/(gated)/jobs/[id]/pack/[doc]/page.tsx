@@ -6,6 +6,18 @@ import { PACK_DOC_ORDER, renderPackDoc, type Dict } from "@/lib/portal/packDocs"
 
 export const dynamic = "force-dynamic";
 
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string; doc: string }>;
+}) {
+  const { id, doc } = await params;
+  return { title: `${doc} · ${id} · Yaadly` };
+}
+
 export default async function PackDoc({
   params,
   searchParams,

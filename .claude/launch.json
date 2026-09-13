@@ -60,6 +60,18 @@
       ],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "concierge-alt",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8935",
+        "--directory",
+        "concierge"
+      ],
+      "port": 8935
     }
   ]
 }

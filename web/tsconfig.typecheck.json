@@ -1,0 +1,26 @@
+{
+  // The config `npm run typecheck` uses. It is the same as tsconfig.json with
+  // one change: build output is excluded.
+  //
+  // Why this file exists. tsconfig.json includes `.next/types/**` and
+  // `.next/dev/types/**`, which are route validators that `next dev` and
+  // `next build` generate. Those files import each route as a `.js` path, so a
+  // `.next` left behind by a different branch makes tsc report TS2307 "Cannot
+  // find module" for routes that were never on the current branch. The modules
+  // it names are real, they just belong to somebody else's build. On 6 Sep 2026
+  // that cost a session most of its time chasing a component that had been
+  // committed a week earlier and was sitting on disk the whole time.
+  //
+  // This tree gets recycled worktrees and parallel Claude sessions, so a
+  // foreign `.next` is normal here rather than exotic.
+  //
+  // CI checks out fresh, so it has no `.next` and has always typechecked
+  // without these validators. Excluding them is what makes a local run
+  // reproduce CI instead of guessing at it. Route types are still checked,
+  // by `next build`, on the way to preview and deploy.
+  //
+  // Do not move this exclusion into tsconfig.json. Next.js rewrites that
+  // file's `include` on `next dev`, so the change would not survive.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", ".next", ".open-next", "out", "build"]
+}

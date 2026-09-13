@@ -106,13 +106,13 @@ export function JobRail({
       <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
         <div className="mb-1 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.16em] text-dim">This job</div>
         <Link href={jobBase + "?tab=evidence"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Evidence <span className="text-dim">&rarr;</span>
+          Progress evidence <span className="text-dim">&rarr;</span>
         </Link>
-        <Link href={jobBase + "?tab=documents"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Documents <span className="text-dim">&rarr;</span>
+        <Link href={jobBase + "?tab=approvals"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
+          Approvals <span className="text-dim">&rarr;</span>
         </Link>
-        <Link href={jobBase + "?tab=info"} className="flex items-center justify-between py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Link &amp; settings <span className="text-dim">&rarr;</span>
+        <Link href={jobBase} className="flex items-center justify-between py-2.5 text-[13px] text-mute transition hover:text-purpleb">
+          Overview &amp; documents <span className="text-dim">&rarr;</span>
         </Link>
       </div>
 
@@ -125,9 +125,9 @@ export function JobRail({
           href="https://wa.me/447878877567"
           target="_blank"
           rel="noopener"
-          className="flex items-center justify-center gap-2 rounded-full bg-[#25D366] py-2.5 text-[12.5px] font-bold text-[#04211D] transition hover:brightness-105"
+          className="flex items-center justify-center gap-2 rounded-full bg-[#25D366] py-2.5 text-[12.5px] font-bold text-onbrand transition hover:brightness-105"
         >
-          <svg viewBox="0 0 32 32" className="size-4 fill-[#04211D]">
+          <svg viewBox="0 0 32 32" className="size-4 fill-onbrand">
             <path d="M16 3C9.4 3 4 8.4 4 15c0 2.1.6 4.2 1.6 6L4 29l8.2-1.6c1.7.9 3.6 1.4 5.8 1.4 6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8c-1.8 0-3.5-.5-5-1.3l-.4-.2-4.9 1 1-4.7-.3-.4c-1-1.5-1.5-3.3-1.5-5.2 0-5.4 4.4-9.8 9.8-9.8s9.8 4.4 9.8 9.8-4.1 10.8-8.5 10.8z" />
           </svg>
           Message Yaadly

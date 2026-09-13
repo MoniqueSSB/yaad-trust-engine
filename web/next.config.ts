@@ -12,18 +12,71 @@ import "./scripts/check-env.mjs";
 // This host carries the client and worker portals: signed-in sessions, job
 // evidence, quotes and money figures. It had none of these headers.
 //
-// Deliberately no Content-Security-Policy yet. Next injects inline bootstrap
-// script, so a CSP here needs nonces wired through the document, and a CSP
-// that is wrong breaks the app for real users rather than merely failing to
-// protect them. The headers below are the ones that are unambiguous and cost
-// nothing to be right about. CSP is worth doing next, on its own, with
-// report-only first.
+// Content-Security-Policy, REPORT ONLY. Added 3 Sep 2026.
+//
+// Report-only was the whole point of doing it now. A wrong CSP breaks the app
+// for real people rather than merely failing to protect them, and this one is
+// certain to be wrong in at least one place on the first attempt, because the
+// only honest way to find the last few sources is to watch a real browser
+// complain about them. Report-Only complains and loads the resource anyway.
+//
+// FOUNDER DECISION, 3 Sep: two weeks in report-only, no collector, then
+// enforce. No collector means the violations land in the browser console and
+// nowhere else, so finding them is a person opening the site with devtools
+// open rather than a dashboard filling up. That is a real limitation and it is
+// the right trade at this size: a report endpoint is another service, another
+// data-protection question about what it stores, and another thing to run.
+//
+// TO ENFORCE, on or after 17 Sep 2026: rename the key below from
+// "Content-Security-Policy-Report-Only" to "Content-Security-Policy" and
+// delete the frame-ancestors-only header above it, which this supersedes.
+// Walk every route first: the board, /jobs/new, /apply including the Persona
+// step and the camera, the portal, and a Kickoff Pack document. See RUNBOOK.
+//
+// WHERE EACH SOURCE COMES FROM. Derived from the code, not guessed:
+//   'self'                        the app itself
+//   'unsafe-inline' on script     Next injects an inline bootstrap script and
+//                                 self-hosted font preloads. Removing this
+//                                 needs nonces threaded through the document,
+//                                 which is its own change; the CSP is worth
+//                                 having without it in the meantime.
+//   yaadly.co.uk                  chat.js, loaded on every page by layout.tsx
+//   *.supabase.co                 the API, and signed URLs for evidence and
+//                                 client photographs, which are images
+//   withpersona.com               the identity check on /apply runs in an
+//                                 iframe from inquiry.withpersona.com and
+//                                 talks back to its own API
+//   data: and blob: on img        EXIF-stripped previews and older evidence
+//                                 rows that still hold a data URL
+// Fonts are self-hosted by next/font at build time, so there is deliberately
+// no font-src entry for Google. cal.com, wa.me and api.hubapi.com are links or
+// server-side calls, never browser loads, so they are absent on purpose.
+const csp = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' https://yaadly.co.uk",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.supabase.co https://yaadly.co.uk",
+  "media-src 'self' blob: https://*.supabase.co",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co https://yaadly.co.uk https://*.withpersona.com",
+  "frame-src https://*.withpersona.com",
+  "worker-src 'self' blob:",
+].join("; ");
 const securityHeaders = [
   // A year, and subdomains, so app/concierge/www cannot be downgraded to http.
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   // The portals show a signed-in session. Nothing should be framing them.
   { key: "X-Frame-Options", value: "DENY" },
+  // Kept enforcing while the full policy is report-only, because this one
+  // clause has been proven in production and there is no reason to downgrade
+  // it to a warning while the rest is being watched. Delete it when the full
+  // policy is enforced; frame-ancestors is already in there.
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
+  { key: "Content-Security-Policy-Report-Only", value: csp },
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Job ids and portal codes can appear in a path. Do not leak them to
   // whatever a client clicks through to next.

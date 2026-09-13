@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { pickTextProvider, providerAttrs, type TextProvider, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { pickTextProvider, providerAttrs, chatWithFailover, type TextProvider, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
 import * as guardrails from "./guardrails.ts";
 
 // Project Kickoff Pack agent.
@@ -34,7 +34,7 @@ import * as guardrails from "./guardrails.ts";
 // same brief can be drafted by MiniMax M2.7, GLM 5.2, Kimi K3 and DeepSeek
 // V4 Pro and the packs read side by side. Requires the OPENROUTER_API_KEY
 // secret; without it the override is refused with a plain message. The
-// default remains MiniMax direct, per the standing decision.
+// default was MiniMax direct then, and is Mistral in the EU from 4 Sep 2026.
 //
 // v11, 24 Aug 2026: the v10 budgets made part A too slow for one worker; a
 // rich-brief draft was culled at the background worker's 400 second lifetime
@@ -61,32 +61,45 @@ import * as guardrails from "./guardrails.ts";
 // checklist, which share stage names and so must come from one mind; (C)
 // document pack, risk register, communications - merged into one document
 // set. Wall time drops to the slowest third. Same table, same polling desk;
-// MiniMax stays the model, per the standing decision.
+// The model came from the shared picker then and still does.
 
-// Provider selection, checked at request time. MiniMax is the DEFAULT by
-// Monique's standing decision (23 Aug: "leave NVIDIA, make it better on
-// MiniMax") - the mere presence of an NVIDIA key must never hijack the
-// draft (v5 did exactly that and a test failed on an NVIDIA 503).
-// NVIDIA runs only when explicitly chosen: set the secret PROVIDER=nvidia.
-function pickProvider(override?: string): TextProvider | null {
-  if (override) {
-    const ork = Deno.env.get("OPENROUTER_API_KEY");
-    if (!ork) return null;
-    return { name: "openrouter", api: "https://openrouter.ai/api/v1/chat/completions", key: ork, model: override, region: "unstated" };
-  }
-  const want = (Deno.env.get("PROVIDER") || "").toLowerCase();
-  const nk = Deno.env.get("NVIDIA_API_KEY");
-  const nvidia = (): TextProvider | null => nk
-    ? { name: "nvidia", api: "https://integrate.api.nvidia.com/v1/chat/completions", key: nk,
-        model: Deno.env.get("NVIDIA_MODEL") || "nvidia/nemotron-3-ultra-550b-a55b", region: "us" }
-    : null;
-
-  if (want === "nvidia") { const n = nvidia(); if (n) return n; }
-
-  // The ordinary path. Shared with the other seven functions so the EU move
-  // is one secret, not eight edits.
-  return pickTextProvider() ?? nvidia();
-}
+// Provider selection, checked at request time. The shared picker in
+// _shared/textmodel.ts is the DEFAULT, and since 4 September 2026 that means
+// Mistral in the EU. It used to mean MiniMax in China, by Monique's standing
+// decision of 23 Aug ("leave NVIDIA, make it better on MiniMax"); the part of
+// that decision which still holds is the shape, not the provider. The mere
+// presence of an NVIDIA key must never hijack the draft (v5 did exactly that
+// and a test failed on an NVIDIA 503).
+//
+// ── This function had three ways out of the EU, and they are gone ──
+//
+// Removed 4 September 2026, the same day the MiniMax branch came out of
+// _shared/textmodel.ts, and for the same reason. This function used to have a
+// picker of its own with three extra routes:
+//
+//   1. `return pickTextProvider() ?? nvidia()` - a SILENT fallback to NVIDIA
+//      in the United States whenever the shared picker came back empty. This
+//      is the exact pattern removed from textmodel.ts an hour earlier, and it
+//      was the live one: NVIDIA_API_KEY IS set on this project, so this route
+//      was armed the whole time. It never fired only because Mistral resolved
+//      first, which is a coincidence of ordering and not a control.
+//   2. `PROVIDER=nvidia` - an explicit switch to the same US endpoint.
+//   3. A per-draft OpenRouter model slug, for reading one brief drafted by
+//      several models side by side (v12 below). It carried region "unstated",
+//      which is the honest label and also the reason it cannot stay: a
+//      Kickoff Pack is drafted from a real client's intake.
+//
+// docs/privacy.html names NVIDIA for IMAGE ANALYSIS only. Drafting a client's
+// pack there was a use that page did not disclose. NVIDIA_API_KEY stays set
+// because yaad-sketch and yaad-notify-client genuinely use it, for photographs,
+// which is what the page says.
+//
+// So this function now uses the shared picker and nothing else, like the other
+// eight. One provider, named on the privacy page, in the EU. If it is missing,
+// the draft fails loudly rather than quietly drafting somewhere else.
+//
+// The model comparison in v12 was a good idea and is recoverable from git. If
+// it comes back it belongs on synthetic briefs, not on a real client's intake.
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -98,10 +111,10 @@ const SYSTEM = `You are the Project Kickoff Agent for Yaadly, a trust-first prop
 WHO YOU ARE WRITING FOR: mostly Jamaican diaspora clients in the UK, US and Canada paying for work on property they own in Jamaica and cannot stand over themselves. They are not construction people. Write plain, warm, direct English. No jargon without explaining it. Never talk down to them.
 
 ABSOLUTE RULES, these override everything else:
-1. NEVER state, estimate, guess or imply a price, cost, rate, valuation or budget figure. Not in any currency. Not a range. Not "typically around". Pricing is a quantity surveyor's job and Yaadly does not do it. Where money must be described, describe the STRUCTURE only: stage names, the proportion of the total each stage represents, and what evidence must exist before that stage is released. Use percentages of an unnamed total, never amounts.
+1. NEVER state, estimate, guess or imply a price, cost, rate, valuation or budget figure. Not in any currency. Not a range. Not "typically around". Pricing is a quantity surveyor's job and Yaadly does not do it. Where money must be described, describe the STRUCTURE only: stage names, the proportion of the total each stage represents, and what evidence must exist before that stage is signed off. Use percentages of an unnamed total, never amounts.
 2. Yaadly provides observation, documentation and oversight judgment. NOT surveys, valuations, quantity surveying, structural engineering or legal advice. Never write a verdict like "the wall is unsafe". Write what would be observed and what question would be put to the contractor.
 3. Never invent facts about this specific job. If the intake does not say, either omit it or write it as a question for the client in the open_questions list.
-4. Payment stages must always be tied to evidence, never to elapsed time. Money moves when work is proven, not when a date passes.
+4. Payment stages must always be tied to evidence, never to elapsed time. Describe what CLOSES a stage, never what "releases" money. Yaadly is the principal contractor: the client buys the job from Yaadly at one agreed price, and Yaadly separately engages and pays the tradesperson under its own agreement with them. So a stage closes when the client has seen the evidence and agreed the work is right, and that stage's balance becomes due to Yaadly. Never write that the client's approval pays the tradesperson, releases funds to them, or that money is held on anybody's behalf. The tradesperson is paid by Yaadly and never waits on the client.
 5. Flag anything that needs a licensed professional (structural, electrical, plumbing certification, permits, title) as a risk with an owner, rather than absorbing it into Yaadly's scope.
 
 Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
@@ -109,7 +122,7 @@ Return STRICT JSON only. No markdown fences, no commentary. Exactly this shape:
  "cover_note": "3 to 5 short paragraphs addressed to the client by name where known, separated by \\n\\n. Name the specific fear or constraint the intake states and answer it directly. Explain in plain words that no figures appear anywhere in this pack and why, and that the client drops their own contractor's figures into the tracking table. Close with exactly what happens next before anything is instructed. Warm, direct, never salesy. No prices.",
  "scope_of_works": {"summary":"3 to 4 short paragraphs separated by \\n\\n, written for a non-builder: what is wrong today, in plain words; the order the work will run in and WHY the building demands that order (open up before diagnosing, diagnose before repairing, prove watertight before covering, decorate last); anything inspected but not worked on, framed explicitly as an inspection and not a work item; and what the property will be like when it is finished","included":["specific items of work"],"excluded":["what is explicitly not covered"],"assumptions":["what this scope assumes to be true"],"acceptance_criteria":["how each party knows the work is done"],"client_responsibilities":["specific things the client, or whoever is on the ground for them, must do or provide, concrete to THIS job and THIS property: clearing a room, securing pets, keeping power and water connected, being reachable for the diagnosis-and-decision phase. Never a generic line like 'cooperate with the contractor'"]},
  "timeline": {"basis":"3 to 5 sentences: what the sequence depends on, including the season and weather reality for this specific job, which phases are rain-stoppable and how the programme absorbs that without stopping internal work, and what site access assumes. Wherever the job involves opening something up or an unknown, the phases MUST include a dedicated diagnosis-and-client-decision phase between opening up and repair, so nothing is bought or covered before the client has instructed in writing","phases":[{"name":"phase name","duration":"working days or weeks, as a range","depends_on":"what must finish first, or Start","milestone":"the observable thing that marks it complete"}]},
- "payment_schedule": {"note":"2 to 3 short paragraphs separated by \\n\\n: why the money is staged this way for THIS job, naming which stages are deliberately weighted and the reason (an opening-up stage paid early and generously so the contractor has every reason to open up fully; a final stage held back so the retention still has something in it), and that no amounts appear because the client inserts figures from their own contractor quote","stages":[{"stage":"stage name","proportion_percent":0,"release_condition":"the evidence that must be approved before release","evidence_required":["specific photo, video or document"]}],"cost_tracking_template":{"columns":["Stage","Agreed amount (client to enter)","Released to date","Balance remaining","Evidence approved date"],"instruction":"one sentence on how to use it"}},
+ "payment_schedule": {"note":"2 to 3 short paragraphs separated by \\n\\n: why the money is staged this way for THIS job, naming which stages are deliberately weighted and the reason (an opening-up stage paid early and generously so the contractor has every reason to open up fully; a final stage held back so the retention still has something in it), and that no amounts appear because the client inserts figures from their own contractor quote","stages":[{"stage":"stage name","proportion_percent":0,"release_condition":"the evidence the client must see and agree before this stage is closed. Write it as a sign-off condition, never as money being released to anyone. The JSON key is a legacy name kept so packs already issued still display; the words you put in it must follow rule 4","evidence_required":["specific photo, video or document"]}],"cost_tracking_template":{"columns":["Stage","Agreed amount (client to enter)","Approved to date","Balance remaining","Evidence approved date"],"instruction":"one sentence on how to use it"}},
  "evidence_checklist": [{"stage":"stage name","items":[{"item":"what to capture","type":"photo | video | document","why":"what it proves","timestamped_geotagged":true}]}],
  "document_pack": [{"document":"name of the document to obtain","who_provides":"client | contractor | Yaadly | authority","why":"why it matters","risk_if_missing":"plain consequence"}],
  "risk_register": [{"risk":"what could go wrong","category":"scope | schedule | quality | payment | legal | access | weather | supply","likelihood":"low | medium | high","impact":"low | medium | high","mitigation":"the practical step that reduces it","owner":"who holds it","early_warning_sign":"what would be seen first"}],
@@ -256,33 +269,30 @@ async function draftPart(
     "yaadly.agent.name": "kickoff",
     "yaadly.kickoff.part": part.name,
   }, async (s) => {
-    const r = await fetch(prov.api, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${prov.key}` },
-      body: JSON.stringify({
-        model: prov.model,
-        temperature: 0.3,
-        max_tokens: part.maxTokens,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content:
-            userPrompt.slice(0, 8000) +
-            "\n\nFOR THIS RESPONSE ONLY: return STRICT JSON with EXACTLY these top-level keys and no others: " +
-            part.keys.join(", ") +
-            ". Follow the shape defined for those keys in the schema above. The remaining sections are being drafted separately; do not mention or include them." },
-        ],
-      }),
-      signal: AbortSignal.timeout(300_000),
-    });
-    const j = await r.json();
+    // Retries, then the failover, 6 September 2026. See _shared/textmodel.ts.
+    const { provider, res: r } = await chatWithFailover(prov, {
+      temperature: 0.3,
+      max_tokens: part.maxTokens,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content:
+          userPrompt.slice(0, 8000) +
+          "\n\nFOR THIS RESPONSE ONLY: return STRICT JSON with EXACTLY these top-level keys and no others: " +
+          part.keys.join(", ") +
+          ". Follow the shape defined for those keys in the schema above. The remaining sections are being drafted separately; do not mention or include them." },
+      ],
+    }, { timeoutMs: 300_000, retries: 2, maxRetryWaitMs: 15_000 });
+    let j: any = {};
+    try { j = await r.json(); } catch (_) { /* a non-JSON body reads as an empty answer below */ }
     s.setAttributes({
+      ...providerAttrs(provider),
       "http.response.status_code": r.status,
       "gen_ai.usage.input_tokens": j?.usage?.prompt_tokens,
       "gen_ai.usage.output_tokens": j?.usage?.completion_tokens,
     });
     if (!r.ok) {
-      s.recordError(`${prov.name} http ${r.status}`);
-      throw new Error(`part ${part.name}: model call failed (${prov.name} ${r.status})`);
+      s.recordError(`${provider.name} http ${r.status}`);
+      throw new Error(`part ${part.name}: model call failed (${provider.name} ${r.status})`);
     }
     finishReason = j?.choices?.[0]?.finish_reason ?? "";
     return j?.choices?.[0]?.message?.content ?? "";
@@ -312,7 +322,7 @@ async function draftPart(
 // model calls. Every exit path updates the row: a draft is never left
 // 'drafting' by this code (short of the platform culling the worker, which
 // the desk's own 8 minute cutoff reports).
-async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace, overrideModel?: string): Promise<void> {
+async function runDraft(draftId: string, intake: Record<string, unknown>, trace: Trace): Promise<void> {
   const fail = async (msg: string) => {
     console.error("kickoff draft", draftId, "failed:", msg);
     await draftsWrite("PATCH", `?id=eq.${draftId}`, {
@@ -320,10 +330,8 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
     }).catch(() => {});
   };
   try {
-    const prov = pickProvider(overrideModel);
-    if (!prov) { await fail(overrideModel
-      ? "A model override needs the OPENROUTER_API_KEY secret, which is not set."
-      : NO_PROVIDER_MESSAGE); return; }
+    const prov = pickTextProvider();
+    if (!prov) { await fail(NO_PROVIDER_MESSAGE); return; }
 
     const userPrompt = intakeToPrompt(intake);
     const partDocs = await Promise.all(PARTS.map((p) => draftPart(prov, userPrompt, p, trace)));
@@ -381,8 +389,10 @@ async function runDraft(draftId: string, intake: Record<string, unknown>, trace:
       ...(blob.match(/\b\d[\d,]{2,}(?:\.\d{2})?\s?(?:dollars|pounds|JMD|USD|GBP)\b/gi) ?? []),
     ];
     const priced = priceHits.length > 0;
-    // MiniMax is a Chinese model and can leak CJK fragments into English
-    // prose (it did, once). Flag them; the desk shows the samples.
+    // MiniMax, the model until 4 September 2026, could leak CJK fragments
+    // into English prose (it did, once). The check stays now the provider is
+    // Mistral: it costs nothing, the OpenRouter override can still reach a
+    // Chinese model, and a guard is cheaper to keep than to reinstate.
     const cjkHits = blob.match(/[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]+/g) ?? [];
 
     // Banned language, same list as the Python engine. Flags rather than
@@ -490,16 +500,15 @@ Deno.serve(async (req: Request) => {
     // can have. Same trust boundary again: only this repository's own
     // automation may stamp it.
     const serviceId = isServiceRole && typeof body.serviceId === "string" && body.serviceId.trim() ? body.serviceId.trim() : undefined;
-    // Optional per-draft model override, for reading the same brief drafted by
-    // different models side by side. Admin session only; OpenRouter slugs only.
-    const overrideModel = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
-    if (overrideModel) {
-      if (!/^[\w-]+\/[\w.:-]+$/.test(overrideModel)) {
-        return json({ error: "Model override must be an OpenRouter slug like z-ai/glm-5.2." }, 400);
-      }
-      if (!Deno.env.get("OPENROUTER_API_KEY")) {
-        return json({ error: "Model overrides go through OpenRouter. Add the OPENROUTER_API_KEY secret to this function first (Supabase dashboard, Edge Functions, Secrets)." }, 400);
-      }
+    // The per-draft model override is gone (4 Sep 2026, see the note at the
+    // top of this file). It routed a real client's intake through OpenRouter
+    // to an unstated region. Refused rather than ignored, so a caller still
+    // sending one is told, instead of quietly getting a pack drafted by a
+    // different model than it asked for.
+    if (typeof body.model === "string" && body.model.trim()) {
+      return json({
+        error: "Per-draft model overrides have been removed. Kickoff Packs are drafted by the provider in _shared/textmodel.ts, in the EU, because the brief is a real client's intake.",
+      }, 400);
     }
 
     // Register the draft, hand back its id, and do the slow work after the
@@ -528,7 +537,7 @@ Deno.serve(async (req: Request) => {
       "yaadly.kickoff.outcome": "queued",
     });
 
-    const bg = runDraft(row.id, intake, trace, overrideModel);
+    const bg = runDraft(row.id, intake, trace);
     const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
     if (rt?.waitUntil) rt.waitUntil(bg);
 

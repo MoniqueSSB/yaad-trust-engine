@@ -17,6 +17,18 @@ export const dynamic = "force-dynamic";
  * knocks a pack back to in_review and it disappears from here until it is
  * approved again, which is the revision discipline working, not a bug.
  */
+/* Its own title, so two job tabs are two different words in the tab strip.
+   The id rather than the job's name because it is already on the page, it is
+   what the client quotes when they message, and reading it costs no query. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return { title: `Pack · ${id} · Yaadly` };
+}
+
 export default async function ServicePackIndex({
   params,
 }: {

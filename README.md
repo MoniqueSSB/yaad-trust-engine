@@ -31,12 +31,22 @@ Two design choices worth defending:
 
 ## Run it
 
+**Python 3.10 or newer.** `opentelemetry-sdk` is pinned at a version that
+requires it, and macOS ships 3.9 as `/usr/bin/python3`, so on a fresh Mac the
+install fails with an unhelpful "No matching distribution found". Check
+`python3 -VV` first if it does.
+
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python run_demo.py            # all three scenarios
 python run_demo.py JOB-001    # one scenario
-python -m pytest -q           # 31 tests
+python -m pytest -q
 ```
+
+A virtual environment is worth the one extra line: it keeps this project off
+the system Python, and it gets its own up to date pip, which the Command Line
+Tools one is not.
 
 With no API key it runs in **mock mode**: deterministic, rule based, and every mocked line is labelled `(mock)` in the output. Nothing mocked can be mistaken for a live model result.
 

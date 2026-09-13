@@ -79,7 +79,7 @@ export function WalkthroughPanel({
             maxLength={80}
             className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
           />
-          <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[13px] font-bold text-[#04211D]">
+          <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[13px] font-bold text-onbrand">
             Request
           </button>
           <textarea
@@ -121,7 +121,7 @@ export function WalkthroughPanel({
                 maxLength={140}
                 className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
               />
-              <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[13px] font-bold text-[#04211D]">
+              <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2.5 text-[13px] font-bold text-onbrand">
                 Confirm the call
               </button>
             </form>
@@ -140,7 +140,7 @@ export function WalkthroughPanel({
             href={walkLink!}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D]"
+            className="mt-2 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand"
           >
             Join the call &rarr;
           </a>
@@ -166,7 +166,7 @@ export function WalkthroughPanel({
                   placeholder="What you found and raised on the call"
                   className="w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
                 />
-                <button className="mt-2 rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D]">
+                <button className="mt-2 rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand">
                   Save notes
                 </button>
               </form>
@@ -183,7 +183,7 @@ export function WalkthroughPanel({
                 {!notesConfirmed && role === "client" && (
                   <form action={confirmWalkthroughNotes} className="mt-2">
                     <input type="hidden" name="jobId" value={jobId} />
-                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-[#04211D]">
+                    <button className="rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[12.5px] font-bold text-onbrand">
                       Confirm these notes
                     </button>
                   </form>
