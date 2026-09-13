@@ -210,6 +210,20 @@ export default async function JobRoom({
   const role =
     job.client_email?.toLowerCase() === email ? "client" : "worker";
 
+  /* The street address, 13 Sep 2026. Founder's instruction: the room has to
+     say exactly where the job is. Fetched on its own and only for the two
+     people who need it: the client, whose property it is, and the booked
+     worker, who has to turn up there. A worker who has quoted and not been
+     booked can reach this page too (RLS lets them read the row through their
+     quote), and for them nothing is fetched, so the address cannot be
+     rendered by mistake further down. */
+  const bookedWorker = role === "worker" && job.worker_email?.toLowerCase() === email;
+  let addr: string | null = null;
+  if (role === "client" || bookedWorker) {
+    const { data: at } = await supabase.from("jobs").select("addr").eq("id", id).maybeSingle();
+    addr = typeof at?.addr === "string" && at.addr.trim() ? at.addr.trim() : null;
+  }
+
   /* The board preview's text, scrubbed by the same Postgres function the
      public board itself calls, public.board_descr() (20260907090000). It used
      to be a JavaScript copy of the view's regexp chain living in
@@ -1035,7 +1049,14 @@ export default async function JobRoom({
         title={job.title ?? "Untitled job"}
         jobId={job.id}
         parish={job.parish}
+        addr={addr}
+        addrHidden={role === "worker" && !bookedWorker}
         statusLabel={STATUS_LABEL[job.status] ?? job.status}
+        stageDetail={
+          jobStage > 0 && job.status !== "complete"
+            ? "Stage " + jobStage + (packStages.length ? " of " + packStages.length : "")
+            : null
+        }
         nextAction={
           topAction
             ? {
@@ -1582,6 +1603,12 @@ export default async function JobRoom({
                 <>
                   <dt className="text-mute">Trade</dt>
                   <dd className="text-right">{job.trade}</dd>
+                </>
+              )}
+              {(role === "client" || bookedWorker) && (
+                <>
+                  <dt className="text-mute">Address</dt>
+                  <dd className="text-right">{addr ?? <span className="text-dim">Not added yet</span>}</dd>
                 </>
               )}
               {job.parish && (
