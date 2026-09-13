@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TRADES } from "@/lib/taxonomy";
+import { ALERTS_WA_LINK } from "@/lib/alerts";
 import { WorkerDirectory, WORKER_VIEW, SELECT_WORKER, type Worker } from "@/components/WorkerDirectory";
 import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/supabase/auth";
@@ -135,9 +136,13 @@ export const metadata = {
    something rather than sitting there as a promise with a dead button. It
    lands in yaad-inbound, where worker conversations already go, so there is
    no new table, no new migration and nowhere new for personal data to sit. */
-const WA_ALERTS =
-  "https://wa.me/447878877567?text=" +
-  encodeURIComponent("Hello Yaadly, I am a worker and I want WhatsApp job alerts. My trades and parishes are:");
+//
+// 13 Sep 2026: the list this panel promised now exists, and the panel is its
+// one door on the board. The sentence moved to web/lib/alerts.ts, word for
+// word, because the WhatsApp lane now has to recognise it exactly: a copy here
+// that drifted by one word would open WhatsApp, send, and put nobody on the
+// list, with no error anywhere. A test in yaad-inbound checks the two match.
+const WA_ALERTS = ALERTS_WA_LINK;
 
 function ago(iso: string | null): string {
   if (!iso) return "";
