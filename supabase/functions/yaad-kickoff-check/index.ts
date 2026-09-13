@@ -143,7 +143,15 @@ Deno.serve(async (req: Request) => {
     const presented = String(body.secret ?? "");
     let allowed = false;
     if (presented) {
-      const { data: st } = await admin.from("app_settings").select("value").eq("key", "kickoff_check_cron_secret_sha256").maybeSingle();
+      const { data: st, error: stErr } = await admin.from("app_settings").select("value").eq("key", "kickoff_check_cron_secret_sha256").maybeSingle();
+      // A read that failed is not a wrong secret. Treating it as one turned
+      // gateway timeouts into "Not authorised." on the scheduler's own calls
+      // (13 Sep 2026, DECISIONS.md). Say what happened; nobody gets in.
+      if (stErr) {
+        console.error(`yaad-kickoff-check: could not read the cron secret hash: ${stErr.message}`);
+        root.recordError(stErr.message);
+        return json({ error: "Could not check the secret, try again." }, 503);
+      }
       const expected = String(st?.value ?? "").toLowerCase();
       if (expected) {
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(presented));
