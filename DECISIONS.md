@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-13 · A cron check that cannot read its own hash says so, instead of "Not authorised."
+
+**Found in the edge logs on 13 September.** The four cron checks (evidence-landed, kickoff, quote-pack, job-health) were answering a minority of their own scheduler's calls with 403 "Not authorised." The secrets were fine: one cron job per function, each secret hashing to its own `app_settings` row, and the same caller succeeding a minute later. Every 403 took 5 to 16 seconds against 0 to 1 for a success, and they sat alongside "Gateway Timeout" 500s with the same delay, nearly all served from Supabase's Frankfurt edge while the database is in Paris. The database itself answered in milliseconds. The cause was in the code: each function read its hash with `const { data: st } = ...`, dropped the error, and treated a failed read as a blank hash, so a timeout on the way to the database came out as a refused caller. On 12 September it cost a day: that one refusal landed on job-health's only daily run, so the stall check did not happen.
+
+**The fix is honesty, not a retry.** A failed read now logs the error and answers 503 "Could not check the secret, try again." Who gets in is unchanged; a wrong or missing secret is still 403 and the admin fallback is still the only other door. A retry was considered and left out: the database call immediately after the auth check fails in the same outage (those are the 500s), so retrying the first read alone would not save the run. A second daily slot for job-health is a separate decision, not taken here.
+
+---
+
 ## 2026-09-13 · Two sessions shipped two alert buttons with two sentences, and the board's panel wins
 
 **Found while opening the pull request for the alert list.** On 6 September, in separate sessions, two things were built for the same promise. One session shipped a "Launching soon" panel on the board with a **Put me on the list** button whose message landed in the desk to be read by hand, deliberately with no table, and its runbook entry said that when the alerts were actually built, its prefilled wording would be the spec. The other session built the alerts: `job_alert_subscribers`, a WhatsApp lane that asks two questions, and its own buttons with a different sentence. Merged as they stood, the board would have carried two alerts buttons, and the lane would not have recognised the panel's sentence at all, so the button Monique approved would have kept putting nobody on the list while a list existed.
