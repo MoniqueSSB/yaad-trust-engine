@@ -5071,3 +5071,14 @@ Jamaican local number is that long. So 447767171858 is checked as
 **Never "fix" the red check by making it pass.** Making it green means reconciling the ledger with the link on, which switches on automatic production deploys. The fix is the toggle, off.
 
 **Do not use `DELETE /v1/projects/{ref}/branches` ("Disables preview branching") or `supabase branches delete` on the `main` row to get the same effect.** The `main` row is the production project; the docs do not say what either does to it.
+
+## A worker's quote is refused over its payment stages, or a booked job shows only one stage
+
+Since 13 Sep 2026 (`20260913222130`) the accepted quote's payment stages are the job's stage schedule, so they have to be readable.
+
+1. **"Payment stage line N needs the shape..." or "add up to..."**: correct refusal. Each line must be `Stage name: 30%: what proves it is done`, no colon in the stage name, percentages totalling 100 between them, ten stages at most. The same rule is `parse_payment_stages()` in Postgres and `web/lib/jobs/payment-stages.ts`; if one ever accepts what the other refuses, they have drifted.
+2. **A booked job shows one stage when the quote had several.** Check whether the schedule was written: `select status, approved_by, docs->'payment_stages' from quote_pack_drafts where job_id = '<job>' order by created_at desc;`. The row with `source` `accepted_quote` and status `approved` is the schedule. If it is missing, look for the warning `accepted_quote_writes_schedule` in the Postgres logs.
+3. **To write it by hand** for a booked job whose accepted quote reads cleanly: `select public.write_stage_schedule_from_quote('<quote id>', 'client acceptance: <client email> (written by hand, <date>, <your name>)');`. It refuses a quote that is not accepted, an unreadable one, and a job that has an approved Kickoff Pack.
+4. **A job with no schedule at all is one stage** and the worker is owed the whole labour less 5% when it is approved. That is a founder decision, not a fault.
+
+To prove the guards, run `supabase/tests/stage_schedule_guards.sql` with `execute_sql`; every line should read PASS.

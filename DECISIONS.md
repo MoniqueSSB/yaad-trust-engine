@@ -3146,3 +3146,20 @@ Decision: the link comes off, by turning **Deploy to production** off in the pro
 **The two historical migrations are edited after all, on founder instruction, reversing the 4 Sep call.** `20260901g` and `20260902c` now carry a placeholder and a note saying the value was rotated and where it lives. That removes nothing from git history, which is why rotation, not the edit, is what closed the exposure. What the edit buys is a scanner with no carve out: the path exclusions for those two files are gone from `ci.yml`, so every tracked file is held to the same rule. The files are applied history and are not re-run, so a changed literal inside them has no effect on any database.
 
 **Flagged, not fixed here.** The cron jobs' own inbound calls to `yaad-evidence-landed-check`, `yaad-kickoff-check` and `yaad-quote-pack-check` are refused with a 403 a few times a day while most succeed. Those use their own per function cron secrets, not this one, and nothing in this change touches them.
+
+## 2026-09-13 · The accepted quote writes the stage schedule; billing follows it
+
+**Why.** Founder instruction, 13 Sep 2026: the quote pack should make the payment terms, invoice plan and stage schedule. Found on the verandah job (JOB-WEB-1789253807959): nothing did. The schedule only ever came from an AI Quote Pack draft or a Kickoff Pack, and since 9 Sep the worker's own quote, stages included, is what the client accepts. The drafter had also failed on every job since 7 Sep (`minimax 429`), so no job had a schedule at all.
+
+**The schedule is what two people agreed, not what a model drafted.** On acceptance, the accepted quote's stages become the job's approved Quote Pack, `approved_by` the client's acceptance, in the slot everything downstream already reads. An approved Kickoff Pack, where one exists, still wins. This takes the model out of the money path entirely: the drafter now only pre-fills the quote form. Whether to top MiniMax up or make the planned Mistral move is a separate decision, the founder's.
+
+**Two bugs fixed with it.** With no schedule, `job_final_stage_count()` said one stage while `raise_job_stage_worker_payable()` paid 25% on stage 1 and 75% on a stage 2 that never came, so a finished job recorded the worker as owed a quarter of their labour. And `sync_job_status()` read the stage count from Kickoff Packs only, so a correct Quote Pack schedule still completed a job after stage 1. Both now read one count. No real worker was affected: the verandah job was the only non-test booked job without a schedule, and it had not started.
+
+**Founder decisions, 13 Sep 2026.**
+1. A quote's stages must read as `Name: 30%: proof`, totalling the whole, or the quote is refused (web and database both).
+2. A job with no schedule at all is one stage, and the worker is owed the whole labour less 5% when it is approved, over the 25/75 default.
+3. Client billing: under J$ 100,000 client total (labour, the 15%, materials), always paid in full. At or above it, the quote says "in full" or "by stage" and accepting agrees it.
+4. By stage: each stage's client invoice is drafted when that stage is reached (stage 1 at booking, the next when the one before is approved). Work does not wait for later stages' payment, but a stage billed job starts only when stage 1's invoice is paid. The worker is paid for a stage once it is approved, as already built.
+5. Every client invoice is drafted automatically and sent by the founder.
+
+**Built in four pieces.** 1: this schedule (`20260913222130`). 2: in full or by stage on the quote. 3: drafted invoices and the change to the "awaiting payment" rule, which today opens only on a paid invoice with no stage; the desk change there comes as a clickable demo first. 4: the payment plan on the job page.

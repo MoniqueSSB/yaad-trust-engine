@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { parsePaymentStages } from "@/lib/jobs/payment-stages";
 
 /**
  * Quote submission. Thin on purpose: jq_insert_vetted in Postgres is the
@@ -26,6 +27,14 @@ export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult
   const paymentStageNote = String(formData.get("paymentStageNote") ?? "").trim() || null;
   if (!jobId || !Number.isFinite(labour) || labour <= 0) {
     return { ok: false, error: "Put a labour price in before sending." };
+  }
+  /* The stages become the job's stage schedule the moment the client accepts
+     (20260913222130), so they are checked here, before the quote goes, with
+     the same rule the database applies. Founder decision, 13 Sep 2026:
+     refuse until readable. */
+  const stages = parsePaymentStages(paymentStageNote);
+  if (!stages.ok) {
+    return { ok: false, error: stages.error };
   }
 
   const supabase = await createClient();
