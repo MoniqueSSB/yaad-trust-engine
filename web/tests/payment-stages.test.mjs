@@ -5,7 +5,7 @@
  * Why this file exists. Since 13 Sep 2026 the accepted quote's stages ARE the
  * schedule: how many stages the job has, and what the worker is owed as each
  * is approved. A stage line read wrongly is a worker paid wrongly. The same
- * rule lives in Postgres as parse_payment_stages() (20260913222130); the
+ * rule lives in Postgres as parse_payment_stages() (20260913230001); the
  * verandah case below is the real quote that exposed the gap, and the SQL
  * guard test supabase/tests/stage_schedule_guards.sql asserts the same three
  * stages from the database side.

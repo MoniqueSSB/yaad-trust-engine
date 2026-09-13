@@ -25,7 +25,7 @@ import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
 import { JobProgress, type Phase, type Step } from "@/components/portal/JobProgress";
-import { MoneyPanel, type InvoiceRow } from "@/components/portal/MoneyPanel";
+import { MoneyPanel, type CheckTotalLine, type InvoiceRow } from "@/components/portal/MoneyPanel";
 import { StageLedger, type LedgerStage } from "@/components/portal/StageLedger";
 import { JobRail } from "@/components/portal/JobRail";
 import { BoardPreview } from "@/components/portal/BoardPreview";
@@ -34,7 +34,16 @@ import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { ApproveButton } from "@/components/portal/ApproveButton";
 import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
 import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
-import { CHECK_CATALOGUE_ID, finalStageCountFrom, isCheckLevel, jobCheckState } from "@/lib/portal/job-check";
+import {
+  CHECK_CATALOGUE_ID,
+  CHECK_LABEL,
+  checkChargePence,
+  finalStageCountFrom,
+  isCheckLevel,
+  jobCheckState,
+  penceToJmd,
+} from "@/lib/portal/job-check";
+import { PRICE_BENCHMARKS } from "@/lib/portal/price-bands";
 import legal from "@/lib/legal-copy.json";
 import { agreePrice, chooseQuote, requestKickoff, setWorkerChoice } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
@@ -589,6 +598,28 @@ export default async function JobRoom({
     evidenceStages: ev.map((e) => e.stage),
   });
 
+  /* The check joins the client's job total the moment it is added (founder,
+     13 Sep 2026: "it should automatically add to the total build"). The job
+     is priced in J$ and the check in pounds, and she chose one J$ figure, so
+     the check is converted at the benchmark rate, the one GBP to J$ rate the
+     repo holds, and the rate is named on screen beside it. This is a display
+     figure only: the check's own invoice stays a separate pound invoice with
+     no job_id (20260909180000), and the worker's figures never include it. */
+  const jmdPerGbp = PRICE_BENCHMARKS.jmd_per_gbp;
+  const checkPence = checkLevel ? checkChargePence(checkPrices[checkLevel], checkInvoice) : null;
+  const checkLine: CheckTotalLine | null =
+    checkLevel && checkPence != null
+      ? {
+          label: CHECK_LABEL[checkLevel],
+          jmd: penceToJmd(checkPence, jmdPerGbp),
+          pence: checkPence,
+          fullPence: checkPrices[checkLevel]?.full_pence ?? null,
+          invoiced: !!checkInvoice && checkInvoice.status !== "void",
+          jmdPerGbp,
+        }
+      : null;
+  const clientAllIn = allIn == null ? null : allIn + (checkLine?.jmd ?? 0);
+
   /* Files on the job (20260910120000): receipts, quotes, permits, plans,
      certificates, from either side. Not evidence, so a separate table and
      bucket. RLS returns rows to the job's own client and worker only, and
@@ -704,7 +735,7 @@ export default async function JobRoom({
       title: "Put this job on the marketplace",
       detail:
         "Everything it needs is done. Until you publish it, no tradesperson can see it or quote it.",
-      href: jobBase,
+      href: jobBase + "#go-live",
       cta: "Publish",
     });
   }
@@ -717,7 +748,7 @@ export default async function JobRoom({
       who: "yaadly",
       title: "Yaadly is choosing your tradesperson",
       detail: "You asked Yaadly to pick. Quotes are in, a person at Yaadly is reading them against what the job needs, and one price will appear here with the reason Yaadly chose it. Nothing is charged until you agree it.",
-      href: jobBase + "?tab=scope",
+      href: jobBase + "?tab=scope#who-picks",
       cta: "Who picks",
     });
   }
@@ -733,18 +764,35 @@ export default async function JobRoom({
           ? "A person at Yaadly has chosen your tradesperson. Read the price and the reason, then accept it, which books them, or tell us why not. Nothing is charged until your invoice."
           : qs.length + " quote" + (qs.length === 1 ? " is" : "s are") + " in. Accepting one books that tradesperson. Nothing is charged until your invoice.")
         : "Nothing is owed by either side until a quote is accepted.",
-      href: isClient ? jobBase + "?tab=scope" : undefined,
+      href: isClient ? jobBase + "?tab=scope#quotes" : undefined,
       cta: isClient ? (recommended ? "See the price" : "See quotes") : undefined,
     });
   }
-  if (job.status === "awaiting_payment") {
+  /* The fee invoice is raised by a person at the desk (raise_job_client_invoice
+     is admin only), and a client never sees a draft, so for a while after
+     booking there is nothing for them to pay. Telling them to "Pay" and
+     linking to "See the invoice" then landed on "No invoices yet". Found on
+     the live portal, 13 Sep 2026. Until one exists, the wait is Yaadly's. */
+  if (job.status === "awaiting_payment" && isClient && !feeInvoice) {
+    outstanding.push({
+      who: "yaadly",
+      title: "Yaadly is preparing your invoice",
+      detail:
+        "The job is booked. Your invoice comes from Yaadly next and appears under Approvals. There is nothing to pay until it arrives.",
+    });
+  } else if (job.status === "awaiting_payment") {
     outstanding.push({
       who: isClient ? "you" : "yaadly",
       title: isClient ? "Pay the Guarantee & Support fee" : "Waiting on the client's agency fee",
       detail: isClient
         ? "15% of the labour price, invoiced once. The job cannot start until this is settled."
         : "The job starts once Yaadly's fee invoice is paid. Nothing is needed from you.",
-      href: isClient ? jobBase + "?tab=approvals" : undefined,
+      /* Straight to the fee invoice's own row, not the top of Approvals,
+         where the independent check panel and the stage ledger sit above
+         it and the invoice is a long scroll down. */
+      href: isClient
+        ? jobBase + "?tab=approvals#" + (feeInvoice ? "invoice-" + feeInvoice.id : "invoices")
+        : undefined,
       cta: isClient ? "See the invoice" : undefined,
     });
   }
@@ -760,8 +808,17 @@ export default async function JobRoom({
         detail: isClient
           ? filed + " item" + (filed === 1 ? "" : "s") + " filed. Approve from the evidence, or book a live video walkthrough instead. Nothing is invoiced to you until you decide."
           : "Yaadly raises your pay invoice once the stage is accepted and checked.",
-        href: isClient ? jobBase + "?tab=evidence" : undefined,
-        cta: isClient ? "Review" : undefined,
+        /* The Approve button lives on Approvals, with a link back to the
+           evidence beside it, and only once the job is at "evidence".
+           Progress evidence has no Approve button, so sending the client
+           there while it was live left them with nothing to press. Before
+           that, the filed items are the thing to look at. */
+        href: isClient
+          ? job.status === "evidence"
+            ? jobBase + "?tab=approvals#approve"
+            : jobBase + "?tab=evidence#stage-evidence"
+          : undefined,
+        cta: isClient ? "Review and approve" : undefined,
       });
     } else if (!approved && filed === 0) {
       outstanding.push({
@@ -772,7 +829,7 @@ export default async function JobRoom({
         detail: isClient
           ? "Nothing to approve yet. Evidence appears here as it is filed."
           : "Photographs for this stage. Yaadly raises your pay invoice once the stage is accepted and checked.",
-        href: isClient ? undefined : jobBase + "?tab=evidence",
+        href: isClient ? undefined : jobBase + "?tab=evidence#upload",
         cta: isClient ? undefined : "Upload",
       });
     }
@@ -784,7 +841,7 @@ export default async function JobRoom({
       detail:
         (money(materialsQuoted) ?? "The materials line") +
         " is paid to the worker against a receipt before labour starts. Yaadly releases it once the receipt and the storage evidence are in.",
-      href: jobBase + "?tab=materials",
+      href: jobBase + "?tab=materials#materials-money",
       cta: "See it",
     });
   }
@@ -794,7 +851,7 @@ export default async function JobRoom({
         who: "you",
         title: "Invoice " + inv.id + " is unpaid",
         detail: "Sent" + (inv.issue_date ? " on " + inv.issue_date : "") + ". Paid by bank transfer.",
-        href: jobBase + "?tab=approvals",
+        href: jobBase + "?tab=approvals#invoice-" + inv.id,
         cta: "See it",
       });
     }
@@ -804,7 +861,7 @@ export default async function JobRoom({
       who: "you",
       title: "Leave a review",
       detail: "The job is closed and paid. A review is what builds the record on both sides.",
-      href: jobBase + "?tab=overview",
+      href: jobBase + "#review",
       cta: "Write it",
     });
   }
@@ -1042,6 +1099,7 @@ export default async function JobRoom({
           cal={cal}
           sel={d}
           viewerEmail={email}
+          stageNames={packStages.map((s) => s.stage)}
         />
       )}
 
@@ -1164,7 +1222,7 @@ export default async function JobRoom({
           while quotes are in. Added 9 Sep 2026 so the journey runs signed
           in as well as from the WhatsApp link. */}
       {role === "client" && chooseOpen && (
-        <section className="mt-8 rounded-2xl border border-line2 bg-panel p-4">
+        <section id="who-picks" className="mt-8 scroll-mt-6 rounded-2xl border border-line2 bg-panel p-4">
           <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
             Who picks the tradesperson
           </h2>
@@ -1202,7 +1260,7 @@ export default async function JobRoom({
       )}
 
       {qs.length > 0 && (
-        <section className="mt-8">
+        <section id="quotes" className="mt-8 scroll-mt-6">
           <h2 className="mb-4 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
             Quotes · {qs.length}
           </h2>
@@ -1470,12 +1528,13 @@ export default async function JobRoom({
           assignedTo={job.check_assigned_to ?? null}
           invoice={checkInvoice}
           prices={checkPrices}
+          jmdPerGbp={jmdPerGbp}
         />
         {/* The button the product is named after: what unlocks the money,
             next to the money itself. Client only, and only while a stage is
             genuinely waiting on a decision. */}
         {awaitingApproval && role === "client" && (
-          <section className="mt-6 rounded-2xl border border-mango/40 bg-mango/[.07] p-5">
+          <section id="approve" className="mt-6 scroll-mt-6 rounded-2xl border border-mango/40 bg-mango/[.07] p-5">
             <h2 className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
               Waiting on you
             </h2>
@@ -1509,11 +1568,12 @@ export default async function JobRoom({
           labour={labour}
           materials={won?.materials_jmd ?? null}
           fee={feeJmd}
-          allIn={allIn}
+          allIn={role === "client" ? clientAllIn : allIn}
           takeHome={takeHome}
           invoices={invoices}
           money={money}
           materialsReleased={materialsReleasedJmd}
+          check={role === "client" ? checkLine : null}
         />
         </>
       )}
@@ -1652,12 +1712,14 @@ export default async function JobRoom({
       />
 
       {job.status === "complete" && !myReview && (
+        <div id="review" className="scroll-mt-6">
         <ReviewForm
           jobId={job.id}
           direction={role === "client" ? "client_of_worker" : "worker_of_client"}
           subjectEmail={(role === "client" ? job.worker_email : job.client_email) ?? ""}
           subjectName={role === "client" ? (job.worker_name ?? "the worker") : "the client"}
         />
+        </div>
       )}
       {job.status === "complete" && myReview && (
         <p className="mt-4 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] text-mute">
@@ -1684,7 +1746,7 @@ export default async function JobRoom({
           panel use. Nothing here is a new query; it was computed for those
           and simply never had anywhere of its own to be shown. */}
       {won && materialsQuoted > 0 && (
-        <section className="mt-6 rounded-2xl border border-line bg-panel p-5">
+        <section id="materials-money" className="mt-6 scroll-mt-6 rounded-2xl border border-line bg-panel p-5">
           <h2 className="mb-1 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
             Materials money
           </h2>
@@ -1767,6 +1829,7 @@ export default async function JobRoom({
               recent={recentArrivals}
             />
           )}
+          <div id="stage-evidence" className="scroll-mt-6">
           <EvidenceLedger
             items={ev}
             stageCount={stageCount}
@@ -1775,6 +1838,7 @@ export default async function JobRoom({
             awaitingApproval={awaitingApproval}
             jobId={job.id}
           />
+          </div>
       {/* The FAQ's own "or": at sign-off a client can approve straight off
           the evidence above, or ask to walk the site live instead. Sits next
           to the moment it is an alternative to, not buried in a settings
@@ -1798,6 +1862,7 @@ export default async function JobRoom({
         />
       )}
       {job.status !== "complete" && (
+        <div id="upload" className="scroll-mt-6">
         <EvidenceUpload
           jobId={job.id}
           maxStage={stages.length}
@@ -1809,6 +1874,7 @@ export default async function JobRoom({
             .filter((e) => e.phase === "before")
             .map((e) => ({ id: e.id, item_code: e.item_code ?? null, label: e.label }))}
         />
+        </div>
       )}
       {/* Video is a worker thing. A stage walkthrough is the worker proving
           their own work; the photo form above stays open to both sides,
@@ -1829,9 +1895,10 @@ export default async function JobRoom({
           side={role === "worker" ? "worker" : "client"}
           money={money}
           labour={labour}
-          allIn={allIn}
+          allIn={role === "client" ? clientAllIn : allIn}
           takeHome={takeHome}
           fee={feeJmd}
+          check={role === "client" ? checkLine : null}
           heldNote={
             labour == null
               ? role === "worker"

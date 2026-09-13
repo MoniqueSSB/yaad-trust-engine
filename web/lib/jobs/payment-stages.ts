@@ -8,7 +8,7 @@
  * refused before it is sent, not discovered after it is booked.
  *
  * This is the twin of parse_payment_stages() in Postgres
- * (20260913222130_the_accepted_quote_writes_the_stage_schedule.sql). Same
+ * (20260913230001_the_accepted_quote_writes_the_stage_schedule.sql). Same
  * line shape, same limits. Change one, change the other. The difference is
  * only that this one says which line is wrong, because a person reads it.
  */

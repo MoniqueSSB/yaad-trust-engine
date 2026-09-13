@@ -29,7 +29,7 @@ export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult
     return { ok: false, error: "Put a labour price in before sending." };
   }
   /* The stages become the job's stage schedule the moment the client accepts
-     (20260913222130), so they are checked here, before the quote goes, with
+     (20260913230001), so they are checked here, before the quote goes, with
      the same rule the database applies. Founder decision, 13 Sep 2026:
      refuse until readable. */
   const stages = parsePaymentStages(paymentStageNote);

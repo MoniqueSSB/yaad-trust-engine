@@ -1,4 +1,4 @@
--- Proof that the stage schedule guards hold (20260913222130). Run against the
+-- Proof that the stage schedule guards hold (20260913230001). Run against the
 -- project with execute_sql, or psql. Reads only; creates nothing.
 --
 -- The same verandah quote is asserted in web/tests/payment-stages.test.mjs,

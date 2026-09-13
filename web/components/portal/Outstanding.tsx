@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LandingLink } from "./LandingLink";
 
 /**
  * Everything this job is waiting on, in one list, with the name of whoever
@@ -62,8 +62,14 @@ export function Outstanding({
           </span>
         </div>
       ) : (
-        items.map((o, i) => (
-          <div key={i} className="flex items-start gap-3.5 border-b border-line px-5 py-3.5 last:border-b-0">
+        items.map((o, i) => {
+          /* The whole row is the link, not just the words at the end of it.
+             A client reads the title and taps the title; a small "See it"
+             on the far right was the only live part, and on a phone it was
+             easy to miss entirely. Each href carries a #section, so the
+             tab opens on the thing to do rather than at the top of it. */
+          const row = (
+            <>
             <span
               className={
                 "mt-0.5 min-w-[74px] shrink-0 rounded-md border px-2 py-1 text-center font-mono-app text-[9px] font-semibold uppercase tracking-[0.1em] " +
@@ -80,13 +86,28 @@ export function Outstanding({
               <b className="block text-[13.5px] font-semibold leading-snug text-ink">{o.title}</b>
               <span className="mt-0.5 block text-[12px] leading-relaxed text-dim">{o.detail}</span>
             </span>
-            {o.href && o.cta && (
-              <Link href={o.href} className="mt-0.5 shrink-0 whitespace-nowrap text-[12.5px] font-bold text-goldb transition hover:opacity-80">
-                {o.cta} &rarr;
-              </Link>
+            {o.href && (
+              <span className="mt-0.5 shrink-0 whitespace-nowrap text-[12.5px] font-bold text-goldb transition group-hover:opacity-80">
+                {o.cta ?? "Open"} &rarr;
+              </span>
             )}
-          </div>
-        ))
+            </>
+          );
+          const rowClass = "flex items-start gap-3.5 border-b border-line px-5 py-3.5 last:border-b-0";
+          return o.href ? (
+            <LandingLink
+              key={i}
+              href={o.href}
+              className={rowClass + " group transition hover:bg-bg/40 focus-visible:bg-bg/40 focus-visible:outline-none"}
+            >
+              {row}
+            </LandingLink>
+          ) : (
+            <div key={i} className={rowClass}>
+              {row}
+            </div>
+          );
+        })
       )}
     </section>
   );
