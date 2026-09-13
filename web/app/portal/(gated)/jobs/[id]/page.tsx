@@ -684,7 +684,19 @@ export default async function JobRoom({
       cta: isClient ? (recommended ? "See the price" : "See quotes") : undefined,
     });
   }
-  if (job.status === "awaiting_payment") {
+  /* The fee invoice is raised by a person at the desk (raise_job_client_invoice
+     is admin only), and a client never sees a draft, so for a while after
+     booking there is nothing for them to pay. Telling them to "Pay" and
+     linking to "See the invoice" then landed on "No invoices yet". Found on
+     the live portal, 13 Sep 2026. Until one exists, the wait is Yaadly's. */
+  if (job.status === "awaiting_payment" && isClient && !feeInvoice) {
+    outstanding.push({
+      who: "yaadly",
+      title: "Yaadly is preparing your invoice",
+      detail:
+        "The job is booked. Your invoice comes from Yaadly next and appears under Approvals. There is nothing to pay until it arrives.",
+    });
+  } else if (job.status === "awaiting_payment") {
     outstanding.push({
       who: isClient ? "you" : "yaadly",
       title: isClient ? "Pay the Guarantee & Support fee" : "Waiting on the client's agency fee",

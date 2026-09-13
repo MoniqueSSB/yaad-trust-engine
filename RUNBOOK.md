@@ -5086,3 +5086,31 @@ Since 13 September 2026 (migration `20260913160000`, DECISIONS.md the same date)
 **Never "fix" the red check by making it pass.** Making it green means reconciling the ledger with the link on, which switches on automatic production deploys. The fix is the toggle, off.
 
 **Do not use `DELETE /v1/projects/{ref}/branches` ("Disables preview branching") or `supabase branches delete` on the `main` row to get the same effect.** The `main` row is the production project; the docs do not say what either does to it.
+
+## A worker payable exists for a stage nobody approved, or you need to prove that cannot happen
+
+Since `20260913223042` (13 Sep 2026), `raise_job_stage_worker_payable()` raises nothing unless a `stage_approvals` row exists for that job and stage. It cannot be called over the API at all: only the stage-approval trigger runs it.
+
+1. Prove it still holds. Run in the SQL editor:
+
+   ```sql
+   select p.proacl,
+          has_function_privilege('anon', p.oid, 'EXECUTE')          as anon_can,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') as signed_in_can,
+          pg_get_functiondef(p.oid) like '%from stage_approvals s where%' as has_hold_point
+     from pg_proc p
+    where p.oid = 'public.raise_job_stage_worker_payable(text,integer)'::regprocedure;
+   ```
+
+   Correct: `proacl` lists only `postgres` and `service_role`, both `_can` columns are false, and `has_hold_point` is true. Or run `supabase/tests/invoicing_guards.sql`: tests 12 to 14 must all read PASS.
+2. Find any payable with no approval behind it:
+
+   ```sql
+   select i.id, i.job_id, i.stage, i.status, i.created_at
+     from invoices i
+    where i.payable_to = 'worker' and i.stage is not null
+      and not exists (select 1 from stage_approvals s where s.job_id = i.job_id and s.stage = i.stage);
+   ```
+
+   It should return nothing. A row there was raised by something other than an approval. Do not pay it. Void it from the desk and tell Monique before anything else.
+3. If someone rewrites this function in a new migration, end that migration with `revoke all on function public.raise_job_stage_worker_payable(text, integer) from public, anon, authenticated;`. Revoking from `public` alone does not remove the grant Supabase gives `anon` and `authenticated`, which is how this was left open. Never add `grant ... to authenticated`, and never replace the hold point with an `is_admin()` check. The trigger runs in the approver's session, so an admin check would quietly stop every stage payable.
