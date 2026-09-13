@@ -35,7 +35,7 @@ function linesToText(items: string[] | undefined): string {
  *  carrying jsonb into the textarea. */
 function stagesToText(stages: { stage: string; proportion_percent: number; evidence_note: string }[] | undefined): string {
   if (!stages?.length) return "";
-  return stages.map((s) => `${s.stage} — ${s.proportion_percent}% — ${s.evidence_note}`).join("\n");
+  return stages.map((s) => `${s.stage}: ${s.proportion_percent}%: ${s.evidence_note}`).join("\n");
 }
 
 /** A draft is usable only once an admin, or the automatic clean-guardrail
@@ -70,8 +70,10 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
         <p className="mt-2">
           Your quote is with the client, scope, timeline and payment stages
           included. They see your Yaad Score, jobs completed and evidence
-          from past work alongside it. If they accept, the Kickoff Pack is
-          drafted from it, then Yaadly reviews before anything is signed.
+          from past work alongside it. If they accept, the job is booked on
+          your quote and you hear on WhatsApp the moment it happens. A
+          Kickoff Pack is an optional extra the client can ask for on bigger
+          work; it is not part of booking.
         </p>
       </div>
     );
@@ -229,7 +231,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
             rows={3}
             value={paymentStageNote}
             onChange={(e) => setPaymentStageNote(e.target.value)}
-            placeholder="Stage name — proportion — what proves it's done. One per line."
+            placeholder="Stage name: proportion: what proves it's done. One per line."
             className="w-full rounded-xl border border-line bg-bg px-3.5 py-3 text-[14px] leading-relaxed text-ink outline-none focus:border-teal"
           />
           <span className="mt-1.5 block text-[11.5px] text-dim">
@@ -261,9 +263,9 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
 
       <p className="mt-3 text-[11.5px] leading-relaxed text-dim">
         This is your quote to the client, scope, timeline and stages
-        included. If they accept, the Kickoff Pack and its own payment
-        schedule are drafted from it, then Yaadly reviews before anything
-        is signed.
+        included. If they accept, the job is booked on exactly this: your
+        price, your scope and your payment stages. Nothing else is drafted
+        or signed unless the client asks for the optional Kickoff Pack.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button disabled={busy} className="rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110 disabled:opacity-40">
