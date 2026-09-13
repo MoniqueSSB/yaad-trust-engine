@@ -150,7 +150,10 @@ export function MoneyPanel({
         )}
       </section>
 
-      <section className="mb-3.5 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
+      {/* id="invoices", and "invoice-<id>" on each row, are where the
+          outstanding list's "See the invoice" and "Invoice X is unpaid"
+          land. */}
+      <section id="invoices" className="mb-3.5 scroll-mt-6 rounded-2xl border border-line bg-linear-to-b from-[rgba(19,19,50,0.75)] to-[rgba(12,12,38,0.6)] px-5.5 py-5">
         <h3 className="font-display text-[17px] font-normal tracking-[-0.01em]">
           {side === "client" ? "Your invoices" : "Your pay invoices"}
         </h3>
@@ -175,7 +178,7 @@ export function MoneyPanel({
               const paid = inv.status === "paid";
               const isFee = inv.payable_to !== "worker";
               return (
-                <div key={inv.id} className="flex gap-3.5 border-b border-line py-3.5 last:border-b-0">
+                <div key={inv.id} id={"invoice-" + inv.id} className="flex scroll-mt-6 gap-3.5 border-b border-line py-3.5 last:border-b-0">
                   <span
                     className={
                       "mt-1.5 size-[11px] shrink-0 rounded-full border-2 " +
