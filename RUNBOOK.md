@@ -5087,6 +5087,19 @@ Since 13 Sep 2026 (`20260913230001`) the accepted quote's payment stages are the
 
 To prove the guards, run `supabase/tests/stage_schedule_guards.sql` with `execute_sql`; every line should read PASS.
 
+## A client pressed "Ask for a change" on a quote and it did not go through
+
+The request is refused by `request_quote_change_as_me()` in Postgres, and the message the client sees is the reason. Match it:
+
+1. **"Only the client of this job..."**: they are signed in with a different email from the one on the job. Check `jobs.client_email` for the job.
+2. **"This job is already booked"**: correct. After booking a change is a variation; handle it with them directly.
+3. **"That price is not open for changes"**: the quote is no longer `submitted` (accepted, declined or withdrawn).
+4. **"Yaadly is still choosing"**: a "Choose for me" job where nobody has chosen a quote yet. Choose one on the desk first.
+5. **"You have already asked for a change to this quote"**: one open request per quote. See it with `select * from quote_change_requests where quote_id = '<id>' order by created_at desc;`
+6. **"Could not find the function"**: migration `20260913230000` is not on production. Check `select to_regclass('public.quote_change_requests');` returns the table name.
+
+To prove the guards, run `supabase/tests/quote_change_request_guards.sql` with `execute_sql`; every line should read PASS.
+
 ## A worker payable exists for a stage nobody approved, or you need to prove that cannot happen
 
 Since `20260913223042` (13 Sep 2026), `raise_job_stage_worker_payable()` raises nothing unless a `stage_approvals` row exists for that job and stage. It cannot be called over the API at all: only the stage-approval trigger runs it.
