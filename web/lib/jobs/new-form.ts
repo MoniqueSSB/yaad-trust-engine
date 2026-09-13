@@ -3,7 +3,7 @@
  * Pulled out of the component on 3 Sep 2026, when the form went from three
  * screens to six. Two reasons, and the second is the real one.
  *
- * The first is that a form with six stages needs an answer to "may this
+ * The first is that a form with seven stages needs an answer to "may this
  * person move on yet", and that answer was three inline boolean expressions
  * in the middle of the JSX where nothing could test it.
  *
@@ -122,22 +122,51 @@ export const PROBATION_OCCUPIED = /(on site|occupied|lives there|at home)/i;
 export const blocksProbation = (accessType: string) =>
   PROBATION_KEYS.test(accessType) || PROBATION_OCCUPIED.test(accessType);
 
-/* ── the six stages ───────────────────────────────────────────────────────
+/* ── the seven stages ───────────────────────────────────────────────────────
  * One question per stage, in the order somebody actually thinks about a
  * problem with a building: what is wrong, where it is, how soon, what you can
  * show us, how to reach you, then a look at the whole thing before it goes.
  * Nothing personal is asked before stage five.
  */
-export type StageKey = "work" | "property" | "urgency" | "evidence" | "reach" | "review";
+export type StageKey = "work" | "property" | "urgency" | "choose" | "evidence" | "reach" | "review";
 
 export const STAGES: { key: StageKey; label: string; short: string }[] = [
   { key: "work",     label: "What needs doing",   short: "The work" },
   { key: "property", label: "Where the property is", short: "Property" },
   { key: "urgency",  label: "How urgent it is",   short: "Urgency" },
+  { key: "choose",   label: "Who picks the tradesperson", short: "Who picks" },
   { key: "evidence", label: "Photos and evidence", short: "Photos" },
   { key: "reach",    label: "How to reach you",   short: "Contact" },
   { key: "review",   label: "Check it and send",  short: "Review" },
 ];
+
+/* ── who picks the tradesperson ───────────────────────────────────────────
+ * Added 9 Sep 2026 on the founder's instruction. The two paths were decided
+ * on 31 July (ledger: "Choose for me" the default, "Let me choose" the
+ * alternative) and until now the form never asked, so every job ran as
+ * "Let me choose". The value lands on jobs.worker_choice, which is what
+ * decides whether the client sees every quote or one recommended price.
+ *
+ * "yaadly" is the default, and it is pre-selected rather than left blank on
+ * purpose: this is the managed route the product is sold on, and an
+ * unanswered question on a form is a question most people skip. The client
+ * can still tap the other one. */
+export type WorkerChoice = "yaadly" | "client";
+
+export const WORKER_CHOICE: { value: WorkerChoice; title: string; note: string }[] = [
+  {
+    value: "yaadly",
+    title: "Yaadly picks for me",
+    note: "We ask a few vetted tradespeople in your parish to quote, a person at Yaadly reads the quotes, and you get one price to say yes or no to. Nothing is booked until you agree the price.",
+  },
+  {
+    value: "client",
+    title: "Show me the quotes and I will choose",
+    note: "Every quote comes to your page as it lands, labour split from materials. You compare and pick.",
+  },
+];
+
+export const isWorkerChoice = (v: unknown): v is WorkerChoice => v === "yaadly" || v === "client";
 
 export type Fields = {
   trade: string;
@@ -145,12 +174,13 @@ export type Fields = {
   desc: string;
   urgency: string;
   accessType: string;
+  workerChoice: WorkerChoice;
   name: string;
   contact: string;
 };
 
 export const EMPTY_FIELDS: Fields = {
-  trade: "", parish: "", desc: "", urgency: "", accessType: "", name: "", contact: "",
+  trade: "", parish: "", desc: "", urgency: "", accessType: "", workerChoice: "yaadly", name: "", contact: "",
 };
 
 /** Whether a stage has enough on it to move forward.
@@ -169,9 +199,12 @@ export function stageComplete(key: StageKey, f: Fields): boolean {
     case "work":     return f.trade !== "" && f.desc.trim().length >= MIN_DESC;
     case "property": return f.parish !== "" && f.accessType !== "";
     case "urgency":  return f.urgency !== "";
+    /* Pre-selected, so it is complete unless something outside this module
+       has written a value that is not one of the two. */
+    case "choose":   return isWorkerChoice(f.workerChoice);
     case "evidence": return true;
     case "reach":    return f.name.trim().length > 1 && (looksLikeEmail(f.contact) || looksLikePhone(f.contact));
-    case "review":   return STAGES.slice(0, 5).every((s) => stageComplete(s.key, f));
+    case "review":   return STAGES.filter((s) => s.key !== "review").every((s) => stageComplete(s.key, f));
   }
 }
 
@@ -210,12 +243,12 @@ export const DRAFT_KEY = "yaadly.job.new.v1";
  *  enough that a stranger on the same phone next month sees a clean form. */
 export const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type DraftFields = Pick<Fields, "trade" | "parish" | "desc" | "urgency" | "accessType">;
+export type DraftFields = Pick<Fields, "trade" | "parish" | "desc" | "urgency" | "accessType" | "workerChoice">;
 
 export type StoredDraft = { v: 1; jobId: string; at: number; fields: DraftFields };
 
 export function draftFields(f: Fields): DraftFields {
-  return { trade: f.trade, parish: f.parish, desc: f.desc, urgency: f.urgency, accessType: f.accessType };
+  return { trade: f.trade, parish: f.parish, desc: f.desc, urgency: f.urgency, accessType: f.accessType, workerChoice: f.workerChoice };
 }
 
 /** Something worth bringing back. A trade tapped by accident is not. */
@@ -244,6 +277,9 @@ export function parseDraft(raw: string | null, now: number): StoredDraft | null 
   const fields: DraftFields = {
     trade: str("trade"), parish: str("parish"), desc: str("desc"),
     urgency: str("urgency"), accessType: str("accessType"),
+    /* A draft written before this question existed has no answer stored.
+       It gets the default, the same as a fresh form. */
+    workerChoice: isWorkerChoice(src.workerChoice) ? src.workerChoice : "yaadly",
   };
   if (!worthKeeping(fields)) return null;
   return { v: 1, jobId: typeof d.jobId === "string" ? d.jobId : "", at, fields };
@@ -280,5 +316,6 @@ export function restoreFields(
     desc: d.fields.desc,
     urgency: askedFor(d.fields.urgency, URGENCY.map((u) => u.value)),
     accessType: askedFor(d.fields.accessType, ACCESS.map((a) => a.value)),
+    workerChoice: isWorkerChoice(d.fields.workerChoice) ? d.fields.workerChoice : "yaadly",
   };
 }

@@ -16,7 +16,8 @@ import legal from "@/lib/legal-copy.json";
  *   2. enforce_signed_before_open needs a doc_signatures row at the exact
  *      version in app_settings, and a client_profiles row
  *   3. enforce_store_before_open needs materials_store_nominated()
- *   4. open_jobs needs open = true, no worker, stage 0
+ *   4. open_jobs needs open = true, no worker, stage 0, and is_test false
+ *      (a person marked it as a test from the desk; 20260909150000)
  *
  * The split between account and job matters to the reader, not to Postgres.
  * The first two are done once and cover every job somebody has; the third is

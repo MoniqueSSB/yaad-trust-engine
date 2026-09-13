@@ -49,28 +49,68 @@ export const ALERTS_EXACT = /^(alerts?|job alerts?|start alerts?|subscribe)[.!]*
  *  job. That second condition lives in index.ts, where the prior thread is. */
 export const ALERTS_PHRASE = /\b(?:want|get|join|for)\s+(?:the\s+)?(?:job\s+)?alerts?\b/i;
 
-/** The exact sentence the "get job alerts" button puts in somebody's WhatsApp
- *  box, and the link that does it. Both live here, in one place, because the
- *  lane has to recognise this exact sentence: a page that drifts from it by a
- *  word produces a button that looks fine and silently does nothing. There is a
- *  test that reads every page carrying the button and checks it still matches.
+/** The sentence the board's "Put me on the list" button puts in somebody's
+ *  WhatsApp box. Main's wording, not mine, and deliberately: Monique approved
+ *  it on 6 September for the "Launching soon" panel, and that panel's own
+ *  runbook entry says "when the alerts are actually built, the prefilled
+ *  wording is the spec." This is the build. Reconciled 13 September 2026, when
+ *  two sessions turned out to have shipped two different sentences for the
+ *  same button and the lane recognised only one of them.
  *
- *  Matched exactly rather than through ALERTS_PHRASE, and that distinction
- *  matters. The loose phrasings are refused from a number with a job
- *  conversation already running, which is right for a sentence somebody typed
- *  themselves and wrong for one our own button wrote: a tradesperson who posted
- *  a job from the same number last month should still be able to press it. */
-export const ALERTS_OPENER = "Hello Yaadly, I am a tradesperson and I want job alerts.";
+ *  It ENDS WITH A PROMPT, "My trades and parishes are:", so plenty of people
+ *  will type their answer on the end before pressing send. That is why it is
+ *  matched as a prefix rather than exactly, and why alertsOpenerRemainder()
+ *  exists: what they typed is read, not thrown away and asked for again.
+ *
+ *  web/lib/alerts.ts and docs/marketplace.html carry copies, because neither a
+ *  Next.js build nor a page with no build step can import this file. The test
+ *  beside this file reads both and fails if either drifts, because a button
+ *  whose sentence the lane does not recognise opens WhatsApp, sends, and puts
+ *  nobody on the list, with no error anywhere. */
+const ALERTS_OPENER_CORE = "Hello Yaadly, I am a worker and I want WhatsApp job alerts";
+export const ALERTS_OPENER = ALERTS_OPENER_CORE + ". My trades and parishes are:";
 
 /** The Yaadly WhatsApp sender, the same number every button on the site uses. */
 export const ALERTS_WA_LINK =
   "https://wa.me/447878877567?text=" + encodeURIComponent(ALERTS_OPENER);
 
-/** Asking to join, whether or not they have a job conversation running. The
- *  keyword on its own, or the button's own sentence. */
+const squash = (x: string) => (x ?? "").replace(/\s+/g, " ").trim();
+
+/** Asking to join, whether or not they have a job conversation running: the
+ *  keyword on its own, or anything that starts with the button's sentence.
+ *  Deleting the "My trades and parishes are:" prompt before sending still
+ *  counts; only the first sentence has to survive. */
 export function alertsOpenerExact(said: string): boolean {
-  const t = (said ?? "").trim();
-  return ALERTS_EXACT.test(t) || t.toLowerCase() === ALERTS_OPENER.toLowerCase();
+  const t = squash(said);
+  return ALERTS_EXACT.test(t) || t.toLowerCase().startsWith(ALERTS_OPENER_CORE.toLowerCase());
+}
+
+/** Whatever they typed after the button's sentence, with the prompt itself
+ *  taken off. "" when there was nothing, or when this was not the opener. */
+export function alertsOpenerRemainder(said: string): string {
+  const t = squash(said);
+  if (!t.toLowerCase().startsWith(ALERTS_OPENER_CORE.toLowerCase())) return "";
+  return t.slice(ALERTS_OPENER_CORE.length)
+    .replace(/^[.!]?\s*(my trades and parishes are\s*:?)?/i, "")
+    .trim();
+}
+
+/** A word that set_job_alert_parishes() reads as "every parish". Safe in the
+ *  parishes question, where "all" can only mean all of them. NOT safe in a
+ *  sentence that mixes trades and parishes: "I do all kinds of plumbing,
+ *  Portmore" would put somebody on the list for the whole island. So when the
+ *  opener's remainder contains one of these, the lane does not read parishes
+ *  from it and asks the parishes question on its own instead. */
+export const ANYWHERE_WORD = /\b(all|anywhere|island ?wide|whole island|everywhere)\b/i;
+
+/** The words in a mixed answer that NEITHER side could place. Trades and
+ *  parishes are read from the same text, so each side's unmatched list is full
+ *  of the other side's words: "Portmore" is not a trade and "plumbing" is not a
+ *  parish. Only a word both sides rejected is genuinely unplaced, and only that
+ *  is worth saying back to the person. */
+export function neitherPlaced(tradesUnmatched: string[], parishesUnmatched: string[]): string[] {
+  const other = new Set((parishesUnmatched ?? []).map((w) => w.toLowerCase()));
+  return (tradesUnmatched ?? []).filter((w) => other.has(w.toLowerCase()));
 }
 
 /** Coming off the list. Answered with or without a session open: somebody who

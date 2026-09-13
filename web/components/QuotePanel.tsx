@@ -71,7 +71,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           Your quote is with the client, scope, timeline and payment stages
           included. They see your Yaad Score, jobs completed and evidence
           from past work alongside it. If they accept, the Kickoff Pack is
-          drafted from it, then Monique reviews before anything is signed.
+          drafted from it, then Yaadly reviews before anything is signed.
         </p>
       </div>
     );
@@ -246,8 +246,8 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           <div className="flex justify-between text-mute"><span>Client fee, 15% on labour</span><span>+{jmd(Math.round(labour * 0.15))}</span></div>
           <div className="flex justify-between font-bold text-ink"><span>Client sees one number</span><span>{jmd(Math.round(labour * 1.15) + materials)}</span></div>
           <div className="my-2 h-px bg-line" />
-          <div className="flex justify-between text-mute"><span>Yaadly&rsquo;s margin, 12% on labour</span><span>{jmd(Math.round(labour * 0.12))}</span></div>
-          <div className="flex justify-between font-bold text-tealb"><span>Yaadly pays you</span><span>{jmd(Math.round(labour * 0.88) + materials)}</span></div>
+          <div className="flex justify-between text-mute"><span>Yaadly&rsquo;s margin, 5% on labour</span><span>{jmd(Math.round(labour * 0.05))}</span></div>
+          <div className="flex justify-between font-bold text-tealb"><span>Yaadly pays you</span><span>{jmd(Math.round(labour * 0.95) + materials)}</span></div>
           <p className="mt-2.5 text-[11.5px] leading-relaxed text-dim">
             The client is shown the all-in total before they accept, never a
             base price with the fee added at the end.
@@ -262,7 +262,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
       <p className="mt-3 text-[11.5px] leading-relaxed text-dim">
         This is your quote to the client, scope, timeline and stages
         included. If they accept, the Kickoff Pack and its own payment
-        schedule are drafted from it, then Monique reviews before anything
+        schedule are drafted from it, then Yaadly reviews before anything
         is signed.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">

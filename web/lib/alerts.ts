@@ -13,6 +13,10 @@
  * anything; the button opens WhatsApp with the sentence already typed and the
  * person presses send.
  *
+ * The wording is the one Monique approved on 6 September for the board's
+ * "Launching soon" panel, adopted as the spec on 13 September when two
+ * sessions were found to have shipped two sentences for the same button.
+ *
  * THIS SENTENCE IS DUPLICATED ON PURPOSE, the same way web/lib/taxonomy.ts
  * duplicates the trade list. The lane that recognises it runs on Deno, in
  * supabase/functions/yaad-inbound/job-alerts.ts, which owns the original and
@@ -21,7 +25,7 @@
  * lane does not recognise looks perfectly fine and silently does nothing.
  */
 
-export const ALERTS_OPENER = "Hello Yaadly, I am a tradesperson and I want job alerts.";
+export const ALERTS_OPENER = "Hello Yaadly, I am a worker and I want WhatsApp job alerts. My trades and parishes are:";
 
 /** The Yaadly WhatsApp sender, the same number every button on the site uses. */
 export const ALERTS_WA_LINK =

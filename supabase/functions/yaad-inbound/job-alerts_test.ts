@@ -8,7 +8,8 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_EXACT, ALERTS_PHRASE, ALERTS_STOP,
-  ALERTS_MAX_TRIES, ALERTS_OPENER, ALERTS_WA_LINK, alertsOpenerExact, sayList,
+  ALERTS_MAX_TRIES, ALERTS_OPENER, ALERTS_WA_LINK, alertsOpenerExact, alertsOpenerRemainder,
+  ANYWHERE_WORD, neitherPlaced, sayList,
 } from "./job-alerts.ts";
 import { scan } from "./guardrails.ts";
 
@@ -84,11 +85,19 @@ Deno.test("every fixed reply in the alert lane passes the banned-language screen
     inboundSource.indexOf("// A worker answering the \"send this draft"),
   );
   assert(lane.length > 1000, "the lane should be in index.ts");
-  for (const m of lane.matchAll(/twiml\(\s*([`"][^`"]*[`"])/g)) {
-    const text = m[1].slice(1, -1);
+  // Every string of any length in the lane, not only the ones written straight
+  // into twiml(). The joining confirmation is built in joinedReply() and only
+  // handed to twiml() afterwards, and a test that screened literals inside the
+  // call alone would have stopped reading it the day it moved.
+  let screened = 0;
+  for (const m of lane.matchAll(/([`"])((?:(?!\1)[^\\]|\\.){30,}?)\1/g)) {
+    const text = m[2];
     assertEquals(scan(text), [], `banned language in: ${text.slice(0, 80)}`);
     assert(!/[‐-―]/.test(text), `dash in: ${text.slice(0, 80)}`);
+    screened++;
   }
+  assert(screened >= 10, `expected to screen the lane's replies, only found ${screened}`);
+  assert(/You are on the list\$\{onFor\}/.test(lane), "the confirmation must still be in the lane, where this test reads it");
 });
 
 Deno.test("joining the list sends nobody an alert", () => {
@@ -207,9 +216,74 @@ Deno.test("the button is a link, never a form that posts a number", () => {
   // that they consented, and it does not open WhatsApp's 24 hour window, so the
   // first reply would need an approved template that does not exist yet.
   const board = read("web/app/jobs/page.tsx");
-  // lastIndexOf, not indexOf: the first occurrence is the import line.
-  const at = board.lastIndexOf("ALERTS_WA_LINK");
+  // The panel links through its own name for the constant. The import and the
+  // alias are elsewhere in the file; this is the element itself.
+  const at = board.indexOf("href={WA_ALERTS}");
+  assert(at > 0, "the board's panel should still link to the alerts sentence");
+  assert(/const WA_ALERTS = ALERTS_WA_LINK;/.test(board), "the panel must take the shared sentence, not its own copy");
   const around = board.slice(Math.max(0, at - 400), at + 400);
   assert(/<a\s/.test(around), "the alerts button must be a link");
   assert(!/<input|<form/.test(around), "the alerts button must not collect a number on the page");
+});
+
+// ── the board's own sentence, and the answer people type after it ──────────
+//
+// Reconciled 13 Sep 2026. The board's "Put me on the list" panel ends its
+// sentence with a prompt, "My trades and parishes are:", so a real message is
+// usually the sentence plus an answer. Treating that as an exact match would
+// have put nobody on the list; treating it as a bare opener would have thrown
+// their answer away and asked for it again.
+
+Deno.test("the board's sentence joins, with or without an answer typed on the end", () => {
+  assert(alertsOpenerExact(ALERTS_OPENER), "the sentence as the button writes it");
+  assert(alertsOpenerExact(ALERTS_OPENER + " plumbing, tiling, Portmore"), "with an answer typed after the prompt");
+  assert(
+    alertsOpenerExact("Hello Yaadly, I am a worker and I want WhatsApp job alerts."),
+    "somebody who deleted the prompt before sending is still asking to join",
+  );
+  assert(alertsOpenerExact("hello yaadly,  I am a worker and I want whatsapp job alerts"), "case and spacing are not the point");
+  assert(!alertsOpenerExact("Hello Yaadly, I have a property in Jamaica"), "a client opener is not the alerts opener");
+});
+
+Deno.test("what they typed after the prompt is read, and the prompt itself is not", () => {
+  assertEquals(alertsOpenerRemainder(ALERTS_OPENER), "", "the untouched sentence carries no answer");
+  assertEquals(alertsOpenerRemainder(ALERTS_OPENER + " plumbing, Portmore"), "plumbing, Portmore");
+  assertEquals(alertsOpenerRemainder(ALERTS_OPENER + "\nplumbing and tiling\nKingston"), "plumbing and tiling Kingston");
+  assertEquals(
+    alertsOpenerRemainder("Hello Yaadly, I am a worker and I want WhatsApp job alerts. roofing, St Thomas"),
+    "roofing, St Thomas",
+    "prompt deleted, answer kept",
+  );
+  assertEquals(alertsOpenerRemainder("ALERTS"), "", "the bare keyword has nothing after it");
+  assertEquals(alertsOpenerRemainder("plumbing, Portmore"), "", "not the opener, so nothing is read as its answer");
+});
+
+Deno.test("'all kinds of plumbing' is never read as every parish", () => {
+  assert(ANYWHERE_WORD.test("I do all kinds of plumbing, Portmore"));
+  assert(ANYWHERE_WORD.test("roofing, anywhere"));
+  assert(!ANYWHERE_WORD.test("plumbing, tiling, Portmore and Kingston"));
+  assert(!ANYWHERE_WORD.test("St Catherine, Hall's Delight"), "a place name containing 'all' is not the word all");
+
+  // The guard itself, in the lane. If this goes, a combined answer containing
+  // "all" puts somebody on the list for fourteen parishes they never named.
+  assert(/readParishes\s*=\s*!ANYWHERE_WORD\.test\(rest\)/.test(inboundSource), "the combined read must check for an anywhere word");
+  assert(/if \(readParishes\) \{\s*const p = await supabase\.rpc\("set_job_alert_parishes"/.test(inboundSource),
+    "parishes must only be read from the combined answer when that check passes");
+});
+
+Deno.test("only words neither side could place are read back", () => {
+  // The same text goes to both normalisers. "Portmore" is not a trade and
+  // "plumbing" is not a parish, and saying either back as unplaced is nonsense.
+  assertEquals(neitherPlaced(["Portmore", "swimming pools"], ["plumbing", "swimming pools"]), ["swimming pools"]);
+  assertEquals(neitherPlaced(["Portmore"], ["plumbing"]), []);
+  assertEquals(neitherPlaced(["Swimming Pools"], ["swimming pools"]), ["Swimming Pools"], "case does not make a word placed");
+  assert(/neitherPlaced\(tRow\?\.unmatched/.test(inboundSource), "the lane must report the intersection, not either side alone");
+});
+
+Deno.test("both paths to 'you are on the list' use the same confirmation", () => {
+  // One place for the vetting warning. Two copies would drift, and the copy
+  // that lost the warning would tell an unvetted person they are on the list
+  // without saying they cannot quote.
+  const uses = inboundSource.match(/await joinedReply\(/g) ?? [];
+  assertEquals(uses.length, 2, "the parishes answer and the one-message join should both call joinedReply");
 });

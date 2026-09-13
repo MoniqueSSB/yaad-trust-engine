@@ -77,10 +77,11 @@ combined**. Defensible on scope, but expect it to be queried.
 **£10**, automated. State in one line why yours is £249, a person, Jamaican material costs
 and day rates a UK tool does not hold, a written go or no-go, and PI cover behind the opinion.
 
-## Marketplace fee, unchanged
+## Marketplace fee
 
-**27% blended on labour only, never on materials.** Client 15% Guarantee & Support fee,
-worker 12%, worker keeps **88%**. Yaadly Remote (digital) 10%. Small-job client minimum
+**20% blended on labour only, never on materials.** Client 15% Guarantee & Support fee,
+worker 5%, worker keeps **95%** (worker side cut from 12% on 9 September 2026, founder
+instruction). Yaadly Remote (digital) 10%. Small-job client minimum
 J$3,500 to 4,500 by trade risk. Materials cash advance 5%. FX ~2%.
 
 Under **DMCCA 2024 s230 / CMA209 para 4.4** the client fee must sit **inside the headline

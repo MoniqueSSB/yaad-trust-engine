@@ -165,7 +165,7 @@ export async function CalBand({
 
       <div className="min-w-0">
         <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-mango">
-          {side === "worker" ? "Your diary" : side === "service" ? "Book time with Monique" : "Coming up"}
+          {side === "worker" ? "Your diary" : side === "service" ? "Book time with Yaadly" : "Coming up"}
         </h4>
 
         {upcoming.length === 0 ? (
@@ -223,7 +223,7 @@ export async function CalBand({
               <p className="mt-1.5 text-[11.5px] text-dim">This day is booked and closed to new requests.</p>
             ) : !selOpen ? (
               <p className="mt-1.5 text-[11.5px] text-dim">
-                {side === "service" ? "Monique has" : "The worker has"} not opened this day. Teal days are the open ones.
+                {side === "service" ? "Yaadly has" : "The worker has"} not opened this day. Teal days are the open ones.
               </p>
             ) : (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -242,7 +242,7 @@ export async function CalBand({
                 ))}
                 <p className="w-full text-[11px] leading-relaxed text-dim">
                   {side === "service"
-                    ? "You get a confirmation once Monique accepts."
+                    ? "You get a confirmation once Yaadly accepts."
                     : "This goes to the worker as a request. Nothing is booked by you alone."}
                 </p>
               </div>

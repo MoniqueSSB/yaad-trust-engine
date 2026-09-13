@@ -22,6 +22,9 @@ export type Job = {
   client_email: string | null;
   worker_email: string | null;
   updated_at: string | null;
+  /** Who picks the tradesperson, 'yaadly' or 'client'. Optional: the worker
+   *  list never selects it and never shows it. */
+  worker_choice?: string | null;
 };
 
 /**
@@ -121,6 +124,13 @@ export function JobList({
                     <span className="font-mono-app">{j.id}</span>
                     {j.trade && <span>{j.trade}</span>}
                     {j.parish && <span>{j.parish}</span>}
+                    {/* Only on the client's list, only while nobody is booked:
+                        once a worker is on the job the question is answered. */}
+                    {j.worker_choice != null && !j.worker_email && (
+                      <span className="text-tealb">
+                        {j.worker_choice === "client" ? "You choose from the quotes" : "Yaadly picks the tradesperson"}
+                      </span>
+                    )}
                     {updated && <span className="ml-auto">Last moved {updated}</span>}
                   </div>
                 </Link>

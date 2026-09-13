@@ -90,6 +90,34 @@ async function pingDesk(admin: any, title: string, body: string): Promise<void> 
   } catch (_) { /* never let a notification break a scheduled run */ }
 }
 
+/** Should this reminder actually go to the phone right now?
+ *
+ *  The count alone is the wrong question. This function runs on a schedule
+ *  and the queue it counts is normally NOT empty, so "push when the count is
+ *  above zero" means "push on every single poll", which is what it did: two
+ *  pushes a minute for days, against four items, three of them August test
+ *  rows nobody was ever going to approve.
+ *
+ *  should_push_desk_notice() (20260907140000) holds the memory in one place
+ *  rather than in two Deno files that would drift, and answers the real
+ *  question: has the queue GROWN, or has a day passed with it still not
+ *  empty. Nothing about the approval gate changes; only how often the phone
+ *  says so.
+ *
+ *  Fails OPEN. If the call errors the push still goes, because a reminder
+ *  arriving too often is a nuisance and a reminder that silently stops is a
+ *  booking nobody knows is blocked. */
+async function shouldPushDeskNotice(admin: any, key: string, count: number): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("should_push_desk_notice", { p_key: key, p_count: count });
+    if (error) { console.error(`should_push_desk_notice(${key}) failed, pushing anyway: ${error.message}`); return true; }
+    return data === true;
+  } catch (e) {
+    console.error(`should_push_desk_notice(${key}) threw, pushing anyway: ${String(e).slice(0, 200)}`);
+    return true;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -361,7 +389,7 @@ Deno.serve(async (req: Request) => {
     // load bearing rather than courteous, and it says what is stuck.
     const { count: awaitingApproval } = await admin.from("kickoff_packs")
       .select("id", { count: "exact", head: true }).eq("status", "draft");
-    if ((awaitingApproval ?? 0) > 0) {
+    if ((awaitingApproval ?? 0) > 0 && await shouldPushDeskNotice(admin, "kickoff_packs_awaiting_approval", awaitingApproval ?? 0)) {
       await pingDesk(admin,
         `${awaitingApproval} kickoff pack${awaitingApproval === 1 ? "" : "s"} waiting on you`,
         `${awaitingApproval} pack${awaitingApproval === 1 ? " is" : "s are"} drafted and waiting for you to approve. `

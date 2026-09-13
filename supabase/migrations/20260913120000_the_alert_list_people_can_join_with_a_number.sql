@@ -1,3 +1,10 @@
+-- RENAMED 13 September 2026, content unchanged. Written and applied to
+-- production on 6 September 2026 as 20260906223046. Main gained nine migrations in the
+-- meantime, and scripts/check-migration-order.mjs requires a new file to sort
+-- after every migration already on the base branch, so the filename moved and
+-- nothing else did. Applying it again is safe: every statement is CREATE OR
+-- REPLACE, IF NOT EXISTS, or an idempotent update.
+
 -- The alert list, and the four doors into it.
 --
 -- WHAT THIS IS FOR. Until now "who hears about a new job" was not a list at

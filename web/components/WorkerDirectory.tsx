@@ -69,7 +69,14 @@ export function WorkerDirectory({ workers }: { workers: Worker[] }) {
       <p className="mt-4 font-mono-app text-[11px] font-medium uppercase tracking-[0.06em] text-dim">
         Every profile: identity checked with an independent provider, TRN checked against the ID
       </p>
-      <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+      {/* auto-fit rather than a fixed 2/3 column count, changed 6 Sep 2026
+          with the job board redesign. This component renders in two very
+          different widths: full page on /workers, and beside a 316px rail on
+          the board's worker tab. A fixed lg:grid-cols-3 gave the board three
+          175px cards, which is narrower than the two buttons at the bottom of
+          one. Letting the track decide means the same card is comfortable in
+          both places without either page knowing about the other. */}
+      <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-3.5">
         {workers.map((w, i) => {
           const initials = (w.name ?? "W").split(" ").map((x) => x[0]).join("").slice(0, 2);
           // Book routes into the post-a-job flow with this worker requested,
@@ -103,9 +110,16 @@ export function WorkerDirectory({ workers }: { workers: Worker[] }) {
                   <small className="block text-[12.5px] text-mute">{w.trade ?? "General trades"}</small>
                   <small className="block font-mono-app text-[10.5px] font-medium uppercase text-dim">{w.parish}</small>
                 </span>
+                {/* "New" rather than "0", 6 Sep 2026. A bold zero beside a name
+                    reads as a score, and the thing it is actually saying is that
+                    this person has not been booked through Yaadly yet, which is a
+                    fact about the platform's age and not about the tradesperson.
+                    They have all passed the same checks either way. */}
                 <span className="text-right font-mono-app text-[11px] font-semibold text-goldb">
-                  {w.jobs_completed ?? 0}
-                  <small className="block font-mono-app text-[9px] font-medium uppercase tracking-[0.08em] text-dim">jobs</small>
+                  {(w.jobs_completed ?? 0) > 0 ? w.jobs_completed : "New"}
+                  <small className="block font-mono-app text-[9px] font-medium uppercase tracking-[0.08em] text-dim">
+                    {(w.jobs_completed ?? 0) > 0 ? "jobs" : "on Yaadly"}
+                  </small>
                 </span>
               </div>
 

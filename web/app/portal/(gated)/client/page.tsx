@@ -51,7 +51,7 @@ export default async function ClientPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type",
+      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type,worker_choice",
     )
     .order("updated_at", { ascending: false });
 

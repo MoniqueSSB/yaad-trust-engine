@@ -26,10 +26,11 @@ with `verify_jwt = true`, so it is not publicly reachable. It has been left
 alone rather than deleted, because deleting a deployed endpoint nobody can
 read the source of is not a tidy-up, it is a guess. Decide it deliberately.
 
-**Nine of the 29 call a text model**, all of them through
+**Ten call a text model** (nine until 9 September 2026, when
+`yaad-shortlist` was added), all of them through
 `_shared/textmodel.ts`: `yaad-agent`, `yaad-completion`, `yaad-inbound`,
 `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`,
-`yaad-quote-pack` and `yaad-sketch`. Two more call a vision model directly
+`yaad-quote-pack`, `yaad-shortlist` and `yaad-sketch`. Two more call a vision model directly
 (`yaad-sketch` again, and `yaad-notify-client`'s ported photo review), and
 `yaad-transcribe` calls speech-to-text. Everything else has no model in it.
 
@@ -41,6 +42,7 @@ two copies of one prompt with only one of them maintained.)
 | Function | verify_jwt | What it does |
 |---|---|---|
 | `yaad-agent` | true | Intake, trade classifier and Reporting agents. Model comes from `_shared/textmodel.ts`, which has been Mistral in the EU since 4 Sep 2026. Admin session only |
+| `yaad-shortlist` | true | The shortlist agent, 9 Sep 2026. Reads a job as the board shows it (`board_descr_for_job`, never the client's contact details or address) and the candidates' published profiles, and names up to four to be ASKED to quote, one plain reason each, into `job_shortlists`. Alerts nobody: the desk's Invite button calls `yaad-match` with the names. Cannot pick outside `shortlist_candidates_for_job` (same vetting bar as the alert), cannot touch a quote, a price or a booking. Falls back to the database ranking, marked `source = 'rank'`, when agents are paused, no provider is set, or the answer is unusable. Admin session, or service role with `x-yaad-internal` |
 | `yaad-vision` | true | AI photo review of evidence (NVIDIA NIM vision model), admin session only |
 | `yaad-quote-pack-rescan` | true | An admin corrects a held quote pack's wording; the same verdict function the drafter uses decides again. Approves nothing, never touches `status`, calls no model. |
 | `yaad-website-intake` | false | Public job request form on yaadly.co.uk → job row + client photos |

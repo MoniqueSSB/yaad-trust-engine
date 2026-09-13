@@ -1,9 +1,9 @@
 /**
  * What happens after a service closes, from the preview's `svcNext()`.
  *
- * Two routes, and the point of showing both is that neither is a upsell. A
- * client who buys one small honest thing and then keeps their own contractor
- * is a good outcome; the report they paid for is worth having either way.
+ * Two routes, and the point of showing both is that neither is an upsell. A
+ * client who buys one small honest thing and stops there is a good outcome;
+ * the report they paid for is worth having either way.
  *
  * Shown only once the service is finished, because before that it is noise.
  */
@@ -39,13 +39,12 @@ export function ServiceNext() {
             Route two
           </p>
           <h3 className="mt-2 text-[16px] font-bold">
-            Keep your own contractor, add oversight
+            Add the Oversight Retainer
           </h3>
           <p className="mt-2 text-[13px] leading-relaxed text-mute">
-            You already have someone and you want to keep them. The Oversight
-            Retainer writes the stages and the evidence protocol at the first
-            visit, then watches it fortnightly or weekly. Your contractor knows
-            somebody is looking.
+            For longer work. The Oversight Retainer writes the stages and the
+            evidence protocol at the first visit, then watches it fortnightly or
+            weekly. The tradesperson knows somebody is looking.
           </p>
           <p className="mt-3.5">
             <a
@@ -63,8 +62,8 @@ export function ServiceNext() {
           <b className="text-ink">Either one is a good outcome.</b> A service is
           where somebody who does not trust a marketplace yet can buy one small
           honest thing and find out whether it is worth listening to. Plenty of
-          people will have their own contractor and never touch the board. That
-          is fine. The report is worth having either way.
+          people will buy one report and never touch the board. That is fine.
+          The report is worth having either way.
         </p>
       </div>
     </>

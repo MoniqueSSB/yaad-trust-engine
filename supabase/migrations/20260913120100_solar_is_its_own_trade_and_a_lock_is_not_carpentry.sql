@@ -1,3 +1,10 @@
+-- RENAMED 13 September 2026, content unchanged. Written and applied to
+-- production on 7 September 2026 as 20260907091500. Main gained nine migrations in the
+-- meantime, and scripts/check-migration-order.mjs requires a new file to sort
+-- after every migration already on the base branch, so the filename moved and
+-- nothing else did. Applying it again is safe: every statement is CREATE OR
+-- REPLACE, IF NOT EXISTS, or an idempotent update.
+
 -- Two faults in trade_key(), found on 6 September 2026 while building the job
 -- alert list and fixed here on their own, because trade_key decides who hears
 -- about a job and changing it is not something to do inside another change.

@@ -76,7 +76,7 @@ minimum £2,500
 Founding prices for the first five run below each full price and are shown as a real,
 dated discount off a price that is genuinely purchasable, required under DMCCA 2024 s226.
 
-Marketplace fee is unchanged: 27% blended on labour only, never on materials, 15% client, 12% worker, worker keeps 88%.
+Marketplace fee: 20% blended on labour only, never on materials, 15% client, 5% worker, worker keeps 95% (worker side cut from 12% on 9 September 2026).
 
 ## Removed, deliberately
 

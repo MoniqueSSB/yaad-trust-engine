@@ -58,50 +58,56 @@ jobs:
           fi
           echo "Database awake, and anon still cannot read anything."
 
-      - name: Check the live site is answering
+      - name: Check the live site and the app are answering
         run: |
           set -euo pipefail
-          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -L https://yaadly.co.uk)
-          echo "yaadly.co.uk -> HTTP $code"
-          if [ "$code" != "200" ]; then
-            echo "::error::yaadly.co.uk returned $code."
-            exit 1
-          fi
+          # Two hosts, deployed separately on purpose: the marketing site on
+          # GitHub Pages and the app on Cloudflare Workers. Since 31 Aug 2026
+          # the app is the only place a job is created, so a dead app is a
+          # dead business even while the marketing site smiles.
+          for host in https://yaadly.co.uk https://app.yaadly.co.uk; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -L "$host")
+            echo "$host -> HTTP $code"
+            if [ "$code" != "200" ]; then
+              echo "::error::$host returned $code."
+              exit 1
+            fi
+          done
 
-      - name: Check the public job-request endpoint is alive
+      - name: Check the public front doors are alive, and the retired one is still shut
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          # The same publishable key the website form sends. It is printed in
-          # yaadly.co.uk's own JavaScript, so it is public by design and safe
-          # to keep here in the open. If it is ever rotated, update it here
-          # and in the site in the same breath.
-          PUBLISHABLE_KEY: sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz
         run: |
           set -euo pipefail
           if [ -z "${SUPABASE_URL:-}" ]; then echo "Skipped, secret not set."; exit 0; fi
-          # Since the 24 Aug 2026 hardening the function sits behind the
-          # gateway's auth check, so two things must both be true:
-          #  1. A bare GET with no key is turned away with 401. That proves the
-          #     auth gate is still up.
-          #  2. A GET sent exactly the way the website sends it, publishable
-          #     key in the apikey header and nothing else, is refused with
-          #     405, method not allowed. That proves the request got past the
-          #     gate and the function itself answered, without creating a job
-          #     or sending anything. Deliberately not the SUPABASE_ANON_KEY
-          #     secret: the gateway rejects that value as a bearer token, and
-          #     the point of this check is to mimic the real form.
-          bare=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+          # These functions are deployed without the platform's token check
+          # (verify_jwt false, see RUNBOOK section 3), because the people who
+          # call them have no account: a visitor posting a job or sending an
+          # enquiry. So a bare GET with no key reaches the function itself,
+          # and the function refuses it with 405, method not allowed. That
+          # proves the endpoint is deployed and answering without creating a
+          # job, sending an email, or touching a row. A 401 or 404 here means
+          # the function was redeployed with the wrong flag or deleted, and
+          # the form on the site is broken.
+          for fn in yaad-post-job yaad-enquiry; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              "$SUPABASE_URL/functions/v1/$fn")
+            echo "$fn bare GET -> HTTP $code (405 expected)"
+            if [ "$code" != "405" ]; then
+              echo "::error::$fn answered $code instead of 405. The public form behind it may be broken."
+              exit 1
+            fi
+          done
+          # yaad-website-intake was retired to a 410 stub on 31 Aug 2026. It
+          # used to create jobs with no authentication, so the one thing that
+          # must never happen is for it to quietly come back to life. 410 is
+          # the stub saying so; 404 means somebody deleted the stub, which is
+          # a decision but not a danger. Anything else means it is answering
+          # again, and that is the alarm.
+          gone=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             "$SUPABASE_URL/functions/v1/yaad-website-intake")
-          echo "yaad-website-intake bare GET -> HTTP $bare (401 expected)"
-          if [ "$bare" != "401" ]; then
-            echo "::error::A keyless request answered $bare instead of 401. The gateway auth gate on yaad-website-intake may be off."
-            exit 1
-          fi
-          keyed=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-            "$SUPABASE_URL/functions/v1/yaad-website-intake" \
-            -H "apikey: $PUBLISHABLE_KEY")
-          echo "yaad-website-intake keyed GET -> HTTP $keyed (405 expected)"
-          if [ "$keyed" != "405" ]; then
-            echo "::error::yaad-website-intake answered $keyed instead of 405. The form endpoint may be broken."
+          echo "yaad-website-intake bare GET -> HTTP $gone (410 expected)"
+          if [ "$gone" != "410" ] && [ "$gone" != "404" ]; then
+            echo "::error::The retired yaad-website-intake answered $gone. It should be a 410 stub. Something has redeployed it."
             exit 1
           fi

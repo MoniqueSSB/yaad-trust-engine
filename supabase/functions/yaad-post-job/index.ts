@@ -421,6 +421,18 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      /* Who picks the tradesperson. Two values the database also checks
+         (jobs_worker_choice_chk), so an unknown word is dropped here and the
+         column keeps its default of 'yaadly' rather than refusing the whole
+         save. Left out of the row when absent, for the same reason as the
+         request above: a draft saved from the first screen has not reached
+         the question yet, and re-saving it must not wipe an answer already
+         given. */
+      const choice = s(b.workerChoice);
+      const whoPicks: Record<string, string> =
+        choice === "yaadly" || choice === "client" ? { worker_choice: choice } : {};
+      if (whoPicks.worker_choice) root.setAttributes({ "yaadly.post.worker_choice": whoPicks.worker_choice });
+
       const row = {
         title: s(b.workType) ? `${s(b.workType)} job, ${parish || "Jamaica"}` : "Job request",
         parish, descr: buildDescr(b), addr, access_contact: access,
@@ -435,6 +447,7 @@ Deno.serve(async (req: Request) => {
         source: "form",
         ...cardCols(b), stage: 0, open: false,
         ...request,
+        ...whoPicks,
       };
 
       if (existing) {

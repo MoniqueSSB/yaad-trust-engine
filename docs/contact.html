@@ -48,7 +48,7 @@
 <div class="sect first"><div class="wrap">
   <p class="kick">Contact</p>
   <h1 class="hx" style="font-size:clamp(28px,4.5vw,44px)">Question, or something <span class="g2">gone wrong?</span></h1>
-  <p class="lead">Either way, write in. This is not a queue: Monique reads every message herself and <b>replies within one working day</b>.</p>
+  <p class="lead">Either way, write in. This is not a queue: a person at Yaadly reads every message and <b>replies within one working day</b>.</p>
   <div class="rule soft" style="margin-top:20px">
     <span><svg class="gl" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
     <div><b>Which one to use.</b> <b>WhatsApp</b> for a quick question, or anything easier said out loud: text, photos or a voice note, Patois or English. <b>Email</b> when there is something to attach, and for anything you want a written record of, including a complaint. <b>A call</b> when it needs a conversation, fifteen minutes, free, no obligation. All three reach the same person and carry the same one working day reply.</div>
@@ -186,10 +186,10 @@ async function sendEnquiry(){
          the message can be matched to this enquiry on the desk. */
       var looksEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.contact);
       if (looksEmail) {
-        say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly and a copy has gone to " + esc(e.contact) + ". Monique replies within one working day.");
+        say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly and a copy has gone to " + esc(e.contact) + ". Yaadly replies within one working day.");
       } else {
         var pre = encodeURIComponent("Hello Yaadly, I just sent an enquiry through the website. My name is " + e.name + ".");
-        say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly and Monique replies within one working day."
+        say("ok", "Thank you, " + esc(e.name) + ". Your message reached Yaadly and Yaadly replies within one working day."
           + "<br><br><b>You left a phone number rather than an email</b>, so there is nowhere to send you a copy."
           + ' <a href="https://wa.me/447878877567?text=' + pre + '" target="_blank" rel="noopener"><b>Open WhatsApp and say hello</b></a>'
           + " so we can answer you there. One tap, and your message is already written.");

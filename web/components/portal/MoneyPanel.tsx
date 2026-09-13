@@ -99,7 +99,7 @@ export function MoneyPanel({
             <p className="mx-auto max-w-[46ch] text-[12.5px] leading-relaxed text-dim">
               {side === "client"
                 ? "When quotes arrive you will see each worker's labour price, Yaadly's 15% fee calculated on it, and the full all-in total, before you commit to anything."
-                : "When a client accepts your quote, your labour price and what you take home after Yaadly's 12% appear here."}
+                : "When a client accepts your quote, your labour price and what you take home after Yaadly's 5% appear here."}
             </p>
           </div>
         ) : (
