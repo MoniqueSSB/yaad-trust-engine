@@ -14,6 +14,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **What deliberately did not change.** The check's invoice is still its own pound invoice with no `job_id`. Putting it on the job invoice would make three live money functions read it as the agency fee (see the 20260909180000 header), and the job invoice is usually already sent by the time the check can be chosen. The worker's figures never include the check. The Client Guidelines v1.5 still say a client can choose either check at £149 for the Technical Sign-off; changing a signed document means a version bump that makes every existing signature stale, so that is left to her.
 
+---
+
+## 2026-09-13 · The portal says where the job is, and only to the two people who go there
+
+**Founder:** "on the portal it should be clear exactly where the job is", and the stage the job is at should be in bold. The job room had shown the parish only, and said so in a comment: it never queried `jobs.addr`, so there was nothing more private to leak. The portal lists showed the stage as a small pill and the parish in the grey footer. Both now read as two labelled lines on every job card and at the top of the job room: **Stage**, in bold, and **Where**, the street address and parish. While work is under way the room adds the stage number ("Work under way, stage 2 of 3").
+
+**Who sees the street address.** The job's client, whose property it is, and the booked worker (`jobs.worker_email`), who has to turn up there. Nobody else. A worker who has quoted and not been booked gets the parish and "street address shown once you are booked", the same as the public board, which strips addresses. The room fetches `addr` in its own query only for those two, and the worker list blanks it on the server for quoted-only jobs, so it cannot be rendered by mistake further down either page. When there is no address (most jobs today, because the job form deliberately never asks for one) the card says "street address not added yet" rather than showing nothing.
+
+**Flagged, not fixed here.** The page-level rule is not the whole control. The `workers can read their own jobs` policy (20260901g) returns the whole `jobs` row to any worker with a quote on the job, so a quoted-only worker calling the Supabase API directly can read `addr`, and other columns, today. That predates this change and is a question of what a quoting worker may see, which is hers to decide, so it is written down rather than changed.
+
+---
+
 ## 2026-09-13 · A dispute reaches everybody it is about, and a client can reach Monique from the job
 
 **Founder, testing the portal as a client:** the dispute form "does not work", and "there should be a way they can contact yaadly directly if they have a problem and it comes directly to my whatsapp and email." The form did work; the live table had zero rows because her test message was three characters, the database refuses under five, and the button stayed grey with no reason given. Every action in the panel also swallowed its error in an empty catch. Both now say what is wrong. Underneath was the real fault: a raised dispute told nobody. The client's receipt said it was "with a person, not a queue" while no person was told, the worker's panel promised "you hear it first" while the worker heard nothing unless they opened the portal, and escalating alerted nobody at all. The portal's only way to reach Yaadly was a wa.me link to the Yaadly number, where the intake assistant answers.

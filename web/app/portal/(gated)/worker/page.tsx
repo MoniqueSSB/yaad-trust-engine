@@ -47,7 +47,7 @@ export default async function WorkerPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,stage,status,client_email,worker_email,updated_at,pay_method,pay_ref",
+      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,pay_method,pay_ref",
     )
     .order("updated_at", { ascending: false });
 
@@ -72,9 +72,15 @@ export default async function WorkerPortal() {
   const quotedJobIds = new Set((myQuotes ?? []).map((q) => q.job_id));
 
   const email = (user.email ?? "").toLowerCase();
-  const jobs = ((data ?? []) as (Job & { pay_method: string | null; pay_ref: string | null })[]).filter(
-    (j) => j.worker_email?.toLowerCase() === email || quotedJobIds.has(j.id),
-  );
+  /* The street address is for the worker who is booked on the job, because
+     they have to turn up there. A worker who has only quoted gets the parish,
+     the same as the public board, and the address is blanked here, on the
+     server, so it never reaches the page they are looking at. */
+  const jobs = ((data ?? []) as (Job & { pay_method: string | null; pay_ref: string | null })[])
+    .filter((j) => j.worker_email?.toLowerCase() === email || quotedJobIds.has(j.id))
+    .map((j) =>
+      j.worker_email?.toLowerCase() === email ? j : { ...j, addr: null, addr_hidden: true },
+    );
 
   const live = jobs.filter((j) => j.status !== "complete");
   const done = jobs.filter((j) => j.status === "complete");

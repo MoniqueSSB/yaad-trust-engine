@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { STATUS_RAIL, STATUS_TONE, type StatusLabel, type StatusTone } from "./statusTone";
+import { STATUS_DOT, STATUS_RAIL, type StatusLabel, type StatusTone } from "./statusTone";
 import { whenDate } from "@/lib/date";
 
 /**
@@ -25,7 +25,48 @@ export type Job = {
   /** Who picks the tradesperson, 'yaadly' or 'client'. Optional: the worker
    *  list never selects it and never shows it. */
   worker_choice?: string | null;
+  /** The street address, free text. Only ever set for the job's client or
+   *  its booked worker; the page blanks it for anybody else before it gets
+   *  here. Mostly empty today: the job form never asks for it. */
+  addr?: string | null;
+  /** True when the reader is a worker who has quoted but is not booked, so
+   *  the address exists and is deliberately not theirs to see yet. */
+  addr_hidden?: boolean;
 };
+
+/**
+ * Where a job is, in one line: the street address and the parish when there
+ * is an address, the parish and a plain note about the address when there is
+ * not. Shared with the job room's summary card so the list and the room say
+ * the same thing about the same property.
+ */
+export function WhereText({
+  addr,
+  parish,
+  hidden = false,
+}: {
+  addr?: string | null;
+  parish: string | null;
+  hidden?: boolean;
+}) {
+  const a = (addr ?? "").trim();
+  const p = (parish ?? "").trim();
+  if (a) {
+    // "12 Main St, Portmore, St Catherine" already names the parish; saying
+    // it twice reads as two places.
+    const withParish = p && !a.toLowerCase().includes(p.toLowerCase()) ? a + ", " + p : a;
+    return <>{withParish}</>;
+  }
+  return (
+    <>
+      {p || "Parish not given"}
+      <span className="text-dim">
+        {" · "}
+        {hidden ? "street address shown once you are booked" : "street address not added yet"}
+      </span>
+    </>
+  );
+}
 
 /**
  * The wording of a status, and its tone.
@@ -108,16 +149,27 @@ export function JobList({
                     (rail ? " border-l-4 " + STATUS_RAIL[s.tone] : "")
                   }
                 >
-                  <div className="flex flex-wrap items-start gap-3">
-                    <b className="min-w-[200px] flex-1 text-[15.5px] leading-snug">
-                      {j.title ?? "Untitled job"}
-                    </b>
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${STATUS_TONE[s.tone]}`}
-                    >
-                      {s.label}
-                    </span>
-                  </div>
+                  <b className="block text-[15.5px] leading-snug">
+                    {j.title ?? "Untitled job"}
+                  </b>
+                  {/*
+                    Where the job is and what stage it is at, as two labelled
+                    lines rather than a small pill and a parish in the grey
+                    footer. Founder's instruction, 13 Sep 2026: both have to be
+                    readable at a glance, the stage in bold. The dot keeps the
+                    status colour the pill used to carry.
+                  */}
+                  <dl className="mt-2.5 grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 text-[13.5px]">
+                    <dt className="text-dim">Stage</dt>
+                    <dd className="flex items-center gap-2">
+                      <span className={"size-2 shrink-0 rounded-full " + STATUS_DOT[s.tone]} aria-hidden />
+                      <b className="font-extrabold text-ink">{s.label}</b>
+                    </dd>
+                    <dt className="text-dim">Where</dt>
+                    <dd className="text-ink">
+                      <WhereText addr={j.addr} parish={j.parish} hidden={j.addr_hidden} />
+                    </dd>
+                  </dl>
                   {/*
                     "Stage 0" used to sit in this row. It is the rail's internal
                     counter, it means nothing to the person reading it, and on a
@@ -130,7 +182,6 @@ export function JobList({
                   <div className="mt-3 flex flex-wrap gap-3.5 border-t border-line pt-3 text-[12.5px] text-dim">
                     <span className="font-mono-app">{j.id}</span>
                     {j.trade && <span>{j.trade}</span>}
-                    {j.parish && <span>{j.parish}</span>}
                     {/* Only on the client's list, only while nobody is booked:
                         once a worker is on the job the question is answered. */}
                     {j.worker_choice != null && !j.worker_email && (
