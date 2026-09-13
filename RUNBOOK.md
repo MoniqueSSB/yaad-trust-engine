@@ -5116,3 +5116,25 @@ Since `20260913223042` (13 Sep 2026), `raise_job_stage_worker_payable()` raises 
 
    It should return nothing. A row there was raised by something other than an approval. Do not pay it. Void it from the desk and tell Monique before anything else.
 3. If someone rewrites this function in a new migration, end that migration with `revoke all on function public.raise_job_stage_worker_payable(text, integer) from public, anon, authenticated;`. Revoking from `public` alone does not remove the grant Supabase gives `anon` and `authenticated`, which is how this was left open. Never add `grant ... to authenticated`, and never replace the hold point with an `is_admin()` check. The trigger runs in the approver's session, so an admin check would quietly stop every stage payable.
+
+## A new SECURITY DEFINER function, or proving the open ones are still shut
+
+Since `20260913223042` and `20260913230100` (13 Sep 2026). A `SECURITY DEFINER` function runs with the owner's rights, so whoever can call it gets past row-level security. Supabase grants `anon` and `authenticated` directly on every new function, and `revoke ... from public` does not remove those grants.
+
+1. Writing a new one: end the migration with `revoke all on function public.<name>(<args>) from public, anon, authenticated;` then grant back only who needs it. Then either check the caller inside the body (`is_admin()`, or the caller's own `auth.jwt() ->> 'email'` against the row), or make sure nothing but the service role or a trigger can reach it. A helper that answers a yes or no about an email must only answer about the caller's own email.
+2. Prove the three from 13 Sep are still shut: run `supabase/tests/open_function_guards.sql` in the SQL editor. All 10 lines must read PASS. It reads only, and prints no email.
+3. See every function that is still open, to review a new one:
+
+   ```sql
+   select p.oid::regprocedure as fn,
+          has_function_privilege('anon', p.oid, 'EXECUTE')          as anon_can,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') as signed_in_can,
+          pg_get_function_result(p.oid) = 'trigger'                 as is_trigger,
+          p.prosrc ~* 'is_admin\s*\(|auth\.(uid|jwt)\s*\('          as checks_caller
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prosecdef
+      and (has_function_privilege('anon', p.oid, 'EXECUTE') or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+    order by checks_caller, is_trigger, 1;
+   ```
+
+   Rows where `is_trigger` and `checks_caller` are both false are the ones to read by hand. `checks_caller` true only means the body mentions the caller, not that it checks correctly, so read anything that touches money or personal data.
