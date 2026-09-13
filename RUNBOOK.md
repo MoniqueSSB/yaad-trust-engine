@@ -4426,14 +4426,16 @@ test file. It is a note, never a block: the job can still be posted.
 
 The job board's right rail carries a "Launching soon" panel with a **Put me on the list** button. It opens WhatsApp to the Yaadly sender with the message half written: *"Hello Yaadly, I am a worker and I want WhatsApp job alerts. My trades and parishes are:"*. Monique's call, 6 Sep 2026: the panel ships, but it collects something rather than being a promise with a dead button.
 
-**There is no alerts list and no table.** The message lands in `yaad-inbound` like any other worker message and sits in the conversation. That is deliberate: no new table, no new migration, and nowhere new for a phone number to sit until the feature is real. **So somebody has to read them.** They are in the desk with the rest of the inbound traffic.
+**Since 13 September 2026 there IS a list, and that message is what puts them on it.** This section used to say there was no table and that somebody had to read each message by hand in the desk. That was true when the panel shipped and it was the deliberate choice at the time. A separate session built the list on the same day (`job_alert_subscribers`, see "Somebody wants to join, change or leave the job alert list" below), and the two were reconciled on 13 September: the panel and its wording won, because this section had already named that wording as the spec for when the alerts were built.
 
-- **If these start arriving faster than they can be read,** the honest move is to take the button off rather than let people think they are on a list they are not on. It is one block in `web/app/jobs/page.tsx`, marked with Monique's decision in a comment above it.
-- **When the alerts are actually built,** the prefilled wording is the spec: trades and parishes, chosen once.
+- **The message is matched as a prefix, not exactly.** It ends with a prompt, so people type their trades and parishes on the end before sending. Whatever follows the prompt is read through both normalisers at once; each keeps only what it recognises. "plumbing, tiling, Portmore and Kingston" joins them in one message. If only trades were recognisable, they are asked for parishes; otherwise they are asked for trades, as if they had sent ALERTS.
+- **"All" in that combined sentence is not read as every parish.** "I do all kinds of plumbing" would otherwise put somebody on the list island wide. When the remainder contains all, anywhere, island wide or everywhere, parishes are not read from it and the parishes question is asked on its own, where ANYWHERE is unambiguous.
+- **Only words neither side could place are read back** as "I could not place". A mixed answer is full of words that are not trades (the parishes) and not parishes (the trades), and repeating those back would be nonsense.
+- **The sentence lives in one file,** `supabase/functions/yaad-inbound/job-alerts.ts`, as `ALERTS_OPENER`. `web/lib/alerts.ts` and `docs/marketplace.html` carry copies because they cannot import it, and `job-alerts_test.ts` fails if either drifts.
+- **Nothing is sent to the list yet.** Joining works; the alerts themselves are the matcher's next step. The panel's "coming shortly" copy is therefore still accurate, and was left exactly as Monique approved it.
 - **The number is `447878877567`**, the same sender as everywhere else on the site. There is one, deliberately.
 
 ---
-
 ## A client says their access note is visible on the public job board
 
 **Fixed 7 September 2026, migration `20260907090000`, applied to production the same day.** Kept here because the shape of it matters more than the fix.
@@ -4759,3 +4761,209 @@ select kind, status, created_at from message_deliveries where kind = 'desk_reply
 ## Health says what to do next
 
 Every Health finding now carries a next step and a button. The steps are matched on each finding's wording in `HEALTH_NEXT` in `concierge.html`. A new Health check with no matching rule shows without a step. Add a rule beside it; never borrow another check's step.
+
+---
+
+## Somebody wants to join, change or leave the job alert list
+
+**The list is `job_alert_subscribers`. Being on it is permission to be told
+about work, never permission to quote.** Only a vetted worker can quote, and
+the desk shows which is which: People → Alert list, "vetted worker" or "lead".
+`can_quote` there is resolved live, so somebody who finishes vetting next month
+flips on their own with nothing to backfill.
+
+**There is a button, and it is a link rather than a form.** "Put me on the list"
+in the "Launching soon" panel on the board at `app.yaadly.co.uk/jobs`, and "Get
+job alerts" on `docs/marketplace.html`, both open WhatsApp with the same
+sentence already typed. The person presses send, and that send
+is what puts them on the list: the message proves the number is theirs and
+carries the consent in their own words, neither of which a typed number box
+proves. Nothing is stored by pressing the button.
+
+**The sentence in every button must stay exactly `ALERTS_OPENER`**, which
+`supabase/functions/yaad-inbound/job-alerts.ts` owns. A page carrying a sentence
+the lane does not recognise opens WhatsApp, sends fine, and drops the person
+into the ordinary intake assistant instead of joining anything, with no error
+anywhere. `job-alerts_test.ts` reads both pages and `web/lib/alerts.ts` and
+fails if any of them drifts.
+
+**To join by hand, they message the Yaadly WhatsApp number.** `ALERTS` on its own is
+enough. The lane then asks two questions, trades and then parishes, and they
+answer in their own words: "plumbing, tiling and a likkle bit of masonry" and
+"Portmore and Kingston 8" both read correctly, because the answers go through
+`trade_key()` and `parish_key()`, the same normalisers the matcher uses. Saying
+`ANYWHERE` for parishes takes all fourteen.
+
+**Sending ALERTS again is also how somebody changes what they are on for.**
+There is no second command. Sending `STOP` takes them off.
+
+**Nothing is being sent to this list yet.** Joining is deliberately built cold.
+Alerting is `yaad-match`, which has no WhatsApp channel and nothing calling it
+when a job opens, both by design until the matcher is fixed.
+
+### They say they joined and they are not on the list
+
+Check what actually arrived, then what it was read as:
+
+```sql
+select phone, name, trades, trade_keys, parishes, parish_keys, listening, stopped_at
+from job_alert_subscribers order by created_at desc limit 20;
+```
+
+- **They pressed the button and nothing happened.** Check the href on the page
+  against `ALERTS_OPENER`, and run the Deno tests, which compare them.
+- **It was Monique's own phone.** `desk_phone` is claimed by the desk reply lane
+  before every lane below it, so ALERTS from her number returns "I do not know
+  who that is for". Testing this needs a second phone. That cost was accepted
+  knowingly when the desk lane was built, 6 Sep 2026.
+- **No row at all.** The opener was not recognised. `ALERTS_EXACT` in
+  `supabase/functions/yaad-inbound/job-alerts.ts` takes `ALERTS`, `alerts`,
+  `job alerts`, `start alerts` and `subscribe`. The looser phrasings
+  (`ALERTS_PHRASE`) are only acted on from a number with **no job conversation
+  already running**, on purpose, so a client asking about their own job is never
+  dragged into the worker lane. A tradesperson who has previously posted a job
+  from the same number therefore has to send the exact word.
+- **A row, `listening` false, empty arrays.** They joined and never answered the
+  two questions, or answered them with something nothing recognised. The lane
+  asks twice and then lets go rather than swallowing every later message. They
+  hear nothing until they send ALERTS again, which is correct, not a fault.
+- **A row with `stopped_at` set.** They sent STOP. Rejoining lifts it.
+
+### Taking somebody off by hand
+
+There is no button for this yet, deliberately: the desk is read-only on this
+table while the list is small. If somebody asks to come off by telephone:
+
+```sql
+select stop_job_alerts('18765550123');
+```
+
+Digits only, no plus. It returns `true` if they were on the list. **It does not
+delete the row**, and must not be changed to: "did this person ask us to stop"
+is a question you have to be able to answer years later, and a deleted row
+answers it with silence.
+
+### The consent, if it is ever questioned
+
+Every row carries `consent_words` (what they actually sent), `consent_at`, and
+`consent_version`. The version names the sentence they were shown in reply,
+which is `ALERT_TERMS` in `job-alerts.ts`. **Change that wording and bump
+`ALERT_CONSENT_VERSION` in the same commit.** A consent is worth exactly what
+the sentence that earned it said, and editing the copy without moving the
+version silently reinterprets everybody's existing answer as agreement to the
+new one. Same rule as `AI_CONSENT_VERSION` in `web/app/apply/JoinFlow.tsx`.
+
+### Proving the whole thing still holds
+
+```bash
+deno test --allow-read supabase/functions/yaad-inbound/
+```
+
+and `supabase/tests/job_alert_list_guards.sql` against the database, which
+checks eighteen things including that none of the four functions is reachable
+from the open internet and that the desk view still reads through row level
+security rather than round it.
+
+---
+
+## Changing which trade a job or a worker is matched on
+
+**`trade_key()` decides who hears about a job.** Both sides go through it: the
+trade on the job, and the trade on the worker's profile or the words an alert
+subscriber typed. That is the only reason a client's roofing job and a roofer
+find each other.
+
+**It is a chain of CASE branches, so the answer depends on their order, and
+every branch is a substring test.** This is the one function in the schema
+where adding a line in the wrong place is both the easiest mistake to make and
+the hardest to see, because a wrong trade key does not throw. It sends the job
+to the wrong tradespeople, or to nobody, and looks perfectly healthy doing it.
+
+**Two orderings are load bearing and have guard tests naming them:**
+
+- **Masonry above security.** The security branch matches `lock`, and the word
+  "block" contains it. Move security up and every piece of blockwork becomes a
+  locksmith job.
+- **Security above carpentry.** The carpentry branch matches `door`. Below it,
+  "Locks & Security Doors" was read as joinery while "CCTV & Alarms" was read as
+  security, splitting one trade in two. Fixed 7 September 2026.
+- **Solar above plumbing.** The plumbing branch matches `water`. Below it, a
+  solar water heater is a plumbing job.
+
+**Do not sort this function alphabetically or tidy it for readability.**
+
+### If you change it, three things have to happen in the same migration
+
+1. **Read the live definition first**, with `pg_get_functiondef`, rather than
+   copying the newest migration file. Section 18 explains why.
+2. **REINDEX `wp_match` and `jobs_match`.** Both are expression indexes built on
+   `trade_key(trade)`. Redefining the function does not rebuild them and
+   Postgres does not warn. The index keeps the values the old function produced
+   and queries silently return the wrong workers.
+   ```sql
+   reindex index public.wp_match;
+   reindex index public.jobs_match;
+   ```
+3. **Recompute `job_alert_subscribers.trade_keys`.** That column stores this
+   function's output, so a GIN index has a real column to read, which makes it a
+   cache of a function you have just changed. Their own words are kept in
+   `.trades` for exactly this purpose:
+   ```sql
+   update job_alert_subscribers s
+      set trade_keys = (select coalesce(array_agg(distinct trade_key(w)), '{}')
+                          from unnest(s.trades) as w where trade_key(w) is not null),
+          updated_at = now()
+    where coalesce(array_length(s.trades, 1), 0) > 0;
+   ```
+
+### Proving it
+
+`supabase/tests/trade_key_guards.sql` against the database. Ten checks,
+read only, including both ordering traps above and that every one of the
+eighteen published trades still produces a key. To see the whole mapping:
+
+```sql
+select n as trade, trade_key(n) as key
+  from unnest(string_to_array((select value from app_settings where key='trade_list'), ',')) as n
+ order by 2, 1;
+```
+
+**The eighteen published trades produce fourteen keys, and that is intended.**
+"Water Tank & Pump" and "Drainage & Septic" both read as plumbing, because a
+plumber does both and splitting them would narrow matching for nothing.
+"Fencing" has no branch and falls through to a cleaned copy of itself, which is
+safe precisely because both sides of a match fall through the same way.
+
+---
+
+## The founder's phone buzzed several times for one job
+
+**Fixed 7 September 2026, and if it comes back the cause is the same one.**
+`yaad-match` posted its ntfy notification inside the per worker loop, so a job
+matching twelve workers sent twelve identical pushes. `ntfy_topic` is one topic
+and it is Monique's phone, not any worker's.
+
+**The half worth checking for is the one nobody would notice.** Each push also
+wrote a `job_alerts` row saying that worker had been told on the ntfy channel,
+and `match_workers_for_job` strikes off anybody holding a `sent` row on **any**
+channel. A worker whose email bounced was excluded from every later run by a
+notification that never reached them.
+
+```sql
+select channel, status, count(*) from job_alerts group by 1, 2 order by 1, 2;
+```
+
+**There must be no rows on the `ntfy` channel.** The desk push is deliberately
+not recorded there any more: `job_alerts` is one row per worker per job per
+channel, and a push to the desk is none of those three. It is reported in
+`yaad-match`'s response as `desk_push` instead. If ntfy rows reappear, somebody
+has put the push back inside the loop, and
+`supabase/functions/yaad-match/desk-push_test.ts` should have caught it.
+
+**To clear the damage if it ever happens again**, delete only the ntfy rows.
+The workers they wrongly excluded become eligible on the next run, and no real
+alert record is touched:
+
+```sql
+delete from job_alerts where channel = 'ntfy';
+```
