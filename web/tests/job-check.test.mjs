@@ -110,9 +110,46 @@ describe("the small helpers agree with the database", () => {
     assert.equal(m.isCheckLevel(null), false);
   });
 
+  test("only the Visual Check is offered; the Technical Sign-off is coming soon", () => {
+    assert.equal(m.isCheckOffered("visual"), true);
+    assert.equal(m.isCheckOffered("technical"), false);
+    assert.deepEqual([...m.OFFERED_LEVELS], ["visual"]);
+  });
+
   test("each level maps to its own returning-client catalogue row, not the standalone one", () => {
     assert.equal(m.CHECK_CATALOGUE_ID.visual, "job-visual-check");
     assert.equal(m.CHECK_CATALOGUE_ID.technical, "job-technical-check");
     assert.notEqual(m.CHECK_CATALOGUE_ID.visual, "eyes-on-it");
+  });
+});
+
+describe("what the check adds to the job total", () => {
+  const visual = { full_pence: 4500, founding_pence: 2500 };
+
+  test("before an invoice, the founding rate is the figure", () => {
+    assert.equal(m.checkChargePence(visual, null), 2500);
+  });
+
+  test("with no founding rate, the full price", () => {
+    assert.equal(m.checkChargePence({ full_pence: 4500, founding_pence: null }, null), 4500);
+  });
+
+  test("once invoiced in pounds, the invoice is the figure", () => {
+    const inv = { total_pence: 4500, currency: "GBP", status: "sent" };
+    assert.equal(m.checkChargePence(visual, inv), 4500);
+  });
+
+  test("a void invoice falls back to the catalogue", () => {
+    const inv = { total_pence: 4500, currency: "GBP", status: "void" };
+    assert.equal(m.checkChargePence(visual, inv), 2500);
+  });
+
+  test("no catalogue row and no invoice means no figure, never a guess", () => {
+    assert.equal(m.checkChargePence(null, null), null);
+  });
+
+  test("pence convert to whole J$ at the rate given", () => {
+    assert.equal(m.penceToJmd(2500, 210), 5250);
+    assert.equal(m.penceToJmd(4500, 210), 9450);
   });
 });

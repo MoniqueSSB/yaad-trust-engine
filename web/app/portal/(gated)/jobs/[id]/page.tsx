@@ -25,7 +25,7 @@ import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
 import { GoLive, type Gate } from "@/components/portal/GoLive";
 import { Outstanding, type OutItem } from "@/components/portal/Outstanding";
 import { JobProgress, type Phase, type Step } from "@/components/portal/JobProgress";
-import { MoneyPanel, type InvoiceRow } from "@/components/portal/MoneyPanel";
+import { MoneyPanel, type CheckTotalLine, type InvoiceRow } from "@/components/portal/MoneyPanel";
 import { StageLedger, type LedgerStage } from "@/components/portal/StageLedger";
 import { JobRail } from "@/components/portal/JobRail";
 import { BoardPreview } from "@/components/portal/BoardPreview";
@@ -34,7 +34,16 @@ import { ConfirmAction } from "@/components/portal/ConfirmAction";
 import { ApproveButton } from "@/components/portal/ApproveButton";
 import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
 import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
-import { CHECK_CATALOGUE_ID, finalStageCountFrom, isCheckLevel, jobCheckState } from "@/lib/portal/job-check";
+import {
+  CHECK_CATALOGUE_ID,
+  CHECK_LABEL,
+  checkChargePence,
+  finalStageCountFrom,
+  isCheckLevel,
+  jobCheckState,
+  penceToJmd,
+} from "@/lib/portal/job-check";
+import { PRICE_BENCHMARKS } from "@/lib/portal/price-bands";
 import legal from "@/lib/legal-copy.json";
 import { agreePrice, chooseQuote, requestKickoff, setWorkerChoice } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
@@ -574,6 +583,28 @@ export default async function JobRoom({
     finalStageCount: finalStageCountFrom(packStages.length),
     evidenceStages: ev.map((e) => e.stage),
   });
+
+  /* The check joins the client's job total the moment it is added (founder,
+     13 Sep 2026: "it should automatically add to the total build"). The job
+     is priced in J$ and the check in pounds, and she chose one J$ figure, so
+     the check is converted at the benchmark rate, the one GBP to J$ rate the
+     repo holds, and the rate is named on screen beside it. This is a display
+     figure only: the check's own invoice stays a separate pound invoice with
+     no job_id (20260909180000), and the worker's figures never include it. */
+  const jmdPerGbp = PRICE_BENCHMARKS.jmd_per_gbp;
+  const checkPence = checkLevel ? checkChargePence(checkPrices[checkLevel], checkInvoice) : null;
+  const checkLine: CheckTotalLine | null =
+    checkLevel && checkPence != null
+      ? {
+          label: CHECK_LABEL[checkLevel],
+          jmd: penceToJmd(checkPence, jmdPerGbp),
+          pence: checkPence,
+          fullPence: checkPrices[checkLevel]?.full_pence ?? null,
+          invoiced: !!checkInvoice && checkInvoice.status !== "void",
+          jmdPerGbp,
+        }
+      : null;
+  const clientAllIn = allIn == null ? null : allIn + (checkLine?.jmd ?? 0);
 
   /* Files on the job (20260910120000): receipts, quotes, permits, plans,
      certificates, from either side. Not evidence, so a separate table and
@@ -1449,6 +1480,7 @@ export default async function JobRoom({
           assignedTo={job.check_assigned_to ?? null}
           invoice={checkInvoice}
           prices={checkPrices}
+          jmdPerGbp={jmdPerGbp}
         />
         {/* The button the product is named after: what unlocks the money,
             next to the money itself. Client only, and only while a stage is
@@ -1488,11 +1520,12 @@ export default async function JobRoom({
           labour={labour}
           materials={won?.materials_jmd ?? null}
           fee={feeJmd}
-          allIn={allIn}
+          allIn={role === "client" ? clientAllIn : allIn}
           takeHome={takeHome}
           invoices={invoices}
           money={money}
           materialsReleased={materialsReleasedJmd}
+          check={role === "client" ? checkLine : null}
         />
         </>
       )}
@@ -1802,9 +1835,10 @@ export default async function JobRoom({
           side={role === "worker" ? "worker" : "client"}
           money={money}
           labour={labour}
-          allIn={allIn}
+          allIn={role === "client" ? clientAllIn : allIn}
           takeHome={takeHome}
           fee={feeJmd}
+          check={role === "client" ? checkLine : null}
           heldNote={
             labour == null
               ? role === "worker"
