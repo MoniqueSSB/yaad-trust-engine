@@ -5141,7 +5141,7 @@ Since `20260913223042` (13 Sep 2026), `raise_job_stage_worker_payable()` raises 
 
 ## A new SECURITY DEFINER function, or proving the open ones are still shut
 
-Since `20260913223042` and `20260913230100` (13 Sep 2026). A `SECURITY DEFINER` function runs with the owner's rights, so whoever can call it gets past row-level security. Supabase grants `anon` and `authenticated` directly on every new function, and `revoke ... from public` does not remove those grants.
+Since `20260913223042` and `20260914090757` (13 Sep 2026). A `SECURITY DEFINER` function runs with the owner's rights, so whoever can call it gets past row-level security. Supabase grants `anon` and `authenticated` directly on every new function, and `revoke ... from public` does not remove those grants.
 
 1. Writing a new one: end the migration with `revoke all on function public.<name>(<args>) from public, anon, authenticated;` then grant back only who needs it. Then either check the caller inside the body (`is_admin()`, or the caller's own `auth.jwt() ->> 'email'` against the row), or make sure nothing but the service role or a trigger can reach it. A helper that answers a yes or no about an email must only answer about the caller's own email.
 2. Prove the three from 13 Sep are still shut: run `supabase/tests/open_function_guards.sql` in the SQL editor. All 10 lines must read PASS. It reads only, and prints no email.

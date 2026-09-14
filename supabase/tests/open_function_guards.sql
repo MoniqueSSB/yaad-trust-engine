@@ -1,5 +1,5 @@
 -- Proof that three SECURITY DEFINER functions answer only their own caller
--- (20260913230100). Run against the project with execute_sql, or psql.
+-- (20260914090757). Run against the project with execute_sql, or psql.
 -- Reads only; creates nothing. No email is ever printed.
 --
 -- The session running this has no JWT. Tests that need one set

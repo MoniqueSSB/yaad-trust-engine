@@ -40,6 +40,19 @@
 --    grant comes off public and anon. authenticated keeps it because
 --    yaad-agent calls it as the user.
 --
+-- WHY THIS FILE WAS RESTAMPED, and why the second function reads as it does.
+-- This was applied to production on 13 Sep 2026 as 20260913230100. A
+-- parallel session's 20260913230642 (a quoting worker sees the tender pack)
+-- was applied after it, found the same blank-email flaw independently, and
+-- redefined job_client_email_matches() with btrim() and a non-empty check but
+-- without the caller's own email. Neither session could see the other's
+-- branch. So production lost the own-email half of item 2 while keeping the
+-- blank-email half, and the function's comment still claimed both. This file
+-- now sorts after 20260913230742 and carries the two versions combined:
+-- 230642's btrim() on both sides, plus the own-email check. A fresh replay
+-- therefore ends where production should be. Items 1 and 3 are unchanged
+-- from what was applied and were still live when checked on 14 Sep.
+--
 -- No function here moves money or rules on anything. This is who may ask.
 
 create or replace function public.match_workers_for_job(p_job text, p_limit integer default 25)
@@ -104,17 +117,17 @@ language sql
 stable security definer
 set search_path to 'public'
 as $function$
-  select coalesce(p_email, '') <> ''
-     and lower(p_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  select coalesce(btrim(p_email), '') <> ''
+     and lower(btrim(p_email)) = lower(btrim(coalesce(auth.jwt() ->> 'email', '')))
      and exists (
        select 1 from jobs j
-        where j.id = p_job_id
-          and lower(coalesce(j.client_email, '')) = lower(p_email)
+       where j.id = p_job_id
+         and lower(coalesce(j.client_email, '')) = lower(btrim(p_email))
      );
 $function$;
 
 comment on function public.job_client_email_matches(text, text) is
-  'True only when p_email is the caller''s own signed-in email and that email is the client on the job. Used inside job_quotes and quote_materials policies to break an RLS loop (20260901w). Answers nothing about anybody else since 20260913230100.';
+  'True only when p_email is the caller''s own signed-in email and that email is the client on the job. Used inside job_quotes and quote_materials policies to break an RLS loop (20260901w). Answers nothing about anybody else since 20260914090757.';
 
 create or replace function public.may_use_agents(p_email text)
 returns boolean
@@ -132,4 +145,4 @@ revoke all on function public.may_use_agents(text) from public, anon;
 grant execute on function public.may_use_agents(text) to authenticated, service_role;
 
 comment on function public.may_use_agents(text) is
-  'Who may invoke yaad-agent: the Yaadly admin, or a signed-in client asking about their own email who has a profile and has signed the CURRENT Client Guidelines version. Answers nothing about anybody else since 20260913230100.';
+  'Who may invoke yaad-agent: the Yaadly admin, or a signed-in client asking about their own email who has a profile and has signed the CURRENT Client Guidelines version. Answers nothing about anybody else since 20260914090757.';
