@@ -135,9 +135,21 @@ export function EvidenceLedger({
             : "Each stage has its own checklist, its own proof and its own release. Money moves once per stage, never as one lump at the end."}
         </p>
         <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-dim">
+          {/* "Stage 0 of 1" read as broken (founder, 14 Sep 2026). Before
+              work starts it says how many stages there are and where they
+              came from; after, which one is being worked. */}
           <span>
-            Stage <b className="text-mute">{Math.max(currentStage, 0)}</b> of{" "}
-            <b className="text-mute">{stageCount}</b>
+            {currentStage > 0 ? (
+              <>
+                Stage <b className="text-mute">{currentStage}</b> of{" "}
+                <b className="text-mute">{stageCount}</b>
+              </>
+            ) : (
+              <>
+                Not started · <b className="text-mute">{stageCount}</b> stage{stageCount === 1 ? "" : "s"}
+                {stageNames.length > 0 ? " from the quote" : ""}
+              </>
+            )}
           </span>
           <span>
             <b className="text-mute">{filed}</b> item
