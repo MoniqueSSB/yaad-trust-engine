@@ -6641,7 +6641,17 @@ async function reload(id){
       for (const p of parts) p.lines = (pl || []).filter(l => l.invoice_id === p.id);
     }
   }
-  CURRENT = { invoice: inv, lines: lines || [], parts, questions: CURRENT?.questions || [] };
+  // Card payments Stripe reported against this invoice (invoice_payments,
+  // 20260914120000). Recorded by yaad-stripe-webhook, never trusted: marking
+  // the invoice paid is still this desk's click. Phase 1b, 14 Sep 2026.
+  let cardPays = [];
+  if (inv) {
+    const { data: cp } = await sb.from("invoice_payments")
+      .select("status,amount_stored,currency,livemode,received_at,provider_ref")
+      .eq("invoice_id", id).order("received_at");
+    cardPays = cp || [];
+  }
+  CURRENT = { invoice: inv, lines: lines || [], parts, cardPays, questions: CURRENT?.questions || [] };
   renderInvoice();
   await loadInvoices();
 }
@@ -6717,6 +6727,18 @@ function renderInvoice(){
         &middot; ${esc((p.lines || []).map(x => x.description).join(", "))}${p.starts_job && p.status !== "void" ? " &middot; <b>paying this starts the job</b>" : ""}${p.sent_at ? " &middot; sent " + esc(String(p.sent_at).slice(0, 10)) : ""}${p.paid_at ? " &middot; paid " + esc(String(p.paid_at).slice(0, 10)) + (p.paid_reference ? ", ref " + esc(p.paid_reference) : "") : ""}</li>`).join("")}</ul>
       <p style="margin:8px 0 0">Still on this bill <b>${amt(inv.total_pence)}</b> &middot; requested in parts <b>${amt(sumOf(liveParts))}</b> &middot; paid so far <b>${amt(sumOf(liveParts.filter(p => p.status === "paid")))}</b></p></div>` : "";
 
+  // What Stripe reported, beside the invoice, so a card payment is visible
+  // here before anyone marks the invoice paid. Reads only; it pays nothing
+  // and marks nothing. A mismatch is a warning, never a green light.
+  const cardPays = CURRENT.cardPays || [];
+  const cardOk = cardPays.find(p => p.status === "succeeded");
+  const cardBad = cardPays.filter(p => p.status === "mismatch");
+  const cardWhen = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const cardMode = (p) => p.livemode ? "" : " &middot; Stripe test mode";
+  const cardHtml =
+    (cardOk ? `<div class="alert"><span class="ic">&#10003;</span><div><b>Card payment received</b><p>${amt(cardOk.amount_stored)} by card on ${esc(cardWhen(cardOk.received_at))}${cardMode(cardOk)} &middot; matches this invoice.${inv.status === "sent" ? " Mark it paid when you are satisfied; the Stripe reference is filled in for you." : ""}</p></div></div>` : "")
+    + cardBad.map(p => `<div class="alert crit"><span class="ic">!</span><div><b>A card payment does not match this invoice</b><p>Stripe charged ${amt(p.amount_stored)} ${esc(p.currency)} on ${esc(cardWhen(p.received_at))}${cardMode(p)}, and this invoice is ${amt(inv.total_pence)} ${esc(inv.currency || "")}. Do not mark it paid from this. Check it in Stripe, and refund or correct it there.</p></div></div>`).join("");
+
   $("invBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)}${inv.client_company ? " (" + esc(inv.client_company) + ")" : ""} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}${inv.po_number ? " &middot; PO " + esc(inv.po_number) : ""}</p>
     ${inv.part_of ? `<p class="vsub" style="margin:0 0 10px">Part of <a href="#" data-openinv="${esc(inv.part_of)}">${esc(inv.part_of)}</a>, the whole-job bill for ${esc(inv.job_id || "")}.${inv.starts_job ? " It carries the Guarantee &amp; Support fee, so paying it starts the job." : ""}</p>` : ""}
@@ -6726,6 +6748,7 @@ function renderInvoice(){
     </table></div>
     <div class="grand">${amt(inv.total_pence)}</div>
     ${partsHtml}
+    ${cardHtml}
     ${unpriced ? `<div class="alert crit"><span class="ic">!</span><div><b>${unpriced} line${unpriced > 1 ? "s" : ""} the agent could not price</b><p>It will not guess. Pick a service off your list for each one, or remove it. This invoice cannot be marked as sent until they are gone.</p></div></div>` : ""}
     ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
     ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
@@ -6903,7 +6926,7 @@ function renderInvoice(){
   });
 
   if ($("paidBtn")) $("paidBtn").addEventListener("click", async () => {
-    const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
+    const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.", ((CURRENT.cardPays || []).find(p => p.status === "succeeded") || {}).provider_ref || "");
     if (ref === null) return;
     const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", inv.id);
     if (error) return say("invMsg","err",error.message);
