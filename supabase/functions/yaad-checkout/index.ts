@@ -28,7 +28,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
-import { isLiveKey, STRIPE_CURRENCIES, toStripeAmount } from "./stripe.ts";
+import { buildCheckoutForm, isLiveKey, STRIPE_CURRENCIES, toStripeAmount } from "./stripe.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -112,23 +112,16 @@ Deno.serve(async (req: Request) => {
       : `${APP_URL}/portal`;
     const anchor = `#invoice-${encodeURIComponent(inv.id)}`;
 
-    const form = new URLSearchParams();
-    form.set("mode", "payment");
-    form.set("line_items[0][quantity]", "1");
-    form.set("line_items[0][price_data][currency]", currency.toLowerCase());
-    form.set("line_items[0][price_data][unit_amount]", String(unitAmount));
-    form.set("line_items[0][price_data][product_data][name]", `Yaadly invoice ${inv.id}`);
-    if (inv.job_id) form.set("line_items[0][price_data][product_data][description]", `Job ${inv.job_id}`);
-    form.set("customer_email", email);
-    form.set("client_reference_id", inv.id);
-    form.set("metadata[invoice_id]", inv.id);
-    form.set("payment_intent_data[metadata][invoice_id]", inv.id);
-    if (inv.job_id) {
-      form.set("metadata[job_id]", inv.job_id);
-      form.set("payment_intent_data[metadata][job_id]", inv.job_id);
-    }
-    form.set("success_url", `${back}${inv.job_id ? "&" : "?"}card=paid${anchor}`);
-    form.set("cancel_url", `${back}${inv.job_id ? "&" : "?"}card=cancelled${anchor}`);
+    // The same session yaad-pay asks for from the email link (_shared/stripe.ts).
+    const form = buildCheckoutForm({
+      invoiceId: inv.id,
+      jobId: inv.job_id ?? null,
+      email,
+      currency,
+      unitAmount,
+      successUrl: `${back}${inv.job_id ? "&" : "?"}card=paid${anchor}`,
+      cancelUrl: `${back}${inv.job_id ? "&" : "?"}card=cancelled${anchor}`,
+    });
 
     const res = await trace.span("stripe.checkout.sessions.create", SpanKind.CLIENT, { "server.address": "api.stripe.com" }, async (s) => {
       const r = await fetch("https://api.stripe.com/v1/checkout/sessions", {

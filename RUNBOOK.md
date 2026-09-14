@@ -5276,6 +5276,32 @@ update app_settings set value = '<Bank>, <account name>, sort code <..>, account
 
 **A transfer is still marked paid by a person** at the desk when the money arrives. Showing the details moves nothing.
 
+## The one-click pay link in an invoice email
+
+**What it is.** Since 14 Sep 2026 every sent client invoice email carries "Pay this invoice by card: pay online". The link is `…/functions/v1/yaad-pay?i=<invoice>&t=<token>`. Tapping it, with no sign-in, checks the token and the invoice, makes a fresh Stripe Checkout page for exactly its total and goes there. Stripe returns the client to yaad-pay's own thank-you or cancelled page. The payment is recorded by `yaad-stripe-webhook` like any other; **you still mark the invoice paid at the desk**.
+
+**Why it is not a Stripe link.** A Checkout page expires within 24 hours; the email outlives it. yaad-pay makes a new page each time, and re-checks the invoice each time, so a paid or voided invoice gets a page saying so, never a payment page.
+
+**"This payment link is not valid".** The token did not match: the link was edited or truncated, or **the service role key was rotated**, which invalidates every link in emails already sent (the token is signed with it). The client pays from their job page instead; re-sending the invoice issues a new link.
+
+**Deploy:** `supabase functions deploy yaad-pay --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (the token is its only door; it goes on the CLAUDE.md §12 list once verified), and redeploy `yaad-invoice` (JWT on) so emails carry the link. Probe: `curl -s -o /dev/null -w "%{http_code}\n" "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-pay?i=INV-X&t=00000000000000000000000000000000"` must print 404.
+
+## Going live with card payments
+
+Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handles a key.**
+
+1. **Stripe Dashboard, live mode** (switch off Test mode / Sandbox): Developers, API keys, copy the **live Secret key** (`sk_live_…`).
+2. **Live webhook**: Developers, Webhooks, Add destination, *Your account*, events `checkout.session.completed` and `checkout.session.async_payment_succeeded`, Webhook endpoint `https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-stripe-webhook`. Reveal its **Signing secret** (`whsec_…`). A live endpoint has a different secret from the test one.
+3. In your own terminal:
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=sk_live_PASTE STRIPE_WEBHOOK_SECRET=whsec_PASTE STRIPE_ALLOW_LIVE=yes --project-ref leffyisvfvjwzilydlwf
+   ```
+4. **Check** `select livemode, count(*) from invoice_payments group by 1;` after the first real payment: `true` means live.
+
+**What changes.** Test cards stop working; test-mode payments are no longer verified (the webhook secret is now the live one). The client pays exactly the invoice total, so **Yaadly absorbs Stripe's fee** unless that is changed. If Stripe refuses a J$ card session in live mode, the JMD currency or card settings on the live account are the first thing to check.
+
+**Going back to test**: set the test key and test webhook secret again and `supabase secrets unset STRIPE_ALLOW_LIVE --project-ref leffyisvfvjwzilydlwf`.
+
 ## Worker payout setup (Stripe Global Payouts, test mode)
 
 **What it is.** Since 14 Sep 2026 (`20260914200000`) a worker sets up how Yaadly pays them at `/portal/worker/payouts`, on Stripe's own form. Yaadly never sees or stores their bank details; `worker_profiles.stripe_recipient_status` says `none`, `started`, `ready` or `needs_info`. The booking WhatsApp points them there.
