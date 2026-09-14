@@ -38,9 +38,12 @@
 --
 -- Live definitions of raise_job_client_invoice(), sync_job_status() and
 -- start_job_on_agency_fee_paid() were read with pg_get_functiondef on
--- 13 September 2026 before this was written; production is ahead of the
--- repository for raise_job_client_invoice (the materials-already-billed
--- branch). The bodies below change only what the comments name.
+-- 13 September 2026 before this was written, and read again on 14 September
+-- immediately before it was applied, because 20260913230001 had meanwhile
+-- rewritten sync_job_status() to call job_final_stage_count(). The body below
+-- is that version. Production is also ahead of the repository for
+-- raise_job_client_invoice (the materials-already-billed branch). The bodies
+-- below change only what the comments name.
 
 -- ------------------------------------------------------------------ columns
 
@@ -155,12 +158,7 @@ begin
       return new;
     end if;
 
-    select jsonb_array_length(p.docs->'payment_schedule'->'stages')
-      into final_stage_count
-      from public.kickoff_packs p
-     where p.job_id = new.id and p.status = 'approved'
-     order by p.updated_at desc
-     limit 1;
+    final_stage_count := public.job_final_stage_count(new.id);
 
     is_complete := coalesce(new.stage, 0) > coalesce(final_stage_count, 1);
 
