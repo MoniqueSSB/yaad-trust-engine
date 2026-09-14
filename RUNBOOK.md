@@ -5064,6 +5064,17 @@ Jamaican local number is that long. So 447767171858 is checked as
    is redeployed from disk after merge (§12 of CLAUDE.md). It runs WITH
    platform auth: do not add `--no-verify-jwt`.
 
+## A worker who quoted says they cannot see the job, or can see too much of it
+
+Since 13 September 2026 (migration `20260913230642`, DECISIONS.md the same date) a worker who has quoted on a job and is not booked on it gets the tender pack, not the job: title, parish, trade, the board's scrubbed description, the board photos, their own quote and their own Kickoff Pack. No street address, no client details, no job code. The job stays on their worker portal after the client picks somebody else, under "Quotes that closed".
+
+1. **"The job has gone from my portal."** Check they have a quote on it at all: the desk's quotes view, or `select status from job_quotes where job_id = '<JOB>' and worker_user = '<their user id>'`. No row means they never quoted; nothing to fix. A row means `my_quoted_jobs()` should return the job. If it does not, the function has been changed or dropped: re-run the guard test (step 4).
+2. **"I can see the job but not the photos."** Only photos the client put on the board show (`job_photos.board_ok`). A photo with `board_ok` false is the client's alone, on purpose.
+3. **"I was booked but I still see the small view."** The room decides "booked" by `jobs.worker_email` matching the address they signed in with. A booking under a different email looks like a quote. Fix the email on the job; do not widen the read rule.
+4. **Proving the whole thing still holds.** Run `supabase/tests/quoted_worker_guards.sql` with execute_sql. Every line should say PASS (9 to 11 say SKIP when no worker has quoted without being booked). A FAIL on 1, 3 or 9 means a quoting worker can read client details again: stop and tell Monique before changing anything.
+5. **"Nobody told me I was not picked."** When a worker is booked, every other live quote on the job becomes `declined`, and trigger `trg_notify_worker_quote_not_selected` (migration `20260913230742`) sends each of those workers a `quote_not_selected` WhatsApp. Check the function's logs for kind `quote_not_selected` on that job. `told: false` with "no recipient phone" means their `worker_profiles.phone` is blank. A WhatsApp refused for the 24 hour window means they had not messaged Yaadly recently; there is no approved template for this message yet, so tell them by hand.
+6. **Adding a column to what a quoting worker sees** means changing `my_quoted_jobs()`. That is a data protection decision for Monique, not a fix. The same goes for the two rules this migration also tightened: `job_open_for_quotes()` refuses a job with no client email (the public board hides one too), and `job_client_email_matches()` never matches an empty email.
+
 ## Supabase "Deploy to production" must stay off, and what the "Supabase Preview" check on `main` means
 
 **The rule.** Migrations reach production by hand, one at a time, applied deliberately and recorded (see the "Applied to production" header every migration file carries). Nothing applies them because a branch was merged. So in the Supabase dashboard, Project Settings → Integrations → GitHub, **Deploy to production must be off**. It was turned off on 13 Sep 2026 at 11:08 UTC. If it is ever found on again: open `https://supabase.com/dashboard/project/leffyisvfvjwzilydlwf/settings/integrations`, switch **Deploy to production** off, then scroll to the bottom of the GitHub section and press **Save changes**. The switch on its own saves nothing; the confirmation is a message reading "Production branch settings successfully updated". Leave the GitHub connection in place: **Disable integration**, right beside Save changes, disconnects the repository altogether, which is not the fix. With it on, every push or merge to GitHub `main` makes Supabase run the repo's migration files against the production database by itself; the docs say it also deploys Edge Functions and storage buckets declared in `supabase/config.toml`, which this repo does not have.
@@ -5075,6 +5086,30 @@ Jamaican local number is that long. So 447767171858 is checked as
 **Never "fix" the red check by making it pass.** Making it green means reconciling the ledger with the link on, which switches on automatic production deploys. The fix is the toggle, off.
 
 **Do not use `DELETE /v1/projects/{ref}/branches` ("Disables preview branching") or `supabase branches delete` on the `main` row to get the same effect.** The `main` row is the production project; the docs do not say what either does to it.
+
+## A worker's quote is refused over its payment stages, or a booked job shows only one stage
+
+Since 13 Sep 2026 (`20260913230001`) the accepted quote's payment stages are the job's stage schedule, so they have to be readable.
+
+1. **"Payment stage line N needs the shape..." or "add up to..."**: correct refusal. Each line must be `Stage name: 30%: what proves it is done`, no colon in the stage name, percentages totalling 100 between them, ten stages at most. The same rule is `parse_payment_stages()` in Postgres and `web/lib/jobs/payment-stages.ts`; if one ever accepts what the other refuses, they have drifted.
+2. **A booked job shows one stage when the quote had several.** Check whether the schedule was written: `select status, approved_by, docs->'payment_stages' from quote_pack_drafts where job_id = '<job>' order by created_at desc;`. The row with `source` `accepted_quote` and status `approved` is the schedule. If it is missing, look for the warning `accepted_quote_writes_schedule` in the Postgres logs.
+3. **To write it by hand** for a booked job whose accepted quote reads cleanly: `select public.write_stage_schedule_from_quote('<quote id>', 'client acceptance: <client email> (written by hand, <date>, <your name>)');`. It refuses a quote that is not accepted, an unreadable one, and a job that has an approved Kickoff Pack.
+4. **A job with no schedule at all is one stage** and the worker is owed the whole labour less 5% when it is approved. That is a founder decision, not a fault.
+
+To prove the guards, run `supabase/tests/stage_schedule_guards.sql` with `execute_sql`; every line should read PASS.
+
+## A client pressed "Ask for a change" on a quote and it did not go through
+
+The request is refused by `request_quote_change_as_me()` in Postgres, and the message the client sees is the reason. Match it:
+
+1. **"Only the client of this job..."**: they are signed in with a different email from the one on the job. Check `jobs.client_email` for the job.
+2. **"This job is already booked"**: correct. After booking a change is a variation; handle it with them directly.
+3. **"That price is not open for changes"**: the quote is no longer `submitted` (accepted, declined or withdrawn).
+4. **"Yaadly is still choosing"**: a "Choose for me" job where nobody has chosen a quote yet. Choose one on the desk first.
+5. **"You have already asked for a change to this quote"**: one open request per quote. See it with `select * from quote_change_requests where quote_id = '<id>' order by created_at desc;`
+6. **"Could not find the function"**: migration `20260913230000` is not on production. Check `select to_regclass('public.quote_change_requests');` returns the table name.
+
+To prove the guards, run `supabase/tests/quote_change_request_guards.sql` with `execute_sql`; every line should read PASS.
 
 ## A worker payable exists for a stage nobody approved, or you need to prove that cannot happen
 

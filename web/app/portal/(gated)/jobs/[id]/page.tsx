@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
-import { priceContext, priceSentence, PRICE_CAVEAT, type Observation } from "@/lib/portal/price-context";
+import { type Observation } from "@/lib/portal/price-context";
+import { PriceContextNote } from "@/components/portal/PriceContextNote";
+import { QuotedJobRoom } from "@/components/portal/QuotedJobRoom";
 import { packPaymentStages, quotePackPaymentStages } from "@/lib/portal/journey";
 import { CalBand } from "@/components/portal/CalBand";
 import { ReviewForm } from "@/components/portal/ReviewForm";
@@ -31,6 +33,7 @@ import { JobRail } from "@/components/portal/JobRail";
 import { BoardPreview } from "@/components/portal/BoardPreview";
 import { JobSummaryCard } from "@/components/portal/JobSummaryCard";
 import { ConfirmAction } from "@/components/portal/ConfirmAction";
+import { AskForChange } from "@/components/portal/AskForChange";
 import { ApproveButton } from "@/components/portal/ApproveButton";
 import { JobCheckPanel, type CheckInvoice, type CheckPrice } from "@/components/portal/JobCheckPanel";
 import { JobFiles, type JobFile } from "@/components/portal/JobFiles";
@@ -182,7 +185,12 @@ export default async function JobRoom({
 
   // RLS returning nothing and the job not existing look identical from here.
   // That is correct: a stranger probing ids learns nothing either way.
-  if (!job) notFound();
+  //
+  // One exception, 13 Sep 2026: a worker who has quoted on this job and is not
+  // booked on it gets no row either, by design, and is sent to the tender
+  // pack instead. QuotedJobRoom 404s by itself for anybody with no quote here,
+  // so a stranger still learns nothing.
+  if (!job) return <QuotedJobRoom id={id} userId={user.id} />;
 
   /* Where a quote sits, for BOTH sides to read.
    *
@@ -227,6 +235,17 @@ export default async function JobRoom({
      quote), and for them nothing is fetched, so the address cannot be
      rendered by mistake further down. */
   const bookedWorker = role === "worker" && job.worker_email?.toLowerCase() === email;
+
+  /* Everything below this line assumes a client or a booked worker: the
+     arrival log, the materials store, evidence upload, the description in
+     full. Since 13 Sep 2026 row level security only returns this row to one
+     of those two (or to an admin), so a quoting worker never gets here. If
+     anybody else does, they get the tender pack view rather than a room
+     written for somebody else. It used to be the other way round: this check
+     only ran while nobody was booked, so a declined worker whose rival had
+     been booked fell straight through into the full room. */
+  if (role === "worker" && !bookedWorker) return <QuotedJobRoom id={id} userId={user.id} />;
+
   let addr: string | null = null;
   if (role === "client" || bookedWorker) {
     const { data: at } = await supabase.from("jobs").select("addr").eq("id", id).maybeSingle();
@@ -406,6 +425,23 @@ export default async function JobRoom({
   const clientAlreadyConfirming = new Set(
     (partialAgreements ?? []).filter((a) => a.side === "client").map((a) => a.quote_id),
   );
+  /* A client's open "can you change..." on a quote (13 Sep 2026). RLS
+     returns these to the job's client and to the worker whose quote it is,
+     nobody else. Newest first, so the first open one per quote is the live
+     request. An error (the table not yet applied) reads as none. */
+  const { data: changeRows } = qs.length
+    ? await supabase
+        .from("quote_change_requests")
+        .select("quote_id,request_text,status,created_at")
+        .eq("job_id", id)
+        .order("created_at", { ascending: false })
+    : { data: [] as { quote_id: string; request_text: string; status: string; created_at: string }[] };
+  const openChange = new Map<string, { text: string; at: string }>();
+  for (const r of changeRows ?? []) {
+    if (r.status === "open" && !openChange.has(r.quote_id)) {
+      openChange.set(r.quote_id, { text: scrub(r.request_text).clean, at: whenDateTime(r.created_at) ?? "" });
+    }
+  }
   const chat = (msgRows ?? []).map((m) => ({
     id: m.id,
     mine: m.sender_email.toLowerCase() === email,
@@ -417,110 +453,8 @@ export default async function JobRoom({
     : null;
   const pk = (packs ?? []) as Pack[];
 
-  /* A worker with a live quote but no booking (since 20260901f: a client can
-     accept more than one quote, and a Kickoff Pack is drafted and confirmed
-     BEFORE anyone is chosen). role fell to "worker" only by exclusion above,
-     and RLS now lets that row through on the strength of job_quotes alone,
-     not job.worker_email. The rest of this page assumes a booked worker
-     everywhere it says role === "worker" - the arrival log, materials store,
-     evidence upload - none of which apply yet. Rather than audit every one
-     of those sections for a state that cannot happen until this migration,
-     this renders a small, honest, separate view: their own quote, and their
-     own Kickoff Pack once one exists. */
-  if (role === "worker" && !job.worker_email) {
-    const myQuote = qs.find((q) => q.worker_email?.toLowerCase() === email) ?? qs[0];
-    const myPack = myQuote ? pk.find((p) => p.quote_id === myQuote.id) : undefined;
-    return (
-      <div className="mx-auto max-w-[720px] px-5 py-10">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Your quote</p>
-        <h1 className="mt-2 font-display text-[clamp(24px,4vw,36px)] uppercase leading-[.95]">
-          {job.title}
-        </h1>
-        <p className="mt-2 text-[13px] text-mute">
-          {job.parish} · <span className="font-mono text-[12px]">{job.id}</span>
-        </p>
-
-        {!myQuote && (
-          <p className="mt-6 max-w-[58ch] text-[14px] leading-relaxed text-mute">
-            No live quote of yours found on this job.
-          </p>
-        )}
-
-        {myQuote && (
-          <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
-            <div className="flex flex-wrap items-center gap-3">
-              <b className="text-[15px]">Your price</b>
-              <span className="rounded-full border border-line bg-panel2 px-2.5 py-1 text-[10.5px] font-bold text-mute">
-                {myQuote.status}
-              </span>
-              <span className="ml-auto text-[15px] font-bold text-tealb">
-                {jmd(myQuote.labour_jmd) ?? "No labour figure"}
-              </span>
-            </div>
-            {/* The Mirror Rule. The client is shown where this price sits, so
-                the worker is shown the same words. He is also the one who
-                knows the access is bad, which is what the caveat names. */}
-            <PriceContextNote trade={job.trade} labour={myQuote.labour_jmd} observations={observations} />
-
-            {myQuote.status === "submitted" && (
-              <p className="mt-3 text-[13px] leading-relaxed text-mute">
-                Waiting on the client. Nothing to do here yet: if they want to
-                move forward with your price, they will ask you to write a
-                Kickoff Pack against it.
-              </p>
-            )}
-
-            {myQuote.status === "declined" && (
-              <p className="mt-3 text-[13px] leading-relaxed text-mute">
-                The client went with a different price for this job.
-              </p>
-            )}
-
-            {myQuote.status === "kickoff_requested" && !myPack && (
-              <p className="mt-3 text-[13px] leading-relaxed text-mute">
-                The client wants a Kickoff Pack against your price. It is
-                being written now; check back shortly.
-              </p>
-            )}
-
-            {myQuote.status === "kickoff_requested" && myPack && myPack.status !== "approved" && (
-              <p className="mt-3 text-[13px] leading-relaxed text-mute">
-                Your Kickoff Pack is drafted and waiting on review before it
-                is issued.
-              </p>
-            )}
-
-            {myQuote.status === "kickoff_requested" && myPack && myPack.status === "approved" && (
-              <div className="mt-4 border-t border-line pt-4">
-                <p className="text-[13px] leading-relaxed text-mute">
-                  Your Kickoff Pack is ready: scope, timeline, payment stages
-                  and the evidence checklist. Read it, then confirm your side.
-                  {myPack.both_confirmed_at
-                    ? " Both sides have confirmed it."
-                    : " Once both you and the client confirm it, they can choose you for the job."}
-                </p>
-                <Link
-                  href={"/portal/jobs/" + encodeURIComponent(job.id) + "/pack"}
-                  className="mt-3 inline-block rounded-full bg-linear-to-r from-teal to-mango px-4 py-2 text-[13px] font-bold text-onbrand"
-                >
-                  Read the Kickoff Pack &rarr;
-                </Link>
-                {/* A button here is exactly the surface CLAUDE.md §9 rules
-                    out for a worker. Confirming is a WhatsApp reply, same
-                    message that told them the pack was ready. */}
-                {!myPack.both_confirmed_at && (
-                  <p className="mt-3 text-[13px] leading-relaxed text-mute">
-                    Reply to Yaadly&apos;s WhatsApp message with{" "}
-                    <b className="font-mono text-ink">{job.id}</b> to confirm your side.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
+  /* A worker who has quoted and is not booked is handled near the top of this
+     function, by QuotedJobRoom, before anything booked-only is fetched. */
 
   /* The accepted quote is what the money panels read from. Before a worker is
      chosen there is no agreed number, and the panels stay away rather than
@@ -1410,6 +1344,26 @@ export default async function JobRoom({
                         Ask for full project documentation first
                       </button>
                     </form>
+                    {!openChange.has(q.id) && (
+                      <AskForChange jobId={job.id} quoteId={q.id} workerName={q.worker_name ?? "the tradesperson"} />
+                    )}
+                  </div>
+                )}
+
+                {/* A client's open change request on this quote, 13 Sep 2026.
+                    Shown to both sides: RLS only returns it to this job's
+                    client and to the worker whose quote it is. */}
+                {openChange.has(q.id) && (
+                  <div className="mt-3 rounded-xl border border-softline bg-soft px-3.5 py-3 text-[12.5px] leading-relaxed">
+                    <p className="text-[10px] font-bold uppercase tracking-[.14em] text-tealb">
+                      Change asked for{openChange.get(q.id)!.at ? ", " + openChange.get(q.id)!.at : ""}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-ink">{openChange.get(q.id)!.text}</p>
+                    <p className="mt-1.5 text-dim">
+                      {role === "client"
+                        ? (q.worker_name ?? "The tradesperson") + " has this. They can update their quote or keep it as it is. You can still accept this price as it stands."
+                        : "The client has asked for this change to your quote. Nothing on your quote has changed."}
+                    </p>
                   </div>
                 )}
 
@@ -1923,40 +1877,5 @@ export default async function JobRoom({
   );
 }
 
-/**
- * Where a quote sits, in words, for whoever is reading.
- *
- * No `role` prop, deliberately. Client and worker see identical text: a client
- * told their quote is above typical, while the worker cannot see that and
- * cannot answer it, is a protection with no counterpart. The Mirror Rule.
- *
- * Renders nothing at all when there is nothing honest to say, which is most of
- * the time on a young data set and is the correct behaviour rather than a
- * failure. The caveat is not optional and travels with every statement: a
- * range without it reads as a valuation, and valuing work is quantity
- * surveying, which is the one thing Yaadly does not guarantee.
- */
-function PriceContextNote({
-  trade,
-  labour,
-  observations,
-}: {
-  trade: string | null;
-  labour: number | null;
-  observations: Observation[];
-}) {
-  const ctx = priceContext(trade, labour, observations);
-  if (!ctx.show || !labour) return null;
-  const sentence = priceSentence(ctx, labour);
-  if (!sentence) return null;
-
-  return (
-    <div className="mt-3 rounded-xl border border-line bg-bg/40 px-3.5 py-3">
-      <b className="block text-[10.5px] font-bold uppercase tracking-[.15em] text-dim">
-        For comparison
-      </b>
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-mute">{sentence}</p>
-      <p className="mt-2 text-[11.5px] leading-relaxed text-dim">{PRICE_CAVEAT}</p>
-    </div>
-  );
-}
+/* PriceContextNote moved to components/portal/PriceContextNote.tsx on
+   13 Sep 2026, so the quoting worker's room shows the client's words. */
