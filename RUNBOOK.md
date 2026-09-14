@@ -845,6 +845,8 @@ select walk_platform, walk_link, walk_date, walk_who, walk_notes, signoff_method
 
 **This never blocks the Approve button.** `approve_stage()` does not read `signoff_method` at all. If a client says they cannot approve because a walkthrough is pending, that is a UI question or a misunderstanding, not this system enforcing an order; the button is available regardless of where a walkthrough request stands.
 
+**The worker is told when a request lands (15 Sep 2026).** `trg_notify_job_change` fires `yaad-notify-client` with kind `walkthrough_requested` when `signoff_method` becomes `walkthrough` with no `walk_link`, or when the platform, time or note on an unconfirmed request changes. The worker gets a WhatsApp (phone from `worker_profiles`) and an email (`jobs.worker_email`). It does not fire on the worker's own confirm or on a clear. If a worker says they were never told: check the function's logs for `walkthrough_requested`; a `told: false` with reason "No open walkthrough request" means the request was cancelled or confirmed before the message ran; `no recipient phone` means the worker profile has no phone. Migration `20260915000000`.
+
 **Nothing here calls a video API.** There is no Zoom, Meet or WhatsApp integration in this repository. The link a worker enters through `confirm_walkthrough` is whatever they pasted in themselves, from a call they arranged over WhatsApp the ordinary way. If a link does not work, that is between the worker and whichever service they used to create it, not something to look for in this code.
 
 ---

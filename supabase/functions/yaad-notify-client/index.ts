@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -908,7 +908,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -950,7 +950,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1571,6 +1571,33 @@ Deno.serve(async (req: Request) => {
       const arrivalLabel = await stageLabel(admin, jobId, arrival?.stage ?? job.stage ?? 1);
       line = `Your worker checked in on site today for ${arrivalLabel} of ${job.title}. ` +
         `Follow along here: ${roomLink}`;
+    } else if (kind === "walkthrough_requested") {
+      // 14 Sep 2026, founder: the worker is told by WhatsApp AND email that
+      // a client has asked for a live video walkthrough. Fired by
+      // trg_notify_job_change (20260915000000) when request_walkthrough()
+      // lands, or changes an unconfirmed request. Read off the row itself,
+      // and only while a request is open with no confirmed link, so a
+      // repeated or stray call cannot ask a worker to arrange a call the
+      // client has since cancelled or the worker has already confirmed.
+      // Email goes to the worker's own address on the job, the same as
+      // dispute_raised_worker: the worker's portal login is that address.
+      const { data: w } = await admin.from("jobs")
+        .select("signoff_method, walk_platform, walk_link, walk_date, walk_notes")
+        .eq("id", jobId).maybeSingle();
+      if (w?.signoff_method !== "walkthrough" || w?.walk_link) {
+        root.setAttributes({ "yaadly.notify.outcome": "walkthrough_not_open" });
+        return json({ ok: true, kind, told: false, reason: "No open walkthrough request on this job." });
+      }
+      recipientEmail = String(job.worker_email ?? "").trim();
+      const platform = ({ whatsapp: "WhatsApp video", google_meet: "Google Meet", zoom: "Zoom" } as Record<string, string>)[String(w.walk_platform ?? "")] ?? "a video call";
+      const when = String(w.walk_date ?? "").trim();
+      const ask = String(w.walk_notes ?? "").trim();
+      subject = `Video walkthrough requested: ${job.title}`;
+      line = `The client on ${job.title} (${job.id}) has asked for a live video walkthrough of the site, on ${platform}` +
+        (when ? `, preferred time: ${when}` : "") + `. ` +
+        (ask ? `What they want walked through: "${ask.slice(0, 600)}"\n\n` : "") +
+        `Arrange the call with them over WhatsApp as usual, then paste the link into the job so it is on the record: ${roomLink}\n\n` +
+        `This does not change the evidence you file or how the job is approved.`;
     } else if (kind === "walkthrough_notes_ready") {
       subject = `Notes from your video walkthrough: ${job.title}`;
       line = `The worker has written up what came out of your video walkthrough on ${job.title}. ` +
