@@ -196,7 +196,7 @@ export function EvidenceLedger({
               key={n}
               aria-disabled={state === "todo" || undefined}
               className={
-                "rounded-2xl border p-4 " +
+                "min-w-0 rounded-2xl border p-4 " +
                 (state === "done"
                   ? "border-softline bg-soft"
                   : state === "now"

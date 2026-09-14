@@ -174,18 +174,21 @@ export function VideoEvidenceUpload({
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_auto]">
+      {/* Two columns that fit any width, the same fix as EvidenceUpload: the
+          fixed row pushed the open stage card across the right-hand column on
+          a laptop. 14 Sep 2026. */}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           maxLength={140}
           placeholder='What this shows, e.g. "Stage 1 walkthrough"'
-          className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal"
+          className="w-full min-w-0 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal sm:col-span-2"
         />
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value === "materials" ? "materials" : "work")}
-          className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
+          className="w-full min-w-0 rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
         >
           <option value="work">The work</option>
           <option value="materials" disabled={!storeType}>
@@ -199,7 +202,7 @@ export function VideoEvidenceUpload({
           value={kind === "materials" ? "" : phase}
           disabled={kind === "materials"}
           onChange={(e) => setPhase(e.target.value as "" | EvidencePhase)}
-          className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40"
+          className="w-full min-w-0 rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40"
         >
           {kind === "materials" ? (
             <option value="">Its own section</option>
@@ -220,7 +223,7 @@ export function VideoEvidenceUpload({
           accept="video/mp4,video/webm,video/quicktime"
           capture="environment"
           onChange={onPick}
-          className="text-[12.5px] text-mute file:mr-3 file:rounded-full file:border file:border-line2 file:bg-transparent file:px-3.5 file:py-2 file:text-[12.5px] file:font-bold file:text-ink"
+          className="w-full min-w-0 max-w-full text-[12.5px] text-mute sm:col-span-2 file:mr-3 file:rounded-full file:border file:border-line2 file:bg-transparent file:px-3.5 file:py-2 file:text-[12.5px] file:font-bold file:text-ink"
         />
       </div>
 
