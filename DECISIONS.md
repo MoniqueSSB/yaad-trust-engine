@@ -3383,3 +3383,15 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **No human gate moved.** Releasing is one named click and marking sent is a second; neither moves money by itself.
 
 **The late receipt clock moves to sent.** The same day's entry above counts a receipt as late 48 hours after the money was released. With a separate sent step that would mark a worker late because Yaadly had not yet paid them, which is the Mirror Rule failing on the worker's side. The desk now counts from `sent_at`, and money released but not sent is never late.
+
+## 2026-09-14 · A worker gives their bank details to Stripe, never to Yaadly
+
+**Why.** Founder, 14 Sep 2026: Yaadly does not store worker bank details, and "make this live" for the route that avoids them. A worker's bank details are needed to pay them; the only question was who holds them.
+
+**How.** The booking WhatsApp now asks the worker to set up how Yaadly pays them, and points at `/portal/worker/payouts` in their own portal. It never asks for a reply: anything typed to the Yaadly number is kept with the job, and a worker's plain text on a live job is filed as work evidence and drafted into a client report (`yaad-inbound`), so bank details sent there would travel exactly where they must not. On the page, one button calls `yaad-payout-setup`, which makes the worker a Stripe Global Payouts recipient (a person in Jamaica, paid in J$ to a local bank; Stripe asks Yaadly only for email and name) and returns Stripe's one-time sign-up link. The worker types their bank details into Stripe's form. Yaadly keeps only `worker_profiles.stripe_recipient_id` and a status (`20260914200000`), written by the function with the service role; the existing policies let a worker read that row and not write it.
+
+**Why a portal page and not a link in the message.** Stripe's sign-up link is single use, lasts ten minutes, and Stripe says never to text or email it: message apps open links to preview them, which uses the link up. So the message carries a Yaadly address, and the Stripe link is made fresh when the signed-in worker taps the button. When it expires, Stripe sends them back with `?again=1` and the page makes another.
+
+**Test mode, with its own switch.** It runs on the same test key as card payments. A live key is refused unless `STRIPE_PAYOUTS_ALLOW_LIVE` is `yes`, a separate switch from card payments' `STRIPE_ALLOW_LIVE`, so taking card payments live cannot quietly start onboarding real payout recipients. The live Stripe account already has a Global Payouts financial account (GBP, open, read 14 Sep 2026).
+
+**Not built yet, deliberately.** Sending a payout. That is a later piece: a named person's click on the desk, with Stripe's quote for the fee and exchange rate shown first, never automatic (CLAUDE.md §2). Also still open: Stripe support enabling cross-border payouts to outside bank accounts, and the solicitor's view on the licensing note Stripe attaches to Global Payouts. Worker bank and identity details now go to Stripe by the worker's own hand; that is the founder's decision of this date.

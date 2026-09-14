@@ -5275,3 +5275,15 @@ update app_settings set value = '<Bank>, <account name>, sort code <..>, account
 **Where they appear once set.** Under an unpaid Yaadly invoice in the client portal ("Or pay by bank transfer: … Use INV-… as the reference"), read through `client_bank_details()`, which returns that one setting and nothing else from the admin-only table. And in the footer of every emailed client invoice, from `yaad-invoice`, which also prints a "Pay online by card" link to the client's job page on sent job invoices. `yaad-invoice` must be redeployed for the email side (from `main`, JWT on).
 
 **A transfer is still marked paid by a person** at the desk when the money arrives. Showing the details moves nothing.
+
+## Worker payout setup (Stripe Global Payouts, test mode)
+
+**What it is.** Since 14 Sep 2026 (`20260914200000`) a worker sets up how Yaadly pays them at `/portal/worker/payouts`, on Stripe's own form. Yaadly never sees or stores their bank details; `worker_profiles.stripe_recipient_status` says `none`, `started`, `ready` or `needs_info`. The booking WhatsApp points them there.
+
+1. **Switching it on (test mode), in this order:** apply `20260914190000`, then `20260914200000`. Then, from the repo root, from `main`: `supabase/functions/sync-shared.sh`, `supabase functions deploy yaad-payout-setup --project-ref leffyisvfvjwzilydlwf` (platform JWT check stays ON, no flag), and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it is on the CLAUDE.md §12 list). Then the web app, then the desk. It uses the `STRIPE_SECRET_KEY` already set for card payments.
+2. **Check it is behind the login:** `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-payout-setup` must answer 401.
+3. **Try it as a worker:** sign in to the portal as the test worker, open How Yaadly pays you, press Set up with Stripe. Stripe's test form opens; test bank numbers are on Stripe's Global Payouts testing page. On return the status should read Ready.
+4. **"Setting up payment is not available right now."** Supabase, Edge Functions, `yaad-payout-setup`, Logs. A Stripe answer naming the API version: set the secret `STRIPE_V2_VERSION` to the version Stripe names. A Stripe answer saying Global Payouts or recipients are not enabled: that is the Stripe account, not the code; switch it on in the Dashboard for the mode the key is in.
+5. **A worker is stuck on "Stripe needs something from you".** Open the recipient in the Stripe Dashboard, Global Payouts, Recipients, and read what it asks for. The worker fixes it through the same button.
+6. **Going live** is its own decision: live key, `STRIPE_PAYOUTS_ALLOW_LIVE=yes`, cross-border payouts enabled by Stripe support. Until then every recipient is a test one.
+7. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.

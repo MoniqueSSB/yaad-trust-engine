@@ -1094,7 +1094,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ MATERIALS TRANCHES -->
 <section class="view" data-view="materials">
   <h1 class="vh">Materials tranches</h1>
-  <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
+  <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. Releasing records the decision and moves no money: you then pay the worker from your business bank app and press Mark as sent, which is when the worker gets a WhatsApp. Yaadly stores no worker bank details. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
   <div id="mrMsg"></div>
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
 </section>
@@ -3528,9 +3528,12 @@ const SHOWCASE_DOC_TYPES = ["profile_photo", "intro_video", "portfolio"];
 //
 // Founder rule, 14 Sep 2026. Materials money goes to the worker before the
 // goods are bought (20260914112000), and the receipt is the evidence the
-// goods were bought. The clock starts when the money is released; once a
-// receipt is more than 48 hours behind it, it counts as late, and the
-// worker's record here says so.
+// goods were bought. The clock starts when a person marks the money SENT
+// (mark_materials_sent, 20260914190000), not when it is released: a worker
+// cannot buy goods with money that has not reached them, so money released
+// and not yet sent is never late. Once a receipt is more than 48 hours
+// behind the money leaving, it counts as late, and the worker's record here
+// says so.
 //
 // Desk only. It is a note for whoever chooses a worker, nothing more: it
 // holds no stage, blocks no payment and changes no score, because the
@@ -3559,14 +3562,14 @@ async function readLateReceipts(list){
     const jobWorker = new Map((jobs || []).map(j => [j.id, String(j.worker_email || "").toLowerCase()]));
     if (!jobWorker.size) return;
     const { data: rels, error: re } = await sb.from("materials_releases")
-      .select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at")
-      .in("job_id", [...jobWorker.keys()]).not("released_at", "is", null).limit(3000);
+      .select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,sent_at")
+      .in("job_id", [...jobWorker.keys()]).not("sent_at", "is", null).limit(3000);
     if (re) throw re;
     const byEmail = new Map(list.map(r => [String(r.worker_email || "").toLowerCase(), r]));
     const now = Date.now();
     for (const x of rels || []) {
-      if (!x.released_at) continue;
-      const out = Date.parse(x.released_at);
+      if (!x.sent_at) continue;
+      const out = Date.parse(x.sent_at);
       const came = x.receipt_at ? Date.parse(x.receipt_at)
                  : String(x.receipt_ref || "").trim() ? out : null;
       const hours = ((came ?? now) - out) / 3600e3;
@@ -7115,7 +7118,7 @@ async function loadMaterials(keepMsg){
   // materials_paid_jmd() applies in the database, which has the last word.
   const [{ data: quotes }, { data: rels }, { data: paidInvs }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
     sb.from("invoices").select("job_id,currency,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").eq("status", "paid"),
   ]);
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
@@ -7141,10 +7144,13 @@ async function loadMaterials(keepMsg){
     const canGo = Math.max(Math.min(quoted, paidFor) - soFar, 0);
     const storeOk = !!job.materials_store_type;
     const full = left <= 0;
-    const receiptsDue = done.filter((r) => !String(r.receipt_ref || "").trim()).length;
+    const receiptsDue = done.filter((r) => r.sent_at && !String(r.receipt_ref || "").trim()).length;
+    const toSend = done.filter((r) => !r.sent_at).length;
     const id = esc(job.id);
 
-    const statusHtml = full
+    const statusHtml = toSend
+      ? `<span class="jichip ready"><span class="dot"></span>Released, ${toSend === 1 ? "not yet sent" : toSend + " not yet sent"} to the worker</span>`
+      : full
       ? (receiptsDue
           ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
           : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
@@ -7158,10 +7164,19 @@ async function loadMaterials(keepMsg){
       ? `<div class="jicond" style="margin-top:6px">` + done.map((r) => {
           const ref = String(r.receipt_ref || "").trim();
           const rid = esc(String(r.id));
-          const receiptHtml = ref
-            ? `receipt ${esc(ref)}`
-            : `<b>receipt to come</b> <input type="text" placeholder="receipt ref" data-mr-rref="${rid}" style="width:110px"> <button class="btn g" data-receipt-rel="${rid}">Record receipt</button>`;
-          return `${jmdFmt(r.amount_jmd)} &middot; ${receiptHtml}${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`;
+          const head = `${jmdFmt(r.amount_jmd)} released${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`;
+          // Released is a decision; sent is the money leaving. Yaadly holds no
+          // worker bank details, so the transfer happens in the bank's own app
+          // and this only records that it did (mark_materials_sent).
+          const payHtml = r.sent_at
+            ? `sent by bank transfer${String(r.sent_ref || "").trim() ? ", ref " + esc(r.sent_ref) : ""}, ${esc(String(r.sent_at).slice(0, 10))}, ${esc(r.sent_by || "")}`
+            : `<b>not yet sent.</b> Pay it from your business bank app, then <input type="text" placeholder="transfer ref, optional" data-mr-sref="${rid}" style="width:150px"> <button class="btn" data-sent-rel="${rid}" data-sent-amt="${esc(String(r.amount_jmd))}">Mark as sent</button> <span style="opacity:.55" title="Needs Stripe Global Payouts switched on">Pay by Stripe: not set up yet</span>`;
+          const receiptHtml = !r.sent_at
+            ? ""
+            : ref
+              ? ` &middot; receipt ${esc(ref)}`
+              : ` &middot; <b>receipt to come</b> <input type="text" placeholder="receipt ref" data-mr-rref="${rid}" style="width:110px"> <button class="btn g" data-receipt-rel="${rid}">Record receipt</button>`;
+          return `${head}<br>&nbsp;&nbsp;${payHtml}${receiptHtml}`;
         }).join("<br>") + `</div>`
       : "";
 
@@ -7217,7 +7232,31 @@ async function loadMaterials(keepMsg){
         if (error) throw error;
         const row = (data || [])[0];
         if (!row) throw new Error("Released nothing.");
-        say("mrMsg", "ok", `Released ${jmdFmt(amount)} on ${job}${receipt ? " against receipt " + receipt : ", receipt to come"}. ${jmdFmt(row.released_total_jmd)} of ${jmdFmt(row.quoted_materials_jmd)} now released. The client and worker can see it in their portal.`);
+        say("mrMsg", "ok", `Released ${jmdFmt(amount)} on ${job}${receipt ? " against receipt " + receipt : ", receipt to come"}. ${jmdFmt(row.released_total_jmd)} of ${jmdFmt(row.quoted_materials_jmd)} now released. No money has moved yet: pay the worker from your bank app, then press Mark as sent under the release. The worker gets a WhatsApp then.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        say("mrMsg", "err", hint);
+      }
+      await loadMaterials(true);
+    });
+  });
+
+  // Mark as sent (20260914190000): a named person saying the money has left
+  // their bank. Stamped by the database with who and when, once, never
+  // changed. It sends the worker a WhatsApp, which cannot be unsent, so it
+  // asks first.
+  host.querySelectorAll("[data-sent-rel]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const rel = btn.dataset.sentRel;
+      const ref = ((host.querySelector(`[data-mr-sref="${rel}"]`) || {}).value || "").trim();
+      const amt = jmdFmt(Number(btn.dataset.sentAmt || 0));
+      if (!confirm(`Mark ${amt} as sent to the worker by bank transfer${ref ? ", reference " + ref : ""}?\n\nThis sends them a WhatsApp saying it has been sent, and it cannot be changed afterwards. Only press it once the transfer has gone from your bank.`)) return;
+      btn.disabled = true;
+      try {
+        const { error } = await sb.rpc("mark_materials_sent", { p_release: rel, p_method: "bank_transfer", p_ref: ref });
+        if (error) throw error;
+        say("mrMsg", "ok", `Marked ${amt} as sent${ref ? ", reference " + ref : ""}. The worker is being sent a WhatsApp with a link to upload the receipt.`);
       } catch (e) {
         let hint = e.message;
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
