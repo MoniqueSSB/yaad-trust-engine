@@ -5313,3 +5313,16 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 5. **A worker is stuck on "Stripe needs something from you".** Open the recipient in the Stripe Dashboard, Global Payouts, Recipients, and read what it asks for. The worker fixes it through the same button.
 6. **Going live** is its own decision: live key, `STRIPE_PAYOUTS_ALLOW_LIVE=yes`, cross-border payouts enabled by Stripe support. Until then every recipient is a test one.
 7. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.
+
+## Paying a worker, until Stripe payouts reach Jamaica
+
+**What it is.** Since 14 Sep 2026 (`20260914210000`) a worker's pay invoice is paid from the desk's **Pay workers** view, the same shape as materials money: you pay from the business bank app, then record it. Yaadly stores no worker bank details; the payee lives in your bank app.
+
+1. **Who is owed.** Desk, Documents & money, **Pay workers**. "Owed now" lists every sent worker pay invoice, oldest first, with how many days it has waited (amber from one day, red from three) and whether the worker has set up Stripe yet.
+2. **Pay it.** From your business bank app, to the payee saved there. Get the worker's bank details from them by phone or in person, never over the Yaadly WhatsApp number: messages there are filed as job evidence and can reach a client report.
+3. **Record it.** Type the transfer reference if you have one and press **Mark as sent**. It asks first, because it sends the worker a WhatsApp that cannot be unsent. It marks the invoice paid, stamped with your email and the time, once. It cannot be changed afterwards; a mistake is corrected with a note.
+4. **"Pay the worker from your business bank app, then press Mark as sent..."** Somebody pressed the old Mark as paid on a worker's pay invoice, or wrote to the table directly. The database now refuses that, because it would skip the record and the WhatsApp. Use Pay workers. The invoice screens show a **Pay the worker** button that goes there.
+5. **The worker says no WhatsApp arrived.** It is free text, so it only arrives if they have messaged the Yaadly number in the last 24 hours. Check Supabase, Edge Functions, `yaad-notify-client`, Logs, for kind `worker_paid`, and tell them by phone. Their portal shows the invoice as Paid, with the date and reference, either way.
+6. **Proving the rules hold:** run `supabase/tests/worker_pay_guards.sql` with `execute_sql`. Eleven lines, all PASS (a SKIP means there was no test invoice to borrow). Nothing is kept, and the WhatsApp it queues is thrown away with everything else.
+7. **Deploy order:** apply `20260914210000` first, then deploy `yaad-notify-client` (it keeps `--no-verify-jwt`, it is on the CLAUDE.md §12 list), then the web app, then the desk. The portal and the desk read `paid_method` and `paid_reference`; before the migration that read fails and the invoice lists come back empty.
+8. **Client bills are unchanged.** They are still marked paid with Mark as paid on Invoices; the database now also stamps who pressed it (`paid_by`).

@@ -328,7 +328,7 @@ export default async function JobRoom({
          place for that rule to drift out of step with Postgres. */
       supabase
         .from("invoices")
-        .select("id,status,total_pence,currency,stage,payable_to,issue_date,paid_at,period_label,starts_job,part_of")
+        .select("id,status,total_pence,currency,stage,payable_to,issue_date,paid_at,period_label,starts_job,part_of,paid_method,paid_reference")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       /* The other route to a payment schedule. A job goes through EITHER a

@@ -144,7 +144,7 @@ export default async function WorkerPortal() {
   // (invoices_worker_read) already scopes this to the signed-in worker.
   const { data: myInvoices } = await supabase
     .from("invoices")
-    .select("id,job_id,stage,period_label,total_pence,status,sent_at")
+    .select("id,job_id,stage,period_label,total_pence,status,sent_at,paid_at,paid_method,paid_reference")
     .eq("payable_to", "worker")
     .neq("status", "void")
     .order("stage", { ascending: true, nullsFirst: true });
@@ -171,6 +171,9 @@ export default async function WorkerPortal() {
       totalPence: inv.total_pence,
       status: inv.status,
       sentAt: inv.sent_at,
+      paidAt: inv.paid_at,
+      paidMethod: inv.paid_method,
+      paidRef: inv.paid_reference,
     });
     invoicesByJob.set(inv.job_id!, list);
   }
