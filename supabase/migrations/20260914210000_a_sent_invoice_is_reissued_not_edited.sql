@@ -56,7 +56,7 @@ alter table public.invoices
 create index if not exists invoices_replaces_idx on public.invoices(replaces) where replaces is not null;
 
 comment on column public.invoices.replaces is
-  'On a reissued invoice, the sent invoice it replaced, which is now void. NULL otherwise. 20260914170000.';
+  'On a reissued invoice, the sent invoice it replaced, which is now void. NULL otherwise. 20260914210000.';
 
 -- ------------------------------------------------------------------ reissue
 
@@ -166,7 +166,7 @@ begin
 end $function$;
 
 comment on function public.reissue_invoice(text) is
-  'Voids a sent client invoice and opens an editable copy as a new numbered draft that names it in replaces. A bill''s live parts move to the copy; a part is put back on its draft bill and requested again. Refuses a card-paid invoice. Emails nobody. 20260914170000.';
+  'Voids a sent client invoice and opens an editable copy as a new numbered draft that names it in replaces. A bill''s live parts move to the copy; a part is put back on its draft bill and requested again. Refuses a card-paid invoice. Emails nobody. 20260914210000.';
 
 -- ------------------------------------------------------------------ grants
 --

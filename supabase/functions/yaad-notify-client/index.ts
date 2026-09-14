@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -908,7 +908,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -950,7 +950,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1132,9 +1132,15 @@ Deno.serve(async (req: Request) => {
       const pay = l - Math.round(l * 0.05) + Math.round(Number(q?.materials_jmd ?? 0));
       subject = `You are booked: ${job.title}`;
       line = `The client has accepted your price on ${job.id} (${job.title}) in ${job.parish ?? "Jamaica"}. ` +
-        `Yaadly is engaging you for it at your quoted labour price less 5%, plus materials at cost against your receipt: ${money(pay)} owed to you by Yaadly as the stages are signed off. ` +
+        `Yaadly is engaging you for it at your quoted labour price less 5%, plus materials at cost: ${money(pay)} owed to you by Yaadly. ` +
+        `Materials money is sent to you to buy the goods once the client has paid for them; your labour is paid as the stages are signed off. ` +
         `Do not start yet. The job goes live once the client's invoice to Yaadly is paid, and you will get a message on this number when it is. ` +
-        `Your Arrival Log on day one is what opens the first stage.`;
+        `Your Arrival Log on day one is what opens the first stage.\n\n` +
+        // 20260914200000. The request for payment details, pointing at a page
+        // in their own portal and never asking for a reply here: anything a
+        // worker types to this number is kept with the job and read by the
+        // intake and reporting steps, so bank details must never be sent in it.
+        `To be paid, set up how Yaadly pays you: ${APP_URL}/portal/worker/payouts. You type your bank details into Stripe's secure page, and Yaadly never sees them. Never type bank details into this chat.`;
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
@@ -1220,6 +1226,27 @@ Deno.serve(async (req: Request) => {
       line = `${job.title} (${job.id}) is signed off, every stage approved. ` +
         `Yaadly owes you your labour and materials for it, and Yaadly pays you for the work. ` +
         `Check your own figure any time in your Yaadly portal.`;
+    } else if (kind === "materials_sent_worker") {
+      // 14 Sep 2026. A materials release records a decision and moves no
+      // money, so the worker hears nothing then. This fires when a person on
+      // the desk marks the money SENT (mark_materials_sent, 20260914190000),
+      // so it only says what has actually happened. Read off the row itself,
+      // and only while it is on this job and marked sent, so a stray or
+      // repeated call cannot tell a worker money is coming that is not.
+      // Names no bank account: Yaadly stores no worker bank details.
+      const { data: rel } = await admin.from("materials_releases")
+        .select("amount_jmd, sent_at, sent_method, sent_ref")
+        .eq("id", String(meta.releaseId ?? "")).eq("job_id", jobId).maybeSingle();
+      if (!rel?.sent_at) {
+        root.setAttributes({ "yaadly.notify.outcome": "release_not_sent" });
+        return json({ ok: true, kind, told: false, reason: "That release is not marked sent on this job." });
+      }
+      const how = rel.sent_method === "bank_transfer" ? " by bank transfer" : "";
+      const ref = String(rel.sent_ref ?? "").trim();
+      subject = `Materials money sent: ${job.title}`;
+      line = `Yaadly has sent you ${money(Number(rel.amount_jmd))}${how} for the materials on ${job.title} (${job.id})` +
+        (ref ? `, reference ${ref}` : "") + `. ` +
+        `Keep the supplier receipt. Once you have the goods, upload the receipt and a photo of the materials in the store here: ${roomLink}#files`;
     } else if (kind === "evidence_landed") {
       // Founder's own requirement, 31 Aug 2026, and a real change from how
       // this kind worked that same morning: the AI's composed report does

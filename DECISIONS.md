@@ -6,6 +6,24 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-14 · Invoices: a summary per currency, Paid by month, Agency fees, and every invoice on one job
+
+**Founder, on the first version of the one Invoices screen:** the money bars with "J$129,000 + £149.00" "looks confusing and what happens when i have alot of jobs"; "there needs to be a part inside for agency fees", "and that being paid"; "I should be able to click on a job and it show me all the invoices linked to that job". Each was shown to her as a clickable demo with invented data before it was built into the desk.
+
+**A table, not bars, and never two currencies added together.** One row per currency and one box per group, each a single amount and a count, clicking through to the group. The group buttons carry counts only, so the same money is not shown twice.
+
+**Paid is one month at a time, and reading no longer stops at the newest 300.** The old read took the latest 300 invoices and totalled them, which would have quietly undercounted as soon as there were more. Now every draft and sent invoice is read whatever its age, because that is what is owed and it stays small; paid is read for the month on screen; void for the latest 50; and every invoice on the booked jobs and every piece of an open bill, so a balance, a 15% and a 5% always add up from the complete set. The ceiling is Supabase's 1,000 rows per read, noted in the RUNBOOK; beyond that the totals want a database-side sum.
+
+**Agency fees, and what counts, are her call:** the 15% on each job, every service invoice, and the 5% from each tradesperson. When each is taken, in her words: "the client it is one the job when it is paid and the worker, once the job is finished we will deduct the 5 and pay the rest". The 15% is read off the invoice line that carries it, by `is_fee` or by its words, because `is_fee` was only backfilled on drafts and every bill sent or paid before 13 Sep 2026 carries it unflagged. The 5% is on no invoice, so it is worked out from the accepted quote (the same `round(labour * 0.05)` the payable functions use) and shown as a worked-out figure, never as a record.
+
+**Open question, hers, not changed here.** Production raises a tradesperson's pay invoice at each stage sign-off (`trg_raise_worker_pay_on_stage_approval`), each already less 5%, so today money reaches them stage by stage, not in one payment at the end as she described. Agency fees reads correctly either way. Changing when a tradesperson is paid is a money decision (CLAUDE.md §10) and was left alone.
+
+**One job's invoices.** Every invoice with that `job_id`, whatever its month or state, oldest first, with the job's money at the top. Reached from any job reference on the view and from the job page's Money box (`invoices:job:<id>`). Read only: no new table, column or function.
+
+**Where it lives.** The Invoices view of `concierge/concierge.html`. No database change.
+
+---
+
 ## 2026-09-14 · One Invoices screen with a running balance, and a sent invoice is reissued, never edited
 
 **Founder:** "in the admin desk all the invoices should be in one section not split up, there should be a section to showcase what is paid and what is outstanding and what is preview", then "I should be able to edit invoice, raise invoices partly and it record what is outstanding." Three calls, hers, made on 14 Sep 2026 against a clickable demo with invented data: job bills are split into parts with a running balance, not paid in instalments against one invoice; a sent invoice is voided and reissued, never edited in place; job bills only, because the payment terms page says a service is one invoice at the full price, due before work starts.
@@ -18,7 +36,17 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Known edge.** Catalogue lines are copied as catalogue lines, so the price guard reprices them at today's list price, the same rule as any new line. A line whose service is off the list is copied at its old amount as a "my figure" line rather than failing the reissue.
 
-**Where it lives.** The Invoices view of `concierge/concierge.html`; `supabase/migrations/20260914170000_a_sent_invoice_is_reissued_not_edited.sql`; proof in `supabase/tests/invoice_reissue_guards.sql`. Applied to production 14 Sep 2026 on Monique's instruction ("go ahead, apply and raise") by `execute_sql` in two steps, the column then the function, and recorded by hand in `supabase_migrations.schema_migrations`. The live `request_invoice_part()`, status guard and void guards were read immediately before and are untouched. The test was run against production straight after: 9 of 9 PASS, nothing survived the rollback, and the invoice counter was back where it started.
+**Where it lives.** The Invoices view of `concierge/concierge.html`; `supabase/migrations/20260914210000_a_sent_invoice_is_reissued_not_edited.sql`; proof in `supabase/tests/invoice_reissue_guards.sql`. Applied to production 14 Sep 2026 on Monique's instruction ("go ahead, apply and raise") by `execute_sql` in two steps, the column then the function, and recorded by hand in `supabase_migrations.schema_migrations`. The live `request_invoice_part()`, status guard and void guards were read immediately before and are untouched. The test was run against production straight after: 9 of 9 PASS, nothing survived the rollback, and the invoice counter was back where it started.
+
+---
+
+## 2026-09-14 · The price comparison lives on the quote, and the desk's Price check view is gone
+
+**Founder:** "the price check should be on quote automatically shown to the client, not on its own section in admin." The client half already existed. Since 5 September every quote on a client's job page carries a "For comparison" box (`web/components/portal/PriceContextNote.tsx`), worked out automatically from the researched band and from `price_spread_for_trade`, and the quoting worker reads the same words (the Mirror Rule). So the change was to take the desk's separate Price check view out: its menu entry, its page, and the code that ran it. Nothing about the client's box changed.
+
+**The verdict did not move across, on purpose.** The desk view said "red flag", "high, ask questions" or "suspiciously low". Those are judgements on a price, which is quantity surveying, the one thing Yaadly does not guarantee. The client box says where the labour figure sits and what the comparison is made of, never whether it is right. That rule is `web/lib/portal/price-context.ts` rule 1 and `web/tests/price-context.test.mjs` holds it in words. The thresholds still exist in the engine's `review_quote()`, which is where they came from.
+
+**What went with it.** The desk no longer writes `quote_reviews`, so "quote review" stops adding to `desk_decisions`. The table, its rows and its RLS are untouched, and no migration was needed. The price database does not depend on it: every submitted quote already lands in `price_observations` by trigger. The generated `PRICE_BENCHMARKS` block stays in `concierge.html` although nothing in the page reads it now, because `tests/test_price_benchmarks.py` checks the engine's bands against it, and removing it would mean rewriting those tests rather than the page. If the desk ever shows the client's sentence beside a quote, that block is what it would read.
 
 ---
 
@@ -3352,6 +3380,14 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 
 **Payouts to tradespeople will not use Connect.** Stripe's docs say Connect cross-border payouts from a UK platform reach only the US, UK, EEA, Canada and Switzerland. Stripe Global Payouts added Jamaican bank accounts (`jm_bank_account`) in December 2025 and is open to UK businesses, so phase 3 is designed on that, pending the founder enabling it, a solicitor view on the licensing note Stripe attaches to it, and a decision on worker bank and identity data going to Stripe.
 
+## 2026-09-14 · The invoice email carries a one-click pay link through yaad-pay, not a Stripe link
+
+**Why.** Founder, 14 Sep 2026: the invoice should give the client a direct link to pay Yaadly the amount. The portal's Pay by card needs a sign-in first; the founder wanted the email itself to be enough.
+
+**Why not a Stripe Checkout or Payment Link in the email.** A Checkout Session expires within 24 hours, and an email is read days later. A Payment Link lives forever but carries a fixed amount decided at send time, and keeps working after the invoice is paid or voided. So the email links to `yaad-pay`, which on every tap re-reads the invoice, refuses a paid, void, draft or already card-paid one with a page saying so, and only then asks Stripe for a fresh page for exactly its total.
+
+**The token is the door.** `yaad-pay` runs without platform JWT, like `yaad-stripe-webhook`. The link carries an HMAC of the invoice number (128 bits), signed by `yaad-invoice` and checked by `yaad-pay`, both with the service role key the platform already gives every function, so there is no new secret to manage. The cost, accepted: rotating that key invalidates links already sent (the portal still works). A wrong token looks exactly like an unknown invoice, so the endpoint cannot be used to discover invoice numbers. The session itself is built by `buildCheckoutForm` in `_shared/stripe.ts`, shared with `yaad-checkout`, so the two routes cannot drift apart. Nothing in either route marks an invoice paid.
+
 ## 2026-09-14 · Kickoff Drafts leaves the desk menu; the drafts that did not become a pack show on Kickoff packs
 
 **Why.** Founder, 14 Sep 2026: remove the Kickoff Drafts section. It listed every draft `yaad-kickoff` had ever written, most of them already packs. But it was also the only place in the desk where a draft held back by the guardrail, or a job whose drafts kept failing, could be seen at all, so deleting it outright would have turned a stopped job into a silent one. Of the options put to her she chose to take the view out of the menu and move that one job onto Kickoff packs.
@@ -3371,3 +3407,33 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **Worked out, not stored.** It is computed on the desk from `materials_releases.released_at` and `receipt_at`, which the database already stamps, joined to the worker through `jobs.worker_email`. There is no new column, table or migration, so there is nothing that could fall out of step with the release it describes. A receipt taken at release time (a `receipt_ref` with no `receipt_at`, from before `20260914112000`) counts as on time. The 48 hours is `RECEIPT_DUE_HOURS` in `concierge/concierge.html`. Known limit: a release is matched to the job's current worker, so if a job were ever reassigned after materials went out, the late receipt would show against the new worker.
 
 **What it is not.** A note for the person choosing a worker, on the desk only. It holds no stage, blocks no payment and changes no score: CLAUDE.md §2 and §4, the system never alters a reputation by itself, and the Yaad Score is not built (§9). Whether a missing receipt should also stop the next stage's sign-off was asked and is not yet decided, so nothing stops.
+
+## 2026-09-14 · Materials money is marked sent by a person; Yaadly stores no worker bank details
+
+**Why.** Founder, 14 Sep 2026, after the first real release on the desk: "who was it released to? Where does that money go? Do they receive a link?" A release (`20260914112000`) records a decision and moves nothing. Nothing told the worker, and nothing recorded that the money had actually left.
+
+**Yaadly stores no worker bank details (founder decision, the same day).** Considered and declined: a worker payout details table filled in through the worker portal. It would have made Yaadly the holder of a new kind of personal financial data, with a data protection record entry and a retention question of its own. Instead, until Stripe Global Payouts is live, the founder pays from the business bank using a payee saved in the bank's own app. When Global Payouts is live, the worker types their details into Stripe's hosted form (Account Links) and Yaadly keeps only Stripe's recipient reference. Workers must not send bank details to the Yaadly WhatsApp number: that text is stored and passed to the intake model.
+
+**What changed (`20260914190000`).** `materials_releases` gains `sent_at`, `sent_by`, `sent_method` and `sent_ref`. `mark_materials_sent()` is admin only, once per released row, and accepts `bank_transfer` only until Stripe is set up. A BEFORE trigger makes the sent fields write once and stamps who and when from the signed-in person, because the desk can write this table directly under `materials_releases_admin`, so a rule that lived only inside the function could be walked round with a plain UPDATE. An AFTER trigger calls `yaad-notify-client` with kind `materials_sent_worker`, which reads the row itself and says nothing unless it is marked sent on that job.
+
+**The WhatsApp fires on sent, not on release,** so it only states what has happened. It names no bank account and no arrival time. It is free text: no Content Template exists for it, so it reaches a worker only inside WhatsApp's 24 hour window, and no SMS sender is configured.
+
+**The portals follow.** A released, unsent tranche shows as Yaadly's task, "being sent". "Was paid to you" and the receipt to-do appear only once it is sent. The booking message stopped saying materials are paid "against your receipt".
+
+**Not built, deliberately.** Pay by Stripe is greyed on the desk until Global Payouts is switched on, Stripe support has enabled cross-border payouts to outside bank accounts, and the licensing note Stripe attaches has had a solicitor's view. It will widen the `sent_method` check in its own migration.
+
+**No human gate moved.** Releasing is one named click and marking sent is a second; neither moves money by itself.
+
+**The late receipt clock moves to sent.** The same day's entry above counts a receipt as late 48 hours after the money was released. With a separate sent step that would mark a worker late because Yaadly had not yet paid them, which is the Mirror Rule failing on the worker's side. The desk now counts from `sent_at`, and money released but not sent is never late.
+
+## 2026-09-14 · A worker gives their bank details to Stripe, never to Yaadly
+
+**Why.** Founder, 14 Sep 2026: Yaadly does not store worker bank details, and "make this live" for the route that avoids them. A worker's bank details are needed to pay them; the only question was who holds them.
+
+**How.** The booking WhatsApp now asks the worker to set up how Yaadly pays them, and points at `/portal/worker/payouts` in their own portal. It never asks for a reply: anything typed to the Yaadly number is kept with the job, and a worker's plain text on a live job is filed as work evidence and drafted into a client report (`yaad-inbound`), so bank details sent there would travel exactly where they must not. On the page, one button calls `yaad-payout-setup`, which makes the worker a Stripe Global Payouts recipient (a person in Jamaica, paid in J$ to a local bank; Stripe asks Yaadly only for email and name) and returns Stripe's one-time sign-up link. The worker types their bank details into Stripe's form. Yaadly keeps only `worker_profiles.stripe_recipient_id` and a status (`20260914200000`), written by the function with the service role; the existing policies let a worker read that row and not write it.
+
+**Why a portal page and not a link in the message.** Stripe's sign-up link is single use, lasts ten minutes, and Stripe says never to text or email it: message apps open links to preview them, which uses the link up. So the message carries a Yaadly address, and the Stripe link is made fresh when the signed-in worker taps the button. When it expires, Stripe sends them back with `?again=1` and the page makes another.
+
+**Test mode, with its own switch.** It runs on the same test key as card payments. A live key is refused unless `STRIPE_PAYOUTS_ALLOW_LIVE` is `yes`, a separate switch from card payments' `STRIPE_ALLOW_LIVE`, so taking card payments live cannot quietly start onboarding real payout recipients. The live Stripe account already has a Global Payouts financial account (GBP, open, read 14 Sep 2026).
+
+**Not built yet, deliberately.** Sending a payout. That is a later piece: a named person's click on the desk, with Stripe's quote for the fee and exchange rate shown first, never automatic (CLAUDE.md §2). Also still open: Stripe support enabling cross-border payouts to outside bank accounts, and the solicitor's view on the licensing note Stripe attaches to Global Payouts. Worker bank and identity details now go to Stripe by the worker's own hand; that is the founder's decision of this date.

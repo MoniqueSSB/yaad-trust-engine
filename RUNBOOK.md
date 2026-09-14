@@ -3492,9 +3492,11 @@ Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean dr
 
 ---
 
-## 22. A price check looks wrong, or a band has changed
+## 22. A price comparison on a quote looks wrong, or a band has changed
 
-The Price check view in the desk reads bands generated from `yaad/benchmarks.py`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+There is no Price check view in the desk any more (removed 14 September 2026, founder's instruction). The comparison is shown automatically on every quote, as the "For comparison" box on the client's job page, and the quoting worker sees the same words. It is worked out in `web/lib/portal/price-context.ts` from bands generated from `yaad/benchmarks.py` and from `price_spread_for_trade`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+
+**The box is missing on a quote.** Usually correct. It shows only when the trade has a general band with real figures, or when Yaadly has seen at least three real quotes for that trade. Below that it says nothing rather than something thin. Plumbing, for example, has only tank, unclog and septic bands, so it stays silent until three plumbing quotes exist.
 
 **To change a band:** edit `yaad/benchmarks.py`, then run
 
@@ -3502,17 +3504,17 @@ The Price check view in the desk reads bands generated from `yaad/benchmarks.py`
 python3 scripts/gen_price_benchmarks.py
 ```
 
-That rewrites the generated block inside `concierge/concierge.html`. Copy the file into `concierge-deploy/public/index.html` and deploy the desk. `tests/test_price_benchmarks.py` fails if the page has drifted from the engine, so a hand edit to the page is caught rather than shipped.
+That rewrites `web/lib/portal/price-bands.ts` (what clients read, live once the app is redeployed) and the generated block inside `concierge/concierge.html`, which nothing in the desk reads now but which `tests/test_price_benchmarks.py` checks against the engine. A hand edit to either is caught rather than shipped.
 
 **"No public price exists in Jamaica for this work" is a correct answer**, not a missing row. Painting, masonry, septic and general repair are deliberately empty: four-agent research on 1 August 2026 found no public prices for them anywhere in the country, and that gap is the reason the product exists. Do not fill them with a guess. A test asserts those four stay empty.
 
-**The verdict thresholds** are ported verbatim from `review_quote()`: over 2x the top of the band is a red flag, over 1.3x is worth asking about, under half the bottom is suspiciously low. Coarse on purpose. Six cases are checked against the Python source directly.
+**No verdict ever reaches a client or a worker.** The box says where the labour figure sits and what the comparison is made of, never whether the price is right. A verdict on a price is quantity surveying, the one thing Yaadly does not guarantee. The old desk view's verdicts ("red flag" over 2x the top of the band, "ask questions" over 1.3x, "suspiciously low" under half the bottom) were deliberately not carried onto the quote; they survive only in the engine's `review_quote()`. `web/tests/price-context.test.mjs` holds the no-verdict rule in words.
 
-**A trade with no band family** simply is not offered in the dropdown. Nine of the eighteen taxonomy trades map onto seeded families; the rest have no benchmark at all, and offering them would imply a lookup that cannot happen. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and checking a fence against it is a wrong reference dressed as a right one.
+**A trade with no band family** gets no researched comparison, only the observed spread once three quotes exist. Nine of the eighteen taxonomy trades map onto seeded families. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and comparing a fence against it is a wrong reference dressed as a right one.
 
-**Three outcomes, not two, and the difference matters.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. Those report **"say which kind of job"** and list the variants. They must never report "no public price exists", which is the third outcome and is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. A test asserts no mapped trade can fall into the wrong one.
+**Never say "no public price exists" where it is not true.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. On a quote those say nothing (until three real quotes exist), because nobody has judged which kind of job it is. They must never say "no public price exists", which is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. `tests/test_price_benchmarks.py` asserts no mapped trade can fall into the wrong one.
 
-**Nothing here is ever shown to a client or a worker.** `quote_reviews` is admin-only in RLS, deliberately with no party read policy. A band beside somebody's price reads as an estimate, and estimating is QS work, which is the one thing Yaadly does not guarantee.
+**`quote_reviews` is no longer written.** It was the desk view's log. The table, its rows and its admin-only RLS stay; nothing new lands there, so "quote review" no longer adds to `desk_decisions`. The price database keeps growing without it, because every submitted quote lands in `price_observations` by trigger.
 
 ## Changing anything a customer reads about money, checks or prices
 
@@ -5190,11 +5192,21 @@ Raising never emails anybody (13 Sep 2026). The reasoning is in DECISIONS.md, "R
 
 **Deploying this.** Apply `20260913233000_a_job_bill_can_be_requested_in_parts.sql` first, then deploy the desk and the web app. Both read `part_of` and `starts_job`, and a query that names a column the database does not have yet fails as a whole: the desk's invoice list would show "Could not read invoices", and the portal's job page would lose its invoices.
 
+## Reading the Invoices view: the summary, Paid by month, Agency fees, one job
+
+1. **The summary at the top** has one row per currency (Jamaican dollars for job bills, pounds for services) and three columns: Preview (drafted, not sent), Outstanding (sent, waiting for the money), Paid (in the month shown). Each box is one amount and a count; click it to open that group. Currencies are never added together. It counts money coming in only: what Yaadly pays a tradesperson is in the lists, labelled, and not in these figures.
+2. **Paid is one month at a time**, this month first. Use the arrows beside the month name, on the Paid and Agency fees groups, to step back. Preview and Outstanding always show everything unsent or unpaid, however old.
+3. **Agency fees** shows Yaadly's own money and whether it has come in: the 15% on each job (taken when the client pays the invoice that carries it, which starts the job), every service invoice (the whole price), and the 5% from each tradesperson. The 5% is on no invoice, because their pay is already less 5%, so it is worked out from the accepted quote at today's rate and counted as deducted once the job is complete and their pay is marked paid. Jobs whose pay was raised before 9 Sep 2026 were at 12%, so for those the worked-out figure is not what was deducted.
+4. **A 15% row saying "not found on its bill"** means the job has a client bill but no Guarantee & Support line on it. Open the bill and check it: the fee is recognised by `is_fee` or by the line starting "Guarantee & Support".
+5. **Every invoice on one job**: click any job reference on the view, or press **Every invoice on this job** in the Money box on the job's page. It lists the client's bill, its parts, what Yaadly pays the tradesperson and void ones, whatever the month, with the job's whole price, paid, waiting, not sent yet and still owed at the top. **Back to every invoice** returns to the groups.
+
+**If a total looks short.** The view reads every draft and sent invoice, the chosen month's paid ones, the latest 50 void, every invoice on the 50 most recently updated booked jobs, and every piece of an open bill. Supabase returns at most 1,000 rows per read, so past 1,000 unsent or unpaid invoices at once the totals need a database-side sum instead. Nowhere near that in the pilot.
+
 ## A sent invoice is wrong and needs changing
 
 A sent invoice is locked, because the client holds that copy: the database refuses any change to its lines. It is voided and reissued, never edited in place. Founder decision, 14 Sep 2026; the reasoning is in DECISIONS.md.
 
-1. **Open it** on the Invoices view (Outstanding group) and press **Void and reissue as a new draft**. Confirm. One database step (`reissue_invoice`, `20260914170000`) voids it and opens a copy as a new numbered draft. Each names the other: the draft says "Replaces INV-…", the void one says "Replaced by INV-…", on the list and in the editor. Nothing is emailed.
+1. **Open it** on the Invoices view (Outstanding group) and press **Void and reissue as a new draft**. Confirm. One database step (`reissue_invoice`, `20260914210000`) voids it and opens a copy as a new numbered draft. Each names the other: the draft says "Replaces INV-…", the void one says "Replaced by INV-…", on the list and in the editor. Nothing is emailed.
 2. **Change the draft**, preview it, and email it. Tell the client the new number replaces the old one.
 3. **A bill with parts**: its live parts move to the new bill, so the job's balance stays whole and nothing is billed twice.
 4. **A part**: its amount goes back on its bill and is requested again as a new part, so the fee and the job start move with it exactly as when it was first requested.
@@ -5243,7 +5255,11 @@ Since 14 September 2026 (`20260914112000`) materials money goes to the worker **
 4. **Record the receipt when it arrives.** Same row: each release still waiting shows **receipt to come** with a box. Type the reference as printed and press **Record receipt**. It is stamped with your email and time. A recorded receipt cannot be overwritten; a wrong one is corrected with a note, not retyped.
 5. **Who still owes a receipt:** `select * from public.materials_open_releases;` (released, no receipt, oldest first) and `select * from public.materials_reconciliation;` per job.
 6. **Proving the rules still hold:** run `supabase/tests/materials_release_guards.sql` with `execute_sql`, when nobody is invoicing. Eleven lines, all PASS. It rolls itself back.
-7. **A receipt is late.** The clock starts when the money is released to the worker. More than 48 hours without a receipt and it counts as late: the worker's row on the desk's Workers view shows "N overdue" in the Receipts column, and opening the worker lists each one. A receipt that arrives late stays on the record as "came late", with how long it took. It is a note for you when choosing a worker, seen on the desk only; it holds no stage and moves no money. Nothing is stored for it: it is worked out from `released_at` and `receipt_at`, so recording the receipt is the only way to clear an overdue one. The 48 hours is `RECEIPT_DUE_HOURS` in `concierge/concierge.html`.
+7. **A receipt is late.** The clock starts when the money is marked sent to the worker, not when it is released (`20260914190000`): money released and not yet sent is never late. More than 48 hours without a receipt and it counts as late: the worker's row on the desk's Workers view shows "N overdue" in the Receipts column, and opening the worker lists each one. A receipt that arrives late stays on the record as "came late", with how long it took. It is a note for you when choosing a worker, seen on the desk only; it holds no stage and moves no money. Nothing is stored for it: it is worked out from `released_at` and `receipt_at`, so recording the receipt is the only way to clear an overdue one. The 48 hours is `RECEIPT_DUE_HOURS` in `concierge/concierge.html`.
+8. **Pay the worker, then mark it sent** (`20260914190000`). A release moves no money. Each release shows **not yet sent**. Pay it from the business bank app, to the payee saved there: Yaadly holds no worker bank details, and a worker must never send them to the Yaadly WhatsApp number. Type the transfer reference if you have one and press **Mark as sent**. It asks first, because it sends the worker a WhatsApp that cannot be unsent. It is stamped with your email and the time, once, and cannot be changed afterwards; a mistake is corrected with a note.
+9. **The worker says no WhatsApp arrived.** It is free text, so it only arrives if they have messaged the Yaadly number in the last 24 hours. Check Supabase, Edge Functions, `yaad-notify-client`, Logs, for kind `materials_sent_worker`, and tell them by phone. Their portal shows the release as Sent either way.
+10. **Proving the sent rules hold:** run `supabase/tests/materials_sent_guards.sql` with `execute_sql`. Eleven lines, all PASS. Nothing is kept, and the WhatsApp it queues is thrown away with everything else.
+11. **Deploy order for this change:** apply `20260914190000` first, then deploy `yaad-notify-client` (it keeps `--no-verify-jwt`, it is on the CLAUDE.md §12 list), then the web app, then the desk. The portal and the desk read `sent_at`; before the migration that read fails and the release list shows nothing.
 
 ## Card payment on an invoice (Stripe, phase 1, test mode)
 
@@ -5290,3 +5306,41 @@ update app_settings set value = '<Bank>, <account name>, sort code <..>, account
 **Where they appear once set.** Under an unpaid Yaadly invoice in the client portal ("Or pay by bank transfer: … Use INV-… as the reference"), read through `client_bank_details()`, which returns that one setting and nothing else from the admin-only table. And in the footer of every emailed client invoice, from `yaad-invoice`, which also prints a "Pay online by card" link to the client's job page on sent job invoices. `yaad-invoice` must be redeployed for the email side (from `main`, JWT on).
 
 **A transfer is still marked paid by a person** at the desk when the money arrives. Showing the details moves nothing.
+
+## The one-click pay link in an invoice email
+
+**What it is.** Since 14 Sep 2026 every sent client invoice email carries "Pay this invoice by card: pay online". The link is `…/functions/v1/yaad-pay?i=<invoice>&t=<token>`. Tapping it, with no sign-in, checks the token and the invoice, makes a fresh Stripe Checkout page for exactly its total and goes there. Stripe returns the client to yaad-pay's own thank-you or cancelled page. The payment is recorded by `yaad-stripe-webhook` like any other; **you still mark the invoice paid at the desk**.
+
+**Why it is not a Stripe link.** A Checkout page expires within 24 hours; the email outlives it. yaad-pay makes a new page each time, and re-checks the invoice each time, so a paid or voided invoice gets a page saying so, never a payment page.
+
+**"This payment link is not valid".** The token did not match: the link was edited or truncated, or **the service role key was rotated**, which invalidates every link in emails already sent (the token is signed with it). The client pays from their job page instead; re-sending the invoice issues a new link.
+
+**Deploy:** `supabase functions deploy yaad-pay --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (the token is its only door; it goes on the CLAUDE.md §12 list once verified), and redeploy `yaad-invoice` (JWT on) so emails carry the link. Probe: `curl -s -o /dev/null -w "%{http_code}\n" "https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-pay?i=INV-X&t=00000000000000000000000000000000"` must print 404.
+
+## Going live with card payments
+
+Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handles a key.**
+
+1. **Stripe Dashboard, live mode** (switch off Test mode / Sandbox): Developers, API keys, copy the **live Secret key** (`sk_live_…`).
+2. **Live webhook**: Developers, Webhooks, Add destination, *Your account*, events `checkout.session.completed` and `checkout.session.async_payment_succeeded`, Webhook endpoint `https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-stripe-webhook`. Reveal its **Signing secret** (`whsec_…`). A live endpoint has a different secret from the test one.
+3. In your own terminal:
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=sk_live_PASTE STRIPE_WEBHOOK_SECRET=whsec_PASTE STRIPE_ALLOW_LIVE=yes --project-ref leffyisvfvjwzilydlwf
+   ```
+4. **Check** `select livemode, count(*) from invoice_payments group by 1;` after the first real payment: `true` means live.
+
+**What changes.** Test cards stop working; test-mode payments are no longer verified (the webhook secret is now the live one). The client pays exactly the invoice total, so **Yaadly absorbs Stripe's fee** unless that is changed. If Stripe refuses a J$ card session in live mode, the JMD currency or card settings on the live account are the first thing to check.
+
+**Going back to test**: set the test key and test webhook secret again and `supabase secrets unset STRIPE_ALLOW_LIVE --project-ref leffyisvfvjwzilydlwf`.
+
+## Worker payout setup (Stripe Global Payouts, test mode)
+
+**What it is.** Since 14 Sep 2026 (`20260914200000`) a worker sets up how Yaadly pays them at `/portal/worker/payouts`, on Stripe's own form. Yaadly never sees or stores their bank details; `worker_profiles.stripe_recipient_status` says `none`, `started`, `ready` or `needs_info`. The booking WhatsApp points them there.
+
+1. **Switching it on (test mode), in this order:** apply `20260914190000`, then `20260914200000`. Then, from the repo root, from `main`: `supabase/functions/sync-shared.sh`, `supabase functions deploy yaad-payout-setup --project-ref leffyisvfvjwzilydlwf` (platform JWT check stays ON, no flag), and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it is on the CLAUDE.md §12 list). Then the web app, then the desk. It uses the `STRIPE_SECRET_KEY` already set for card payments.
+2. **Check it is behind the login:** `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-payout-setup` must answer 401.
+3. **Try it as a worker:** sign in to the portal as the test worker, open How Yaadly pays you, press Set up with Stripe. Stripe's test form opens; test bank numbers are on Stripe's Global Payouts testing page. On return the status should read Ready.
+4. **"Setting up payment is not available right now."** Supabase, Edge Functions, `yaad-payout-setup`, Logs. A Stripe answer naming the API version: set the secret `STRIPE_V2_VERSION` to the version Stripe names. A Stripe answer saying Global Payouts or recipients are not enabled: that is the Stripe account, not the code; switch it on in the Dashboard for the mode the key is in.
+5. **A worker is stuck on "Stripe needs something from you".** Open the recipient in the Stripe Dashboard, Global Payouts, Recipients, and read what it asks for. The worker fixes it through the same button.
+6. **Going live** is its own decision: live key, `STRIPE_PAYOUTS_ALLOW_LIVE=yes`, cross-border payouts enabled by Stripe support. Until then every recipient is a test one.
+7. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.

@@ -1,6 +1,6 @@
 -- Proof that a sent invoice is reissued without an amount ever sitting on two
 -- invoices, and that everything which must refuse, refuses. Run with
--- execute_sql once 20260914170000 is applied.
+-- execute_sql once 20260914210000 is applied.
 --
 -- NOTHING HERE PERSISTS AND NOTHING LEAVES. Same shape as
 -- invoice_parts_guards.sql: it borrows a TEST job with an accepted quote and
