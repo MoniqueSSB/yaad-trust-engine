@@ -192,6 +192,7 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
     <div>
       <h2>Due</h2><p>${dt(inv.due_date)}</p>
     </div>
+    ${inv.job_id ? `<div><h2>Job</h2><p>${esc(inv.job_id)}</p></div>` : ""}
     ${inv.period_label ? `<div><h2>Period</h2><p>${esc(inv.period_label)}</p></div>` : ""}
     ${inv.po_number ? `<div><h2>PO number</h2><p>${esc(inv.po_number)}</p></div>` : ""}
   </div>
@@ -303,7 +304,12 @@ Deno.serve(async (req) => {
       if (lines.some((l: any) => l.price_source === "needs_price")) return fail(`invoice ${id} has an unpriced line and cannot be sent`, 409);
       const settings: Record<string, string> = {};
       if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
-      const html = renderInvoice(inv, lines, settings);
+      // The copy that is emailed is the sent invoice, so it is stamped sent.
+      // It used to be rendered from the row as read, still 'draft', so every
+      // invoice emailed from the desk reached the client marked "draft".
+      // Found on INV-2026-0021, 14 Sep 2026. If the email fails, the row
+      // below is never updated and stays a draft, as before.
+      const html = renderInvoice({ ...inv, status: "sent" }, lines, settings);
 
       const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
       if (!resendKey) return fail("RESEND_API_KEY is not set, so this cannot email anybody yet. Render and send it by hand instead.", 500);

@@ -66,8 +66,17 @@ describe("the null shapes differ on purpose", () => {
 });
 
 describe("amount, for invoices in minor units", () => {
-  test("JMD rounds like everything else J$", () => {
-    assert.equal(m.amount(123456789, "JMD"), "J$1,234,568");
+  /* JMD is the exception to "minor units": J$ invoices store WHOLE dollars.
+     This test used to assert amount(123456789, "JMD") === "J$1,234,568",
+     which locked in dividing J$ by 100 and showed a J$134,250 job bill as
+     "J$1,343" on the live portal (INV-2026-0021, 14 Sep 2026). Changed with
+     the founder's explicit approval, 14 Sep 2026. */
+  test("JMD is stored in whole dollars and shown as it is stored", () => {
+    assert.equal(m.amount(123456789, "JMD"), "J$123,456,789");
+  });
+
+  test("the real INV-2026-0021 total reads as the bill the client received", () => {
+    assert.equal(m.amount(134250, "JMD"), "J$134,250");
   });
 
   test("card currencies keep both decimals, because a statement has them", () => {
@@ -82,7 +91,7 @@ describe("amount, for invoices in minor units", () => {
   });
 
   test("currency is matched case insensitively", () => {
-    assert.equal(m.amount(14900, "jmd"), "J$149");
+    assert.equal(m.amount(14900, "jmd"), "J$14,900");
   });
 
   test("a missing total says so in words rather than printing a dash", () => {
