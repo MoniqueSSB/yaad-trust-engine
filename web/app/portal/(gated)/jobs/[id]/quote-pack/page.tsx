@@ -48,7 +48,17 @@ export default async function QuotePackPage({
     .select("id,title,parish,client_email,worker_email")
     .eq("id", id)
     .maybeSingle();
-  if (!job) notFound();
+
+  /* Since 13 Sep 2026 a worker who has quoted and is not booked gets no jobs
+     row at all, only the tender pack (my_quoted_jobs). This page needs the
+     title and parish from the job and nothing else, so it takes them from
+     there. Whose quote it is still comes from the quote row below. */
+  let head: { title: string | null; parish: string | null } | null = job;
+  if (!head) {
+    const { data: tenderRows } = await supabase.rpc("my_quoted_jobs").eq("id", id);
+    head = ((tenderRows ?? []) as { title: string | null; parish: string | null }[])[0] ?? null;
+  }
+  if (!head) notFound();
 
   // Same "prefer the one named in the link, fall back to the newest live
   // one" shape the Kickoff Pack index page already uses (20260831zzzz13):
@@ -68,7 +78,7 @@ export default async function QuotePackPage({
 
   const email = (user.email ?? "").toLowerCase();
   const role: "client" | "worker" | null =
-    job.client_email?.toLowerCase() === email
+    job?.client_email?.toLowerCase() === email
       ? "client"
       : quoteRow.worker_email?.toLowerCase() === email
       ? "worker"
@@ -111,8 +121,8 @@ export default async function QuotePackPage({
       <div className="mt-3 border-b-2 border-teal pb-4">
         <h1 className="font-display text-[clamp(22px,3.5vw,30px)] uppercase leading-tight">Quote Pack</h1>
         <p className="mt-1 text-[12px] text-dim">
-          {job.title} · {quoteRow.worker_name}
-          {job.parish ? " · " + job.parish : ""} ·{" "}
+          {head.title} · {quoteRow.worker_name}
+          {head.parish ? " · " + head.parish : ""} ·{" "}
           {quoteRow.status === "quote_confirmed" ? "Confirmed by both sides" : quoteRow.status}
         </p>
       </div>
