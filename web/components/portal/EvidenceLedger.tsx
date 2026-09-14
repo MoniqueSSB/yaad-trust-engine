@@ -52,6 +52,8 @@ function stamp(iso: string | null) {
 export function EvidenceLedger({
   items,
   stageCount,
+  stageNames = [],
+  stageProofs = [],
   currentStage,
   role,
   awaitingApproval,
@@ -59,6 +61,12 @@ export function EvidenceLedger({
 }: {
   items: EvidenceItem[];
   stageCount: number;
+  /** The stage names from the accepted quote's schedule, in order, so each
+      section reads "Stage 2 · Posts and rails fitted" and not a bare number.
+      Empty on a job with no schedule, which keeps the numbered sections. */
+  stageNames?: string[];
+  /** What proves each stage, from the same schedule. */
+  stageProofs?: (string | null)[];
   /** jobs.stage: the stage being worked, 0 before anything starts */
   currentStage: number;
   role: "client" | "worker";
@@ -96,9 +104,14 @@ export function EvidenceLedger({
     : currentStage === 0
       ? "Nothing filed yet. Evidence starts when the first stage does."
       : filed === 0
-        ? "Stage " + currentStage + " is under way. No photos filed against it yet."
-        : "Stage " + currentStage + " is under way, with " + filed +
+        ? stageTitle(currentStage) + " is under way. No photos filed against it yet."
+        : stageTitle(currentStage) + " is under way, with " + filed +
           " item" + (filed === 1 ? "" : "s") + " filed so far.";
+
+  function stageTitle(n: number): string {
+    const name = stageNames[n - 1];
+    return name ? "Stage " + n + ", " + name + "," : "Stage " + n;
+  }
 
   return (
     <section className="mt-6">
@@ -117,13 +130,26 @@ export function EvidenceLedger({
           {headline}
         </p>
         <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-mute">
-          Each stage has its own checklist, its own proof and its own release.
-          Money moves once per stage, never as one lump at the end.
+          {stageNames.length > 0
+            ? "The work is split into the " + stageNames.length + " stages of the accepted quote, below. Photos go under the stage they prove. The client signs each stage off on the Approvals tab, and the worker is paid for that stage once it is approved."
+            : "Each stage has its own checklist, its own proof and its own release. Money moves once per stage, never as one lump at the end."}
         </p>
         <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-dim">
+          {/* "Stage 0 of 1" read as broken (founder, 14 Sep 2026). Before
+              work starts it says how many stages there are and where they
+              came from; after, which one is being worked. */}
           <span>
-            Stage <b className="text-mute">{Math.max(currentStage, 0)}</b> of{" "}
-            <b className="text-mute">{stageCount}</b>
+            {currentStage > 0 ? (
+              <>
+                Stage <b className="text-mute">{currentStage}</b> of{" "}
+                <b className="text-mute">{stageCount}</b>
+              </>
+            ) : (
+              <>
+                Not started · <b className="text-mute">{stageCount}</b> stage{stageCount === 1 ? "" : "s"}
+                {stageNames.length > 0 ? " from the quote" : ""}
+              </>
+            )}
           </span>
           <span>
             <b className="text-mute">{filed}</b> item
@@ -166,7 +192,10 @@ export function EvidenceLedger({
               }
             >
               <div className="flex flex-wrap items-center gap-3">
-                <b className="text-[14px]">Stage {n}</b>
+                <b className="text-[14px]">
+                  Stage {n}
+                  {stageNames[n - 1] ? " · " + stageNames[n - 1] : ""}
+                </b>
                 <span
                   className={
                     "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide " +
@@ -189,6 +218,13 @@ export function EvidenceLedger({
                     : mine.length + " item" + (mine.length === 1 ? "" : "s")}
                 </span>
               </div>
+              {/* What proves this stage, in the accepted quote's own words,
+                  so the photos filed below can be read against it. */}
+              {stageProofs[n - 1] && (
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-dim">
+                  What proves it: <span className="text-mute">{stageProofs[n - 1]}</span>
+                </p>
+              )}
 
               {mine.length > 0 && (
                 <>

@@ -10,12 +10,17 @@ export type BeforeShot = { id: string; item_code: string | null; label: string |
 export function EvidenceUpload({
   jobId,
   maxStage,
+  stageNames = [],
   storeType,
   store,
   befores = [],
 }: {
   jobId: string;
   maxStage: number;
+  /** The accepted quote's stage names, in order, so the stage picker reads
+      "Stage 2: Posts and rails fitted" and the photo lands under the stage
+      it proves. Empty on a job with no schedule. */
+  stageNames?: string[];
   storeType: string | null;
   store: string | null;
   befores?: BeforeShot[];
@@ -69,8 +74,15 @@ export function EvidenceUpload({
             ? "Materials go here: " + store + ". Film them in that exact place and file it as materials on site. That is what moves the risk in them to the client."
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
+      {stageNames.length > 0 && (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
+          The work is split into the {stageNames.length} stages of the accepted
+          quote. Pick the stage this photo proves, and it is filed under that
+          stage in Progress evidence above.
+        </p>
+      )}
       <input type="hidden" name="jobId" value={jobId} />
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_120px_auto]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_minmax(190px,auto)_auto]">
         <input name="label" required maxLength={140} placeholder='What this shows, e.g. "The joint before work"'
           className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal" />
         {/* Materials on site is its own kind because it does a different job:
@@ -103,9 +115,11 @@ export function EvidenceUpload({
             </>
           )}
         </select>
-        <select name="stage" className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
+        <select name="stage" aria-label="Which stage this proves" className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
           {Array.from({ length: Math.max(1, maxStage) }, (_, i) => (
-            <option key={i} value={i + 1}>Stage {i + 1}</option>
+            <option key={i} value={i + 1}>
+              {stageNames[i] ? "Stage " + (i + 1) + ": " + stageNames[i] : "Stage " + (i + 1)}
+            </option>
           ))}
         </select>
         <input type="file" name="photo" accept="image/*"

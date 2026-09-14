@@ -26,7 +26,7 @@
 -- dropped and created in one transaction and its grants are put back exactly
 -- as they were: anon and authenticated may execute it.
 --
--- Applied to production: not yet.
+-- Applied to production: 14 Sep 2026, on Monique's "merge and deploy both", with execute_sql in one transaction, and recorded in schema_migrations as 20260914092546.
 
 begin;
 

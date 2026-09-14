@@ -405,7 +405,6 @@ export default async function JobRoom({
   }
 
   const stageCount = Math.max(job.stage ?? 0, ...ev.map((e) => e.stage ?? 1), 1);
-  const stages = Array.from({ length: stageCount }, (_, k) => k + 1);
   const qs = (quotes ?? []) as Quote[];
   const chooseOpen = !job.worker_email && job.status !== "complete";
   /* Who picks the tradesperson. 'yaadly' is the default and the managed
@@ -492,6 +491,16 @@ export default async function JobRoom({
     (quotePackRow as { docs?: unknown } | null)?.docs ?? null,
   );
   const packStages = kickoffStages.length ? kickoffStages : quotePackStages;
+  /* Progress evidence follows the quote's stages (founder, 14 Sep 2026: "the
+     work should have been split into the stages and the progress evidence
+     section aligned to the quote"). stageCount above only counts stages
+     that have been reached or have photos, so a three stage job with nothing
+     filed showed one stage and offered only "Stage 1" to upload against.
+     Here the schedule sets the count, and each stage carries its name and
+     what proves it, the same words the Approvals tab and the money use. */
+  const evidenceStageCount = Math.max(stageCount, packStages.length);
+  const evidenceStageNames = packStages.map((s) => s.stage);
+  const evidenceStageProofs = packStages.map((s) => s.release_condition ?? null);
   const packSource: "kickoff" | "quote" | null = kickoffStages.length
     ? "kickoff"
     : quotePackStages.length
@@ -1802,7 +1811,9 @@ export default async function JobRoom({
           <div id="stage-evidence" className="scroll-mt-6">
           <EvidenceLedger
             items={ev}
-            stageCount={stageCount}
+            stageCount={evidenceStageCount}
+            stageNames={evidenceStageNames}
+            stageProofs={evidenceStageProofs}
             currentStage={job.stage ?? 0}
             role={role === "worker" ? "worker" : "client"}
             awaitingApproval={awaitingApproval}
@@ -1835,7 +1846,8 @@ export default async function JobRoom({
         <div id="upload" className="scroll-mt-6">
         <EvidenceUpload
           jobId={job.id}
-          maxStage={stages.length}
+          maxStage={evidenceStageCount}
+          stageNames={evidenceStageNames}
           storeType={job.materials_store_type ?? null}
           store={job.materials_store ?? null}
           /* Every before already on this job, so an after can name the one it
@@ -1852,7 +1864,8 @@ export default async function JobRoom({
       {job.status !== "complete" && role === "worker" && (
         <VideoEvidenceUpload
           jobId={job.id}
-          maxStage={stages.length}
+          maxStage={evidenceStageCount}
+          stageNames={evidenceStageNames}
           storeType={job.materials_store_type ?? null}
           store={job.materials_store ?? null}
         />
