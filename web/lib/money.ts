@@ -53,9 +53,14 @@ export function jmdOrBlank(n: number | null | undefined): string {
  */
 export function amount(totalMinorUnits: number | null, currency: string | null): string {
   if (totalMinorUnits == null) return "not set";
-  const n = totalMinorUnits / 100;
   const cur = (currency ?? "GBP").toUpperCase();
-  if (cur === "JMD") return jmd(n);
+  /* J$ invoices are stored in WHOLE dollars, despite the *_pence column name:
+     raise_job_client_invoice writes J$75,000 of labour as 75000, and the
+     invoice document prints it that way. Dividing by 100 here showed the
+     client a J$134,250 bill as "J$1,343". Found on the live portal,
+     14 Sep 2026 (INV-2026-0021). GBP, USD and CAD are stored in pence/cents. */
+  if (cur === "JMD") return jmd(totalMinorUnits);
+  const n = totalMinorUnits / 100;
   if (cur === "USD") return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
   if (cur === "CAD") return "C$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
   return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2 });
