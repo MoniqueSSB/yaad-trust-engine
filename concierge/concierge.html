@@ -970,9 +970,9 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   </div>
 
   <div class="card">
-    <div class="chd"><h3>Raise & send, per your own published terms</h3></div>
+    <div class="chd"><h3>Raise a draft, per your own published terms</h3></div>
     <div id="policyMsg"></div>
-    <p class="hint">Reads the price straight off your service list, never typed by hand, and follows the same rule as <a href="https://yaadly.co.uk/payments.html" target="_blank" rel="noopener">the payment terms page</a>: one invoice, the full published price, due before work starts, whatever the price; the Oversight Retainer, one invoice for the month, cancel with 30 days notice. One click raises it, renders it and emails it to the client, then marks it sent.</p>
+    <p class="hint">Reads the price straight off your service list, never typed by hand, and follows the same rule as <a href="https://yaadly.co.uk/payments.html" target="_blank" rel="noopener">the payment terms page</a>: one invoice, the full published price, due before work starts, whatever the price; the Oversight Retainer, one invoice for the month, cancel with 30 days notice. Raising writes a draft and opens it below, so you can check it, change it and preview it before it is emailed.</p>
     <label>Which service</label>
     <select id="policyCatalogue"></select>
     <div class="row" style="margin-top:13px">
@@ -980,8 +980,8 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
       <div><label>Client email</label><input id="policyClientEmail" type="email" placeholder="marcia@example.com"></div>
     </div>
     <div class="row"><div><label>Client address, optional</label><input id="policyClientAddress"></div></div>
-    <div class="brow"><button class="btn" id="policyRaise">Raise &amp; send</button></div>
-    <p class="conseq">Writes one or two numbered invoices to your record, emails each one to the client, and marks it sent, all in this one click. Nothing here is model-drafted, so there is no separate review step: the amount comes straight from your service list and the wording is fixed, the same reason a policy-raised invoice does not need the "mark sent" click a free-text drafted one still does.</p>
+    <div class="brow"><button class="btn" id="policyRaise">Raise draft</button></div>
+    <p class="conseq">Writes one or two numbered draft invoices to your record and opens the first. It emails nobody: you send it from the draft, once you have read it.</p>
   </div>
 
   <div class="card hidden" id="invCard">
@@ -6594,13 +6594,41 @@ $("draft").addEventListener("click", async () => {
 });
 
 async function reload(id){
+  // Moving from one invoice to another (a part to its bill, say) must not
+  // leave the last one's preview sitting under the new one.
+  if (CURRENT?.invoice?.id !== id) show("previewCard", false);
   const [{ data: inv }, { data: lines }] = await Promise.all([
     sb.from("invoices").select("*").eq("id", id).single(),
     sb.from("invoice_lines").select("*").eq("invoice_id", id).order("sort").order("id")
   ]);
-  CURRENT = { invoice: inv, lines: lines || [], questions: CURRENT?.questions || [] };
+  // A whole-job bill lists the parts requested from it, each with its own
+  // lines, so the bill itself shows what has gone out and what has been paid.
+  let parts = [];
+  if (inv && inv.job_id && !inv.part_of) {
+    const { data: ps } = await sb.from("invoices")
+      .select("id,status,total_pence,currency,sent_at,paid_at,paid_reference,starts_job")
+      .eq("part_of", id).order("created_at");
+    parts = ps || [];
+    if (parts.length) {
+      const { data: pl } = await sb.from("invoice_lines")
+        .select("invoice_id,description,line_total_pence").in("invoice_id", parts.map(p => p.id));
+      for (const p of parts) p.lines = (pl || []).filter(l => l.invoice_id === p.id);
+    }
+  }
+  CURRENT = { invoice: inv, lines: lines || [], parts, questions: CURRENT?.questions || [] };
   renderInvoice();
   await loadInvoices();
+}
+
+// Opens any invoice in the editor on this view: from Job Invoices, Agency
+// Fees, or the service raise card. Raising only ever writes a draft; this is
+// where it is read, changed, split into parts, previewed and sent.
+async function openInvoice(id, note){
+  go("invoices");
+  CURRENT = { questions: [] };
+  await reload(id);
+  say("invMsg", note ? "ok" : "", note || "");
+  $("invCard").scrollIntoView({ behavior: "smooth" });
 }
 
 function renderInvoice(){
@@ -6608,8 +6636,34 @@ function renderInvoice(){
   const inv = CURRENT.invoice, lines = CURRENT.lines, draft = inv.status === "draft";
   const unpriced = lines.filter(l => l.price_source === "needs_price").length;
 
+  // A marketplace job bill is kept in whole Jamaican dollars, a service
+  // invoice in pence. Every figure on this card goes through amt(), and the
+  // my-figure box takes the unit the invoice is kept in, so J$4,000 is typed
+  // as 4000. Before 13 Sep 2026 this card assumed pence throughout, which
+  // showed a job bill in pounds and would have saved a typed J$4,000 as
+  // J$400,000.
+  const jmd = inv.currency === "JMD";
+  const amt = (p) => feeAmt(p, inv.currency);
+  const toUnit = (p) => jmd ? String(Math.round(p)) : (p / 100).toFixed(2);
+  const fromUnit = (v) => jmd ? Math.round(Number(v) || 0) : Math.round((Number(v) || 0) * 100);
+
+  // A whole-job bill can be requested in parts while it is a draft. Each part
+  // is its own numbered invoice and takes its amount off this bill, so no
+  // amount is ever on two documents. The Guarantee & Support line moves whole:
+  // whichever invoice carries it is the one whose payment starts the job.
+  // Founder decisions, 13 Sep 2026; the database enforces all of it
+  // (request_invoice_part, 20260913233000).
+  const isBill = !!inv.job_id && inv.stage == null && !inv.part_of && (inv.payable_to || "yaadly") === "yaadly";
+  const canPart = isBill && draft && lines.length > 0;
+  const parts = CURRENT.parts || [];
+  const liveParts = parts.filter(p => p.status !== "void");
+  const feePart = liveParts.find(p => p.starts_job);
+  const sumOf = (a) => a.reduce((t, p) => t + (p.total_pence || 0), 0);
+
   $("invTitle").innerHTML = esc(inv.id) + " " + chipFor(INV_CHIP, inv.status)
-    + (inv.drafted_by === "ai" ? ' <span class="chip ai">drafted by the agent</span>' : '');
+    + (inv.drafted_by === "ai" ? ' <span class="chip ai">drafted by the agent</span>' : '')
+    + (isBill ? ' <span class="chip mute">whole-job bill</span>' : '')
+    + (inv.part_of ? ' <span class="chip mute">part payment</span>' : '');
 
   const opts = (sel) => CATALOGUE.map(c => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.name)}</option>`).join("");
 
@@ -6624,19 +6678,28 @@ function renderInvoice(){
         </select>` : ""}</td>
       <td class="num" style="width:70px">${draft ? `<input class="q" type="number" min="0.5" step="0.5" value="${Number(l.qty)}">` : Number(l.qty)}</td>
       <td class="num">${draft && l.price_source === "manual"
-        ? `<input class="u" type="number" min="0" step="0.01" style="width:90px" value="${(l.unit_amount_pence / 100).toFixed(2)}">`
-        : l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : money(l.unit_amount_pence)}</td>
-      <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.line_total_pence)}</td>
+        ? `<input class="u" type="number" min="0" step="${jmd ? 1 : 0.01}" style="width:90px" value="${toUnit(l.unit_amount_pence)}">`
+        : l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : amt(l.unit_amount_pence)}</td>
+      <td class="num">${l.price_source === "needs_price" ? "&mdash;" : amt(l.line_total_pence)}</td>
+      ${canPart ? `<td class="num" style="min-width:150px">${l.price_source === "needs_price" ? "" : `<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end"><input type="checkbox" class="pk" title="Request this line now"><input class="pa" type="number" min="1" step="${jmd ? 1 : 0.01}" style="width:88px" value="${toUnit(l.line_total_pence)}"${l.is_fee ? ' readonly title="The Guarantee &amp; Support fee is requested whole. Paying whichever invoice carries it starts the job."' : ""}></div>`}</td>` : ""}
       <td class="num">${draft ? `<button class="btn d rm">Remove</button>` : ""}</td>
     </tr>`).join("");
 
+  const partsHtml = isBill && parts.length ? `
+    <div class="qs" style="margin-top:14px"><h4>Requested in parts</h4><ul>${parts.map(p => `
+      <li><a href="#" data-openinv="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(INV_CHIP, p.status)} <b>${amt(p.total_pence)}</b>
+        &middot; ${esc((p.lines || []).map(x => x.description).join(", "))}${p.starts_job && p.status !== "void" ? " &middot; <b>paying this starts the job</b>" : ""}${p.sent_at ? " &middot; sent " + esc(String(p.sent_at).slice(0, 10)) : ""}${p.paid_at ? " &middot; paid " + esc(String(p.paid_at).slice(0, 10)) + (p.paid_reference ? ", ref " + esc(p.paid_reference) : "") : ""}</li>`).join("")}</ul>
+      <p style="margin:8px 0 0">Still on this bill <b>${amt(inv.total_pence)}</b> &middot; requested in parts <b>${amt(sumOf(liveParts))}</b> &middot; paid so far <b>${amt(sumOf(liveParts.filter(p => p.status === "paid")))}</b></p></div>` : "";
+
   $("invBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)}${inv.client_company ? " (" + esc(inv.client_company) + ")" : ""} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}${inv.po_number ? " &middot; PO " + esc(inv.po_number) : ""}</p>
+    ${inv.part_of ? `<p class="vsub" style="margin:0 0 10px">Part of <a href="#" data-openinv="${esc(inv.part_of)}">${esc(inv.part_of)}</a>, the whole-job bill for ${esc(inv.job_id || "")}.${inv.starts_job ? " It carries the Guarantee &amp; Support fee, so paying it starts the job." : ""}</p>` : ""}
     <div class="tw"><table>
-      <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th><th></th></tr></thead>
+      <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th>${canPart ? '<th class="num">Request now</th>' : ""}<th></th></tr></thead>
       <tbody id="lineRows">${rows}</tbody>
     </table></div>
-    <div class="grand">${money(inv.total_pence)}</div>
+    <div class="grand">${amt(inv.total_pence)}</div>
+    ${partsHtml}
     ${unpriced ? `<div class="alert crit"><span class="ic">!</span><div><b>${unpriced} line${unpriced > 1 ? "s" : ""} the agent could not price</b><p>It will not guess. Pick a service off your list for each one, or remove it. This invoice cannot be marked as sent until they are gone.</p></div></div>` : ""}
     ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
     ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
@@ -6644,15 +6707,32 @@ function renderInvoice(){
       ${draft && inv.drafted_by === "ai" ? `<button class="btn g" id="takeOver">Make it mine to price</button>` : ""}
       ${draft ? `<button class="btn g" id="addLine">Add a line</button>` : ""}
       ${draft ? `<button class="btn g" id="saveLines">Save changes</button>` : ""}
+      ${canPart ? `<button class="btn g" id="partBtn">Request the ticked lines as a part</button>` : ""}
       <button class="btn g" id="previewBtn">Preview</button>
-      ${draft ? `<button class="btn" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent</button>` : ""}
+      ${draft && lines.length && inv.drafted_by !== "ai" ? `<button class="btn" id="emailBtn"${unpriced ? " disabled" : ""}>Email ${amt(inv.total_pence)} to ${esc(inv.client_email)}</button>` : ""}
+      ${draft && lines.length ? `<button class="btn g" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent, I sent it myself</button>` : ""}
       ${inv.status === "sent" ? `<button class="btn" id="paidBtn">Mark as paid</button>` : ""}
       ${draft || inv.status === "sent" ? `<button class="btn d" id="voidBtn">Void</button>` : ""}
     </div>
-    ${draft ? `<p class="conseq">Marking as sent <b>freezes ${esc(inv.id)} at ${money(inv.total_pence)}</b> and you cannot edit a line afterwards. It emails nobody: you still send it yourself.</p>` : ""}
-    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${money(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}`;
+    ${isBill && draft && !lines.length ? `<div class="alert"><span class="ic">i</span><div><b>Everything on this bill has been requested in parts</b><p>There is nothing left on it to send.</p></div></div>` : ""}
+    ${draft && lines.length ? `<p class="conseq">Emailing sends exactly what Preview shows and <b>freezes ${esc(inv.id)} at ${amt(inv.total_pence)}</b>: no line can be changed afterwards. Marking as sent freezes it the same way but emails nobody.</p>` : ""}
+    ${canPart ? `<p class="conseq">Requesting a part writes a new numbered draft for the ticked amounts and takes them off this bill, so nothing is billed twice. It emails nobody. ${inv.starts_job ? "The Guarantee &amp; Support fee is on this bill, so paying this bill starts the job, unless you request the fee as a part." : feePart ? `The fee went out on ${esc(feePart.id)}, so paying that part, not this bill, starts the job.` : ""}</p>` : ""}
+    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${amt(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}`;
 
   show("invCard", true);
+
+  let dirty = false;
+  $("invBody").querySelectorAll("#lineRows .d, #lineRows .q, #lineRows .u").forEach(x => x.addEventListener("input", () => { dirty = true; }));
+  $("invBody").querySelectorAll("#lineRows .pa").forEach(x => x.addEventListener("input", () => {
+    const pk = x.closest("tr").querySelector(".pk");
+    if (pk) pk.checked = true;
+  }));
+  $("invBody").querySelectorAll("[data-openinv]").forEach(a => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    say("invMsg", "", "");
+    CURRENT = { questions: [] };
+    await reload(a.dataset.openinv);
+  }));
 
   $("invBody").querySelectorAll(".rm").forEach(b => b.addEventListener("click", async (e) => {
     const { error } = await sb.from("invoice_lines").delete().eq("id", e.target.closest("tr").dataset.id);
@@ -6730,7 +6810,7 @@ function renderInvoice(){
       // catalogue tiers keep being overwritten by the price guard, so a
       // number typed against those is still discarded, on purpose.
       const u = tr.querySelector(".u");
-      if (u && tier === "manual") upd.unit_amount_pence = Math.round((Number(u.value) || 0) * 100);
+      if (u && tier === "manual") upd.unit_amount_pence = fromUnit(u.value);
       const { error } = await sb.from("invoice_lines").update(upd).eq("id", tr.dataset.id);
       if (error) return say("invMsg","err",error.message);
     }
@@ -6747,8 +6827,49 @@ function renderInvoice(){
     } catch (e) { say("invMsg","err",e.message); }
   });
 
+  if ($("partBtn")) $("partBtn").addEventListener("click", async () => {
+    if (dirty) return say("invMsg","err","You have changed a line without saving. Press Save changes first, so the part is taken from the figures you can see.");
+    const items = [];
+    for (const tr of $("lineRows").querySelectorAll("tr")) {
+      const pk = tr.querySelector(".pk");
+      if (!pk || !pk.checked) continue;
+      items.push({ line: Number(tr.dataset.id), amount: fromUnit(tr.querySelector(".pa").value) });
+    }
+    if (!items.length) return say("invMsg","err","Tick at least one line to request.");
+    const sum = items.reduce((t, i) => t + i.amount, 0);
+    if (!confirm("Request " + amt(sum) + " from " + inv.id + " as its own invoice?\n\nThis writes a new numbered draft for the ticked amounts and takes them off this bill. It emails nobody: you preview it and send it from the next screen.")) return;
+    try {
+      const { data, error } = await sb.rpc("request_invoice_part", { p_bill: inv.id, p_items: items });
+      if (error) throw error;
+      const row = (data || [])[0];
+      if (!row) throw new Error("Nothing was requested.");
+      CURRENT = { questions: [] };
+      await reload(row.invoice_id);
+      say("invMsg","ok", row.invoice_id + " drafted for " + amt(row.total) + ", part of " + inv.id + ". Nothing has been sent. Preview it, then email it.");
+    } catch (e) {
+      let hint = e.message;
+      if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+      say("invMsg","err", hint);
+    }
+  });
+
+  if ($("emailBtn")) $("emailBtn").addEventListener("click", async () => {
+    if (dirty) return say("invMsg","err","You have changed a line without saving. Press Save changes first, then Preview, so what goes out is what you checked.");
+    if (!confirm("Email " + inv.id + " to " + inv.client_email + "?\n\n" + amt(inv.total_pence) + ", exactly as Preview shows it. Sending freezes it: no line can be changed afterwards.")) return;
+    $("emailBtn").disabled = true;
+    try {
+      const out = await fn({ action: "send", invoice_id: inv.id });
+      say("invMsg","ok", "Emailed " + inv.id + " (" + amt(inv.total_pence) + ") to " + (out?.emailed_to || inv.client_email) + ". It is now marked sent.");
+    } catch (e) {
+      let hint = e.message;
+      if (/RESEND_API_KEY/i.test(hint)) hint = "RESEND_API_KEY is not set, so it could not be emailed. It is still a draft: preview it, print or save it, send it yourself, then press Mark as sent.";
+      say("invMsg","err", hint);
+    }
+    await reload(inv.id);
+  });
+
   if ($("sendBtn")) $("sendBtn").addEventListener("click", async () => {
-    if (!confirm("Mark " + inv.id + " as sent?\n\nThis freezes the invoice at " + money(inv.total_pence) + ". It does not email anybody: you still send it yourself.")) return;
+    if (!confirm("Mark " + inv.id + " as sent?\n\nThis freezes the invoice at " + amt(inv.total_pence) + ". It does not email anybody: you still send it yourself.")) return;
     const { error } = await sb.from("invoices").update({ status: "sent" }).eq("id", inv.id);
     if (error) return say("invMsg","err",error.message);
     say("invMsg","ok","Marked as sent and frozen. Now email or WhatsApp it to them.");
@@ -6765,7 +6886,8 @@ function renderInvoice(){
   });
 
   if ($("voidBtn")) $("voidBtn").addEventListener("click", async () => {
-    if (!confirm("Void " + inv.id + "? It stays on the record, marked void.")) return;
+    const back = inv.part_of ? "\n\nIts " + amt(inv.total_pence) + " goes back onto " + inv.part_of + "." : "";
+    if (!confirm("Void " + inv.id + "? It stays on the record, marked void." + back)) return;
     const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", inv.id);
     if (error) return say("invMsg","err",error.message);
     await reload(inv.id);
@@ -6837,37 +6959,53 @@ async function loadJobInvoices(){
 
   const jobIds = jobs.map((j) => j.id);
   const [{ data: quotes }, { data: invs }] = await Promise.all([
-    sb.from("job_quotes").select("job_id,worker_name,labour_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("invoices").select("id,job_id,status,total_pence,sent_at").in("job_id", jobIds).is("stage", null),
+    sb.from("job_quotes").select("job_id,worker_name,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
+    sb.from("invoices").select("id,job_id,status,total_pence,sent_at,part_of,payable_to").in("job_id", jobIds).is("stage", null),
   ]);
 
+  // The whole-job bill is the one with no part_of; parts are counted against
+  // it. A stage-less worker payable is what Yaadly owes, not the client's bill.
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
-  const invByJob = new Map();
-  for (const i of invs || []) if (i.status !== "void") invByJob.set(i.job_id, i);
+  const invByJob = new Map(), partsByJob = new Map();
+  for (const i of invs || []) {
+    if (i.status === "void" || i.payable_to === "worker") continue;
+    if (i.part_of) { if (!partsByJob.has(i.job_id)) partsByJob.set(i.job_id, []); partsByJob.get(i.job_id).push(i); }
+    else invByJob.set(i.job_id, i);
+  }
 
   const rows = jobs.map((job) => {
     const quote = quoteByJob.get(job.id);
     if (!quote) return "";
-    const fee = Math.round((quote.labour_jmd || 0) * 0.15);
+    // What the client is billed: labour, Yaadly's 15% on labour, materials at
+    // cost, the same sum raise_job_client_invoice writes. This used to show
+    // the 15% alone next to a button that sent the whole bill.
+    const labour = Math.round(quote.labour_jmd || 0);
+    const fee = Math.round(labour * 0.15);
     const inv = invByJob.get(job.id);
+    const parts = partsByJob.get(job.id) || [];
+    const billed = inv ? inv.total_pence + parts.reduce((t, p) => t + (p.total_pence || 0), 0)
+                       : labour + fee + Math.round(quote.materials_jmd || 0);
 
     let statusHtml, actionHtml;
     if (inv) {
       const when = inv.sent_at ? String(inv.sent_at).slice(0, 10) : "not sent yet";
+      const paidParts = parts.filter((p) => p.status === "paid").length;
       statusHtml = `<span class="jichip raised"><span class="dot"></span>${esc(inv.status)}</span>`
-        + `<span class="jiref">${esc(inv.id)} · ${esc(when)}</span>`;
-      actionHtml = `<button class="btn g" data-preview-inv="${esc(inv.id)}">Preview</button>`
+        + `<span class="jiref">${esc(inv.id)} · ${esc(when)}</span>`
+        + (parts.length ? `<span class="jiref">${parts.length} part${parts.length > 1 ? "s" : ""} requested, ${paidParts} paid</span>` : "");
+      actionHtml = `<button class="btn g" data-open-inv="${esc(inv.id)}">Open</button>`
+        + `<button class="btn g" data-preview-inv="${esc(inv.id)}">Preview</button>`
         + (inv.status === "sent" ? `<button class="btn" data-paid-inv="${esc(inv.id)}" data-paid-total="${inv.total_pence}">Mark as paid</button>` : "")
         + (inv.status === "draft" || inv.status === "sent" ? `<button class="btn d" data-void-inv="${esc(inv.id)}">Void</button>` : "");
     } else {
       statusHtml = `<span class="jichip ready"><span class="dot"></span>Ready to raise</span>`;
-      actionHtml = `<button class="btn" data-raise-job="${esc(job.id)}">Raise &amp; send</button>`;
+      actionHtml = `<button class="btn" data-raise-job="${esc(job.id)}">Raise draft</button>`;
     }
 
     return `<tr>
       <td><div class="jistagename">${esc(job.id)}</div><div class="jistagepct">${esc(job.title || "")}</div></td>
-      <td><div class="jicond">${esc(quote.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Labour ${jmdFmt(quote.labour_jmd || 0)}</div></td>
-      <td class="num"><span class="jiamt">${jmdFmt(fee)}</span></td>
+      <td><div class="jicond">${esc(quote.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Labour ${jmdFmt(labour)}</div></td>
+      <td class="num"><span class="jiamt">${jmdFmt(billed)}</span><div class="jistagepct">Yaadly's 15%: ${jmdFmt(fee)}</div></td>
       <td>${statusHtml}</td>
       <td>${actionHtml}</td>
     </tr>`;
@@ -6875,32 +7013,36 @@ async function loadJobInvoices(){
 
   host.innerHTML = rows.length
     ? `<table class="jitable">
-        <thead><tr><th>Job</th><th>Who</th><th class="num">Yaadly's fee, 15% of labour</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Job</th><th>Who</th><th class="num">Client's bill, Yaadly's 15% inside it</th><th>Status</th><th></th></tr></thead>
         <tbody>${rows.join("")}</tbody>
       </table>`
-    : `<div class="empty"><b>No booked job here has an accepted quote yet</b>An accepted quote is needed before the agency fee can be computed.</div>`;
+    : `<div class="empty"><b>No booked job here has an accepted quote yet</b>An accepted quote is needed before the client's bill can be worked out.</div>`;
 
+  // Raising writes a draft and opens it. Nothing is emailed from here: the
+  // bill is read, changed or split into parts in the editor, previewed, and
+  // only then sent. Founder instruction, 13 Sep 2026.
   host.querySelectorAll("[data-raise-job]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const job = btn.dataset.raiseJob;
       btn.disabled = true;
-      say("jiMsg", "ok", `Raising the agency fee on ${job}…`);
+      say("jiMsg", "ok", `Drafting the client's bill for ${job}…`);
       try {
         const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
         if (error) throw error;
         const row = (data || [])[0];
-        if (!row) throw new Error("Raised nothing to send.");
-        say("jiMsg", "ok", `Raised ${row.invoice_id} (${jmdFmt(row.total_jmd)}). Sending…`);
-        const out = await fn({ action: "send", invoice_id: row.invoice_id });
-        say("jiMsg", "ok", `Sent ${row.invoice_id} (${jmdFmt(row.total_jmd)}) to ${out?.emailed_to || "the client"}. Marked sent.`);
+        if (!row) throw new Error("Nothing was raised.");
+        await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
       } catch (e) {
         let hint = e.message;
         if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-        if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set, so it could not be emailed. Find it under Invoices, drafted, and send it from there once that is fixed.";
         say("jiMsg", "err", hint);
+        btn.disabled = false;
       }
-      await loadJobInvoices();
     });
+  });
+
+  host.querySelectorAll("[data-open-inv]").forEach((btn) => {
+    btn.addEventListener("click", () => openInvoice(btn.dataset.openInv));
   });
 
   host.querySelectorAll("[data-preview-inv]").forEach((btn) => {
@@ -7085,7 +7227,7 @@ async function loadAgencyFees(){
   } else {
     const jobIds = jobs.map((j) => j.id);
     const [{ data: quotes }, { data: invs }] = await Promise.all([
-      sb.from("job_quotes").select("job_id,labour_jmd").eq("status", "accepted").in("job_id", jobIds),
+      sb.from("job_quotes").select("job_id,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
       sb.from("invoices").select("job_id").in("job_id", jobIds).is("stage", null).neq("status", "void"),
     ]);
     const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
@@ -7096,8 +7238,12 @@ async function loadAgencyFees(){
       if (raised.has(job.id)) continue;
       const quote = quoteByJob.get(job.id);
       if (!quote) continue;
-      const fee = Math.round((quote.labour_jmd || 0) * 0.15);
-      dueRows.push({ job, fee });
+      // The whole bill, the same sum raise_job_client_invoice writes, with
+      // Yaadly's 15% shown inside it. This row used to show the 15% alone
+      // next to a button that emailed the whole bill.
+      const labour = Math.round(quote.labour_jmd || 0);
+      const fee = Math.round(labour * 0.15);
+      dueRows.push({ job, fee, bill: labour + fee + Math.round(quote.materials_jmd || 0) });
     }
 
     dueHost.innerHTML = dueRows.length
@@ -7105,31 +7251,31 @@ async function loadAgencyFees(){
         <div class="item">
           <div><b>${esc(r.job.id)}</b> &middot; ${esc(r.job.title || "")}<div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(r.job.client_email || "")}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-weight:700;font-variant-numeric:tabular-nums">${jmdFmt(r.fee)}</span>
-            <button class="btn" data-due-job="${esc(r.job.id)}">Raise &amp; send</button>
+            <span style="text-align:right"><span style="font-weight:700;font-variant-numeric:tabular-nums">${jmdFmt(r.bill)}</span><div style="color:var(--dim);font-size:11.5px">Yaadly's 15%: ${jmdFmt(r.fee)}</div></span>
+            <button class="btn" data-due-job="${esc(r.job.id)}">Raise draft</button>
           </div>
         </div>`).join("")}</div>`
-      : `<div class="empty"><b>Nothing outstanding</b>Every booked job already has its agency fee raised.</div>`;
+      : `<div class="empty"><b>Nothing outstanding</b>Every booked job already has its client's bill raised.</div>`;
 
+    // Raising writes a draft and opens it in the editor. Nothing is emailed
+    // from here. Founder instruction, 13 Sep 2026.
     dueHost.querySelectorAll("[data-due-job]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const job = btn.dataset.dueJob;
         btn.disabled = true;
-        say("feesMsg", "ok", `Raising the agency fee on ${job}…`);
+        say("feesMsg", "ok", `Drafting the client's bill for ${job}…`);
         try {
           const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
           if (error) throw error;
           const row = (data || [])[0];
-          if (!row) throw new Error("Raised nothing to send.");
-          const out = await fn({ action: "send", invoice_id: row.invoice_id });
-          say("feesMsg", "ok", `Sent ${row.invoice_id} (${jmdFmt(row.total_jmd)}) to ${out?.emailed_to || "the client"}.`);
+          if (!row) throw new Error("Nothing was raised.");
+          await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
         } catch (e) {
           let hint = e.message;
           if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-          if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set, so it could not be emailed. Find it under Invoices, drafted, and send it from there once that is fixed.";
           say("feesMsg", "err", hint);
+          btn.disabled = false;
         }
-        await loadAgencyFees();
       });
     });
   }
@@ -7151,6 +7297,7 @@ async function loadAgencyFees(){
       <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
       <td>${chipFor(INV_CHIP, i.status)}</td>
       <td>
+        <button class="btn g" data-fopen="${esc(i.id)}">Open</button>
         <button class="btn g" data-fp="${esc(i.id)}">Preview</button>
         ${i.status === "sent" ? `<button class="btn" data-fpaid="${esc(i.id)}" data-fpaidtotal="${i.total_pence}" data-fpaidcur="${esc(i.currency)}">Mark as paid</button>` : ""}
         ${i.status === "draft" || i.status === "sent" ? `<button class="btn d" data-fvoid="${esc(i.id)}">Void</button>` : ""}
@@ -7168,6 +7315,10 @@ async function loadAgencyFees(){
         $("feesPreviewCard").scrollIntoView({ behavior: "smooth" });
       } catch (e) { say("feesMsg", "err", e.message); }
     });
+  });
+
+  allHost.querySelectorAll("[data-fopen]").forEach((btn) => {
+    btn.addEventListener("click", () => openInvoice(btn.dataset.fopen));
   });
 
   allHost.querySelectorAll("[data-fpaid]").forEach((btn) => {
@@ -7227,19 +7378,19 @@ $("policyRaise").addEventListener("click", async () => {
     });
     if (error) throw error;
     const row = (data || [])[0];
-    if (!row) throw new Error("Raised nothing to send.");
+    if (!row) throw new Error("Nothing was raised.");
 
-    say("policyMsg","ok", `Raised ${row.invoice_id}. Sending to ${clientEmail}…`);
-    await fn({ action: "send", invoice_id: row.invoice_id });
-
-    say("policyMsg","ok", `Sent ${row.invoice_id} (${money(row.total_pence)}) to ${clientEmail}. It is now marked sent.`);
+    // Raising writes a draft and opens it. Nothing is emailed from here.
+    // Founder instruction, 13 Sep 2026: this used to raise and email in
+    // one click, with no chance to read or change it first.
+    const more = (data || []).length > 1 ? ` ${data.length - 1} more raised with it, in Recent invoices below.` : "";
+    say("policyMsg","ok", `Raised ${row.invoice_id} as a draft.${more}`);
     $("policyClientName").value = ""; $("policyClientEmail").value = ""; $("policyClientAddress").value = "";
-    await loadInvoices();
+    await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${feeAmt(row.total_pence, row.currency || "GBP")}. Nothing has been sent. Check it, preview it, then email it.`);
   } catch (e) {
     let hint = e.message;
     if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-    if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set as an Edge Function secret, so it could not be emailed. Find it under Invoices below, drafted, and send it from there once that is fixed.";
-    say("policyMsg","err", hint + " Check Recent invoices below: what raised before the failure is still there as a draft.");
+    say("policyMsg","err", hint);
   }
   $("policyRaise").disabled = false;
 });

@@ -30,6 +30,10 @@ export type InvoiceRow = {
   issue_date: string | null;
   paid_at: string | null;
   period_label: string | null;
+  /** Paying this invoice starts the job: it carries the Guarantee & Support line. */
+  starts_job?: boolean | null;
+  /** On a part payment, the whole-job bill it was requested from. */
+  part_of?: string | null;
 };
 
 /** The independent check, once a client has added one, as a line in the job
