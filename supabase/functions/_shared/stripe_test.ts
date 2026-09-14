@@ -1,12 +1,55 @@
 // Tests for _shared/stripe.ts. No imports beyond the module under test, so a
 // library version bump can never be the reason these go red.
 import {
+  buildCheckoutForm,
   checkStripeSignature,
   fromStripeAmount,
   hmacSha256Hex,
   isLiveKey,
+  payLinkToken,
   toStripeAmount,
+  verifyPayLinkToken,
 } from "./stripe.ts";
+
+const PAY_SECRET = "service-role-key-stand-in";
+
+Deno.test("a pay link token opens its own invoice", async () => {
+  const t = await payLinkToken("INV-2026-0021", PAY_SECRET);
+  eq(/^[0-9a-f]{32}$/.test(t), true, "32 hex");
+  eq(await verifyPayLinkToken("INV-2026-0021", t, PAY_SECRET), true, "valid");
+});
+
+Deno.test("a pay link token cannot be moved to another invoice or altered", async () => {
+  const t = await payLinkToken("INV-2026-0021", PAY_SECRET);
+  eq(await verifyPayLinkToken("INV-2026-0022", t, PAY_SECRET), false, "other invoice");
+  const flipped = (t[0] === "a" ? "b" : "a") + t.slice(1);
+  eq(await verifyPayLinkToken("INV-2026-0021", flipped, PAY_SECRET), false, "altered");
+  eq(await verifyPayLinkToken("INV-2026-0021", t, "another-secret"), false, "other secret");
+  eq(await verifyPayLinkToken("INV-2026-0021", "", PAY_SECRET), false, "empty token");
+  eq(await verifyPayLinkToken("INV-2026-0021", t.toUpperCase(), PAY_SECRET), false, "wrong shape");
+});
+
+Deno.test("no secret means no pay link, never an unsigned one", async () => {
+  let threw = false;
+  try { await payLinkToken("INV-2026-0021", ""); } catch { threw = true; }
+  eq(threw, true, "sign without secret throws");
+  eq(await verifyPayLinkToken("INV-2026-0021", "0".repeat(32), ""), false, "verify without secret fails");
+});
+
+Deno.test("the checkout form asks for exactly the invoice's total, tagged with the invoice", () => {
+  const f = buildCheckoutForm({
+    invoiceId: "INV-2026-0021", jobId: "JOB-1", email: "client@example.com", currency: "JMD",
+    unitAmount: toStripeAmount(134250, "JMD"), successUrl: "https://s", cancelUrl: "https://c",
+  });
+  eq(f.get("line_items[0][price_data][unit_amount]"), "13425000", "amount in cents");
+  eq(f.get("line_items[0][price_data][currency]"), "jmd", "currency lower case");
+  eq(f.get("metadata[invoice_id]"), "INV-2026-0021", "session metadata");
+  eq(f.get("payment_intent_data[metadata][invoice_id]"), "INV-2026-0021", "payment metadata");
+  eq(f.get("client_reference_id"), "INV-2026-0021", "reference");
+  eq(f.get("success_url"), "https://s", "success");
+  eq(f.get("cancel_url"), "https://c", "cancel");
+  eq(f.get("mode"), "payment", "one-off payment");
+});
 
 function eq(actual: unknown, expected: unknown, msg = "") {
   if (actual !== expected) throw new Error(`${msg} expected ${String(expected)}, got ${String(actual)}`);
