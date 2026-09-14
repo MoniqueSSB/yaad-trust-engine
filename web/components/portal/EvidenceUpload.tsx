@@ -82,15 +82,19 @@ export function EvidenceUpload({
       </p>
       <input type="hidden" name="jobId" value={jobId} />
       <input type="hidden" name="stage" value={stage} />
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_auto]">
+      {/* Two columns that fit any width, not one fixed 823px row. The fixed
+          150px and 160px columns and the file picker could not shrink, so on a
+          laptop the open stage card was pushed across the job page's right-hand
+          column. Founder's report, 14 Sep 2026. */}
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <input name="label" required maxLength={140} placeholder='What this shows, e.g. "The joint before work"'
-          className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal" />
+          className="w-full min-w-0 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal sm:col-span-2" />
         {/* Materials on site is its own kind because it does a different job:
             the receipt, the photographs and the video of the materials in the
             place the client named are what move the risk in them across. The
             database refuses it on a job where the client has not named a
             place, and says so in words worth reading. */}
-        <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as "work" | "materials")} className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
+        <select name="kind" value={kind} onChange={(e) => setKind(e.target.value as "work" | "materials")} className="w-full min-w-0 rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
           <option value="work">The work</option>
           <option value="materials" disabled={!storeType}>
             {storeType ? "Materials on site" : "Materials (no store named)"}
@@ -103,7 +107,7 @@ export function EvidenceUpload({
             Leaving it unmarked is a real answer and files perfectly well.
             Materials is its own section and carries no phase, so the control
             says why rather than disappearing. */}
-        <select name="phase" value={phase} onChange={(e) => setPhase(e.target.value)} disabled={kind === "materials"} className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40">
+        <select name="phase" value={phase} onChange={(e) => setPhase(e.target.value)} disabled={kind === "materials"} className="w-full min-w-0 rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal disabled:opacity-40">
           {kind === "materials" ? (
             <option value="">Its own section</option>
           ) : (
@@ -116,7 +120,7 @@ export function EvidenceUpload({
           )}
         </select>
         <input type="file" name="photo" accept="image/*"
-          className="text-[12.5px] text-mute file:mr-3 file:rounded-full file:border file:border-line2 file:bg-transparent file:px-3.5 file:py-2 file:text-[12.5px] file:font-bold file:text-ink" />
+          className="w-full min-w-0 max-w-full text-[12.5px] text-mute sm:col-span-2 file:mr-3 file:rounded-full file:border file:border-line2 file:bg-transparent file:px-3.5 file:py-2 file:text-[12.5px] file:font-bold file:text-ink" />
       </div>
       {phase === "after" && kind !== "materials" && (
         befores.length ? (
