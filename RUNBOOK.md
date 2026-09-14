@@ -5335,6 +5335,8 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 ## Worker payout setup (Stripe Global Payouts, test mode)
 
+**Coming soon, not in use (14 Sep 2026, `20260914220000`).** Workers are paid by bank transfer only, never cash. `/portal/worker/payouts` says Stripe setup is coming soon and does not call `yaad-payout-setup`, which is deployed and dormant. Take a worker's bank details by phone and save them as a payee in the business bank app; never on the desk, never by WhatsApp. The steps below are for switching Stripe on once Global Payouts is approved: put the button back on that page first.
+
 **What it is.** Since 14 Sep 2026 (`20260914200000`) a worker sets up how Yaadly pays them at `/portal/worker/payouts`, on Stripe's own form. Yaadly never sees or stores their bank details; `worker_profiles.stripe_recipient_status` says `none`, `started`, `ready` or `needs_info`. The booking WhatsApp points them there.
 
 1. **Switching it on (test mode), in this order:** apply `20260914190000`, then `20260914200000`. Then, from the repo root, from `main`: `supabase/functions/sync-shared.sh`, `supabase functions deploy yaad-payout-setup --project-ref leffyisvfvjwzilydlwf` (platform JWT check stays ON, no flag), and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it is on the CLAUDE.md §12 list). Then the web app, then the desk. It uses the `STRIPE_SECRET_KEY` already set for card payments.
