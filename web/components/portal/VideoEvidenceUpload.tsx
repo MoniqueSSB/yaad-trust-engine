@@ -43,11 +43,14 @@ const STATUS_LABEL: Record<QueueItem["status"], string> = {
 export function VideoEvidenceUpload({
   jobId,
   maxStage,
+  stageNames = [],
   storeType,
   store,
 }: {
   jobId: string;
   maxStage: number;
+  /** The accepted quote's stage names, in order; see EvidenceUpload. */
+  stageNames?: string[];
   storeType: string | null;
   store: string | null;
 }) {
@@ -214,7 +217,9 @@ export function VideoEvidenceUpload({
           className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
         >
           {Array.from({ length: Math.max(1, maxStage) }, (_, i) => (
-            <option key={i} value={i + 1}>Stage {i + 1}</option>
+            <option key={i} value={i + 1}>
+              {stageNames[i] ? "Stage " + (i + 1) + ": " + stageNames[i] : "Stage " + (i + 1)}
+            </option>
           ))}
         </select>
         {/* capture="environment" opens the phone's own camera on mobile

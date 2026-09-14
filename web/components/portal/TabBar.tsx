@@ -62,11 +62,15 @@ export function TabBar({
             key={t.key}
             href={base + (t.key === "overview" ? "" : "?tab=" + t.key)}
             aria-current={on ? "page" : undefined}
+            /* The section you are on reads as a filled, outlined tab in ink;
+               the rest are plain and lighter. Founder, 14 Sep 2026: with every
+               tab bold and only a thin underline on the current one, "it is
+               not clear what section I am on". */
             className={
-              "-mb-px rounded-t-xl border-b-2 px-3.5 py-2.5 text-[13px] font-bold transition " +
+              "-mb-px rounded-t-xl border px-3.5 py-2.5 text-[13px] transition " +
               (on
-                ? "border-teal text-tealb"
-                : "border-transparent text-mute hover:text-tealb")
+                ? "border-teal border-b-bg bg-soft font-bold text-ink"
+                : "border-transparent font-medium text-dim hover:bg-panel2 hover:text-tealb")
             }
           >
             {t.label}
