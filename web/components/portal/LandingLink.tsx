@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 /**
  * A link that lands on a section and shows the reader which one.
@@ -53,6 +53,21 @@ export function landOn(id: string) {
     if (Date.now() - started < WAIT_MS) window.setTimeout(tick, STEP_MS);
   };
   tick();
+}
+
+/**
+ * The same landing, on page load. Found live, 13 Sep 2026: on the deployed
+ * portal a tab link does a full page load rather than an in-app switch, so
+ * the click handler below runs on a page that is thrown away a moment
+ * later. Whatever the navigation turns out to be, the page that opens with
+ * a #section in its address lands on it here. Renders nothing.
+ */
+export function LandOnLoad() {
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (id) landOn(id);
+  }, []);
+  return null;
 }
 
 export function LandingLink({
