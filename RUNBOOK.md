@@ -5153,3 +5153,12 @@ Raising never emails anybody (13 Sep 2026). The reasoning is in DECISIONS.md, "R
 8. **Proving it still holds.** Run `supabase/tests/invoice_parts_guards.sql` with `execute_sql`, when nobody is invoicing. Every line should read PASS. It borrows a TEST job, rolls everything back and puts the invoice number counter back where it was, so it leaves nothing behind.
 
 **Deploying this.** Apply `20260913233000_a_job_bill_can_be_requested_in_parts.sql` first, then deploy the desk and the web app. Both read `part_of` and `starts_job`, and a query that names a column the database does not have yet fails as a whole: Job Invoices would show "Could not read jobs", and the portal's job page would lose its invoices.
+
+## An invoice total on the desk looks wrong, or shows pounds for a Jamaican dollar bill
+
+Job bills are kept in whole Jamaican dollars and service invoices in pence, in the same `total_pence` column (14 Sep 2026). The desk shows every total per currency, for example "J$54,000 + £149.00", and never adds the two. The reasoning is in DECISIONS.md, "Invoice totals on the desk are kept per currency".
+
+1. **A J$ bill shows as pounds, or as one hundredth of itself** (J$54,000 as £540.00, J$59,800 as J$598). Some total is not going through `curAmt()` / `sumByCur()` in `concierge/concierge.html`, or its query does not select `currency`. Find it with `grep -n "total_pence" concierge/concierge.html`: every query that feeds a total must name `currency`, and every sum across more than one invoice must use `sumByCur()`.
+2. **You want one figure in pounds.** There is no exchange rate on file and none has been chosen, so the desk will not make one. Choosing a rate, and where it comes from, is Monique's decision before any code changes.
+3. **"Paid this month" includes a tradesperson's payable.** Known, and not yet decided: it counts every paid invoice, money out as well as money in. See the flag at the end of the DECISIONS.md entry.
+4. **Proving it.** Open the desk's Overview, Invoices and Money views. Any total that mixes both currencies should read "J$… + £…", and a job page's "Client paid Yaadly" should match the J$ figure on that job's bill. `node scripts/check-desk-script.mjs` must still print "clean".
