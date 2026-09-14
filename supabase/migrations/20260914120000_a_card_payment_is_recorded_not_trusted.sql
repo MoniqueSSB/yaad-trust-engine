@@ -61,7 +61,13 @@ create policy invoice_payments_client_read on public.invoice_payments
   );
 
 revoke all on public.invoice_payments from anon;
-revoke insert, update, delete on public.invoice_payments from authenticated;
+-- Supabase's default privileges hand every new public table ALL to
+-- authenticated. Insert, update and delete are refused by having no policy,
+-- but TRUNCATE is not governed by RLS at all, so it is revoked outright,
+-- with TRIGGER and REFERENCES, rather than relying on the API not exposing
+-- it. Found by the post-apply check, 14 Sep 2026; applied to production the
+-- same day. SELECT is the only thing a signed-in user holds here.
+revoke insert, update, delete, truncate, references, trigger on public.invoice_payments from authenticated;
 grant select on public.invoice_payments to authenticated;
 
 comment on table public.invoice_payments is
