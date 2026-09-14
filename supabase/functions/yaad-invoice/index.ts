@@ -214,8 +214,23 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
 
   <footer>
     ${inv.payable_to === "worker"
-      ? "This is a record of what you agreed to pay your tradesperson, not a bill from Yaadly. Pay them directly, the way you already agreed. Yaadly does not hold or move this money and is not the payee on this invoice.<br>"
-      : `${esc(settings.invoice_payment_terms)}<br>${esc(settings.invoice_pay_to)}<br>`}
+      /* Since 3 Sep 2026 Yaadly is the principal: the client pays Yaadly for
+         the whole job and Yaadly pays the tradesperson. This sentence still
+         told the reader to pay the tradesperson directly, which the 9 Sep rule
+         forbids. Corrected 14 Sep 2026. */
+      ? "This is what Yaadly owes the tradesperson for this work. Yaadly pays them. It is not a bill to the client, who pays Yaadly for the job.<br>"
+      : `${esc(settings.invoice_payment_terms)}<br>${esc(settings.invoice_pay_to)}<br>`
+        /* The real link the pay wording promises (14 Sep 2026): a sent job
+           invoice opens the client's own job page, where "Pay by card" is. */
+        + (inv.job_id && inv.status === "sent"
+          ? `Pay online by card: <a href="${esc((Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk").replace(/\/+$/, ""))}/portal/jobs/${encodeURIComponent(inv.job_id)}?tab=approvals#invoice-${encodeURIComponent(inv.id)}">your job page on app.yaadly.co.uk</a><br>`
+          : "")
+        /* Bank transfer, once the founder has written the details in
+           app_settings.invoice_bank_details (20260914160000). Empty means
+           nothing is printed: no invented account. */
+        + (settings.invoice_bank_details
+          ? `Bank transfer: ${esc(settings.invoice_bank_details)}. Use ${esc(inv.id)} as the reference.<br>`
+          : "")}
     ${esc(settings.invoice_vat_status)}. ${esc(settings.invoice_issuer_name)} is registered in England and Wales, company number ${esc(settings.invoice_issuer_number)}.<br>
     Services are project management, observation and documentation. They are not a survey, a valuation, a legal opinion or a quantity surveyor's estimate.
   </footer>

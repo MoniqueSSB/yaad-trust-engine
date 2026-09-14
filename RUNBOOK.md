@@ -5253,3 +5253,18 @@ Since 14 September 2026 (`20260914112000`) materials money goes to the worker **
 **Switching it off.** `supabase secrets unset STRIPE_SECRET_KEY --project-ref leffyisvfvjwzilydlwf`. The button then answers "not switched on yet" and nothing else changes. Payments already recorded stay recorded.
 
 **Going live is its own decision, not a config step:** a live key, a live-mode webhook with its own secret, `STRIPE_ALLOW_LIVE=yes`, and the card fee, JMD enablement and conversion cost settled first.
+
+**After a card payment the portal stops asking the client to pay** (14 Sep 2026). While a `succeeded` payment is recorded and the invoice is not yet marked paid, "Everything outstanding" reads "Card payment received. Yaadly is confirming it", and straight after Stripe's page (`?card=paid`) the button is replaced by "Payment is being confirmed" until the webhook's row lands. Marking paid is still the desk's click.
+
+## Bank transfer details on an invoice
+
+**Where they come from.** One setting, `app_settings.invoice_bank_details`, free text written exactly as a client should read it (bank, account name, sort code or routing, account number). It starts **empty**, and while it is empty nothing is shown anywhere: no invented account. Set by `20260914160000`.
+
+**Setting them** (admin, SQL editor or the desk's settings):
+```sql
+update app_settings set value = '<Bank>, <account name>, sort code <..>, account <..>' where key = 'invoice_bank_details';
+```
+
+**Where they appear once set.** Under an unpaid Yaadly invoice in the client portal ("Or pay by bank transfer: … Use INV-… as the reference"), read through `client_bank_details()`, which returns that one setting and nothing else from the admin-only table. And in the footer of every emailed client invoice, from `yaad-invoice`, which also prints a "Pay online by card" link to the client's job page on sent job invoices. `yaad-invoice` must be redeployed for the email side (from `main`, JWT on).
+
+**A transfer is still marked paid by a person** at the desk when the money arrives. Showing the details moves nothing.
