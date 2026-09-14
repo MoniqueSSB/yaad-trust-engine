@@ -1124,6 +1124,14 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 </section>
 
 <!-- ============================================ MATERIALS TRANCHES -->
+<!-- ============================================ PAY WORKERS -->
+<section class="view" data-view="workerpay">
+  <h1 class="vh">Pay workers</h1>
+  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. Pay it from your business bank app, to the payee saved there, then press Mark as sent. That marks the invoice paid, stamped with you and the time, once, and sends the worker a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number. Stripe payouts come here once Stripe has switched on payments to Jamaica.</p>
+  <div id="wpMsg"></div>
+  <div id="wpBody"><div class="empty"><b>Reading worker pay invoices&hellip;</b></div></div>
+</section>
+
 <section class="view" data-view="materials">
   <h1 class="vh">Materials tranches</h1>
   <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. Releasing records the decision and moves no money: you then pay the worker from your business bank app and press Mark as sent, which is when the worker gets a WhatsApp. Yaadly stores no worker bank details. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
@@ -2156,6 +2164,7 @@ const VIEWS = [
     ]},
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
+  { k:"workerpay", g:"Documents & money", label:"Pay workers", icon:"card", hand:true },
   { k:"materials", g:"Documents & money", label:"Materials tranches", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
 
@@ -5079,7 +5088,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 // does not re-read the database.
 const OVLANE = { you:true, wrk:false, cli:false, non:false, clr:false };
 
-const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials };
+const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials, workerpay: loadWorkerPay };
 let currentView = "over";
 
 function go(v){
@@ -6742,7 +6751,8 @@ function renderInvoice(){
       <button class="btn g" id="previewBtn">Preview</button>
       ${draft && lines.length && inv.drafted_by !== "ai" ? `<button class="btn" id="emailBtn"${unpriced ? " disabled" : ""}>Email ${amt(inv.total_pence)} to ${esc(inv.client_email)}</button>` : ""}
       ${draft && lines.length ? `<button class="btn g" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent, I sent it myself</button>` : ""}
-      ${inv.status === "sent" ? `<button class="btn" id="paidBtn">Mark as paid</button>` : ""}
+      ${inv.status === "sent" && inv.payable_to === "worker" ? `<button class="btn" id="payWorkerBtn">Pay the worker</button>` : ""}
+      ${inv.status === "sent" && inv.payable_to !== "worker" ? `<button class="btn" id="paidBtn">Mark as paid</button>` : ""}
       ${inv.status === "sent" && (inv.payable_to || "yaadly") === "yaadly" ? `<button class="btn g" id="reissueBtn">Void and reissue as a new draft</button>` : ""}
       ${draft || inv.status === "sent" ? `<button class="btn d" id="voidBtn">Void</button>` : ""}
     </div>
@@ -6908,6 +6918,10 @@ function renderInvoice(){
     say("invMsg","ok","Marked as sent and frozen. Now email or WhatsApp it to them.");
     await reload(inv.id);
   });
+
+  // A worker's pay is paid from the Pay workers view, which records how the
+  // money went and tells the worker (20260914230000).
+  if ($("payWorkerBtn")) $("payWorkerBtn").addEventListener("click", () => go("workerpay"));
 
   if ($("paidBtn")) $("paidBtn").addEventListener("click", async () => {
     const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.", ((CURRENT.cardPays || []).find(p => p.status === "succeeded") || {}).provider_ref || "");
@@ -7369,7 +7383,7 @@ function invRowHtml(i){
     <td><div>${esc(i.client_name || "")}</div><div class="jicond">${i.job_id ? `<a href="#" data-ivjob="${esc(i.job_id)}">Job ${esc(i.job_id)}</a>` : "Service"}</div>${INV_JOB ? "" : invBalanceHtml(i)}</td>
     <td class="jistagepct">${esc(invWhen(i))}</td>
     <td class="num"><span class="jiamt">${curAmt(i.total_pence, i.currency)}</span></td>
-    <td class="ivact">${i.status === "draft" && invIsBill(i) ? `<button class="btn g" data-ivsplit="${esc(i.id)}">Split into parts</button>` : ""}<button class="btn g" data-ivopen="${esc(i.id)}">${i.status === "draft" ? "Edit" : "Open"}</button><button class="btn g" data-ivprev="${esc(i.id)}">Preview</button>${i.status === "sent" && !card.bad ? `<button class="btn" data-ivpaid="${esc(i.id)}">Mark as paid</button>` : ""}</td>
+    <td class="ivact">${i.status === "draft" && invIsBill(i) ? `<button class="btn g" data-ivsplit="${esc(i.id)}">Split into parts</button>` : ""}<button class="btn g" data-ivopen="${esc(i.id)}">${i.status === "draft" ? "Edit" : "Open"}</button><button class="btn g" data-ivprev="${esc(i.id)}">Preview</button>${i.status === "sent" && !card.bad && i.payable_to === "worker" ? `<button class="btn" data-ivpayworker="1">Pay the worker</button>` : ""}${i.status === "sent" && !card.bad && i.payable_to !== "worker" ? `<button class="btn" data-ivpaid="${esc(i.id)}">Mark as paid</button>` : ""}</td>
   </tr>`;
 }
 
@@ -7407,6 +7421,8 @@ function invWireList(){
     $("previewBtn").click();
   }));
 
+  // A worker's pay is paid from Pay workers, which records how and tells them (20260914230000).
+  $("ivList").querySelectorAll("[data-ivpayworker]").forEach(b => b.addEventListener("click", () => go("workerpay")));
   $("ivList").querySelectorAll("[data-ivpaid]").forEach(b => b.addEventListener("click", async () => {
     const id = b.dataset.ivpaid, inv = INV_LIST.find(x => x.id === id) || {};
     const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.", (INV_CARD[id] || {}).ref || "");
@@ -7749,6 +7765,127 @@ async function loadMaterials(keepMsg){
 // A figure in the unit its invoice is kept in: whole J$ for a job bill,
 // pence for a service invoice.
 const feeAmt = (pence, currency) => currency === "JMD" ? jmdFmt(pence) : money(pence);
+
+// ------------------------------------------------- pay workers
+// 20260914230000. A worker's pay invoice is raised when a stage is approved
+// and goes to them at once. Paying it happens in the business bank app, to
+// the payee saved there: Yaadly holds no worker bank details. This view is the
+// one list of what is owed, and Mark as sent is a named person saying the
+// money has gone (mark_worker_paid). The database refuses to mark a worker's
+// pay paid any other way, stamps who and when, and never changes it after.
+// The worker's WhatsApp fires then, not before.
+async function loadWorkerPay(keepMsg){
+  const host = $("wpBody");
+  if (!keepMsg) say("wpMsg", "", "");
+  host.innerHTML = `<div class="empty"><b>Reading worker pay invoices&hellip;</b></div>`;
+
+  const { data: invs, error } = await sb.from("invoices")
+    .select("id,job_id,stage,period_label,total_pence,currency,status,sent_at,paid_at,paid_by,paid_method,paid_reference,worker_email")
+    .eq("payable_to", "worker").neq("status", "void")
+    .order("sent_at", { ascending: true, nullsFirst: false }).limit(200);
+  if (error) {
+    host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read worker pay invoices</b><p>${esc(error.message)}</p></div></div>`;
+    return;
+  }
+  const list = invs || [];
+  const jobIds = [...new Set(list.map((i) => i.job_id).filter(Boolean))];
+  const emails = [...new Set(list.map((i) => i.worker_email).filter(Boolean))];
+  const [{ data: jobs }, { data: workers }] = await Promise.all([
+    jobIds.length ? sb.from("jobs").select("id,title,is_test").in("id", jobIds) : Promise.resolve({ data: [] }),
+    emails.length ? sb.from("worker_profiles").select("worker_email,name,stripe_recipient_status").in("worker_email", emails) : Promise.resolve({ data: [] }),
+  ]);
+  const jobById = new Map((jobs || []).map((j) => [j.id, j]));
+  const workerByEmail = new Map((workers || []).map((w) => [String(w.worker_email || "").toLowerCase(), w]));
+
+  const who = (i) => {
+    const w = workerByEmail.get(String(i.worker_email || "").toLowerCase());
+    return (w && w.name) || i.worker_email || "the worker";
+  };
+  const whoCell = (i) => {
+    const w = workerByEmail.get(String(i.worker_email || "").toLowerCase());
+    const st = w && w.stripe_recipient_status;
+    const stripe = st === "ready" ? "set up on Stripe" : st === "started" || st === "needs_info" ? "Stripe set up unfinished" : "not on Stripe yet";
+    return `<b>${esc(who(i))}</b>` + sub_((i.worker_email || "") + " · " + stripe);
+  };
+  const jobCell = (i) => {
+    const j = jobById.get(i.job_id);
+    return esc((j && j.title) || i.job_id || "") + (j && j.is_test ? " " + chip_("mute", "test") : "") + sub_(i.job_id || "");
+  };
+  const forCell = (i) => esc(String(i.period_label || "").trim() || (i.stage ? "Stage " + i.stage : "Work completed")) + sub_(i.id);
+  const totals = (rows) => {
+    const by = new Map();
+    for (const r of rows) by.set(r.currency || "JMD", (by.get(r.currency || "JMD") || 0) + Number(r.total_pence || 0));
+    return [...by.entries()].map(([c, p]) => feeAmt(p, c)).join(" + ");
+  };
+
+  const owed = list.filter((i) => i.status === "sent");
+  const paid = list.filter((i) => i.status === "paid").sort((a, b) => String(b.paid_at || "").localeCompare(String(a.paid_at || ""))).slice(0, 30);
+  const drafts = list.filter((i) => i.status === "draft");
+
+  const owedRows = owed.map((i) => {
+    const since = i.sent_at ? String(i.sent_at).slice(0, 10) : "";
+    const days = i.sent_at ? Math.floor((Date.now() - new Date(i.sent_at).getTime()) / 86400000) : 0;
+    const wait = days >= 1 ? chip_(days >= 3 ? "crit" : "warn", days === 1 ? "1 day" : days + " days") : chip_("ok", "today");
+    return `<tr>
+      <td>${whoCell(i)}</td>
+      <td>${jobCell(i)}</td>
+      <td>${forCell(i)}</td>
+      <td class="num"><b>${feeAmt(i.total_pence, i.currency)}</b>${sub_("owed since " + since)}</td>
+      <td>${wait}</td>
+      <td><input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">
+        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button></td>
+    </tr>`;
+  }).join("");
+
+  const paidRows = paid.map((i) => {
+    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : "marked paid";
+    const ref = String(i.paid_reference || "").trim();
+    return `<tr>
+      <td>${whoCell(i)}</td>
+      <td>${jobCell(i)}</td>
+      <td>${forCell(i)}</td>
+      <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
+      <td>${chip_("ok", "sent")}</td>
+      <td>${esc(how)}${ref ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}</td>
+    </tr>`;
+  }).join("");
+
+  const head = `<thead><tr><th>Worker</th><th>Job</th><th>For</th><th class="num">Amount</th><th>Waiting</th><th></th></tr></thead>`;
+  host.innerHTML = `
+    <div class="card">
+      <div class="chd"><h3>Owed now${owed.length ? ": " + owed.length + ", " + totals(owed) : ""}</h3></div>
+      ${owed.length ? `<div class="tw"><table>${head}<tbody>${owedRows}</tbody></table></div>`
+        : `<div class="empty"><b>Nobody is owed anything right now</b>A pay invoice lands here the moment a stage is approved.</div>`}
+    </div>
+    <div class="card">
+      <div class="chd"><h3>Sent${paid.length ? ", latest " + paid.length : ""}</h3></div>
+      ${paid.length ? `<div class="tw"><table>${head.replace("<th>Waiting</th>", "<th></th>")}<tbody>${paidRows}</tbody></table></div>`
+        : `<div class="empty"><b>No worker has been marked paid yet</b></div>`}
+    </div>
+    ${drafts.length ? `<p class="vsub">${drafts.length} worker pay invoice${drafts.length > 1 ? "s are" : " is"} still a draft, not yet owed: ${drafts.map((d) => esc(d.id)).join(", ")}.</p>` : ""}`;
+
+  // Mark as sent: a named person saying the money has left their bank. It
+  // sends the worker a WhatsApp, which cannot be unsent, so it asks first.
+  host.querySelectorAll("[data-wp-sent]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.wpSent;
+      const ref = ((host.querySelector(`[data-wp-ref="${id}"]`) || {}).value || "").trim();
+      const amt = btn.dataset.wpAmt, name = btn.dataset.wpWho;
+      if (!confirm(`Mark ${amt} as sent to ${name} by bank transfer${ref ? ", reference " + ref : ""}?\n\nThis marks ${id} paid and sends ${name} a WhatsApp saying the money has been sent. It cannot be changed afterwards. Only press it once the transfer has gone from your bank.`)) return;
+      btn.disabled = true;
+      try {
+        const { error: e } = await sb.rpc("mark_worker_paid", { p_invoice: id, p_method: "bank_transfer", p_ref: ref });
+        if (e) throw e;
+        say("wpMsg", "ok", `Marked ${amt} as sent to ${name}${ref ? ", reference " + ref : ""}. ${id} is now paid, and ${name} is being sent a WhatsApp.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        say("wpMsg", "err", hint);
+      }
+      await loadWorkerPay(true);
+    });
+  });
+}
 
 // The dropdown for "Raise, per your own published terms": every active
 // catalogue item, priced from service_catalogue itself, never a typed one.

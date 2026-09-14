@@ -36,6 +36,9 @@ export type InvoiceRow = {
   starts_job?: boolean | null;
   /** On a part payment, the whole-job bill it was requested from. */
   part_of?: string | null;
+  /** How a worker's pay went out, and its reference (mark_worker_paid, 20260914230000). */
+  paid_method?: string | null;
+  paid_reference?: string | null;
 };
 
 /** The independent check, once a client has added one, as a line in the job
@@ -274,6 +277,8 @@ export function MoneyPanel({
                       <span className="font-mono-app">{inv.id}</span>
                       {inv.issue_date ? " · issued " + inv.issue_date : ""}
                       {inv.paid_at ? " · paid " + (whenDate(inv.paid_at) ?? inv.paid_at) : ""}
+                      {side === "worker" && inv.paid_at && inv.paid_method === "bank_transfer" ? " by bank transfer" : ""}
+                      {side === "worker" && inv.paid_at && inv.paid_reference ? ", reference " + inv.paid_reference : ""}
                       {inv.period_label ? " · " + inv.period_label : ""}
                     </div>
                     {/* Pay by card, phase 1 (14 Sep 2026). Only the client,

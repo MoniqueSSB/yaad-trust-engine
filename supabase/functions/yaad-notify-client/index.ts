@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -908,7 +908,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -950,7 +950,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1226,6 +1226,30 @@ Deno.serve(async (req: Request) => {
       line = `${job.title} (${job.id}) is signed off, every stage approved. ` +
         `Yaadly owes you your labour and materials for it, and Yaadly pays you for the work. ` +
         `Check your own figure any time in your Yaadly portal.`;
+    } else if (kind === "worker_paid") {
+      // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
+      // invoice paid (mark_worker_paid, 20260914230000), after paying it from
+      // the business bank app. Same shape as materials_sent_worker: read off
+      // the row itself, and only while it is this job's worker pay and marked
+      // paid, so a stray or repeated call cannot tell a worker money is coming
+      // that is not. Yaadly stores no worker bank details, so the message carries none.
+      const { data: inv } = await admin.from("invoices")
+        .select("id, status, total_pence, currency, stage, period_label, paid_method, paid_reference")
+        .eq("id", String(meta.invoiceId ?? "")).eq("job_id", jobId).eq("payable_to", "worker").maybeSingle();
+      if (inv?.status !== "paid") {
+        root.setAttributes({ "yaadly.notify.outcome": "worker_pay_not_paid" });
+        return json({ ok: true, kind, told: false, reason: "That pay invoice is not marked paid on this job." });
+      }
+      const cur = String(inv.currency ?? "JMD").toUpperCase();
+      // JMD is stored as whole dollars in total_pence; anything else is pence.
+      const amt = cur === "JMD" ? money(Number(inv.total_pence)) : `${cur} ${(Number(inv.total_pence) / 100).toFixed(2)}`;
+      const how = inv.paid_method === "bank_transfer" ? " by bank transfer" : "";
+      const ref = String(inv.paid_reference ?? "").trim();
+      const what = String(inv.period_label ?? "").trim() || (inv.stage ? `stage ${inv.stage}` : "the work");
+      subject = `Payment sent: ${job.title}`;
+      line = `Yaadly has sent you ${amt}${how} for ${what} on ${job.title} (${job.id})` +
+        (ref ? `, reference ${ref}` : "") + `. ` +
+        `Pay invoice ${inv.id} now shows as paid in your Yaadly portal: ${roomLink}`;
     } else if (kind === "materials_sent_worker") {
       // 14 Sep 2026. A materials release records a decision and moves no
       // money, so the worker hears nothing then. This fires when a person on

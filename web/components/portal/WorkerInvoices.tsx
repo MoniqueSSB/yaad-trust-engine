@@ -14,6 +14,7 @@
 
 import { STATUS_TONE, type StatusLabel } from "./statusTone";
 import { jmd } from "@/lib/money";
+import { whenDate } from "@/lib/date";
 
 export type WorkerInvoiceJob = {
   jobId: string;
@@ -26,6 +27,10 @@ export type WorkerInvoiceJob = {
     totalPence: number;
     status: string;
     sentAt: string | null;
+    /** Set when Yaadly marks the money sent (mark_worker_paid, 20260914230000). */
+    paidAt: string | null;
+    paidMethod: string | null;
+    paidRef: string | null;
   }[];
 };
 
@@ -43,6 +48,9 @@ export type WorkerInvoiceJob = {
  * says that, and nothing in this codebase moves money (CLAUDE.md 9).
  */
 function invoiceStatus(status: string, paid: boolean): StatusLabel {
+  // Paid is Yaadly's own record that a named person sent the money
+  // (mark_worker_paid, 20260914230000), not the worker's note.
+  if (status === "paid") return { label: "Paid", tone: "done" };
   if (status === "sent" && !paid) return { label: "Pending", tone: "waiting" };
   if (status === "sent") return { label: "Recorded paid", tone: "done" };
   if (status === "draft") return { label: "Draft, not sent", tone: "idle" };
@@ -58,8 +66,8 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
       </h2>
       <p className="mb-3 text-[12px] leading-relaxed text-dim">
         The actual record, raised in your name as each stage was approved. Pending means
-        sent and waiting; it is not proof the money has moved, only your own note against
-        a job says that.
+        sent and waiting. Paid means Yaadly has sent you the money, with the date and the
+        bank reference to look for.
       </p>
       <ul className="grid gap-3">
         {jobs.map((j) => (
@@ -92,6 +100,13 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                   </span>
                   <span className="font-mono text-[10px] text-dim">{inv.id}</span>
                   </span>
+                  {inv.status === "paid" && (
+                    <span className="col-span-full text-[11.5px] leading-relaxed text-dim">
+                      Sent to you{inv.paidMethod === "bank_transfer" ? " by bank transfer" : ""}
+                      {inv.paidAt ? " on " + (whenDate(inv.paidAt) ?? inv.paidAt) : ""}
+                      {inv.paidRef ? ", reference " + inv.paidRef : ""}.
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
