@@ -660,6 +660,16 @@ export default async function JobRoom({
   const approvedStages = new Set((approvalRows ?? []).map((r) => r.stage as number));
 
   const jobStage = Math.max(job.stage ?? 0, 0);
+  /* Evidence is filed on the stage being worked and nowhere else, and not at
+     all before stage 1, which starts when the Guarantee & Support invoice is
+     paid (founder, 14 Sep 2026). awaiting_payment is checked as well as the
+     stage number because the insert policy refuses on it, and a job that
+     reached a stage before the fee rule existed can still be sitting in it. */
+  const canFileEvidence =
+    jobStage >= 1 &&
+    job.status !== "awaiting_payment" &&
+    job.status !== "complete" &&
+    job.status !== "cancelled";
   const evidenceOnStage = (n: number) => ev.filter((e) => (e.stage ?? 1) === n).length;
 
   const outstanding: OutItem[] = [];
@@ -1809,6 +1819,13 @@ export default async function JobRoom({
             />
           )}
           <div id="stage-evidence" className="scroll-mt-6">
+          {/* The upload forms sit inside the one stage card that is open,
+              founder, 14 Sep 2026: "click on a stage and attach the evidence
+              to that stage, the other stages should be blacked out until each
+              stage is finished". Stage 1 opens when the Guarantee & Support
+              invoice is paid; each later stage when approve_stage() signs off
+              the one before. The database refuses the same filings
+              (20260914095005), so this is the sign and that is the lock. */}
           <EvidenceLedger
             items={ev}
             stageCount={evidenceStageCount}
@@ -1818,6 +1835,44 @@ export default async function JobRoom({
             role={role === "worker" ? "worker" : "client"}
             awaitingApproval={awaitingApproval}
             jobId={job.id}
+            startsWhen={
+              job.status === "awaiting_payment"
+                ? "Opens once the Guarantee & Support invoice is paid. That is what starts stage 1."
+                : !job.worker_email
+                  ? "Opens once a tradesperson is booked and the Guarantee & Support invoice is paid."
+                  : "Opens when stage 1 starts."
+            }
+            upload={
+              canFileEvidence ? (
+                <>
+                  <EvidenceUpload
+                    jobId={job.id}
+                    stage={jobStage}
+                    stageName={evidenceStageNames[jobStage - 1] ?? null}
+                    storeType={job.materials_store_type ?? null}
+                    store={job.materials_store ?? null}
+                    /* Every before already on this job, so an after can name
+                       the one it answers. Already loaded above; not a second
+                       query. */
+                    befores={ev
+                      .filter((e) => e.phase === "before")
+                      .map((e) => ({ id: e.id, item_code: e.item_code ?? null, label: e.label }))}
+                  />
+                  {/* Video is a worker thing. A stage walkthrough is the
+                      worker proving their own work; the photo form stays open
+                      to both sides. */}
+                  {role === "worker" && (
+                    <VideoEvidenceUpload
+                      jobId={job.id}
+                      stage={jobStage}
+                      stageName={evidenceStageNames[jobStage - 1] ?? null}
+                      storeType={job.materials_store_type ?? null}
+                      store={job.materials_store ?? null}
+                    />
+                  )}
+                </>
+              ) : null
+            }
           />
           </div>
       {/* The FAQ's own "or": at sign-off a client can approve straight off
@@ -1840,34 +1895,6 @@ export default async function JobRoom({
           walkNotes={job.walk_notes ?? null}
           walkCallNotes={job.walk_call_notes ?? null}
           walkNotesConfirmedAt={job.walk_notes_confirmed_at ?? null}
-        />
-      )}
-      {job.status !== "complete" && (
-        <div id="upload" className="scroll-mt-6">
-        <EvidenceUpload
-          jobId={job.id}
-          maxStage={evidenceStageCount}
-          stageNames={evidenceStageNames}
-          storeType={job.materials_store_type ?? null}
-          store={job.materials_store ?? null}
-          /* Every before already on this job, so an after can name the one it
-             answers. Already loaded above; not a second query. */
-          befores={ev
-            .filter((e) => e.phase === "before")
-            .map((e) => ({ id: e.id, item_code: e.item_code ?? null, label: e.label }))}
-        />
-        </div>
-      )}
-      {/* Video is a worker thing. A stage walkthrough is the worker proving
-          their own work; the photo form above stays open to both sides,
-          unchanged, because that question was never Stage 5.5's to answer. */}
-      {job.status !== "complete" && role === "worker" && (
-        <VideoEvidenceUpload
-          jobId={job.id}
-          maxStage={evidenceStageCount}
-          stageNames={evidenceStageNames}
-          storeType={job.materials_store_type ?? null}
-          store={job.materials_store ?? null}
         />
       )}
         </>

@@ -142,3 +142,24 @@ export function sectionsOf<T extends { phase?: string | null; kind?: string | nu
 
   return out;
 }
+
+/**
+ * Whether a stage is open for evidence, founder's rule of 14 Sep 2026: only
+ * the stage being worked takes evidence. The ones before it are signed off
+ * and closed; the ones after it are locked until the stage before them is
+ * signed off. Before stage 1 starts (jobs.stage 0, the Guarantee & Support
+ * invoice not yet paid) every stage is locked.
+ *
+ * Only jobs.stage moves a stage, and only approve_stage() moves jobs.stage,
+ * so this reads a human decision and makes none. The database refuses the
+ * same filings in 20260914095005; this is so the page never offers one.
+ */
+export type StageLock = "done" | "now" | "locked";
+
+export function stageLock(n: number, currentStage: number): StageLock {
+  const cur = Math.max(0, Math.floor(Number(currentStage) || 0));
+  if (cur < 1) return "locked";
+  if (n < cur) return "done";
+  if (n === cur) return "now";
+  return "locked";
+}
