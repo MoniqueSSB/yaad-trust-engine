@@ -350,7 +350,7 @@ export default async function JobRoom({
          returns rows to the job's own client and worker only. */
       supabase
         .from("materials_releases")
-        .select("amount_jmd,released_at,stage,receipt_ref")
+        .select("amount_jmd,released_at,stage,receipt_ref,sent_at")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
     ]);
@@ -673,7 +673,7 @@ export default async function JobRoom({
      showed "Yaadly fee, deducted" at three times what is deducted. */
   const workerFeeJmd = labour == null ? null : Math.round(labour * 0.05);
   const matReleases = (materialsRows ?? []) as {
-    amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string;
+    amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string; sent_at: string | null;
   }[];
   const materialsReleasedJmd = matReleases
     .filter((m) => m.released_at)
@@ -878,10 +878,29 @@ export default async function JobRoom({
       cta: "See it",
     });
   }
-  /* The receipt milestone: money only, not a stage. Each release with no
-     receipt recorded against it is a receipt still to come, the same reading
-     the desk's materials_open_releases view uses. */
-  const receiptsDue = matReleases.filter((m) => m.released_at && !m.receipt_ref?.trim());
+  /* Released is a decision; sent is the money leaving (20260914190000). A
+     person on the desk marks it sent, and only then does anybody read that
+     it "was paid to you". Between the two it is Yaadly's task, named. */
+  const beingSent = matReleases.filter((m) => m.released_at && !m.sent_at);
+  if (beingSent.length && job.status !== "complete") {
+    const sendJmd = beingSent.reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
+    outstanding.push({
+      who: "yaadly",
+      title: "Materials money released, being sent",
+      detail:
+        (money(sendJmd) ?? "Materials money") +
+        (isClient
+          ? " is released to the worker to buy the goods. Yaadly sends it next, and the worker gets a WhatsApp when it has gone."
+          : " is released to you to buy the goods. Yaadly sends it next, and you get a WhatsApp when it has gone."),
+      href: jobBase + "?tab=materials#materials-money",
+      cta: "See it",
+    });
+  }
+  /* The receipt milestone: money only, not a stage. Each release that has
+     been SENT with no receipt recorded against it is a receipt still to come.
+     A release not yet sent is not: nobody can buy goods with money that has
+     not reached them. */
+  const receiptsDue = matReleases.filter((m) => m.released_at && m.sent_at && !m.receipt_ref?.trim());
   if (receiptsDue.length && job.status !== "complete") {
     const dueJmd = receiptsDue.reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
     outstanding.push({
@@ -1871,7 +1890,10 @@ export default async function JobRoom({
                   <b className="text-ink">{money(m.amount_jmd)}</b>
                   {m.stage != null && <span className="text-dim">Stage {m.stage}</span>}
                   <span className="text-dim">
-                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : "Receipt to come"}
+                    {m.sent_at ? "Sent " + whenDate(m.sent_at) : "Being sent"}
+                  </span>
+                  <span className="text-dim">
+                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : m.sent_at ? "Receipt to come" : ""}
                   </span>
                   <span className="ml-auto text-dim">
                     {m.released_at ? whenDate(m.released_at) : "not yet released"}

@@ -3335,3 +3335,19 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **Amounts live in one place.** J$ invoices are stored in whole dollars; Stripe treats JMD as a two-decimal currency, so J$134,250 is 13425000 to Stripe. `_shared/stripe.ts` does that conversion and the signature check, with Deno tests that need no imports.
 
 **Payouts to tradespeople will not use Connect.** Stripe's docs say Connect cross-border payouts from a UK platform reach only the US, UK, EEA, Canada and Switzerland. Stripe Global Payouts added Jamaican bank accounts (`jm_bank_account`) in December 2025 and is open to UK businesses, so phase 3 is designed on that, pending the founder enabling it, a solicitor view on the licensing note Stripe attaches to it, and a decision on worker bank and identity data going to Stripe.
+
+## 2026-09-14 · Materials money is marked sent by a person; Yaadly stores no worker bank details
+
+**Why.** Founder, 14 Sep 2026, after the first real release on the desk: "who was it released to? Where does that money go? Do they receive a link?" A release (`20260914112000`) records a decision and moves nothing. Nothing told the worker, and nothing recorded that the money had actually left.
+
+**Yaadly stores no worker bank details (founder decision, the same day).** Considered and declined: a worker payout details table filled in through the worker portal. It would have made Yaadly the holder of a new kind of personal financial data, with a data protection record entry and a retention question of its own. Instead, until Stripe Global Payouts is live, the founder pays from the business bank using a payee saved in the bank's own app. When Global Payouts is live, the worker types their details into Stripe's hosted form (Account Links) and Yaadly keeps only Stripe's recipient reference. Workers must not send bank details to the Yaadly WhatsApp number: that text is stored and passed to the intake model.
+
+**What changed (`20260914190000`).** `materials_releases` gains `sent_at`, `sent_by`, `sent_method` and `sent_ref`. `mark_materials_sent()` is admin only, once per released row, and accepts `bank_transfer` only until Stripe is set up. A BEFORE trigger makes the sent fields write once and stamps who and when from the signed-in person, because the desk can write this table directly under `materials_releases_admin`, so a rule that lived only inside the function could be walked round with a plain UPDATE. An AFTER trigger calls `yaad-notify-client` with kind `materials_sent_worker`, which reads the row itself and says nothing unless it is marked sent on that job.
+
+**The WhatsApp fires on sent, not on release,** so it only states what has happened. It names no bank account and no arrival time. It is free text: no Content Template exists for it, so it reaches a worker only inside WhatsApp's 24 hour window, and no SMS sender is configured.
+
+**The portals follow.** A released, unsent tranche shows as Yaadly's task, "being sent". "Was paid to you" and the receipt to-do appear only once it is sent. The booking message stopped saying materials are paid "against your receipt".
+
+**Not built, deliberately.** Pay by Stripe is greyed on the desk until Global Payouts is switched on, Stripe support has enabled cross-border payouts to outside bank accounts, and the licensing note Stripe attaches has had a solicitor's view. It will widen the `sent_method` check in its own migration.
+
+**No human gate moved.** Releasing is one named click and marking sent is a second; neither moves money by itself.

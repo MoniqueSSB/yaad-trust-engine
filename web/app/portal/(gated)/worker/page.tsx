@@ -6,6 +6,7 @@ import { MoneySplit, WorkerPipeline, WorkerStatCards, type StatCard } from "@/co
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
 import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
+import Link from "next/link";
 import { LIVE_QUOTE, type Tender } from "@/components/portal/QuotedJobRoom";
 import { jmd } from "@/lib/money";
 
@@ -54,7 +55,7 @@ export default async function WorkerPortal() {
 
   const { data: profile } = await supabase
     .from("worker_profiles")
-    .select("phone")
+    .select("phone,stripe_recipient_status")
     .eq("worker_user", user.id)
     .maybeSingle();
 
@@ -311,6 +312,20 @@ export default async function WorkerPortal() {
               every other section in this column starts with. */}
           <div className="mt-4">
             <LinkWorkerPhone phone={profile?.phone ?? null} />
+            {/* How Yaadly pays them, on Stripe's own form (20260914200000).
+                Yaadly never sees the bank details; this only says whether
+                Stripe has them. */}
+            <section className="mt-4 rounded-2xl border border-line bg-panel p-4">
+              <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">How Yaadly pays you</p>
+              <p className="mt-1 text-[12px] leading-relaxed text-dim">
+                {profile?.stripe_recipient_status === "ready"
+                  ? "Ready. Stripe has your bank details and Yaadly can pay you."
+                  : "Add the bank account Yaadly pays you into, on Stripe's secure page. Yaadly never sees it."}
+              </p>
+              <Link href="/portal/worker/payouts" className="mt-2.5 inline-block text-[12.5px] font-bold text-tealb underline-offset-2 hover:underline">
+                {profile?.stripe_recipient_status === "ready" ? "See or change it" : "Set it up"}
+              </Link>
+            </section>
           </div>
         </aside>
       </div>
