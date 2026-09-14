@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 import { pickTextProvider, providerAttrs, chatWithFailover, NO_PROVIDER_MESSAGE } from "./textmodel.ts";
+import { payLinkToken } from "./stripe.ts";
 
 // yaad-invoice
 //
@@ -96,6 +97,19 @@ const money = (pence: number, currency = "GBP") =>
 const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+// --------------------------------------------------------------- pay link
+
+/** The one-click card link for a client invoice (yaad-pay, 14 Sep 2026).
+ *  Signed with the service role key, which yaad-pay checks with. Returns ""
+ *  when there is no key, so an unsigned link is never printed. */
+async function payLinkUrlFor(invoiceId: string): Promise<string> {
+  const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const base = Deno.env.get("SUPABASE_URL") ?? "";
+  if (!secret || !base || !invoiceId) return "";
+  const t = await payLinkToken(invoiceId, secret);
+  return `${base}/functions/v1/yaad-pay?i=${encodeURIComponent(invoiceId)}&t=${t}`;
+}
 
 // --------------------------------------------------------------- render
 
@@ -220,10 +234,12 @@ ${esc(inv.client_email)}${inv.client_address ? "\n" + esc(inv.client_address) : 
          forbids. Corrected 14 Sep 2026. */
       ? "This is what Yaadly owes the tradesperson for this work. Yaadly pays them. It is not a bill to the client, who pays Yaadly for the job.<br>"
       : `${esc(settings.invoice_payment_terms)}<br>${esc(settings.invoice_pay_to)}<br>`
-        /* The real link the pay wording promises (14 Sep 2026): a sent job
-           invoice opens the client's own job page, where "Pay by card" is. */
-        + (inv.job_id && inv.status === "sent"
-          ? `Pay online by card: <a href="${esc((Deno.env.get("YAADLY_APP_URL") ?? "https://app.yaadly.co.uk").replace(/\/+$/, ""))}/portal/jobs/${encodeURIComponent(inv.job_id)}?tab=approvals#invoice-${encodeURIComponent(inv.id)}">your job page on app.yaadly.co.uk</a><br>`
+        /* The one-click link (14 Sep 2026): straight to a Stripe payment page
+           for exactly this invoice, no sign-in, through yaad-pay. _payUrl is
+           only set on a sent client invoice, by the caller, because signing
+           it is asynchronous and this render is not. */
+        + (inv._payUrl && inv.status === "sent"
+          ? `Pay this invoice by card: <a href="${esc(inv._payUrl)}">pay online</a><br>`
           : "")
         /* Bank transfer, once the founder has written the details in
            app_settings.invoice_bank_details (20260914160000). Empty means
@@ -324,7 +340,8 @@ Deno.serve(async (req) => {
       // invoice emailed from the desk reached the client marked "draft".
       // Found on INV-2026-0021, 14 Sep 2026. If the email fails, the row
       // below is never updated and stays a draft, as before.
-      const html = renderInvoice({ ...inv, status: "sent" }, lines, settings);
+      const payUrl = inv.payable_to === "worker" ? "" : await payLinkUrlFor(inv.id);
+      const html = renderInvoice({ ...inv, status: "sent", _payUrl: payUrl }, lines, settings);
 
       const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
       if (!resendKey) return fail("RESEND_API_KEY is not set, so this cannot email anybody yet. Render and send it by hand instead.", 500);
@@ -380,7 +397,8 @@ Deno.serve(async (req) => {
       const settings: Record<string, string> = {};
       if (sR.ok) for (const r of await sR.json()) settings[r.key] = r.value;
 
-      const html = renderInvoice(inv, lines, settings);
+      const payUrl = inv.status === "sent" && inv.payable_to !== "worker" ? await payLinkUrlFor(inv.id) : "";
+      const html = renderInvoice({ ...inv, _payUrl: payUrl }, lines, settings);
       return body.as === "json"
         ? done(JSON.stringify({ invoice: inv, lines, html }), 200)
         : done(html, 200, "text/html; charset=utf-8");

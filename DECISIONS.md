@@ -3336,6 +3336,14 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 
 **Payouts to tradespeople will not use Connect.** Stripe's docs say Connect cross-border payouts from a UK platform reach only the US, UK, EEA, Canada and Switzerland. Stripe Global Payouts added Jamaican bank accounts (`jm_bank_account`) in December 2025 and is open to UK businesses, so phase 3 is designed on that, pending the founder enabling it, a solicitor view on the licensing note Stripe attaches to it, and a decision on worker bank and identity data going to Stripe.
 
+## 2026-09-14 · The invoice email carries a one-click pay link through yaad-pay, not a Stripe link
+
+**Why.** Founder, 14 Sep 2026: the invoice should give the client a direct link to pay Yaadly the amount. The portal's Pay by card needs a sign-in first; the founder wanted the email itself to be enough.
+
+**Why not a Stripe Checkout or Payment Link in the email.** A Checkout Session expires within 24 hours, and an email is read days later. A Payment Link lives forever but carries a fixed amount decided at send time, and keeps working after the invoice is paid or voided. So the email links to `yaad-pay`, which on every tap re-reads the invoice, refuses a paid, void, draft or already card-paid one with a page saying so, and only then asks Stripe for a fresh page for exactly its total.
+
+**The token is the door.** `yaad-pay` runs without platform JWT, like `yaad-stripe-webhook`. The link carries an HMAC of the invoice number (128 bits), signed by `yaad-invoice` and checked by `yaad-pay`, both with the service role key the platform already gives every function, so there is no new secret to manage. The cost, accepted: rotating that key invalidates links already sent (the portal still works). A wrong token looks exactly like an unknown invoice, so the endpoint cannot be used to discover invoice numbers. The session itself is built by `buildCheckoutForm` in `_shared/stripe.ts`, shared with `yaad-checkout`, so the two routes cannot drift apart. Nothing in either route marks an invoice paid.
+
 ## 2026-09-14 · Kickoff Drafts leaves the desk menu; the drafts that did not become a pack show on Kickoff packs
 
 **Why.** Founder, 14 Sep 2026: remove the Kickoff Drafts section. It listed every draft `yaad-kickoff` had ever written, most of them already packs. But it was also the only place in the desk where a draft held back by the guardrail, or a job whose drafts kept failing, could be seen at all, so deleting it outright would have turned a stopped job into a silent one. Of the options put to her she chose to take the view out of the menu and move that one job onto Kickoff packs.
