@@ -1937,8 +1937,7 @@ export function JoinFlow() {
                         lump at the end: a stage signed off is a stage paid,
                         within 3 working days of Yaadly signing the stage
                         off.</b>{" "}
-                        Bank transfer, Lynk wallet or remittance pick-up,
-                        whichever you choose.
+                        By bank transfer. Yaadly does not pay in cash.
                       </p>
                       <p className="mt-2.5 text-[12.5px] text-dim">
                         <b className="text-mute">Yaadly pays you, the client

@@ -1,77 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
-import { createClient } from "@/lib/supabase/server";
-import { PayoutSetupButton } from "@/components/portal/PayoutSetupButton";
-import { checkPayoutSetup, startPayoutSetup, type PayoutState } from "@/app/portal/payout-actions";
-
-// Never cached: what Stripe last said about this worker is the whole page.
-export const dynamic = "force-dynamic";
 
 export const metadata = { title: "How Yaadly pays you · Yaadly" };
 
 /**
- * How Yaadly pays a worker, 20260914200000.
+ * How Yaadly pays a worker.
  *
- * The page the booking WhatsApp points at, and the page Stripe sends the
- * worker back to. The worker types their bank details into Stripe's own
- * form; Yaadly never sees or keeps them (founder decision, 14 Sep 2026).
- * Stripe's sign-up link is single use and lasts ten minutes, so it is never
- * put in a message: it is made fresh here, for the signed-in worker, on the
- * tap of the button.
+ * Founder, 14 Sep 2026: bank transfer only for now, never cash. Lynk waits
+ * until Yaadly is registered in Jamaica. Stripe payouts, where a worker types
+ * bank details into Stripe's own form (20260914200000, yaad-payout-setup),
+ * stay "coming soon" until Global Payouts is approved: the function is
+ * deployed and dormant, and this page does not call it. Yaadly never stores
+ * worker bank details; they are taken by phone and saved in Yaadly's own bank.
  */
-const WORDS: Record<PayoutState, { title: string; detail: string; button: string }> = {
-  none: {
-    title: "Not set up yet",
-    detail: "Before Yaadly can pay you, add the bank account you want to be paid into. It takes a few minutes on Stripe's secure page.",
-    button: "Set up with Stripe",
-  },
-  started: {
-    title: "Started, not finished",
-    detail: "Stripe still needs a few details from you before it can pay you. Pick up where you left off.",
-    button: "Carry on with Stripe",
-  },
-  needs_info: {
-    title: "Stripe needs something from you",
-    detail: "Stripe cannot pay you yet. Open it to see what is missing.",
-    button: "Open Stripe",
-  },
-  ready: {
-    title: "Ready to be paid",
-    detail: "Stripe has your bank details and Yaadly can pay you. To change the account you are paid into, update it on Stripe.",
-    button: "Update your details",
-  },
-};
-
-export default async function Payouts({
-  searchParams,
-}: {
-  searchParams: Promise<{ back?: string; again?: string }>;
-}) {
+export default async function Payouts() {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
-  const { back, again } = await searchParams;
-
-  // Stripe sends the worker here with ?again=1 when its one-time link had
-  // expired or been opened twice: make a fresh one and go straight back.
-  if (again) {
-    const out = await startPayoutSetup();
-    if (out.ok) redirect(out.url);
-  }
-
-  // Coming back from Stripe: ask Stripe, which records the answer. Otherwise
-  // read what was last recorded.
-  let state: PayoutState | null = back ? await checkPayoutSetup() : null;
-  if (!state) {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("worker_profiles")
-      .select("stripe_recipient_status")
-      .eq("worker_user", user.id)
-      .maybeSingle();
-    state = ((data?.stripe_recipient_status as PayoutState | undefined) ?? "none");
-  }
-  const w = WORDS[state];
 
   return (
     <main className="mx-auto max-w-[720px] px-5 py-10">
@@ -80,14 +25,18 @@ export default async function Payouts({
       </Link>
       <h1 className="mt-4 font-display text-[clamp(26px,4vw,38px)] uppercase leading-none">How Yaadly pays you</h1>
       <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-mute">
-        Yaadly pays you through Stripe, in J$, into your own Jamaican bank account. You type your bank details into
-        Stripe&apos;s secure page. Yaadly never sees them and does not keep them.
+        Yaadly pays you in J$ by bank transfer, into your own Jamaican bank account. Yaadly does not pay in cash.
       </p>
 
       <section className="mt-6 rounded-2xl border border-line bg-panel p-5">
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">{w.title}</p>
-        <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{w.detail}</p>
-        <PayoutSetupButton label={w.button} />
+        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Your bank details</p>
+        <p className="mt-2 text-[13.5px] leading-relaxed text-ink">
+          Yaadly calls you to take your bank details before your first payment, and saves them in its own bank, not on
+          this site. When a payment goes, you get a WhatsApp with the amount and the reference.
+        </p>
+        <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
+          <b className="text-mute">Coming soon:</b> setting up your bank details yourself, on Stripe&apos;s secure page.
+        </p>
       </section>
 
       <p className="mt-5 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">

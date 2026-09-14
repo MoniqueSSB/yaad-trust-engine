@@ -14,7 +14,7 @@ import { jmd } from "@/lib/money";
  * Released does not mean paid. Nothing in this repository moves money
  * (CLAUDE.md 9): a released figure is what Yaadly's part is done with,
  * cleared to be paid off-platform within 3 working days. Recording how that
- * actually happened, bank transfer, Lynk or remittance, and what reference
+ * actually happened (bank transfer; never cash, 20260914220000), and what reference
  * it carried, is the worker's own note for their own record, through
  * record_pay_info() in Postgres, not a payment confirmation Yaadly makes.
  */
@@ -32,8 +32,6 @@ export type MoneyJob = {
 
 const METHOD_LABEL: Record<string, string> = {
   bank_transfer: "Bank transfer",
-  lynk: "Lynk wallet",
-  remittance: "Remittance pick up",
 };
 
 export function WorkerMoneyPanel({ jobs }: { jobs: MoneyJob[] }) {
@@ -113,8 +111,6 @@ function MoneyRow({ job }: { job: MoneyJob }) {
               >
                 <option value="" disabled>How were you paid?</option>
                 <option value="bank_transfer">Bank transfer</option>
-                <option value="lynk">Lynk wallet</option>
-                <option value="remittance">Remittance pick up</option>
               </select>
               <input
                 name="ref"
