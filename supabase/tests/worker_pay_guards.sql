@@ -1,6 +1,6 @@
 -- Proof that a worker's pay is marked sent by a named person, once, that the
 -- worker is told only then, and that client bills still mark paid as before.
--- Run with execute_sql once 20260914210000 is applied.
+-- Run with execute_sql once 20260914230000 is applied.
 --
 -- NOTHING HERE PERSISTS AND NOTHING LEAVES. It borrows sent invoices on TEST
 -- jobs, marks them paid inside a subtransaction and throws it all away. The

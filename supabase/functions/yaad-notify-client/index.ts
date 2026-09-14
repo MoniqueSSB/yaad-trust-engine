@@ -1136,11 +1136,11 @@ Deno.serve(async (req: Request) => {
         `Materials money is sent to you to buy the goods once the client has paid for them; your labour is paid as the stages are signed off. ` +
         `Do not start yet. The job goes live once the client's invoice to Yaadly is paid, and you will get a message on this number when it is. ` +
         `Your Arrival Log on day one is what opens the first stage.\n\n` +
-        // 20260914200000. The request for payment details, pointing at a page
+        // 20260914200000, reworded 20260914220000 (bank transfer only, no cash, Stripe coming soon). How the worker is paid, pointing at a page
         // in their own portal and never asking for a reply here: anything a
         // worker types to this number is kept with the job and read by the
         // intake and reporting steps, so bank details must never be sent in it.
-        `To be paid, set up how Yaadly pays you: ${APP_URL}/portal/worker/payouts. You type your bank details into Stripe's secure page, and Yaadly never sees them. Never type bank details into this chat.`;
+        `Yaadly pays you by bank transfer, never cash, and will call you to take your bank details: ${APP_URL}/portal/worker/payouts. Never type bank details into this chat.`;
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
@@ -1249,7 +1249,7 @@ Deno.serve(async (req: Request) => {
         `Keep the supplier receipt. Once you have the goods, upload the receipt and a photo of the materials in the store here: ${roomLink}#files`;
     } else if (kind === "worker_paid") {
       // 14 Sep 2026. Fires when a person on the desk marks a worker's pay
-      // invoice paid (mark_worker_paid, 20260914210000), after paying it from
+      // invoice paid (mark_worker_paid, 20260914230000), after paying it from
       // the business bank app. Same shape as materials_sent_worker: read off
       // the row itself, and only while it is this job's worker pay and marked
       // paid, so a stray or repeated call cannot tell a worker money is coming

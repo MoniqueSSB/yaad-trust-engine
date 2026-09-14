@@ -27,7 +27,7 @@ export type WorkerInvoiceJob = {
     totalPence: number;
     status: string;
     sentAt: string | null;
-    /** Set when Yaadly marks the money sent (mark_worker_paid, 20260914210000). */
+    /** Set when Yaadly marks the money sent (mark_worker_paid, 20260914230000). */
     paidAt: string | null;
     paidMethod: string | null;
     paidRef: string | null;
@@ -49,7 +49,7 @@ export type WorkerInvoiceJob = {
  */
 function invoiceStatus(status: string, paid: boolean): StatusLabel {
   // Paid is Yaadly's own record that a named person sent the money
-  // (mark_worker_paid, 20260914210000), not the worker's note.
+  // (mark_worker_paid, 20260914230000), not the worker's note.
   if (status === "paid") return { label: "Paid", tone: "done" };
   if (status === "sent" && !paid) return { label: "Pending", tone: "waiting" };
   if (status === "sent") return { label: "Recorded paid", tone: "done" };

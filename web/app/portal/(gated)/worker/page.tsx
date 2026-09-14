@@ -55,7 +55,7 @@ export default async function WorkerPortal() {
 
   const { data: profile } = await supabase
     .from("worker_profiles")
-    .select("phone,stripe_recipient_status")
+    .select("phone")
     .eq("worker_user", user.id)
     .maybeSingle();
 
@@ -231,7 +231,7 @@ export default async function WorkerPortal() {
             value: jmd(released),
             tone: released > 0 ? "done" : "idle",
             icon: "released",
-            note: "Paid straight to you by bank transfer, Lynk or cash, within 3 working days",
+            note: "Paid straight to you by bank transfer, within 3 working days. Never cash.",
           },
         ] satisfies StatCard[])
       : []),
@@ -315,18 +315,15 @@ export default async function WorkerPortal() {
               every other section in this column starts with. */}
           <div className="mt-4">
             <LinkWorkerPhone phone={profile?.phone ?? null} />
-            {/* How Yaadly pays them, on Stripe's own form (20260914200000).
-                Yaadly never sees the bank details; this only says whether
-                Stripe has them. */}
+            {/* How Yaadly pays them: bank transfer only for now, never cash
+                (20260914220000). Stripe setup is coming soon. */}
             <section className="mt-4 rounded-2xl border border-line bg-panel p-4">
               <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">How Yaadly pays you</p>
               <p className="mt-1 text-[12px] leading-relaxed text-dim">
-                {profile?.stripe_recipient_status === "ready"
-                  ? "Ready. Stripe has your bank details and Yaadly can pay you."
-                  : "Add the bank account Yaadly pays you into, on Stripe's secure page. Yaadly never sees it."}
+                By bank transfer, into your own bank account. Never cash.
               </p>
               <Link href="/portal/worker/payouts" className="mt-2.5 inline-block text-[12.5px] font-bold text-tealb underline-offset-2 hover:underline">
-                {profile?.stripe_recipient_status === "ready" ? "See or change it" : "Set it up"}
+                See how
               </Link>
             </section>
           </div>

@@ -45,9 +45,9 @@ alter table public.invoices add constraint invoices_paid_method_check
   check (paid_method is null or paid_method in ('bank_transfer'));
 
 comment on column public.invoices.paid_by is
-  'Who marked this invoice paid: the signed-in admin''s email, written by invoice_status_guard, never by the caller. Blank on invoices paid before 20260914210000.';
+  'Who marked this invoice paid: the signed-in admin''s email, written by invoice_status_guard, never by the caller. Blank on invoices paid before 20260914230000.';
 comment on column public.invoices.paid_method is
-  'How a worker''s pay went out. bank_transfer only, until Stripe Global Payouts is live. Required to mark a worker pay invoice paid; null on client bills. Yaadly stores no worker bank details. 20260914210000.';
+  'How a worker''s pay went out. bank_transfer only, until Stripe Global Payouts is live. Required to mark a worker pay invoice paid; null on client bills. Yaadly stores no worker bank details. 20260914230000.';
 
 -- ------------------------------------------------------------------ guard
 
@@ -62,7 +62,7 @@ declare
   v_lines    integer;
   v_who      text := nullif(btrim(lower(coalesce(auth.jwt() ->> 'email', ''))), '');
 begin
-  -- A paid invoice's payment record is written once (20260914210000).
+  -- A paid invoice's payment record is written once (20260914230000).
   if old.status = 'paid' then
     if new.paid_at is distinct from old.paid_at or new.paid_by is distinct from old.paid_by
        or new.paid_method is distinct from old.paid_method or new.paid_reference is distinct from old.paid_reference then
@@ -168,7 +168,7 @@ end
 $function$;
 
 comment on function public.mark_worker_paid(text, text, text) is
-  'A named admin records that a worker''s pay invoice has been paid to them: how, and the transfer reference. Once, never changed. Fires the worker''s WhatsApp. Moves no money itself. 20260914210000.';
+  'A named admin records that a worker''s pay invoice has been paid to them: how, and the transfer reference. Once, never changed. Fires the worker''s WhatsApp. Moves no money itself. 20260914230000.';
 
 revoke execute on function public.mark_worker_paid(text, text, text) from public, anon;
 grant execute on function public.mark_worker_paid(text, text, text) to authenticated;

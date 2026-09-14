@@ -36,7 +36,7 @@ export type InvoiceRow = {
   starts_job?: boolean | null;
   /** On a part payment, the whole-job bill it was requested from. */
   part_of?: string | null;
-  /** How a worker's pay went out, and its reference (mark_worker_paid, 20260914210000). */
+  /** How a worker's pay went out, and its reference (mark_worker_paid, 20260914230000). */
   paid_method?: string | null;
   paid_reference?: string | null;
 };
