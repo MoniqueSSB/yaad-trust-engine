@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-14 · The price comparison lives on the quote, and the desk's Price check view is gone
+
+**Founder:** "the price check should be on quote automatically shown to the client, not on its own section in admin." The client half already existed. Since 5 September every quote on a client's job page carries a "For comparison" box (`web/components/portal/PriceContextNote.tsx`), worked out automatically from the researched band and from `price_spread_for_trade`, and the quoting worker reads the same words (the Mirror Rule). So the change was to take the desk's separate Price check view out: its menu entry, its page, and the code that ran it. Nothing about the client's box changed.
+
+**The verdict did not move across, on purpose.** The desk view said "red flag", "high, ask questions" or "suspiciously low". Those are judgements on a price, which is quantity surveying, the one thing Yaadly does not guarantee. The client box says where the labour figure sits and what the comparison is made of, never whether it is right. That rule is `web/lib/portal/price-context.ts` rule 1 and `web/tests/price-context.test.mjs` holds it in words. The thresholds still exist in the engine's `review_quote()`, which is where they came from.
+
+**What went with it.** The desk no longer writes `quote_reviews`, so "quote review" stops adding to `desk_decisions`. The table, its rows and its RLS are untouched, and no migration was needed. The price database does not depend on it: every submitted quote already lands in `price_observations` by trigger. The generated `PRICE_BENCHMARKS` block stays in `concierge.html` although nothing in the page reads it now, because `tests/test_price_benchmarks.py` checks the engine's bands against it, and removing it would mean rewriting those tests rather than the page. If the desk ever shows the client's sentence beside a quote, that block is what it would read.
+
+---
+
 ## 2026-09-13 · A quoting worker sees the tender pack, not the job
 
 **Founder's decision, the same day, closing what the address entry further down flagged.** A worker who has quoted on a job and is not booked on it sees what the public board shows: title, parish, trade, the description with names and contact details taken out by `board_descr()`, and the photographs the client put on the board. Plus their own quote and their own Kickoff Pack. That stays true after the client picks somebody else: the job remains on their list as "Not selected this time", board level only. The street address and the client's details are for the client and the booked worker. In construction terms: every tenderer gets the tender pack, only the contractor on site gets the site file.

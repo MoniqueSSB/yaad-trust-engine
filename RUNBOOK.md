@@ -3490,9 +3490,11 @@ Since 4 September 2026 no pack issues itself. Both used to: a guardrail-clean dr
 
 ---
 
-## 22. A price check looks wrong, or a band has changed
+## 22. A price comparison on a quote looks wrong, or a band has changed
 
-The Price check view in the desk reads bands generated from `yaad/benchmarks.py`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+There is no Price check view in the desk any more (removed 14 September 2026, founder's instruction). The comparison is shown automatically on every quote, as the "For comparison" box on the client's job page, and the quoting worker sees the same words. It is worked out in `web/lib/portal/price-context.ts` from bands generated from `yaad/benchmarks.py` and from `price_spread_for_trade`. **There is no model in this path and there must never be one** (CLAUDE.md §5). It is a lookup.
+
+**The box is missing on a quote.** Usually correct. It shows only when the trade has a general band with real figures, or when Yaadly has seen at least three real quotes for that trade. Below that it says nothing rather than something thin. Plumbing, for example, has only tank, unclog and septic bands, so it stays silent until three plumbing quotes exist.
 
 **To change a band:** edit `yaad/benchmarks.py`, then run
 
@@ -3500,17 +3502,17 @@ The Price check view in the desk reads bands generated from `yaad/benchmarks.py`
 python3 scripts/gen_price_benchmarks.py
 ```
 
-That rewrites the generated block inside `concierge/concierge.html`. Copy the file into `concierge-deploy/public/index.html` and deploy the desk. `tests/test_price_benchmarks.py` fails if the page has drifted from the engine, so a hand edit to the page is caught rather than shipped.
+That rewrites `web/lib/portal/price-bands.ts` (what clients read, live once the app is redeployed) and the generated block inside `concierge/concierge.html`, which nothing in the desk reads now but which `tests/test_price_benchmarks.py` checks against the engine. A hand edit to either is caught rather than shipped.
 
 **"No public price exists in Jamaica for this work" is a correct answer**, not a missing row. Painting, masonry, septic and general repair are deliberately empty: four-agent research on 1 August 2026 found no public prices for them anywhere in the country, and that gap is the reason the product exists. Do not fill them with a guess. A test asserts those four stay empty.
 
-**The verdict thresholds** are ported verbatim from `review_quote()`: over 2x the top of the band is a red flag, over 1.3x is worth asking about, under half the bottom is suspiciously low. Coarse on purpose. Six cases are checked against the Python source directly.
+**No verdict ever reaches a client or a worker.** The box says where the labour figure sits and what the comparison is made of, never whether the price is right. A verdict on a price is quantity surveying, the one thing Yaadly does not guarantee. The old desk view's verdicts ("red flag" over 2x the top of the band, "ask questions" over 1.3x, "suspiciously low" under half the bottom) were deliberately not carried onto the quote; they survive only in the engine's `review_quote()`. `web/tests/price-context.test.mjs` holds the no-verdict rule in words.
 
-**A trade with no band family** simply is not offered in the dropdown. Nine of the eighteen taxonomy trades map onto seeded families; the rest have no benchmark at all, and offering them would imply a lookup that cannot happen. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and checking a fence against it is a wrong reference dressed as a right one.
+**A trade with no band family** gets no researched comparison, only the observed spread once three quotes exist. Nine of the eighteen taxonomy trades map onto seeded families. **Fencing is deliberately not mapped** even though metalwork exists: the only metalwork band is a window or door grill from one seller in St Ann, and comparing a fence against it is a wrong reference dressed as a right one.
 
-**Three outcomes, not two, and the difference matters.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. Those report **"say which kind of job"** and list the variants. They must never report "no public price exists", which is the third outcome and is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. A test asserts no mapped trade can fall into the wrong one.
+**Never say "no public price exists" where it is not true.** A family can have real bands and no general figure: plumbing has unclog, tank and septic and nothing generic, and so do metalwork and grounds. On a quote those say nothing (until three real quotes exist), because nobody has judged which kind of job it is. They must never say "no public price exists", which is reserved for painting, masonry, septic and general repair, where it is true. Saying it when it is not true is as damaging as inventing a number, because that sentence is the one the whole product rests on. `tests/test_price_benchmarks.py` asserts no mapped trade can fall into the wrong one.
 
-**Nothing here is ever shown to a client or a worker.** `quote_reviews` is admin-only in RLS, deliberately with no party read policy. A band beside somebody's price reads as an estimate, and estimating is QS work, which is the one thing Yaadly does not guarantee.
+**`quote_reviews` is no longer written.** It was the desk view's log. The table, its rows and its admin-only RLS stay; nothing new lands there, so "quote review" no longer adds to `desk_decisions`. The price database keeps growing without it, because every submitted quote lands in `price_observations` by trigger.
 
 ## Changing anything a customer reads about money, checks or prices
 
