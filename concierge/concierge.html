@@ -311,6 +311,7 @@ svg.chart{width:100%;flex:1;min-height:0;display:block}
 .mrow .mn{font-size:10px;color:var(--dim)}
 .mrow .mamt{justify-self:end;font-family:var(--disp);font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mrow.warn .mamt{color:var(--mango)}.mrow.ok .mamt{color:var(--tealb)}
+.mrow{grid-template-columns:auto minmax(0,1fr)}.mrow .mamt,.msl .v{white-space:normal;text-align:right;line-height:1.2}
 .diary{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0}
 .dv{display:flex;align-items:baseline;gap:8px;padding:4px 0;border-top:1px solid var(--softline);font-size:11.5px;min-width:0}
 .diary .dv:first-child{border-top:0}
@@ -402,6 +403,7 @@ button.stl:hover{background:var(--panel2)}
 /* ---------- money, one bar ---------- */
 .msplit{margin:14px 0 6px}
 .msplit .stack{height:22px}
+.mscur{font-size:10.5px;color:var(--dim);margin:10px 0 4px}.mscur:first-child{margin-top:0}
 .mslegend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 18px;margin-top:10px}
 @media(max-width:700px){.mslegend{grid-template-columns:1fr}}
 .msl{display:grid;grid-template-columns:10px minmax(0,1fr) auto;grid-template-areas:"dot k v" ". n n";align-items:baseline;gap:1px 8px;padding:6px;border-radius:8px;text-align:left}
@@ -1367,6 +1369,26 @@ const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
 const money = (p) => "£" + (p / 100).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
 const jmd = (n) => "J$" + Number(n || 0).toLocaleString("en-JM");
+// Invoices carry two currencies in one column (DECISIONS.md, 14 Sep 2026).
+// A GBP row's total_pence is pence; a JMD row's is whole Jamaican dollars, as
+// raise_job_client_invoice writes it and yaad-invoice prints it. So a single
+// amount is drawn in its own currency, and a list is totalled per currency
+// and never added across. There is no exchange rate on file and the founder
+// has not chosen one, so nothing on this desk converts one into the other.
+// A row read without its currency counts as GBP, which is exactly the old
+// bug: every query that totals invoices must select currency.
+const curAmt = (v, cur) => cur === "JMD" ? jmd(Math.round(Number(v || 0))) : money(Number(v || 0));
+const curRank = (c) => c === "JMD" ? 0 : c === "GBP" ? 1 : 2;
+const curOrder = (cs) => [...new Set(cs)].sort((a, b) => curRank(a) - curRank(b) || a.localeCompare(b));
+const sumByCur = (list) => {
+  const t = {};
+  for (const i of list || []) { const c = i.currency || "GBP"; t[c] = (t[c] || 0) + Number(i.total_pence || 0); }
+  return t;
+};
+const curText = (t) => {
+  const cs = curOrder(Object.keys(t || {}).filter(c => t[c]));
+  return cs.length ? cs.map(c => curAmt(t[c], c)).join(" + ") : "none";
+};
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function say(where, kind, text){ $(where).innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; }
 
@@ -3146,7 +3168,7 @@ function applicantCard(r){
 // signoffCard draws one job's record at the top of its drawer. Every line is
 // read from a row: a step with no row says so rather than guessing.
 let JOBCTX = null;
-const amt_ = (p, cur) => cur === "JMD" ? jmd(Math.round(Number(p || 0) / 100)) : money(Number(p || 0));
+const amt_ = curAmt;
 async function preJobs(rows){
   JOBCTX = null;
   const ids = (rows || []).map(r => r.id).filter(Boolean);
@@ -3337,25 +3359,31 @@ function wireJobMessage(r, el){
   });
 }
 
-// One bar, split by where the money is. Amounts in pounds, counts beside them.
+// One bar per currency, split by where the money is, counts beside it. Each
+// part's v is a { currency: amount } total from sumByCur. A job bill is in
+// Jamaican dollars and a service invoice in pounds, so they get a bar each:
+// one bar across both would size a J$ figure against a pence figure.
 function moneySplit(parts, note){
-  const total = parts.reduce((a, x) => a + (x.v || 0), 0);
-  let left = 0;
-  const segs = total ? parts.filter(x => x.v).map(x => {
-    const w = 100 * x.v / total, seg = `<span class="sg" style="left:${left}%;width:${w}%;background:${x.col}" title="${esc(x.label)}"></span>`;
-    left += w; return seg;
-  }).join("") : "";
-  const legend = parts.map(x => `<button class="msl"${x.view ? ` data-v="${esc(x.view)}"` : ""}><i style="background:${x.col}"></i><span class="k">${esc(x.label)}</span><span class="v">${esc(money(x.v || 0))}</span><span class="n">${plural_(x.n || 0, "invoice", "invoices")}</span></button>`).join("");
-  return `<div class="msplit">${total ? `<div class="stack">${segs}</div>` : `<p class="stclear" style="color:var(--dim)">No invoices yet.</p>`}<div class="mslegend">${legend}</div>${note ? `<p class="hint">${note}</p>` : ""}</div>`;
+  const curs = curOrder(parts.flatMap(x => Object.keys(x.v || {}).filter(c => x.v[c])));
+  const bars = curs.map(c => {
+    const total = parts.reduce((a, x) => a + ((x.v || {})[c] || 0), 0);
+    let left = 0;
+    const segs = parts.filter(x => (x.v || {})[c]).map(x => {
+      const w = 100 * x.v[c] / total, seg = `<span class="sg" style="left:${left}%;width:${w}%;background:${x.col}" title="${esc(x.label + ", " + curAmt(x.v[c], c))}"></span>`;
+      left += w; return seg;
+    }).join("");
+    return (curs.length > 1 ? `<div class="mscur">${c === "JMD" ? "Jamaican dollars" : c === "GBP" ? "Pounds" : esc(c)}, ${esc(curAmt(total, c))}</div>` : "") + `<div class="stack">${segs}</div>`;
+  }).join("");
+  const legend = parts.map(x => `<button class="msl"${x.view ? ` data-v="${esc(x.view)}"` : ""}><i style="background:${x.col}"></i><span class="k">${esc(x.label)}</span><span class="v">${esc(curText(x.v))}</span><span class="n">${plural_(x.n || 0, "invoice", "invoices")}</span></button>`).join("");
+  return `<div class="msplit">${bars || `<p class="stclear" style="color:var(--dim)">No invoices yet.</p>`}<div class="mslegend">${legend}</div>${note ? `<p class="hint">${note}</p>` : ""}</div>`;
 }
 
 function invoiceSplit(list){
   const by = (s) => (list || []).filter(i => i.status === s);
-  const sum = (a) => a.reduce((t, i) => t + (i.total_pence || 0), 0);
   return moneySplit([
-    { label:"Raised, not sent", v:sum(by("draft")), n:by("draft").length, col:"#4A4A72" },
-    { label:"Sent, awaiting payment", v:sum(by("sent")), n:by("sent").length, col:"#F59E0B" },
-    { label:"Paid", v:sum(by("paid")), n:by("paid").length, col:"#9B73F5" },
+    { label:"Raised, not sent", v:sumByCur(by("draft")), n:by("draft").length, col:"#4A4A72" },
+    { label:"Sent, awaiting payment", v:sumByCur(by("sent")), n:by("sent").length, col:"#F59E0B" },
+    { label:"Paid", v:sumByCur(by("paid")), n:by("paid").length, col:"#9B73F5" },
   ]);
 }
 
@@ -3406,10 +3434,8 @@ function jobPage(r){
   const qs = ctx.quotes[r.id] || [], invs = ctx.invoices[r.id] || [], evs = ctx.evidence[r.id] || [];
   const stage = Number(r.stage) || 0;
   const cinv = invs.filter(i => i.payable_to !== "worker"), winv = invs.filter(i => i.payable_to === "worker");
-  const paidC = cinv.filter(i => i.status === "paid").reduce((a, i) => a + Number(i.total_pence || 0), 0);
-  const outC = cinv.filter(i => i.status === "sent").reduce((a, i) => a + Number(i.total_pence || 0), 0);
-  const paidW = winv.filter(i => i.status === "paid").reduce((a, i) => a + Number(i.total_pence || 0), 0);
-  const cur = (cinv[0] || winv[0] || {}).currency || "JMD";
+  const paidC = cinv.filter(i => i.status === "paid"), outC = cinv.filter(i => i.status === "sent");
+  const paidW = winv.filter(i => i.status === "paid");
   const acc = qs.find(q => q.status === "accepted");
   const visits = (VISITS || []).filter(v => v.job_id === r.id).sort((a, b) => String(a.day).localeCompare(String(b.day)));
   const today = new Date().toISOString().slice(0, 10);
@@ -3440,8 +3466,8 @@ function jobPage(r){
         <div class="kv" style="font-size:12.5px">
           <span class="k2">Agreed labour</span><span class="v2">${Number(r.owed) > 0 ? jmd(r.owed) : mute_("none agreed")}</span>
           <span class="k2">Quote accepted</span><span class="v2">${acc ? jmd(Number(acc.labour_jmd || 0) + Number(acc.materials_jmd || 0)) : mute_(qs.length ? qs.length + " in" : "none")}</span>
-          <span class="k2">Client paid Yaadly</span><span class="v2">${paidC ? amt_(paidC, cur) : outC ? `<span style="color:var(--mango)">${amt_(outC, cur)} out</span>` : mute_("nothing raised")}</span>
-          <span class="k2">Paid to tradesperson</span><span class="v2">${paidW ? amt_(paidW, cur) : mute_("nothing yet")}</span>
+          <span class="k2">Client paid Yaadly</span><span class="v2">${paidC.length ? curText(sumByCur(paidC)) : outC.length ? `<span style="color:var(--mango)">${curText(sumByCur(outC))} out</span>` : mute_("nothing raised")}</span>
+          <span class="k2">Paid to tradesperson</span><span class="v2">${paidW.length ? curText(sumByCur(paidW)) : mute_("nothing yet")}</span>
         </div></div>
       <div class="jpc"><h6>Site</h6>
         <div class="jpv"><span>Materials kept</span><div class="jpvv">${matStore(r)}</div></div>
@@ -5587,7 +5613,7 @@ async function renderDash(d){
   const stages = d.stages.map((s, i) => `<button class="stb" data-v="${s.done ? "jobs" : "day"}"><span class="stn">${s.n}</span><i style="height:${s.n ? Math.max(6, Math.round(100 * s.n / stgMax)) : 2}%;background:${s.done ? CH.l : CH.p}"></i><span class="stl">${esc(s.label)}</span></button>`).join("");
   const moves = d.lanes.reduce((a, l) => a + l.n, 0);
   const laneLegend = d.lanes.map(l => `<button class="lg" data-v="${esc(l.view)}"><i style="background:${l.color}"></i>${esc(l.label)}<b>${l.n}</b></button>`).join("");
-  const moneyRows = d.money.map(m => `<button class="mrow ${m.tone}" data-v="${esc(m.view)}"><span class="ml">${esc(m.label)}<span class="mn"> &middot; ${m.n}</span></span><span class="mamt">${esc(money(m.v))}</span></button>`).join("");
+  const moneyRows = d.money.map(m => `<button class="mrow ${m.tone}" data-v="${esc(m.view)}"><span class="ml">${esc(m.label)}<span class="mn"> &middot; ${m.n}</span></span><span class="mamt">${esc(curText(m.v))}</span></button>`).join("");
   const nums = d.numbers.map(n => `<button class="bn ${n.tone || ""}" data-v="${esc(n.view)}"><span class="v">${esc(String(n.v))}</span><span class="k">${esc(n.k)}</span><span class="s">${esc(n.note || "")}</span></button>`).join("");
   const vRow = (v, when) => `<div class="dv"><span class="dvt">${esc(when)}</span><span class="dvw">${esc(v.what || v.kind || "visit")}</span>${v.state && v.state !== "booked" ? `<span class="dvs">${esc(v.state)}</span>` : ""}</div>`;
   const diary = (d.visitsToday.length ? d.visitsToday.map(v => vRow(v, v.slot || "today")).join("")
@@ -5865,7 +5891,7 @@ async function loadOverview(){
   const [jobQ, quoteQ, invQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
     sb.from("jobs").select("id,parish,trade,stage,status,open,owed,updated_at").eq("open", true).limit(300),
     sb.from("job_quotes").select("job_id").limit(600),
-    sb.from("invoices").select("id,job_id,client_name,status,total_pence,created_at").limit(600),
+    sb.from("invoices").select("id,job_id,client_name,status,total_pence,currency,created_at").limit(600),
     sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
     sb.from("kickoff_packs").select("job_id,status").limit(300),
     countOf("reviews", q => q.is("reply", null)),
@@ -5881,7 +5907,7 @@ async function loadOverview(){
   const DISPUTED = new Set((dispQ.data || []).map(d => d.job_id));
 
   const INV = invQ.data || [];
-  const sumOf = (a) => a.reduce((t, i) => t + (i.total_pence || 0), 0);
+  const sumOf = sumByCur;
   const draftsInv = INV.filter(i => i.status === "draft");
   const sentInv   = INV.filter(i => i.status === "sent");
   const mKey      = new Date().toISOString().slice(0, 7);
@@ -6058,7 +6084,7 @@ async function loadOverview(){
   if (quotesOut)
     push(yours, "warn", "Decide", plural(quotesOut, "quote is", "quotes are") + " sitting with you", "the client has not seen these", null, "Compare", "quotes", false);
   if (invDraft)
-    push(yours, "warn", "Unsent", plural(invDraft, "invoice draft is", "invoice drafts are") + " unsent", null, money(sumOf(draftsInv)), "Open invoices", "invoices", false);
+    push(yours, "warn", "Unsent", plural(invDraft, "invoice draft is", "invoice drafts are") + " unsent", null, curText(sumOf(draftsInv)), "Open invoices", "invoices", false);
   if (kickDraft)
     push(yours, "warn", "Draft", plural(kickDraft, "kickoff pack is", "kickoff packs are") + " in draft", "approving freezes it", null, "Open packs", "kick", false);
   if (pkDraft)
@@ -6091,7 +6117,7 @@ async function loadOverview(){
   if (signing.length)
     push(cli, "warn", "Reading", plural(signing.length, "job is", "jobs are") + " waiting on a client sign-off", null, null, "Open jobs", "jobs", false);
   if (invSent)
-    push(cli, "warn", "With client", plural(invSent, "invoice is", "invoices are") + " out and awaiting payment", null, money(sumOf(sentInv)), "Open money", "money", false);
+    push(cli, "warn", "With client", plural(invSent, "invoice is", "invoices are") + " out and awaiting payment", null, curText(sumOf(sentInv)), "Open money", "money", false);
   if (waitN)
     push(cli, "", "Waiting", plural(waitN, "person is", "people are") + " on the waiting list", null, null, "Write to them", "waitlist", false);
   if (!cli.length)
@@ -6100,7 +6126,7 @@ async function loadOverview(){
   if (doneJobs.length)
     push(non, "ok", "Proven", plural(doneJobs.length, "job is", "jobs are") + " signed off and complete", null, null, "Open jobs", "jobs", false);
   if (paidM.length)
-    push(non, "ok", "Paid", plural(paidM.length, "invoice", "invoices") + " paid this month", null, money(sumOf(paidM)), "Open money", "money", false);
+    push(non, "ok", "Paid", plural(paidM.length, "invoice", "invoices") + " paid this month", null, curText(sumOf(paidM)), "Open money", "money", false);
   if (!non.length)
     push(non, "ok", "Clear", "Nothing is running on its own right now", null, null, null, null, false);
 
@@ -6152,16 +6178,16 @@ async function loadOverview(){
           <div class="slnote">Across ${plural(JOBS.length, "open job", "open jobs")}. Yaadly holds none of it.</div>
         </div>
         <div>
-          <div class="sl"><span>Invoices raised, unsent</span><span class="v warn">${esc(money(sumOf(draftsInv)))}</span></div>
+          <div class="sl"><span>Invoices raised, unsent</span><span class="v warn">${esc(curText(sumOf(draftsInv)))}</span></div>
           <div class="slnote">${plural(draftsInv.length, "draft", "drafts")} sitting on you.</div>
         </div>
         <div>
-          <div class="sl"><span>Out with clients, unpaid</span><span class="v warn">${esc(money(sumOf(sentInv)))}</span></div>
+          <div class="sl"><span>Out with clients, unpaid</span><span class="v warn">${esc(curText(sumOf(sentInv)))}</span></div>
           <div class="slnote">${plural(sentInv.length, "invoice", "invoices")} sent. Nothing to do until the money lands.</div>
         </div>
         ${namedDrafts.length ? `<div class="sdiv">${namedDrafts.map(i =>
-          `<div class="sl"><span>${esc(i.client_name || i.job_id || "unnamed draft")}</span><span class="v">${esc(money(i.total_pence || 0))}</span></div>`).join("")}</div>` : ""}
-        <div class="sdiv"><div class="sl"><span>Paid this month</span><span class="v ok">${esc(money(sumOf(paidM)))}</span></div></div>
+          `<div class="sl"><span>${esc(i.client_name || i.job_id || "unnamed draft")}</span><span class="v">${esc(curAmt(i.total_pence, i.currency))}</span></div>`).join("")}</div>` : ""}
+        <div class="sdiv"><div class="sl"><span>Paid this month</span><span class="v ok">${esc(curText(sumOf(paidM)))}</span></div></div>
       </div>
     </div>`;
 
@@ -6412,7 +6438,7 @@ async function loadMoney(){
   const host = $("v-money");
   host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
   const [invR, svcR, jobR] = await Promise.all([
-    sb.from("invoices").select("id,client_name,status,total_pence,created_at").limit(400),
+    sb.from("invoices").select("id,client_name,status,total_pence,currency,created_at").limit(400),
     sb.from("services").select("id,type,client_name,price,stage").limit(200),
     sb.from("jobs").select("id,owed,status,open").limit(400),
   ]);
@@ -6421,7 +6447,7 @@ async function loadMoney(){
     return;
   }
   const inv = invR.data || [], jobs = jobR.data || [];
-  const sum = (a) => a.reduce((t,i) => t + (i.total_pence || 0), 0);
+  const sum = sumByCur;
   const drafts = inv.filter(i => i.status === "draft");
   const sent   = inv.filter(i => i.status === "sent");
   const mKey   = new Date().toISOString().slice(0,7);
@@ -6905,7 +6931,7 @@ function renderInvoiceList(){
     <div class="item">
       <div><a href="#" data-open="${esc(i.id)}">${esc(i.id)}</a> ${chipFor(INV_CHIP, i.status)}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(i.client_name)} &middot; ${esc(i.issue_date)}</div></div>
-      <div style="font-weight:700;font-variant-numeric:tabular-nums">${money(i.total_pence)}</div>
+      <div style="font-weight:700;font-variant-numeric:tabular-nums">${curAmt(i.total_pence, i.currency)}</div>
     </div>`).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
           : '<div class="empty"><b>Nothing yet</b>Draft your first invoice above.</div>');
@@ -6920,7 +6946,7 @@ function renderInvoiceList(){
 
 async function loadInvoices(){
   const { data, error } = await sb.from("invoices")
-    .select("id,client_name,status,total_pence,issue_date,drafted_by")
+    .select("id,client_name,status,total_pence,currency,issue_date,drafted_by")
     .order("created_at", { ascending: false }).limit(15);
   if (error) return;
   INV_LIST = data || [];
