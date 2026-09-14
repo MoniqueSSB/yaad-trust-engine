@@ -311,6 +311,7 @@ svg.chart{width:100%;flex:1;min-height:0;display:block}
 .mrow .mn{font-size:10px;color:var(--dim)}
 .mrow .mamt{justify-self:end;font-family:var(--disp);font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mrow.warn .mamt{color:var(--mango)}.mrow.ok .mamt{color:var(--tealb)}
+.mrow{grid-template-columns:auto minmax(0,1fr)}.mrow .mamt,.msl .v{white-space:normal;text-align:right;line-height:1.2}
 .diary{display:flex;flex-direction:column;gap:2px;overflow-y:auto;min-height:0}
 .dv{display:flex;align-items:baseline;gap:8px;padding:4px 0;border-top:1px solid var(--softline);font-size:11.5px;min-width:0}
 .diary .dv:first-child{border-top:0}
@@ -402,6 +403,7 @@ button.stl:hover{background:var(--panel2)}
 /* ---------- money, one bar ---------- */
 .msplit{margin:14px 0 6px}
 .msplit .stack{height:22px}
+.mscur{font-size:10.5px;color:var(--dim);margin:10px 0 4px}.mscur:first-child{margin-top:0}
 .mslegend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 18px;margin-top:10px}
 @media(max-width:700px){.mslegend{grid-template-columns:1fr}}
 .msl{display:grid;grid-template-columns:10px minmax(0,1fr) auto;grid-template-areas:"dot k v" ". n n";align-items:baseline;gap:1px 8px;padding:6px;border-radius:8px;text-align:left}
@@ -970,9 +972,9 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   </div>
 
   <div class="card">
-    <div class="chd"><h3>Raise & send, per your own published terms</h3></div>
+    <div class="chd"><h3>Raise a draft, per your own published terms</h3></div>
     <div id="policyMsg"></div>
-    <p class="hint">Reads the price straight off your service list, never typed by hand, and follows the same rule as <a href="https://yaadly.co.uk/payments.html" target="_blank" rel="noopener">the payment terms page</a>: one invoice, the full published price, due before work starts, whatever the price; the Oversight Retainer, one invoice for the month, cancel with 30 days notice. One click raises it, renders it and emails it to the client, then marks it sent.</p>
+    <p class="hint">Reads the price straight off your service list, never typed by hand, and follows the same rule as <a href="https://yaadly.co.uk/payments.html" target="_blank" rel="noopener">the payment terms page</a>: one invoice, the full published price, due before work starts, whatever the price; the Oversight Retainer, one invoice for the month, cancel with 30 days notice. Raising writes a draft and opens it below, so you can check it, change it and preview it before it is emailed.</p>
     <label>Which service</label>
     <select id="policyCatalogue"></select>
     <div class="row" style="margin-top:13px">
@@ -980,8 +982,8 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
       <div><label>Client email</label><input id="policyClientEmail" type="email" placeholder="marcia@example.com"></div>
     </div>
     <div class="row"><div><label>Client address, optional</label><input id="policyClientAddress"></div></div>
-    <div class="brow"><button class="btn" id="policyRaise">Raise &amp; send</button></div>
-    <p class="conseq">Writes one or two numbered invoices to your record, emails each one to the client, and marks it sent, all in this one click. Nothing here is model-drafted, so there is no separate review step: the amount comes straight from your service list and the wording is fixed, the same reason a policy-raised invoice does not need the "mark sent" click a free-text drafted one still does.</p>
+    <div class="brow"><button class="btn" id="policyRaise">Raise draft</button></div>
+    <p class="conseq">Writes one or two numbered draft invoices to your record and opens the first. It emails nobody: you send it from the draft, once you have read it.</p>
   </div>
 
   <div class="card hidden" id="invCard">
@@ -1092,7 +1094,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ MATERIALS TRANCHES -->
 <section class="view" data-view="materials">
   <h1 class="vh">Materials tranches</h1>
-  <p class="vsub">The materials line of an accepted quote, paid to the worker against a receipt before any labour stage, and never fee'd on either side. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
+  <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
   <div id="mrMsg"></div>
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
 </section>
@@ -1367,6 +1369,26 @@ const $ = (id) => document.getElementById(id);
 const show = (id, on) => $(id).classList.toggle("hidden", !on);
 const money = (p) => "£" + (p / 100).toLocaleString("en-GB", {minimumFractionDigits:2, maximumFractionDigits:2});
 const jmd = (n) => "J$" + Number(n || 0).toLocaleString("en-JM");
+// Invoices carry two currencies in one column (DECISIONS.md, 14 Sep 2026).
+// A GBP row's total_pence is pence; a JMD row's is whole Jamaican dollars, as
+// raise_job_client_invoice writes it and yaad-invoice prints it. So a single
+// amount is drawn in its own currency, and a list is totalled per currency
+// and never added across. There is no exchange rate on file and the founder
+// has not chosen one, so nothing on this desk converts one into the other.
+// A row read without its currency counts as GBP, which is exactly the old
+// bug: every query that totals invoices must select currency.
+const curAmt = (v, cur) => cur === "JMD" ? jmd(Math.round(Number(v || 0))) : money(Number(v || 0));
+const curRank = (c) => c === "JMD" ? 0 : c === "GBP" ? 1 : 2;
+const curOrder = (cs) => [...new Set(cs)].sort((a, b) => curRank(a) - curRank(b) || a.localeCompare(b));
+const sumByCur = (list) => {
+  const t = {};
+  for (const i of list || []) { const c = i.currency || "GBP"; t[c] = (t[c] || 0) + Number(i.total_pence || 0); }
+  return t;
+};
+const curText = (t) => {
+  const cs = curOrder(Object.keys(t || {}).filter(c => t[c]));
+  return cs.length ? cs.map(c => curAmt(t[c], c)).join(" + ") : "none";
+};
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function say(where, kind, text){ $(where).innerHTML = text ? `<div class="msg ${kind}">${esc(text)}</div>` : ""; }
 
@@ -3146,7 +3168,7 @@ function applicantCard(r){
 // signoffCard draws one job's record at the top of its drawer. Every line is
 // read from a row: a step with no row says so rather than guessing.
 let JOBCTX = null;
-const amt_ = (p, cur) => cur === "JMD" ? jmd(Math.round(Number(p || 0) / 100)) : money(Number(p || 0));
+const amt_ = curAmt;
 async function preJobs(rows){
   JOBCTX = null;
   const ids = (rows || []).map(r => r.id).filter(Boolean);
@@ -3337,25 +3359,31 @@ function wireJobMessage(r, el){
   });
 }
 
-// One bar, split by where the money is. Amounts in pounds, counts beside them.
+// One bar per currency, split by where the money is, counts beside it. Each
+// part's v is a { currency: amount } total from sumByCur. A job bill is in
+// Jamaican dollars and a service invoice in pounds, so they get a bar each:
+// one bar across both would size a J$ figure against a pence figure.
 function moneySplit(parts, note){
-  const total = parts.reduce((a, x) => a + (x.v || 0), 0);
-  let left = 0;
-  const segs = total ? parts.filter(x => x.v).map(x => {
-    const w = 100 * x.v / total, seg = `<span class="sg" style="left:${left}%;width:${w}%;background:${x.col}" title="${esc(x.label)}"></span>`;
-    left += w; return seg;
-  }).join("") : "";
-  const legend = parts.map(x => `<button class="msl"${x.view ? ` data-v="${esc(x.view)}"` : ""}><i style="background:${x.col}"></i><span class="k">${esc(x.label)}</span><span class="v">${esc(money(x.v || 0))}</span><span class="n">${plural_(x.n || 0, "invoice", "invoices")}</span></button>`).join("");
-  return `<div class="msplit">${total ? `<div class="stack">${segs}</div>` : `<p class="stclear" style="color:var(--dim)">No invoices yet.</p>`}<div class="mslegend">${legend}</div>${note ? `<p class="hint">${note}</p>` : ""}</div>`;
+  const curs = curOrder(parts.flatMap(x => Object.keys(x.v || {}).filter(c => x.v[c])));
+  const bars = curs.map(c => {
+    const total = parts.reduce((a, x) => a + ((x.v || {})[c] || 0), 0);
+    let left = 0;
+    const segs = parts.filter(x => (x.v || {})[c]).map(x => {
+      const w = 100 * x.v[c] / total, seg = `<span class="sg" style="left:${left}%;width:${w}%;background:${x.col}" title="${esc(x.label + ", " + curAmt(x.v[c], c))}"></span>`;
+      left += w; return seg;
+    }).join("");
+    return (curs.length > 1 ? `<div class="mscur">${c === "JMD" ? "Jamaican dollars" : c === "GBP" ? "Pounds" : esc(c)}, ${esc(curAmt(total, c))}</div>` : "") + `<div class="stack">${segs}</div>`;
+  }).join("");
+  const legend = parts.map(x => `<button class="msl"${x.view ? ` data-v="${esc(x.view)}"` : ""}><i style="background:${x.col}"></i><span class="k">${esc(x.label)}</span><span class="v">${esc(curText(x.v))}</span><span class="n">${plural_(x.n || 0, "invoice", "invoices")}</span></button>`).join("");
+  return `<div class="msplit">${bars || `<p class="stclear" style="color:var(--dim)">No invoices yet.</p>`}<div class="mslegend">${legend}</div>${note ? `<p class="hint">${note}</p>` : ""}</div>`;
 }
 
 function invoiceSplit(list){
   const by = (s) => (list || []).filter(i => i.status === s);
-  const sum = (a) => a.reduce((t, i) => t + (i.total_pence || 0), 0);
   return moneySplit([
-    { label:"Raised, not sent", v:sum(by("draft")), n:by("draft").length, col:"#4A4A72" },
-    { label:"Sent, awaiting payment", v:sum(by("sent")), n:by("sent").length, col:"#F59E0B" },
-    { label:"Paid", v:sum(by("paid")), n:by("paid").length, col:"#9B73F5" },
+    { label:"Raised, not sent", v:sumByCur(by("draft")), n:by("draft").length, col:"#4A4A72" },
+    { label:"Sent, awaiting payment", v:sumByCur(by("sent")), n:by("sent").length, col:"#F59E0B" },
+    { label:"Paid", v:sumByCur(by("paid")), n:by("paid").length, col:"#9B73F5" },
   ]);
 }
 
@@ -3406,10 +3434,8 @@ function jobPage(r){
   const qs = ctx.quotes[r.id] || [], invs = ctx.invoices[r.id] || [], evs = ctx.evidence[r.id] || [];
   const stage = Number(r.stage) || 0;
   const cinv = invs.filter(i => i.payable_to !== "worker"), winv = invs.filter(i => i.payable_to === "worker");
-  const paidC = cinv.filter(i => i.status === "paid").reduce((a, i) => a + Number(i.total_pence || 0), 0);
-  const outC = cinv.filter(i => i.status === "sent").reduce((a, i) => a + Number(i.total_pence || 0), 0);
-  const paidW = winv.filter(i => i.status === "paid").reduce((a, i) => a + Number(i.total_pence || 0), 0);
-  const cur = (cinv[0] || winv[0] || {}).currency || "JMD";
+  const paidC = cinv.filter(i => i.status === "paid"), outC = cinv.filter(i => i.status === "sent");
+  const paidW = winv.filter(i => i.status === "paid");
   const acc = qs.find(q => q.status === "accepted");
   const visits = (VISITS || []).filter(v => v.job_id === r.id).sort((a, b) => String(a.day).localeCompare(String(b.day)));
   const today = new Date().toISOString().slice(0, 10);
@@ -3440,8 +3466,8 @@ function jobPage(r){
         <div class="kv" style="font-size:12.5px">
           <span class="k2">Agreed labour</span><span class="v2">${Number(r.owed) > 0 ? jmd(r.owed) : mute_("none agreed")}</span>
           <span class="k2">Quote accepted</span><span class="v2">${acc ? jmd(Number(acc.labour_jmd || 0) + Number(acc.materials_jmd || 0)) : mute_(qs.length ? qs.length + " in" : "none")}</span>
-          <span class="k2">Client paid Yaadly</span><span class="v2">${paidC ? amt_(paidC, cur) : outC ? `<span style="color:var(--mango)">${amt_(outC, cur)} out</span>` : mute_("nothing raised")}</span>
-          <span class="k2">Paid to tradesperson</span><span class="v2">${paidW ? amt_(paidW, cur) : mute_("nothing yet")}</span>
+          <span class="k2">Client paid Yaadly</span><span class="v2">${paidC.length ? curText(sumByCur(paidC)) : outC.length ? `<span style="color:var(--mango)">${curText(sumByCur(outC))} out</span>` : mute_("nothing raised")}</span>
+          <span class="k2">Paid to tradesperson</span><span class="v2">${paidW.length ? curText(sumByCur(paidW)) : mute_("nothing yet")}</span>
         </div></div>
       <div class="jpc"><h6>Site</h6>
         <div class="jpv"><span>Materials kept</span><div class="jpvv">${matStore(r)}</div></div>
@@ -5587,7 +5613,7 @@ async function renderDash(d){
   const stages = d.stages.map((s, i) => `<button class="stb" data-v="${s.done ? "jobs" : "day"}"><span class="stn">${s.n}</span><i style="height:${s.n ? Math.max(6, Math.round(100 * s.n / stgMax)) : 2}%;background:${s.done ? CH.l : CH.p}"></i><span class="stl">${esc(s.label)}</span></button>`).join("");
   const moves = d.lanes.reduce((a, l) => a + l.n, 0);
   const laneLegend = d.lanes.map(l => `<button class="lg" data-v="${esc(l.view)}"><i style="background:${l.color}"></i>${esc(l.label)}<b>${l.n}</b></button>`).join("");
-  const moneyRows = d.money.map(m => `<button class="mrow ${m.tone}" data-v="${esc(m.view)}"><span class="ml">${esc(m.label)}<span class="mn"> &middot; ${m.n}</span></span><span class="mamt">${esc(money(m.v))}</span></button>`).join("");
+  const moneyRows = d.money.map(m => `<button class="mrow ${m.tone}" data-v="${esc(m.view)}"><span class="ml">${esc(m.label)}<span class="mn"> &middot; ${m.n}</span></span><span class="mamt">${esc(curText(m.v))}</span></button>`).join("");
   const nums = d.numbers.map(n => `<button class="bn ${n.tone || ""}" data-v="${esc(n.view)}"><span class="v">${esc(String(n.v))}</span><span class="k">${esc(n.k)}</span><span class="s">${esc(n.note || "")}</span></button>`).join("");
   const vRow = (v, when) => `<div class="dv"><span class="dvt">${esc(when)}</span><span class="dvw">${esc(v.what || v.kind || "visit")}</span>${v.state && v.state !== "booked" ? `<span class="dvs">${esc(v.state)}</span>` : ""}</div>`;
   const diary = (d.visitsToday.length ? d.visitsToday.map(v => vRow(v, v.slot || "today")).join("")
@@ -5865,7 +5891,7 @@ async function loadOverview(){
   const [jobQ, quoteQ, invQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
     sb.from("jobs").select("id,parish,trade,stage,status,open,owed,updated_at").eq("open", true).limit(300),
     sb.from("job_quotes").select("job_id").limit(600),
-    sb.from("invoices").select("id,job_id,client_name,status,total_pence,created_at").limit(600),
+    sb.from("invoices").select("id,job_id,client_name,status,total_pence,currency,created_at").limit(600),
     sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
     sb.from("kickoff_packs").select("job_id,status").limit(300),
     countOf("reviews", q => q.is("reply", null)),
@@ -5881,7 +5907,7 @@ async function loadOverview(){
   const DISPUTED = new Set((dispQ.data || []).map(d => d.job_id));
 
   const INV = invQ.data || [];
-  const sumOf = (a) => a.reduce((t, i) => t + (i.total_pence || 0), 0);
+  const sumOf = sumByCur;
   const draftsInv = INV.filter(i => i.status === "draft");
   const sentInv   = INV.filter(i => i.status === "sent");
   const mKey      = new Date().toISOString().slice(0, 7);
@@ -6058,7 +6084,7 @@ async function loadOverview(){
   if (quotesOut)
     push(yours, "warn", "Decide", plural(quotesOut, "quote is", "quotes are") + " sitting with you", "the client has not seen these", null, "Compare", "quotes", false);
   if (invDraft)
-    push(yours, "warn", "Unsent", plural(invDraft, "invoice draft is", "invoice drafts are") + " unsent", null, money(sumOf(draftsInv)), "Open invoices", "invoices", false);
+    push(yours, "warn", "Unsent", plural(invDraft, "invoice draft is", "invoice drafts are") + " unsent", null, curText(sumOf(draftsInv)), "Open invoices", "invoices", false);
   if (kickDraft)
     push(yours, "warn", "Draft", plural(kickDraft, "kickoff pack is", "kickoff packs are") + " in draft", "approving freezes it", null, "Open packs", "kick", false);
   if (pkDraft)
@@ -6091,7 +6117,7 @@ async function loadOverview(){
   if (signing.length)
     push(cli, "warn", "Reading", plural(signing.length, "job is", "jobs are") + " waiting on a client sign-off", null, null, "Open jobs", "jobs", false);
   if (invSent)
-    push(cli, "warn", "With client", plural(invSent, "invoice is", "invoices are") + " out and awaiting payment", null, money(sumOf(sentInv)), "Open money", "money", false);
+    push(cli, "warn", "With client", plural(invSent, "invoice is", "invoices are") + " out and awaiting payment", null, curText(sumOf(sentInv)), "Open money", "money", false);
   if (waitN)
     push(cli, "", "Waiting", plural(waitN, "person is", "people are") + " on the waiting list", null, null, "Write to them", "waitlist", false);
   if (!cli.length)
@@ -6100,7 +6126,7 @@ async function loadOverview(){
   if (doneJobs.length)
     push(non, "ok", "Proven", plural(doneJobs.length, "job is", "jobs are") + " signed off and complete", null, null, "Open jobs", "jobs", false);
   if (paidM.length)
-    push(non, "ok", "Paid", plural(paidM.length, "invoice", "invoices") + " paid this month", null, money(sumOf(paidM)), "Open money", "money", false);
+    push(non, "ok", "Paid", plural(paidM.length, "invoice", "invoices") + " paid this month", null, curText(sumOf(paidM)), "Open money", "money", false);
   if (!non.length)
     push(non, "ok", "Clear", "Nothing is running on its own right now", null, null, null, null, false);
 
@@ -6152,16 +6178,16 @@ async function loadOverview(){
           <div class="slnote">Across ${plural(JOBS.length, "open job", "open jobs")}. Yaadly holds none of it.</div>
         </div>
         <div>
-          <div class="sl"><span>Invoices raised, unsent</span><span class="v warn">${esc(money(sumOf(draftsInv)))}</span></div>
+          <div class="sl"><span>Invoices raised, unsent</span><span class="v warn">${esc(curText(sumOf(draftsInv)))}</span></div>
           <div class="slnote">${plural(draftsInv.length, "draft", "drafts")} sitting on you.</div>
         </div>
         <div>
-          <div class="sl"><span>Out with clients, unpaid</span><span class="v warn">${esc(money(sumOf(sentInv)))}</span></div>
+          <div class="sl"><span>Out with clients, unpaid</span><span class="v warn">${esc(curText(sumOf(sentInv)))}</span></div>
           <div class="slnote">${plural(sentInv.length, "invoice", "invoices")} sent. Nothing to do until the money lands.</div>
         </div>
         ${namedDrafts.length ? `<div class="sdiv">${namedDrafts.map(i =>
-          `<div class="sl"><span>${esc(i.client_name || i.job_id || "unnamed draft")}</span><span class="v">${esc(money(i.total_pence || 0))}</span></div>`).join("")}</div>` : ""}
-        <div class="sdiv"><div class="sl"><span>Paid this month</span><span class="v ok">${esc(money(sumOf(paidM)))}</span></div></div>
+          `<div class="sl"><span>${esc(i.client_name || i.job_id || "unnamed draft")}</span><span class="v">${esc(curAmt(i.total_pence, i.currency))}</span></div>`).join("")}</div>` : ""}
+        <div class="sdiv"><div class="sl"><span>Paid this month</span><span class="v ok">${esc(curText(sumOf(paidM)))}</span></div></div>
       </div>
     </div>`;
 
@@ -6412,7 +6438,7 @@ async function loadMoney(){
   const host = $("v-money");
   host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
   const [invR, svcR, jobR] = await Promise.all([
-    sb.from("invoices").select("id,client_name,status,total_pence,created_at").limit(400),
+    sb.from("invoices").select("id,client_name,status,total_pence,currency,created_at").limit(400),
     sb.from("services").select("id,type,client_name,price,stage").limit(200),
     sb.from("jobs").select("id,owed,status,open").limit(400),
   ]);
@@ -6421,7 +6447,7 @@ async function loadMoney(){
     return;
   }
   const inv = invR.data || [], jobs = jobR.data || [];
-  const sum = (a) => a.reduce((t,i) => t + (i.total_pence || 0), 0);
+  const sum = sumByCur;
   const drafts = inv.filter(i => i.status === "draft");
   const sent   = inv.filter(i => i.status === "sent");
   const mKey   = new Date().toISOString().slice(0,7);
@@ -6594,13 +6620,51 @@ $("draft").addEventListener("click", async () => {
 });
 
 async function reload(id){
+  // Moving from one invoice to another (a part to its bill, say) must not
+  // leave the last one's preview sitting under the new one.
+  if (CURRENT?.invoice?.id !== id) show("previewCard", false);
   const [{ data: inv }, { data: lines }] = await Promise.all([
     sb.from("invoices").select("*").eq("id", id).single(),
     sb.from("invoice_lines").select("*").eq("invoice_id", id).order("sort").order("id")
   ]);
-  CURRENT = { invoice: inv, lines: lines || [], questions: CURRENT?.questions || [] };
+  // A whole-job bill lists the parts requested from it, each with its own
+  // lines, so the bill itself shows what has gone out and what has been paid.
+  let parts = [];
+  if (inv && inv.job_id && !inv.part_of) {
+    const { data: ps } = await sb.from("invoices")
+      .select("id,status,total_pence,currency,sent_at,paid_at,paid_reference,starts_job")
+      .eq("part_of", id).order("created_at");
+    parts = ps || [];
+    if (parts.length) {
+      const { data: pl } = await sb.from("invoice_lines")
+        .select("invoice_id,description,line_total_pence").in("invoice_id", parts.map(p => p.id));
+      for (const p of parts) p.lines = (pl || []).filter(l => l.invoice_id === p.id);
+    }
+  }
+  // Card payments Stripe reported against this invoice (invoice_payments,
+  // 20260914120000). Recorded by yaad-stripe-webhook, never trusted: marking
+  // the invoice paid is still this desk's click. Phase 1b, 14 Sep 2026.
+  let cardPays = [];
+  if (inv) {
+    const { data: cp } = await sb.from("invoice_payments")
+      .select("status,amount_stored,currency,livemode,received_at,provider_ref")
+      .eq("invoice_id", id).order("received_at");
+    cardPays = cp || [];
+  }
+  CURRENT = { invoice: inv, lines: lines || [], parts, cardPays, questions: CURRENT?.questions || [] };
   renderInvoice();
   await loadInvoices();
+}
+
+// Opens any invoice in the editor on this view: from Job Invoices, Agency
+// Fees, or the service raise card. Raising only ever writes a draft; this is
+// where it is read, changed, split into parts, previewed and sent.
+async function openInvoice(id, note){
+  go("invoices");
+  CURRENT = { questions: [] };
+  await reload(id);
+  say("invMsg", note ? "ok" : "", note || "");
+  $("invCard").scrollIntoView({ behavior: "smooth" });
 }
 
 function renderInvoice(){
@@ -6608,8 +6672,34 @@ function renderInvoice(){
   const inv = CURRENT.invoice, lines = CURRENT.lines, draft = inv.status === "draft";
   const unpriced = lines.filter(l => l.price_source === "needs_price").length;
 
+  // A marketplace job bill is kept in whole Jamaican dollars, a service
+  // invoice in pence. Every figure on this card goes through amt(), and the
+  // my-figure box takes the unit the invoice is kept in, so J$4,000 is typed
+  // as 4000. Before 13 Sep 2026 this card assumed pence throughout, which
+  // showed a job bill in pounds and would have saved a typed J$4,000 as
+  // J$400,000.
+  const jmd = inv.currency === "JMD";
+  const amt = (p) => feeAmt(p, inv.currency);
+  const toUnit = (p) => jmd ? String(Math.round(p)) : (p / 100).toFixed(2);
+  const fromUnit = (v) => jmd ? Math.round(Number(v) || 0) : Math.round((Number(v) || 0) * 100);
+
+  // A whole-job bill can be requested in parts while it is a draft. Each part
+  // is its own numbered invoice and takes its amount off this bill, so no
+  // amount is ever on two documents. The Guarantee & Support line moves whole:
+  // whichever invoice carries it is the one whose payment starts the job.
+  // Founder decisions, 13 Sep 2026; the database enforces all of it
+  // (request_invoice_part, 20260913233000).
+  const isBill = !!inv.job_id && inv.stage == null && !inv.part_of && (inv.payable_to || "yaadly") === "yaadly";
+  const canPart = isBill && draft && lines.length > 0;
+  const parts = CURRENT.parts || [];
+  const liveParts = parts.filter(p => p.status !== "void");
+  const feePart = liveParts.find(p => p.starts_job);
+  const sumOf = (a) => a.reduce((t, p) => t + (p.total_pence || 0), 0);
+
   $("invTitle").innerHTML = esc(inv.id) + " " + chipFor(INV_CHIP, inv.status)
-    + (inv.drafted_by === "ai" ? ' <span class="chip ai">drafted by the agent</span>' : '');
+    + (inv.drafted_by === "ai" ? ' <span class="chip ai">drafted by the agent</span>' : '')
+    + (isBill ? ' <span class="chip mute">whole-job bill</span>' : '')
+    + (inv.part_of ? ' <span class="chip mute">part payment</span>' : '');
 
   const opts = (sel) => CATALOGUE.map(c => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.name)}</option>`).join("");
 
@@ -6624,19 +6714,41 @@ function renderInvoice(){
         </select>` : ""}</td>
       <td class="num" style="width:70px">${draft ? `<input class="q" type="number" min="0.5" step="0.5" value="${Number(l.qty)}">` : Number(l.qty)}</td>
       <td class="num">${draft && l.price_source === "manual"
-        ? `<input class="u" type="number" min="0" step="0.01" style="width:90px" value="${(l.unit_amount_pence / 100).toFixed(2)}">`
-        : l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : money(l.unit_amount_pence)}</td>
-      <td class="num">${l.price_source === "needs_price" ? "&mdash;" : money(l.line_total_pence)}</td>
+        ? `<input class="u" type="number" min="0" step="${jmd ? 1 : 0.01}" style="width:90px" value="${toUnit(l.unit_amount_pence)}">`
+        : l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : amt(l.unit_amount_pence)}</td>
+      <td class="num">${l.price_source === "needs_price" ? "&mdash;" : amt(l.line_total_pence)}</td>
+      ${canPart ? `<td class="num" style="min-width:150px">${l.price_source === "needs_price" ? "" : `<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end"><input type="checkbox" class="pk" title="Request this line now"><input class="pa" type="number" min="1" step="${jmd ? 1 : 0.01}" style="width:88px" value="${toUnit(l.line_total_pence)}"${l.is_fee ? ' readonly title="The Guarantee &amp; Support fee is requested whole. Paying whichever invoice carries it starts the job."' : ""}></div>`}</td>` : ""}
       <td class="num">${draft ? `<button class="btn d rm">Remove</button>` : ""}</td>
     </tr>`).join("");
 
+  const partsHtml = isBill && parts.length ? `
+    <div class="qs" style="margin-top:14px"><h4>Requested in parts</h4><ul>${parts.map(p => `
+      <li><a href="#" data-openinv="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(INV_CHIP, p.status)} <b>${amt(p.total_pence)}</b>
+        &middot; ${esc((p.lines || []).map(x => x.description).join(", "))}${p.starts_job && p.status !== "void" ? " &middot; <b>paying this starts the job</b>" : ""}${p.sent_at ? " &middot; sent " + esc(String(p.sent_at).slice(0, 10)) : ""}${p.paid_at ? " &middot; paid " + esc(String(p.paid_at).slice(0, 10)) + (p.paid_reference ? ", ref " + esc(p.paid_reference) : "") : ""}</li>`).join("")}</ul>
+      <p style="margin:8px 0 0">Still on this bill <b>${amt(inv.total_pence)}</b> &middot; requested in parts <b>${amt(sumOf(liveParts))}</b> &middot; paid so far <b>${amt(sumOf(liveParts.filter(p => p.status === "paid")))}</b></p></div>` : "";
+
+  // What Stripe reported, beside the invoice, so a card payment is visible
+  // here before anyone marks the invoice paid. Reads only; it pays nothing
+  // and marks nothing. A mismatch is a warning, never a green light.
+  const cardPays = CURRENT.cardPays || [];
+  const cardOk = cardPays.find(p => p.status === "succeeded");
+  const cardBad = cardPays.filter(p => p.status === "mismatch");
+  const cardWhen = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const cardMode = (p) => p.livemode ? "" : " &middot; Stripe test mode";
+  const cardHtml =
+    (cardOk ? `<div class="alert"><span class="ic">&#10003;</span><div><b>Card payment received</b><p>${amt(cardOk.amount_stored)} by card on ${esc(cardWhen(cardOk.received_at))}${cardMode(cardOk)} &middot; matches this invoice.${inv.status === "sent" ? " Mark it paid when you are satisfied; the Stripe reference is filled in for you." : ""}</p></div></div>` : "")
+    + cardBad.map(p => `<div class="alert crit"><span class="ic">!</span><div><b>A card payment does not match this invoice</b><p>Stripe charged ${amt(p.amount_stored)} ${esc(p.currency)} on ${esc(cardWhen(p.received_at))}${cardMode(p)}, and this invoice is ${amt(inv.total_pence)} ${esc(inv.currency || "")}. Do not mark it paid from this. Check it in Stripe, and refund or correct it there.</p></div></div>`).join("");
+
   $("invBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)}${inv.client_company ? " (" + esc(inv.client_company) + ")" : ""} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}${inv.po_number ? " &middot; PO " + esc(inv.po_number) : ""}</p>
+    ${inv.part_of ? `<p class="vsub" style="margin:0 0 10px">Part of <a href="#" data-openinv="${esc(inv.part_of)}">${esc(inv.part_of)}</a>, the whole-job bill for ${esc(inv.job_id || "")}.${inv.starts_job ? " It carries the Guarantee &amp; Support fee, so paying it starts the job." : ""}</p>` : ""}
     <div class="tw"><table>
-      <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th><th></th></tr></thead>
+      <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th>${canPart ? '<th class="num">Request now</th>' : ""}<th></th></tr></thead>
       <tbody id="lineRows">${rows}</tbody>
     </table></div>
-    <div class="grand">${money(inv.total_pence)}</div>
+    <div class="grand">${amt(inv.total_pence)}</div>
+    ${partsHtml}
+    ${cardHtml}
     ${unpriced ? `<div class="alert crit"><span class="ic">!</span><div><b>${unpriced} line${unpriced > 1 ? "s" : ""} the agent could not price</b><p>It will not guess. Pick a service off your list for each one, or remove it. This invoice cannot be marked as sent until they are gone.</p></div></div>` : ""}
     ${(CURRENT.questions || []).length ? `<div class="qs"><h4>Check these before you send</h4><ul>${CURRENT.questions.map(q => "<li>" + esc(q) + "</li>").join("")}</ul></div>` : ""}
     ${inv.covering_note ? `<div class="note">${esc(inv.covering_note)}</div>` : ""}
@@ -6644,15 +6756,32 @@ function renderInvoice(){
       ${draft && inv.drafted_by === "ai" ? `<button class="btn g" id="takeOver">Make it mine to price</button>` : ""}
       ${draft ? `<button class="btn g" id="addLine">Add a line</button>` : ""}
       ${draft ? `<button class="btn g" id="saveLines">Save changes</button>` : ""}
+      ${canPart ? `<button class="btn g" id="partBtn">Request the ticked lines as a part</button>` : ""}
       <button class="btn g" id="previewBtn">Preview</button>
-      ${draft ? `<button class="btn" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent</button>` : ""}
+      ${draft && lines.length && inv.drafted_by !== "ai" ? `<button class="btn" id="emailBtn"${unpriced ? " disabled" : ""}>Email ${amt(inv.total_pence)} to ${esc(inv.client_email)}</button>` : ""}
+      ${draft && lines.length ? `<button class="btn g" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent, I sent it myself</button>` : ""}
       ${inv.status === "sent" ? `<button class="btn" id="paidBtn">Mark as paid</button>` : ""}
       ${draft || inv.status === "sent" ? `<button class="btn d" id="voidBtn">Void</button>` : ""}
     </div>
-    ${draft ? `<p class="conseq">Marking as sent <b>freezes ${esc(inv.id)} at ${money(inv.total_pence)}</b> and you cannot edit a line afterwards. It emails nobody: you still send it yourself.</p>` : ""}
-    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${money(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}`;
+    ${isBill && draft && !lines.length ? `<div class="alert"><span class="ic">i</span><div><b>Everything on this bill has been requested in parts</b><p>There is nothing left on it to send.</p></div></div>` : ""}
+    ${draft && lines.length ? `<p class="conseq">Emailing sends exactly what Preview shows and <b>freezes ${esc(inv.id)} at ${amt(inv.total_pence)}</b>: no line can be changed afterwards. Marking as sent freezes it the same way but emails nobody.</p>` : ""}
+    ${canPart ? `<p class="conseq">Requesting a part writes a new numbered draft for the ticked amounts and takes them off this bill, so nothing is billed twice. It emails nobody. ${inv.starts_job ? "The Guarantee &amp; Support fee is on this bill, so paying this bill starts the job, unless you request the fee as a part." : feePart ? `The fee went out on ${esc(feePart.id)}, so paying that part, not this bill, starts the job.` : ""}</p>` : ""}
+    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${amt(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}`;
 
   show("invCard", true);
+
+  let dirty = false;
+  $("invBody").querySelectorAll("#lineRows .d, #lineRows .q, #lineRows .u").forEach(x => x.addEventListener("input", () => { dirty = true; }));
+  $("invBody").querySelectorAll("#lineRows .pa").forEach(x => x.addEventListener("input", () => {
+    const pk = x.closest("tr").querySelector(".pk");
+    if (pk) pk.checked = true;
+  }));
+  $("invBody").querySelectorAll("[data-openinv]").forEach(a => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    say("invMsg", "", "");
+    CURRENT = { questions: [] };
+    await reload(a.dataset.openinv);
+  }));
 
   $("invBody").querySelectorAll(".rm").forEach(b => b.addEventListener("click", async (e) => {
     const { error } = await sb.from("invoice_lines").delete().eq("id", e.target.closest("tr").dataset.id);
@@ -6730,7 +6859,7 @@ function renderInvoice(){
       // catalogue tiers keep being overwritten by the price guard, so a
       // number typed against those is still discarded, on purpose.
       const u = tr.querySelector(".u");
-      if (u && tier === "manual") upd.unit_amount_pence = Math.round((Number(u.value) || 0) * 100);
+      if (u && tier === "manual") upd.unit_amount_pence = fromUnit(u.value);
       const { error } = await sb.from("invoice_lines").update(upd).eq("id", tr.dataset.id);
       if (error) return say("invMsg","err",error.message);
     }
@@ -6747,8 +6876,49 @@ function renderInvoice(){
     } catch (e) { say("invMsg","err",e.message); }
   });
 
+  if ($("partBtn")) $("partBtn").addEventListener("click", async () => {
+    if (dirty) return say("invMsg","err","You have changed a line without saving. Press Save changes first, so the part is taken from the figures you can see.");
+    const items = [];
+    for (const tr of $("lineRows").querySelectorAll("tr")) {
+      const pk = tr.querySelector(".pk");
+      if (!pk || !pk.checked) continue;
+      items.push({ line: Number(tr.dataset.id), amount: fromUnit(tr.querySelector(".pa").value) });
+    }
+    if (!items.length) return say("invMsg","err","Tick at least one line to request.");
+    const sum = items.reduce((t, i) => t + i.amount, 0);
+    if (!confirm("Request " + amt(sum) + " from " + inv.id + " as its own invoice?\n\nThis writes a new numbered draft for the ticked amounts and takes them off this bill. It emails nobody: you preview it and send it from the next screen.")) return;
+    try {
+      const { data, error } = await sb.rpc("request_invoice_part", { p_bill: inv.id, p_items: items });
+      if (error) throw error;
+      const row = (data || [])[0];
+      if (!row) throw new Error("Nothing was requested.");
+      CURRENT = { questions: [] };
+      await reload(row.invoice_id);
+      say("invMsg","ok", row.invoice_id + " drafted for " + amt(row.total) + ", part of " + inv.id + ". Nothing has been sent. Preview it, then email it.");
+    } catch (e) {
+      let hint = e.message;
+      if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+      say("invMsg","err", hint);
+    }
+  });
+
+  if ($("emailBtn")) $("emailBtn").addEventListener("click", async () => {
+    if (dirty) return say("invMsg","err","You have changed a line without saving. Press Save changes first, then Preview, so what goes out is what you checked.");
+    if (!confirm("Email " + inv.id + " to " + inv.client_email + "?\n\n" + amt(inv.total_pence) + ", exactly as Preview shows it. Sending freezes it: no line can be changed afterwards.")) return;
+    $("emailBtn").disabled = true;
+    try {
+      const out = await fn({ action: "send", invoice_id: inv.id });
+      say("invMsg","ok", "Emailed " + inv.id + " (" + amt(inv.total_pence) + ") to " + (out?.emailed_to || inv.client_email) + ". It is now marked sent.");
+    } catch (e) {
+      let hint = e.message;
+      if (/RESEND_API_KEY/i.test(hint)) hint = "RESEND_API_KEY is not set, so it could not be emailed. It is still a draft: preview it, print or save it, send it yourself, then press Mark as sent.";
+      say("invMsg","err", hint);
+    }
+    await reload(inv.id);
+  });
+
   if ($("sendBtn")) $("sendBtn").addEventListener("click", async () => {
-    if (!confirm("Mark " + inv.id + " as sent?\n\nThis freezes the invoice at " + money(inv.total_pence) + ". It does not email anybody: you still send it yourself.")) return;
+    if (!confirm("Mark " + inv.id + " as sent?\n\nThis freezes the invoice at " + amt(inv.total_pence) + ". It does not email anybody: you still send it yourself.")) return;
     const { error } = await sb.from("invoices").update({ status: "sent" }).eq("id", inv.id);
     if (error) return say("invMsg","err",error.message);
     say("invMsg","ok","Marked as sent and frozen. Now email or WhatsApp it to them.");
@@ -6756,7 +6926,7 @@ function renderInvoice(){
   });
 
   if ($("paidBtn")) $("paidBtn").addEventListener("click", async () => {
-    const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
+    const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.", ((CURRENT.cardPays || []).find(p => p.status === "succeeded") || {}).provider_ref || "");
     if (ref === null) return;
     const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", inv.id);
     if (error) return say("invMsg","err",error.message);
@@ -6765,7 +6935,8 @@ function renderInvoice(){
   });
 
   if ($("voidBtn")) $("voidBtn").addEventListener("click", async () => {
-    if (!confirm("Void " + inv.id + "? It stays on the record, marked void.")) return;
+    const back = inv.part_of ? "\n\nIts " + amt(inv.total_pence) + " goes back onto " + inv.part_of + "." : "";
+    if (!confirm("Void " + inv.id + "? It stays on the record, marked void." + back)) return;
     const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", inv.id);
     if (error) return say("invMsg","err",error.message);
     await reload(inv.id);
@@ -6783,7 +6954,7 @@ function renderInvoiceList(){
     <div class="item">
       <div><a href="#" data-open="${esc(i.id)}">${esc(i.id)}</a> ${chipFor(INV_CHIP, i.status)}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(i.client_name)} &middot; ${esc(i.issue_date)}</div></div>
-      <div style="font-weight:700;font-variant-numeric:tabular-nums">${money(i.total_pence)}</div>
+      <div style="font-weight:700;font-variant-numeric:tabular-nums">${curAmt(i.total_pence, i.currency)}</div>
     </div>`).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
           : '<div class="empty"><b>Nothing yet</b>Draft your first invoice above.</div>');
@@ -6798,7 +6969,7 @@ function renderInvoiceList(){
 
 async function loadInvoices(){
   const { data, error } = await sb.from("invoices")
-    .select("id,client_name,status,total_pence,issue_date,drafted_by")
+    .select("id,client_name,status,total_pence,currency,issue_date,drafted_by")
     .order("created_at", { ascending: false }).limit(15);
   if (error) return;
   INV_LIST = data || [];
@@ -6837,37 +7008,53 @@ async function loadJobInvoices(){
 
   const jobIds = jobs.map((j) => j.id);
   const [{ data: quotes }, { data: invs }] = await Promise.all([
-    sb.from("job_quotes").select("job_id,worker_name,labour_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("invoices").select("id,job_id,status,total_pence,sent_at").in("job_id", jobIds).is("stage", null),
+    sb.from("job_quotes").select("job_id,worker_name,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
+    sb.from("invoices").select("id,job_id,status,total_pence,sent_at,part_of,payable_to").in("job_id", jobIds).is("stage", null),
   ]);
 
+  // The whole-job bill is the one with no part_of; parts are counted against
+  // it. A stage-less worker payable is what Yaadly owes, not the client's bill.
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
-  const invByJob = new Map();
-  for (const i of invs || []) if (i.status !== "void") invByJob.set(i.job_id, i);
+  const invByJob = new Map(), partsByJob = new Map();
+  for (const i of invs || []) {
+    if (i.status === "void" || i.payable_to === "worker") continue;
+    if (i.part_of) { if (!partsByJob.has(i.job_id)) partsByJob.set(i.job_id, []); partsByJob.get(i.job_id).push(i); }
+    else invByJob.set(i.job_id, i);
+  }
 
   const rows = jobs.map((job) => {
     const quote = quoteByJob.get(job.id);
     if (!quote) return "";
-    const fee = Math.round((quote.labour_jmd || 0) * 0.15);
+    // What the client is billed: labour, Yaadly's 15% on labour, materials at
+    // cost, the same sum raise_job_client_invoice writes. This used to show
+    // the 15% alone next to a button that sent the whole bill.
+    const labour = Math.round(quote.labour_jmd || 0);
+    const fee = Math.round(labour * 0.15);
     const inv = invByJob.get(job.id);
+    const parts = partsByJob.get(job.id) || [];
+    const billed = inv ? inv.total_pence + parts.reduce((t, p) => t + (p.total_pence || 0), 0)
+                       : labour + fee + Math.round(quote.materials_jmd || 0);
 
     let statusHtml, actionHtml;
     if (inv) {
       const when = inv.sent_at ? String(inv.sent_at).slice(0, 10) : "not sent yet";
+      const paidParts = parts.filter((p) => p.status === "paid").length;
       statusHtml = `<span class="jichip raised"><span class="dot"></span>${esc(inv.status)}</span>`
-        + `<span class="jiref">${esc(inv.id)} · ${esc(when)}</span>`;
-      actionHtml = `<button class="btn g" data-preview-inv="${esc(inv.id)}">Preview</button>`
+        + `<span class="jiref">${esc(inv.id)} · ${esc(when)}</span>`
+        + (parts.length ? `<span class="jiref">${parts.length} part${parts.length > 1 ? "s" : ""} requested, ${paidParts} paid</span>` : "");
+      actionHtml = `<button class="btn g" data-open-inv="${esc(inv.id)}">Open</button>`
+        + `<button class="btn g" data-preview-inv="${esc(inv.id)}">Preview</button>`
         + (inv.status === "sent" ? `<button class="btn" data-paid-inv="${esc(inv.id)}" data-paid-total="${inv.total_pence}">Mark as paid</button>` : "")
         + (inv.status === "draft" || inv.status === "sent" ? `<button class="btn d" data-void-inv="${esc(inv.id)}">Void</button>` : "");
     } else {
       statusHtml = `<span class="jichip ready"><span class="dot"></span>Ready to raise</span>`;
-      actionHtml = `<button class="btn" data-raise-job="${esc(job.id)}">Raise &amp; send</button>`;
+      actionHtml = `<button class="btn" data-raise-job="${esc(job.id)}">Raise draft</button>`;
     }
 
     return `<tr>
       <td><div class="jistagename">${esc(job.id)}</div><div class="jistagepct">${esc(job.title || "")}</div></td>
-      <td><div class="jicond">${esc(quote.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Labour ${jmdFmt(quote.labour_jmd || 0)}</div></td>
-      <td class="num"><span class="jiamt">${jmdFmt(fee)}</span></td>
+      <td><div class="jicond">${esc(quote.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Labour ${jmdFmt(labour)}</div></td>
+      <td class="num"><span class="jiamt">${jmdFmt(billed)}</span><div class="jistagepct">Yaadly's 15%: ${jmdFmt(fee)}</div></td>
       <td>${statusHtml}</td>
       <td>${actionHtml}</td>
     </tr>`;
@@ -6875,32 +7062,36 @@ async function loadJobInvoices(){
 
   host.innerHTML = rows.length
     ? `<table class="jitable">
-        <thead><tr><th>Job</th><th>Who</th><th class="num">Yaadly's fee, 15% of labour</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Job</th><th>Who</th><th class="num">Client's bill, Yaadly's 15% inside it</th><th>Status</th><th></th></tr></thead>
         <tbody>${rows.join("")}</tbody>
       </table>`
-    : `<div class="empty"><b>No booked job here has an accepted quote yet</b>An accepted quote is needed before the agency fee can be computed.</div>`;
+    : `<div class="empty"><b>No booked job here has an accepted quote yet</b>An accepted quote is needed before the client's bill can be worked out.</div>`;
 
+  // Raising writes a draft and opens it. Nothing is emailed from here: the
+  // bill is read, changed or split into parts in the editor, previewed, and
+  // only then sent. Founder instruction, 13 Sep 2026.
   host.querySelectorAll("[data-raise-job]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const job = btn.dataset.raiseJob;
       btn.disabled = true;
-      say("jiMsg", "ok", `Raising the agency fee on ${job}…`);
+      say("jiMsg", "ok", `Drafting the client's bill for ${job}…`);
       try {
         const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
         if (error) throw error;
         const row = (data || [])[0];
-        if (!row) throw new Error("Raised nothing to send.");
-        say("jiMsg", "ok", `Raised ${row.invoice_id} (${jmdFmt(row.total_jmd)}). Sending…`);
-        const out = await fn({ action: "send", invoice_id: row.invoice_id });
-        say("jiMsg", "ok", `Sent ${row.invoice_id} (${jmdFmt(row.total_jmd)}) to ${out?.emailed_to || "the client"}. Marked sent.`);
+        if (!row) throw new Error("Nothing was raised.");
+        await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
       } catch (e) {
         let hint = e.message;
         if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-        if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set, so it could not be emailed. Find it under Invoices, drafted, and send it from there once that is fixed.";
         say("jiMsg", "err", hint);
+        btn.disabled = false;
       }
-      await loadJobInvoices();
     });
+  });
+
+  host.querySelectorAll("[data-open-inv]").forEach((btn) => {
+    btn.addEventListener("click", () => openInvoice(btn.dataset.openInv));
   });
 
   host.querySelectorAll("[data-preview-inv]").forEach((btn) => {
@@ -6948,10 +7139,13 @@ $("jiPrint").addEventListener("click", () => $("jiPreview").contentWindow.print(
 // admin only, needs a booked worker, an accepted quote with a materials line,
 // a receipt reference, and refuses any total above the quoted line. The store
 // gate stays in the trigger, so this panel shows it but does not re-check it.
-async function loadMaterials(){
+// keepMsg: true when a button on this view redraws it, so the confirmation
+// it just wrote survives the redraw. It used to be wiped straight away, so a
+// release or a receipt went through with nothing on screen to say so.
+async function loadMaterials(keepMsg){
   const host = $("mrBody");
   host.innerHTML = `<div class="empty"><b>Reading booked jobs with a materials line&hellip;</b></div>`;
-  say("mrMsg", "", "");
+  if (keepMsg !== true) say("mrMsg", "", "");
 
   const { data: jobs, error: jobsErr } = await sb.from("jobs")
     .select("id,title,client_email,worker_email,worker_name,materials_store_type,status")
@@ -6968,53 +7162,83 @@ async function loadMaterials(){
   }
 
   const jobIds = jobs.map((j) => j.id);
-  const [{ data: quotes }, { data: rels }] = await Promise.all([
+  // Since 20260914112000 a tranche goes out once the client has PAID for the
+  // materials, not against a receipt, so this reads what has been paid:
+  // materials lines on the job's paid Yaadly invoices, the same test
+  // materials_paid_jmd() applies in the database, which has the last word.
+  const [{ data: quotes }, { data: rels }, { data: paidInvs }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("materials_releases").select("job_id,amount_jmd,released_at,receipt_ref,stage").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("invoices").select("job_id,currency,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").eq("status", "paid"),
   ]);
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
+  const paidMatByJob = new Map();
+  for (const inv of paidInvs || []) {
+    if (String(inv.currency || "JMD").toUpperCase() !== "JMD") continue;
+    const m = (inv.invoice_lines || [])
+      .filter((l) => /^materials, at cost/i.test(l.description || ""))
+      .reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
+    paidMatByJob.set(inv.job_id, (paidMatByJob.get(inv.job_id) || 0) + m);
+  }
 
   const rows = jobs.map((job) => {
     const q = quoteByJob.get(job.id);
     if (!q || !(Number(q.materials_jmd) > 0)) return "";
     const quoted = Number(q.materials_jmd);
+    const paidFor = paidMatByJob.get(job.id) || 0;
     const done = relByJob.get(job.id) || [];
     const soFar = done.reduce((t, r) => t + Number(r.amount_jmd || 0), 0);
     const left = Math.max(quoted - soFar, 0);
+    const canGo = Math.max(Math.min(quoted, paidFor) - soFar, 0);
     const storeOk = !!job.materials_store_type;
     const full = left <= 0;
+    const receiptsDue = done.filter((r) => !String(r.receipt_ref || "").trim()).length;
     const id = esc(job.id);
 
     const statusHtml = full
-      ? `<span class="jichip paid"><span class="dot"></span>Fully released</span>`
-      : storeOk
-        ? `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`
-        : `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`;
+      ? (receiptsDue
+          ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
+          : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
+      : !storeOk
+        ? `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`
+        : canGo <= 0
+          ? `<span class="jichip"><span class="dot"></span>Waiting on the client paying for the materials</span>`
+          : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
 
     const history = done.length
-      ? `<div class="jicond" style="margin-top:6px">` + done.map((r) =>
-          `${jmdFmt(r.amount_jmd)} &middot; receipt ${esc(r.receipt_ref || "")}${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`
-        ).join("<br>") + `</div>`
+      ? `<div class="jicond" style="margin-top:6px">` + done.map((r) => {
+          const ref = String(r.receipt_ref || "").trim();
+          const rid = esc(String(r.id));
+          const receiptHtml = ref
+            ? `receipt ${esc(ref)}`
+            : `<b>receipt to come</b> <input type="text" placeholder="receipt ref" data-mr-rref="${rid}" style="width:110px"> <button class="btn g" data-receipt-rel="${rid}">Record receipt</button>`;
+          return `${jmdFmt(r.amount_jmd)} &middot; ${receiptHtml}${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`;
+        }).join("<br>") + `</div>`
       : "";
 
     const form = full ? "" : `
       <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-        <div><label>Amount J$</label><input type="number" min="1" step="1" value="${left}" data-mr-amount="${id}" style="width:120px"></div>
-        <div><label>Receipt ref</label><input type="text" placeholder="e.g. HW-4471" data-mr-receipt="${id}" style="width:130px"></div>
+        <div><label>Amount J$</label><input type="number" min="1" step="1" value="${canGo || left}" data-mr-amount="${id}" style="width:120px"></div>
+        <div><label>Receipt ref, if you have one</label><input type="text" placeholder="usually comes later" data-mr-receipt="${id}" style="width:150px"></div>
         <div><label>Stage</label><input type="number" min="1" step="1" placeholder="opt." data-mr-stage="${id}" style="width:70px"></div>
         <div><label>Note</label><input type="text" placeholder="optional" data-mr-note="${id}" style="width:160px"></div>
       </div>`;
 
+    const blocked = !storeOk
+      ? "The database will refuse this until the client has said where materials are kept."
+      : canGo <= 0
+        ? "The database will refuse this until the bill carrying the materials is marked paid."
+        : "";
     const actionHtml = full
       ? ""
-      : `<button class="btn" data-release-job="${id}" ${storeOk ? "" : "disabled title=\"The database will refuse this until the client has said where materials are kept.\""}>Release against receipt</button>`;
+      : `<button class="btn" data-release-job="${id}" ${blocked ? `disabled title="${esc(blocked)}"` : ""}>Release materials money</button>`;
 
     return `<tr>
       <td><div class="jistagename">${id}</div><div class="jistagepct">${esc(job.title || "")}</div>${history}</td>
       <td><div class="jicond">${esc(q.worker_name || job.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Store: ${esc(job.materials_store_type || "not nominated")}</div>${form}</td>
-      <td class="num"><span class="jiamt">${jmdFmt(quoted)}</span><div class="jistagepct">${jmdFmt(soFar)} released &middot; ${jmdFmt(left)} left</div></td>
+      <td class="num"><span class="jiamt">${jmdFmt(quoted)}</span><div class="jistagepct">${jmdFmt(Math.min(paidFor, quoted))} paid by client &middot; ${jmdFmt(soFar)} released &middot; ${jmdFmt(left)} left</div></td>
       <td>${statusHtml}</td>
       <td>${actionHtml}</td>
     </tr>`;
@@ -7036,9 +7260,8 @@ async function loadMaterials(){
       const stageV = ((g("stage") || {}).value || "").trim();
       const note = ((g("note") || {}).value || "").trim();
       if (!(amount > 0)) { say("mrMsg", "err", "Enter the amount being released."); return; }
-      if (!receipt) { say("mrMsg", "err", "Enter the receipt reference. This is money paid against a receipt."); return; }
       btn.disabled = true;
-      say("mrMsg", "ok", `Releasing ${jmdFmt(amount)} on ${job}\u2026`);
+      say("mrMsg", "ok", `Releasing ${jmdFmt(amount)} on ${job}…`);
       try {
         const { data, error } = await sb.rpc("release_materials_tranche", {
           p_job: job, p_amount_jmd: amount, p_receipt_ref: receipt,
@@ -7047,13 +7270,36 @@ async function loadMaterials(){
         if (error) throw error;
         const row = (data || [])[0];
         if (!row) throw new Error("Released nothing.");
-        say("mrMsg", "ok", `Released ${jmdFmt(amount)} against receipt ${receipt}. ${jmdFmt(row.released_total_jmd)} of ${jmdFmt(row.quoted_materials_jmd)} now released on ${job}. The client and worker can see it in their portal.`);
+        say("mrMsg", "ok", `Released ${jmdFmt(amount)} on ${job}${receipt ? " against receipt " + receipt : ", receipt to come"}. ${jmdFmt(row.released_total_jmd)} of ${jmdFmt(row.quoted_materials_jmd)} now released. The client and worker can see it in their portal.`);
       } catch (e) {
         let hint = e.message;
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
         say("mrMsg", "err", hint);
       }
-      await loadMaterials();
+      await loadMaterials(true);
+    });
+  });
+
+  // The receipt comes back after the money has gone out, and is recorded
+  // against the release it accounts for (record_materials_receipt,
+  // 20260914112000). Stamped against you; a recorded receipt is never
+  // overwritten, so a mistyped one is corrected with a note.
+  host.querySelectorAll("[data-receipt-rel]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const rel = btn.dataset.receiptRel;
+      const ref = ((host.querySelector(`[data-mr-rref="${rel}"]`) || {}).value || "").trim();
+      if (!ref) { say("mrMsg", "err", "Enter the receipt reference, as it is printed on the supplier's receipt."); return; }
+      btn.disabled = true;
+      try {
+        const { error } = await sb.rpc("record_materials_receipt", { p_release: rel, p_receipt_ref: ref, p_note: "" });
+        if (error) throw error;
+        say("mrMsg", "ok", `Receipt ${ref} recorded.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        say("mrMsg", "err", hint);
+      }
+      await loadMaterials(true);
     });
   });
 }
@@ -7085,7 +7331,7 @@ async function loadAgencyFees(){
   } else {
     const jobIds = jobs.map((j) => j.id);
     const [{ data: quotes }, { data: invs }] = await Promise.all([
-      sb.from("job_quotes").select("job_id,labour_jmd").eq("status", "accepted").in("job_id", jobIds),
+      sb.from("job_quotes").select("job_id,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
       sb.from("invoices").select("job_id").in("job_id", jobIds).is("stage", null).neq("status", "void"),
     ]);
     const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
@@ -7096,8 +7342,12 @@ async function loadAgencyFees(){
       if (raised.has(job.id)) continue;
       const quote = quoteByJob.get(job.id);
       if (!quote) continue;
-      const fee = Math.round((quote.labour_jmd || 0) * 0.15);
-      dueRows.push({ job, fee });
+      // The whole bill, the same sum raise_job_client_invoice writes, with
+      // Yaadly's 15% shown inside it. This row used to show the 15% alone
+      // next to a button that emailed the whole bill.
+      const labour = Math.round(quote.labour_jmd || 0);
+      const fee = Math.round(labour * 0.15);
+      dueRows.push({ job, fee, bill: labour + fee + Math.round(quote.materials_jmd || 0) });
     }
 
     dueHost.innerHTML = dueRows.length
@@ -7105,31 +7355,31 @@ async function loadAgencyFees(){
         <div class="item">
           <div><b>${esc(r.job.id)}</b> &middot; ${esc(r.job.title || "")}<div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(r.job.client_email || "")}</div></div>
           <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-weight:700;font-variant-numeric:tabular-nums">${jmdFmt(r.fee)}</span>
-            <button class="btn" data-due-job="${esc(r.job.id)}">Raise &amp; send</button>
+            <span style="text-align:right"><span style="font-weight:700;font-variant-numeric:tabular-nums">${jmdFmt(r.bill)}</span><div style="color:var(--dim);font-size:11.5px">Yaadly's 15%: ${jmdFmt(r.fee)}</div></span>
+            <button class="btn" data-due-job="${esc(r.job.id)}">Raise draft</button>
           </div>
         </div>`).join("")}</div>`
-      : `<div class="empty"><b>Nothing outstanding</b>Every booked job already has its agency fee raised.</div>`;
+      : `<div class="empty"><b>Nothing outstanding</b>Every booked job already has its client's bill raised.</div>`;
 
+    // Raising writes a draft and opens it in the editor. Nothing is emailed
+    // from here. Founder instruction, 13 Sep 2026.
     dueHost.querySelectorAll("[data-due-job]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const job = btn.dataset.dueJob;
         btn.disabled = true;
-        say("feesMsg", "ok", `Raising the agency fee on ${job}…`);
+        say("feesMsg", "ok", `Drafting the client's bill for ${job}…`);
         try {
           const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
           if (error) throw error;
           const row = (data || [])[0];
-          if (!row) throw new Error("Raised nothing to send.");
-          const out = await fn({ action: "send", invoice_id: row.invoice_id });
-          say("feesMsg", "ok", `Sent ${row.invoice_id} (${jmdFmt(row.total_jmd)}) to ${out?.emailed_to || "the client"}.`);
+          if (!row) throw new Error("Nothing was raised.");
+          await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
         } catch (e) {
           let hint = e.message;
           if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-          if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set, so it could not be emailed. Find it under Invoices, drafted, and send it from there once that is fixed.";
           say("feesMsg", "err", hint);
+          btn.disabled = false;
         }
-        await loadAgencyFees();
       });
     });
   }
@@ -7151,6 +7401,7 @@ async function loadAgencyFees(){
       <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
       <td>${chipFor(INV_CHIP, i.status)}</td>
       <td>
+        <button class="btn g" data-fopen="${esc(i.id)}">Open</button>
         <button class="btn g" data-fp="${esc(i.id)}">Preview</button>
         ${i.status === "sent" ? `<button class="btn" data-fpaid="${esc(i.id)}" data-fpaidtotal="${i.total_pence}" data-fpaidcur="${esc(i.currency)}">Mark as paid</button>` : ""}
         ${i.status === "draft" || i.status === "sent" ? `<button class="btn d" data-fvoid="${esc(i.id)}">Void</button>` : ""}
@@ -7168,6 +7419,10 @@ async function loadAgencyFees(){
         $("feesPreviewCard").scrollIntoView({ behavior: "smooth" });
       } catch (e) { say("feesMsg", "err", e.message); }
     });
+  });
+
+  allHost.querySelectorAll("[data-fopen]").forEach((btn) => {
+    btn.addEventListener("click", () => openInvoice(btn.dataset.fopen));
   });
 
   allHost.querySelectorAll("[data-fpaid]").forEach((btn) => {
@@ -7227,19 +7482,19 @@ $("policyRaise").addEventListener("click", async () => {
     });
     if (error) throw error;
     const row = (data || [])[0];
-    if (!row) throw new Error("Raised nothing to send.");
+    if (!row) throw new Error("Nothing was raised.");
 
-    say("policyMsg","ok", `Raised ${row.invoice_id}. Sending to ${clientEmail}…`);
-    await fn({ action: "send", invoice_id: row.invoice_id });
-
-    say("policyMsg","ok", `Sent ${row.invoice_id} (${money(row.total_pence)}) to ${clientEmail}. It is now marked sent.`);
+    // Raising writes a draft and opens it. Nothing is emailed from here.
+    // Founder instruction, 13 Sep 2026: this used to raise and email in
+    // one click, with no chance to read or change it first.
+    const more = (data || []).length > 1 ? ` ${data.length - 1} more raised with it, in Recent invoices below.` : "";
+    say("policyMsg","ok", `Raised ${row.invoice_id} as a draft.${more}`);
     $("policyClientName").value = ""; $("policyClientEmail").value = ""; $("policyClientAddress").value = "";
-    await loadInvoices();
+    await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${feeAmt(row.total_pence, row.currency || "GBP")}. Nothing has been sent. Check it, preview it, then email it.`);
   } catch (e) {
     let hint = e.message;
     if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-    if (/RESEND_API_KEY/i.test(e.message)) hint = "Raised, but RESEND_API_KEY is not set as an Edge Function secret, so it could not be emailed. Find it under Invoices below, drafted, and send it from there once that is fixed.";
-    say("policyMsg","err", hint + " Check Recent invoices below: what raised before the failure is still there as a draft.");
+    say("policyMsg","err", hint);
   }
   $("policyRaise").disabled = false;
 });
