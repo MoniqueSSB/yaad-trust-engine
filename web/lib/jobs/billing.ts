@@ -8,7 +8,7 @@
  *
  * "Client total" is clientBill().total: labour, the 15% on labour, materials
  * at cost. The same line is enforced in Postgres by
- * quote_billing_mode_allowed() (20260914090641), with the threshold in
+ * quote_billing_mode_allowed() (20260914092546), with the threshold in
  * quote_billing_threshold_jmd(). Change one, change the other.
  *
  * This only decides and words the choice. Drafting the invoices it describes

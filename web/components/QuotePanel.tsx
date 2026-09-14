@@ -61,7 +61,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
   const [excludedNote, setExcludedNote] = useState(linesToText(docs?.excluded));
   const [timelineNote, setTimelineNote] = useState(docs?.rough_timeline ?? "");
   const [paymentStageNote, setPaymentStageNote] = useState(stagesToText(docs?.payment_stages));
-  /* In full or by stage (20260914090641). Offered only at or above the
+  /* In full or by stage (20260914092546). Offered only at or above the
      J$100,000 line, on the client's all-in total; under it, in full. */
   const [billingChoice, setBillingChoice] = useState<BillingMode>("in_full");
   const allIn = clientBill(labour, materials).total;
@@ -236,7 +236,7 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
         </label>
       </div>
 
-      {/* In full or by stage (20260914090641). The hidden input is what is
+      {/* In full or by stage (20260914092546). The hidden input is what is
           sent, so under the line it is always in_full whatever was clicked
           before the price dropped below it. */}
       <input type="hidden" name="billingMode" value={billingMode} />

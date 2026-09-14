@@ -1254,7 +1254,7 @@ export default async function JobRoom({
                     <div className="flex justify-between gap-4"><span className="text-dim">Materials{q.materials_at_cost ? ", at cost, nothing added" : ""}</span><span className="font-mono-app text-mute">{jmd(bill.materials)}</span></div>
                     <div className="flex justify-between gap-4 border-t border-line pt-1 font-bold"><span>You pay Yaadly</span><span className="font-mono-app">{jmd(bill.total)}</span></div>
                     {/* In full or by stage, as the worker quoted it
-                        (20260914090641). Accepting the quote agrees it. */}
+                        (20260914092546). Accepting the quote agrees it. */}
                     <p className="mt-0.5 leading-relaxed text-dim">{billingLineForClient(billingModeOf(q.billing_mode))}</p>
                   </div>
                 )}

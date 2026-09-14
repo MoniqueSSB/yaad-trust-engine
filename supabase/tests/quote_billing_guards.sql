@@ -1,4 +1,4 @@
--- Proof that the in full or by stage guards hold (20260914090641). Run
+-- Proof that the in full or by stage guards hold (20260914092546). Run
 -- against the project with execute_sql, or psql. Reads only; creates nothing.
 --
 -- The same line is asserted in web/tests/billing.test.mjs, so the form and the

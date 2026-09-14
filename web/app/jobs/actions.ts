@@ -38,7 +38,7 @@ export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult
   if (!stages.ok) {
     return { ok: false, error: stages.error };
   }
-  /* In full or by stage (20260914090641). Under J$100,000 all in it is always
+  /* In full or by stage (20260914092546). Under J$100,000 all in it is always
      in full; the database refuses stage billing under the line too, so this
      is the readable version of the same rule, not the only one. */
   const billing = resolveBillingMode(

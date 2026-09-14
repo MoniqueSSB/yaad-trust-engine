@@ -3,7 +3,7 @@
  *
  * The line is a founder decision (13 Sep 2026): under J$ 100,000 client
  * total, always in full; at or above it, the quote says which. The database
- * enforces the same line (quote_billing_mode_allowed, 20260914090641), so a
+ * enforces the same line (quote_billing_mode_allowed, 20260914092546), so a
  * change here that the database does not share would let the form offer a
  * choice the database then refuses.
  *

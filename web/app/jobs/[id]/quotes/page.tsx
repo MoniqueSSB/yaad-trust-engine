@@ -247,7 +247,7 @@ export default async function Quotes({
                       <span className="font-mono">{money(bill.total)}</span>
                     </div>
                     {/* In full or by stage, as the worker quoted it
-                        (20260914090641). Accepting the quote agrees it. */}
+                        (20260914092546). Accepting the quote agrees it. */}
                     <p className="mt-1 text-[12.5px] leading-relaxed text-dim">
                       {billingLineForClient(billingModeOf(q.billing_mode))}
                     </p>

@@ -5101,7 +5101,7 @@ To prove the guards, run `supabase/tests/stage_schedule_guards.sql` with `execut
 
 ## A worker cannot choose "by stage" on a quote, or a client asks why they must pay in full
 
-Since 14 Sep 2026 (`20260914090641`) a quote records how the client pays: `job_quotes.billing_mode`, `in_full` or `by_stage`.
+Since 14 Sep 2026 (`20260914092546`) a quote records how the client pays: `job_quotes.billing_mode`, `in_full` or `by_stage`.
 
 1. **The choice is not offered at all**: the client's all-in total (labour, the 15%, materials) is under J$ 100,000. That is the founder's line: under it, always in full. Correct, not a fault.
 2. **"Under J$100,000 all in, the client pays in full"**: the same line, from the database. It checks the total again whenever the labour or materials figure changes.
