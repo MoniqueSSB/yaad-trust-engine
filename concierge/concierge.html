@@ -831,6 +831,22 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 .jichip.wait{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
 .jichip.wait .dot{background:var(--dim)}
 .jiref{display:block;margin-top:5px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+
+/* ---------- the one invoice list ---------- */
+.ivtabs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 2px}
+.ivtab{display:inline-flex;align-items:baseline;gap:8px;padding:8px 14px;border-radius:100px;border:1px solid var(--line);background:var(--panel2);color:var(--mute);font-size:12.5px;font-weight:700;cursor:pointer}
+.ivtab i{width:8px;height:8px;border-radius:2px;align-self:center}
+.ivtab .n{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.ivtab .v{font-family:var(--mono);font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ivtab.on{border-color:var(--tealb);color:var(--ink);background:var(--soft)}
+.ivtab.quiet{margin-left:auto;font-weight:500;background:none}
+.ivtags{margin-top:5px;display:flex;flex-wrap:wrap;gap:5px}
+.ivact{white-space:nowrap;text-align:right}
+.ivbal{margin-top:6px;font-size:11px;color:var(--mute);line-height:1.5;max-width:46ch}
+.ivbal b{color:var(--ink)}
+.ivact .btn{margin-left:6px}
+tr.ivdue td{background:rgba(245,158,11,.05)}
+.ivgrp td{padding:9px 18px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:700;background:var(--panel2)}
 </style>
 </head>
 <body>
@@ -951,8 +967,29 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ INVOICES -->
 <section class="view" data-view="invoices">
   <h1 class="vh">Invoices</h1>
-  <p class="vsub">The agent drafts and flags. Prices come from your service list, never from the model, and anything it cannot recognise comes back unpriced rather than guessed. Only you send one, and only you mark one paid.</p>
+  <p class="vsub">Every invoice in one place: services, job bills and the parts of a bill. <b>Preview</b> is drafted and not sent, so no client has seen it. <b>Outstanding</b> is sent and waiting for the money. <b>Paid</b> is money in. Prices come from your service list or the accepted quote, never from the model. Only you send one, and only you mark one paid.</p>
+  <div id="ivMsg"></div>
 
+  <div class="card">
+    <div class="chd"><h3>Every invoice</h3><span class="sp"><button class="btn g" id="ivNewBtn">Raise a new invoice</button></span></div>
+    <div id="ivSplit"></div>
+    <div class="ivtabs" id="ivTabs"></div>
+    <p class="hint" id="ivHint"></p>
+    <div id="ivList"><div class="empty"><b>Reading every invoice&hellip;</b></div></div>
+  </div>
+
+  <div class="card hidden" id="invCard">
+    <div class="chd"><h3 id="invTitle">Draft</h3></div>
+    <div id="invMsg"></div>
+    <div id="invBody"></div>
+  </div>
+
+  <div class="card hidden" id="previewCard">
+    <div class="chd"><h3>What the client sees</h3><span class="sp"><button class="btn g" id="printBtn">Print or save as PDF</button></span></div>
+    <iframe id="preview" title="Invoice preview"></iframe>
+  </div>
+
+  <div id="ivNew" class="hidden">
   <div class="card">
     <div class="chd"><h3>What are you billing for?</h3></div>
     <div id="draftMsg"></div>
@@ -986,20 +1023,6 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
     <p class="conseq">Writes one or two numbered draft invoices to your record and opens the first. It emails nobody: you send it from the draft, once you have read it.</p>
   </div>
 
-  <div class="card hidden" id="invCard">
-    <div class="chd"><h3 id="invTitle">Draft</h3></div>
-    <div id="invMsg"></div>
-    <div id="invBody"></div>
-  </div>
-
-  <div class="card hidden" id="previewCard">
-    <div class="chd"><h3>What the client sees</h3><span class="sp"><button class="btn g" id="printBtn">Print or save as PDF</button></span></div>
-    <iframe id="preview" title="Invoice preview"></iframe>
-  </div>
-
-  <div class="card">
-    <div class="chd"><h3>Recent invoices</h3></div>
-    <div class="list" id="list"></div>
   </div>
 </section>
 
@@ -1078,19 +1101,6 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   </div>
 </section>
 
-<!-- ============================================ JOB INVOICES -->
-<section class="view" data-view="jobinv">
-  <h1 class="vh">Job Invoices</h1>
-  <p class="vsub">One row per booked job. Raises the client's single all-in invoice: the labour price, Yaadly's 15% Guarantee &amp; Support fee, and materials at cost. The client buys the whole job from Yaadly and is never billed for the worker. What Yaadly owes the tradesperson, their quoted labour less the agreed 5% plus materials, is a separate payable raised once the job is complete.</p>
-  <div id="jiMsg"></div>
-  <div id="jiBody"><div class="empty"><b>Reading your booked jobs&hellip;</b></div></div>
-
-  <div class="card hidden" id="jiPreviewCard">
-    <div class="chd"><h3>What the client reads</h3><span class="sp"><button class="btn g" id="jiPrint">Print or save as PDF</button></span></div>
-    <iframe id="jiPreview" title="Job invoice preview"></iframe>
-  </div>
-</section>
-
 <!-- ============================================ MATERIALS TRANCHES -->
 <section class="view" data-view="materials">
   <h1 class="vh">Materials tranches</h1>
@@ -1125,31 +1135,6 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   <h2 class="vh" style="font-size:17px;margin-top:26px">Reviewed so far</h2>
   <p class="vsub">Every check you log lands here. There are no public prices in Jamaica for most of this work, so this table is how that stops being true: one reviewed quote at a time, it becomes the price database the whole "no farrin price" promise rests on.</p>
   <div id="pcLog"><div class="empty"><b>Nothing logged yet.</b></div></div>
-</section>
-
-<!-- ============================================ AGENCY FEES -->
-<section class="view" data-view="fees">
-  <h1 class="vh">Agency Fees</h1>
-  <p class="vsub">Every invoice on this account is Yaadly's own cut, from a job's per-stage fee or from a drafted service, never the worker's pay. This is the one place both live side by side, so nothing owed to Yaadly sits uncollected because it was only visible on a different screen.</p>
-  <div id="feesMsg"></div>
-
-  <div class="card">
-    <div class="chd"><h3>Ready to raise, not yet raised</h3></div>
-    <div id="feesDue"><div class="empty"><b>Checking every booked job&hellip;</b></div></div>
-  </div>
-
-  <div class="card">
-    <div class="chd"><h3>Every agency fee invoice, jobs and services together</h3></div>
-    <div class="tw"><table>
-      <thead><tr><th>Invoice</th><th>Client</th><th>Source</th><th class="num">Amount</th><th>Status</th><th></th></tr></thead>
-      <tbody id="feesAll"></tbody>
-    </table></div>
-  </div>
-
-  <div class="card hidden" id="feesPreviewCard">
-    <div class="chd"><h3>What the client reads</h3><span class="sp"><button class="btn g" id="feesPrint">Print or save as PDF</button></span></div>
-    <iframe id="feesPreview" title="Agency fee invoice preview"></iframe>
-  </div>
 </section>
 
       <div class="rule">&#9878;&#65039; <b>The governing rule holds here:</b> the agents draft and flag.
@@ -2176,8 +2161,6 @@ const VIEWS = [
     ]},
 
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
-  { k:"jobinv", g:"Documents & money", label:"Job Invoices", icon:"bill", hand:true },
-  { k:"fees", g:"Documents & money", label:"Agency Fees", icon:"bill", hand:true },
   { k:"materials", g:"Documents & money", label:"Materials tranches", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
   { k:"pricecheck", g:"Documents & money", label:"Price check", icon:"bill", hand:true },
@@ -5304,10 +5287,15 @@ async function loadPriceLog(){
 // does not re-read the database.
 const OVLANE = { you:true, wrk:false, cli:false, non:false, clr:false };
 
-const BESPOKE = { pricecheck: loadPriceCheck, over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees, materials: loadMaterials };
+const BESPOKE = { pricecheck: loadPriceCheck, over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, materials: loadMaterials };
 let currentView = "over";
 
 function go(v){
+  // Job Invoices and Agency Fees were folded into Invoices on 14 Sep 2026.
+  // Their old names still land there, and "invoices:out" opens Invoices on
+  // one group of the list, which is how the Overview's money links use it.
+  if (v === "jobinv" || v === "fees") v = "invoices";
+  if (String(v).startsWith("invoices:")) { INV_TAB = v.slice(9); v = "invoices"; }
   currentView = v;
   document.querySelectorAll(".rlink").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.dataset.view === v));
@@ -6547,7 +6535,7 @@ async function loadOverview(){
       { label:"Applications in vetting", n:appsWaiting, view:"apps" },
       { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
       { label:"Quote packs held", n:held.length, view:"qpd" },
-      { label:"Invoice drafts unsent", n:invDraft, view:"invoices" },
+      { label:"Invoice drafts unsent", n:invDraft, view:"invoices:preview" },
       { label:"Kickoff packs in draft", n:kickDraft, view:"kick" },
       { label:"Sketch packs to read or issue", n:pkDraft + pkAppr, view:"sketch" },
       { label:"Questions to publish", n:asksNew, view:"asks" },
@@ -6574,7 +6562,7 @@ async function loadOverview(){
       { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
       { label:"Applications in vetting", n:appsWaiting, view:"apps" },
       { label:"Quote packs held", n:held.length, view:"qpd" },
-      { label:"Invoice drafts unsent", n:invDraft, view:"invoices" },
+      { label:"Invoice drafts unsent", n:invDraft, view:"invoices:preview" },
       { label:"Kickoff packs in draft", n:kickDraft, view:"kick" },
       { label:"Sketch packs unread", n:pkDraft + pkAppr, view:"sketch" },
       { label:"Questions to publish", n:asksNew, view:"asks" },
@@ -6583,7 +6571,7 @@ async function loadOverview(){
       { label:"Built, never signed for", n:unsigned, view:"intake" },
     ],
     money: [
-      { label:"Raised, not sent", v:sumOf(draftsInv), n:draftsInv.length, tone:"dim", view:"invoices" },
+      { label:"Raised, not sent", v:sumOf(draftsInv), n:draftsInv.length, tone:"dim", view:"invoices:preview" },
       { label:"Sent, unpaid", v:sumOf(sentInv), n:sentInv.length, tone:"warn", view:"money" },
       { label:"Paid this month", v:sumOf(paidM), n:paidM.length, tone:"ok", view:"money" },
     ],
@@ -6638,9 +6626,9 @@ async function loadMoney(){
 
   host.innerHTML = `
     ${moneySplit([
-        { label:"Drafted, unsent", v:sum(drafts), n:drafts.length, col:"#4A4A72", view:"invoices" },
-        { label:"Awaiting payment", v:sum(sent), n:sent.length, col:"#F59E0B", view:"invoices" },
-        { label:"Paid this month", v:sum(paidM), n:paidM.length, col:"#9B73F5", view:"invoices" },
+        { label:"Drafted, unsent", v:sum(drafts), n:drafts.length, col:"#4A4A72", view:"invoices:preview" },
+        { label:"Awaiting payment", v:sum(sent), n:sent.length, col:"#F59E0B", view:"invoices:out" },
+        { label:"Paid this month", v:sum(paidM), n:paidM.length, col:"#9B73F5", view:"invoices:paid" },
       ], `Owed on jobs, agreed in writing and not held: <b>${esc(jmd(owed))}</b>.`)}
     <div class="sechd">Fee model in force</div>
     <div class="card">
@@ -6833,13 +6821,20 @@ async function reload(id){
       .eq("invoice_id", id).order("received_at");
     cardPays = cp || [];
   }
-  CURRENT = { invoice: inv, lines: lines || [], parts, cardPays, questions: CURRENT?.questions || [] };
+  // What this invoice replaced, and what replaced it (reissue_invoice,
+  // 20260914170000), so either end of a reissue leads to the other.
+  let replacedBy = [];
+  if (inv) {
+    const { data: rb } = await sb.from("invoices").select("id,status").eq("replaces", id);
+    replacedBy = rb || [];
+  }
+  CURRENT = { invoice: inv, lines: lines || [], parts, cardPays, replacedBy, questions: CURRENT?.questions || [] };
   renderInvoice();
   await loadInvoices();
 }
 
-// Opens any invoice in the editor on this view: from Job Invoices, Agency
-// Fees, or the service raise card. Raising only ever writes a draft; this is
+// Opens any invoice in the editor on this view: from the list, a job's
+// Raise draft, or the service raise card. Raising only ever writes a draft; this is
 // where it is read, changed, split into parts, previewed and sent.
 async function openInvoice(id, note){
   go("invoices");
@@ -6907,7 +6902,14 @@ function renderInvoice(){
     <div class="qs" style="margin-top:14px"><h4>Requested in parts</h4><ul>${parts.map(p => `
       <li><a href="#" data-openinv="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(INV_CHIP, p.status)} <b>${amt(p.total_pence)}</b>
         &middot; ${esc((p.lines || []).map(x => x.description).join(", "))}${p.starts_job && p.status !== "void" ? " &middot; <b>paying this starts the job</b>" : ""}${p.sent_at ? " &middot; sent " + esc(String(p.sent_at).slice(0, 10)) : ""}${p.paid_at ? " &middot; paid " + esc(String(p.paid_at).slice(0, 10)) + (p.paid_reference ? ", ref " + esc(p.paid_reference) : "") : ""}</li>`).join("")}</ul>
-      <p style="margin:8px 0 0">Still on this bill <b>${amt(inv.total_pence)}</b> &middot; requested in parts <b>${amt(sumOf(liveParts))}</b> &middot; paid so far <b>${amt(sumOf(liveParts.filter(p => p.status === "paid")))}</b></p></div>` : "";
+      <p style="margin:8px 0 0">${(() => {
+        const all = sumOf(liveParts) + (inv.status === "void" ? 0 : inv.total_pence);
+        const paid = sumOf(liveParts.filter(p => p.status === "paid")) + (inv.status === "paid" ? inv.total_pence : 0);
+        const sent = sumOf(liveParts.filter(p => p.status === "sent")) + (inv.status === "sent" ? inv.total_pence : 0);
+        const drafted = sumOf(liveParts.filter(p => p.status === "draft"));
+        const unbilled = inv.status === "draft" ? inv.total_pence : 0;
+        return `The whole job <b>${amt(all)}</b> &middot; paid <b>${amt(paid)}</b>${sent ? ` &middot; sent, unpaid <b>${amt(sent)}</b>` : ""}${drafted ? ` &middot; drafted, not sent <b>${amt(drafted)}</b>` : ""}${unbilled ? ` &middot; not billed yet, still on this bill <b>${amt(unbilled)}</b>` : ""} &middot; <b>still owed ${amt(all - paid)}</b>`;
+      })()}</p></div>` : "";
 
   // What Stripe reported, beside the invoice, so a card payment is visible
   // here before anyone marks the invoice paid. Reads only; it pays nothing
@@ -6923,6 +6925,8 @@ function renderInvoice(){
 
   $("invBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(inv.client_name)}${inv.client_company ? " (" + esc(inv.client_company) + ")" : ""} &middot; ${esc(inv.client_email)}${inv.period_label ? " &middot; " + esc(inv.period_label) : ""}${inv.po_number ? " &middot; PO " + esc(inv.po_number) : ""}</p>
+    ${inv.replaces ? `<p class="vsub" style="margin:0 0 10px">Replaces <a href="#" data-openinv="${esc(inv.replaces)}">${esc(inv.replaces)}</a>, which was sent and is now void. Tell the client this one replaces it when you send it.</p>` : ""}
+    ${(CURRENT.replacedBy || []).length ? `<p class="vsub" style="margin:0 0 10px">Replaced by ${CURRENT.replacedBy.map(r => `<a href="#" data-openinv="${esc(r.id)}">${esc(r.id)}</a> (${esc(r.status)})`).join(", ")}.</p>` : ""}
     ${inv.part_of ? `<p class="vsub" style="margin:0 0 10px">Part of <a href="#" data-openinv="${esc(inv.part_of)}">${esc(inv.part_of)}</a>, the whole-job bill for ${esc(inv.job_id || "")}.${inv.starts_job ? " It carries the Guarantee &amp; Support fee, so paying it starts the job." : ""}</p>` : ""}
     <div class="tw"><table>
       <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th>${canPart ? '<th class="num">Request now</th>' : ""}<th></th></tr></thead>
@@ -6943,12 +6947,14 @@ function renderInvoice(){
       ${draft && lines.length && inv.drafted_by !== "ai" ? `<button class="btn" id="emailBtn"${unpriced ? " disabled" : ""}>Email ${amt(inv.total_pence)} to ${esc(inv.client_email)}</button>` : ""}
       ${draft && lines.length ? `<button class="btn g" id="sendBtn"${unpriced ? " disabled" : ""}>Mark as sent, I sent it myself</button>` : ""}
       ${inv.status === "sent" ? `<button class="btn" id="paidBtn">Mark as paid</button>` : ""}
+      ${inv.status === "sent" && (inv.payable_to || "yaadly") === "yaadly" ? `<button class="btn g" id="reissueBtn">Void and reissue as a new draft</button>` : ""}
       ${draft || inv.status === "sent" ? `<button class="btn d" id="voidBtn">Void</button>` : ""}
     </div>
     ${isBill && draft && !lines.length ? `<div class="alert"><span class="ic">i</span><div><b>Everything on this bill has been requested in parts</b><p>There is nothing left on it to send.</p></div></div>` : ""}
     ${draft && lines.length ? `<p class="conseq">Emailing sends exactly what Preview shows and <b>freezes ${esc(inv.id)} at ${amt(inv.total_pence)}</b>: no line can be changed afterwards. Marking as sent freezes it the same way but emails nobody.</p>` : ""}
     ${canPart ? `<p class="conseq">Requesting a part writes a new numbered draft for the ticked amounts and takes them off this bill, so nothing is billed twice. It emails nobody. ${inv.starts_job ? "The Guarantee &amp; Support fee is on this bill, so paying this bill starts the job, unless you request the fee as a part." : feePart ? `The fee went out on ${esc(feePart.id)}, so paying that part, not this bill, starts the job.` : ""}</p>` : ""}
-    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${amt(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}`;
+    ${inv.status === "sent" ? `<p class="conseq">Marking as paid records <b>${amt(inv.total_pence)}</b> as money in, against ${esc(inv.id)}.</p>` : ""}
+    ${inv.status === "sent" && (inv.payable_to || "yaadly") === "yaadly" ? `<p class="conseq">A sent invoice is locked, because the client holds that copy. To change it, <b>Void and reissue</b>: ${esc(inv.id)} is voided and an editable copy opens as a new numbered draft that names it. Nothing is emailed until you send the new one.</p>` : ""}`;
 
   show("invCard", true);
 
@@ -7116,6 +7122,31 @@ function renderInvoice(){
     await reload(inv.id);
   });
 
+  // Void and reissue, one step in the database (reissue_invoice): the sent
+  // invoice goes void, an editable copy opens as a new draft naming it, a
+  // bill's parts follow the copy, and a part goes back on its bill and is
+  // requested again. It emails nobody. Founder decision, 14 Sep 2026: a sent
+  // invoice is reissued, never edited.
+  if ($("reissueBtn")) $("reissueBtn").addEventListener("click", async () => {
+    const live = (CURRENT.parts || []).filter(p => p.status !== "void").length;
+    const how = inv.part_of ? "\n\nIt is a part of " + inv.part_of + ": its amount goes back on that bill and is requested again as a new part."
+      : live ? "\n\nIts " + live + " part" + (live === 1 ? "" : "s") + " move to the new bill, so nothing is billed twice." : "";
+    if (!confirm("Void " + inv.id + " and open a copy as a new draft?\n\nThe client already has " + inv.id + ". Nothing is emailed now: tell them the new one replaces it when you send it." + how)) return;
+    try {
+      const { data, error } = await sb.rpc("reissue_invoice", { p_id: inv.id });
+      if (error) throw error;
+      const row = (data || [])[0];
+      if (!row) throw new Error("Nothing was reissued.");
+      CURRENT = { questions: [] };
+      await reload(row.invoice_id);
+      say("invMsg", "ok", `${inv.id} is void. ${row.invoice_id} replaces it, a draft for ${amt(row.total)}. Change what needs changing, preview it, then email it. Nothing has been sent.`);
+    } catch (e) {
+      let hint = e.message;
+      if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+      say("invMsg", "err", hint);
+    }
+  });
+
   if ($("voidBtn")) $("voidBtn").addEventListener("click", async () => {
     const back = inv.part_of ? "\n\nIts " + amt(inv.total_pence) + " goes back onto " + inv.part_of + "." : "";
     if (!confirm("Void " + inv.id + "? It stays on the record, marked void." + back)) return;
@@ -7127,191 +7158,261 @@ function renderInvoice(){
 
 $("printBtn").addEventListener("click", () => $("preview").contentWindow.print());
 
-let INV_LIST = [];
+// ---------------------------------------------------------------- the list
+//
+// Every invoice on one screen, grouped by where the money is. Asked for on
+// 14 Sep 2026: "all the invoices should be in one section not split up".
+// Until then the same table was shown three ways, on Invoices, Job Invoices
+// and Agency Fees, each with its own copy of the same buttons.
+//
+// Preview is drafted and not sent: nobody has seen it. Outstanding is sent
+// and waiting. Paid is money in, marked by you. A booked job with an accepted
+// quote and no bill yet sits at the top of Preview, which is where the old
+// "ready to raise" list went. What Yaadly owes a tradesperson is listed and
+// labelled, but kept out of the totals, because it is money going out.
+// Nothing on this list sends, pays or marks anything by itself: each button
+// is the same click the editor below makes.
+let INV_LIST = [], INV_DUE = [], INV_CARD = {}, INV_TAB = "preview";
+
+const INV_TABS = [
+  { k:"preview", label:"Preview", col:"#4A4A72", has:i => i.status === "draft",
+    hint:"Drafted, not sent. No client has seen these. Open one to check it and preview it, then email it." },
+  { k:"out", label:"Outstanding", col:"#F59E0B", has:i => i.status === "sent",
+    hint:"Sent and waiting for the money, longest waiting first. A card payment Stripe has reported shows beside the invoice; marking it paid is still your click." },
+  { k:"paid", label:"Paid", col:"#9B73F5", has:i => i.status === "paid",
+    hint:"Money in, marked paid by you, newest first." },
+  { k:"void", label:"Void", col:"#6b6b80", has:i => i.status === "void",
+    hint:"Cancelled. Kept on the record, never deleted." },
+];
+
+const invWaited = (t) => {
+  const d = t ? Math.floor((Date.now() - new Date(t).getTime()) / 864e5) : 0;
+  return d >= 1 ? `, ${d} day${d === 1 ? "" : "s"} waiting` : "";
+};
+const invWhen = (i) => i.status === "paid" ? "paid " + day_(i.paid_at)
+  : i.status === "sent" ? "sent " + day_(i.sent_at) + invWaited(i.sent_at)
+  : i.status === "void" ? "void"
+  : "drafted " + day_(i.created_at);
+
+// A job bill and its parts, added up. A part takes its amount off the bill,
+// so the bill's own total is only what is still on it: the job's price is
+// the bill plus every live part. "Still owed" is that price less what is
+// marked paid, so it counts what is sent and waiting, what is drafted and
+// what has not been billed yet.
+const invIsBill = (i) => !!i.job_id && i.stage == null && !i.part_of && (i.payable_to || "yaadly") === "yaadly";
+
+function invBalance(billId){
+  const bill = INV_LIST.find(i => i.id === billId);
+  if (!bill || bill.status === "void") return null;
+  const docs = [bill].concat(INV_LIST.filter(i => i.part_of === billId && i.status !== "void"));
+  const sum = (f) => docs.filter(f).reduce((t, i) => t + Number(i.total_pence || 0), 0);
+  return { bill, parts: docs.length - 1, total: sum(() => true), paid: sum(i => i.status === "paid"),
+    sent: sum(i => i.status === "sent"), drafted: sum(i => i.status === "draft" && i.part_of),
+    unbilled: sum(i => i.status === "draft" && !i.part_of) };
+}
+
+function invBalanceHtml(i){
+  const b = invBalance(invIsBill(i) ? i.id : i.part_of);
+  if (!b || !b.parts) return "";
+  const a = (v) => curAmt(v, b.bill.currency);
+  const bits = [`${a(b.total)} in all`, `${a(b.paid)} paid`];
+  if (b.sent) bits.push(`${a(b.sent)} sent, unpaid`);
+  if (b.drafted) bits.push(`${a(b.drafted)} drafted, not sent`);
+  if (b.unbilled) bits.push(`${a(b.unbilled)} not billed yet`);
+  return `<div class="ivbal">Job bill ${esc(b.bill.id)}: ${bits.join(" &middot; ")} &middot; <b>${a(b.total - b.paid)} still owed</b></div>`;
+}
 
 function renderInvoiceList(){
   const q = ($("srch").value || "").trim().toLowerCase();
-  const rows = q ? INV_LIST.filter(i => (i.id + " " + i.client_name).toLowerCase().includes(q)) : INV_LIST;
-  $("list").innerHTML = (q ? "" : invoiceSplit(INV_LIST)) + rows.map(i => `
-    <div class="item">
-      <div><a href="#" data-open="${esc(i.id)}">${esc(i.id)}</a> ${chipFor(INV_CHIP, i.status)}
-        <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(i.client_name)} &middot; ${esc(i.issue_date)}</div></div>
-      <div style="font-weight:700;font-variant-numeric:tabular-nums">${curAmt(i.total_pence, i.currency)}</div>
-    </div>`).join("")
-    || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
-          : '<div class="empty"><b>Nothing yet</b>Draft your first invoice above.</div>');
+  const hit = (s) => !q || String(s).toLowerCase().includes(q);
+  const tab = INV_TABS.find(t => t.k === INV_TAB) || INV_TABS[0];
+  const clientInv = INV_LIST.filter(i => i.payable_to !== "worker");
 
-  $("list").querySelectorAll("[data-open]").forEach(a => a.addEventListener("click", async (e) => {
+  // The bars: client invoices only, one per currency, as on the Overview.
+  $("ivSplit").innerHTML = moneySplit(INV_TABS.slice(0, 3).map(t => {
+    const l = clientInv.filter(t.has);
+    return { label:t.label, v:sumByCur(l), n:l.length, col:t.col };
+  }), INV_LIST.some(i => i.payable_to === "worker") ? "Client invoices only. What Yaadly owes a tradesperson is in the list, labelled, and not counted in these bars." : "");
+  $("ivSplit").querySelectorAll(".msl").forEach((b, n) => b.addEventListener("click", () => { INV_TAB = INV_TABS[n].k; renderInvoiceList(); }));
+
+  $("ivTabs").innerHTML = INV_TABS.map(t => {
+    const l = INV_LIST.filter(t.has);
+    const n = l.length + (t.k === "preview" ? INV_DUE.length : 0);
+    const sum = sumByCur(l.filter(i => i.payable_to !== "worker"));
+    const v = t.k !== "void" && Object.values(sum).some(Boolean) ? `<span class="v">${esc(curText(sum))}</span>` : "";
+    return `<button class="ivtab${t.k === tab.k ? " on" : ""}${t.k === "void" ? " quiet" : ""}" data-ivtab="${t.k}"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${n}</span>${v}</button>`;
+  }).join("");
+  // A job bill split into parts can have a balance nobody has been sent yet.
+  // It is not outstanding, but it is owed, so Outstanding says so.
+  const unbilled = INV_LIST.filter(i => invIsBill(i) && i.status === "draft" && INV_LIST.some(p => p.part_of === i.id && p.status !== "void"));
+  $("ivHint").textContent = tab.hint + (tab.k === "preview" && INV_DUE.length ? " Booked jobs with no bill yet are at the top." : "")
+    + (tab.k === "out" && unbilled.length ? ` Job bills split into parts also have ${curText(sumByCur(unbilled))} not billed yet, on ${unbilled.map(i => i.id).join(", ")}.` : "");
+
+  const due = tab.k === "preview" ? INV_DUE.filter(d => hit(d.job.id + " " + (d.job.title || "") + " " + (d.job.client_email || ""))) : [];
+  let rows = INV_LIST.filter(tab.has).filter(i => hit([i.id, i.client_name, i.client_email, i.job_id, i.part_of].join(" ")));
+  if (tab.k === "out") rows = rows.slice().sort((x, y) => String(x.sent_at || x.created_at).localeCompare(String(y.sent_at || y.created_at)));
+  if (tab.k === "paid") rows = rows.slice().sort((x, y) => String(y.paid_at || "").localeCompare(String(x.paid_at || "")));
+
+  const dueRows = due.map(d => `<tr class="ivdue">
+      <td><div class="jistagename">${esc(d.job.id)}</div><div class="ivtags"><span class="jichip ready"><span class="dot"></span>No bill yet</span></div></td>
+      <td><div>${esc(d.job.client_email || "")}</div><div class="jicond">${esc(d.job.title || "")}${d.worker ? " &middot; " + esc(d.worker) : ""}</div></td>
+      <td class="jistagepct">quote accepted</td>
+      <td class="num"><span class="jiamt">${jmdFmt(d.bill)}</span><div class="jistagepct">Yaadly's 15%: ${jmdFmt(d.fee)}</div></td>
+      <td class="ivact"><button class="btn" data-ivraise="${esc(d.job.id)}">Raise draft</button></td>
+    </tr>`);
+
+  const invRows = rows.map(i => {
+    const card = INV_CARD[i.id] || {};
+    const tags = [
+      i.payable_to === "worker" ? '<span class="chip mute">Yaadly pays the worker</span>' : "",
+      i.part_of ? `<span class="chip mute">part of ${esc(i.part_of)}</span>` : "",
+      i.replaces ? `<span class="chip mute">replaces ${esc(i.replaces)}</span>` : "",
+      (() => { const by = INV_LIST.find(x => x.replaces === i.id); return by ? `<span class="chip mute">replaced by ${esc(by.id)}</span>` : ""; })(),
+      i.drafted_by === "ai" && i.status === "draft" ? '<span class="chip ai">drafted by the agent</span>' : "",
+      card.bad ? '<span class="chip crit">card payment does not match</span>'
+        : card.ok && i.status === "sent" ? '<span class="chip ok">card payment received</span>' : "",
+    ].filter(Boolean).join("");
+    return `<tr>
+      <td><a href="#" class="jistagename" data-ivopen="${esc(i.id)}">${esc(i.id)}</a>${tags ? `<div class="ivtags">${tags}</div>` : ""}</td>
+      <td><div>${esc(i.client_name || "")}</div><div class="jicond">${i.job_id ? "Job " + esc(i.job_id) : "Service"}</div>${invBalanceHtml(i)}</td>
+      <td class="jistagepct">${esc(invWhen(i))}</td>
+      <td class="num"><span class="jiamt">${curAmt(i.total_pence, i.currency)}</span></td>
+      <td class="ivact">${i.status === "draft" && invIsBill(i) ? `<button class="btn g" data-ivsplit="${esc(i.id)}">Split into parts</button>` : ""}<button class="btn g" data-ivopen="${esc(i.id)}">${i.status === "draft" ? "Edit" : "Open"}</button><button class="btn g" data-ivprev="${esc(i.id)}">Preview</button>${i.status === "sent" && !card.bad ? `<button class="btn" data-ivpaid="${esc(i.id)}">Mark as paid</button>` : ""}</td>
+    </tr>`;
+  });
+
+  const all = dueRows.concat(invRows);
+  $("ivList").innerHTML = all.length
+    ? `<div class="tw"><table class="jitable">
+        <thead><tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody>${all.join("")}</tbody></table></div>`
+    : q ? '<div class="empty"><b>Nothing here matches that</b>Clear the search box, or try another group.</div>'
+    : `<div class="empty"><b>Nothing in ${esc(tab.label)}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : ""}</div>`;
+
+  $("ivTabs").querySelectorAll("[data-ivtab]").forEach(b => b.addEventListener("click", () => { INV_TAB = b.dataset.ivtab; renderInvoiceList(); }));
+
+  $("ivList").querySelectorAll("[data-ivopen]").forEach(a => a.addEventListener("click", async (e) => {
     e.preventDefault();
+    say("invMsg", "", "");
     CURRENT = { questions: [] };
-    await reload(e.target.dataset.open);
+    await reload(a.dataset.ivopen);
     $("invCard").scrollIntoView({ behavior: "smooth" });
   }));
-}
 
-async function loadInvoices(){
-  const { data, error } = await sb.from("invoices")
-    .select("id,client_name,status,total_pence,currency,issue_date,drafted_by")
-    .order("created_at", { ascending: false }).limit(15);
-  if (error) return;
-  INV_LIST = data || [];
-  renderInvoiceList();
-  await loadCatalogueOptions();
-}
+  // Split opens the bill in the editor, where the lines are ticked. The
+  // database takes each part off the bill (request_invoice_part), so nothing
+  // is billed twice.
+  $("ivList").querySelectorAll("[data-ivsplit]").forEach(b => b.addEventListener("click", async () => {
+    CURRENT = { questions: [] };
+    await reload(b.dataset.ivsplit);
+    say("invMsg", "ok", "Tick the lines to bill now, or type part of a line's amount, then press Request the ticked lines as a part. Whatever you leave stays on this bill, not billed yet, and the balance on the list keeps count.");
+    $("invCard").scrollIntoView({ behavior: "smooth" });
+  }));
 
-// ------------------------------------------------------------- job invoices
-//
-// Yaadly's own 15% Guarantee & Support fee on a marketplace job, one
-// invoice, raised at the start of the job, 15% of the whole accepted
-// quote's labour price - never the worker's own pay, which stays a direct
-// arrangement between the client and the worker, and never split by
-// payment stage. Founder's instruction, 1 Sep 2026: agency fee invoices are
-// not milestone payments.
-const jmdFmt = (n) => "J$" + Math.round(n).toLocaleString("en-JM");
+  // Preview opens the invoice in the editor too, so what is on screen above
+  // the preview is always the invoice it shows.
+  $("ivList").querySelectorAll("[data-ivprev]").forEach(b => b.addEventListener("click", async () => {
+    say("invMsg", "", "");
+    CURRENT = { questions: [] };
+    await reload(b.dataset.ivprev);
+    $("previewBtn").click();
+  }));
 
-async function loadJobInvoices(){
-  const host = $("jiBody");
-  host.innerHTML = `<div class="empty"><b>Reading your booked jobs&hellip;</b></div>`;
-  say("jiMsg", "", "");
-
-  const { data: jobs, error: jobsErr } = await sb.from("jobs")
-    .select("id,title,client_email,worker_email")
-    .not("worker_email", "is", null)
-    .order("updated_at", { ascending: false })
-    .limit(50);
-  if (jobsErr) {
-    host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read jobs</b><p>${esc(jobsErr.message)}</p></div></div>`;
-    return;
-  }
-  if (!jobs || !jobs.length) {
-    host.innerHTML = `<div class="empty"><b>No booked jobs yet</b>A job needs a chosen worker before its agency fee can be raised.</div>`;
-    return;
-  }
-
-  const jobIds = jobs.map((j) => j.id);
-  const [{ data: quotes }, { data: invs }] = await Promise.all([
-    sb.from("job_quotes").select("job_id,worker_name,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("invoices").select("id,job_id,status,total_pence,sent_at,part_of,payable_to").in("job_id", jobIds).is("stage", null),
-  ]);
-
-  // The whole-job bill is the one with no part_of; parts are counted against
-  // it. A stage-less worker payable is what Yaadly owes, not the client's bill.
-  const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
-  const invByJob = new Map(), partsByJob = new Map();
-  for (const i of invs || []) {
-    if (i.status === "void" || i.payable_to === "worker") continue;
-    if (i.part_of) { if (!partsByJob.has(i.job_id)) partsByJob.set(i.job_id, []); partsByJob.get(i.job_id).push(i); }
-    else invByJob.set(i.job_id, i);
-  }
-
-  const rows = jobs.map((job) => {
-    const quote = quoteByJob.get(job.id);
-    if (!quote) return "";
-    // What the client is billed: labour, Yaadly's 15% on labour, materials at
-    // cost, the same sum raise_job_client_invoice writes. This used to show
-    // the 15% alone next to a button that sent the whole bill.
-    const labour = Math.round(quote.labour_jmd || 0);
-    const fee = Math.round(labour * 0.15);
-    const inv = invByJob.get(job.id);
-    const parts = partsByJob.get(job.id) || [];
-    const billed = inv ? inv.total_pence + parts.reduce((t, p) => t + (p.total_pence || 0), 0)
-                       : labour + fee + Math.round(quote.materials_jmd || 0);
-
-    let statusHtml, actionHtml;
-    if (inv) {
-      const when = inv.sent_at ? String(inv.sent_at).slice(0, 10) : "not sent yet";
-      const paidParts = parts.filter((p) => p.status === "paid").length;
-      statusHtml = `<span class="jichip raised"><span class="dot"></span>${esc(inv.status)}</span>`
-        + `<span class="jiref">${esc(inv.id)} · ${esc(when)}</span>`
-        + (parts.length ? `<span class="jiref">${parts.length} part${parts.length > 1 ? "s" : ""} requested, ${paidParts} paid</span>` : "");
-      actionHtml = `<button class="btn g" data-open-inv="${esc(inv.id)}">Open</button>`
-        + `<button class="btn g" data-preview-inv="${esc(inv.id)}">Preview</button>`
-        + (inv.status === "sent" ? `<button class="btn" data-paid-inv="${esc(inv.id)}" data-paid-total="${inv.total_pence}">Mark as paid</button>` : "")
-        + (inv.status === "draft" || inv.status === "sent" ? `<button class="btn d" data-void-inv="${esc(inv.id)}">Void</button>` : "");
-    } else {
-      statusHtml = `<span class="jichip ready"><span class="dot"></span>Ready to raise</span>`;
-      actionHtml = `<button class="btn" data-raise-job="${esc(job.id)}">Raise draft</button>`;
-    }
-
-    return `<tr>
-      <td><div class="jistagename">${esc(job.id)}</div><div class="jistagepct">${esc(job.title || "")}</div></td>
-      <td><div class="jicond">${esc(quote.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Labour ${jmdFmt(labour)}</div></td>
-      <td class="num"><span class="jiamt">${jmdFmt(billed)}</span><div class="jistagepct">Yaadly's 15%: ${jmdFmt(fee)}</div></td>
-      <td>${statusHtml}</td>
-      <td>${actionHtml}</td>
-    </tr>`;
-  }).filter(Boolean);
-
-  host.innerHTML = rows.length
-    ? `<table class="jitable">
-        <thead><tr><th>Job</th><th>Who</th><th class="num">Client's bill, Yaadly's 15% inside it</th><th>Status</th><th></th></tr></thead>
-        <tbody>${rows.join("")}</tbody>
-      </table>`
-    : `<div class="empty"><b>No booked job here has an accepted quote yet</b>An accepted quote is needed before the client's bill can be worked out.</div>`;
+  $("ivList").querySelectorAll("[data-ivpaid]").forEach(b => b.addEventListener("click", async () => {
+    const id = b.dataset.ivpaid, inv = INV_LIST.find(x => x.id === id) || {};
+    const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.", (INV_CARD[id] || {}).ref || "");
+    if (ref === null) return;
+    const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", id);
+    if (error) return say("ivMsg", "err", error.message);
+    say("ivMsg", "ok", `${curAmt(inv.total_pence, inv.currency)} logged as paid against ${id}.`);
+    if (CURRENT?.invoice?.id === id) await reload(id); else await loadInvoices();
+  }));
 
   // Raising writes a draft and opens it. Nothing is emailed from here: the
   // bill is read, changed or split into parts in the editor, previewed, and
   // only then sent. Founder instruction, 13 Sep 2026.
-  host.querySelectorAll("[data-raise-job]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const job = btn.dataset.raiseJob;
-      btn.disabled = true;
-      say("jiMsg", "ok", `Drafting the client's bill for ${job}…`);
-      try {
-        const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
-        if (error) throw error;
-        const row = (data || [])[0];
-        if (!row) throw new Error("Nothing was raised.");
-        await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
-      } catch (e) {
-        let hint = e.message;
-        if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-        say("jiMsg", "err", hint);
-        btn.disabled = false;
-      }
-    });
-  });
-
-  host.querySelectorAll("[data-open-inv]").forEach((btn) => {
-    btn.addEventListener("click", () => openInvoice(btn.dataset.openInv));
-  });
-
-  host.querySelectorAll("[data-preview-inv]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      say("jiMsg", "", "");
-      try {
-        const { html } = await fn({ action: "render", invoice_id: btn.dataset.previewInv, as: "json" });
-        $("jiPreview").srcdoc = html;
-        show("jiPreviewCard", true);
-        $("jiPreviewCard").scrollIntoView({ behavior: "smooth" });
-      } catch (e) { say("jiMsg", "err", e.message); }
-    });
-  });
-
-  host.querySelectorAll("[data-paid-inv]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.paidInv;
-      const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
-      if (ref === null) return;
-      const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", id);
-      if (error) return say("jiMsg", "err", error.message);
-      say("jiMsg", "ok", `${jmdFmt(Number(btn.dataset.paidTotal))} logged as paid against ${id}.`);
-      await loadJobInvoices();
-    });
-  });
-
-  host.querySelectorAll("[data-void-inv]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.voidInv;
-      if (!confirm("Void " + id + "? It stays on the record, marked void.")) return;
-      const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", id);
-      if (error) return say("jiMsg", "err", error.message);
-      await loadJobInvoices();
-    });
-  });
+  $("ivList").querySelectorAll("[data-ivraise]").forEach(b => b.addEventListener("click", async () => {
+    const job = b.dataset.ivraise;
+    b.disabled = true;
+    say("ivMsg", "ok", `Drafting the client's bill for ${job}…`);
+    try {
+      const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
+      if (error) throw error;
+      const row = (data || [])[0];
+      if (!row) throw new Error("Nothing was raised.");
+      say("ivMsg", "", "");
+      await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
+    } catch (e) {
+      let hint = e.message;
+      if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+      say("ivMsg", "err", hint);
+      b.disabled = false;
+    }
+  }));
 }
 
-$("jiPrint").addEventListener("click", () => $("jiPreview").contentWindow.print());
+$("ivNewBtn").addEventListener("click", () => {
+  const on = $("ivNew").classList.contains("hidden");
+  show("ivNew", on);
+  $("ivNewBtn").textContent = on ? "Hide the new invoice forms" : "Raise a new invoice";
+  if (on) $("ivNew").scrollIntoView({ behavior: "smooth" });
+});
+
+async function loadInvoices(){
+  const [{ data, error }, { data: jobs }] = await Promise.all([
+    sb.from("invoices")
+      .select("id,client_name,client_email,job_id,part_of,payable_to,status,total_pence,currency,issue_date,created_at,sent_at,paid_at,drafted_by,stage,replaces,starts_job")
+      .order("created_at", { ascending: false }).limit(300),
+    sb.from("jobs").select("id,title,client_email")
+      .not("worker_email", "is", null).order("updated_at", { ascending: false }).limit(50),
+  ]);
+  if (error) {
+    $("ivList").innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read invoices</b><p>${esc(error.message)}</p></div></div>`;
+    return;
+  }
+  INV_LIST = data || [];
+
+  // Ready to raise: a booked job with an accepted quote and no live client
+  // bill. The figure is the sum raise_job_client_invoice writes: labour,
+  // Yaadly's 15% on labour, and materials at cost.
+  const due = [];
+  const jobIds = (jobs || []).map(j => j.id);
+  if (jobIds.length) {
+    const [{ data: quotes }, { data: onJobs }] = await Promise.all([
+      sb.from("job_quotes").select("job_id,worker_name,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
+      sb.from("invoices").select("job_id,payable_to").in("job_id", jobIds).is("stage", null).neq("status", "void"),
+    ]);
+    const billed = new Set((onJobs || []).filter(i => i.payable_to !== "worker").map(i => i.job_id));
+    const quoteByJob = new Map((quotes || []).map(q => [q.job_id, q]));
+    for (const job of jobs) {
+      const quote = quoteByJob.get(job.id);
+      if (!quote || billed.has(job.id)) continue;
+      const labour = Math.round(quote.labour_jmd || 0), fee = Math.round(labour * 0.15);
+      due.push({ job, worker: quote.worker_name, fee, bill: labour + fee + Math.round(quote.materials_jmd || 0) });
+    }
+  }
+  INV_DUE = due;
+
+  // What Stripe reported against the outstanding ones (invoice_payments,
+  // 20260914120000). Read only: a matching card payment is information, and
+  // a mismatch takes the Mark as paid button off the row.
+  INV_CARD = {};
+  const sentIds = INV_LIST.filter(i => i.status === "sent").map(i => i.id);
+  if (sentIds.length) {
+    const { data: cps } = await sb.from("invoice_payments").select("invoice_id,status,provider_ref").in("invoice_id", sentIds);
+    for (const p of cps || []) {
+      const c = INV_CARD[p.invoice_id] = INV_CARD[p.invoice_id] || {};
+      if (p.status === "succeeded") { c.ok = true; c.ref = p.provider_ref; }
+      if (p.status === "mismatch") c.bad = true;
+    }
+  }
+
+  renderInvoiceList();
+  await loadCatalogueOptions();
+}
+
+// A job bill is kept in whole Jamaican dollars.
+const jmdFmt = (n) => "J$" + Math.round(n).toLocaleString("en-JM");
 
 // ------------------------------------------------- materials tranches
 // The write that 20260828c never built. materials_releases had the table, the
@@ -7486,151 +7587,9 @@ async function loadMaterials(keepMsg){
   });
 }
 
-// ------------------------------------------------------- agency fees
-//
-// Every row in `invoices` is already Yaadly's own cut, never the worker's
-// pay, whether it came from a job's per-stage fee or a drafted service.
-// This view exists so both are checkable in one place: what's ready to
-// raise but hasn't been, and everything that has, jobs and services mixed,
-// one list, so a fee owed to Yaadly is never sitting uncollected just
-// because it only showed up on a different screen.
+// A figure in the unit its invoice is kept in: whole J$ for a job bill,
+// pence for a service invoice.
 const feeAmt = (pence, currency) => currency === "JMD" ? jmdFmt(pence) : money(pence);
-
-async function loadAgencyFees(){
-  say("feesMsg", "", "");
-  const dueHost = $("feesDue"), allHost = $("feesAll");
-  dueHost.innerHTML = `<div class="empty"><b>Checking every booked job&hellip;</b></div>`;
-
-  const { data: jobs, error: jobsErr } = await sb.from("jobs")
-    .select("id,title,client_email")
-    .not("worker_email", "is", null)
-    .order("updated_at", { ascending: false })
-    .limit(50);
-  if (jobsErr) {
-    dueHost.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read jobs</b><p>${esc(jobsErr.message)}</p></div></div>`;
-  } else if (!jobs || !jobs.length) {
-    dueHost.innerHTML = `<div class="empty"><b>No booked jobs yet</b></div>`;
-  } else {
-    const jobIds = jobs.map((j) => j.id);
-    const [{ data: quotes }, { data: invs }] = await Promise.all([
-      sb.from("job_quotes").select("job_id,labour_jmd,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-      sb.from("invoices").select("job_id").in("job_id", jobIds).is("stage", null).neq("status", "void"),
-    ]);
-    const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
-    const raised = new Set((invs || []).map((i) => i.job_id));
-
-    const dueRows = [];
-    for (const job of jobs) {
-      if (raised.has(job.id)) continue;
-      const quote = quoteByJob.get(job.id);
-      if (!quote) continue;
-      // The whole bill, the same sum raise_job_client_invoice writes, with
-      // Yaadly's 15% shown inside it. This row used to show the 15% alone
-      // next to a button that emailed the whole bill.
-      const labour = Math.round(quote.labour_jmd || 0);
-      const fee = Math.round(labour * 0.15);
-      dueRows.push({ job, fee, bill: labour + fee + Math.round(quote.materials_jmd || 0) });
-    }
-
-    dueHost.innerHTML = dueRows.length
-      ? `<div class="list">${dueRows.map((r) => `
-        <div class="item">
-          <div><b>${esc(r.job.id)}</b> &middot; ${esc(r.job.title || "")}<div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(r.job.client_email || "")}</div></div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <span style="text-align:right"><span style="font-weight:700;font-variant-numeric:tabular-nums">${jmdFmt(r.bill)}</span><div style="color:var(--dim);font-size:11.5px">Yaadly's 15%: ${jmdFmt(r.fee)}</div></span>
-            <button class="btn" data-due-job="${esc(r.job.id)}">Raise draft</button>
-          </div>
-        </div>`).join("")}</div>`
-      : `<div class="empty"><b>Nothing outstanding</b>Every booked job already has its client's bill raised.</div>`;
-
-    // Raising writes a draft and opens it in the editor. Nothing is emailed
-    // from here. Founder instruction, 13 Sep 2026.
-    dueHost.querySelectorAll("[data-due-job]").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const job = btn.dataset.dueJob;
-        btn.disabled = true;
-        say("feesMsg", "ok", `Drafting the client's bill for ${job}…`);
-        try {
-          const { data, error } = await sb.rpc("raise_job_client_invoice", { p_job: job });
-          if (error) throw error;
-          const row = (data || [])[0];
-          if (!row) throw new Error("Nothing was raised.");
-          await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${jmdFmt(row.total_jmd)}. Nothing has been sent. Check every line, change what needs changing, request a part if you want one, preview it, then email it.`);
-        } catch (e) {
-          let hint = e.message;
-          if (/Admin only/i.test(e.message)) hint = "This account is not on the Yaadly admin list.";
-          say("feesMsg", "err", hint);
-          btn.disabled = false;
-        }
-      });
-    });
-  }
-
-  const { data: all, error: allErr } = await sb.from("invoices")
-    .select("id,client_name,job_id,status,total_pence,currency,created_at")
-    .order("created_at", { ascending: false }).limit(100);
-  if (allErr) {
-    allHost.innerHTML = `<tr><td colspan="6"><div class="alert crit"><span class="ic">!</span><div><b>Could not read invoices</b><p>${esc(allErr.message)}</p></div></div></td></tr>`;
-    return;
-  }
-
-  allHost.innerHTML = (all || []).map((i) => {
-    const source = i.job_id ? `Job ${esc(i.job_id)}` : "Service";
-    return `<tr>
-      <td>${esc(i.id)}</td>
-      <td>${esc(i.client_name)}</td>
-      <td>${source}</td>
-      <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
-      <td>${chipFor(INV_CHIP, i.status)}</td>
-      <td>
-        <button class="btn g" data-fopen="${esc(i.id)}">Open</button>
-        <button class="btn g" data-fp="${esc(i.id)}">Preview</button>
-        ${i.status === "sent" ? `<button class="btn" data-fpaid="${esc(i.id)}" data-fpaidtotal="${i.total_pence}" data-fpaidcur="${esc(i.currency)}">Mark as paid</button>` : ""}
-        ${i.status === "draft" || i.status === "sent" ? `<button class="btn d" data-fvoid="${esc(i.id)}">Void</button>` : ""}
-      </td>
-    </tr>`;
-  }).join("") || `<tr><td colspan="6"><div class="empty"><b>Nothing raised yet</b></div></td></tr>`;
-
-  allHost.querySelectorAll("[data-fp]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      say("feesMsg", "", "");
-      try {
-        const { html } = await fn({ action: "render", invoice_id: btn.dataset.fp, as: "json" });
-        $("feesPreview").srcdoc = html;
-        show("feesPreviewCard", true);
-        $("feesPreviewCard").scrollIntoView({ behavior: "smooth" });
-      } catch (e) { say("feesMsg", "err", e.message); }
-    });
-  });
-
-  allHost.querySelectorAll("[data-fopen]").forEach((btn) => {
-    btn.addEventListener("click", () => openInvoice(btn.dataset.fopen));
-  });
-
-  allHost.querySelectorAll("[data-fpaid]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.fpaid;
-      const ref = prompt("Paid. What is the reference? Bank reference, Stripe id, or leave blank.");
-      if (ref === null) return;
-      const { error } = await sb.from("invoices").update({ status: "paid", paid_reference: ref }).eq("id", id);
-      if (error) return say("feesMsg", "err", error.message);
-      say("feesMsg", "ok", `${feeAmt(Number(btn.dataset.fpaidtotal), btn.dataset.fpaidcur)} logged as paid against ${id}.`);
-      await loadAgencyFees();
-    });
-  });
-
-  allHost.querySelectorAll("[data-fvoid]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const id = btn.dataset.fvoid;
-      if (!confirm("Void " + id + "? It stays on the record, marked void.")) return;
-      const { error } = await sb.from("invoices").update({ status: "void" }).eq("id", id);
-      if (error) return say("feesMsg", "err", error.message);
-      await loadAgencyFees();
-    });
-  });
-}
-
-$("feesPrint").addEventListener("click", () => $("feesPreview").contentWindow.print());
 
 // The dropdown for "Raise, per your own published terms": every active
 // catalogue item, priced from service_catalogue itself, never a typed one.
@@ -7669,7 +7628,7 @@ $("policyRaise").addEventListener("click", async () => {
     // Raising writes a draft and opens it. Nothing is emailed from here.
     // Founder instruction, 13 Sep 2026: this used to raise and email in
     // one click, with no chance to read or change it first.
-    const more = (data || []).length > 1 ? ` ${data.length - 1} more raised with it, in Recent invoices below.` : "";
+    const more = (data || []).length > 1 ? ` ${data.length - 1} more raised with it, in Preview on the list above.` : "";
     say("policyMsg","ok", `Raised ${row.invoice_id} as a draft.${more}`);
     $("policyClientName").value = ""; $("policyClientEmail").value = ""; $("policyClientAddress").value = "";
     await openInvoice(row.invoice_id, `${row.invoice_id} drafted for ${feeAmt(row.total_pence, row.currency || "GBP")}. Nothing has been sent. Check it, preview it, then email it.`);

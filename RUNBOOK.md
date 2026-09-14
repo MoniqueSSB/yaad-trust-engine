@@ -2454,6 +2454,8 @@ Two rows (`client`, `worker`) for the current `rev` and `both_confirmed_at` set 
 
 ## A job doesn't show up on the Job Invoices view, or its "Raise & send" button won't light up
 
+*Historical. Job Invoices and Agency Fees were folded into the one Invoices view on 14 Sep 2026: a booked job with an accepted quote and no bill sits at the top of its Preview group with a Raise draft button. The per-stage fee this section describes was dropped on 1 Sep 2026.*
+
 **Check three things exist, in this order**, in concierge or SQL:
 ```sql
 select id, worker_email from jobs where id = '<job id>';
@@ -2467,7 +2469,7 @@ No `worker_email`: the job never appears on this view at all, it only lists book
 
 ## Raise & send didn't email anybody, or a client can't see their invoice
 
-**"RESEND_API_KEY is not set..."** means the invoice raised correctly (check Recent invoices in concierge, it will be sitting there as a `draft`) but `yaad-invoice`'s `send` action could not reach Resend. Set the secret, then open that draft, render it, and mark it sent by hand, or re-raise once the secret is in place - raising again for the same service is harmless, it just numbers a fresh pair.
+**"RESEND_API_KEY is not set..."** means the invoice raised correctly (check the Preview group on the Invoices view in concierge, it will be sitting there as a `draft`) but `yaad-invoice`'s `send` action could not reach Resend. Set the secret, then open that draft, render it, and mark it sent by hand, or re-raise once the secret is in place - raising again for the same service is harmless, it just numbers a fresh pair.
 
 **A client says they can't see an invoice in their portal.** Check `invoices.service_id` is actually set on the row - `/portal/services/[id]/page.tsx` filters on it, so an invoice raised without one (the free-text drafting flow only sets it if the admin passes one) is invisible there even though RLS would let the client read it. `raise_service_invoice()` always sets it when called with `p_service_id`; the concierge "Raise & send" card does not currently ask for one, since no real service booking carries a `catalogue_id` yet for it to look up (`services.type` is free text, not linked to `service_catalogue`) - that link is the next real gap, not this one.
 
@@ -2652,11 +2654,11 @@ select id, status, payable_to, total_pence from invoices where job_id = '<job id
 
 **A job with no approved Kickoff Pack or Quote Pack still gets a worker-pay invoice, on the founder's own stated default: 25% on stage 1, the rest on stage 2, nothing on a third.** Not a bug if a stage 3 approval on such a job raises nothing, that default only ever defines two parts. `invoices.notes` says outright when a stage used this default rather than an agreed document.
 
-**As of `20260902l`/`m`, the per-stage worker pay invoice goes straight to `sent`, no admin click, the moment it's raised.** The client's own approval is the confirmation this one needed, per the founder's own instruction; see DECISIONS.md. `invoice_status_guard` still requires `is_admin()` before anything ever reaches `paid`, unchanged, that gate was never touched. The desk's Job Invoices view still shows a **Send** button on any `draft` row, kept for the whole-job fallback (`raise_job_worker_pay_invoice`, `20260902i`) and the agency fee invoice, both still admin-raised and admin-sent exactly as before. If a worker-pay invoice for a specific stage is ever sitting as `draft` rather than `sent`, that means it did not come from the trigger, worth asking why before just clicking Send on it.
+**As of `20260902l`/`m`, the per-stage worker pay invoice goes straight to `sent`, no admin click, the moment it's raised.** The client's own approval is the confirmation this one needed, per the founder's own instruction; see DECISIONS.md. `invoice_status_guard` still requires `is_admin()` before anything ever reaches `paid`, unchanged, that gate was never touched. The desk's Invoices view (Job Invoices until 14 Sep 2026) still shows a **Send** button on any `draft` row, kept for the whole-job fallback (`raise_job_worker_pay_invoice`, `20260902i`) and the agency fee invoice, both still admin-raised and admin-sent exactly as before. If a worker-pay invoice for a specific stage is ever sitting as `draft` rather than `sent`, that means it did not come from the trigger, worth asking why before just clicking Send on it.
 
 **A real ordering bug lived here for one migration, `20260902l`, caught before it reached a client: inserting an invoice as `status = 'sent'` directly, then inserting its lines, hits `invoice_line_price_guard`'s "a sent invoice's lines are frozen" and fails outright.** If that error ever reappears (`invoice %s is sent and its lines are frozen`), it means something is once again trying to add lines after marking an invoice sent rather than before. Insert as `draft`, add the lines, only then flip to `sent`, the order `20260902m` fixed it to.
 
-**If a worker-pay invoice's rendered document ever shows Yaadly's own bank details, that is a real bug, stop and fix it before sending another.** `renderInvoice()` in `yaad-invoice` branches its footer on `inv.payable_to`: a worker-pay invoice must never print `app_settings.invoice_pay_to`, since that would tell a client to pay the worker's money into Yaadly's own account. Preview any worker-pay invoice before it goes out if the function has been touched since: `Job Invoices → Preview` on the desk, check the footer reads "This is a record of what you agreed to pay your tradesperson, not a bill from Yaadly," not a bank sort code.
+**If a worker-pay invoice's rendered document ever shows Yaadly's own bank details, that is a real bug, stop and fix it before sending another.** `renderInvoice()` in `yaad-invoice` branches its footer on `inv.payable_to`: a worker-pay invoice must never print `app_settings.invoice_pay_to`, since that would tell a client to pay the worker's money into Yaadly's own account. Preview any worker-pay invoice before it goes out if the function has been touched since: `Invoices → Preview` on the desk, check the footer reads "This is a record of what you agreed to pay your tradesperson, not a bill from Yaadly," not a bank sort code.
 
 **As of `20260902n`, a worker can read the invoice raised in their own name, `invoices.worker_email` plus `invoices_worker_read`/`lines_worker_read`, mirroring the client-read policies exactly.** Set only on `payable_to = 'worker'`; null and irrelevant on an agency fee invoice. If a worker reports they can't see a payment they know was raised, check `worker_email` on that invoice is actually populated, filed before this migration and never backfilled would be the one real way this breaks.
 
@@ -5177,16 +5179,35 @@ Since `20260913223042` and `20260914090757` (13 Sep 2026). A `SECURITY DEFINER` 
 
 Raising never emails anybody (13 Sep 2026). The reasoning is in DECISIONS.md, "Raising a bill never sends it".
 
-1. **Raise it.** Job Invoices or Agency Fees, press **Raise draft** on the job. The whole bill opens on the Invoices view as a draft: the work, Guarantee & Support 15%, and materials at cost. Nothing has been sent.
+1. **Raise it.** On the Invoices view, a booked job with no bill yet sits at the top of **Preview**. Press **Raise draft** on it. The whole bill opens below the list as a draft: the work, Guarantee & Support 15%, and materials at cost. Nothing has been sent.
 2. **Change it.** Edit any line, add or remove one, then press **Save changes**. Job bills are in whole Jamaican dollars, so J$4,000 is typed as 4000.
 3. **Send it whole.** Press **Preview** and read what the client will read. Then press **Email J$… to …**. That emails exactly the preview and freezes the invoice. If you sent it yourself another way, use **Mark as sent, I sent it myself** instead.
-4. **Or send part of it.** Tick the lines you want now under **Request now**. For part of a line, type the amount in the box beside it. The Guarantee & Support line only moves whole. Press **Request the ticked lines as a part**. A new numbered draft opens for just those amounts, and they come off the bill. Preview it, then email it.
-5. **Read where it stands.** Open the bill, from Job Invoices or Agency Fees with **Open**. Under the total it lists every part: its number, amount, what it covers, when it was sent and paid, and which one starts the job. What is left is the balance on the bill itself. Send that last, the same way as step 3.
+4. **Or send part of it.** Press **Split into parts** on the bill in the list, or open it. Tick the lines you want now under **Request now**. For part of a line, type the amount in the box beside it. The Guarantee & Support line only moves whole. Press **Request the ticked lines as a part**. A new numbered draft opens for just those amounts, and they come off the bill. Preview it, then email it.
+5. **Read where it stands.** Every bill with parts, and each of its parts, carries one line on the list: the whole job, paid, sent and unpaid, drafted, not billed yet, and **still owed**. Open the bill for the same figures plus every part: its number, amount, what it covers, when it was sent and paid, and which one starts the job. What is left is the balance on the bill itself. Send that last, the same way as step 3. The Outstanding group also names any job bill with an amount not billed yet, because that money is owed even though nobody has been sent it.
 6. **When money arrives.** Open the part or the bill it paid and press **Mark as paid**. Whichever invoice carries the Guarantee & Support line starts the job when it is marked paid. A paid part without it does not.
 7. **Taking a part back.** While the bill is still a draft, **Void** the part and its amount goes back onto the bill. Once the balance has gone out the database refuses, because the amount would drop off the job's billing with nowhere to go. In that case raise a new invoice for it by hand, from the free-text draft at the top of the Invoices view. A bill with a live part cannot be voided at all until its parts are.
 8. **Proving it still holds.** Run `supabase/tests/invoice_parts_guards.sql` with `execute_sql`, when nobody is invoicing. Every line should read PASS. It borrows a TEST job, rolls everything back and puts the invoice number counter back where it was, so it leaves nothing behind.
 
-**Deploying this.** Apply `20260913233000_a_job_bill_can_be_requested_in_parts.sql` first, then deploy the desk and the web app. Both read `part_of` and `starts_job`, and a query that names a column the database does not have yet fails as a whole: Job Invoices would show "Could not read jobs", and the portal's job page would lose its invoices.
+**Deploying this.** Apply `20260913233000_a_job_bill_can_be_requested_in_parts.sql` first, then deploy the desk and the web app. Both read `part_of` and `starts_job`, and a query that names a column the database does not have yet fails as a whole: the desk's invoice list would show "Could not read invoices", and the portal's job page would lose its invoices.
+
+## A sent invoice is wrong and needs changing
+
+A sent invoice is locked, because the client holds that copy: the database refuses any change to its lines. It is voided and reissued, never edited in place. Founder decision, 14 Sep 2026; the reasoning is in DECISIONS.md.
+
+1. **Open it** on the Invoices view (Outstanding group) and press **Void and reissue as a new draft**. Confirm. One database step (`reissue_invoice`, `20260914170000`) voids it and opens a copy as a new numbered draft. Each names the other: the draft says "Replaces INV-…", the void one says "Replaced by INV-…", on the list and in the editor. Nothing is emailed.
+2. **Change the draft**, preview it, and email it. Tell the client the new number replaces the old one.
+3. **A bill with parts**: its live parts move to the new bill, so the job's balance stays whole and nothing is billed twice.
+4. **A part**: its amount goes back on its bill and is requested again as a new part, so the fee and the job start move with it exactly as when it was first requested.
+
+**It refuses, on purpose:**
+- **"Only a sent invoice is reissued"**: a draft is edited as it is, and a paid one is money in. A paid invoice that is wrong needs a refund or a new invoice, and that is a decision, not a button.
+- **"Stripe has recorded a card payment against…"**: mark it paid, or refund it in Stripe, first. Otherwise the money would sit against a void invoice.
+- **"…its amount would have nowhere to go"**: a part whose bill has already been sent. Raise a separate invoice for the difference by hand from the free-text draft on the Invoices view.
+- **"…what Yaadly owes a tradesperson"**: a worker payable is not a client invoice.
+
+**Prices on the copy.** A line from the service list is copied as a service-list line, so it takes today's list price. A line whose service has since come off the list keeps its old amount as a "my figure" line. Read the draft before sending it.
+
+**Proving it still holds.** Run `supabase/tests/invoice_reissue_guards.sql` with `execute_sql`, when nobody is invoicing, then `drop table if exists public._invoice_reissue_test_out;` if the last statement did not run. Every line should read PASS: 9 of 9 on 14 Sep 2026. It borrows a TEST job, rolls everything back and puts the invoice number counter back.
 
 ## An invoice total on the desk looks wrong, or shows pounds for a Jamaican dollar bill
 
