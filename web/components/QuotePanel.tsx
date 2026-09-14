@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { submitQuote } from "@/app/jobs/actions";
 import { jmd } from "@/lib/money";
+import { clientBill } from "@/lib/jobs/client-bill";
+import { BILLING_THRESHOLD_JMD, stageBillingAllowed, type BillingMode } from "@/lib/jobs/billing";
 
 /**
  * The quote form, MARKETPLACE-BUILD-SPEC 2.4. Helper copy is decided and
@@ -59,6 +61,12 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
   const [excludedNote, setExcludedNote] = useState(linesToText(docs?.excluded));
   const [timelineNote, setTimelineNote] = useState(docs?.rough_timeline ?? "");
   const [paymentStageNote, setPaymentStageNote] = useState(stagesToText(docs?.payment_stages));
+  /* In full or by stage (20260914092546). Offered only at or above the
+     J$100,000 line, on the client's all-in total; under it, in full. */
+  const [billingChoice, setBillingChoice] = useState<BillingMode>("in_full");
+  const allIn = clientBill(labour, materials).total;
+  const canStageBill = stageBillingAllowed(allIn);
+  const billingMode: BillingMode = canStageBill ? billingChoice : "in_full";
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -227,6 +235,47 @@ export function QuotePanel({ jobId, draft }: { jobId: string; draft?: QuotePackD
           </span>
         </label>
       </div>
+
+      {/* In full or by stage (20260914092546). The hidden input is what is
+          sent, so under the line it is always in_full whatever was clicked
+          before the price dropped below it. */}
+      <input type="hidden" name="billingMode" value={billingMode} />
+      <fieldset className="mt-3.5 rounded-xl border border-line bg-panel2 p-4">
+        <legend className="px-1 text-[11px] font-bold uppercase tracking-[.13em] text-dim">
+          How the client pays
+        </legend>
+        {canStageBill ? (
+          <div className="grid gap-2 text-[13.5px]">
+            <label className="flex items-start gap-2.5">
+              <input
+                type="radio"
+                name="billingChoice"
+                checked={billingChoice === "in_full"}
+                onChange={() => setBillingChoice("in_full")}
+                className="mt-1"
+              />
+              <span><b className="text-ink">In full.</b> <span className="text-mute">One invoice when the client accepts; work starts once it is paid.</span></span>
+            </label>
+            <label className="flex items-start gap-2.5">
+              <input
+                type="radio"
+                name="billingChoice"
+                checked={billingChoice === "by_stage"}
+                onChange={() => setBillingChoice("by_stage")}
+                className="mt-1"
+              />
+              <span><b className="text-ink">By stage.</b> <span className="text-mute">The client is invoiced for each of your payment stages as it is reached; work starts once the first is paid.</span></span>
+            </label>
+          </div>
+        ) : (
+          <p className="text-[13px] leading-relaxed text-mute">
+            In full. Under {jmd(BILLING_THRESHOLD_JMD)} all in, the client pays the whole price before work starts.
+          </p>
+        )}
+        <p className="mt-2 text-[11.5px] leading-relaxed text-dim">
+          Either way, Yaadly pays you for each payment stage once the client approves it.
+        </p>
+      </fieldset>
 
       {labour > 0 && (
         <div className="mt-3.5 rounded-xl border border-line bg-panel2 p-4 text-[13.5px] tabular-nums">

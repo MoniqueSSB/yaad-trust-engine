@@ -52,6 +52,7 @@ import { agreePrice, chooseQuote, requestKickoff, setWorkerChoice } from "@/app/
 import { scrub } from "@/lib/scrub";
 import { jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
 import { clientBill } from "@/lib/jobs/client-bill";
+import { billingLineForClient, billingModeOf } from "@/lib/jobs/billing";
 import { whenDate, whenDateTime } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,7 @@ type Evidence = {
 
 type Quote = {
   id: string;
+  billing_mode?: string | null;
   worker_name: string | null;
   worker_email: string | null;
   labour_jmd: number | null;
@@ -294,7 +296,7 @@ export default async function JobRoom({
       supabase
         .from("job_quotes")
         .select(
-          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason",
+          "id,worker_name,worker_email,labour_jmd,materials_jmd,materials_at_cost,earliest_start,days_estimate,note,status,scope_summary,included_note,excluded_note,timeline_note,payment_stage_note,recommended_at,recommended_by,recommended_reason,billing_mode",
         )
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
@@ -1251,6 +1253,9 @@ export default async function JobRoom({
                     <div className="flex justify-between gap-4"><span className="text-dim">Yaadly&rsquo;s Guarantee &amp; Support, 15% of the work</span><span className="font-mono-app text-mute">{jmd(bill.fee)}</span></div>
                     <div className="flex justify-between gap-4"><span className="text-dim">Materials{q.materials_at_cost ? ", at cost, nothing added" : ""}</span><span className="font-mono-app text-mute">{jmd(bill.materials)}</span></div>
                     <div className="flex justify-between gap-4 border-t border-line pt-1 font-bold"><span>You pay Yaadly</span><span className="font-mono-app">{jmd(bill.total)}</span></div>
+                    {/* In full or by stage, as the worker quoted it
+                        (20260914092546). Accepting the quote agrees it. */}
+                    <p className="mt-0.5 leading-relaxed text-dim">{billingLineForClient(billingModeOf(q.billing_mode))}</p>
                   </div>
                 )}
                 {q.recommended_at && role === "client" && (

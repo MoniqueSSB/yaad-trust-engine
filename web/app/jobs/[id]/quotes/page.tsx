@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AcceptPanel } from "./AcceptPanel";
 import { jmdOrBlank as money } from "@/lib/money";
 import { clientBill } from "@/lib/jobs/client-bill";
+import { billingLineForClient, billingModeOf } from "@/lib/jobs/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,7 @@ export default async function Quotes({
     scope_summary: string | null; timeline_note: string | null; payment_stage_note: string | null;
     included_note: string | null; excluded_note: string | null;
     recommended_at: string | null; recommended_by: string | null; recommended_reason: string | null;
+    billing_mode: string | null;
   }[];
 
   const booked = String(job.worker_email ?? "") !== "";
@@ -244,6 +246,11 @@ export default async function Quotes({
                       <span>You pay Yaadly</span>
                       <span className="font-mono">{money(bill.total)}</span>
                     </div>
+                    {/* In full or by stage, as the worker quoted it
+                        (20260914092546). Accepting the quote agrees it. */}
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-dim">
+                      {billingLineForClient(billingModeOf(q.billing_mode))}
+                    </p>
                   </div>
 
                   {q.note && (
