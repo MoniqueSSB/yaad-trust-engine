@@ -224,6 +224,16 @@ export function MoneyPanel({
             {invoices.map((inv) => {
               const paid = inv.status === "paid";
               const isFee = inv.payable_to !== "worker";
+              /* Since 3 Sep 2026 the client's invoice is the whole job
+                 (work, fee and materials), and since 14 Sep it can go out in
+                 parts. Calling every one "Guarantee & Support fee" put the
+                 fee's name on a J$134,250 job bill (INV-2026-0021). The
+                 row now says which it is, from the invoice's own fields. */
+              const clientLabel = inv.part_of
+                ? "Part payment"
+                : inv.period_label === "Agency fee"
+                  ? "Yaadly Guarantee & Support fee"
+                  : "Job bill";
               return (
                 <div key={inv.id} id={"invoice-" + inv.id} className="flex scroll-mt-6 gap-3.5 border-b border-line py-3.5 last:border-b-0">
                   <span
@@ -236,7 +246,7 @@ export function MoneyPanel({
                     <div className="flex flex-wrap items-center gap-2.5 text-[13.5px] font-semibold text-ink">
                       <span>
                         {isFee
-                          ? "Yaadly Guarantee & Support fee"
+                          ? clientLabel + (inv.starts_job && inv.status !== "paid" ? " · paying this starts the job" : "")
                           : "Worker pay" + (inv.stage != null ? " · stage " + inv.stage : "")}
                       </span>
                       <span
