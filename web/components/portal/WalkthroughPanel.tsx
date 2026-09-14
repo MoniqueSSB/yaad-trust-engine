@@ -101,7 +101,7 @@ export function WalkthroughPanel({
           <p className="text-[13px] text-mute">
             <b className="text-ink">Requested:</b> {PLATFORM_LABEL[walkPlatform!] ?? walkPlatform}
             {walkDate ? ", " + walkDate : ""}.{" "}
-            {role === "client" ? "Waiting for the worker to confirm a link." : "Send a link once you have arranged it."}
+            {role === "client" ? "The worker has been sent a WhatsApp and an email. Waiting for them to confirm a link." : "Send a link once you have arranged it."}
           </p>
           {walkNotes && role === "worker" && (
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-dim">&ldquo;{walkNotes}&rdquo;</p>
