@@ -50,7 +50,7 @@ import { PRICE_BENCHMARKS } from "@/lib/portal/price-bands";
 import legal from "@/lib/legal-copy.json";
 import { agreePrice, chooseQuote, requestKickoff, setWorkerChoice } from "@/app/portal/job-actions";
 import { scrub } from "@/lib/scrub";
-import { jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
+import { amount, jmdOrNull, jmdOrNull as jmd } from "@/lib/money";
 import { clientBill } from "@/lib/jobs/client-bill";
 import { billingLineForClient, billingModeOf } from "@/lib/jobs/billing";
 import { whenDate, whenDateTime } from "@/lib/date";
@@ -343,8 +343,10 @@ export default async function JobRoom({
         .eq("status", "approved")
         .limit(1)
         .maybeSingle(),
-      /* Materials money moves BEFORE any labour stage, against a receipt
-         (20260828c), and until now the room never showed it moving. RLS
+      /* Materials money moves BEFORE the goods are bought, once the client
+         has paid for them, and the receipt comes back afterwards
+         (20260914112000; it was "against a receipt"
+         under 20260828c), and until now the room never showed it moving. RLS
          returns rows to the job's own client and worker only. */
       supabase
         .from("materials_releases")
@@ -654,6 +656,10 @@ export default async function JobRoom({
      in parts can have one part paid while the fee is still owed. */
   const feeInvoice = invoices.find((i) => i.starts_job);
   const feeJmd = labour == null ? null : Math.round(labour * 0.15);
+  /* The worker's side is 5% (9 Sep 2026), the same figure takeHome uses.
+     The worker's money panel was handed feeJmd, the client's 15%, and so
+     showed "Yaadly fee, deducted" at three times what is deducted. */
+  const workerFeeJmd = labour == null ? null : Math.round(labour * 0.05);
   const matReleases = (materialsRows ?? []) as {
     amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string;
   }[];
@@ -756,12 +762,24 @@ export default async function JobRoom({
         "The job is booked. Your invoice comes from Yaadly next and appears under Approvals. There is nothing to pay until it arrives.",
     });
   } else if (job.status === "awaiting_payment") {
+    /* The invoice that starts the job is the client's bill for the whole
+       job (labour, the 15%, materials), not a fee invoice, since the
+       principal structure of 3 Sep 2026. Both sides were still told it was
+       "the agency fee" until 14 Sep 2026. A part that carries the 15% is
+       named as a part, so the client knows the rest of the bill exists. */
+    const billAmount = feeInvoice ? amount(feeInvoice.total_pence, feeInvoice.currency) : null;
+    const isPart = !!feeInvoice?.part_of;
     outstanding.push({
       who: isClient ? "you" : "yaadly",
-      title: isClient ? "Pay the Guarantee & Support fee" : "Waiting on the client's agency fee",
+      title: isClient
+        ? (isPart ? "Pay the part of your bill that starts the job" : "Pay your bill for this job") +
+          (billAmount ? ": " + billAmount : "")
+        : "Waiting on the client's payment",
       detail: isClient
-        ? "15% of the labour price, invoiced once. The job cannot start until this is settled."
-        : "The job starts once Yaadly's fee invoice is paid. Nothing is needed from you.",
+        ? isPart
+          ? "This part carries Yaadly's 15%. The job starts once it is paid."
+          : "The labour, Yaadly's 15% and materials, on one bill. The job starts once it is paid."
+        : "The client's bill for this job is with them. The job starts once it is paid. Nothing is needed from you.",
       /* Straight to the fee invoice's own row, not the top of Approvals,
          where the independent check panel and the stage ledger sit above
          it and the invoice is a long scroll down. */
@@ -809,18 +827,49 @@ export default async function JobRoom({
       });
     }
   }
+  /* Materials money goes out before the goods are bought, once the client
+     has paid for them, and the receipt comes back afterwards
+     (20260914112000). This row used to say "against a receipt", which in
+     practice made the worker buy the materials first. A job past
+     awaiting_payment has had the bill that starts it paid. */
   if (won && materialsQuoted > 0 && materialsReleasedJmd === 0 && job.status !== "complete") {
+    const billPaid = job.status !== "awaiting_payment";
     outstanding.push({
       who: "yaadly",
-      title: "Materials tranche not yet released",
+      title: billPaid ? "Materials money not yet released" : "Materials money goes out once the bill is paid",
       detail:
         (money(materialsQuoted) ?? "The materials line") +
-        " is paid to the worker against a receipt before labour starts. Yaadly releases it once the receipt and the storage evidence are in.",
+        (billPaid
+          ? " goes to the worker so they can buy the goods. A person at Yaadly releases it now the bill is paid. The receipt and a photo of the materials in the store come back afterwards."
+          : " goes to the worker so they can buy the goods, released by a person at Yaadly once " +
+            (isClient ? "your" : "the client's") +
+            " bill is paid. The receipt and a photo of the materials in the store come back afterwards."),
       href: jobBase + "?tab=materials#materials-money",
       cta: "See it",
     });
   }
+  /* The receipt milestone: money only, not a stage. Each release with no
+     receipt recorded against it is a receipt still to come, the same reading
+     the desk's materials_open_releases view uses. */
+  const receiptsDue = matReleases.filter((m) => m.released_at && !m.receipt_ref?.trim());
+  if (receiptsDue.length && job.status !== "complete") {
+    const dueJmd = receiptsDue.reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
+    outstanding.push({
+      who: isClient ? "them" : "you",
+      title: isClient ? "The materials receipt is due from the worker" : "Send the materials receipt and a photo",
+      detail: isClient
+        ? (money(dueJmd) ?? "Materials money") +
+          " went to the worker to buy the goods. The receipt and a photo of the materials in the store come next, and Yaadly records them."
+        : (money(dueJmd) ?? "Materials money") +
+          " was paid to you to buy the goods. Upload the supplier receipt under Files, and file a photo of the materials in the store as materials evidence.",
+      href: isClient ? jobBase + "?tab=materials#materials-money" : jobBase + "#files",
+      cta: isClient ? "See it" : "Upload the receipt",
+    });
+  }
   for (const inv of invoices) {
+    /* The bill that starts the job already has its own row above while the
+       job waits on it; listing it again here showed one bill as two tasks. */
+    if (job.status === "awaiting_payment" && inv.id === feeInvoice?.id) continue;
     if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
       outstanding.push({
         who: "you",
@@ -869,9 +918,11 @@ export default async function JobRoom({
       ? [{ title: "Kickoff Pack agreed", state: stepState(!!trulyApprovedPack, hasWon && !trulyApprovedPack) }]
       : []),
     {
-      title: "Yaadly fee " + (isClient ? "paid" : "settled"),
+      title: isClient ? "Job bill paid" : "Client's bill paid",
       state: stepState(feeInvoice?.status === "paid", feeInvoice?.status === "sent"),
-      amount: money(feeJmd) ?? undefined,
+      /* The bill itself, not the 15% inside it, and only to the client,
+         whose bill it is. */
+      amount: isClient && feeInvoice ? amount(feeInvoice.total_pence, feeInvoice.currency) : undefined,
     },
     ...(packStages.length
       ? packStages.map((ps, k) => {
@@ -1586,7 +1637,7 @@ export default async function JobRoom({
           side={role === "worker" ? "worker" : "client"}
           labour={labour}
           materials={won?.materials_jmd ?? null}
-          fee={feeJmd}
+          fee={role === "worker" ? workerFeeJmd : feeJmd}
           allIn={role === "client" ? clientAllIn : allIn}
           takeHome={takeHome}
           invoices={invoices}
@@ -1778,7 +1829,9 @@ export default async function JobRoom({
                 <li key={i} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg/40 px-3.5 py-2.5 text-[12.5px]">
                   <b className="text-ink">{money(m.amount_jmd)}</b>
                   {m.stage != null && <span className="text-dim">Stage {m.stage}</span>}
-                  <span className="text-dim">{m.receipt_ref}</span>
+                  <span className="text-dim">
+                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : "Receipt to come"}
+                  </span>
                   <span className="ml-auto text-dim">
                     {m.released_at ? whenDate(m.released_at) : "not yet released"}
                   </span>
@@ -1787,8 +1840,10 @@ export default async function JobRoom({
             </ul>
           ) : (
             <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-              Nothing released yet. Yaadly releases this against a receipt and
-              the storage evidence, before labour starts.
+              Nothing released yet. A person at Yaadly releases this to the
+              worker once the client&apos;s bill is paid, so the goods can be
+              bought. The receipt and a photo of the materials in the store
+              come back afterwards.
             </p>
           )}
         </section>

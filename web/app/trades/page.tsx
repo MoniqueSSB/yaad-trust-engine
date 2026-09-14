@@ -161,7 +161,8 @@ export default function TradesInfo() {
             engages you at that price less 5%. Remote digital work is 10% instead. You see both
             figures, your price and what Yaadly pays you, in writing before you accept anything, and
             neither moves afterwards. Materials carry no fee at all: they’re paid to you at cost
-            against a receipt.
+            before you buy them, once the client has paid for them, and you send the receipt
+            afterwards. You never buy a job’s materials out of your own pocket.
             <p className="mt-2">
               <b className="text-ink">Nothing is deducted from money of yours.</b> You’re Yaadly’s
               subcontractor, not the client’s, so what a client pays Yaadly was never your money for
