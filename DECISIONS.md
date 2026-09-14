@@ -6,6 +6,40 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-14 · Invoices: a summary per currency, Paid by month, Agency fees, and every invoice on one job
+
+**Founder, on the first version of the one Invoices screen:** the money bars with "J$129,000 + £149.00" "looks confusing and what happens when i have alot of jobs"; "there needs to be a part inside for agency fees", "and that being paid"; "I should be able to click on a job and it show me all the invoices linked to that job". Each was shown to her as a clickable demo with invented data before it was built into the desk.
+
+**A table, not bars, and never two currencies added together.** One row per currency and one box per group, each a single amount and a count, clicking through to the group. The group buttons carry counts only, so the same money is not shown twice.
+
+**Paid is one month at a time, and reading no longer stops at the newest 300.** The old read took the latest 300 invoices and totalled them, which would have quietly undercounted as soon as there were more. Now every draft and sent invoice is read whatever its age, because that is what is owed and it stays small; paid is read for the month on screen; void for the latest 50; and every invoice on the booked jobs and every piece of an open bill, so a balance, a 15% and a 5% always add up from the complete set. The ceiling is Supabase's 1,000 rows per read, noted in the RUNBOOK; beyond that the totals want a database-side sum.
+
+**Agency fees, and what counts, are her call:** the 15% on each job, every service invoice, and the 5% from each tradesperson. When each is taken, in her words: "the client it is one the job when it is paid and the worker, once the job is finished we will deduct the 5 and pay the rest". The 15% is read off the invoice line that carries it, by `is_fee` or by its words, because `is_fee` was only backfilled on drafts and every bill sent or paid before 13 Sep 2026 carries it unflagged. The 5% is on no invoice, so it is worked out from the accepted quote (the same `round(labour * 0.05)` the payable functions use) and shown as a worked-out figure, never as a record.
+
+**Open question, hers, not changed here.** Production raises a tradesperson's pay invoice at each stage sign-off (`trg_raise_worker_pay_on_stage_approval`), each already less 5%, so today money reaches them stage by stage, not in one payment at the end as she described. Agency fees reads correctly either way. Changing when a tradesperson is paid is a money decision (CLAUDE.md §10) and was left alone.
+
+**One job's invoices.** Every invoice with that `job_id`, whatever its month or state, oldest first, with the job's money at the top. Reached from any job reference on the view and from the job page's Money box (`invoices:job:<id>`). Read only: no new table, column or function.
+
+**Where it lives.** The Invoices view of `concierge/concierge.html`. No database change.
+
+---
+
+## 2026-09-14 · One Invoices screen with a running balance, and a sent invoice is reissued, never edited
+
+**Founder:** "in the admin desk all the invoices should be in one section not split up, there should be a section to showcase what is paid and what is outstanding and what is preview", then "I should be able to edit invoice, raise invoices partly and it record what is outstanding." Three calls, hers, made on 14 Sep 2026 against a clickable demo with invented data: job bills are split into parts with a running balance, not paid in instalments against one invoice; a sent invoice is voided and reissued, never edited in place; job bills only, because the payment terms page says a service is one invoice at the full price, due before work starts.
+
+**One screen.** Invoices, Job Invoices and Agency Fees showed the same `invoices` table three ways, each with its own copy of the same buttons. They are one view now, in groups: Preview (draft, no client has seen it), Outstanding (sent, longest waiting first), Paid, and a small Void group. A booked job with an accepted quote and no bill sits at the top of Preview, which is where the old "ready to raise" list went. The two raise forms fold behind one button. What Yaadly owes a tradesperson is listed and labelled but kept out of the totals, because it is money going out. The old view keys still route to Invoices, and `invoices:<group>` opens one group, which the Overview and Money links now use. No list button sends, pays or marks anything by itself: each is the same click the editor makes, and Mark as paid is taken off any row whose Stripe card payment does not match.
+
+**The running balance is added up on the desk, not stored.** A part takes its amount off the bill, so a job's price is the bill plus its live parts. The list and the editor add them up: paid, sent and unpaid, drafted, not billed yet, still owed. No column and no trigger, so nothing can drift from the invoices themselves.
+
+**Reissue is one database step, `reissue_invoice()`.** A sent invoice stays frozen by `invoice_line_price_guard`, unchanged. Reissue voids it and opens a copy as a new numbered draft, and the new `invoices.replaces` column names the old one, so either end leads to the other. A bill's live parts move to the copy, so the balance stays whole. A part is voided onto its still-draft bill (the existing restore trigger) and requested again through `request_invoice_part()`, so every part rule, the fee moving whole and `starts_job` with it, applies to the new part too. Refused: anything not sent, a worker payable, a part whose bill has already gone out, and any invoice Stripe has recorded a card payment against, so money never sits against a void. A function rather than desk steps because three writes on money records must all happen or none. Admin only, emails nobody, and every human gate is where it was.
+
+**Known edge.** Catalogue lines are copied as catalogue lines, so the price guard reprices them at today's list price, the same rule as any new line. A line whose service is off the list is copied at its old amount as a "my figure" line rather than failing the reissue.
+
+**Where it lives.** The Invoices view of `concierge/concierge.html`; `supabase/migrations/20260914210000_a_sent_invoice_is_reissued_not_edited.sql`; proof in `supabase/tests/invoice_reissue_guards.sql`. Applied to production 14 Sep 2026 on Monique's instruction ("go ahead, apply and raise") by `execute_sql` in two steps, the column then the function, and recorded by hand in `supabase_migrations.schema_migrations`. The live `request_invoice_part()`, status guard and void guards were read immediately before and are untouched. The test was run against production straight after: 9 of 9 PASS, nothing survived the rollback, and the invoice counter was back where it started.
+
+---
+
 ## 2026-09-14 · The price comparison lives on the quote, and the desk's Price check view is gone
 
 **Founder:** "the price check should be on quote automatically shown to the client, not on its own section in admin." The client half already existed. Since 5 September every quote on a client's job page carries a "For comparison" box (`web/components/portal/PriceContextNote.tsx`), worked out automatically from the researched band and from `price_spread_for_trade`, and the quoting worker reads the same words (the Mirror Rule). So the change was to take the desk's separate Price check view out: its menu entry, its page, and the code that ran it. Nothing about the client's box changed.
