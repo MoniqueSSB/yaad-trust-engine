@@ -165,13 +165,13 @@ export default async function JobRoom({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ cal?: string; d?: string; tab?: string; photos?: string }>;
+  searchParams: Promise<{ cal?: string; d?: string; tab?: string; photos?: string; card?: string }>;
 }) {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
 
   const { id } = await params;
-  const { cal, d, tab: tabParam, photos: photosParam } = await searchParams;
+  const { cal, d, tab: tabParam, photos: photosParam, card: cardParam } = await searchParams;
   /* ?photos=1 opens the photo panel on arrival. Set by /portal/join when
      somebody comes through the job form's confirmation link. */
   const openPhotos = photosParam === "1";
@@ -632,6 +632,22 @@ export default async function JobRoom({
      number, and every branch is one a job can actually be in. */
 
   const invoices = (invoiceRows ?? []) as InvoiceRow[];
+
+  /* Card payments Stripe has reported against these invoices (phase 1,
+     14 Sep 2026). RLS lets a client read only their own. Read defensively:
+     before 20260914120000 is applied the table does not exist, the query
+     returns an error rather than throwing, and the page carries on with no
+     card payments, exactly as it did before. */
+  const cardPayments: Record<string, "succeeded" | "mismatch"> = {};
+  if (role === "client" && invoices.length) {
+    const { data: payRows } = await supabase
+      .from("invoice_payments")
+      .select("invoice_id,status")
+      .in("invoice_id", invoices.map((i) => i.id));
+    for (const p of (payRows ?? []) as { invoice_id: string; status: "succeeded" | "mismatch" }[]) {
+      if (cardPayments[p.invoice_id] !== "succeeded") cardPayments[p.invoice_id] = p.status;
+    }
+  }
   /* The invoice whose payment starts the job: whichever one carries the
      Guarantee & Support line, the whole-job bill or a part of it
      (20260913233000). Not simply the first invoice to Yaadly: a job billed
@@ -1552,7 +1568,21 @@ export default async function JobRoom({
           jobBase={jobBase}
           source={packSource}
         />
+        {/* Back from Stripe's payment page. Said plainly either way: a
+            cancelled payment charged nothing, and a completed one is not
+            "paid" until Yaadly confirms it. */}
+        {role === "client" && cardParam === "paid" && (
+          <p className="mb-3.5 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] leading-relaxed text-mute">
+            <b className="font-semibold text-ink">Thank you.</b> Stripe is confirming your card payment. It shows on the invoice below as received, and Yaadly marks the invoice paid.
+          </p>
+        )}
+        {role === "client" && cardParam === "cancelled" && (
+          <p className="mb-3.5 rounded-2xl border border-line bg-panel px-4 py-3 text-[13px] leading-relaxed text-mute">
+            Card payment cancelled. Nothing was charged.
+          </p>
+        )}
         <MoneyPanel
+          cardPayments={role === "client" ? cardPayments : {}}
           side={role === "worker" ? "worker" : "client"}
           labour={labour}
           materials={won?.materials_jmd ?? null}
