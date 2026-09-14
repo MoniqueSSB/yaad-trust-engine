@@ -86,6 +86,8 @@ export function MoneyPanel({
   materialsReleased,
   check = null,
   cardPayments = {},
+  cardReturning = false,
+  bankDetails = "",
 }: {
   side: "client" | "worker";
   labour: number | null;
@@ -103,6 +105,14 @@ export function MoneyPanel({
    *  Client side only. A payment here never means the invoice is paid: a
    *  named person at Yaadly marks it paid. */
   cardPayments?: Record<string, "succeeded" | "mismatch">;
+  /** The client has just come back from Stripe's page (?card=paid). Stripe's
+   *  confirmation can land a few seconds after them, so until it does the
+   *  button is replaced, not offered again: a second press would open a
+   *  second payment page. 14 Sep 2026. */
+  cardReturning?: boolean;
+  /** The business bank details a client may pay into (client_bank_details()).
+   *  Empty means none are set, and then no bank line is drawn at all. */
+  bankDetails?: string;
 }) {
   const agreed = labour != null;
   const showCheck = side === "client" && check != null;
@@ -279,8 +289,26 @@ export function MoneyPanel({
                             : "A card payment arrived that does not match this invoice. Yaadly is checking it."}
                         </p>
                       ) : (
-                        <PayByCardButton invoiceId={inv.id} amountLabel={amount(inv.total_pence, inv.currency)} />
+                        cardReturning ? (
+                          <p className="mt-2 text-[12px] leading-relaxed text-tealb">
+                            Payment is being confirmed. Refresh in a moment and it shows here as received.
+                          </p>
+                        ) : (
+                          <PayByCardButton invoiceId={inv.id} amountLabel={amount(inv.total_pence, inv.currency)} />
+                        )
                       )
+                    )}
+                    {/* Bank transfer, the second way to pay (14 Sep 2026).
+                        Drawn only once the founder has written the details
+                        (client_bank_details(), 20260914160000), only on an
+                        unpaid invoice with no card payment under way. A
+                        transfer is marked paid by a person, as before. */}
+                    {side === "client" && inv.payable_to !== "worker" && inv.status === "sent" &&
+                      !cardPayments[inv.id] && !cardReturning && bankDetails && (
+                      <p className="mt-2 text-[12px] leading-relaxed text-dim">
+                        Or pay by bank transfer: <span className="text-mute">{bankDetails}</span>. Use{" "}
+                        <b className="font-mono-app text-ink">{inv.id}</b> as the reference, and Yaadly marks it paid when it arrives.
+                      </p>
                     )}
                   </div>
                 </div>

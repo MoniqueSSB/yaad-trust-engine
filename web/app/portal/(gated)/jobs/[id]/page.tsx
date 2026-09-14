@@ -650,6 +650,18 @@ export default async function JobRoom({
       if (cardPayments[p.invoice_id] !== "succeeded") cardPayments[p.invoice_id] = p.status;
     }
   }
+
+  /* Bank transfer, the second way to pay (14 Sep 2026). client_bank_details()
+     returns the one setting the founder writes and nothing else from the
+     admin-only app_settings (20260914160000). Before that is applied, or
+     while the setting is empty, this is "" and no bank box is drawn: an
+     account number is never invented. Only fetched when there is something
+     unpaid to pay. */
+  let bankDetails = "";
+  if (role === "client" && invoices.some((i) => i.status === "sent" && i.payable_to !== "worker")) {
+    const { data: bank } = await supabase.rpc("client_bank_details");
+    bankDetails = typeof bank === "string" ? bank.trim() : "";
+  }
   /* The invoice whose payment starts the job: whichever one carries the
      Guarantee & Support line, the whole-job bill or a part of it
      (20260913233000). Not simply the first invoice to Yaadly: a job billed
@@ -761,6 +773,24 @@ export default async function JobRoom({
       detail:
         "The job is booked. Your invoice comes from Yaadly next and appears under Approvals. There is nothing to pay until it arrives.",
     });
+  } else if (
+    job.status === "awaiting_payment" && isClient && feeInvoice &&
+    cardPayments[feeInvoice.id] === "succeeded"
+  ) {
+    /* Paid by card, recorded, not yet marked paid (14 Sep 2026). Telling a
+       client who has just paid to "Pay your bill" is the confusion the
+       founder found on the live portal. The wait is Yaadly's now: a person
+       confirms the payment and marks the bill paid, which starts the job.
+       Nothing here marks anything paid. */
+    outstanding.push({
+      who: "yaadly",
+      title: "Card payment received. Yaadly is confirming it",
+      detail:
+        "Your card payment for " + amount(feeInvoice.total_pence, feeInvoice.currency) +
+        " came through. Yaadly checks it and marks the bill paid, and the job starts then. There is nothing more to pay on it.",
+      href: jobBase + "?tab=approvals#invoice-" + feeInvoice.id,
+      cta: "See it",
+    });
   } else if (job.status === "awaiting_payment") {
     /* The invoice that starts the job is the client's bill for the whole
        job (labour, the 15%, materials), not a fee invoice, since the
@@ -870,7 +900,16 @@ export default async function JobRoom({
     /* The bill that starts the job already has its own row above while the
        job waits on it; listing it again here showed one bill as two tasks. */
     if (job.status === "awaiting_payment" && inv.id === feeInvoice?.id) continue;
-    if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
+    if (inv.status === "sent" && inv.payable_to !== "worker" && isClient && cardPayments[inv.id] === "succeeded") {
+      /* Paid by card and recorded; a person at Yaadly still marks it paid. */
+      outstanding.push({
+        who: "yaadly",
+        title: "Card payment received for " + inv.id + ". Yaadly is confirming it",
+        detail: "It came through by card. Yaadly checks it and marks the invoice paid. There is nothing more to pay on it.",
+        href: jobBase + "?tab=approvals#invoice-" + inv.id,
+        cta: "See it",
+      });
+    } else if (inv.status === "sent" && inv.payable_to !== "worker" && isClient) {
       outstanding.push({
         who: "you",
         title: "Invoice " + inv.id + " is unpaid",
@@ -1634,6 +1673,8 @@ export default async function JobRoom({
         )}
         <MoneyPanel
           cardPayments={role === "client" ? cardPayments : {}}
+          cardReturning={role === "client" && cardParam === "paid"}
+          bankDetails={role === "client" ? bankDetails : ""}
           side={role === "worker" ? "worker" : "client"}
           labour={labour}
           materials={won?.materials_jmd ?? null}
