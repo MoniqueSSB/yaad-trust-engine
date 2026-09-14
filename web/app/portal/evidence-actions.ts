@@ -25,7 +25,15 @@ import { isPhase } from "@/lib/portal/evidence-sections";
  * then dropped, so captured_at knows when the shutter fired while no GPS
  * coordinate is ever stored. See lib/exif.ts. The fingerprint is taken AFTER
  * the strip, because the invariant is that it covers the exact bytes kept.
+ *
+ * A refusal is RETURNED, never thrown (14 Sep 2026). In production Next
+ * replaces the message of anything a Server Action throws with a generic one,
+ * so every sentence below, and every sentence the database writes for the
+ * person reading it, reached the worker as "The database refused this
+ * upload." Returned as a value, it arrives as written.
  */
+
+export type UploadResult = { ok: true } | { ok: false; message: string };
 
 const BUCKET = "evidence";
 
@@ -47,19 +55,25 @@ const EXT: Record<string, string> = {
   "image/gif": "gif",
 };
 
-export async function uploadEvidence(formData: FormData): Promise<void> {
+// The database's own refusals that are written for the person reading them:
+// the materials gate (20260828c), the pairing checks (20260906020400) and
+// the stage lock (20260914095005). Anything else is a message for the logs.
+const SAYS_WHY = /materials store|answer a before|same job|does not exist|answer itself|Stage \d+ (is|has)/i;
+
+export async function uploadEvidence(formData: FormData): Promise<UploadResult> {
   const user = await requireUser();
   const jobId = String(formData.get("jobId") ?? "");
   const label = String(formData.get("label") ?? "").trim();
   const stageRaw = String(formData.get("stage") ?? "");
   const file = formData.get("photo");
-  if (!jobId || !label) throw new Error("missing");
+  if (!jobId) return { ok: false, message: "This form lost track of the job. Reload the page and try again." };
+  if (!label) return { ok: false, message: "Say what this shows before filing it." };
 
   // The job id becomes the first folder of the object path, so it is checked
   // here rather than trusted. A slash or a dot-dot in this value is how one
   // job's evidence gets written into another job's folder, and the storage
   // policy matches on exactly that first folder.
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(jobId)) throw new Error("refused");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(jobId)) return { ok: false, message: "That job reference is not valid." };
 
   const supabase = await createClient();
 
@@ -70,16 +84,19 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
   let sha256: string;
 
   if (file instanceof File && file.size > 0) {
-    if (!/^image\//.test(file.type)) throw new Error("not an image");
+    if (!/^image\//.test(file.type))
+      return { ok: false, message: "That file is not a photograph. Choose a JPEG, PNG or WebP image." };
     const ext = EXT[file.type.toLowerCase()];
     if (!ext)
-      throw new Error(
-        `this is a ${file.type.replace("image/", "").toUpperCase()} image, which most browsers cannot display. Send it as a JPEG.`,
-      );
+      return {
+        ok: false,
+        message: `This is a ${file.type.replace("image/", "").toUpperCase()} image, which most browsers cannot display. Send it as a JPEG.`,
+      };
     if (file.size > MAX_IMAGE_BYTES)
-      throw new Error(
-        `too large at ${(file.size / 1_000_000).toFixed(1)}MB: keep photos under about ${MAX_IMAGE_BYTES / 1_000_000}MB`,
-      );
+      return {
+        ok: false,
+        message: `Too large at ${(file.size / 1_000_000).toFixed(1)}MB: keep photos under about ${MAX_IMAGE_BYTES / 1_000_000}MB.`,
+      };
 
     const raw = Buffer.from(await file.arrayBuffer());
     capturedAt = readCapturedAt(raw);
@@ -94,7 +111,10 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
       .upload(storagePath, stored, { contentType: mime, upsert: false });
     // The bucket answers to the same predicate as the evidence table, so a
     // refusal here means this person is not party to this job.
-    if (upErr) throw new Error("refused");
+    if (upErr) {
+      console.error("evidence storage upload refused", jobId, upErr.message);
+      return { ok: false, message: "The photo could not be stored against this job. Check you are signed in as the client or the booked worker." };
+    }
   } else {
     sha256 = createHash("sha256").update(label + "|" + jobId).digest("hex");
   }
@@ -123,6 +143,8 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
   const pairRaw = String(formData.get("pairs_with") ?? "");
   const pairsWith = phase === "after" && /^[0-9a-f-]{36}$/i.test(pairRaw) ? pairRaw : null;
 
+  // The stage is whichever one the page opened, and the database checks it is
+  // the stage being worked (20260914095005). Not trusted, only passed on.
   const stage = /^\d+$/.test(stageRaw) ? parseInt(stageRaw, 10) : null;
 
   const { error } = await supabase.from("evidence").insert({
@@ -146,17 +168,18 @@ export async function uploadEvidence(formData: FormData): Promise<void> {
     // and the storage policy lets the uploader clear exactly that: the moment
     // a row points at the path, nobody but an admin can remove it.
     if (storagePath) await supabase.storage.from(BUCKET).remove([storagePath]);
-    // The materials gate raises with a sentence written for the person reading
-    // it, so pass it through rather than flattening it to "refused". Being told
-    // the client has not said where the materials go is actionable; being told
-    // the database said no is not.
-    // The database's pairing messages are written for the person reading
-    // them, the same treatment the materials gate already gets.
-    throw new Error(
-      /materials store|answer a before|same job|does not exist|answer itself/i.test(error.message)
-        ? error.message
-        : "refused",
-    );
+    console.error("evidence insert refused", jobId, error.message);
+    if (SAYS_WHY.test(error.message)) return { ok: false, message: error.message };
+    // The insert policy refuses a job that is awaiting_payment, which is the
+    // one refusal a booked party on this page can actually meet: the Guarantee
+    // & Support invoice has not been paid, so stage 1 has not started.
+    if (/row-level security/i.test(error.message))
+      return {
+        ok: false,
+        message: "Evidence cannot be filed on this job yet. It opens once the Guarantee & Support invoice is paid and stage 1 starts.",
+      };
+    return { ok: false, message: "The database refused this upload. Nothing was filed." };
   }
   revalidatePath("/portal/jobs/" + jobId);
+  return { ok: true };
 }

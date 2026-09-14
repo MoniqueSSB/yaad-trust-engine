@@ -247,3 +247,28 @@ describe("sectionsOf, the grouping a client actually reads", () => {
     assert.deepEqual(sectionsOf([]), []);
   });
 });
+
+describe("which stage is open for evidence", () => {
+  test("before stage 1 starts, every stage is locked", () => {
+    for (const n of [1, 2, 3]) assert.equal(sections.stageLock(n, 0), "locked");
+  });
+
+  test("only the stage being worked is open", () => {
+    assert.deepEqual(
+      [1, 2, 3].map((n) => sections.stageLock(n, 2)),
+      ["done", "now", "locked"],
+    );
+  });
+
+  test("past the last stage, every stage is signed off and none is open", () => {
+    assert.deepEqual(
+      [1, 2, 3].map((n) => sections.stageLock(n, 4)),
+      ["done", "done", "done"],
+    );
+  });
+
+  test("a missing stage counts as not started, never as open", () => {
+    assert.equal(sections.stageLock(1, null), "locked");
+    assert.equal(sections.stageLock(1, undefined), "locked");
+  });
+});

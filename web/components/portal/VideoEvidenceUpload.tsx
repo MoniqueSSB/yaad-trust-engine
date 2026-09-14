@@ -42,15 +42,16 @@ const STATUS_LABEL: Record<QueueItem["status"], string> = {
 
 export function VideoEvidenceUpload({
   jobId,
-  maxStage,
-  stageNames = [],
+  stage,
+  stageName = null,
   storeType,
   store,
 }: {
   jobId: string;
-  maxStage: number;
-  /** The accepted quote's stage names, in order; see EvidenceUpload. */
-  stageNames?: string[];
+  /** jobs.stage, the stage being worked. Only that stage takes evidence
+      (14 Sep 2026), so there is no stage to pick; see EvidenceUpload. */
+  stage: number;
+  stageName?: string | null;
   storeType: string | null;
   store: string | null;
 }) {
@@ -60,8 +61,8 @@ export function VideoEvidenceUpload({
   const [label, setLabel] = useState("");
   const [kind, setKind] = useState<"work" | "materials">("work");
   const [phase, setPhase] = useState<"" | EvidencePhase>("");
-  const [stage, setStage] = useState(1);
   const [pickError, setPickError] = useState("");
+  const stageTitle = "Stage " + stage + (stageName ? ": " + stageName : "");
   const processingRef = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -158,7 +159,7 @@ export function VideoEvidenceUpload({
 
   return (
     <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
-      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">File video evidence</p>
+      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">File video evidence for {stageTitle}</p>
       <p className="mt-1 text-[12px] leading-relaxed text-dim">
         A walkthrough proves what a still cannot. Choosing a video adds it to
         this list and it uploads from here, even if the connection drops:
@@ -173,7 +174,7 @@ export function VideoEvidenceUpload({
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_120px_auto]">
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_auto]">
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -210,17 +211,6 @@ export function VideoEvidenceUpload({
               ))}
             </>
           )}
-        </select>
-        <select
-          value={stage}
-          onChange={(e) => setStage(parseInt(e.target.value, 10))}
-          className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal"
-        >
-          {Array.from({ length: Math.max(1, maxStage) }, (_, i) => (
-            <option key={i} value={i + 1}>
-              {stageNames[i] ? "Stage " + (i + 1) + ": " + stageNames[i] : "Stage " + (i + 1)}
-            </option>
-          ))}
         </select>
         {/* capture="environment" opens the phone's own camera on mobile
             rather than the file picker; it is ignored, harmlessly, on desktop

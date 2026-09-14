@@ -7,20 +7,26 @@ import { EVIDENCE_PHASES, PHASE_OPTION } from "@/lib/portal/evidence-sections";
 /** The befores already on this job, so an after can name the one it answers. */
 export type BeforeShot = { id: string; item_code: string | null; label: string | null };
 
+/**
+ * The photo form, drawn inside the one stage card that is open (14 Sep 2026).
+ * It files on that stage and no other, so there is no stage to pick: the
+ * founder's rule is that only the stage being worked takes evidence and the
+ * rest stay locked until the one before is signed off. The database holds the
+ * same rule (20260914095005), so this form cannot be talked past.
+ */
 export function EvidenceUpload({
   jobId,
-  maxStage,
-  stageNames = [],
+  stage,
+  stageName = null,
   storeType,
   store,
   befores = [],
 }: {
   jobId: string;
-  maxStage: number;
-  /** The accepted quote's stage names, in order, so the stage picker reads
-      "Stage 2: Posts and rails fitted" and the photo lands under the stage
-      it proves. Empty on a job with no schedule. */
-  stageNames?: string[];
+  /** jobs.stage, the stage being worked. */
+  stage: number;
+  /** That stage's name in the accepted quote, if it has one. */
+  stageName?: string | null;
   storeType: string | null;
   store: string | null;
   befores?: BeforeShot[];
@@ -36,30 +42,30 @@ export function EvidenceUpload({
      submitted form on every other answer, rather than hidden and still
      posting a value. */
   const [phase, setPhase] = useState("");
+  const stageTitle = "Stage " + stage + (stageName ? ": " + stageName : "");
   return (
     <form
       action={async (fd) => {
         setState("busy");
         try {
-          await uploadEvidence(fd);
-          setState("done");
-          setMsg("Filed, timestamped and fingerprinted. It cannot be edited now.");
-        } catch (e) {
+          /* The action returns its refusal as a sentence rather than throwing,
+             because in production a thrown message never reaches this page. */
+          const r = await uploadEvidence(fd);
+          if (r.ok) {
+            setState("done");
+            setMsg("Filed under " + stageTitle + ", timestamped and fingerprinted. It cannot be edited now.");
+          } else {
+            setState("error");
+            setMsg(r.message);
+          }
+        } catch {
           setState("error");
-          /* The database's own sentences are written for the person reading
-             them (no store named, that before is on another job), so they are
-             passed through rather than flattened to "refused". */
-          setMsg(
-            e instanceof Error &&
-              /large|image|materials store|answer a before|same job|does not exist|answer itself/.test(e.message)
-              ? e.message
-              : "The database refused this upload.",
-          );
+          setMsg("That did not reach Yaadly. Check the signal and try again. Nothing was filed.");
         }
       }}
-      className="mt-4 rounded-2xl border border-line bg-panel p-4"
+      className="mt-3 rounded-2xl border border-line bg-panel p-4"
     >
-      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">File evidence</p>
+      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">File evidence for {stageTitle}</p>
       <p className="mt-1 text-[12px] leading-relaxed text-dim">
         Photograph it before it is covered over. Uploads are timestamped and
         fingerprinted on arrival, and nothing here can be edited after.
@@ -74,15 +80,9 @@ export function EvidenceUpload({
             ? "Materials go here: " + store + ". Film them in that exact place and file it as materials on site. That is what moves the risk in them to the client."
             : "The client has not said where materials are to be kept, so materials evidence cannot be filed yet and the database will refuse it."}
       </p>
-      {stageNames.length > 0 && (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
-          The work is split into the {stageNames.length} stages of the accepted
-          quote. Pick the stage this photo proves, and it is filed under that
-          stage in Progress evidence above.
-        </p>
-      )}
       <input type="hidden" name="jobId" value={jobId} />
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_minmax(190px,auto)_auto]">
+      <input type="hidden" name="stage" value={stage} />
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_150px_160px_auto]">
         <input name="label" required maxLength={140} placeholder='What this shows, e.g. "The joint before work"'
           className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[13.5px] text-ink outline-none focus:border-teal" />
         {/* Materials on site is its own kind because it does a different job:
@@ -114,13 +114,6 @@ export function EvidenceUpload({
               ))}
             </>
           )}
-        </select>
-        <select name="stage" aria-label="Which stage this proves" className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[13px] text-ink outline-none focus:border-teal">
-          {Array.from({ length: Math.max(1, maxStage) }, (_, i) => (
-            <option key={i} value={i + 1}>
-              {stageNames[i] ? "Stage " + (i + 1) + ": " + stageNames[i] : "Stage " + (i + 1)}
-            </option>
-          ))}
         </select>
         <input type="file" name="photo" accept="image/*"
           className="text-[12.5px] text-mute file:mr-3 file:rounded-full file:border file:border-line2 file:bg-transparent file:px-3.5 file:py-2 file:text-[12.5px] file:font-bold file:text-ink" />

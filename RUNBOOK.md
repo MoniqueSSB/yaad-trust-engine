@@ -5196,3 +5196,18 @@ Job bills are kept in whole Jamaican dollars and service invoices in pence, in t
 2. **You want one figure in pounds.** There is no exchange rate on file and none has been chosen, so the desk will not make one. Choosing a rate, and where it comes from, is Monique's decision before any code changes.
 3. **"Paid this month" includes a tradesperson's payable.** Known, and not yet decided: it counts every paid invoice, money out as well as money in. See the flag at the end of the DECISIONS.md entry.
 4. **Proving it.** Open the desk's Overview, Invoices and Money views. Any total that mixes both currencies should read "J$… + £…", and a job page's "Client paid Yaadly" should match the J$ figure on that job's bill. `node scripts/check-desk-script.mjs` must still print "clean".
+
+---
+
+## Evidence will not file: "Stage N is locked", "signed off and closed", or "has not started"
+
+**Since 14 Sep 2026 evidence goes on the stage being worked and nowhere else** (`20260914095005`, `trg_evidence_on_the_working_stage`). All three sentences come from that trigger, and all three are correct refusals, not faults.
+
+- **"Stage 1 has not started on this job..."** `jobs.stage` is 0. Stage 1 starts when the Guarantee & Support invoice (`invoices.starts_job`) is marked paid. Check it with `select status, starts_job from invoices where job_id = 'JOB-XXXX';`. Nothing is wrong with the evidence path.
+- **"Stage N is locked..."** Somebody filed ahead of the job. The stage before has not been approved. Only the client pressing Approve (`approve_stage()`) moves it.
+- **"Stage N is signed off and closed..."** Filed against a stage already approved. If the item genuinely belongs to that stage, an admin can file it from the desk: admins are not held to the lock.
+- **A queued video from before the lock** that was set to a different stage fails with one of these sentences in the worker's queue. Delete it and file it again from the open stage.
+
+**Service role callers are exempt on purpose** (WhatsApp evidence in `yaad-inbound` files against `jobs.stage` itself; job form photos in `yaad-post-job` are intake). If WhatsApp evidence lands on the wrong stage, the fault is in `yaad-inbound`, not the trigger.
+
+**The job page draws the same rule** (`stageLock` in `web/lib/portal/evidence-sections.ts`): only the current stage's card has "Add evidence to stage N". If the page offers a stage the database refuses, the two have drifted, and the database is the one to trust.

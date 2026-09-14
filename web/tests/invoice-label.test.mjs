@@ -42,7 +42,14 @@ describe("invoiceLabel", () => {
     assert.equal(m.invoiceLabel({ payable_to: "worker", stage: null }), "Worker pay");
   });
 
-  test("no Yaadly invoice on a job is ever called the fee", () => {
+  test("an old fee-only invoice, labelled Agency fee, is the one invoice named as the fee", () => {
+    assert.equal(
+      m.invoiceLabel({ payable_to: "yaadly", stage: null, starts_job: true, part_of: null, period_label: "Agency fee" }),
+      "Yaadly Guarantee & Support fee",
+    );
+  });
+
+  test("no other Yaadly invoice on a job is ever called the fee", () => {
     const shapes = [
       { payable_to: "yaadly", stage: null, starts_job: true, part_of: null },
       { payable_to: "yaadly", stage: null, starts_job: false, part_of: null },

@@ -224,6 +224,11 @@ export function MoneyPanel({
           <div className="mt-1">
             {invoices.map((inv) => {
               const paid = inv.status === "paid";
+              /* The name comes from lib/portal/invoice-label.ts, which says
+                 why: since 3 Sep 2026 the client's invoice is the whole job,
+                 and since 14 Sep it can go out in parts. */
+              const startsJobNote =
+                inv.payable_to !== "worker" && inv.starts_job && !paid ? " · paying this starts the job" : "";
               return (
                 <div key={inv.id} id={"invoice-" + inv.id} className="flex scroll-mt-6 gap-3.5 border-b border-line py-3.5 last:border-b-0">
                   <span
@@ -234,7 +239,7 @@ export function MoneyPanel({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5 text-[13.5px] font-semibold text-ink">
-                      <span>{invoiceLabel(inv)}</span>
+                      <span>{invoiceLabel(inv) + startsJobNote}</span>
                       <span
                         className={
                           "rounded-full border px-2 py-0.5 font-mono-app text-[9px] font-semibold uppercase tracking-[0.1em] " +

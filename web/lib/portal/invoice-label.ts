@@ -17,6 +17,7 @@ export type LabelledInvoice = {
   stage: number | null;
   starts_job?: boolean | null;
   part_of?: string | null;
+  period_label?: string | null;
 };
 
 export function invoiceLabel(inv: LabelledInvoice): string {
@@ -24,6 +25,9 @@ export function invoiceLabel(inv: LabelledInvoice): string {
     return "Worker pay" + (inv.stage != null ? " · stage " + inv.stage : "");
   }
   if (inv.part_of) return "Part of the job bill";
+  /* An invoice raised before 3 Sep 2026 as the fee alone (20260901y) carries
+     this period label and genuinely is the fee. The only invoice called one. */
+  if (inv.period_label === "Agency fee") return "Yaadly Guarantee & Support fee";
   if (inv.stage != null) return "Job bill · stage " + inv.stage;
   if (inv.starts_job) return "Job bill";
   return "Yaadly invoice";

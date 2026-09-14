@@ -194,11 +194,12 @@ Deno.serve(async (req: Request) => {
         // write must not leave an object nothing points at.
         await asUser.storage.from(BUCKET).remove([path]);
         root.recordError(insErr.message);
-        // The materials gate raises a sentence written for the person
-        // reading it (20260828c); pass it through rather than flattening it,
-        // exactly as the photo path does.
-        const msg = /materials store/i.test(insErr.message) ? insErr.message : "Could not record that video.";
-        return json({ error: msg }, insErr.message.includes("materials store") ? 409 : 500);
+        // The materials gate (20260828c) and the stage lock (20260914095005)
+        // raise sentences written for the person reading them; pass them
+        // through rather than flattening them, exactly as the photo path does.
+        const saysWhy = /materials store|Stage \d+ (is|has)/i.test(insErr.message);
+        const msg = saysWhy ? insErr.message : "Could not record that video.";
+        return json({ error: msg }, saysWhy ? 409 : 500);
       }
 
       root.setAttributes({ "yaadly.evidence_video.outcome": "stored", "yaadly.evidence_video.bytes": buf.byteLength });
