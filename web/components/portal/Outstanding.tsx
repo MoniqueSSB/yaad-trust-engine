@@ -1,4 +1,4 @@
-import { LandingLink } from "./LandingLink";
+import { LandingLink, LandOnLoad } from "./LandingLink";
 
 /**
  * Everything this job is waiting on, in one list, with the name of whoever
@@ -38,6 +38,7 @@ export function Outstanding({
 
   return (
     <section className="mt-4 overflow-hidden rounded-[18px] border border-line2 bg-[rgba(13,13,40,0.5)]">
+      <LandOnLoad />
       <div className="flex items-center gap-3 border-b border-line bg-bg/40 px-5 py-4">
         <h2 className="text-[14px] font-bold">Everything outstanding</h2>
         <span

@@ -195,13 +195,29 @@ Deno.serve(async (req: Request) => {
     const failedCounts = new Map<string, number>();
     for (const d of draftRows ?? []) if (d.status === "failed") failedCounts.set(d.job_id, (failedCounts.get(d.job_id) ?? 0) + 1);
 
-    let requested = 0, skippedNoBrief = 0, skippedTooManyFailures = 0, requestFailed = 0;
+    // Paced, and capped per run. Found 14 September 2026: yaad-quote-pack
+    // answers at once and drafts in the background (EdgeRuntime.waitUntil),
+    // so this loop "waiting" for each request waited for nothing, and every
+    // job needing a pack reached the model in the same second. Mistral's
+    // free tier allows about one request a second across every function
+    // sharing the key, so the whole batch came back 429 and, while the
+    // MiniMax fallback was armed, went to China instead. The founder moved
+    // fully to Mistral the same day (MINIMAX_API_KEY unset, no spend), so
+    // the fix has to be staying under the limit, not paying past it.
+    // A job not reached this run is reached on the next poll, fifteen
+    // minutes later; a draft is a starting point for a worker, not urgent.
+    const MAX_DRAFTS_PER_RUN = 4;
+    const GAP_BETWEEN_DRAFTS_MS = 5000;
+
+    let requested = 0, skippedNoBrief = 0, skippedTooManyFailures = 0, requestFailed = 0, deferred = 0;
     const requestErrors: string[] = [];
     for (const j of jobs) {
       if (hasActiveOrReadyDraft.has(j.id)) continue;
       if ((failedCounts.get(j.id) ?? 0) >= 3) { skippedTooManyFailures++; continue; }
       const prompt = jobToPrompt(j);
       if (!prompt.brief) { skippedNoBrief++; continue; }
+      if (requested + requestFailed >= MAX_DRAFTS_PER_RUN) { deferred++; continue; }
+      if (requested + requestFailed > 0) await new Promise((r) => setTimeout(r, GAP_BETWEEN_DRAFTS_MS));
 
       const errMsg = await trace.span("yaad-quote-pack request", SpanKind.INTERNAL, { "yaadly.quote_pack_check.job_id": j.id }, async (s) => {
         const r = await fetch(`${SUPABASE_URL}/functions/v1/yaad-quote-pack`, {
@@ -265,7 +281,7 @@ Deno.serve(async (req: Request) => {
       "yaadly.quote_pack_check.held_for_review": heldForReview,
       "yaadly.quote_pack_check.flagged": dirty,
     });
-    return json({ ok: true, requested, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors, heldForReview, flagged: dirty });
+    return json({ ok: true, requested, deferred, skippedNoBrief, skippedTooManyFailures, requestFailed, requestErrors, heldForReview, flagged: dirty });
   } catch (e) {
     root.recordError(e);
     return json({ error: String(e).slice(0, 200) }, 500);
