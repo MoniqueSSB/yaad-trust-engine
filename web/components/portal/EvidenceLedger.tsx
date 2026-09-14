@@ -18,10 +18,11 @@
  * "what is the proof", never "shall I sign this off" in the same breath.
  */
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { EvidenceItemComment } from "./EvidenceItemComment";
 import { whenDateTime } from "@/lib/date";
-import { phaseBadge, sectionsOf } from "@/lib/portal/evidence-sections";
+import { phaseBadge, sectionsOf, stageLock } from "@/lib/portal/evidence-sections";
 
 export type EvidenceItem = {
   id: string;
@@ -58,7 +59,14 @@ export function EvidenceLedger({
   role,
   awaitingApproval,
   jobId,
+  upload = null,
+  startsWhen = null,
 }: {
+  /** The upload forms, drawn inside the one stage card that is open. Null
+      when nothing may be filed (before stage 1, or once the job is done). */
+  upload?: ReactNode;
+  /** What stage 1 is waiting on, shown on it while every stage is locked. */
+  startsWhen?: string | null;
   items: EvidenceItem[];
   stageCount: number;
   /** The stage names from the accepted quote's schedule, in order, so each
@@ -131,8 +139,8 @@ export function EvidenceLedger({
         </p>
         <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-mute">
           {stageNames.length > 0
-            ? "The work is split into the " + stageNames.length + " stages of the accepted quote, below. Photos go under the stage they prove. The client signs each stage off on the Approvals tab, and the worker is paid for that stage once it is approved."
-            : "Each stage has its own checklist, its own proof and its own release. Money moves once per stage, never as one lump at the end."}
+            ? "The work is split into the " + stageNames.length + " stages of the accepted quote, below. Evidence goes on the stage being worked: open it to add photos. The stages after it stay locked until it is signed off on the Approvals tab, and the worker is paid for each stage once it is approved."
+            : "Each stage has its own proof and its own release. Evidence goes on the stage being worked, and the stages after it stay locked until it is signed off. Money moves once per stage, never as one lump at the end."}
         </p>
         <div className="mt-3.5 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-dim">
           {/* "Stage 0 of 1" read as broken (founder, 14 Sep 2026). Before
@@ -177,18 +185,23 @@ export function EvidenceLedger({
       <ul className="mt-3 grid gap-2.5">
         {stages.map((n) => {
           const mine = items.filter((e) => (e.stage ?? 1) === n);
-          const state: StageState =
-            n < currentStage ? "done" : n === currentStage ? "now" : "todo";
+          /* Founder, 14 Sep 2026: only the stage being worked is open, and
+             the rest are blacked out until each stage before them is signed
+             off. stageLock reads jobs.stage, which only approve_stage()
+             moves, so this decides nothing a person has not already decided. */
+          const lock = stageLock(n, currentStage);
+          const state: StageState = lock === "locked" ? "todo" : lock;
           return (
             <li
               key={n}
+              aria-disabled={state === "todo" || undefined}
               className={
                 "rounded-2xl border p-4 " +
                 (state === "done"
                   ? "border-softline bg-soft"
                   : state === "now"
                     ? "border-mango/40 bg-mango/5"
-                    : "border-line bg-panel")
+                    : "border-line bg-panel2 opacity-45 grayscale")
               }
             >
               <div className="flex flex-wrap items-center gap-3">
@@ -210,7 +223,7 @@ export function EvidenceLedger({
                     ? "Signed off, released"
                     : state === "now"
                       ? "In progress"
-                      : "Not started"}
+                      : "Locked"}
                 </span>
                 <span className="ml-auto text-[11.5px] text-dim">
                   {mine.length === 0
@@ -224,6 +237,34 @@ export function EvidenceLedger({
                 <p className="mt-1.5 text-[12.5px] leading-relaxed text-dim">
                   What proves it: <span className="text-mute">{stageProofs[n - 1]}</span>
                 </p>
+              )}
+              {/* Why a locked stage is locked, in one line, so a greyed card
+                  never reads as broken. */}
+              {state === "todo" && (
+                <p className="mt-1.5 text-[12.5px] font-bold leading-relaxed text-dim">
+                  {n === 1
+                    ? (startsWhen ?? "Opens when stage 1 starts.")
+                    : "Opens when stage " + (n - 1) + " is signed off."}
+                </p>
+              )}
+              {state === "done" && (
+                <p className="mt-1.5 text-[12px] leading-relaxed text-dim">
+                  Signed off. Closed to new evidence.
+                </p>
+              )}
+              {/* The stage you click to file on. A native details element, so
+                  it opens without any script; open by default for the worker,
+                  whose job this is, and one tap away for the client. id
+                  "upload" is what the worker's "File stage N evidence" action
+                  links to. */}
+              {state === "now" && upload && (
+                <details id="upload" open={role === "worker"} className="group mt-3 scroll-mt-6">
+                  <summary className="inline-flex cursor-pointer list-none rounded-full bg-linear-to-r from-teal to-mango px-4.5 py-2.5 text-[13.5px] font-bold text-onbrand transition hover:brightness-110">
+                    <span className="group-open:hidden">Add evidence to stage {n}</span>
+                    <span className="hidden group-open:inline">Close</span>
+                  </summary>
+                  {upload}
+                </details>
               )}
 
               {mine.length > 0 && (
