@@ -3335,3 +3335,23 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **Amounts live in one place.** J$ invoices are stored in whole dollars; Stripe treats JMD as a two-decimal currency, so J$134,250 is 13425000 to Stripe. `_shared/stripe.ts` does that conversion and the signature check, with Deno tests that need no imports.
 
 **Payouts to tradespeople will not use Connect.** Stripe's docs say Connect cross-border payouts from a UK platform reach only the US, UK, EEA, Canada and Switzerland. Stripe Global Payouts added Jamaican bank accounts (`jm_bank_account`) in December 2025 and is open to UK businesses, so phase 3 is designed on that, pending the founder enabling it, a solicitor view on the licensing note Stripe attaches to it, and a decision on worker bank and identity data going to Stripe.
+
+## 2026-09-14 · Kickoff Drafts leaves the desk menu; the drafts that did not become a pack show on Kickoff packs
+
+**Why.** Founder, 14 Sep 2026: remove the Kickoff Drafts section. It listed every draft `yaad-kickoff` had ever written, most of them already packs. But it was also the only place in the desk where a draft held back by the guardrail, or a job whose drafts kept failing, could be seen at all, so deleting it outright would have turned a stopped job into a silent one. Of the options put to her she chose to take the view out of the menu and move that one job onto Kickoff packs.
+
+**What it shows.** A card at the top of Kickoff packs, "Drafts that did not become a pack", listing three kinds and only these: a finished draft the guardrail flagged (price language, banned language, foreign text), with the flags named; a job, booking or quote whose drafts failed and where nothing has succeeded since, counted once with how many times; and a clean draft written for no quote or booking, which `yaad-kickoff-check` will never link, with "Link to a job" and "Link to a service". When nothing is stuck it says so in one line.
+
+**How "dealt with" is decided.** `kickoff_packs` keeps no draft id, and `link_kickoff_draft_to_job()` / `_to_service()` write the pack without touching the draft's row. So a draft is left off if its job, booking or quote already has a pack, or if a pack carries its exact intake, which both link functions copy across unchanged. Without the second test a hand-linked wizard draft would have stayed on the list forever; the demo caught that before the live edit.
+
+**No gate moved.** The link buttons call the same two functions the old view did, which still refuse a flagged draft outright. A linked pack starts at `draft`, and only Approve on the pack makes it readable in the client's portal. Nothing in the database changed.
+
+## 2026-09-14 · A materials receipt more than 48 hours behind the money shows on the worker's record
+
+**Why.** Founder, 14 Sep 2026: the receipt is the evidence the goods were bought. The clock starts when the materials money is released to the worker; after 48 hours without a receipt it counts as late, and she wants to see that on the worker's profile.
+
+**What it does.** The desk's Workers view has a Receipts column ("N overdue", "N came late", or "none late"), and opening a worker lists each late receipt with the job, the amount, when the money went out and how long the receipt took or has been missing. A receipt that arrives late stays on the record as late.
+
+**Worked out, not stored.** It is computed on the desk from `materials_releases.released_at` and `receipt_at`, which the database already stamps, joined to the worker through `jobs.worker_email`. There is no new column, table or migration, so there is nothing that could fall out of step with the release it describes. A receipt taken at release time (a `receipt_ref` with no `receipt_at`, from before `20260914112000`) counts as on time. The 48 hours is `RECEIPT_DUE_HOURS` in `concierge/concierge.html`. Known limit: a release is matched to the job's current worker, so if a job were ever reassigned after materials went out, the late receipt would show against the new worker.
+
+**What it is not.** A note for the person choosing a worker, on the desk only. It holds no stage, blocks no payment and changes no score: CLAUDE.md §2 and §4, the system never alters a reputation by itself, and the Yaad Score is not built (§9). Whether a missing receipt should also stop the next stage's sign-off was asked and is not yet decided, so nothing stops.
