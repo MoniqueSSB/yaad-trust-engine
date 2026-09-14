@@ -1140,7 +1140,7 @@ Deno.serve(async (req: Request) => {
         // in their own portal and never asking for a reply here: anything a
         // worker types to this number is kept with the job and read by the
         // intake and reporting steps, so bank details must never be sent in it.
-        `Yaadly pays you by bank transfer, never cash, and will call you to take your bank details: ${APP_URL}/portal/worker/payouts. Never type bank details into this chat.`;
+        `Yaadly pays you by bank transfer, never cash. Add your bank details securely here, and Yaadly will call you to check them: ${APP_URL}/portal/worker/payouts. Never type bank details into this chat.`;
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of

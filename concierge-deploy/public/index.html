@@ -1127,7 +1127,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <!-- ============================================ PAY WORKERS -->
 <section class="view" data-view="workerpay">
   <h1 class="vh">Pay workers</h1>
-  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. Pay it from your business bank app, to the payee saved there, then press Mark as sent. That marks the invoice paid, stamped with you and the time, once, and sends the worker a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number. Stripe payouts come here once Stripe has switched on payments to Jamaica.</p>
+  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then pay it from Wise, to the recipient saved there, and press Mark as sent. That marks the invoice paid, stamped with you and the time, once, and sends the worker a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number. Stripe payouts come here once Stripe has switched on payments to Jamaica.</p>
   <div id="wpMsg"></div>
   <div id="wpBody"><div class="empty"><b>Reading worker pay invoices&hellip;</b></div></div>
 </section>
@@ -7642,7 +7642,7 @@ async function loadMaterials(keepMsg){
           // and this only records that it did (mark_materials_sent).
           const payHtml = r.sent_at
             ? `sent by bank transfer${String(r.sent_ref || "").trim() ? ", ref " + esc(r.sent_ref) : ""}, ${esc(String(r.sent_at).slice(0, 10))}, ${esc(r.sent_by || "")}`
-            : `<b>not yet sent.</b> Pay it from your business bank app, then <input type="text" placeholder="transfer ref, optional" data-mr-sref="${rid}" style="width:150px"> <button class="btn" data-sent-rel="${rid}" data-sent-amt="${esc(String(r.amount_jmd))}">Mark as sent</button> <span style="opacity:.55" title="Needs Stripe Global Payouts switched on">Pay by Stripe: not set up yet</span>`;
+            : `<b>not yet sent.</b> Call-back first (Pay workers), then pay it from Wise, then <input type="text" placeholder="transfer ref, optional" data-mr-sref="${rid}" style="width:150px"> <button class="btn" data-sent-rel="${rid}" data-sent-amt="${esc(String(r.amount_jmd))}">Mark as sent</button> <span style="opacity:.55" title="Needs Stripe Global Payouts switched on">Pay by Stripe: not set up yet</span>`;
           const receiptHtml = !r.sent_at
             ? ""
             : ref
@@ -7789,10 +7789,14 @@ async function loadWorkerPay(keepMsg){
   }
   const list = invs || [];
   const jobIds = [...new Set(list.map((i) => i.job_id).filter(Boolean))];
-  const emails = [...new Set(list.map((i) => i.worker_email).filter(Boolean))];
+  // Everyone who may need paying: workers with a pay invoice, and workers
+  // booked on a live job (materials money goes to them before any invoice).
+  const { data: booked } = await sb.from("jobs").select("worker_email,worker_name,status")
+    .not("worker_email", "is", null).not("status", "in", "(complete,cancelled)").limit(500);
+  const emails = [...new Set([...list.map((i) => i.worker_email), ...(booked || []).map((j) => j.worker_email)].filter(Boolean))];
   const [{ data: jobs }, { data: workers }] = await Promise.all([
     jobIds.length ? sb.from("jobs").select("id,title,is_test").in("id", jobIds) : Promise.resolve({ data: [] }),
-    emails.length ? sb.from("worker_profiles").select("worker_email,name,stripe_recipient_status").in("worker_email", emails) : Promise.resolve({ data: [] }),
+    emails.length ? sb.from("worker_profiles").select("worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by").in("worker_email", emails) : Promise.resolve({ data: [] }),
   ]);
   const jobById = new Map((jobs || []).map((j) => [j.id, j]));
   const workerByEmail = new Map((workers || []).map((w) => [String(w.worker_email || "").toLowerCase(), w]));
@@ -7803,9 +7807,11 @@ async function loadWorkerPay(keepMsg){
   };
   const whoCell = (i) => {
     const w = workerByEmail.get(String(i.worker_email || "").toLowerCase());
-    const st = w && w.stripe_recipient_status;
-    const stripe = st === "ready" ? "set up on Stripe" : st === "started" || st === "needs_info" ? "Stripe set up unfinished" : "not on Stripe yet";
-    return `<b>${esc(who(i))}</b>` + sub_((i.worker_email || "") + " · " + stripe);
+    // 20260914240000: nobody is paid until a person has called them back.
+    const bank = w && w.bank_callback_at
+      ? "bank details checked " + String(w.bank_callback_at).slice(0, 10)
+      : "call-back needed before paying";
+    return `<b>${esc(who(i))}</b>` + sub_((i.worker_email || "") + " · " + bank);
   };
   const jobCell = (i) => {
     const j = jobById.get(i.job_id);
@@ -7850,8 +7856,31 @@ async function loadWorkerPay(keepMsg){
     </tr>`;
   }).join("");
 
+  // Bank details to check (20260914240000). A worker's details arrive in Wise
+  // from their portal, or are taken by phone. Either way nobody is paid until
+  // a person has phoned them on the number on file and pressed Call-back
+  // done; new details clear it. The database enforces this, not this list.
+  const toCheck = emails.map((e) => workerByEmail.get(String(e).toLowerCase()) || { worker_email: e, _noProfile: true })
+    .filter((w) => !w.bank_callback_at);
+  const checkRows = toCheck.map((w) => {
+    const name = w.name || (booked || []).find((j) => String(j.worker_email).toLowerCase() === String(w.worker_email).toLowerCase())?.worker_name || w.worker_email;
+    const given = w.wise_recipient_set_at ? "Gave their details in Wise on " + String(w.wise_recipient_set_at).slice(0, 10) + ". Check them in Wise, Recipients." : "No details through the portal yet: take them by phone.";
+    return `<tr>
+      <td><b>${esc(name)}</b>${sub_(w.worker_email || "")}</td>
+      <td>${esc(w.phone || "no phone on file")}</td>
+      <td>${esc(given)}</td>
+      <td>${w._noProfile ? mute_("no worker profile") : `<button class="btn" data-wp-callback="${esc(w.worker_email)}" data-wp-cbname="${esc(name)}">Call-back done</button>`}</td>
+    </tr>`;
+  }).join("");
+  const checkCard = toCheck.length ? `
+    <div class="card">
+      <div class="chd"><h3>Bank details to check: ${toCheck.length}</h3></div>
+      <p class="vsub">Phone each worker on the number on file, read back their bank, branch, the last four digits and the name, and check the name matches their ID. Then press Call-back done. Until then, Mark as sent will not work for them.</p>
+      <div class="tw"><table><thead><tr><th>Worker</th><th>Phone on file</th><th>Details</th><th></th></tr></thead><tbody>${checkRows}</tbody></table></div>
+    </div>` : "";
+
   const head = `<thead><tr><th>Worker</th><th>Job</th><th>For</th><th class="num">Amount</th><th>Waiting</th><th></th></tr></thead>`;
-  host.innerHTML = `
+  host.innerHTML = checkCard + `
     <div class="card">
       <div class="chd"><h3>Owed now${owed.length ? ": " + owed.length + ", " + totals(owed) : ""}</h3></div>
       ${owed.length ? `<div class="tw"><table>${head}<tbody>${owedRows}</tbody></table></div>`
@@ -7863,6 +7892,26 @@ async function loadWorkerPay(keepMsg){
         : `<div class="empty"><b>No worker has been marked paid yet</b></div>`}
     </div>
     ${drafts.length ? `<p class="vsub">${drafts.length} worker pay invoice${drafts.length > 1 ? "s are" : " is"} still a draft, not yet owed: ${drafts.map((d) => esc(d.id)).join(", ")}.</p>` : ""}`;
+
+  // Call-back done: a named person saying they phoned the worker and checked
+  // their bank details (confirm_bank_callback). Stamped by the database.
+  host.querySelectorAll("[data-wp-callback]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const email = btn.dataset.wpCallback, name = btn.dataset.wpCbname;
+      if (!confirm(`Record that you phoned ${name} on the number on file and checked their bank details?\n\nThis lets money be marked sent to them. It is stamped with your name and the time.`)) return;
+      btn.disabled = true;
+      try {
+        const { error: e } = await sb.rpc("confirm_bank_callback", { p_worker_email: email });
+        if (e) throw e;
+        say("wpMsg", "ok", `Call-back recorded for ${name}. Money can now be marked sent to them.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        say("wpMsg", "err", hint);
+      }
+      await loadWorkerPay(true);
+    });
+  });
 
   // Mark as sent: a named person saying the money has left their bank. It
   // sends the worker a WhatsApp, which cannot be unsent, so it asks first.

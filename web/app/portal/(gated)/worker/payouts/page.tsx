@@ -1,22 +1,45 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
+import { createClient } from "@/lib/supabase/server";
+import { BankDetailsForm } from "@/components/portal/BankDetailsForm";
+
+// Never cached: whether Yaadly has checked the details is the point of the page.
+export const dynamic = "force-dynamic";
 
 export const metadata = { title: "How Yaadly pays you · Yaadly" };
 
 /**
  * How Yaadly pays a worker.
  *
- * Founder, 14 Sep 2026: bank transfer only for now, never cash. Lynk waits
- * until Yaadly is registered in Jamaica. Stripe payouts, where a worker types
- * bank details into Stripe's own form (20260914200000, yaad-payout-setup),
- * stay "coming soon" until Global Payouts is approved: the function is
- * deployed and dormant, and this page does not call it. Yaadly never stores
- * worker bank details; they are taken by phone and saved in Yaadly's own bank.
+ * Founder, 14 Sep 2026: bank transfer only, never cash, through Yaadly's Wise
+ * Business account. The worker's details go straight to Wise from this page
+ * (yaad-wise-recipient, 20260914240000); Yaadly keeps only Wise's reference.
+ * Nobody is paid until a person has called the worker back to check them,
+ * and new details need a fresh call-back. Stripe payouts stay "coming soon".
  */
+function day(iso: string | null | undefined) {
+  return iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+}
+
 export default async function Payouts() {
   const user = await getUser();
   if (!user) redirect("/portal/sign-in");
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("worker_profiles")
+    .select("wise_recipient_set_at,bank_callback_at")
+    .eq("worker_user", user.id)
+    .maybeSingle();
+  const setAt = (data?.wise_recipient_set_at as string | null | undefined) ?? null;
+  const checkedAt = (data?.bank_callback_at as string | null | undefined) ?? null;
+
+  const status = checkedAt
+    ? `Checked by phone on ${day(checkedAt)}. Yaadly can pay you.`
+    : setAt
+      ? `Sent to Wise on ${day(setAt)}. Yaadly will call you on the number we have for you to check them before any money goes.`
+      : "Not given yet.";
 
   return (
     <main className="mx-auto max-w-[720px] px-5 py-10">
@@ -30,12 +53,10 @@ export default async function Payouts() {
 
       <section className="mt-6 rounded-2xl border border-line bg-panel p-5">
         <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Your bank details</p>
-        <p className="mt-2 text-[13.5px] leading-relaxed text-ink">
-          Yaadly calls you to take your bank details before your first payment, and saves them in its own bank, not on
-          this site. When a payment goes, you get a WhatsApp with the amount and the reference.
-        </p>
-        <p className="mt-3 text-[12.5px] leading-relaxed text-dim">
-          <b className="text-mute">Coming soon:</b> setting up your bank details yourself, on Stripe&apos;s secure page.
+        <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{status}</p>
+        <BankDetailsForm hasDetails={Boolean(setAt)} />
+        <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
+          Rather not type them? Yaadly can take them on a call instead.
         </p>
       </section>
 
