@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { parsePaymentStages } from "@/lib/jobs/payment-stages";
+import { resolveBillingMode } from "@/lib/jobs/billing";
+import { clientBill } from "@/lib/jobs/client-bill";
 
 /**
  * Quote submission. Thin on purpose: jq_insert_vetted in Postgres is the
@@ -36,6 +38,16 @@ export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult
   if (!stages.ok) {
     return { ok: false, error: stages.error };
   }
+  /* In full or by stage (20260914090641). Under J$100,000 all in it is always
+     in full; the database refuses stage billing under the line too, so this
+     is the readable version of the same rule, not the only one. */
+  const billing = resolveBillingMode(
+    clientBill(labour, materials).total,
+    String(formData.get("billingMode") ?? "") || null,
+  );
+  if (!billing.ok) {
+    return { ok: false, error: billing.error };
+  }
 
   const supabase = await createClient();
   const email = (user.email ?? "").toLowerCase();
@@ -67,6 +79,7 @@ export async function submitQuote(formData: FormData): Promise<SubmitQuoteResult
     excluded_note: excludedNote,
     timeline_note: timelineNote,
     payment_stage_note: paymentStageNote,
+    billing_mode: billing.mode,
     status: "submitted",
   });
   if (error) {

@@ -211,6 +211,7 @@ Turning on a real OTLP endpoint is still worth doing and would make this a one-q
 - `pickTextProvider()` reaches it only when `MISTRAL_API_KEY` is not set at all. A wrong model id or a 400 never falls through: that is bad everywhere
 - **a refused key does, since 6 September 2026.** The Mistral key on the project started coming back `401 Invalid API Key` on the night of the 5th, and the instruction was "use the MiniMax key when Mistral fails". So `chatWithFailover()` also hands a 401 or a 403 to MiniMax, without retrying it first, because a refused key is refused the same way every time. That covered the two file makers first, and then, later the same morning, after "didn't I say to use MiniMax to solve this", **every text caller**: `yaad-agent`, `yaad-completion`, `yaad-inbound` (classify and compose, with the webhook's own deadline still attached), `yaad-invoice`, `yaad-kickoff`, `yaad-notify-client`, `yaad-post-job`, `yaad-quote-pack`, `yaad-report`, `yaad-sketch`. All ten go through `chatWithFailover()` and all ten were redeployed with their existing `verify_jwt` setting. Desk callers retry twice with up to fifteen seconds of Retry-After; webhook callers retry once with the four second budget; then MiniMax, if its key is set. The log line is the same in every function
 - **a rate limit can, since 6 September 2026.** Monique's words: "I want my file to be produced even when the limit is used on Mistral." So the two desk callers that make a file, `yaad-report` (the draft) and `yaad-sketch` (assemble), now go through `chatWithFailover()`: Mistral first, two retries with `Retry-After` honoured up to fifteen seconds, and only if it is STILL a 429 or a 5xx, one call to MiniMax. Per call, logged as `mistral http 429 after retries, falling back to MiniMax (China)`. The webhook callers keep one retry and no failover, because a webhook has fifteen seconds in total and a client message is not a file
+- **14 September 2026: `MINIMAX_API_KEY` unset again, on Monique's instruction ("move to Mistral"), and `docs/privacy.html` updated to say there is no China fallback.** The drafter's failures were Mistral's free tier rate limit, not the key; the fix is the pacing in `yaad-quote-pack-check` (four drafts a run, five seconds apart), not a paid plan. Do not set the MiniMax key again without her say.
 - **with `MINIMAX_API_KEY` unset, which is the state today, none of that reroutes anything.** The retries still happen, so a short rate limit now produces the file on Mistral alone where yesterday it produced a 502. A rate limit that outlasts the retries is still a loud failure
 - it is opt-in: with `MINIMAX_API_KEY` unset there is still no third branch
 - it announces itself: every call it is chosen for writes `falling back to MiniMax (China)` to the function log, so `supabase functions logs <fn>` answers "did any of this go to China, and when"
@@ -5097,6 +5098,18 @@ Since 13 Sep 2026 (`20260913230001`) the accepted quote's payment stages are the
 4. **A job with no schedule at all is one stage** and the worker is owed the whole labour less 5% when it is approved. That is a founder decision, not a fault.
 
 To prove the guards, run `supabase/tests/stage_schedule_guards.sql` with `execute_sql`; every line should read PASS.
+
+## A worker cannot choose "by stage" on a quote, or a client asks why they must pay in full
+
+Since 14 Sep 2026 (`20260914090641`) a quote records how the client pays: `job_quotes.billing_mode`, `in_full` or `by_stage`.
+
+1. **The choice is not offered at all**: the client's all-in total (labour, the 15%, materials) is under J$ 100,000. That is the founder's line: under it, always in full. Correct, not a fault.
+2. **"Under J$100,000 all in, the client pays in full"**: the same line, from the database. It checks the total again whenever the labour or materials figure changes.
+3. **"Stage billing needs payment stages that can be read"**: stage billing follows the stages, so they must read as `Name: 30%: proof` totalling the whole. See the section above.
+4. **Where the line lives**: `quote_billing_threshold_jmd()` in Postgres and `BILLING_THRESHOLD_JMD` in `web/lib/jobs/billing.ts`. Change both together, and record it in DECISIONS.md, because it is a money decision.
+5. **What a client sees**: one line under "You pay Yaadly" on the portal and on the no-sign-in quotes page. A quote with nothing recorded reads as in full.
+
+To prove the guards, run `supabase/tests/quote_billing_guards.sql` with `execute_sql`; every line should read PASS.
 
 ## A client pressed "Ask for a change" on a quote and it did not go through
 
