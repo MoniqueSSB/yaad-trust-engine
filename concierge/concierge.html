@@ -1094,7 +1094,7 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 <!-- ============================================ MATERIALS TRANCHES -->
 <section class="view" data-view="materials">
   <h1 class="vh">Materials tranches</h1>
-  <p class="vsub">The materials line of an accepted quote, paid to the worker against a receipt before any labour stage, and never fee'd on either side. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
+  <p class="vsub">The materials line of an accepted quote, paid to the worker so they can buy the goods, once the client has paid for it, and never fee'd on either side. The receipt comes back afterwards and is recorded here against the release it accounts for. The database refuses a tranche until the client has said where materials are kept (Materials store, on the jobs view), and refuses any total above the quoted materials line. Every release is stamped against you.</p>
   <div id="mrMsg"></div>
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
 </section>
@@ -7116,10 +7116,13 @@ $("jiPrint").addEventListener("click", () => $("jiPreview").contentWindow.print(
 // admin only, needs a booked worker, an accepted quote with a materials line,
 // a receipt reference, and refuses any total above the quoted line. The store
 // gate stays in the trigger, so this panel shows it but does not re-check it.
-async function loadMaterials(){
+// keepMsg: true when a button on this view redraws it, so the confirmation
+// it just wrote survives the redraw. It used to be wiped straight away, so a
+// release or a receipt went through with nothing on screen to say so.
+async function loadMaterials(keepMsg){
   const host = $("mrBody");
   host.innerHTML = `<div class="empty"><b>Reading booked jobs with a materials line&hellip;</b></div>`;
-  say("mrMsg", "", "");
+  if (keepMsg !== true) say("mrMsg", "", "");
 
   const { data: jobs, error: jobsErr } = await sb.from("jobs")
     .select("id,title,client_email,worker_email,worker_name,materials_store_type,status")
@@ -7136,53 +7139,83 @@ async function loadMaterials(){
   }
 
   const jobIds = jobs.map((j) => j.id);
-  const [{ data: quotes }, { data: rels }] = await Promise.all([
+  // Since 20260914112000 a tranche goes out once the client has PAID for the
+  // materials, not against a receipt, so this reads what has been paid:
+  // materials lines on the job's paid Yaadly invoices, the same test
+  // materials_paid_jmd() applies in the database, which has the last word.
+  const [{ data: quotes }, { data: rels }, { data: paidInvs }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
-    sb.from("materials_releases").select("job_id,amount_jmd,released_at,receipt_ref,stage").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
+    sb.from("invoices").select("job_id,currency,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").eq("status", "paid"),
   ]);
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
+  const paidMatByJob = new Map();
+  for (const inv of paidInvs || []) {
+    if (String(inv.currency || "JMD").toUpperCase() !== "JMD") continue;
+    const m = (inv.invoice_lines || [])
+      .filter((l) => /^materials, at cost/i.test(l.description || ""))
+      .reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
+    paidMatByJob.set(inv.job_id, (paidMatByJob.get(inv.job_id) || 0) + m);
+  }
 
   const rows = jobs.map((job) => {
     const q = quoteByJob.get(job.id);
     if (!q || !(Number(q.materials_jmd) > 0)) return "";
     const quoted = Number(q.materials_jmd);
+    const paidFor = paidMatByJob.get(job.id) || 0;
     const done = relByJob.get(job.id) || [];
     const soFar = done.reduce((t, r) => t + Number(r.amount_jmd || 0), 0);
     const left = Math.max(quoted - soFar, 0);
+    const canGo = Math.max(Math.min(quoted, paidFor) - soFar, 0);
     const storeOk = !!job.materials_store_type;
     const full = left <= 0;
+    const receiptsDue = done.filter((r) => !String(r.receipt_ref || "").trim()).length;
     const id = esc(job.id);
 
     const statusHtml = full
-      ? `<span class="jichip paid"><span class="dot"></span>Fully released</span>`
-      : storeOk
-        ? `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`
-        : `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`;
+      ? (receiptsDue
+          ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
+          : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
+      : !storeOk
+        ? `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`
+        : canGo <= 0
+          ? `<span class="jichip"><span class="dot"></span>Waiting on the client paying for the materials</span>`
+          : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
 
     const history = done.length
-      ? `<div class="jicond" style="margin-top:6px">` + done.map((r) =>
-          `${jmdFmt(r.amount_jmd)} &middot; receipt ${esc(r.receipt_ref || "")}${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`
-        ).join("<br>") + `</div>`
+      ? `<div class="jicond" style="margin-top:6px">` + done.map((r) => {
+          const ref = String(r.receipt_ref || "").trim();
+          const rid = esc(String(r.id));
+          const receiptHtml = ref
+            ? `receipt ${esc(ref)}`
+            : `<b>receipt to come</b> <input type="text" placeholder="receipt ref" data-mr-rref="${rid}" style="width:110px"> <button class="btn g" data-receipt-rel="${rid}">Record receipt</button>`;
+          return `${jmdFmt(r.amount_jmd)} &middot; ${receiptHtml}${r.stage != null ? " &middot; stage " + esc(String(r.stage)) : ""} &middot; ${esc(String(r.released_at || "").slice(0, 10))}`;
+        }).join("<br>") + `</div>`
       : "";
 
     const form = full ? "" : `
       <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-        <div><label>Amount J$</label><input type="number" min="1" step="1" value="${left}" data-mr-amount="${id}" style="width:120px"></div>
-        <div><label>Receipt ref</label><input type="text" placeholder="e.g. HW-4471" data-mr-receipt="${id}" style="width:130px"></div>
+        <div><label>Amount J$</label><input type="number" min="1" step="1" value="${canGo || left}" data-mr-amount="${id}" style="width:120px"></div>
+        <div><label>Receipt ref, if you have one</label><input type="text" placeholder="usually comes later" data-mr-receipt="${id}" style="width:150px"></div>
         <div><label>Stage</label><input type="number" min="1" step="1" placeholder="opt." data-mr-stage="${id}" style="width:70px"></div>
         <div><label>Note</label><input type="text" placeholder="optional" data-mr-note="${id}" style="width:160px"></div>
       </div>`;
 
+    const blocked = !storeOk
+      ? "The database will refuse this until the client has said where materials are kept."
+      : canGo <= 0
+        ? "The database will refuse this until the bill carrying the materials is marked paid."
+        : "";
     const actionHtml = full
       ? ""
-      : `<button class="btn" data-release-job="${id}" ${storeOk ? "" : "disabled title=\"The database will refuse this until the client has said where materials are kept.\""}>Release against receipt</button>`;
+      : `<button class="btn" data-release-job="${id}" ${blocked ? `disabled title="${esc(blocked)}"` : ""}>Release materials money</button>`;
 
     return `<tr>
       <td><div class="jistagename">${id}</div><div class="jistagepct">${esc(job.title || "")}</div>${history}</td>
       <td><div class="jicond">${esc(q.worker_name || job.worker_name || "")} &middot; ${esc(job.client_email || "")}<br>Store: ${esc(job.materials_store_type || "not nominated")}</div>${form}</td>
-      <td class="num"><span class="jiamt">${jmdFmt(quoted)}</span><div class="jistagepct">${jmdFmt(soFar)} released &middot; ${jmdFmt(left)} left</div></td>
+      <td class="num"><span class="jiamt">${jmdFmt(quoted)}</span><div class="jistagepct">${jmdFmt(Math.min(paidFor, quoted))} paid by client &middot; ${jmdFmt(soFar)} released &middot; ${jmdFmt(left)} left</div></td>
       <td>${statusHtml}</td>
       <td>${actionHtml}</td>
     </tr>`;
@@ -7204,9 +7237,8 @@ async function loadMaterials(){
       const stageV = ((g("stage") || {}).value || "").trim();
       const note = ((g("note") || {}).value || "").trim();
       if (!(amount > 0)) { say("mrMsg", "err", "Enter the amount being released."); return; }
-      if (!receipt) { say("mrMsg", "err", "Enter the receipt reference. This is money paid against a receipt."); return; }
       btn.disabled = true;
-      say("mrMsg", "ok", `Releasing ${jmdFmt(amount)} on ${job}\u2026`);
+      say("mrMsg", "ok", `Releasing ${jmdFmt(amount)} on ${job}…`);
       try {
         const { data, error } = await sb.rpc("release_materials_tranche", {
           p_job: job, p_amount_jmd: amount, p_receipt_ref: receipt,
@@ -7215,13 +7247,36 @@ async function loadMaterials(){
         if (error) throw error;
         const row = (data || [])[0];
         if (!row) throw new Error("Released nothing.");
-        say("mrMsg", "ok", `Released ${jmdFmt(amount)} against receipt ${receipt}. ${jmdFmt(row.released_total_jmd)} of ${jmdFmt(row.quoted_materials_jmd)} now released on ${job}. The client and worker can see it in their portal.`);
+        say("mrMsg", "ok", `Released ${jmdFmt(amount)} on ${job}${receipt ? " against receipt " + receipt : ", receipt to come"}. ${jmdFmt(row.released_total_jmd)} of ${jmdFmt(row.quoted_materials_jmd)} now released. The client and worker can see it in their portal.`);
       } catch (e) {
         let hint = e.message;
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
         say("mrMsg", "err", hint);
       }
-      await loadMaterials();
+      await loadMaterials(true);
+    });
+  });
+
+  // The receipt comes back after the money has gone out, and is recorded
+  // against the release it accounts for (record_materials_receipt,
+  // 20260914112000). Stamped against you; a recorded receipt is never
+  // overwritten, so a mistyped one is corrected with a note.
+  host.querySelectorAll("[data-receipt-rel]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const rel = btn.dataset.receiptRel;
+      const ref = ((host.querySelector(`[data-mr-rref="${rel}"]`) || {}).value || "").trim();
+      if (!ref) { say("mrMsg", "err", "Enter the receipt reference, as it is printed on the supplier's receipt."); return; }
+      btn.disabled = true;
+      try {
+        const { error } = await sb.rpc("record_materials_receipt", { p_release: rel, p_receipt_ref: ref, p_note: "" });
+        if (error) throw error;
+        say("mrMsg", "ok", `Receipt ${ref} recorded.`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        say("mrMsg", "err", hint);
+      }
+      await loadMaterials(true);
     });
   });
 }
