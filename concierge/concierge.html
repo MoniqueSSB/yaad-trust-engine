@@ -7380,10 +7380,8 @@ async function loadWorkerPay(keepMsg){
       <td>${forCell(i)}</td>
       <td class="num"><b>${feeAmt(i.total_pence, i.currency)}</b>${sub_("owed since " + since)}</td>
       <td>${wait}</td>
-      <td>Pay it from your business bank app, then<br>
-        <input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">
-        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button>
-        <span style="opacity:.55" title="Needs Stripe Global Payouts switched on for Jamaica">Pay by Stripe: not set up yet</span></td>
+      <td><input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">
+        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button></td>
     </tr>`;
   }).join("");
 
