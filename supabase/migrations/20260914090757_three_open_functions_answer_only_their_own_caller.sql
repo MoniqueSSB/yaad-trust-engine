@@ -22,10 +22,12 @@
 --    session passed that half of the policy on an unclaimed job. Checked
 --    before writing this: no unclaimed job has a quote today, so nothing was
 --    exposed through it. Fix: it answers only about the caller's own
---    non-empty email. Its four callers (qm_client_read, jq_select_client,
---    mark_material_supplied, and "parties read quote change requests" from
---    20260913230000, which landed while this was being written) all pass the
---    caller's own email already, so what they decide is unchanged. The anon grant stays, deliberately:
+--    non-empty email. Its five callers (qm_client_read, jq_select_client,
+--    mark_material_supplied, "parties read quote change requests" from
+--    20260913230000 and "parties read quote agreements" from 20260913230642,
+--    both of which landed while this was being written) all pass the
+--    caller's own email already, so what they decide is unchanged. Checked
+--    against the live policy text on 14 Sep before this was applied. The anon grant stays, deliberately:
 --    jq_select_client is written for every role, and taking the function away
 --    from anon would turn an anon read of job_quotes into an error instead of
 --    an empty result. With this body anon always gets false, which is the
