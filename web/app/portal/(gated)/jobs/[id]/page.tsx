@@ -2055,7 +2055,10 @@ export default async function JobRoom({
           labour={labour}
           allIn={role === "client" ? clientAllIn : allIn}
           takeHome={takeHome}
-          fee={feeJmd}
+          /* Same inputs as MoneyPanel above: the rail showed the client's
+             15% on the worker's side until 14 Sep 2026. */
+          fee={role === "worker" ? workerFeeJmd : feeJmd}
+          materials={won?.materials_jmd ?? null}
           check={role === "client" ? checkLine : null}
           heldNote={
             labour == null
