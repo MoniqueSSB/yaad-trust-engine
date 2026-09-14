@@ -10,6 +10,15 @@ import Link from "next/link";
  * the chat, so "how much is held" and "who is my tradesperson" were things
  * you scrolled to find rather than things that stayed with you. Sticky on
  * a wide screen, stacked underneath on a narrow one.
+ *
+ * The lines under the headline must add up to the headline, on both sides,
+ * and must say the same thing as MoneyPanel on the Money tab. Until
+ * 14 September 2026 they did neither on the worker's side: the rail was
+ * handed the client's 15% fee with a hard-coded "15%" label, so a worker
+ * read "Yaadly fee, 15%" at three times what is actually taken (the
+ * worker's side is 5%, 9 Sep 2026), and materials were in the headline but
+ * missing from the lines, so nothing summed. Fee and materials now arrive
+ * from the same place MoneyPanel gets them, and the label follows the side.
  */
 
 export function JobRail({
@@ -19,6 +28,7 @@ export function JobRail({
   allIn,
   takeHome,
   fee,
+  materials = null,
   heldNote,
   workerName,
   jobBase,
@@ -30,7 +40,10 @@ export function JobRail({
   labour: number | null;
   allIn: number | null;
   takeHome: number | null;
+  /** This side's fee: the client's 15% or the worker's 5%, never the other one. */
   fee: number | null;
+  /** Materials at cost, already inside allIn and takeHome. Never fee'd on either side. */
+  materials?: number | null;
   heldNote: string;
   workerName: string | null;
   jobBase: string;
@@ -74,8 +87,14 @@ export function JobRail({
               <span className="text-mute">{side === "client" ? "Worker labour" : "Your labour price"}</span>
               <span className="font-mono-app text-[11.5px] text-ink">{money(labour)}</span>
             </div>
+            {materials != null && materials > 0 && (
+              <div className="flex justify-between text-[12px]">
+                <span className="text-mute">Materials, at cost</span>
+                <span className="font-mono-app text-[11.5px] text-ink">{money(materials)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-[12px]">
-              <span className="text-mute">Yaadly fee, 15%</span>
+              <span className="text-mute">{side === "client" ? "Yaadly fee, 15%" : "Yaadly fee, 5%, deducted"}</span>
               <span className="font-mono-app text-[11.5px] text-ink">{money(fee)}</span>
             </div>
             {side === "client" && check && (
