@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-14 · The price comparison lives on the quote, and the desk's Price check view is gone
+
+**Founder:** "the price check should be on quote automatically shown to the client, not on its own section in admin." The client half already existed. Since 5 September every quote on a client's job page carries a "For comparison" box (`web/components/portal/PriceContextNote.tsx`), worked out automatically from the researched band and from `price_spread_for_trade`, and the quoting worker reads the same words (the Mirror Rule). So the change was to take the desk's separate Price check view out: its menu entry, its page, and the code that ran it. Nothing about the client's box changed.
+
+**The verdict did not move across, on purpose.** The desk view said "red flag", "high, ask questions" or "suspiciously low". Those are judgements on a price, which is quantity surveying, the one thing Yaadly does not guarantee. The client box says where the labour figure sits and what the comparison is made of, never whether it is right. That rule is `web/lib/portal/price-context.ts` rule 1 and `web/tests/price-context.test.mjs` holds it in words. The thresholds still exist in the engine's `review_quote()`, which is where they came from.
+
+**What went with it.** The desk no longer writes `quote_reviews`, so "quote review" stops adding to `desk_decisions`. The table, its rows and its RLS are untouched, and no migration was needed. The price database does not depend on it: every submitted quote already lands in `price_observations` by trigger. The generated `PRICE_BENCHMARKS` block stays in `concierge.html` although nothing in the page reads it now, because `tests/test_price_benchmarks.py` checks the engine's bands against it, and removing it would mean rewriting those tests rather than the page. If the desk ever shows the client's sentence beside a quote, that block is what it would read.
+
+---
+
 ## 2026-09-13 · A quoting worker sees the tender pack, not the job
 
 **Founder's decision, the same day, closing what the address entry further down flagged.** A worker who has quoted on a job and is not booked on it sees what the public board shows: title, parish, trade, the description with names and contact details taken out by `board_descr()`, and the photographs the client put on the board. Plus their own quote and their own Kickoff Pack. That stays true after the client picks somebody else: the job remains on their list as "Not selected this time", board level only. The street address and the client's details are for the client and the booked worker. In construction terms: every tenderer gets the tender pack, only the contractor on site gets the site file.
@@ -3336,6 +3346,26 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 
 **Payouts to tradespeople will not use Connect.** Stripe's docs say Connect cross-border payouts from a UK platform reach only the US, UK, EEA, Canada and Switzerland. Stripe Global Payouts added Jamaican bank accounts (`jm_bank_account`) in December 2025 and is open to UK businesses, so phase 3 is designed on that, pending the founder enabling it, a solicitor view on the licensing note Stripe attaches to it, and a decision on worker bank and identity data going to Stripe.
 
+## 2026-09-14 · Kickoff Drafts leaves the desk menu; the drafts that did not become a pack show on Kickoff packs
+
+**Why.** Founder, 14 Sep 2026: remove the Kickoff Drafts section. It listed every draft `yaad-kickoff` had ever written, most of them already packs. But it was also the only place in the desk where a draft held back by the guardrail, or a job whose drafts kept failing, could be seen at all, so deleting it outright would have turned a stopped job into a silent one. Of the options put to her she chose to take the view out of the menu and move that one job onto Kickoff packs.
+
+**What it shows.** A card at the top of Kickoff packs, "Drafts that did not become a pack", listing three kinds and only these: a finished draft the guardrail flagged (price language, banned language, foreign text), with the flags named; a job, booking or quote whose drafts failed and where nothing has succeeded since, counted once with how many times; and a clean draft written for no quote or booking, which `yaad-kickoff-check` will never link, with "Link to a job" and "Link to a service". When nothing is stuck it says so in one line.
+
+**How "dealt with" is decided.** `kickoff_packs` keeps no draft id, and `link_kickoff_draft_to_job()` / `_to_service()` write the pack without touching the draft's row. So a draft is left off if its job, booking or quote already has a pack, or if a pack carries its exact intake, which both link functions copy across unchanged. Without the second test a hand-linked wizard draft would have stayed on the list forever; the demo caught that before the live edit.
+
+**No gate moved.** The link buttons call the same two functions the old view did, which still refuse a flagged draft outright. A linked pack starts at `draft`, and only Approve on the pack makes it readable in the client's portal. Nothing in the database changed.
+
+## 2026-09-14 · A materials receipt more than 48 hours behind the money shows on the worker's record
+
+**Why.** Founder, 14 Sep 2026: the receipt is the evidence the goods were bought. The clock starts when the materials money is released to the worker; after 48 hours without a receipt it counts as late, and she wants to see that on the worker's profile.
+
+**What it does.** The desk's Workers view has a Receipts column ("N overdue", "N came late", or "none late"), and opening a worker lists each late receipt with the job, the amount, when the money went out and how long the receipt took or has been missing. A receipt that arrives late stays on the record as late.
+
+**Worked out, not stored.** It is computed on the desk from `materials_releases.released_at` and `receipt_at`, which the database already stamps, joined to the worker through `jobs.worker_email`. There is no new column, table or migration, so there is nothing that could fall out of step with the release it describes. A receipt taken at release time (a `receipt_ref` with no `receipt_at`, from before `20260914112000`) counts as on time. The 48 hours is `RECEIPT_DUE_HOURS` in `concierge/concierge.html`. Known limit: a release is matched to the job's current worker, so if a job were ever reassigned after materials went out, the late receipt would show against the new worker.
+
+**What it is not.** A note for the person choosing a worker, on the desk only. It holds no stage, blocks no payment and changes no score: CLAUDE.md §2 and §4, the system never alters a reputation by itself, and the Yaad Score is not built (§9). Whether a missing receipt should also stop the next stage's sign-off was asked and is not yet decided, so nothing stops.
+
 ## 2026-09-14 · Materials money is marked sent by a person; Yaadly stores no worker bank details
 
 **Why.** Founder, 14 Sep 2026, after the first real release on the desk: "who was it released to? Where does that money go? Do they receive a link?" A release (`20260914112000`) records a decision and moves nothing. Nothing told the worker, and nothing recorded that the money had actually left.
@@ -3351,3 +3381,5 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **Not built, deliberately.** Pay by Stripe is greyed on the desk until Global Payouts is switched on, Stripe support has enabled cross-border payouts to outside bank accounts, and the licensing note Stripe attaches has had a solicitor's view. It will widen the `sent_method` check in its own migration.
 
 **No human gate moved.** Releasing is one named click and marking sent is a second; neither moves money by itself.
+
+**The late receipt clock moves to sent.** The same day's entry above counts a receipt as late 48 hours after the money was released. With a separate sent step that would mark a worker late because Yaadly had not yet paid them, which is the Mirror Rule failing on the worker's side. The desk now counts from `sent_at`, and money released but not sent is never late.

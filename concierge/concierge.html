@@ -1099,34 +1099,6 @@ tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
   <div id="mrBody"><div class="empty"><b>Reading booked jobs&hellip;</b></div></div>
 </section>
 
-<!-- ============================================ PRICE CHECK -->
-<section class="view" data-view="pricecheck">
-  <h1 class="vh">Price check</h1>
-  <p class="vsub">Paste a worker's figure and see it against the researched band for that trade. <b>This is a reference, not an estimate.</b> Yaadly guarantees project management and oversight judgment; estimating is a quantity surveyor's job and this does not do it. Every band carries its own source and confidence so you can argue with it. Nothing here is ever shown to a client or a worker. For several trades the honest answer is that no public price exists in Jamaica, and saying so out loud is the point rather than a gap to fill.</p>
-  <div class="card" style="padding:16px;margin-bottom:14px">
-    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
-      <label style="flex:1 1 210px"><span class="dk" style="display:block;margin-bottom:5px">Trade</span>
-        <select id="pcTrade" class="inp" style="width:100%"></select></label>
-      <label style="flex:1 1 150px"><span class="dk" style="display:block;margin-bottom:5px">Variant, if you know it</span>
-        <select id="pcVariant" class="inp" style="width:100%"></select></label>
-      <label style="flex:1 1 150px"><span class="dk" style="display:block;margin-bottom:5px">Quoted, J$</span>
-        <input id="pcAmount" class="inp" type="number" min="1" step="1" placeholder="185000" style="width:100%"></label>
-      <button id="pcRun" class="btn" type="button">Check it</button>
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px">
-      <label style="flex:1 1 150px"><span class="dk" style="display:block;margin-bottom:5px">Job, optional</span>
-        <input id="pcJob" class="inp" type="text" placeholder="JOB-0002" style="width:100%"></label>
-      <label style="flex:2 1 320px"><span class="dk" style="display:block;margin-bottom:5px">What you make of it, optional</span>
-        <input id="pcNotes" class="inp" type="text" placeholder="access is bad, three flights, no lift" style="width:100%"></label>
-    </div>
-  </div>
-  <div id="pcMsg"></div>
-  <div id="pcOut"></div>
-  <h2 class="vh" style="font-size:17px;margin-top:26px">Reviewed so far</h2>
-  <p class="vsub">Every check you log lands here. There are no public prices in Jamaica for most of this work, so this table is how that stops being true: one reviewed quote at a time, it becomes the price database the whole "no farrin price" promise rests on.</p>
-  <div id="pcLog"><div class="empty"><b>Nothing logged yet.</b></div></div>
-</section>
-
 <!-- ============================================ AGENCY FEES -->
 <section class="view" data-view="fees">
   <h1 class="vh">Agency Fees</h1>
@@ -1998,12 +1970,13 @@ const VIEWS = [
     // The candidate files, with links to open them. Publishing somebody's
     // face is a decision, and a decision needs to be made looking at the
     // thing, so the links are here rather than a button firing blind.
-    detailExtra: showcaseDetail,
+    detailExtra: r => lateReceiptsDetail(r) + showcaseDetail(r),
     cols:[
       {h:"Worker", f:r => esc(r.name || "no name") + sub_(r.worker_email || "")},
       {h:"Trade & area", f:r => esc(r.trade || "") + sub_(r.parish || "")},
       {h:"Lane", f:r => r.lane ? chip_("mute", r.lane) : mute_("none")},
       {h:"Jobs done", n:true, f:r => String(r.jobs_completed ?? 0)},
+      {h:"Receipts", f:r => receiptCell(r)},
       {h:"Guidelines", f:r => guidelinesChip(r.worker_email, "worker_guidelines", "WG")},
       {h:"Public profile", f:r => showcaseCell(r)},
       {h:"State", f:r => (r.is_test ? chip_("mute","test") + " " : "") + (r.active ? chip_("ok","active") : chip_("warn","cannot quote"))},
@@ -2174,47 +2147,11 @@ const VIEWS = [
         says:r => `Re-checks this pack with the same rule the drafter uses. It clears nothing: if the wording still trips the guardrail it stays flagged and Approve still refuses it. Nothing is sent to anybody, and no model is called.` },
     ]},
 
-  { k:"kickd", g:"Documents & money", label:"Kickoff Drafts", icon:"doc",
-    title:"Kickoff Drafts", table:"kickoff_drafts",
-    sub:"Every kickoff draft yaad-kickoff has written, whether or not anybody has done anything with it. A draft is not a pack: nothing here is client-facing, and nothing ever becomes a pack on its own. Link a ready draft to a job below, and it starts as a draft pack there too, unread by the client until they accept a quote on that job.",
-    select:"id,status,model,intake,docs,error,created_at,finished_at",
-    order:"created_at", search:["id","title","client_name"],
-    empty:["No drafts yet","A draft is written when the kickoff wizard, or an admin request, asks yaad-kickoff for one."],
-    pre: preKickDrafts, hide:["docs"],
-    detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${kickDocsHtml(r.docs)}</div></div>`,
-    cols:[
-      {h:"Draft", f:r => id_(r.id) + sub_(r.model || "not recorded")},
-      {h:"Project", f:r => esc(r.title || "untitled") + sub_(r.client_name || "")},
-      {h:"State", f:r => tone_(r.status)},
-      {h:"Drafted", f:r => mute_(ago_(r.created_at))},
-    ],
-    actions:[
-      { label:"Link to a job", cls:"",
-        when:r => r.status === "ready",
-        rpc:"link_kickoff_draft_to_job",
-        ask:[
-          { k:"job_id", label:"Which job is this pack for?", type:"text",
-            placeholder:"JOB-0002", from:() => "" },
-        ],
-        args:(r, v) => ({ p_draft_id:r.id, p_job_id:(v.job_id || "").trim() }),
-        says:() => "Creates a Kickoff Pack for that job from this draft, listed under Kickoff Packs. It stays a draft, unread by the client, until they accept a quote on that job: that is the one moment anything ever approves it." },
-      { label:"Link to a service", cls:"g",
-        when:r => r.status === "ready",
-        rpc:"link_kickoff_draft_to_service",
-        ask:[
-          { k:"service_id", label:"Which service booking is this pack for?", type:"text",
-            placeholder:"SVC-A1B2C3", from:() => "" },
-        ],
-        args:(r, v) => ({ p_draft_id:r.id, p_service_id:(v.service_id || "").trim() }),
-        says:() => "Creates a Kickoff Pack for that service booking from this draft, listed under Kickoff Packs. It starts as a draft; press Approve there to make it readable in the client's portal. Refused while the guardrail still flags anything." },
-    ]},
-
   { k:"invoices", g:"Documents & money", label:"Invoices", icon:"bill", hand:true },
   { k:"jobinv", g:"Documents & money", label:"Job Invoices", icon:"bill", hand:true },
   { k:"fees", g:"Documents & money", label:"Agency Fees", icon:"bill", hand:true },
   { k:"materials", g:"Documents & money", label:"Materials tranches", icon:"bill", hand:true },
   { k:"sketch",   g:"Documents & money", label:"Sketch packs", icon:"cam", hand:true },
-  { k:"pricecheck", g:"Documents & money", label:"Price check", icon:"bill", hand:true },
 
   { k:"docs", g:"Documents & money", label:"Signatures", icon:"pen",
     title:"Signatures", table:"doc_signatures",
@@ -2980,6 +2917,8 @@ const VET  = {};            // application id -> latest vetting_reviews row
 const VDOC = {};            // application id -> [vetting_documents]
 let   EVID_CTX = null;      // { group, job, pack, error } for the evidence panel
 let   KICK_CTX = null;      // { pack, error } for the kickoff panel
+let   KICK_HELD = null;     // { rows, error }, drafts that did not become a pack
+let   KICK_HELD_MSG = null; // the last link result, kept across the redraw after it
 let   INTAKE_DRAFTS = [];   // jobs built but never signed for
 
 const softFail = (what, msg) =>
@@ -3585,10 +3524,92 @@ async function preJobPhotos(rows){
  */
 const SHOWCASE_DOC_TYPES = ["profile_photo", "intro_video", "portfolio"];
 
+// ---- Late materials receipts, on the worker's record.
+//
+// Founder rule, 14 Sep 2026. Materials money goes to the worker before the
+// goods are bought (20260914112000), and the receipt is the evidence the
+// goods were bought. The clock starts when the money is released; once a
+// receipt is more than 48 hours behind it, it counts as late, and the
+// worker's record here says so.
+//
+// Desk only. It is a note for whoever chooses a worker, nothing more: it
+// holds no stage, blocks no payment and changes no score, because the
+// system never alters anyone's reputation by itself. Worked out from
+// released_at and receipt_at, which the database already stamps, so there
+// is nothing stored that could fall out of step with them. A receipt taken
+// at release time (receipt_ref set, no receipt_at) counts as on time.
+//
+// A release is matched to a worker through the job's current worker_email.
+// If a job were ever handed to a different worker after materials went out,
+// the late receipt would show against the new one; read the job before
+// acting on it.
+const RECEIPT_DUE_HOURS = 48;
+
+const receiptLag = (h) => h < 96 ? `${Math.floor(h)} hours` : `${Math.floor(h / 24)} days`;
+
+async function readLateReceipts(list){
+  for (const r of list) { r._late_receipts = []; r._late_receipts_error = null; }
+  const raw = list.map(r => String(r.worker_email || "")).filter(Boolean);
+  const emails = [...new Set([...raw, ...raw.map(e => e.toLowerCase())])];
+  if (!emails.length) return;
+  try {
+    const { data: jobs, error: je } = await sb.from("jobs")
+      .select("id,worker_email").in("worker_email", emails).limit(3000);
+    if (je) throw je;
+    const jobWorker = new Map((jobs || []).map(j => [j.id, String(j.worker_email || "").toLowerCase()]));
+    if (!jobWorker.size) return;
+    const { data: rels, error: re } = await sb.from("materials_releases")
+      .select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at")
+      .in("job_id", [...jobWorker.keys()]).not("released_at", "is", null).limit(3000);
+    if (re) throw re;
+    const byEmail = new Map(list.map(r => [String(r.worker_email || "").toLowerCase(), r]));
+    const now = Date.now();
+    for (const x of rels || []) {
+      if (!x.released_at) continue;
+      const out = Date.parse(x.released_at);
+      const came = x.receipt_at ? Date.parse(x.receipt_at)
+                 : String(x.receipt_ref || "").trim() ? out : null;
+      const hours = ((came ?? now) - out) / 3600e3;
+      if (!(hours > RECEIPT_DUE_HOURS)) continue;
+      const r = byEmail.get(jobWorker.get(x.job_id));
+      if (r) r._late_receipts.push({ job_id:x.job_id, amount_jmd:x.amount_jmd, released_at:x.released_at, overdue: came == null, hours });
+    }
+    // Still outstanding first, then the most recent.
+    for (const r of list) r._late_receipts.sort((a, b) => (b.overdue - a.overdue) || String(b.released_at).localeCompare(String(a.released_at)));
+  } catch (e) {
+    for (const r of list) r._late_receipts_error = e.message || String(e);
+  }
+}
+
+function receiptCell(r){
+  if (r._late_receipts_error) return mute_("could not check");
+  const list = r._late_receipts || [];
+  const overdue = list.filter(x => x.overdue).length, late = list.length - overdue;
+  if (!list.length) return mute_("none late");
+  return [overdue ? chip_("crit", `${overdue} overdue`) : "", late ? chip_("warn", `${late} came late`) : ""].filter(Boolean).join(" ");
+}
+
+function lateReceiptsDetail(r){
+  const list = r._late_receipts || [];
+  let body;
+  if (r._late_receipts_error) {
+    body = mute_("Could not check: " + r._late_receipts_error);
+  } else if (!list.length) {
+    body = mute_(`No late materials receipts. A receipt counts as late once it is more than ${RECEIPT_DUE_HOURS} hours behind the money.`);
+  } else {
+    body = list.map(x => x.overdue
+      ? `<div>${chip_("crit", "overdue")} ${jmdFmt(x.amount_jmd)} on ${id_(x.job_id)}, released ${esc(day_(x.released_at))}, no receipt after ${receiptLag(x.hours)}</div>`
+      : `<div>${chip_("warn", "late")} ${jmdFmt(x.amount_jmd)} on ${id_(x.job_id)}, released ${esc(day_(x.released_at))}, receipt came ${receiptLag(x.hours)} after the money</div>`
+    ).join("") + `<div style="margin-top:6px">${mute_("For you to weigh when choosing a worker. Seen on this desk only: it holds nothing and changes no score.")}</div>`;
+  }
+  return `<div class="dfield"><span class="dk">materials receipts</span><div class="reqlist" style="margin-top:0">${body}</div></div>`;
+}
+
 async function preWorkers(rows){
   const list = rows || [];
   for (const r of list) { r._showcase_candidates = []; r._showcase_live = []; }
   if (!list.length) return;
+  await readLateReceipts(list);
 
   const byUser = new Map(list.filter(r => r.worker_user).map(r => [r.worker_user, r]));
   const emails = list.map(r => String(r.worker_email || "").toLowerCase()).filter(Boolean);
@@ -4130,27 +4151,155 @@ const KICK_DOCS = [
   ["cost_breakdown","Cost breakdown"], ["terms_placeholders","Terms to confirm"],
 ];
 
-// Flattens each draft's intake jsonb onto the row as plain fields (title,
-// client_name, parish, brief) and drops the raw intake blob rather than
-// hiding it: nobody reads raw intake jsonb in this desk. docs stays on the
-// row, hidden from the generic field dump, so a click on any draft opens
-// the actual pack it wrote, before it is ever linked to a job.
-async function preKickDrafts(rows){
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
-    const intake = r.intake || {};
-    rows[i] = {
-      id: r.id, status: r.status, model: r.model,
-      title: intake.title || "", client_name: intake.client_name || "",
-      parish: intake.parish || "", brief: intake.brief || "",
-      docs: r.docs, error: r.error, created_at: r.created_at, finished_at: r.finished_at,
-      __i: r.__i,
-    };
+// ---- Held kickoff drafts, shown on the Kickoff packs view.
+//
+// Until 14 Sep 2026 every draft yaad-kickoff had written had a view of its
+// own, Kickoff Drafts. The founder took it out of the menu. What it was for
+// moved here: a draft that did not turn into a pack, and so would otherwise
+// sit where nobody looks. Three kinds, and only these three:
+//   held    finished, but the guardrail flagged price language, banned
+//           language or foreign text. yaad-kickoff-check will not link it,
+//           and both link functions refuse it while any flag stands.
+//   failed  the drafter gave up on a job, booking or quote, and nothing for
+//           it has succeeded since, so it still has no pack. Three failures
+//           stop the automatic retries.
+//   loose   finished and clean, but not for a quote or a booking, so the
+//           checker will never link it (the kickoff wizard's own drafts).
+//           Only a person linking it by hand turns it into a pack.
+// kickoff_packs keeps no draft id, and a hand link writes the pack without
+// touching the draft's own row. So "dealt with" means one of two things: its
+// job, booking or quote already has a pack, or a pack carries this draft's
+// exact intake, which both link functions copy across word for word.
+const draftFlags = (g) => {
+  g = g || {};
+  const f = [];
+  if (g.price_language_detected) f.push("price language");
+  if (g.banned_language_detected) f.push("banned language");
+  if (g.foreign_text_detected) f.push("foreign text");
+  return f;
+};
+
+async function readHeldDrafts(packs){
+  let data, error;
+  try {
+    ({ data, error } = await sb.from("kickoff_drafts")
+      .select("id,status,model,intake,docs,guardrail,error,created_at,job_id,service_id,quote_id")
+      .order("created_at", { ascending:false }).limit(300));
+  } catch (e) { error = e; }
+  if (error) return { rows:[], error: error.message || String(error) };
+
+  const hasPack = new Set(), packIntake = new Set();
+  for (const p of packs) {
+    if (p.job_id) hasPack.add("job:" + p.job_id);
+    if (p.service_id) hasPack.add("svc:" + p.service_id);
+    if (p.quote_id) hasPack.add("quote:" + p.quote_id);
+    const it = p.intake ? JSON.stringify(p.intake) : "";
+    if (it && it !== "{}") packIntake.add(it);
   }
+  const linked = (d) => !!d.intake && packIntake.has(JSON.stringify(d.intake));
+  const keysOf = (d) => [d.quote_id && "quote:" + d.quote_id, d.job_id && "job:" + d.job_id,
+                         d.service_id && "svc:" + d.service_id].filter(Boolean);
+  const all = data || [];
+  // A failure is only stuck if nothing for the same job, booking or quote is
+  // finished or still being written.
+  const alive = new Set();
+  for (const d of all) if (d.status !== "failed") keysOf(d).forEach((k) => alive.add(k));
+
+  const rows = [], failedBy = new Map();
+  for (const d of all) {                       // newest first
+    const keys = keysOf(d);
+    if (keys.some((k) => hasPack.has(k)) || linked(d)) continue;
+    const flags = draftFlags(d.guardrail);
+    if (d.status === "ready" && flags.length) rows.push({ ...d, kind:"held", flags });
+    else if (d.status === "ready" && !d.quote_id && !d.service_id) rows.push({ ...d, kind:"loose", flags });
+    else if (d.status === "failed" && keys.length && !keys.some((k) => alive.has(k))) {
+      const seen = failedBy.get(keys[0]);
+      if (seen) { seen.tries++; continue; }
+      const row = { ...d, kind:"failed", flags, tries:1 };
+      failedBy.set(keys[0], row); rows.push(row);
+    }
+  }
+  return { rows, error:null };
+}
+
+function heldDraftsHtml(){
+  const h = KICK_HELD;
+  if (!h) return "";
+  if (h.error) return softFail("Drafts that did not become a pack", h.error);
+  const msg = KICK_HELD_MSG
+    ? `<div class="msg ${KICK_HELD_MSG.tone}" style="margin-top:8px">${esc(KICK_HELD_MSG.text)}</div>` : "";
+  KICK_HELD_MSG = null;
+  const head = (right) => `<div class="chd"><h3>Drafts that did not become a pack</h3>${right}</div>`;
+  if (!h.rows.length) {
+    return `<div class="card" id="khHeld">${head(chip_("ok", "none"))}`
+      + `<p class="conseq" style="margin:0">Nothing is held back and nothing is stuck without a pack.</p>${msg}</div>`;
+  }
+
+  const items = h.rows.map((d) => {
+    const i = d.intake || {};
+    const id = esc(String(d.id));
+    const forWhat = d.job_id ? id_(d.job_id)
+      : d.service_id ? id_(d.service_id)
+      : d.quote_id ? mute_("a quote on a job")
+      : mute_("no job or booking");
+    const why = d.kind === "held" ? chip_("crit", "held: " + d.flags.join(", "))
+      : d.kind === "failed" ? chip_("crit", d.tries > 1 ? `failed ${d.tries} times` : "failed")
+      : chip_("mute", "not linked to anything");
+    const explain = d.kind === "held"
+      ? "Finished, but the wording tripped the guardrail, so it was not turned into a pack. Linking is refused while any flag stands: it needs fixing or redrafting first."
+      : d.kind === "failed"
+        ? "The drafter gave up" + (d.error ? `: ${esc(String(d.error).slice(0, 240))}` : ".")
+          + " Three failures stop the automatic retries, so this has no pack until a fresh draft is asked for."
+        : "Finished and clean, but not written for a quote or a booking, so nothing will link it unless you do.";
+    const docs = d.status === "ready" && d.docs
+      ? `<details style="margin-top:6px"><summary class="mute" style="cursor:pointer">Read the draft</summary>`
+        + `<div class="reqlist" style="margin-top:6px">${kickDocsHtml(d.docs)}</div></details>` : "";
+    const link = d.kind !== "loose" ? "" : `
+      <div class="row" style="margin:8px 0 0;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div><label>Job or booking reference</label><input type="text" data-kh-target="${id}" value="${esc(d.job_id || "")}" placeholder="JOB-0002 or SVC-A1B2C3" style="width:200px"></div>
+        <button class="btn" data-kh-link="job" data-kh-id="${id}">Link to a job</button>
+        <button class="btn g" data-kh-link="service" data-kh-id="${id}">Link to a service</button>
+      </div>`;
+    return `<div class="hr"></div><div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${why}<b>${esc(i.title || "Untitled draft")}</b>`
+      + `<span class="mute">${esc(i.client_name || "")}</span><span class="mute">${forWhat} &middot; ${ago_(d.created_at)}</span></div>
+        <p class="mute" style="margin:6px 0 0">${explain}</p>${docs}${link}</div>`;
+  });
+
+  return `<div class="card" id="khHeld">${head(chip_("crit", h.rows.length + " to look at"))}`
+    + `<p class="conseq" style="margin:0">A draft is not a pack, and nothing here is client-facing. These are the drafts that did not turn into one on their own.</p>`
+    + msg + items.join("") + `</div>`;
+}
+
+// Linking by hand, the one control on this panel. The database has the last
+// word: both functions refuse a flagged draft, and the service one refuses a
+// booking that already has a pack. A linked pack starts at draft, and only
+// Approve on the pack makes it readable in the client's portal.
+function wireHeldDrafts(){
+  const host = $("khHeld"); if (!host) return;
+  host.querySelectorAll("[data-kh-link]").forEach((btn) => btn.addEventListener("click", async () => {
+    const id = btn.dataset.khId, toJob = btn.dataset.khLink === "job";
+    const target = ((host.querySelector(`[data-kh-target="${id}"]`) || {}).value || "").trim();
+    if (!target) {
+      KICK_HELD_MSG = { tone:"err", text: toJob ? "Type the job reference first, for example JOB-0002."
+                                               : "Type the service booking reference first, for example SVC-A1B2C3." };
+      renderTableView("kick");
+      return;
+    }
+    if (!confirm(`Creates a Kickoff Pack for ${target} from this draft. It starts as a draft, listed under Kickoff packs, and nothing reaches the client's portal until you press Approve on it there.\n\nLink this draft to ${target}?`)) return;
+    btn.disabled = true;
+    const { error } = await sb.rpc(toJob ? "link_kickoff_draft_to_job" : "link_kickoff_draft_to_service",
+      toJob ? { p_draft_id:id, p_job_id:target } : { p_draft_id:id, p_service_id:target });
+    KICK_HELD_MSG = error
+      ? { tone:"err", text: "The database refused this. " + error.message }
+      : { tone:"ok", text: `Linked to ${target}. The new pack is in the list below as a draft, waiting for your Approve.` };
+    await loadTableView("kick");
+  }));
 }
 
 async function preKick(rows){
   KICK_CTX = null;
+  KICK_HELD = await readHeldDrafts(rows || []);
   const draft = (rows || []).find(r => r.status === "draft") || (rows || [])[0];
   if (!draft) return;
   const { data, error } = await sb.from("kickoff_packs").select("*").eq("id", draft.id).maybeSingle();
@@ -4322,7 +4471,9 @@ const QP_DOCS = [
 ];
 const qpDocsHtml = docs => docsListHtml(QP_DOCS, docs);
 
-function panelKick(rows){
+function panelKick(rows){ return heldDraftsHtml() + newestPackHtml(rows); }
+
+function newestPackHtml(rows){
   if (!(rows || []).length || !KICK_CTX) return "";
   const { pack, error } = KICK_CTX;
   if (error) return softFail("The newest pack", error);
@@ -4623,9 +4774,11 @@ function renderTableView(k){
   $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
     : tableCard(v, rows));
-  // A panel is inert markup until something wires it. Only the Reports panel
-  // has a control today, so this is one call and not a framework.
+  // A panel is inert markup until something wires it. Two panels have a
+  // control, Reports and the held drafts on Kickoff packs, so these are
+  // two calls and not a framework.
   if (k === "reports") wireReportDrafter();
+  if (k === "kick") wireHeldDrafts();
 }
 
 // The one panel with a button in it.
@@ -4910,219 +5063,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawe
 
 // ---------------------------------------------------------------- router
 
-// ---- Price check ---------------------------------------------------------
-//
-// The Pricing agent, finally reachable. yaad/agents/pricing.py has existed
-// since the engine was written and ran nowhere but run_demo.py and the tests.
-//
-// THERE IS NO MODEL IN THIS. CLAUDE.md section 5: pricing is a lookup against
-// researched benchmarks, and "no public price exists in Jamaica for this work"
-// is a correct and complete answer rather than a gap to fill. The bands below
-// are generated from yaad/benchmarks.py; tests/test_price_benchmarks.py fails
-// if the copy in this page drifts from the engine's.
-//
-// The thresholds are ported verbatim from review_quote(): more than double the
-// top of the band is a red flag, above 1.3x is worth asking about, under half
-// the bottom is suspiciously low. They are deliberately coarse. This is a
-// conversation starter, not a valuation.
-
-// Three outcomes, not two, and the distinction is the whole honesty of this
-// panel.
-//
-// A family can have real bands and no ":*" default: plumbing has unclog, tank
-// and septic and nothing generic, and so do metalwork and grounds. Six of the
-// ten mapped trades are like that. The first version of this returned null for
-// them, which the panel rendered as "no public price exists in Jamaica for
-// this work". That sentence is FALSE for plumbing, and it is the single
-// sentence this whole product is built on, so saying it when it is not true is
-// as damaging as inventing a number. Fixed before this shipped anywhere.
-//
-//   band          a real reference to show
-//   need_variant  bands exist, say which kind of job. NOT a price claim.
-//   none          genuinely no public price. The honest answer, said out loud.
-function pcLookup(trade, variant){
-  const fam = PRICE_BENCHMARKS.taxonomy_to_benchmark[trade];
-  const b = PRICE_BENCHMARKS.bands;
-  if (!fam) return { state: "none" };
-  const hit = b[fam + ":" + (variant || "*")] || b[fam + ":*"];
-  if (hit) return { state: "band", band: hit };
-  const vs = Object.keys(b).filter(k => k.split(":")[0] === fam)
-                           .map(k => k.split(":")[1]).filter(v => v !== "*");
-  return vs.length ? { state: "need_variant", variants: vs } : { state: "none" };
-}
-
-function pcVariantsFor(trade){
-  const fam = PRICE_BENCHMARKS.taxonomy_to_benchmark[trade];
-  if (!fam) return [];
-  return Object.keys(PRICE_BENCHMARKS.bands)
-    .filter(k => k.split(":")[0] === fam)
-    .map(k => k.split(":")[1])
-    .filter(v => v !== "*");
-}
-
-/** review_quote(), ported. Returns a verdict and the lines behind it. */
-function pcReview(band, quoted){
-  const flags = [];
-  if (!band || band.low_jmd === null || band.high_jmd === null) {
-    flags.push("No public benchmark exists for this trade in Jamaica. Ask for the quote split into materials and labour, plus expected days on site, and check each half separately.");
-    return { verdict: "no benchmark, judged on structure only", flags };
-  }
-  flags.push("Benchmark figures are labour and call-out unless stated. If the quote includes the item itself (a tank, sheets, a grill), compare the labour half only. Always ask for the split.");
-  const lo = Number(band.low_jmd), hi = Number(band.high_jmd);
-  let verdict;
-  if (quoted > hi * 2) {
-    verdict = "red flag";
-    flags.push("Quoted J$" + quoted.toLocaleString() + " against a benchmark topping out near J$" + hi.toLocaleString() + ". More than double the reference. Worth a direct conversation before any deposit moves.");
-  } else if (quoted > hi * 1.3) {
-    verdict = "high, ask questions";
-    flags.push("Quoted J$" + quoted.toLocaleString() + " sits above the J$" + lo.toLocaleString() + " to J$" + hi.toLocaleString() + " reference. Could be legitimate (access, spec, post-Melissa materials). Ask for the split.");
-  } else if (quoted < lo * 0.5) {
-    verdict = "suspiciously low";
-    flags.push("Well under the reference. Underquoting usually reappears as a mid-job variation. Confirm what is excluded.");
-  } else {
-    verdict = "within the expected range";
-  }
-  return { verdict, flags };
-}
-
-const PC_TONE = { "red flag":"crit", "high, ask questions":"warn", "suspiciously low":"warn",
-                  "within the expected range":"ok", "no benchmark, judged on structure only":"mute" };
-
-/** Real quoted prices Yaadly has seen for this trade. Deliberately shows the
- *  spread and the count rather than an average: four quotes is not a market,
- *  and a mean of four numbers reads like an authority it has not earned. */
-function pcObservedHtml(obs){
-  if (!obs || !obs.length) {
-    return `<div class="dfield"><span class="dk">seen by Yaadly</span><span class="dv empty">no quotes recorded for this trade yet</span></div>`;
-  }
-  const nums = obs.map(o => Number(o.labour_jmd)).filter(n => n > 0).sort((a,b) => a - b);
-  if (!nums.length) return "";
-  const lo = nums[0], hi = nums[nums.length - 1], mid = nums[Math.floor(nums.length / 2)];
-  const span = lo === hi ? `J$${lo.toLocaleString()}` : `J$${lo.toLocaleString()} to J$${hi.toLocaleString()}`;
-  return `<div class="dfield"><span class="dk">seen by Yaadly</span><span class="dv">`
-    + `${nums.length} real quote${nums.length === 1 ? "" : "s"}, ${esc(span)} labour`
-    + `${nums.length > 2 ? `, middle one J$${mid.toLocaleString()}` : ""}`
-    + `<small>Observed, not researched. These are what workers actually asked for, and for the trades with no public price they are the only figures there are.</small>`
-    + `</span></div>`;
-}
-
-async function loadPriceCheck(){
-  const trades = Object.keys(PRICE_BENCHMARKS.taxonomy_to_benchmark);
-  const sel = $("pcTrade");
-  if (sel && !sel.options.length) {
-    sel.innerHTML = trades.map(t => `<option>${esc(t)}</option>`).join("");
-    const syncVariants = () => {
-      const vs = pcVariantsFor(sel.value);
-      $("pcVariant").innerHTML = `<option value="">not sure</option>` + vs.map(v => `<option>${esc(v)}</option>`).join("");
-    };
-    sel.onchange = syncVariants; syncVariants();
-    $("pcRun").onclick = runPriceCheck;
-  }
-  await loadPriceLog();
-}
-
-async function runPriceCheck(){
-  const trade = $("pcTrade").value;
-  const variant = $("pcVariant").value || null;
-  const quoted = Number($("pcAmount").value);
-  if (!(quoted > 0)) return say("pcMsg","err","Put in the figure the worker quoted, in J$.");
-  say("pcMsg","ok","Looking it up.");
-
-  // What Yaadly has actually seen quoted for this trade. Observations, not
-  // judgements: every submitted quote lands in price_observations by trigger
-  // (20260905a). This is the half that closes the gap the bands admit to,
-  // because for painting, masonry, septic and general repair the researched
-  // answer is "no public price exists in Jamaica" and these are the only real
-  // figures there will ever be.
-  const { data: obs } = await sb.from("price_observations")
-    .select("labour_jmd,materials_jmd,days_estimate,parish,observed_at")
-    .eq("trade", trade).order("observed_at", { ascending: false }).limit(50);
-
-  const look = pcLookup(trade, variant);
-  if (look.state === "need_variant") {
-    // Deliberately makes NO claim about price. There are bands here; the
-    // question is which job this is.
-    $("pcOut").innerHTML =
-      `<div class="card" style="padding:16px">
-        <b style="font-size:16px">${esc(trade)}</b>
-        <p style="margin-top:8px">There are researched bands for this trade, but they are per kind of job and none of them is a general figure. Say which one this is and check it again.</p>
-        <div class="dfield"><span class="dk">bands on file</span><span class="dv">${look.variants.map(esc).join(", ")}</span></div>
-        <p class="note" style="margin-top:8px">This is not a statement that no price exists. It is a question about which job you mean.</p>
-      </div>`;
-    return say("pcMsg","warn","Pick the kind of job from the variant list, then check it again.");
-  }
-  const band = look.state === "band" ? look.band : null;
-  const r = pcReview(band, quoted);
-  const gbp = Math.round(quoted / PRICE_BENCHMARKS.jmd_per_gbp);
-
-  const bandLine = (band && band.low_jmd !== null)
-    ? `J$${Number(band.low_jmd).toLocaleString()} to J$${Number(band.high_jmd).toLocaleString()} (about GBP ${band.low_gbp} to ${band.high_gbp})`
-    : "no public price exists in Jamaica for this work";
-
-  $("pcOut").innerHTML =
-    `<div class="card" style="padding:16px">
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline;margin-bottom:10px">
-        <b style="font-size:16px">${esc(trade)}${variant ? " · " + esc(variant) : ""}</b>
-        ${chip_(PC_TONE[r.verdict] || "mute", r.verdict)}
-      </div>
-      <div class="dfield"><span class="dk">quoted</span><span class="dv">J$${quoted.toLocaleString()} (about GBP ${gbp.toLocaleString()})</span></div>
-      <div class="dfield"><span class="dk">reference</span><span class="dv">${esc(bandLine)}</span></div>
-      <div class="dfield"><span class="dk">confidence</span><span class="dv">${esc(band ? band.confidence : "none")}</span></div>
-      <div class="dfield"><span class="dk">source</span><span class="dv">${esc(band ? band.source : "no benchmark on file")}</span></div>
-      ${band && band.note ? `<div class="dfield"><span class="dk">note</span><span class="dv">${esc(band.note)}</span></div>` : ""}
-      <ul class="reqlist" style="margin-top:10px">${r.flags.map(f => `<li>${esc(f)}</li>`).join("")}</ul>
-      ${pcObservedHtml(obs)}
-      <p class="note" style="margin-top:10px">${esc(PRICE_BENCHMARKS.market_context)}</p>
-      <p class="note" style="margin-top:8px"><b>A reference, not an estimate.</b> Never show this to a client or a worker.</p>
-      <button id="pcLog1" class="btn" type="button" style="margin-top:12px">Log this review</button>
-    </div>`;
-  say("pcMsg","ok","Checked. Nothing is saved until you log it.");
-
-  $("pcLog1").onclick = async () => {
-    $("pcLog1").disabled = true;
-    const { data: who } = await sb.auth.getUser();
-    const { error } = await sb.from("quote_reviews").insert({
-      trade, variant, quoted_jmd: quoted,
-      band_low_jmd: band ? band.low_jmd : null,
-      band_high_jmd: band ? band.high_jmd : null,
-      confidence: band ? band.confidence : "none",
-      source: band ? band.source : "no benchmark on file",
-      verdict: r.verdict,
-      job_id: ($("pcJob").value || "").trim() || null,
-      notes: ($("pcNotes").value || "").trim() || null,
-      reviewed_by: (who && who.user && who.user.email) || "unknown",
-    });
-    if (error) { $("pcLog1").disabled = false; return say("pcMsg","err","That did not save: " + esc(error.message)); }
-    say("pcMsg","ok","Logged. That is one more real price on the record.");
-    await loadPriceLog();
-  };
-}
-
-async function loadPriceLog(){
-  const { data, error } = await sb.from("quote_reviews")
-    .select("trade,variant,quoted_jmd,band_low_jmd,band_high_jmd,verdict,confidence,parish,job_id,notes,created_at")
-    .order("created_at", { ascending: false }).limit(50);
-  if (error) return say("pcMsg","err","Could not read the log: " + esc(error.message));
-  if (!data || !data.length) { $("pcLog").innerHTML = `<div class="empty"><b>Nothing logged yet.</b><br>Every check you log is one more real Jamaican price on the record.</div>`; return; }
-  $("pcLog").innerHTML =
-    `<div class="tw"><table><thead><tr><th>Trade</th><th>Quoted</th><th>Reference</th><th>Verdict</th><th>Job</th><th>When</th></tr></thead><tbody>` +
-    data.map(r => `<tr>
-      <td>${esc(r.trade)}${r.variant ? sub_(r.variant) : ""}</td>
-      <td class="num">J$${Number(r.quoted_jmd).toLocaleString()}</td>
-      <td>${r.band_low_jmd !== null ? "J$" + Number(r.band_low_jmd).toLocaleString() + " to J$" + Number(r.band_high_jmd).toLocaleString() : mute_("no public price")}</td>
-      <td>${chip_(PC_TONE[r.verdict] || "mute", r.verdict)}</td>
-      <td>${r.job_id ? id_(r.job_id) : mute_("none")}</td>
-      <td>${mute_(ago_(r.created_at))}</td></tr>`).join("") +
-    `</tbody></table></div>`;
-}
-
 // Which lanes of the day band are open. Yours starts open because it is the
 // only lane where nothing at all happens until she acts; the rest are a
 // summary line until she asks for them. Kept out of the render so a toggle
 // does not re-read the database.
 const OVLANE = { you:true, wrk:false, cli:false, non:false, clr:false };
 
-const BESPOKE = { pricecheck: loadPriceCheck, over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees, materials: loadMaterials };
+const BESPOKE = { over: loadOverview, day: loadOverview, stats: loadOverview, invoices: loadInvoices, sketch: loadSketchPacks, money: loadMoney, health: loadHealth, jobinv: loadJobInvoices, fees: loadAgencyFees, materials: loadMaterials };
 let currentView = "over";
 
 function go(v){

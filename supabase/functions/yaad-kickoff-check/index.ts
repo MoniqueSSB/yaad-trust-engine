@@ -26,8 +26,9 @@ import { Trace, SpanKind, httpAttrs } from "./otel.ts";
 //    own guardrail flags and, only if clean, becomes that quote's own
 //    Kickoff Pack directly at status 'approved' - the automatic half of
 //    what link_kickoff_draft_to_job() does by hand for the admin desk. A
-//    dirty draft is left exactly where it is, visible in the desk's own
-//    Kickoff Drafts view, for a human to notice and fix; nothing here ever
+//    dirty draft is left exactly where it is, visible on the desk's
+//    Kickoff packs view under "Drafts that did not become a pack", for a
+//    human to notice and fix; nothing here ever
 //    issues flagged content, the same hard rule 20260831zzzz11 put on the
 //    manual door.
 //
@@ -350,8 +351,8 @@ Deno.serve(async (req: Request) => {
 
     // ── Phase 2b: the same for a finished service draft. The booking's
     // pack is built and left at 'draft' for a person to approve; a dirty
-    // draft never gets that far and stays in the desk's Kickoff Drafts
-    // view, linkable with link_kickoff_draft_to_service once fixed. ──────
+    // draft never gets that far and stays on the desk's Kickoff packs
+    // view, under "Drafts that did not become a pack", until fixed. ──────
     const { data: readySvcDrafts } = await admin.from("kickoff_drafts")
       .select("id,service_id,intake,docs,model,guardrail")
       .not("service_id", "is", null).eq("status", "ready");
