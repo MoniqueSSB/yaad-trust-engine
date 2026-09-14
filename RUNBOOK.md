@@ -5103,3 +5103,18 @@ Since `20260913223042` (13 Sep 2026), `raise_job_stage_worker_payable()` raises 
 
    It should return nothing. A row there was raised by something other than an approval. Do not pay it. Void it from the desk and tell Monique before anything else.
 3. If someone rewrites this function in a new migration, end that migration with `revoke all on function public.raise_job_stage_worker_payable(text, integer) from public, anon, authenticated;`. Revoking from `public` alone does not remove the grant Supabase gives `anon` and `authenticated`, which is how this was left open. Never add `grant ... to authenticated`, and never replace the hold point with an `is_admin()` check. The trigger runs in the approver's session, so an admin check would quietly stop every stage payable.
+
+## A client's bill needs checking before it goes, or needs to go out in parts
+
+Raising never emails anybody (13 Sep 2026). The reasoning is in DECISIONS.md, "Raising a bill never sends it".
+
+1. **Raise it.** Job Invoices or Agency Fees, press **Raise draft** on the job. The whole bill opens on the Invoices view as a draft: the work, Guarantee & Support 15%, and materials at cost. Nothing has been sent.
+2. **Change it.** Edit any line, add or remove one, then press **Save changes**. Job bills are in whole Jamaican dollars, so J$4,000 is typed as 4000.
+3. **Send it whole.** Press **Preview** and read what the client will read. Then press **Email J$… to …**. That emails exactly the preview and freezes the invoice. If you sent it yourself another way, use **Mark as sent, I sent it myself** instead.
+4. **Or send part of it.** Tick the lines you want now under **Request now**. For part of a line, type the amount in the box beside it. The Guarantee & Support line only moves whole. Press **Request the ticked lines as a part**. A new numbered draft opens for just those amounts, and they come off the bill. Preview it, then email it.
+5. **Read where it stands.** Open the bill, from Job Invoices or Agency Fees with **Open**. Under the total it lists every part: its number, amount, what it covers, when it was sent and paid, and which one starts the job. What is left is the balance on the bill itself. Send that last, the same way as step 3.
+6. **When money arrives.** Open the part or the bill it paid and press **Mark as paid**. Whichever invoice carries the Guarantee & Support line starts the job when it is marked paid. A paid part without it does not.
+7. **Taking a part back.** While the bill is still a draft, **Void** the part and its amount goes back onto the bill. Once the balance has gone out the database refuses, because the amount would drop off the job's billing with nowhere to go. In that case raise a new invoice for it by hand, from the free-text draft at the top of the Invoices view. A bill with a live part cannot be voided at all until its parts are.
+8. **Proving it still holds.** Run `supabase/tests/invoice_parts_guards.sql` with `execute_sql`, when nobody is invoicing. Every line should read PASS. It borrows a TEST job, rolls everything back and puts the invoice number counter back where it was, so it leaves nothing behind.
+
+**Deploying this.** Apply `20260913233000_a_job_bill_can_be_requested_in_parts.sql` first, then deploy the desk and the web app. Both read `part_of` and `starts_job`, and a query that names a column the database does not have yet fails as a whole: Job Invoices would show "Could not read jobs", and the portal's job page would lose its invoices.

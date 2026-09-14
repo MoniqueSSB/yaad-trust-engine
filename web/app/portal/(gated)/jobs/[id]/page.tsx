@@ -307,7 +307,7 @@ export default async function JobRoom({
          place for that rule to drift out of step with Postgres. */
       supabase
         .from("invoices")
-        .select("id,status,total_pence,currency,stage,payable_to,issue_date,paid_at,period_label")
+        .select("id,status,total_pence,currency,stage,payable_to,issue_date,paid_at,period_label,starts_job,part_of")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       /* The other route to a payment schedule. A job goes through EITHER a
@@ -687,7 +687,11 @@ export default async function JobRoom({
      number, and every branch is one a job can actually be in. */
 
   const invoices = (invoiceRows ?? []) as InvoiceRow[];
-  const feeInvoice = invoices.find((i) => i.payable_to !== "worker");
+  /* The invoice whose payment starts the job: whichever one carries the
+     Guarantee & Support line, the whole-job bill or a part of it
+     (20260913233000). Not simply the first invoice to Yaadly: a job billed
+     in parts can have one part paid while the fee is still owed. */
+  const feeInvoice = invoices.find((i) => i.starts_job);
   const feeJmd = labour == null ? null : Math.round(labour * 0.15);
   const matReleases = (materialsRows ?? []) as {
     amount_jmd: number; released_at: string | null; stage: number | null; receipt_ref: string;

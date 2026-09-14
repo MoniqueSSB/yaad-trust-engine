@@ -3182,3 +3182,25 @@ Decision: the link comes off, by turning **Deploy to production** off in the pro
 **Applied to production 13 Sep 2026, on Monique's instruction**, by `execute_sql` and recorded by hand in `supabase_migrations.schema_migrations` as `20260913223042`. Read back afterwards: the ACL is `postgres` and `service_role` only, `has_function_privilege` is false for `anon` and `authenticated`, the body carries the hold point and still the 5%, and the trigger still names this function. `supabase/tests/invoicing_guards.sql` gains tests 12 to 14 for the two grants and the hold point. The trigger path, with an approval present, was not exercised end to end in production, because `new_invoice_number()` takes a sequence value that no rollback gives back, so a test run would leave a gap in real invoice numbers. It rests on the ACL read above. The suite was run against production the same evening: 12, 13 and 14 PASS. Tests 1 and 2 FAIL, for a reason unrelated to this change: they still expect the retainer's founding price at 39500, and `20260912090000` moved it to 49500. The guard they exercise works (the model's 1p was overwritten with the catalogue price). Those two assertions were left untouched, as §3 of CLAUDE.md requires. The same run found no worker payable in production without a stage approval behind it.
 
 **Flagged, not fixed here.** A sweep of every `SECURITY DEFINER` function that `anon` can execute, to find any other one that relies on "revoked from public" rather than a check in its own body.
+
+## Raising a bill never sends it, and a job bill can be requested in parts (13 Sep 2026)
+
+**What was wrong.** "Raise & send" on Job Invoices and Agency Fees raised the client's whole bill and emailed it in the same click. The row beside the button showed J$600, the 15% alone, while the email carried J$5,400 for the same job: the labour, the 15% and the materials. Nothing could be read or changed before it left. The service card on Invoices did the same with a catalogue price.
+
+**Decision, founder instruction.** Raising writes a draft and opens it in the invoice editor. It is read, changed and previewed there, and only emailed by a separate click whose label names the amount and the address. The job rows show the whole bill, with the 15% inside it.
+
+A draft whole-job bill can be requested in parts: tick whole lines, or type an amount off a line. Each part is its own numbered invoice (her decision, taken over one invoice with payment requests against it), and each part takes its amount off the bill. So every total on the desk, which sums invoices one by one, still counts each amount once. The bill lists its parts with their sent and paid dates.
+
+The job starts when the agency fee is paid, whichever invoice carries it (her decision). `invoices.starts_job` marks that invoice, and the Guarantee & Support line (`invoice_lines.is_fee`) moves whole, never split, taking the flag with it. `sync_job_status()` and `start_job_on_agency_fee_paid()` read the flag instead of "stage is null", which had also counted a stage-less worker payable. Checked live before changing it: no job relied on that.
+
+Two refusals keep money on one document. A bill with a live part cannot be voided. A part cannot be voided once the balance has gone out, because its amount would drop off the job's billing with nowhere to go. Voiding a part while the bill is still a draft puts its amount, and the fee flag if it had it, back on the bill.
+
+**No human gate moved.** Requesting a part writes a draft and emails nobody. Sending, marking paid and voiding are the same named-human clicks they were.
+
+**Also fixed on the way.** The invoice editor treated every amount as pence and showed it in pounds, so a JMD job bill displayed as pounds, and a J$4,000 typed into "my figure" would have saved as J$400,000.
+
+**Where it lives.** `20260913233000_a_job_bill_can_be_requested_in_parts.sql` (columns, backfill, the two job-start functions, `raise_job_client_invoice()` marking its fee line, `request_invoice_part()`, the void guard and restore), the Invoices, Job Invoices and Agency Fees views of `concierge/concierge.html`, and the portal job page's payment step. Proof in `supabase/tests/invoice_parts_guards.sql`, which borrows a TEST job, runs inside a block that is rolled back, so nothing persists and nothing queued through pg_net is sent, and puts `invoice_seq` back afterwards.
+
+**Order matters when this goes live.** The migration first, then the desk and the web app. Both now name `part_of` and `starts_job` in a query, and a query naming a column that does not exist fails as a whole.
+
+**Left as it was.** `yaad-invoice`'s send action is unchanged. Its comment still describes the old one-click raise, which no longer calls it that way; the behaviour it implements, email then mark sent only on success, is exactly what the new Email button needs.
