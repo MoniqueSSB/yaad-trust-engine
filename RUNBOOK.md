@@ -5372,3 +5372,15 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 6. **"Saving bank details is not switched on yet"** means `WISE_API_TOKEN` is not set. **"Not available right now"**: Supabase, Edge Functions, `yaad-wise-recipient`, Logs. Only the HTTP status and Wise's error codes are logged, never the details.
 7. **If the key may have leaked:** revoke it in Wise at once, create a new one, set the secret again. Recipients already in Wise are unaffected. Treat it as a possible exposure of workers' bank details and note it in the data protection record.
 8. **Proving the rules hold:** run `supabase/tests/worker_bank_callback_guards.sql` with `execute_sql`. Eight lines, all PASS; nothing is kept.
+
+## A worker's question went to the client as their report, or was filed as evidence
+
+**What it looked like, 15 September 2026.** The worker was asked "reply 1 to send this report or send your own version", typed "how do i share my location", and the assistant sent that sentence to the client as the status update ("Sent to the client, your own words"). Two further replies, "no" and "share location", were filed as evidence text on the job. Every worker prompt on WhatsApp was greedy: it treated any reply as the answer it was waiting for.
+
+**What happens now (`supabase/functions/yaad-inbound/worker-question.ts`).** A reply that reads as a question, a trailing question mark or an opening question word in English or Patois, is stopped at four prompts: the report confirm, "what does this show?", "which section is this?", and the plain update lane for a worker on a live job. Nothing is sent, nothing is filed, the session is kept, and the reply repeats what is still wanted. Two questions the app answers itself with a fixed sentence: how to share a location and how to send a video. Everything else goes to you: a high-priority push titled "Worker question: JOB-…" and a text to your phone with their exact words, and the worker is told "Someone at Yaadly will answer it here." The thread is NOT handed over, so their photos still file while they wait.
+
+**To answer them:** desk, Conversations, their number, "Reply from the Yaadly number". Your reply holds the thread, as any desk reply does, so press "Hand back to the assistant" afterwards or their next photo lands in the held branch instead of on the job.
+
+**If a real update is being stopped as a question:** the detector is two expressions at the top of `worker-question.ts` and the negative cases are the bulk of `worker-question_test.ts`. Add the sentence that was wrongly caught to that list first, then adjust the expression until the suite passes. Never widen the question side without adding a negative case, because a false positive here means a worker's real update quietly stops reaching the client.
+
+**"Someone at Yaadly has this" on every worker message, including photos:** that is a different fault, the number is held (`human_handling` true on `intake_threads`). See "The handoff is automatic" above and hand it back.

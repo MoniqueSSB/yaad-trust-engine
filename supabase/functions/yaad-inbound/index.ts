@@ -22,6 +22,7 @@ import { shouldEscapeLane, wantsAPerson } from "./escape-hatch.ts";
 import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
+import { answerWorkerQuestion, looksLikeQuestion } from "./worker-question.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { withStatusCallback } from "./twilio-status.ts";
 
@@ -1536,6 +1537,37 @@ async function pushToDesk(
   } catch (_) { /* never let a notification break intake */ }
 }
 
+// A worker's question, asked while a prompt was waiting for something else.
+//
+// Answers the two the app can answer itself (worker-question.ts), and puts
+// every other one in front of a person, as a note on the desk and a text to
+// her phone with the worker's own words. Either way the reply repeats what
+// the waiting prompt still wants, because the prompt is left exactly where it
+// was: nothing is sent to the client, nothing is filed, no session is
+// deleted. Deliberately does NOT hand the thread over: a held number
+// silences every worker lane on it, which is the wrong price for asking how
+// to send a clip. Her reply from the desk will hold it, as any desk reply
+// does, and the desk hands it back.
+async function answerOrRaiseWorkerQuestion(
+  supabase: SettingsReader,
+  msg: { text: string; from: string; channel: string },
+  jobId: string,
+  stillWanted: string,
+  trace: Trace,
+): Promise<string> {
+  const canned = answerWorkerQuestion(msg.text);
+  if (canned) return `${canned} ${stillWanted}`;
+  await pushToDesk(supabase, {
+    target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+    title: `Worker question${jobId ? `: ${jobId}` : ""}`,
+    priority: "high",
+    tags: "question",
+    body: `${jobId ? `${jobId}: ` : ""}a worker asked something the assistant does not answer. Their words are on your phone. The job lane is still open for them.`,
+    alsoText: `Yaadly, a worker has a question.\n\nThey asked:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown number"} on ${msg.channel}.${jobId ? ` Job ${jobId}.` : ""} Nothing was sent to the client and nothing was filed. Reply from the desk to answer them.`,
+  }, trace);
+  return `That reads as a question, so it has not gone to the client and it is not on the job record. Someone at Yaadly will answer it here. ${stillWanted}`;
+}
+
 async function notifyAdmin(
   supabase: SettingsReader,
   job: { id: string; trade: string; parish: string; title: string; urgency: string;
@@ -2512,6 +2544,17 @@ Deno.serve(async (req: Request) => {
       if (!deskHasThisNumber && reportSession && !msg.media.length && msg.text.trim()) {
         const a = reportSession.answers as any;
         const said = msg.text.trim();
+        // A question is not their own version of the report. On 15 September
+        // 2026 "how do i share my location" went to the client as the status
+        // update. The draft stays waiting; see worker-question.ts.
+        if (said !== "1" && looksLikeQuestion(said)) {
+          root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "question_not_report" });
+          return twiml(await answerOrRaiseWorkerQuestion(
+            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""),
+            "Your report to the client is still waiting: reply 1 to send it as drafted, or send your own words and those go instead.",
+            trace,
+          ));
+        }
         const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
         const { error } = await supabase.rpc("relay_confirmed_report", {
           p_job: a.job_id, p_override_text: overrideText, p_ai_summary: a.ai_summary ?? "",
@@ -2715,6 +2758,16 @@ Deno.serve(async (req: Request) => {
         // approved without a before is a separate question, and a human's, not
         // this webhook's.
         if (awaitingPhase && confirmedJob) {
+          // A question is not a section answer, and "never blocks" must not
+          // mean a worker's question gets filed as an unmarked photo caption.
+          // The photos stay parked and the question stays asked.
+          if (looksLikeQuestion(msg.text)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_phase" });
+            return twiml(await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, confirmedJob.id,
+              `Your photos are still waiting to be filed. ${PHASE_QUESTION}`, trace,
+            ));
+          }
           const phase = readPhaseAnswer(msg.text) ?? null;
 
           // An after may name the before it answers on the same reply, "A P3".
@@ -2756,6 +2809,14 @@ Deno.serve(async (req: Request) => {
         // it shows rather than it being filed as "Sent on WhatsApp" and
         // left for the client to guess at.
         if (confirmedJob) {
+          // Same rule as the section question: a question is not a caption.
+          if (looksLikeQuestion(msg.text)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_context" });
+            return twiml(await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, confirmedJob.id,
+              "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace,
+            ));
+          }
           const context = msg.text.trim().slice(0, 140);
           const described = context
             ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
@@ -3364,6 +3425,16 @@ Deno.serve(async (req: Request) => {
         const text = msg.text.trim();
         if (text) {
           const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+          // A worker's question is not a site update and must not become the
+          // basis of a drafted report. Only for a number that IS a worker on
+          // a live job: anyone else falls through to intake as before.
+          if (found && looksLikeQuestion(text)) {
+            root.setAttributes({ "yaadly.worker_update.outcome": "question_not_update" });
+            return twiml(await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, found.jobs.length === 1 ? found.jobs[0].id : "",
+              "Anything you send about the work itself still goes on the job record as normal.", trace,
+            ));
+          }
           if (found && found.jobs.length === 1) {
             const job = found.jobs[0];
             const { error } = await supabase.from("evidence").insert({
