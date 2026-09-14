@@ -93,7 +93,7 @@ export function MoneyPanel({
   takeHome: number | null;
   invoices: InvoiceRow[];
   money: (n: number | null | undefined) => string | null;
-  /** J$ of the materials line already paid out against a receipt; 0 if none */
+  /** J$ of the materials line already released to the worker; 0 if none */
   materialsReleased: number;
   /** The check the client added, already included in allIn. */
   check?: CheckTotalLine | null;
@@ -143,8 +143,8 @@ export function MoneyPanel({
                   caption={
                     materialsReleased > 0
                       ? (money(materialsReleased) ?? "") +
-                        " released to the worker against a receipt. Never fee'd on either side."
-                      : "Paid to the worker against a receipt before labour starts, once the client has said where materials are kept. Not released yet. Never fee'd on either side."
+                        " released to the worker to buy the goods. The receipt comes back afterwards. Never fee'd on either side."
+                      : "Paid to the worker so they can buy the goods, once the client has paid for them and said where materials are kept. The receipt comes back afterwards. Not released yet. Never fee'd on either side."
                   }
                 />
               )}

@@ -5211,3 +5211,14 @@ Job bills are kept in whole Jamaican dollars and service invoices in pence, in t
 **Service role callers are exempt on purpose** (WhatsApp evidence in `yaad-inbound` files against `jobs.stage` itself; job form photos in `yaad-post-job` are intake). If WhatsApp evidence lands on the wrong stage, the fault is in `yaad-inbound`, not the trigger.
 
 **The job page draws the same rule** (`stageLock` in `web/lib/portal/evidence-sections.ts`): only the current stage's card has "Add evidence to stage N". If the page offers a stage the database refuses, the two have drifted, and the database is the one to trust.
+
+## Materials money will not release, or a receipt is still to come
+
+Since 14 September 2026 (`20260914112000`) materials money goes to the worker **before** the goods are bought, once the client has paid for them. The receipt comes back afterwards.
+
+1. **Release it.** Desk, Materials view. The row shows what the client has paid for, what has gone out and what is left. Press **Release materials money**. The receipt box can stay empty; it usually comes later.
+2. **"The client has paid J$X for materials..."** The bill carrying the materials is not marked paid yet. Mark it paid on Invoices first (or, on a bill in parts, the part carrying the materials line). The database counts only paid invoices, and only lines that still read "Materials, at cost". If somebody retyped that line in the invoice editor, it no longer counts: put the wording back rather than working round it.
+3. **"...no materials store nominated..."** The client has not said where materials are kept. Unchanged: ask them.
+4. **Record the receipt when it arrives.** Same row: each release still waiting shows **receipt to come** with a box. Type the reference as printed and press **Record receipt**. It is stamped with your email and time. A recorded receipt cannot be overwritten; a wrong one is corrected with a note, not retyped.
+5. **Who still owes a receipt:** `select * from public.materials_open_releases;` (released, no receipt, oldest first) and `select * from public.materials_reconciliation;` per job.
+6. **Proving the rules still hold:** run `supabase/tests/materials_release_guards.sql` with `execute_sql`, when nobody is invoicing. Eleven lines, all PASS. It rolls itself back.

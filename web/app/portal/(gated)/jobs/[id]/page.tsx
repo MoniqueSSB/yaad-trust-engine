@@ -343,8 +343,10 @@ export default async function JobRoom({
         .eq("status", "approved")
         .limit(1)
         .maybeSingle(),
-      /* Materials money moves BEFORE any labour stage, against a receipt
-         (20260828c), and until now the room never showed it moving. RLS
+      /* Materials money moves BEFORE the goods are bought, once the client
+         has paid for them, and the receipt comes back afterwards
+         (20260914112000; it was "against a receipt"
+         under 20260828c), and until now the room never showed it moving. RLS
          returns rows to the job's own client and worker only. */
       supabase
         .from("materials_releases")
@@ -809,15 +811,43 @@ export default async function JobRoom({
       });
     }
   }
+  /* Materials money goes out before the goods are bought, once the client
+     has paid for them, and the receipt comes back afterwards
+     (20260914112000). This row used to say "against a receipt", which in
+     practice made the worker buy the materials first. A job past
+     awaiting_payment has had the bill that starts it paid. */
   if (won && materialsQuoted > 0 && materialsReleasedJmd === 0 && job.status !== "complete") {
+    const billPaid = job.status !== "awaiting_payment";
     outstanding.push({
       who: "yaadly",
-      title: "Materials tranche not yet released",
+      title: billPaid ? "Materials money not yet released" : "Materials money goes out once the bill is paid",
       detail:
         (money(materialsQuoted) ?? "The materials line") +
-        " is paid to the worker against a receipt before labour starts. Yaadly releases it once the receipt and the storage evidence are in.",
+        (billPaid
+          ? " goes to the worker so they can buy the goods. A person at Yaadly releases it now the bill is paid. The receipt and a photo of the materials in the store come back afterwards."
+          : " goes to the worker so they can buy the goods, released by a person at Yaadly once " +
+            (isClient ? "your" : "the client's") +
+            " bill is paid. The receipt and a photo of the materials in the store come back afterwards."),
       href: jobBase + "?tab=materials#materials-money",
       cta: "See it",
+    });
+  }
+  /* The receipt milestone: money only, not a stage. Each release with no
+     receipt recorded against it is a receipt still to come, the same reading
+     the desk's materials_open_releases view uses. */
+  const receiptsDue = matReleases.filter((m) => m.released_at && !m.receipt_ref?.trim());
+  if (receiptsDue.length && job.status !== "complete") {
+    const dueJmd = receiptsDue.reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
+    outstanding.push({
+      who: isClient ? "them" : "you",
+      title: isClient ? "The materials receipt is due from the worker" : "Send the materials receipt and a photo",
+      detail: isClient
+        ? (money(dueJmd) ?? "Materials money") +
+          " went to the worker to buy the goods. The receipt and a photo of the materials in the store come next, and Yaadly records them."
+        : (money(dueJmd) ?? "Materials money") +
+          " was paid to you to buy the goods. Upload the supplier receipt under Files, and file a photo of the materials in the store as materials evidence.",
+      href: isClient ? jobBase + "?tab=materials#materials-money" : jobBase + "#files",
+      cta: isClient ? "See it" : "Upload the receipt",
     });
   }
   for (const inv of invoices) {
@@ -1769,7 +1799,9 @@ export default async function JobRoom({
                 <li key={i} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg/40 px-3.5 py-2.5 text-[12.5px]">
                   <b className="text-ink">{money(m.amount_jmd)}</b>
                   {m.stage != null && <span className="text-dim">Stage {m.stage}</span>}
-                  <span className="text-dim">{m.receipt_ref}</span>
+                  <span className="text-dim">
+                    {m.receipt_ref?.trim() ? "Receipt " + m.receipt_ref : "Receipt to come"}
+                  </span>
                   <span className="ml-auto text-dim">
                     {m.released_at ? whenDate(m.released_at) : "not yet released"}
                   </span>
@@ -1778,8 +1810,10 @@ export default async function JobRoom({
             </ul>
           ) : (
             <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-              Nothing released yet. Yaadly releases this against a receipt and
-              the storage evidence, before labour starts.
+              Nothing released yet. A person at Yaadly releases this to the
+              worker once the client&apos;s bill is paid, so the goods can be
+              bought. The receipt and a photo of the materials in the store
+              come back afterwards.
             </p>
           )}
         </section>
