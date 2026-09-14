@@ -65,9 +65,13 @@ describe("the null shapes differ on purpose", () => {
   });
 });
 
-describe("amount, for invoices in minor units", () => {
-  test("JMD rounds like everything else J$", () => {
-    assert.equal(m.amount(123456789, "JMD"), "J$1,234,568");
+describe("amount, for invoices", () => {
+  /* This used to assert amount(123456789, "JMD") === "J$1,234,568", which
+     encoded the wrong storage: JMD invoices hold whole dollars in total_pence.
+     Replaced on 14 Sep 2026 with the live verandah bill, INV-2026-0021. */
+  test("JMD is stored in whole dollars, so it is not divided", () => {
+    assert.equal(m.amount(134250, "JMD"), "J$134,250");
+    assert.equal(m.amount(5400, "jmd"), "J$5,400");
   });
 
   test("card currencies keep both decimals, because a statement has them", () => {
@@ -82,7 +86,9 @@ describe("amount, for invoices in minor units", () => {
   });
 
   test("currency is matched case insensitively", () => {
-    assert.equal(m.amount(14900, "jmd"), "J$149");
+    // JMD in whole dollars, see the first test in this block.
+    assert.equal(m.amount(14900, "jmd"), "J$14,900");
+    assert.equal(m.amount(14900, "gbp"), "£149.00");
   });
 
   test("a missing total says so in words rather than printing a dash", () => {

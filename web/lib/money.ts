@@ -24,8 +24,13 @@
  *   jmdOrBlank()  null in, empty string out, for a caller that concatenates
  *
  * amount() is the separate multi-currency case: invoices are raised in GBP,
- * USD, CAD or JMD, they are stored in minor units, and only J$ is rounded.
- * The others keep their two decimals because a card statement has them.
+ * USD, CAD or JMD. GBP, USD and CAD are stored in minor units and keep their
+ * two decimals because a card statement has them. JMD is stored in WHOLE
+ * dollars, despite the column being called total_pence: every job invoice
+ * (raise_job_client_invoice, parts, stage payables) writes J$134,250 as
+ * 134250. Until 14 Sep 2026 this divided JMD by 100 as well, so the job
+ * room's Approvals tab showed that bill as J$1,343. WorkerInvoices already
+ * read it as whole dollars.
  */
 
 /** J$ with thousands separators and no decimals. */
@@ -53,9 +58,9 @@ export function jmdOrBlank(n: number | null | undefined): string {
  */
 export function amount(totalMinorUnits: number | null, currency: string | null): string {
   if (totalMinorUnits == null) return "not set";
-  const n = totalMinorUnits / 100;
   const cur = (currency ?? "GBP").toUpperCase();
-  if (cur === "JMD") return jmd(n);
+  if (cur === "JMD") return jmd(totalMinorUnits);
+  const n = totalMinorUnits / 100;
   if (cur === "USD") return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
   if (cur === "CAD") return "C$" + n.toLocaleString("en-US", { minimumFractionDigits: 2 });
   return "£" + n.toLocaleString("en-GB", { minimumFractionDigits: 2 });

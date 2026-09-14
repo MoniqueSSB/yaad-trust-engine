@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { amount, gbp } from "@/lib/money";
 import { whenDate } from "@/lib/date";
+import { invoiceLabel } from "@/lib/portal/invoice-label";
 
 /**
  * What this job costs, what has been invoiced, and the rules that govern
@@ -64,7 +65,7 @@ const TERMS: { title: string; body: string }[] = [
   },
   {
     title: "The Yaadly fee is 15%, once",
-    body: "Calculated on the labour price and invoiced at the start of the job. It does not change as stages complete.",
+    body: "Calculated on the labour price and charged once, as a line on the job bill. It does not change as stages complete.",
   },
   {
     title: "If something is wrong, say so",
@@ -131,7 +132,7 @@ export function MoneyPanel({
                 label={side === "client" ? "Worker labour" : "Your labour price"}
                 value={money(labour) ?? "—"}
                 width={fee != null && labour != null ? Math.round((labour / (labour + fee)) * 100) : 100}
-                caption="Paid across the payment stages in the Kickoff Pack, each one paid once that stage has been accepted and checked."
+                caption="Paid to the worker stage by stage, as the agreed schedule sets out, each stage once it has been accepted and checked."
               />
               {materials != null && materials > 0 && (
                 <MoneyRow
@@ -154,8 +155,8 @@ export function MoneyPanel({
                 width={fee != null && labour != null ? Math.max(Math.round((fee / (labour + fee)) * 100), 6) : 15}
                 caption={
                   side === "client"
-                    ? "15% of the labour price, invoiced once at the start of the job, never per stage. The job cannot start until it is paid."
-                    : "Yaadly's cut, taken from the labour price rather than invoiced to you."
+                    ? "15% of the labour price, once, as a line on your job bill, never per stage. The job starts once that bill is paid."
+                    : "Yaadly's 5%, taken from your labour price rather than invoiced to you."
                 }
               />
               {showCheck && check && (
@@ -215,7 +216,7 @@ export function MoneyPanel({
             <b className="mb-1 block text-[14px] font-semibold text-ink">No invoices yet</b>
             <p className="mx-auto max-w-[48ch] text-[12.5px] leading-relaxed text-dim">
               {side === "client"
-                ? "The first will be Yaadly's Guarantee & Support fee once you have chosen a quote. Stage invoices follow, one per stage, each raised only after you have accepted that stage."
+                ? "Your bill for this job comes from Yaadly once you have chosen a quote: the labour, Yaadly's 15% and materials, on one bill. Nothing is owed before it arrives."
                 : "Yaadly raises a pay invoice as soon as a stage is accepted and checked. Nothing appears here before that."}
             </p>
           </div>
@@ -223,7 +224,6 @@ export function MoneyPanel({
           <div className="mt-1">
             {invoices.map((inv) => {
               const paid = inv.status === "paid";
-              const isFee = inv.payable_to !== "worker";
               return (
                 <div key={inv.id} id={"invoice-" + inv.id} className="flex scroll-mt-6 gap-3.5 border-b border-line py-3.5 last:border-b-0">
                   <span
@@ -234,11 +234,7 @@ export function MoneyPanel({
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5 text-[13.5px] font-semibold text-ink">
-                      <span>
-                        {isFee
-                          ? "Yaadly Guarantee & Support fee"
-                          : "Worker pay" + (inv.stage != null ? " · stage " + inv.stage : "")}
-                      </span>
+                      <span>{invoiceLabel(inv)}</span>
                       <span
                         className={
                           "rounded-full border px-2 py-0.5 font-mono-app text-[9px] font-semibold uppercase tracking-[0.1em] " +
