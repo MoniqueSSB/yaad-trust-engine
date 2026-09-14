@@ -73,6 +73,33 @@ export async function agreePrice(formData: FormData): Promise<void> {
   revalidatePath("/portal/jobs/" + jobId);
 }
 
+/** The client asks for a change to one open quote before accepting it
+ *  (13 Sep 2026). Scrubbed before it is saved, same as sendMessage(), because
+ *  it goes straight to the worker. request_quote_change_as_me() in Postgres
+ *  checks it is this job's client, the job is not booked, the quote is still
+ *  open and visible to them, and there is no other open request on it.
+ *  Returns the refusal rather than throwing it: a thrown message from a
+ *  server action is hidden in production, and these refusals are written
+ *  for the client to read. */
+export async function askForQuoteChange(
+  jobId: string,
+  quoteId: string,
+  body: string,
+): Promise<{ ok: true; hits: string[] } | { ok: false; error: string }> {
+  await requireUser();
+  const text = body.trim().slice(0, 1500);
+  if (!jobId || !quoteId || !text) return { ok: false, error: "Say what you would like changed." };
+  const { clean, hits } = scrub(text);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("request_quote_change_as_me", { p_quote: quoteId, p_text: clean });
+  if (error) {
+    console.error("askForQuoteChange refused:", error.code, error.message);
+    return { ok: false, error: error.message };
+  }
+  revalidatePath("/portal/jobs/" + jobId);
+  return { ok: true, hits };
+}
+
 /** Who picks the tradesperson: Yaadly, or the client from the quotes. The
  *  job form asks this once; this is the client changing their mind from
  *  the portal. set_worker_choice_as_me() checks it is their job and that

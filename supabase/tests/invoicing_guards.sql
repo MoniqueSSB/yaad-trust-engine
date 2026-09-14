@@ -4,7 +4,7 @@
 -- The session running this has no admin JWT, which is the point: tests 8 and 9
 -- prove that a caller who is not a signed-in admin cannot move money.
 do $$
-declare r text; v int;
+declare r text; v int; s int;
 begin
   create temp table t(n int generated always as identity, name text, result text) on commit drop;
   delete from public.invoices where id like 'TEST-%';
@@ -97,6 +97,49 @@ begin
   exception when others then
     insert into t(name,result) values ('11. empty invoice cannot be sent', 'PASS, refused');
   end;
+
+  -- 12 and 13. nobody reaches the stage payable over the API (20260913223042).
+  -- Named roles, because a revoke from public never removed anon's own grant.
+  insert into t(name,result) values ('12. anon cannot raise a stage payable',
+    case when has_function_privilege('anon', 'public.raise_job_stage_worker_payable(text, integer)', 'EXECUTE')
+         then 'FAIL, anon holds EXECUTE' else 'PASS' end);
+  insert into t(name,result) values ('13. a signed-in user cannot raise a stage payable',
+    case when has_function_privilege('authenticated', 'public.raise_job_stage_worker_payable(text, integer)', 'EXECUTE')
+         then 'FAIL, authenticated holds EXECUTE' else 'PASS' end);
+
+  -- 14. no recorded stage approval, no stage payable. Reuses a TEST job with an
+  -- accepted quote rather than making one, because a new quote fires client
+  -- notifications. The call runs in a block that is always undone, so nothing
+  -- it raises survives even when this test fails. There is deliberately no
+  -- matching "with an approval it does raise one" test: new_invoice_number()
+  -- takes a sequence value, which an undo does not give back, so every run
+  -- would leave a gap in the real invoice numbers. When this test passes it
+  -- never reaches that line.
+  -- Stages 1 and 2 only, because those are the two the function's default
+  -- split will price with no pack on file, so without the hold point it WOULD
+  -- raise one.
+  select q.job_id, g.stage into r, s from public.job_quotes q
+   cross join generate_series(1, 2) as g(stage)
+   where q.job_id like 'JOB-TEST-%' and q.status = 'accepted' and coalesce(q.worker_email, '') <> ''
+     and not exists (select 1 from public.stage_approvals a where a.job_id = q.job_id and a.stage = g.stage)
+     and not exists (select 1 from public.invoices i where i.job_id = q.job_id and i.payable_to = 'worker' and i.stage = g.stage and i.status <> 'void')
+   order by q.job_id, g.stage limit 1;
+  if r is null then
+    insert into t(name,result) values ('14. no stage approval, no stage payable', 'SKIP, no TEST job to try it on');
+  else
+    v := -1;
+    begin
+      perform public.raise_job_stage_worker_payable(r, s);
+      select count(*) into v from public.invoices
+       where job_id = r and payable_to = 'worker' and stage = s and status <> 'void';
+      raise exception 'undo';
+    exception when others then
+      if sqlerrm <> 'undo' then v := -1; end if;
+    end;
+    insert into t(name,result) values ('14. no stage approval, no stage payable',
+      case when v = 0 then 'PASS' when v = -1 then 'FAIL, the call errored'
+           else 'FAIL, raised one on ' || r || ' stage ' || s || ' with no approval' end);
+  end if;
 
   create table if not exists public._invoice_test_out (n int, name text, result text);
   delete from public._invoice_test_out;

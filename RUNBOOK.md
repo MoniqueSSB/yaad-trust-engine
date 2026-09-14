@@ -5064,6 +5064,17 @@ Jamaican local number is that long. So 447767171858 is checked as
    is redeployed from disk after merge (§12 of CLAUDE.md). It runs WITH
    platform auth: do not add `--no-verify-jwt`.
 
+## A worker who quoted says they cannot see the job, or can see too much of it
+
+Since 13 September 2026 (migration `20260913230642`, DECISIONS.md the same date) a worker who has quoted on a job and is not booked on it gets the tender pack, not the job: title, parish, trade, the board's scrubbed description, the board photos, their own quote and their own Kickoff Pack. No street address, no client details, no job code. The job stays on their worker portal after the client picks somebody else, under "Quotes that closed".
+
+1. **"The job has gone from my portal."** Check they have a quote on it at all: the desk's quotes view, or `select status from job_quotes where job_id = '<JOB>' and worker_user = '<their user id>'`. No row means they never quoted; nothing to fix. A row means `my_quoted_jobs()` should return the job. If it does not, the function has been changed or dropped: re-run the guard test (step 4).
+2. **"I can see the job but not the photos."** Only photos the client put on the board show (`job_photos.board_ok`). A photo with `board_ok` false is the client's alone, on purpose.
+3. **"I was booked but I still see the small view."** The room decides "booked" by `jobs.worker_email` matching the address they signed in with. A booking under a different email looks like a quote. Fix the email on the job; do not widen the read rule.
+4. **Proving the whole thing still holds.** Run `supabase/tests/quoted_worker_guards.sql` with execute_sql. Every line should say PASS (9 to 11 say SKIP when no worker has quoted without being booked). A FAIL on 1, 3 or 9 means a quoting worker can read client details again: stop and tell Monique before changing anything.
+5. **"Nobody told me I was not picked."** When a worker is booked, every other live quote on the job becomes `declined`, and trigger `trg_notify_worker_quote_not_selected` (migration `20260913230742`) sends each of those workers a `quote_not_selected` WhatsApp. Check the function's logs for kind `quote_not_selected` on that job. `told: false` with "no recipient phone" means their `worker_profiles.phone` is blank. A WhatsApp refused for the 24 hour window means they had not messaged Yaadly recently; there is no approved template for this message yet, so tell them by hand.
+6. **Adding a column to what a quoting worker sees** means changing `my_quoted_jobs()`. That is a data protection decision for Monique, not a fix. The same goes for the two rules this migration also tightened: `job_open_for_quotes()` refuses a job with no client email (the public board hides one too), and `job_client_email_matches()` never matches an empty email.
+
 ## Supabase "Deploy to production" must stay off, and what the "Supabase Preview" check on `main` means
 
 **The rule.** Migrations reach production by hand, one at a time, applied deliberately and recorded (see the "Applied to production" header every migration file carries). Nothing applies them because a branch was merged. So in the Supabase dashboard, Project Settings → Integrations → GitHub, **Deploy to production must be off**. It was turned off on 13 Sep 2026 at 11:08 UTC. If it is ever found on again: open `https://supabase.com/dashboard/project/leffyisvfvjwzilydlwf/settings/integrations`, switch **Deploy to production** off, then scroll to the bottom of the GitHub section and press **Save changes**. The switch on its own saves nothing; the confirmation is a message reading "Production branch settings successfully updated". Leave the GitHub connection in place: **Disable integration**, right beside Save changes, disconnects the repository altogether, which is not the fix. With it on, every push or merge to GitHub `main` makes Supabase run the repo's migration files against the production database by itself; the docs say it also deploys Edge Functions and storage buckets declared in `supabase/config.toml`, which this repo does not have.
@@ -5075,3 +5086,100 @@ Jamaican local number is that long. So 447767171858 is checked as
 **Never "fix" the red check by making it pass.** Making it green means reconciling the ledger with the link on, which switches on automatic production deploys. The fix is the toggle, off.
 
 **Do not use `DELETE /v1/projects/{ref}/branches` ("Disables preview branching") or `supabase branches delete` on the `main` row to get the same effect.** The `main` row is the production project; the docs do not say what either does to it.
+
+## A worker's quote is refused over its payment stages, or a booked job shows only one stage
+
+Since 13 Sep 2026 (`20260913230001`) the accepted quote's payment stages are the job's stage schedule, so they have to be readable.
+
+1. **"Payment stage line N needs the shape..." or "add up to..."**: correct refusal. Each line must be `Stage name: 30%: what proves it is done`, no colon in the stage name, percentages totalling 100 between them, ten stages at most. The same rule is `parse_payment_stages()` in Postgres and `web/lib/jobs/payment-stages.ts`; if one ever accepts what the other refuses, they have drifted.
+2. **A booked job shows one stage when the quote had several.** Check whether the schedule was written: `select status, approved_by, docs->'payment_stages' from quote_pack_drafts where job_id = '<job>' order by created_at desc;`. The row with `source` `accepted_quote` and status `approved` is the schedule. If it is missing, look for the warning `accepted_quote_writes_schedule` in the Postgres logs.
+3. **To write it by hand** for a booked job whose accepted quote reads cleanly: `select public.write_stage_schedule_from_quote('<quote id>', 'client acceptance: <client email> (written by hand, <date>, <your name>)');`. It refuses a quote that is not accepted, an unreadable one, and a job that has an approved Kickoff Pack.
+4. **A job with no schedule at all is one stage** and the worker is owed the whole labour less 5% when it is approved. That is a founder decision, not a fault.
+
+To prove the guards, run `supabase/tests/stage_schedule_guards.sql` with `execute_sql`; every line should read PASS.
+
+## A client pressed "Ask for a change" on a quote and it did not go through
+
+The request is refused by `request_quote_change_as_me()` in Postgres, and the message the client sees is the reason. Match it:
+
+1. **"Only the client of this job..."**: they are signed in with a different email from the one on the job. Check `jobs.client_email` for the job.
+2. **"This job is already booked"**: correct. After booking a change is a variation; handle it with them directly.
+3. **"That price is not open for changes"**: the quote is no longer `submitted` (accepted, declined or withdrawn).
+4. **"Yaadly is still choosing"**: a "Choose for me" job where nobody has chosen a quote yet. Choose one on the desk first.
+5. **"You have already asked for a change to this quote"**: one open request per quote. See it with `select * from quote_change_requests where quote_id = '<id>' order by created_at desc;`
+6. **"Could not find the function"**: migration `20260913230000` is not on production. Check `select to_regclass('public.quote_change_requests');` returns the table name.
+
+To prove the guards, run `supabase/tests/quote_change_request_guards.sql` with `execute_sql`; every line should read PASS.
+
+## A worker payable exists for a stage nobody approved, or you need to prove that cannot happen
+
+Since `20260913223042` (13 Sep 2026), `raise_job_stage_worker_payable()` raises nothing unless a `stage_approvals` row exists for that job and stage. It cannot be called over the API at all: only the stage-approval trigger runs it.
+
+1. Prove it still holds. Run in the SQL editor:
+
+   ```sql
+   select p.proacl,
+          has_function_privilege('anon', p.oid, 'EXECUTE')          as anon_can,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') as signed_in_can,
+          pg_get_functiondef(p.oid) like '%from stage_approvals s where%' as has_hold_point
+     from pg_proc p
+    where p.oid = 'public.raise_job_stage_worker_payable(text,integer)'::regprocedure;
+   ```
+
+   Correct: `proacl` lists only `postgres` and `service_role`, both `_can` columns are false, and `has_hold_point` is true. Or run `supabase/tests/invoicing_guards.sql`: tests 12 to 14 must all read PASS.
+2. Find any payable with no approval behind it:
+
+   ```sql
+   select i.id, i.job_id, i.stage, i.status, i.created_at
+     from invoices i
+    where i.payable_to = 'worker' and i.stage is not null
+      and not exists (select 1 from stage_approvals s where s.job_id = i.job_id and s.stage = i.stage);
+   ```
+
+   It should return nothing. A row there was raised by something other than an approval. Do not pay it. Void it from the desk and tell Monique before anything else.
+3. If someone rewrites this function in a new migration, end that migration with `revoke all on function public.raise_job_stage_worker_payable(text, integer) from public, anon, authenticated;`. Revoking from `public` alone does not remove the grant Supabase gives `anon` and `authenticated`, which is how this was left open. Never add `grant ... to authenticated`, and never replace the hold point with an `is_admin()` check. The trigger runs in the approver's session, so an admin check would quietly stop every stage payable.
+
+## A new SECURITY DEFINER function, or proving the open ones are still shut
+
+Since `20260913223042` and `20260914090757` (13 Sep 2026). A `SECURITY DEFINER` function runs with the owner's rights, so whoever can call it gets past row-level security. Supabase grants `anon` and `authenticated` directly on every new function, and `revoke ... from public` does not remove those grants.
+
+1. Writing a new one: end the migration with `revoke all on function public.<name>(<args>) from public, anon, authenticated;` then grant back only who needs it. Then either check the caller inside the body (`is_admin()`, or the caller's own `auth.jwt() ->> 'email'` against the row), or make sure nothing but the service role or a trigger can reach it. A helper that answers a yes or no about an email must only answer about the caller's own email.
+2. Prove the three from 13 Sep are still shut: run `supabase/tests/open_function_guards.sql` in the SQL editor. All 10 lines must read PASS. It reads only, and prints no email.
+3. See every function that is still open, to review a new one:
+
+   ```sql
+   select p.oid::regprocedure as fn,
+          has_function_privilege('anon', p.oid, 'EXECUTE')          as anon_can,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') as signed_in_can,
+          pg_get_function_result(p.oid) = 'trigger'                 as is_trigger,
+          p.prosrc ~* 'is_admin\s*\(|auth\.(uid|jwt)\s*\('          as checks_caller
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prosecdef
+      and (has_function_privilege('anon', p.oid, 'EXECUTE') or has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+    order by checks_caller, is_trigger, 1;
+   ```
+
+   Rows where `is_trigger` and `checks_caller` are both false are the ones to read by hand. `checks_caller` true only means the body mentions the caller, not that it checks correctly, so read anything that touches money or personal data.
+## A client's bill needs checking before it goes, or needs to go out in parts
+
+Raising never emails anybody (13 Sep 2026). The reasoning is in DECISIONS.md, "Raising a bill never sends it".
+
+1. **Raise it.** Job Invoices or Agency Fees, press **Raise draft** on the job. The whole bill opens on the Invoices view as a draft: the work, Guarantee & Support 15%, and materials at cost. Nothing has been sent.
+2. **Change it.** Edit any line, add or remove one, then press **Save changes**. Job bills are in whole Jamaican dollars, so J$4,000 is typed as 4000.
+3. **Send it whole.** Press **Preview** and read what the client will read. Then press **Email J$… to …**. That emails exactly the preview and freezes the invoice. If you sent it yourself another way, use **Mark as sent, I sent it myself** instead.
+4. **Or send part of it.** Tick the lines you want now under **Request now**. For part of a line, type the amount in the box beside it. The Guarantee & Support line only moves whole. Press **Request the ticked lines as a part**. A new numbered draft opens for just those amounts, and they come off the bill. Preview it, then email it.
+5. **Read where it stands.** Open the bill, from Job Invoices or Agency Fees with **Open**. Under the total it lists every part: its number, amount, what it covers, when it was sent and paid, and which one starts the job. What is left is the balance on the bill itself. Send that last, the same way as step 3.
+6. **When money arrives.** Open the part or the bill it paid and press **Mark as paid**. Whichever invoice carries the Guarantee & Support line starts the job when it is marked paid. A paid part without it does not.
+7. **Taking a part back.** While the bill is still a draft, **Void** the part and its amount goes back onto the bill. Once the balance has gone out the database refuses, because the amount would drop off the job's billing with nowhere to go. In that case raise a new invoice for it by hand, from the free-text draft at the top of the Invoices view. A bill with a live part cannot be voided at all until its parts are.
+8. **Proving it still holds.** Run `supabase/tests/invoice_parts_guards.sql` with `execute_sql`, when nobody is invoicing. Every line should read PASS. It borrows a TEST job, rolls everything back and puts the invoice number counter back where it was, so it leaves nothing behind.
+
+**Deploying this.** Apply `20260913233000_a_job_bill_can_be_requested_in_parts.sql` first, then deploy the desk and the web app. Both read `part_of` and `starts_job`, and a query that names a column the database does not have yet fails as a whole: Job Invoices would show "Could not read jobs", and the portal's job page would lose its invoices.
+
+## An invoice total on the desk looks wrong, or shows pounds for a Jamaican dollar bill
+
+Job bills are kept in whole Jamaican dollars and service invoices in pence, in the same `total_pence` column (14 Sep 2026). The desk shows every total per currency, for example "J$54,000 + £149.00", and never adds the two. The reasoning is in DECISIONS.md, "Invoice totals on the desk are kept per currency".
+
+1. **A J$ bill shows as pounds, or as one hundredth of itself** (J$54,000 as £540.00, J$59,800 as J$598). Some total is not going through `curAmt()` / `sumByCur()` in `concierge/concierge.html`, or its query does not select `currency`. Find it with `grep -n "total_pence" concierge/concierge.html`: every query that feeds a total must name `currency`, and every sum across more than one invoice must use `sumByCur()`.
+2. **You want one figure in pounds.** There is no exchange rate on file and none has been chosen, so the desk will not make one. Choosing a rate, and where it comes from, is Monique's decision before any code changes.
+3. **"Paid this month" includes a tradesperson's payable.** Known, and not yet decided: it counts every paid invoice, money out as well as money in. See the flag at the end of the DECISIONS.md entry.
+4. **Proving it.** Open the desk's Overview, Invoices and Money views. Any total that mixes both currencies should read "J$… + £…", and a job page's "Client paid Yaadly" should match the J$ figure on that job's bill. `node scripts/check-desk-script.mjs` must still print "clean".
