@@ -44,6 +44,10 @@ begin
       end;
 
       perform set_config('request.jwt.claims', json_build_object('email', v_admin, 'role', 'authenticated')::text, true);
+      -- 20260914240000: nobody is paid before a call-back.
+      perform public.confirm_bank_callback(j.worker_email) from public.jobs j
+       where j.id = v_job
+         and exists (select 1 from public.worker_profiles w where lower(w.worker_email) = lower(j.worker_email));
 
       -- 2. a method that is not live yet is refused
       begin

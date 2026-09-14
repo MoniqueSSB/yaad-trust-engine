@@ -41,6 +41,11 @@ begin
       end;
 
       perform set_config('request.jwt.claims', json_build_object('email', v_admin, 'role', 'authenticated')::text, true);
+      -- 20260914240000: nobody is paid before a call-back, so the borrowed
+      -- workers get one first, inside this same throwaway transaction.
+      perform public.confirm_bank_callback(i.worker_email) from public.invoices i
+       where i.id in (v_w1, v_w2)
+         and exists (select 1 from public.worker_profiles w where lower(w.worker_email) = lower(i.worker_email));
 
       -- 2. a method that is not live yet is refused
       begin
