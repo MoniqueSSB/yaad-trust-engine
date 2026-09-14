@@ -825,7 +825,12 @@ export default async function JobRoom({
   ];
 
   const workSteps: Step[] = [
-    { title: "Kickoff Pack agreed", state: stepState(!!trulyApprovedPack, hasWon && !trulyApprovedPack) },
+    /* Optional, like its row in the document strip: listed only once a
+       Kickoff Pack has been asked for, or it sits as the current step on
+       every job that booked straight off an accepted quote. */
+    ...(approvedPack
+      ? [{ title: "Kickoff Pack agreed", state: stepState(!!trulyApprovedPack, hasWon && !trulyApprovedPack) }]
+      : []),
     {
       title: "Yaadly fee " + (isClient ? "paid" : "settled"),
       state: stepState(feeInvoice?.status === "paid", feeInvoice?.status === "sent"),
@@ -948,19 +953,21 @@ export default async function JobRoom({
       state: confirmedQuote ? "ready" : "not_completed",
       href: confirmedQuote ? jobBase + "/quote-pack?quote=" + confirmedQuote.id : undefined,
     },
-    {
-      icon: "\ud83d\udcc4",
-      title: "Kickoff Pack",
-      note: approvedPack
-        ? "Scope, milestones and the evidence checklist"
-        : "Written once a worker is chosen and the scope is agreed",
-      state: approvedPack
-        ? approvedPack.status === "approved"
-          ? "ready"
-          : "in_progress"
-        : "not_completed",
-      href: approvedPack ? jobBase + "/pack" : undefined,
-    },
+    /* The Kickoff Pack is optional: accepting a quote books the job without
+       one. So it is listed only once one has been asked for. A "Not
+       completed" row for a document the job may never need read as
+       something outstanding. */
+    ...(approvedPack
+      ? [
+          {
+            icon: "\ud83d\udcc4",
+            title: "Kickoff Pack",
+            note: "Scope, milestones and the evidence checklist",
+            state: approvedPack.status === "approved" ? "ready" : "in_progress",
+            href: jobBase + "/pack",
+          } satisfies Doc,
+        ]
+      : []),
     {
       icon: job.status === "complete" ? "\ud83d\udcc4" : "\u25cb",
       title: "Completion Report",
