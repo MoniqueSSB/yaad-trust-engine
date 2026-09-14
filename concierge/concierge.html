@@ -740,6 +740,8 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 #skEdit .obsrow select{width:auto;font-size:12px;padding:3px 6px}
 #skEdit .obsrow .pro{font-size:11.5px;color:var(--dim);display:flex;gap:4px;align-items:center;white-space:nowrap}
 #skEdit .btn.sm{font-size:11.5px;padding:4px 9px}
+.tg .ctl{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.tg .ctl .btn.sm{font-size:11.5px;padding:4px 10px}
 #skEdit textarea{width:100%;font-size:13px}
 #skEdit label{font-size:11px}
 
@@ -4569,12 +4571,14 @@ const SETTING_META = {
   sketch_stamp:         ["The stamp on every sketch pack", "sketch_guard_approval puts this on the document and refuses to approve a pack carrying a measurement.", false],
   booking_link:         ["Your calendar link", "A page where a client picks a time for a call with you (a Google Calendar appointment page, Calendly, or similar). The Enquiries view puts it into every WhatsApp and email draft it opens for you, so answering an enquiry and offering a call is one message. Leave empty and the drafts simply do not mention a call.", false],
   purge_cron_secret_sha256: ["Deletion clock secret, hashed", "A SHA-256, never the secret itself. yaad-vetting-purge compares against it so a caller cannot run the deletion clock without the real value.", false],
+  invoice_bank_details: ["Bank details a client pays an invoice into", "Written exactly as a client should read it: bank, account name, sort code, account number. Shown under every unpaid Yaadly invoice in the client portal and in the footer of every emailed invoice, with the invoice number as the reference. Empty means no bank transfer option is shown anywhere, and no account is invented. Use the Yaadly Ltd business account, never a personal one.", false],
 };
 const SETTING_GROUP = {
   agents_paused:"Agents", trade_list:"Agents",
   worker_guidelines_version:"Documents in force", client_guidelines_version:"Documents in force", sketch_stamp:"Documents in force",
   ntfy_topic:"Notifications and addresses", desk_url:"Notifications and addresses", admin_email:"Notifications and addresses",
   desk_phone:"Notifications and addresses", booking_link:"Notifications and addresses",
+  invoice_bank_details:"Money",
 };
 
 // The value of a text setting, or empty. Quotes stripped the same way the
@@ -4592,21 +4596,22 @@ function panelSet(rows){
     const g = SETTING_GROUP[r.key] || "Everything else";
     (groups[g] = groups[g] || []).push(r);
   }
-  const order = ["Agents","Documents in force","Notifications and addresses","Everything else"];
+  const order = ["Agents","Documents in force","Notifications and addresses","Money","Everything else"];
   const cards = order.filter(g => groups[g]).map(g => {
     const body = groups[g].map(r => {
       const meta = SETTING_META[r.key] || [r.key, "Nothing in this codebase reads this row. It is a note to yourself, not a switch.", false];
       const val = clean(r.value);
       const control = isBool(r.value)
         ? `<div class="sw${boolOf(r.value) ? " on" : ""}" data-set="${esc(r.key)}" role="switch" tabindex="0" aria-checked="${boolOf(r.value)}" aria-label="${esc(meta[0])}"></div>`
-        : `<span class="chip ${val ? "ok" : "mute"}" title="${esc(val)}">${esc(val.length > 30 ? val.slice(0,30) + "…" : (val || "empty"))}</span>`;
+        : `<span class="ctl"><span class="chip ${val ? "ok" : "mute"}" title="${esc(val)}">${esc(val.length > 30 ? val.slice(0,30) + "…" : (val || "empty"))}</span>`
+          + `<button class="btn sm g" data-edit="${esc(r.key)}" aria-label="Edit ${esc(meta[0])}">Edit</button></span>`;
       return `<div class="tg"><div><b>${esc(meta[0])}</b><span>${meta[1]}</span>`
            + `<span class="mono" style="color:var(--dim);letter-spacing:0;text-transform:none;font-size:10px">${esc(r.key)}</span></div>${control}</div>`;
     }).join("");
     return `<div class="card"><div class="chd"><h3>${esc(g)}</h3></div>${body}</div>`;
   });
   return `<div class="grid2">${cards.join("")}</div>`
-    + `<p class="conseq">These are the live rows in <span class="mono">app_settings</span>, not a picture of them. A switch writes the row the moment you click it. Anything without a switch is text: change it in the table below, or in the function that reads it.</p>`
+    + `<p class="conseq">These are the live rows in <span class="mono">app_settings</span>, not a picture of them. A switch writes the row the moment you click it. Anything without a switch is text: press Edit, type the new value, and it is written the moment you press OK. Until 14 Sep 2026 this sentence sent you to the table below, which only ever displayed the rows, so text settings could not be changed from this desk at all.</p>`
     + `<div class="sechd">Every row, as it is stored</div>`;
 }
 
@@ -5121,6 +5126,19 @@ document.addEventListener("click", (e) => {
       ? "Pause every agent?\n\nInvoice drafting and sketch description stop calling a model, and so does the assistant that answers WhatsApp and the website chat. Anybody who writes in is still recorded, still pushed to your phone, and told you are picking it up yourself."
       : "Let this desk call agents again?")) return;
     setAgentsPaused(next);
+    return;
+  }
+  const ed = e.target.closest("[data-edit]");
+  if (ed) {
+    // A text setting. The prompt shows the value as stored so what is typed
+    // replaces it whole; the empty string is a real value (it switches the
+    // bank transfer line off), so only Cancel leaves the row alone.
+    const key = ed.dataset.edit;
+    const meta = SETTING_META[key] || [key];
+    const cur = settingOf(key);
+    const next = prompt(meta[0] + "\n\nStored as " + key + ". This is written the moment you press OK.", cur);
+    if (next === null) return;
+    writeSetting(key, next.trim(), ed);
     return;
   }
   const sw = e.target.closest("[data-set]");

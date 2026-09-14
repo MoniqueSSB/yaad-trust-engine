@@ -5300,7 +5300,7 @@ Since 14 September 2026 (`20260914112000`) materials money goes to the worker **
 
 **Where they come from.** One setting, `app_settings.invoice_bank_details`, free text written exactly as a client should read it (bank, account name, sort code or routing, account number). It starts **empty**, and while it is empty nothing is shown anywhere: no invented account. Set by `20260914160000`.
 
-**Setting them** (admin, SQL editor or the desk's settings):
+**Setting them.** On the desk: Settings view, Money card, "Bank details a client pays an invoice into", press Edit, type the text, OK. It is written the moment you press OK. (Until 14 Sep 2026 the Settings view had no Edit for text rows and pointed you at a table that only displayed them; fixed the same day.) Or in the Supabase SQL editor, never a terminal, because it is SQL:
 ```sql
 update app_settings set value = '<Bank>, <account name>, sort code <..>, account <..>' where key = 'invoice_bank_details';
 ```
