@@ -5222,3 +5222,34 @@ Since 14 September 2026 (`20260914112000`) materials money goes to the worker **
 4. **Record the receipt when it arrives.** Same row: each release still waiting shows **receipt to come** with a box. Type the reference as printed and press **Record receipt**. It is stamped with your email and time. A recorded receipt cannot be overwritten; a wrong one is corrected with a note, not retyped.
 5. **Who still owes a receipt:** `select * from public.materials_open_releases;` (released, no receipt, oldest first) and `select * from public.materials_reconciliation;` per job.
 6. **Proving the rules still hold:** run `supabase/tests/materials_release_guards.sql` with `execute_sql`, when nobody is invoicing. Eleven lines, all PASS. It rolls itself back.
+
+## Card payment on an invoice (Stripe, phase 1, test mode)
+
+**What it is.** Since 14 Sep 2026 an unpaid Yaadly invoice in the client portal carries "Pay J$… by card". `yaad-checkout` makes the Stripe payment page; `yaad-stripe-webhook` records the payment in `invoice_payments`. **Nothing marks the invoice paid. You still do, at the desk**, and that is what starts the job. See DECISIONS.md, 2026-09-14.
+
+**Switching it on (test mode), in this order:**
+
+1. Apply `20260914120000_a_card_payment_is_recorded_not_trusted.sql`.
+2. In the Stripe Dashboard, **test mode**: Developers, Webhooks, Add endpoint. URL `https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-stripe-webhook`. Events: `checkout.session.completed` and `checkout.session.async_payment_succeeded`. Copy its signing secret (`whsec_...`).
+3. In your own terminal, never a chat session:
+   ```bash
+   supabase secrets set STRIPE_SECRET_KEY=sk_test_... STRIPE_WEBHOOK_SECRET=whsec_... --project-ref leffyisvfvjwzilydlwf
+   ```
+4. Deploy, from the repo root, from `main`:
+   ```bash
+   supabase/functions/sync-shared.sh
+   supabase functions deploy yaad-checkout --project-ref leffyisvfvjwzilydlwf
+   supabase functions deploy yaad-stripe-webhook --project-ref leffyisvfvjwzilydlwf --no-verify-jwt
+   ```
+   `yaad-checkout` keeps the platform JWT check. `yaad-stripe-webhook` is the only one with the flag, and it goes on the CLAUDE.md §12 list once verified live.
+5. Check the door: `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-stripe-webhook` should print **403** (no signature). **503** means `STRIPE_WEBHOOK_SECRET` is not set.
+
+**Testing it.** Sign in as a test client with a sent, unpaid invoice. Press Pay by card. On Stripe's page use card `4242 4242 4242 4242`, any future expiry, any CVC. You return to the job with "Thank you"; the invoice says "Card payment received". At the desk, check `select invoice_id, status, amount_stored, currency, livemode from invoice_payments order by id desc limit 5;` then mark the invoice paid as usual.
+
+**"Card payment is not switched on yet."** `STRIPE_SECRET_KEY` is not set. **"Card payment is in test mode only."** A live key is set without `STRIPE_ALLOW_LIVE=yes`; that refusal is deliberate.
+
+**A `mismatch` row.** Stripe charged an amount or currency that does not equal the invoice. Do not mark the invoice paid from it. Compare `amount_stored` and `currency` with `invoices.total_pence` and `currency`, and refund or correct in the Stripe Dashboard.
+
+**Switching it off.** `supabase secrets unset STRIPE_SECRET_KEY --project-ref leffyisvfvjwzilydlwf`. The button then answers "not switched on yet" and nothing else changes. Payments already recorded stay recorded.
+
+**Going live is its own decision, not a config step:** a live key, a live-mode webhook with its own secret, `STRIPE_ALLOW_LIVE=yes`, and the card fee, JMD enablement and conversion cost settled first.

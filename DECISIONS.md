@@ -3319,3 +3319,19 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 **Surfaces.** Portal: the outstanding row says the money goes out once the bill is paid and is released by a person; once released, "Send the materials receipt and a photo" to the worker (links to Files) and "The materials receipt is due from the worker" to the client; the Materials tab shows "Receipt to come" per release. Desk Materials view: shows what the client has paid for, caps the release amount there, receipt optional, and a Record receipt box on each release still waiting for one. Trades page: "paid to you at cost before you buy them, once the client has paid for them".
 
 **Tests.** `supabase/tests/materials_release_guards.sql`, eleven checks, run against production after applying; everything rolls back and `invoice_seq` is put back.
+
+## 2026-09-14 · A client pays an invoice by card; the payment is recorded, not trusted
+
+**Why.** Founder, 14 Sep 2026: an unpaid invoice in the client portal should be payable there, by card through Stripe, with bank transfer as a second option, and tradespeople paid out through Stripe later. This is phase 1: card payment, on Stripe **test** keys only. Bank transfer is phase 2; paying tradespeople is phase 3.
+
+**What was built.** `yaad-checkout` (JWT on) takes a signed-in client's request to pay one invoice, checks it is theirs by the same email rule as `invoices_client_read`, sent, unpaid, Yaadly's to collect and not already reported paid by card, and returns a Stripe Checkout address for exactly its total. `yaad-stripe-webhook` (JWT off, Stripe's HMAC signature is the only door) hears `checkout.session.completed` or `checkout.session.async_payment_succeeded` and writes one row to `invoice_payments` (`20260914120000`). The portal shows "Pay J$… by card" on the client's unpaid Yaadly invoice, and "Card payment received, Yaadly confirms it" once a payment is recorded.
+
+**Recorded, not trusted: nothing marks an invoice paid.** Neither function writes `invoices.status`, and `invoice_payments` has no insert, update or delete policy, so only the webhook's service role writes it. A named person still marks the invoice paid at the desk. That is deliberate and not an unfinished step: `start_job_on_agency_fee_paid` starts the job when the `starts_job` invoice goes paid, so "Stripe charged the card, mark it paid automatically" would be a machine starting a job, which CLAUDE.md §2 and §3 exist to refuse. Better information at the desk (phase 1b) is the answer, not removing the click.
+
+**Live keys are refused** unless `STRIPE_ALLOW_LIVE=yes`. Setting a live key before anyone has decided to take real money must not quietly start taking it. Going live is its own decision: live key, live webhook, that flag, and the card fee and conversion questions answered.
+
+**A lost payment record is not cosmetic, so this webhook returns 500 on a database failure** and lets Stripe retry, unlike `yaad-message-status`, which always answers Twilio 200. A repeated delivery is harmless: `provider_ref` (the Checkout Session id) is unique. An amount or currency that does not match the invoice is stored as `mismatch`, never dropped, because a real card was charged either way.
+
+**Amounts live in one place.** J$ invoices are stored in whole dollars; Stripe treats JMD as a two-decimal currency, so J$134,250 is 13425000 to Stripe. `_shared/stripe.ts` does that conversion and the signature check, with Deno tests that need no imports.
+
+**Payouts to tradespeople will not use Connect.** Stripe's docs say Connect cross-border payouts from a UK platform reach only the US, UK, EEA, Canada and Switzerland. Stripe Global Payouts added Jamaican bank accounts (`jm_bank_account`) in December 2025 and is open to UK businesses, so phase 3 is designed on that, pending the founder enabling it, a solicitor view on the licensing note Stripe attaches to it, and a decision on worker bank and identity data going to Stripe.

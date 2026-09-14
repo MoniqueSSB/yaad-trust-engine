@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { amount, gbp } from "@/lib/money";
 import { whenDate } from "@/lib/date";
+import { PayByCardButton } from "./PayByCardButton";
 import { invoiceLabel } from "@/lib/portal/invoice-label";
 
 /**
@@ -84,6 +85,7 @@ export function MoneyPanel({
   money,
   materialsReleased,
   check = null,
+  cardPayments = {},
 }: {
   side: "client" | "worker";
   labour: number | null;
@@ -97,6 +99,10 @@ export function MoneyPanel({
   materialsReleased: number;
   /** The check the client added, already included in allIn. */
   check?: CheckTotalLine | null;
+  /** Card payments Stripe has reported, by invoice id (invoice_payments).
+   *  Client side only. A payment here never means the invoice is paid: a
+   *  named person at Yaadly marks it paid. */
+  cardPayments?: Record<string, "succeeded" | "mismatch">;
 }) {
   const agreed = labour != null;
   const showCheck = side === "client" && check != null;
@@ -260,6 +266,22 @@ export function MoneyPanel({
                       {inv.paid_at ? " · paid " + (whenDate(inv.paid_at) ?? inv.paid_at) : ""}
                       {inv.period_label ? " · " + inv.period_label : ""}
                     </div>
+                    {/* Pay by card, phase 1 (14 Sep 2026). Only the client,
+                        only Yaadly's own invoices, only once sent and unpaid.
+                        Once Stripe reports a payment the button goes, so a
+                        client cannot pay twice from here; the invoice stays
+                        "Sent, unpaid" until a person marks it paid. */}
+                    {side === "client" && inv.payable_to !== "worker" && inv.status === "sent" && (
+                      cardPayments[inv.id] ? (
+                        <p className="mt-2 text-[12px] leading-relaxed text-tealb">
+                          {cardPayments[inv.id] === "succeeded"
+                            ? "Card payment received. Yaadly confirms it and marks this invoice paid."
+                            : "A card payment arrived that does not match this invoice. Yaadly is checking it."}
+                        </p>
+                      ) : (
+                        <PayByCardButton invoiceId={inv.id} amountLabel={amount(inv.total_pence, inv.currency)} />
+                      )
+                    )}
                   </div>
                 </div>
               );
