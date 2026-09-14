@@ -7116,10 +7116,13 @@ $("jiPrint").addEventListener("click", () => $("jiPreview").contentWindow.print(
 // admin only, needs a booked worker, an accepted quote with a materials line,
 // a receipt reference, and refuses any total above the quoted line. The store
 // gate stays in the trigger, so this panel shows it but does not re-check it.
-async function loadMaterials(){
+// keepMsg: true when a button on this view redraws it, so the confirmation
+// it just wrote survives the redraw. It used to be wiped straight away, so a
+// release or a receipt went through with nothing on screen to say so.
+async function loadMaterials(keepMsg){
   const host = $("mrBody");
   host.innerHTML = `<div class="empty"><b>Reading booked jobs with a materials line&hellip;</b></div>`;
-  say("mrMsg", "", "");
+  if (keepMsg !== true) say("mrMsg", "", "");
 
   const { data: jobs, error: jobsErr } = await sb.from("jobs")
     .select("id,title,client_email,worker_email,worker_name,materials_store_type,status")
@@ -7250,7 +7253,7 @@ async function loadMaterials(){
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
         say("mrMsg", "err", hint);
       }
-      await loadMaterials();
+      await loadMaterials(true);
     });
   });
 
@@ -7273,7 +7276,7 @@ async function loadMaterials(){
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
         say("mrMsg", "err", hint);
       }
-      await loadMaterials();
+      await loadMaterials(true);
     });
   });
 }
