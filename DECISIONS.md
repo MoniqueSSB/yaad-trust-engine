@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-15 · Stripe support confirmed how a Global Payout reaches a worker in Jamaica
+
+**What was asked (14 Sep 2026, treasury support) and answered (15 Sep, Nayan at Stripe).** Three open questions on the Global Payouts route to Jamaica now have answers, recorded here so nobody has to ask again.
+
+1. **The worker receives J$, not GBP.** Stripe does the GBP to JMD conversion before the money lands. The worker's bank is never left to convert it, so the amount the worker sees is set at Yaadly's end. `recipientBody()` in `yaad-payout-setup/payout.ts` already creates the recipient as a person in Jamaica paid to a local bank; that assumption is now confirmed rather than inferred.
+2. **The fees, read from Stripe's own pricing page the same day** (docs.stripe.com/global-payouts/pricing), not from the support email's "typical" ranges: a UK sender pays 0.50 GBP per payout, plus a 0.50% cross-border fee for Jamaica (the table lists Jamaica by name), plus a 2% FX fee because Yaadly is a non-US sender converting into a currency other than USD, EUR or GBP. Funding the financial account by Faster Payments is free. On the standard worked example, a £285 worker payment, that is about £7.63, or 2.7% of the payment. **It comes out of Yaadly's side, never the worker's:** the worker keeps 95% of labour (CLAUDE.md, ledger 9 Sep 2026), so on a £300 job the payout cost takes roughly £7.63 of Yaadly's £48 net before card fees. That is a pricing input for the founder, not a reason to touch the worker's share.
+3. **Timing.** Funds land in the recipient's bank account in 1 to 7 business days from sending, varying by country; Stripe gave no Jamaica-specific figure. After 7 business days the worker asks their bank, quoting the Trace ID shown on the payout in the Stripe Dashboard (Global Payouts, the payout, details). The runbook carries that step.
+
+**What this does not change.** Nothing in code moves. Sending a payout is still not built, and when it is, it is a named person's click on the desk with Stripe's fee and rate quoted first, never automatic (CLAUDE.md §2 and §9). Wise stays the live route for paying workers (`20260914240000`). Stripe on the desk stays greyed and `bank_transfer` stays the only allowed `paid_method` until its own migration. Still open: whether Stripe has actually enabled cross-border payouts to outside bank accounts on Yaadly's account (the email answers the questions as if set up, it does not say the switch is on), and the solicitor's view on the licensing note Stripe attaches to Global Payouts.
+
+**One thing flagged, not changed.** The worker portal and the application form promise pay "within 3 working days" of the stage being approved. That is a promise about when Yaadly sends. If Stripe's route is ever used and a payout takes the full 7 business days to land, the worker will read the promise as broken. Whether the copy should say "sent within 3 working days" is the founder's call.
+
 ## 2026-09-14 · Invoices: a summary per currency, Paid by month, Agency fees, and every invoice on one job
 
 **Founder, on the first version of the one Invoices screen:** the money bars with "J$129,000 + £149.00" "looks confusing and what happens when i have alot of jobs"; "there needs to be a part inside for agency fees", "and that being paid"; "I should be able to click on a job and it show me all the invoices linked to that job". Each was shown to her as a clickable demo with invented data before it was built into the desk.
