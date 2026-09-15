@@ -5383,7 +5383,7 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 **If a real update is being stopped as a question:** the detector is two expressions at the top of `worker-question.ts` and the negative cases are the bulk of `worker-question_test.ts`. Add the sentence that was wrongly caught to that list first, then adjust the expression until the suite passes. Never widen the question side without adding a negative case, because a false positive here means a worker's real update quietly stops reaching the client.
 
-**"Someone at Yaadly has this" on every worker message, including photos:** that is a different fault, the number is held (`human_handling` true on `intake_threads`). See "The handoff is automatic" above and hand it back.
+**"Someone at Yaadly has this" on a worker's plain text:** the number is held (`human_handling` true on `intake_threads`) and their words are going to you, which is the hold working. **Since 15 Sep 2026 a held number that is a worker on a live job still files evidence:** photos and videos, a location pin, the code and section answers after a photo, and the "1" confirming a drafted report all run through the evidence lanes as normal, and the reply is the evidence reply, not the holding sentence. If a held worker's PHOTO is getting "Someone at Yaadly has this", they are not resolving as a worker on a live job: check `worker_profiles.phone` and that a job in `jobs.worker_email` is not complete or cancelled (the same check as "A worker's WhatsApp evidence never landed" above). The trace attribute `yaadly.held.worker_evidence_open` says which way it went. A held client is held for everything; nothing changed there.
 
 ## The section menu: "which is this?" as rows a worker taps, not letters
 

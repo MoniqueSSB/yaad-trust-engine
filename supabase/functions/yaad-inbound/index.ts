@@ -2403,6 +2403,31 @@ Deno.serve(async (req: Request) => {
     } | null;
     const deskHasThisNumber = prior?.human_handling === true;
 
+    // A held number's EVIDENCE still files, 15 September 2026.
+    //
+    // The hold silences the assistant on a conversation Monique has taken
+    // over, and every worker lane below used to check it, so a worker whose
+    // number was held (they asked for a person, or she replied to them from
+    // the desk, on any thread) could not file a photo, a location pin, an
+    // arrival or a report confirmation on any job until somebody pressed
+    // "Hand back to the assistant". Found on the first live job: the
+    // founder's own test phone was held from an earlier client-side chat and
+    // her worker replies landed in that chat's transcript, answered with
+    // "Someone at Yaadly has this", with nothing on the job.
+    //
+    // So the hold now has two strengths. What a held worker SAYS in plain
+    // text still goes to her and nowhere else: that is the conversation she
+    // took over. What they FILE, photos and videos, a pin, the code and
+    // section answers that follow a photo, and the "1" that confirms a
+    // drafted report, runs through the evidence lanes as it would for any
+    // worker, because none of that is a conversation and all of it is the
+    // job's record. Filing evidence releases nothing and rules on nothing,
+    // so the governing rule is untouched. Only a number that IS a worker on
+    // a live job gets this; a held client is held for everything.
+    const heldWorker = deskHasThisNumber ? await lookupWorkerWithActiveJobs(supabase, msg.from) : null;
+    const evidenceHeld = deskHasThisNumber && !heldWorker;
+    root.setAttributes({ "yaadly.held.worker_evidence_open": Boolean(heldWorker) });
+
     // One read, alongside the other "who is holding this conversation" state.
     // Any value but the string "true" leaves the assistant running: a switch
     // that fails closed on a missing row would take intake down the first time
@@ -2628,7 +2653,7 @@ Deno.serve(async (req: Request) => {
       // typed is read as their own version and that is what goes out
       // instead. Founder's own requirement, 31 Aug 2026, confirmed to the
       // worker to decide, not routed through anyone else first.
-      if (!deskHasThisNumber && reportSession && !msg.media.length && msg.text.trim()) {
+      if (!evidenceHeld && reportSession && !msg.media.length && msg.text.trim()) {
         const a = reportSession.answers as any;
         const said = msg.text.trim();
         // A question is not their own version of the report. On 15 September
@@ -2720,7 +2745,7 @@ Deno.serve(async (req: Request) => {
       // context to here, the text itself was always the whole update.
       // The job-code answer to a pin that named more than one possible job.
       const arrivalSession = sess && String((sess.answers as any)?._lane ?? "") === "arrival" ? sess : null;
-      if (!deskHasThisNumber && arrivalSession && msg.text.trim()) {
+      if (!evidenceHeld && arrivalSession && msg.text.trim()) {
         const a = arrivalSession.answers as any;
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
@@ -2741,7 +2766,7 @@ Deno.serve(async (req: Request) => {
         return twiml(`Checked in on ${pick.id} (${pick.title}). That is on the Arrival Log now.`);
       }
 
-      if (!deskHasThisNumber && textUpdateSession && !msg.media.length && msg.text.trim()) {
+      if (!evidenceHeld && textUpdateSession && !msg.media.length && msg.text.trim()) {
         const a = textUpdateSession.answers as any;
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
@@ -2793,7 +2818,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      if (!deskHasThisNumber && evSession) {
+      if (!evidenceHeld && evSession) {
         const answers = evSession.answers as any;
         const pending: PendingEvidence[] = answers.pending ?? [];
         const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
@@ -2987,7 +3012,7 @@ Deno.serve(async (req: Request) => {
       // lanes already use.
       const hasPin = Number.isFinite(msg.lat) && Number.isFinite(msg.lon)
         && !(msg.lat === 0 && msg.lon === 0);
-      if (!deskHasThisNumber && hasPin) {
+      if (!evidenceHeld && hasPin) {
         const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
         if (found) {
           const where = msg.place ? ` from ${msg.place}` : "";
@@ -3071,7 +3096,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const evidenceMedia = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
-      if (!deskHasThisNumber && evidenceMedia.length) {
+      if (!evidenceHeld && evidenceMedia.length) {
         const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
         if (found) {
           const { email: workerEmail, jobs: activeJobs } = found;
