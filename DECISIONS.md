@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-15 · Mistral goes on pay-as-you-go, training opt-out taken, EUR 20 cap
+
+**Founder decision, from the Mistral console, 15 September 2026: "I now have the cash flow for this."** The API organisation moved from the free Experiment plan to pay-as-you-go, billed to Yaadly Ltd, with the monthly overage cap set at EUR 20. The Vibe "Upgrade" plans on the same page (Pro, Team, Enterprise) were deliberately not bought: they are seats for the chat and coding apps and do nothing for the API rate limits the nine Edge Functions hit.
+
+**Why paying, when the 14 September entry said pacing was the fix.** Pacing fixed the desk drafters, which can wait fifteen minutes. It could not fix `yaad-inbound`, which has about fifteen seconds before Twilio abandons the webhook, so on the free tier a client's WhatsApp message could still land with no reply whenever the shared key was mid-throttle. That path has no cheaper fix than capacity. At `mistral-small-latest` prices the pilot's spend is pounds a month; the cap exists so a bug loop cannot make it more.
+
+**The training opt-out is now a fact rather than an open question.** The sign-up form carries a checkbox allowing API calls to train Mistral's models; she left it unticked, and Mistral's own text on the form says unticked means new interactions, and those of your users, are not used for training. The commercial terms accepted on the same form incorporate the Data Processing Addendum by reference. RUNBOOK 9a had held both as December pilot blockers, and `docs/privacy.html` had said nothing about training on purpose, because an unverified opt-out claim is worse than silence. The page now says it, dated, with the free-tier period stated honestly rather than erased. The page is only as true as the console setting, so the runbook says where to re-read it.
+
+---
+
 ## 2026-09-14 · Invoices: a summary per currency, Paid by month, Agency fees, and every invoice on one job
 
 **Founder, on the first version of the one Invoices screen:** the money bars with "J$129,000 + £149.00" "looks confusing and what happens when i have alot of jobs"; "there needs to be a part inside for agency fees", "and that being paid"; "I should be able to click on a job and it show me all the invoices linked to that job". Each was shown to her as a clickable demo with invented data before it was built into the desk.
