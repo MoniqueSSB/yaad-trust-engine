@@ -58,7 +58,20 @@ Deno.test("yaad-inbound reads the payload and prefers it over the body", () => {
   // whatever the button label happened to say.
   const src = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
   assert(src.includes('f.get("ButtonPayload")'), "yaad-inbound no longer reads the button payload");
-  assert(src.includes("inboundText(buttonPayload, f.get(\"Body\"))"),
-    "yaad-inbound no longer routes the payload through the tested rule");
-  assert(src.includes("wasTapped(buttonPayload)"), "the trace no longer records whether it was a tap");
+  assert(src.includes('f.get("ListId")'), "yaad-inbound no longer reads the list row id");
+  assert(src.includes("inboundText(buttonPayload, f.get(\"Body\"), listId)"),
+    "yaad-inbound no longer routes the payload and the list row through the tested rule");
+  assert(src.includes("wasTapped(buttonPayload, listId)"), "the trace no longer records whether it was a tap");
+});
+
+Deno.test("a row picked from a list arrives as its id, never its title", () => {
+  // The section menu: the row "After" carries the id "A", which is exactly
+  // what a worker typing the letter would have sent. The title stays out of
+  // the message for the same reason a button's label does.
+  assertEquals(inboundText("", "After", "A"), "A");
+  assert(wasTapped("", "A"));
+  // A message with neither is what they wrote, untouched.
+  assertEquals(inboundText("", "done", ""), "done");
+  assert(!wasTapped("", ""));
+  assert(!wasTapped(undefined, undefined));
 });

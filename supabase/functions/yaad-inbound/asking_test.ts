@@ -345,11 +345,13 @@ Deno.test("only the notifications she must act on reach her WhatsApp", () => {
   // The rule lives at the call sites, not in a condition inside pushToDesk,
   // so adding a notification means deciding this on purpose.
   const texted = src.match(/alsoText:/g) ?? [];
-  assertEquals(texted.length, 5,
-    "the set of notifications that text her has changed. Five are meant to: " +
+  assertEquals(texted.length, 6,
+    "the set of notifications that text her has changed. Six are meant to: " +
     "handed over, they wrote again on a held thread, a job did not save, a " +
-    "reply was held back, and a web chat moved to WhatsApp. Every message from " +
-    "every stranger is how a phone gets muted");
+    "reply was held back, a web chat moved to WhatsApp, and a worker on a live " +
+    "job asked a question the app cannot answer (15 Sep 2026: nobody else " +
+    "will, and the worker was told a person would). Every message from every " +
+    "stranger is how a phone gets muted");
   // The informational ones must stay silent. If this catches, someone has
   // started texting her about greetings.
   const push = src.slice(src.indexOf("const pushToPhone"), src.indexOf("const pushToPhone") + 2600);

@@ -26,9 +26,16 @@
  * the number, and that is exactly the gate this product sells.
  */
 
-/** Was this message a button tap rather than something they wrote? */
-export function wasTapped(buttonPayload: unknown): boolean {
-  return String(buttonPayload ?? "").trim().length > 0;
+/** Was this message a tap rather than something they wrote?
+ *
+ *  Two kinds of tap, 15 September 2026. A Quick Reply button arrives as
+ *  `ButtonPayload`; a row picked from a List Picker arrives as `ListId`, with
+ *  the row's visible title in `ListTitle` and `Body`. Same rule for both: the
+ *  id is the text, the title never is. The section menu (Before, During,
+ *  After...) is a list, because WhatsApp allows three buttons and the
+ *  question has six answers. */
+export function wasTapped(buttonPayload: unknown, listId?: unknown): boolean {
+  return String(buttonPayload ?? "").trim().length > 0 || String(listId ?? "").trim().length > 0;
 }
 
 /** The text to treat as the message.
@@ -41,7 +48,7 @@ export function wasTapped(buttonPayload: unknown): boolean {
  *  A payload of only whitespace is not a tap. Twilio sends the parameter on
  *  some message types with nothing in it, and treating that as a tap would
  *  blank the body of an ordinary message. */
-export function inboundText(buttonPayload: unknown, body: unknown): string {
-  const payload = String(buttonPayload ?? "").trim();
+export function inboundText(buttonPayload: unknown, body: unknown, listId?: unknown): string {
+  const payload = String(buttonPayload ?? "").trim() || String(listId ?? "").trim();
   return payload || String(body ?? "").trim();
 }
