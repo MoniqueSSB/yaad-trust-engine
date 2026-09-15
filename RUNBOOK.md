@@ -275,6 +275,23 @@ Then check `verify_jwt` still reads the same after deploying. A deploy that sile
 
 ## 9a. Mistral says 429, and the two account questions behind it
 
+**Settled 15 September 2026, by Monique, in the Mistral console.** The
+organisation is on API pay-as-you-go (the free Experiment plan and the
+Vibe "Upgrade" button are different things; pay-as-you-go is the one that
+lifts the API rate limits). Billing name Yaadly Ltd, card on file, monthly
+overage spending cap set to EUR 20 on the Subscription page. The "Allow the
+use of your API calls to train Mistral's AI models" box on the sign-up form
+was left unticked, which is the opt-out: Mistral's own wording on the form is
+that new interactions, and those of your users, will not be used to train its
+models. The Data Processing Addendum at legal.mistral.ai is incorporated by
+reference into the commercial terms she accepted on the same form, so no
+separate signature was needed. `docs/privacy.html` now says the opt-out is
+in place; if the setting under Admin, API, Privacy ever reads differently,
+the page is wrong and this paragraph is wrong, fix both. If the 429s return
+on a paid plan, that is a per-model rate limit to read under Limits, not the
+free tier, and raising it is a support request to Mistral. The rest of this
+section is kept as the history of how the question was found.
+
 Two separate things, both in Mistral's console and neither of them in this
 repository. They are written here because they keep being described as done.
 
