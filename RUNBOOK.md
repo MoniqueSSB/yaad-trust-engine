@@ -5339,6 +5339,8 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 **Coming soon, not in use (14 Sep 2026, `20260914220000`).** Workers are paid by bank transfer only, never cash. `/portal/worker/payouts` says Stripe setup is coming soon and does not call `yaad-payout-setup`, which is deployed and dormant. Take a worker's bank details by phone and save them as a payee in the business bank app; never on the desk, never by WhatsApp. The steps below are for switching Stripe on once Global Payouts is approved: put the button back on that page first.
 
+**What Stripe confirmed (15 Sep 2026, support email plus the pricing page).** The worker receives J$; Stripe converts from GBP before it lands. Cost per payout from a UK sender to Jamaica: 0.50 GBP, plus 0.50% cross-border, plus 2% FX, about £7.63 on a £285 payment, charged to Yaadly's financial account and never taken from the worker. Landing time 1 to 7 business days. The exact figures show live in the Dashboard once set up; check them there before quoting anyone. Details and what it means for margin: `DECISIONS.md`, 2026-09-15.
+
 **What it is.** Since 14 Sep 2026 (`20260914200000`) a worker sets up how Yaadly pays them at `/portal/worker/payouts`, on Stripe's own form. Yaadly never sees or stores their bank details; `worker_profiles.stripe_recipient_status` says `none`, `started`, `ready` or `needs_info`. The booking WhatsApp points them there.
 
 1. **Switching it on (test mode), in this order:** apply `20260914190000`, then `20260914200000`. Then, from the repo root, from `main`: `supabase/functions/sync-shared.sh`, `supabase functions deploy yaad-payout-setup --project-ref leffyisvfvjwzilydlwf` (platform JWT check stays ON, no flag), and `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (it is on the CLAUDE.md §12 list). Then the web app, then the desk. It uses the `STRIPE_SECRET_KEY` already set for card payments.
@@ -5347,7 +5349,8 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 4. **"Setting up payment is not available right now."** Supabase, Edge Functions, `yaad-payout-setup`, Logs. A Stripe answer naming the API version: set the secret `STRIPE_V2_VERSION` to the version Stripe names. A Stripe answer saying Global Payouts or recipients are not enabled: that is the Stripe account, not the code; switch it on in the Dashboard for the mode the key is in.
 5. **A worker is stuck on "Stripe needs something from you".** Open the recipient in the Stripe Dashboard, Global Payouts, Recipients, and read what it asks for. The worker fixes it through the same button.
 6. **Going live** is its own decision: live key, `STRIPE_PAYOUTS_ALLOW_LIVE=yes`, cross-border payouts enabled by Stripe support. Until then every recipient is a test one.
-7. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.
+7. **A worker says a Stripe payout has not arrived.** Up to 7 business days is normal. After that: Stripe Dashboard, Global Payouts, open the payout, copy the **Trace ID** from its details, and give it to the worker to quote to their bank. Only their bank can see where it is.
+8. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.
 
 ## Paying a worker, until Stripe payouts reach Jamaica
 
