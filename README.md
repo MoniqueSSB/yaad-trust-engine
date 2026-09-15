@@ -57,24 +57,24 @@ OpenAI-compatible endpoint works by setting two environment variables. This was 
 decision: the buildathon gateway key had not been issued when the build started, and the engine was
 written so that a missing key was a configuration state rather than a blocker.
 
-Running against MiniMax, one of the buildathon partner platforms:
+Running against Mistral, in the European Union, which is the built-in default and the same
+provider the live Edge Functions use:
 
 ```bash
-export YAAD_API_KEY="your-minimax-api-key"
-export YAAD_BASE_URL="https://api.minimax.io/v1"
-export YAAD_MODEL="MiniMax-M2"
+export YAAD_API_KEY="your-mistral-api-key"
 python run_demo.py
 ```
 
-Other endpoints verified as drop-in compatible: Nebius Token Factory
-(`https://api.tokenfactory.nebius.com/v1/`) and the Impala gateway
-(`https://ht.getimpala.ai/v1`, model `qwen3.6-27b`), which is the built-in default.
+Other endpoints verified as drop-in compatible: MiniMax (`https://api.minimax.io/v1`, model
+`MiniMax-M2`), Nebius Token Factory (`https://api.tokenfactory.nebius.com/v1/`) and the Impala
+gateway (`https://ht.getimpala.ai/v1`, model `qwen3.6-27b`), which was the default until
+15 September 2026.
 
 | Variable | Default | Notes |
 |---|---|---|
 | `YAAD_API_KEY` | unset | Unset means mock mode. |
-| `YAAD_BASE_URL` | `https://ht.getimpala.ai/v1` | Any OpenAI-compatible endpoint. |
-| `YAAD_MODEL` | `qwen3.6-27b` | |
+| `YAAD_BASE_URL` | `https://api.mistral.ai/v1` | Any OpenAI-compatible endpoint. |
+| `YAAD_MODEL` | `mistral-small-latest` | |
 | `YAAD_TEMPERATURE` | `0.2` | Low on purpose. This is extraction, not creative writing. |
 | `YAAD_TIMEOUT` | `60` | Seconds. |
 
