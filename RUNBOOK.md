@@ -5393,7 +5393,9 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 **Why no Meta approval is needed here, unlike the daily check-in.** A worker has just sent a photo, so Yaadly is inside the 24 hour customer-service window and a Content Template can be sent without approval. The template still has to exist in Twilio.
 
-**To bring it live, in the Twilio console:** Messaging, Content Template Builder (Products and Services, then Templates, on the newer console), **Create new template**:
+**Switched on 15 September 2026, from the server, not the console.** The Twilio key is a function secret nobody can read back, so `yaad-twilio-setup` creates the template from `supabase/functions/yaad-twilio-setup/content.ts` (the six rows, tested) and writes its ContentSid to `app_settings.twilio_content_sid_phase`, which `yaad-inbound` reads whenever the `TWILIO_CONTENT_SID_PHASE` secret is unset. Live template: `yaadly_section_menu_v1`, created that day, visible on the desk under Settings as `twilio_content_sid_phase`. To recreate it after a Twilio account change, run the function once with the cron secret (the same way the scheduled jobs present it) or from an admin session, `{"action":"create-section-menu"}`; it reuses an existing template of that name rather than making a second. `{"action":"list"}` shows every template on the account. **Blanking the `twilio_content_sid_phase` row on the desk turns the menu off** and the typed letters go out again; that is the switch.
+
+**Doing it by hand instead, in the Twilio console:** Messaging, Content Template Builder (Products and Services, then Templates, on the newer console), **Create new template**:
 
 | Field | What to put in it |
 |---|---|
@@ -5415,13 +5417,13 @@ The six rows, in this order. **The Item ID column is the whole point: it must be
 | `N` | Something new I found |
 | `S` | Skip |
 
-Save. No submission for WhatsApp approval is needed for in-session use, but submitting it as **Utility** costs nothing and lets it go out later if ever needed outside the window. Copy its ContentSid (`HX...`) and set it:
+Save. No submission for WhatsApp approval is needed for in-session use, but submitting it as **Utility** costs nothing and lets it go out later if ever needed outside the window. Copy its ContentSid (`HX...`) and either paste it into the `twilio_content_sid_phase` setting on the desk, or set it as a secret, which wins over the setting:
 
 ```bash
 supabase secrets set TWILIO_CONTENT_SID_PHASE=HX... --project-ref leffyisvfvjwzilydlwf
 ```
 
-No redeploy needed; it is read on every request.
+No redeploy needed; both are read on every request.
 
 **To check it worked:** send a photo on a live job from a linked worker number, answer the job code and the "what does this show" question. The section question should arrive with a Choose button. Tap After: the reply is "Filed 1 item against JOB-…, marked as the after", the same words as typing A. In the trace, the send shows as `twilio.send.whatsapp` with `yaadly.template = phase_menu` and the reply as `yaadly.reply.template = true`.
 
