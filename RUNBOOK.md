@@ -3999,6 +3999,30 @@ the key and the model through `supabase/functions/_shared/visionmodel.ts`, the
 same way text goes through `textmodel.ts`. No function types the endpoint out
 itself, and CI fails one that does.
 
+**Since 15 September 2026, job photographs go to Mistral in the EU; the
+vetting read stays on NVIDIA.** Founder instruction ("move the photos to
+Mistral"), the same morning the Mistral account went on to pay-as-you-go with
+training off. `pickVisionProvider("evidence")` and `pickVisionProvider("sketch")`
+resolve to `api.mistral.ai` whenever `MISTRAL_API_KEY` is set, model
+`MISTRAL_VISION_MODEL` or `mistral-small-latest`. `pickVisionProvider("vetting")`
+still resolves to NVIDIA, because an applicant's paperwork is not "the photos"
+and CLAUDE.md section 6 says applicant documents get no new destination
+without her asking by name; `MISTRAL_VISION_JOBS` in `visionmodel.ts` is the
+set, and widening it is her call. The NVIDIA branch is kept beneath Mistral:
+if the Mistral key is ever unset, job photographs go back to NVIDIA and the
+log says so (`visionmodel: MISTRAL_API_KEY is not set, ... going to NVIDIA`).
+The three functions were redeployed the same day (`yaad-notify-client` v102,
+`yaad-sketch` v86, `yaad-vetting-review` v71), each with its existing
+`verify_jwt` setting. `docs/privacy.html` and `docs/how-we-use-ai.html` say
+photographs go to Mistral and paperwork to NVIDIA; change one, change both.
+
+**Proving it after a deploy.** On the desk, open any job with walkthrough
+stills and run Describe, or wait for the next evidence stage to land. Then in
+the function logs look for the vision span: `gen_ai.system` is `mistral`,
+`server.address` is `api.mistral.ai` and `yaadly.model.region` is `eu`. A
+line reading `nvidia_nim` on a `photo_review` or `sketch_frames` span means
+the Mistral key is missing from the project.
+
 **Move one job without touching the others.** Each has its own secret, read
 first, falling back to the shared `NVIDIA_VISION_MODEL` and then to a default:
 
@@ -4341,7 +4365,7 @@ Yaadly never sees the key value in chat, so this step is Monique's.
 The desk flow is Pull the stills, Describe, name the rooms, Build the pack, Add the map. Each step fails in its own way, and the log names which. Read it with the function id for `yaad-sketch`, or `supabase functions logs yaad-sketch --project-ref leffyisvfvjwzilydlwf`.
 
 - **Pull the stills says MP4 only, or every still is black.** The video is an iPhone .mov (HEVC). Send it to yourself on WhatsApp and use the copy that comes back, which is an MP4. No code is involved.
-- **Describe stops on one still, or says N of 12 described.** The log line `yaad-sketch frame:` says what the model answered. "not in JSON, asking once more strictly" is normal and self-healing. "not in JSON, twice" on many stills means the model has changed behaviour; check `NVIDIA_SKETCH_MODEL` and the default in `_shared/visionmodel.ts`. "gave no answer in 40s" twice means NVIDIA is not answering; there is no second vision provider, so wait.
+- **Describe stops on one still, or says N of 12 described.** The log line `yaad-sketch frame:` says what the model answered. "not in JSON, asking once more strictly" is normal and self-healing. "not in JSON, twice" on many stills means the model has changed behaviour; check `NVIDIA_SKETCH_MODEL` and the default in `_shared/visionmodel.ts`. "gave no answer in 40s" twice means the vision provider (Mistral since 15 September 2026, NVIDIA before) is not answering; there is no automatic failover between the two, so wait, or move the job with `VISION_MODEL_API`.
 - **The pack has the wrong rooms.** Not a bug: name them. Click the stills for a room, type the name, Apply, repeat. The server merges same-named rooms and will not split a name you gave.
 - **Build the pack says not in JSON.** The text model's answer had no JSON object after its thinking. The log line `yaad-sketch assemble:` shows the start of the answer. If the provider was MiniMax, `answerText()` should have stripped the `<think>` block; if the block has changed shape, that helper in `_shared/textmodel.ts` is the place.
 - **Add the map.** No key is needed. With no `GOOGLE_MAPS_API_KEY` set, the map comes from OpenStreetMap: the address is geocoded by Nominatim, a three by three grid of tiles is fetched, and they are assembled into one SVG with a marker. Both services are the OpenStreetMap Foundation's, in the EU, free, no account. If it says no map could be made, Nominatim did not recognise the address: try it more plainly, with the parish, for example "Hope Road, Kingston, Jamaica".

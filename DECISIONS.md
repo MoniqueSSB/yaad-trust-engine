@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-15 · Job photographs go to Mistral in the EU; applicant paperwork stays on NVIDIA
+
+**Founder decision: "move the photos to Mistral."** Asked after being shown the trade-off plainly: NVIDIA's free endpoint is the flakiest provider in the estate, a photograph of somebody's house was going to a free US endpoint whose terms nobody had read, and Mistral now sits under a paid account with a data processing addendum and training switched off. Cost is a fraction of a penny per image. So `pickVisionProvider()` gained a Mistral branch ahead of NVIDIA, the same shape as `pickTextProvider()`, for the `evidence` and `sketch` jobs. Three functions redeployed the same morning with their existing auth settings.
+
+**The vetting read did not move, and that is the important half.** `yaad-vetting-review` sends an applicant's proof of address, TRN and certificates, with consent, and CLAUDE.md section 6 says no applicant document gets a new destination without Monique asking for it by name. "The photos" are job photographs. So `MISTRAL_VISION_JOBS` names exactly two jobs, the vetting read still resolves to NVIDIA, and a test asserts that a Mistral key alone gives the vetting read nothing rather than a quiet EU route. If she wants applicant paperwork on Mistral too, that is one word in a set and one row on the privacy page, and it is hers to say.
+
+**NVIDIA is kept beneath Mistral rather than deleted, unlike MiniMax beneath Mistral for text.** The difference is disclosure. MiniMax was removed because a fallback to a country the privacy page said was not used is a leak waiting on one missing secret. NVIDIA is still on the privacy page for the vetting read, so a fall-back to it for job photographs when the Mistral key is unset goes to a disclosed processor, and it logs the country when it happens. `docs/privacy.html` and `docs/how-we-use-ai.html` both changed in the same commit, with the old arrangement stated rather than erased.
+
+**Not proved end to end at the time of writing.** The unit tests prove the resolution, the typecheck and deploy prove the bundle, and the version numbers prove what is live. A real photograph through the live path needs an admin session on the desk, which this session does not hold; the runbook says what the log line looks like when Monique runs the next Describe.
+
+---
+
 ## 2026-09-15 · The engine's default provider is Mistral, matching the live functions
 
 **Founder instruction, the same morning as the pay-as-you-go switch: "make Mistral what I use first."** The live Edge Functions already did: `pickTextProvider()` tries a configured override, then Mistral, and MiniMax only when no Mistral key exists, and that key has been unset since 14 September. The one place Mistral was not first was the Python engine, whose built-in default was still the buildathon's Impala gateway and a Qwen model. Nothing live ran through it, since the engine is local and CI, and CI runs in mock mode, but a default that names a provider nobody chose is the kind of thing that gets copied into a shell profile at midnight. The default is now `api.mistral.ai` and `mistral-small-latest`, so one Mistral key runs the demo, the engine and the live functions on the same provider.

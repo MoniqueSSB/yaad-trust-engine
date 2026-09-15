@@ -42,13 +42,35 @@
 // paperwork was the one class that could not be traced to a country. visionAttrs
 // below fixes that, in the same shape, so both are answerable the same way.
 //
+// ── Job photographs go to Mistral, in the EU, since 15 September 2026 ──
+//
+// Founder decision, the same morning the Mistral account went on to
+// pay-as-you-go with training switched off: "move the photos to Mistral".
+// Evidence photographs and walkthrough stills now go to api.mistral.ai, the
+// same provider and the same data processing terms as every piece of text.
+// Reasons, in order: the NVIDIA free endpoint is the flakiest provider in the
+// estate (35 second hangs and a 500 on the next attempt, recorded in
+// yaad-notify-client); a photograph of somebody's house now goes to the EU
+// under a signed DPA rather than to a free US endpoint; and it costs pennies.
+//
+// The vetting read is NOT moved. It sends an applicant's proof of address,
+// TRN and certificates, and CLAUDE.md section 6 says no applicant document
+// gets a new destination without Monique asking for it by name. She asked
+// for the photos. So MISTRAL_VISION_JOBS below names the two jobs that moved,
+// the vetting read still resolves to NVIDIA, and widening the set is her call.
+//
+// NVIDIA stays as the branch below Mistral rather than being deleted, for the
+// vetting read and so that unsetting the Mistral key fails over to a provider
+// the privacy page still discloses. It logs which country it went to.
+//
 // ── Adding a provider ──
 //
 // Do not add a branch. Set VISION_MODEL_KEY and VISION_MODEL_API, which take
 // priority over everything here and accept any OpenAI-compatible vision
 // endpoint. A new hard-coded branch is a new country receiving personal data,
 // which is a founder decision and a line in the data inventory before it is a
-// code change. CI fails a function that types the endpoint out itself.
+// code change. CI fails a function that types the endpoint out itself. The
+// Mistral branch above is the one exception, and it is dated and named.
 
 export type VisionJob = "evidence" | "sketch" | "vetting";
 
@@ -103,6 +125,10 @@ function modelFor(job: VisionJob): string {
     || JOBS[job].fallbackModel;
 }
 
+/** The jobs whose images go to Mistral. Founder-named, 15 September 2026.
+ *  "vetting" is deliberately absent: see the header. */
+export const MISTRAL_VISION_JOBS: ReadonlySet<VisionJob> = new Set<VisionJob>(["evidence", "sketch"]);
+
 export function pickVisionProvider(job: VisionJob): VisionProvider | null {
   // 1. Explicit override. Any OpenAI-compatible vision endpoint, no code change.
   const overrideKey = Deno.env.get("VISION_MODEL_KEY");
@@ -118,7 +144,25 @@ export function pickVisionProvider(job: VisionJob): VisionProvider | null {
     };
   }
 
-  // 2. NVIDIA's hosted NIM endpoint, United States. The current home.
+  // 2. Mistral, European Union, for job photographs only. See the header.
+  // The model id is the same shape trap as textmodel.ts: set
+  // MISTRAL_VISION_MODEL rather than editing here. mistral-small-latest reads
+  // images; the per-job NVIDIA_* model secrets do not apply to this branch
+  // because they name NVIDIA checkpoints.
+  const mistral = Deno.env.get("MISTRAL_API_KEY");
+  if (mistral && MISTRAL_VISION_JOBS.has(job)) {
+    return {
+      name: "mistral",
+      api: "https://api.mistral.ai/v1/chat/completions",
+      key: mistral,
+      model: Deno.env.get("MISTRAL_VISION_MODEL") || "mistral-small-latest",
+      region: "eu",
+      job,
+    };
+  }
+
+  // 3. NVIDIA's hosted NIM endpoint, United States. The home for the vetting
+  // read, and for job photographs only when no Mistral key is set.
   //
   // Worth knowing before relying on it, from live testing on 3 September 2026
   // recorded in yaad-notify-client: a clean 15 second answer, a request that
@@ -126,6 +170,9 @@ export function pickVisionProvider(job: VisionJob): VisionProvider | null {
   // attempt. Callers retry a timeout or a 5xx once and do not retry a refusal.
   const nvidia = Deno.env.get("NVIDIA_API_KEY");
   if (nvidia) {
+    if (MISTRAL_VISION_JOBS.has(job)) {
+      console.warn(`visionmodel: MISTRAL_API_KEY is not set, ${job} photographs are going to NVIDIA (United States)`);
+    }
     return {
       name: "nvidia_nim",
       api: "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -144,7 +191,7 @@ export function pickVisionProvider(job: VisionJob): VisionProvider | null {
 
 /** The error to return when no vision provider is configured at all. */
 export const NO_VISION_PROVIDER_MESSAGE =
-  "No vision model is configured. Set NVIDIA_API_KEY in the Edge Function secrets.";
+  "No vision model is configured. Set MISTRAL_API_KEY (job photographs) or NVIDIA_API_KEY (vetting, and the fallback) in the Edge Function secrets.";
 
 /**
  * Span attributes for a vision provider, matching providerAttrs in
