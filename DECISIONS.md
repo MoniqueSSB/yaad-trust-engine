@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-15 · The engine's default provider is Mistral, matching the live functions
+
+**Founder instruction, the same morning as the pay-as-you-go switch: "make Mistral what I use first."** The live Edge Functions already did: `pickTextProvider()` tries a configured override, then Mistral, and MiniMax only when no Mistral key exists, and that key has been unset since 14 September. The one place Mistral was not first was the Python engine, whose built-in default was still the buildathon's Impala gateway and a Qwen model. Nothing live ran through it, since the engine is local and CI, and CI runs in mock mode, but a default that names a provider nobody chose is the kind of thing that gets copied into a shell profile at midnight. The default is now `api.mistral.ai` and `mistral-small-latest`, so one Mistral key runs the demo, the engine and the live functions on the same provider.
+
+**Voice notes and photographs are deliberately not moved in this change.** Transcription is Cloudflare Whisper first and photographs go to NVIDIA in the United States; both are named on the privacy page. Mistral offers both capabilities, and pointing photographs at it would be a secrets-only change through `VISION_MODEL_API`, but that sends a new kind of personal data to a provider the page discloses for text only. That is a data destination decision and it is hers, raised rather than made.
+
+---
+
 ## 2026-09-15 · Mistral goes on pay-as-you-go, training opt-out taken, EUR 20 cap
 
 **Founder decision, from the Mistral console, 15 September 2026: "I now have the cash flow for this."** The API organisation moved from the free Experiment plan to pay-as-you-go, billed to Yaadly Ltd, with the monthly overage cap set at EUR 20. The Vibe "Upgrade" plans on the same page (Pro, Team, Enterprise) were deliberately not bought: they are seats for the chat and coding apps and do nothing for the API rate limits the nine Edge Functions hit.

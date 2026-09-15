@@ -154,7 +154,7 @@ export YAAD_BASE_URL="https://..."
 export YAAD_MODEL="..."
 ```
 
-Unset `YAAD_API_KEY` to fall back to mock mode. See [`DECISIONS.md`](DECISIONS.md) on why the provider is a configuration value and why the current one has to change before real data flows.
+Unset `YAAD_API_KEY` to fall back to mock mode. The built-in default is Mistral (`https://api.mistral.ai/v1`, `mistral-small-latest`) since 15 September 2026, the same provider as the live functions, so a Mistral key alone is enough. See [`DECISIONS.md`](DECISIONS.md) on why the provider is a configuration value.
 
 This is the Python engine only. The live Edge Functions are step 9.
 
