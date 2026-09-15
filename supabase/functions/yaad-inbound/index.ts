@@ -639,10 +639,10 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<b
  *  which is always the case here, a Twilio Content Template needs no Meta
  *  approval to be sent. False means "did not go", and the caller falls back
  *  to the typed question, so the menu is an upgrade and never a gap:
- *  until TWILIO_CONTENT_SID_PHASE is set (RUNBOOK.md, "The section menu")
- *  nothing changes at all. The lead sentence goes in as variable {{1}}. */
-async function sendPhaseMenu(to: string, lead: string, trace: Trace): Promise<boolean> {
-  const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE") ?? "";
+ *  until a template id exists (the TWILIO_CONTENT_SID_PHASE secret, or the
+ *  app_settings row yaad-twilio-setup writes; RUNBOOK.md, "The section
+ *  menu") nothing changes at all. The lead sentence goes in as {{1}}. */
+async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace: Trace): Promise<boolean> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -1919,8 +1919,15 @@ Deno.serve(async (req: Request) => {
   // template exists and the send worked, the typed question otherwise, same
   // lead sentence either way. Keeping the fallback here and not at each
   // caller is what stops three sites drifting into three questions.
-  const askPhase = async (to: string, channel: string, lead: string) => {
-    if (channel === "whatsapp" && await sendPhaseMenu(to, lead, trace)) return twimlSilent();
+  // The template id: the secret if set, else the row yaad-twilio-setup wrote
+  // when it created the template (app_settings.twilio_content_sid_phase).
+  const askPhase = async (settings: SettingsReader, to: string, channel: string, lead: string) => {
+    if (channel === "whatsapp") {
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE")
+        || (await readSettings(settings, ["twilio_content_sid_phase"])).twilio_content_sid_phase
+        || "";
+      if (contentSid && await sendPhaseMenu(to, lead, contentSid, trace)) return twimlSilent();
+    }
     return twiml(`${lead} ${PHASE_QUESTION}`);
   };
 
@@ -2823,7 +2830,7 @@ Deno.serve(async (req: Request) => {
           const lead = items.length
             ? `Got that too, ${next.length} so far.`
             : "That one did not come through.";
-          if (!stepBack && awaitingPhase) return askPhase(msg.from, msg.channel, lead);
+          if (!stepBack && awaitingPhase) return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, lead);
           const prompt = stepBack ? "What do these show?" : confirmedJob ? "What do these show?" : codePrompt(choices);
           return twiml(`${lead} ${prompt}`);
         }
@@ -2854,12 +2861,12 @@ Deno.serve(async (req: Request) => {
               supabase as unknown as SettingsReader, msg, confirmedJob.id,
               "Your photos are still waiting to be filed.", trace,
             );
-            return askPhase(msg.from, msg.channel, lead);
+            return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, lead);
           }
           // "ok" is not a section either. Asked again, not filed unmarked.
           if (isBareAcknowledgement(msg.text)) {
             root.setAttributes({ "yaadly.evidence_intake.outcome": "acknowledgement_while_awaiting_phase" });
-            return askPhase(msg.from, msg.channel, "Your photos are still waiting to be filed.");
+            return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, "Your photos are still waiting to be filed.");
           }
           const phase = readPhaseAnswer(msg.text) ?? null;
 
@@ -2921,7 +2928,7 @@ Deno.serve(async (req: Request) => {
             .update({ answers: { ...answers, pending: described, awaiting_phase: true }, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.evidence_intake.outcome": "context_taken_asked_phase" });
-          return askPhase(msg.from, msg.channel, `Got it, going on ${confirmedJob.id}, ${await stageSaid(supabase, confirmedJob.id, confirmedJob.stage)}.${pairHint(await beforesOnJob(supabase, confirmedJob.id))}`);
+          return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, going on ${confirmedJob.id}, ${await stageSaid(supabase, confirmedJob.id, confirmedJob.stage)}.${pairHint(await beforesOnJob(supabase, confirmedJob.id))}`);
         }
 
         const pick = pickJobChoice(msg.text, choices);
@@ -2951,7 +2958,7 @@ Deno.serve(async (req: Request) => {
           })
           .eq("wa_id", msg.from);
         root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
-        return askPhase(msg.from, msg.channel, `Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, pick.id))}`);
+        return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, pick.id))}`);
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
