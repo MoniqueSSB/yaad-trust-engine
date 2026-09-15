@@ -5384,3 +5384,51 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 **If a real update is being stopped as a question:** the detector is two expressions at the top of `worker-question.ts` and the negative cases are the bulk of `worker-question_test.ts`. Add the sentence that was wrongly caught to that list first, then adjust the expression until the suite passes. Never widen the question side without adding a negative case, because a false positive here means a worker's real update quietly stops reaching the client.
 
 **"Someone at Yaadly has this" on every worker message, including photos:** that is a different fault, the number is held (`human_handling` true on `intake_threads`). See "The handoff is automatic" above and hand it back.
+
+## The section menu: "which is this?" as rows a worker taps, not letters
+
+**Until `TWILIO_CONTENT_SID_PHASE` is set, the question goes out as text with the letters, exactly as before.** Founder, 15 Sep 2026: "the letters would be confusing and not clear", she wants separate words they can click. `askPhase()` in `yaad-inbound` is now the one place the question is asked: on WhatsApp it first tries `sendPhaseMenu()`, which sends a Twilio Content Template through the Messages API and answers the webhook with an empty response; if the secret is missing or Twilio refuses, it sends the typed question instead. The menu is an upgrade, never a gap.
+
+**Why a list and not buttons.** WhatsApp allows three Quick Reply buttons per message. This question has six answers. A List Picker shows one button ("Choose") that opens up to ten rows.
+
+**Why no Meta approval is needed here, unlike the daily check-in.** A worker has just sent a photo, so Yaadly is inside the 24 hour customer-service window and a Content Template can be sent without approval. The template still has to exist in Twilio.
+
+**To bring it live, in the Twilio console:** Messaging, Content Template Builder (Products and Services, then Templates, on the newer console), **Create new template**:
+
+| Field | What to put in it |
+|---|---|
+| Template name | `yaadly_section_menu_v1` |
+| Template language | English |
+| Select content type | **List Picker** (`twilio/list-picker`) |
+| Body | `{{1}} Which section is this? Tap Choose and pick one.` |
+| Button text | `Choose` |
+| Variable 1 sample | `Got it, going on JOB-WEB-1789253807959, stage 1.` |
+
+The six rows, in this order. **The Item ID column is the whole point: it must be the single letter, exactly as shown**, because the letter is what the typed version has always accepted and what `readPhaseAnswer()` reads. Item name is what the worker sees; the description column can stay empty.
+
+| Item ID | Item name |
+|---|---|
+| `B` | Before |
+| `D` | During the work |
+| `A` | After |
+| `P` | A problem with the work |
+| `N` | Something new I found |
+| `S` | Skip |
+
+Save. No submission for WhatsApp approval is needed for in-session use, but submitting it as **Utility** costs nothing and lets it go out later if ever needed outside the window. Copy its ContentSid (`HX...`) and set it:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_PHASE=HX... --project-ref leffyisvfvjwzilydlwf
+```
+
+No redeploy needed; it is read on every request.
+
+**To check it worked:** send a photo on a live job from a linked worker number, answer the job code and the "what does this show" question. The section question should arrive with a Choose button. Tap After: the reply is "Filed 1 item against JOB-…, marked as the after", the same words as typing A. In the trace, the send shows as `twilio.send.whatsapp` with `yaadly.template = phase_menu` and the reply as `yaadly.reply.template = true`.
+
+**If the menu never appears:** the function log line `sendPhaseMenu: Twilio refused the template:` carries Twilio's reason. The usual ones are a wrong ContentSid, the template's variable count not matching (it takes exactly one), or the row ids not being the bare letters. The typed question still went, so nothing was lost.
+
+**An "after" that answers a particular before still needs typing.** A tap carries only the letter. The hint "put its code after the letter, like A P3" still goes out in the lead sentence, and a worker who types that gets the pairing; a worker who taps After gets an unpaired after, which the desk can link.
+
+## "no", "ok" or "share location" from a worker was filed as evidence, or sent to the client
+
+Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A bare acknowledgement (no, ok, yes, thanks, hi) is neither a question nor an update: at the report prompt nothing is sent and the prompt is repeated ("yes" and "ok" do not send a report, only "1" does, on purpose); at the section question it is asked again; in the plain update lane it is answered "Noted, nothing filed" and nobody is woken. A short instruction naming something the app explains ("share location", "send video", "photos", up to four words) is answered as the question it was. The app's own answers now cover: sharing a location, sending a video, sending photos, receipts, what the section words mean, what the client sees next, and the published pay fact (3 working days after a named person signs the stage off, by bank transfer, never cash). The pay sentence is copied from `faq.ts` and must change with it. Anything else still goes to you.
