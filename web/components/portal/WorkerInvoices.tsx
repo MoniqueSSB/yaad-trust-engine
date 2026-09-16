@@ -12,6 +12,7 @@
  * money has moved: nothing in this codebase moves money (CLAUDE.md 9).
  */
 
+import Link from "next/link";
 import { STATUS_TONE, type StatusLabel } from "./statusTone";
 import { jmd } from "@/lib/money";
 import { whenDate } from "@/lib/date";
@@ -72,7 +73,15 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
       <ul className="grid gap-3">
         {jobs.map((j) => (
           <li key={j.jobId} className="rounded-2xl border border-line bg-panel p-4">
-            <b className="text-[14.5px]">{j.jobTitle ?? j.jobId}</b>
+            {/* Founder, 16 Sep 2026: an invoice number on its own tells the
+                worker nothing. Every group names the job, carries its job
+                number, and links to the job page the invoice belongs to. */}
+            <Link href={`/portal/jobs/${encodeURIComponent(j.jobId)}`} className="group block">
+              <b className="text-[14.5px] group-hover:underline">{j.jobTitle ?? "Job"}</b>
+              <span className="mt-0.5 block font-mono text-[11px] text-dim">
+                {j.jobId} · open the job
+              </span>
+            </Link>
             <ul className="mt-2 grid gap-1.5">
               {j.invoices.map((inv) => (
                 /* Two explicit columns rather than a four item wrap. On a
@@ -102,7 +111,7 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                   </span>
                   {inv.status === "paid" && (
                     <span className="col-span-full text-[11.5px] leading-relaxed text-dim">
-                      Sent to you{inv.paidMethod === "bank_transfer" ? " by bank transfer" : ""}
+                      Sent to you{inv.paidMethod === "bank_transfer" ? " by bank transfer" : inv.paidMethod === "stripe" ? " by bank transfer through Stripe" : ""}
                       {inv.paidAt ? " on " + (whenDate(inv.paidAt) ?? inv.paidAt) : ""}
                       {inv.paidRef ? ", reference " + inv.paidRef : ""}.
                     </span>
