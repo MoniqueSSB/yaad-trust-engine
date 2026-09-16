@@ -77,7 +77,7 @@ Deno.test("the simple questions the founder named get an answer from the app its
 
 Deno.test("the pay answer is the published fact and nothing more", () => {
   const a = answerWorkerQuestion("when do i get paid") ?? "";
-  assert(a.includes("within 3 working days of a named person at Yaadly signing the stage off"));
+  assert(a.includes("within 7 working days of a named person at Yaadly signing the stage off"));
   assert(a.includes("does not pay in cash"));
   // No amount, no date, no promise that a particular payment is coming.
   assert(!/£|J\$|\d{1,2}\/\d{1,2}|tomorrow|today|on its way|already sent/i.test(a), a);

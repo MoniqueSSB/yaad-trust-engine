@@ -126,7 +126,7 @@ export function answerWorkerQuestion(text: string): string | null {
     return "What happens next: your update is written up as a short report, you are shown it and reply 1 to send it, or send your own words instead. Then the client sees it. Nothing goes to them until you have confirmed it.";
   }
   if (/\b(?:paid|pay|payment|money|cash|wage|when .* get paid|transfer)\b/.test(t)) {
-    return "Paid by Yaadly, not by the client, within 3 working days of a named person at Yaadly signing the stage off, by bank transfer. Yaadly does not pay in cash. If you have a question about a specific payment, say so and a person will answer it.";
+    return "Paid by Yaadly, not by the client, within 7 working days of a named person at Yaadly signing the stage off, by bank transfer. Yaadly does not pay in cash. If you have a question about a specific payment, say so and a person will answer it.";
   }
   return null;
 }

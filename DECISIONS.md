@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-16 · Workers are paid within 7 working days, and Xero is the system of accounts
+
+**7 working days (founder, 16 Sep 2026: "make it 7 days due to timeline").** Every promise of pay "within 3 working days" becomes 7: the worker portal, the application form, the public FAQ, the WhatsApp assistant's answer, the marketing site's worked example. The reason is Stripe's own figure: a Global Payout to Jamaica lands in 1 to 7 business days after it is sent, so a 3 day promise could be broken by the bank on the far end with nothing Yaadly could do. The clock runs from a named person at Yaadly signing the stage off, never from the client.
+
+**The signed Worker Guidelines move to version 1.7.** The pay sentence is the one place the promise is in a document a worker signs, so it changes with a version bump: 7 working days, by bank transfer through Stripe or Wise, never cash. The same sentence still said "Lynk wallet or remittance pick-up", which stopped being true on 14 Sep, so it is corrected in the same version rather than left contradicting the product. Workers who signed 1.6 are asked to read and sign 1.7 before quoting again; today those are the two seed test workers.
+
+**Xero (founder, 16 Sep 2026: "want to use Xero").** Xero is the system of accounts for Yaadly Ltd: bank feeds from Tide, Wise and Stripe, reconciliation, VAT when it comes, year-end. Yaadly's own invoices remain the system of record for jobs, because marking one paid is what starts a job and approving a stage is what raises the worker's pay; Xero never raises a job invoice. For the pilot, invoices and payments are entered into Xero by hand or by export; pushing them automatically through Xero's API is a later piece, and only once an accountant has said how Stripe, Wise and JMD should be set up in it. Not built now, on purpose: the pilot stays lean.
+
 ## 2026-09-16 · Both portal overviews say what each job is, what it costs or pays, and what is next, and every card opens that section
 
 **Why.** Founder, 16 Sep 2026, reading the worker's and then the client's overview: an invoice number alone does not tell anyone where it belongs; a money line must say which job it comes from; a job card must say what the work is, not only where it is; "everything should be clickable and take the worker to the exact section that is still outstanding"; and a professional service "is also a live job and needs that attention", not a side list.
