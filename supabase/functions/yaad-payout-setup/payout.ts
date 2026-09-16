@@ -32,7 +32,13 @@ export function isStripeHostedUrl(u: string): boolean {
   }
 }
 
-/** The recipient Yaadly creates for a worker: a person in Jamaica, paid in J$ to a local bank. */
+/**
+ * The recipient Yaadly creates for a worker: a person in Jamaica, paid in J$
+ * to a local bank. Stripe support confirmed 15 Sep 2026 that the worker
+ * receives J$ with Stripe doing the GBP to JMD conversion, never GBP left
+ * for their bank to convert. Fees (0.50 GBP + 0.50% + 2% FX) fall on
+ * Yaadly's financial account, not on the worker. See DECISIONS.md.
+ */
 export function recipientBody(email: string, name: string) {
   return {
     contact_email: email,

@@ -1137,7 +1137,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <!-- ============================================ PAY WORKERS -->
 <section class="view" data-view="workerpay">
   <h1 class="vh">Pay workers</h1>
-  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then pay it from Wise, to the recipient saved there, and press Mark as sent. That marks the invoice paid, stamped with you and the time, once, and sends the worker a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number. Stripe payouts come here once Stripe has switched on payments to Jamaica.</p>
+  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then either pay it from Wise, to the recipient saved there, and press Mark as sent; or, for a worker who has set up Stripe, press Pay with Stripe: it shows you Stripe's fee, exchange rate and what lands in J$, and sends only when you confirm. Either way the invoice is marked paid, stamped with you and the time, once, and the worker gets a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number.</p>
   <div id="wpMsg"></div>
   <div id="wpBody"><div class="empty"><b>Reading worker pay invoices&hellip;</b></div></div>
 </section>
@@ -1190,6 +1190,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
+const FN_PAYOUT = SUPABASE_URL + "/functions/v1/yaad-payout-send";
 const REPLY_FN = SUPABASE_URL + "/functions/v1/yaad-desk-reply";
 const AGENT_FN = SUPABASE_URL + "/functions/v1/yaad-agent";
 const SHORT_FN = SUPABASE_URL + "/functions/v1/yaad-shortlist";
@@ -7918,8 +7919,13 @@ async function loadWorkerPay(keepMsg){
   const emails = [...new Set([...list.map((i) => i.worker_email), ...(booked || []).map((j) => j.worker_email)].filter(Boolean))];
   const [{ data: jobs }, { data: workers }] = await Promise.all([
     jobIds.length ? sb.from("jobs").select("id,title,is_test").in("id", jobIds) : Promise.resolve({ data: [] }),
-    emails.length ? sb.from("worker_profiles").select("worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by").in("worker_email", emails) : Promise.resolve({ data: [] }),
+    emails.length ? sb.from("worker_profiles").select("worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by,stripe_recipient_status").in("worker_email", emails) : Promise.resolve({ data: [] }),
   ]);
+  // Stripe payouts already sent for these invoices (20260916120000), so a
+  // paid-by-Stripe row can show Stripe's own status, and a failed or returned
+  // one shows red until a person deals with it.
+  const { data: payouts } = list.length ? await sb.from("stripe_payouts").select("invoice_id,outbound_payment_id,status,status_detail,receipt_url,trace_id,expected_arrival,debited_value,debited_currency,fees,fx_rate,quote_is_estimate,sent_by,created_at").in("invoice_id", list.map((i) => i.id)) : { data: [] };
+  const payoutByInv = new Map((payouts || []).map((x) => [x.invoice_id, x]));
   const jobById = new Map((jobs || []).map((j) => [j.id, j]));
   const workerByEmail = new Map((workers || []).map((w) => [String(w.worker_email || "").toLowerCase(), w]));
 
@@ -7946,6 +7952,10 @@ async function loadWorkerPay(keepMsg){
     return [...by.entries()].map(([c, p]) => feeAmt(p, c)).join(" + ");
   };
 
+  const stripeReady = (i) => {
+    const w = workerByEmail.get(String(i.worker_email || "").toLowerCase());
+    return !!(w && w.stripe_recipient_status === "ready") && (i.currency || "JMD") === "JMD";
+  };
   const owed = list.filter((i) => i.status === "sent");
   const paid = list.filter((i) => i.status === "paid").sort((a, b) => String(b.paid_at || "").localeCompare(String(a.paid_at || ""))).slice(0, 30);
   const drafts = list.filter((i) => i.status === "draft");
@@ -7961,20 +7971,34 @@ async function loadWorkerPay(keepMsg){
       <td class="num"><b>${feeAmt(i.total_pence, i.currency)}</b>${sub_("owed since " + since)}</td>
       <td>${wait}</td>
       <td><input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">
-        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button></td>
+        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button>
+        ${stripeReady(i) ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}" title="Shows Stripe's fee and rate first; sends only when you confirm">Pay with Stripe</button>` : `<span style="opacity:.55" title="The worker has not finished setting up Stripe in their portal">Stripe: not set up</span>`}</td>
     </tr>`;
   }).join("");
 
   const paidRows = paid.map((i) => {
-    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : "marked paid";
+    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : i.paid_method === "stripe" ? "by Stripe" : "marked paid";
     const ref = String(i.paid_reference || "").trim();
+    const sp = i.paid_method === "stripe" ? payoutByInv.get(i.id) : null;
+    // Stripe's own word on the payout, as last read. Red until a person has dealt with a failed or returned one.
+    const spChip = !sp ? chip_("ok", "sent")
+      : sp.status === "posted" ? chip_("ok", "posted")
+      : sp.status === "processing" ? chip_("warn", "processing")
+      : chip_("crit", sp.status + (sp.status_detail ? ": " + sp.status_detail : ""));
+    const spDetail = sp ? [
+      sp.debited_value != null ? "£" + (Number(sp.debited_value) / 100).toFixed(2) + " left the Stripe account" : "",
+      sp.fx_rate ? "rate " + sp.fx_rate : "",
+      sp.quote_is_estimate ? "fees were an estimate" : "",
+      sp.expected_arrival ? "expected " + String(sp.expected_arrival).slice(0, 10) : "",
+      sp.trace_id ? "trace " + sp.trace_id : "",
+    ].filter(Boolean).join(" · ") : "";
     return `<tr>
       <td>${whoCell(i)}</td>
       <td>${jobCell(i)}</td>
       <td>${forCell(i)}</td>
       <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
-      <td>${chip_("ok", "sent")}</td>
-      <td>${esc(how)}${ref ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}</td>
+      <td>${spChip}${sp ? ` <button class="btn" data-wp-refresh="${esc(i.id)}" title="Ask Stripe where this payout is">Check</button>` : ""}</td>
+      <td>${esc(how)}${ref && !sp ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}${spDetail ? sub_(spDetail) : ""}${sp && sp.receipt_url ? ` <a href="${esc(sp.receipt_url)}" target="_blank" rel="noopener">receipt</a>` : ""}</td>
     </tr>`;
   }).join("");
 
@@ -8053,6 +8077,63 @@ async function loadWorkerPay(keepMsg){
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
         say("wpMsg", "err", hint);
       }
+      await loadWorkerPay(true);
+    });
+  });
+
+  // Pay with Stripe (yaad-payout-send, 20260916120000). Two clicks, on
+  // purpose. The first asks Stripe for a quote and shows the person the fee,
+  // the exchange rate, what lands in J$ and what leaves the GBP account. Only
+  // the second, a confirm() with those figures in it, sends. The function
+  // then marks the invoice paid under THIS person's session, so paid_by is
+  // them. Nothing here or in the function sends without that confirm.
+  const payoutFn = async (payload) => {
+    const r = await fetch(FN_PAYOUT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({ error: "the payout function returned something unreadable" }));
+    if (!r.ok) { const err = new Error(j.error || ("http " + r.status)); err.body = j; throw err; }
+    return j;
+  };
+  const gbp = (minor) => "£" + (Number(minor) / 100).toFixed(2);
+  const feeLine = (f) => ({ standard_payout_fee: "Stripe payout fee", cross_border_payout_fee: "cross-border fee", foreign_exchange_fee: "currency conversion fee" }[f.type] || f.type) + " " + (f.currency === "GBP" ? gbp(f.value) : f.value + " " + f.currency);
+  host.querySelectorAll("[data-wp-stripe]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.wpStripe, name = btn.dataset.wpWho;
+      btn.disabled = true;
+      say("wpMsg", "", "");
+      try {
+        const q = await payoutFn({ action: "quote", invoice: id });
+        const lands = q.credited ? jmdFmt(Math.round(q.credited.value / 100)) : "the invoice amount";
+        const leaves = q.debited ? gbp(q.debited.value) : "not quoted";
+        const fees = (q.fees || []).map(feeLine).join(", ") || "not quoted";
+        const total = q.fees_total ? gbp(q.fees_total.value) : "see receipt";
+        const bal = q.balance_available_gbp_pence != null ? gbp(q.balance_available_gbp_pence) : "unknown";
+        const text = q.estimate
+          ? `Pay ${name} ${lands} through Stripe for ${id}?\n\nStripe would not quote this in advance. Published fees for a UK sender to Jamaica: £0.50 + 0.50% cross-border + 2% currency conversion, charged to Yaadly. The exact GBP figure shows on Stripe's receipt afterwards.\n\nGBP available in Yaadly's Stripe account: ${bal}.\n\n${q.livemode ? "THIS IS LIVE MONEY." : "Test mode: no real money moves."}\n\nThis sends the payout now, marks ${id} paid with your name, and WhatsApps ${name}. It cannot be cancelled once posted.`
+          : `Pay ${name} ${lands} through Stripe for ${id}?\n\nLeaves Yaadly's GBP account: ${leaves}\nStripe's fees (charged to Yaadly): ${fees} = ${total}\nRate: 1 GBP = ${q.fx_rate || "?"} JMD, locked until ${q.expires_at ? new Date(q.expires_at).toLocaleTimeString("en-GB") : "shortly"}\nGBP available in Yaadly's Stripe account: ${bal}${q.enough === false ? " (NOT ENOUGH)" : ""}\n\n${q.livemode ? "THIS IS LIVE MONEY." : "Test mode: no real money moves."}\n\nThis sends the payout now, marks ${id} paid with your name, and WhatsApps ${name}. It cannot be cancelled once posted.`;
+        if (q.enough === false) { say("wpMsg", "err", `Not enough GBP in Yaadly's Stripe account (${bal} available, ${leaves} needed). Add money in Stripe, Global Payouts, then try again.`); btn.disabled = false; return; }
+        if (!confirm(text)) { btn.disabled = false; return; }
+        const out = await payoutFn({ action: "send", invoice: id, quote_id: q.quote_id, estimate: q.estimate === true, acknowledged: true });
+        say("wpMsg", "ok", `Sent ${lands} to ${name} through Stripe (${out.outbound_payment_id}, ${out.status}). ${id} is now paid, and ${name} is being sent a WhatsApp.${out.expected_arrival ? " Stripe expects it to land by " + String(out.expected_arrival).slice(0, 10) + "." : ""}`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        if (e.body && e.body.outbound_payment_id) hint += ` Stripe payout id: ${e.body.outbound_payment_id}.`;
+        say("wpMsg", "err", hint);
+      }
+      await loadWorkerPay(true);
+    });
+  });
+  host.querySelectorAll("[data-wp-refresh]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const st = await payoutFn({ action: "refresh", invoice: btn.dataset.wpRefresh });
+        say("wpMsg", st.status === "posted" || st.status === "processing" ? "ok" : "err", `Stripe says ${btn.dataset.wpRefresh}: ${st.status}${st.detail ? ", " + st.detail : ""}${st.trace_id ? ". Trace ID " + st.trace_id : ""}.`);
+      } catch (e) { say("wpMsg", "err", e.message); }
       await loadWorkerPay(true);
     });
   });

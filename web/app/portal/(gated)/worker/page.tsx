@@ -49,7 +49,7 @@ export default async function WorkerPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,pay_method,pay_ref",
+      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,pay_method,pay_ref,job_type,size_band",
     )
     .order("updated_at", { ascending: false });
 
@@ -74,7 +74,7 @@ export default async function WorkerPortal() {
   const { data: tenderRows } = await supabase.rpc("my_quoted_jobs");
 
   const email = (user.email ?? "").toLowerCase();
-  type WorkerJob = Job & { pay_method: string | null; pay_ref: string | null };
+  type WorkerJob = Job & { pay_method: string | null; pay_ref: string | null; job_type?: string | null; size_band?: string | null };
   // The filter stays although RLS already scopes the query: an admin, or a
   // worker who is also somebody's client, gets rows here that are not work.
   const booked = ((data ?? []) as WorkerJob[]).filter((j) => j.worker_email?.toLowerCase() === email);
@@ -186,6 +186,43 @@ export default async function WorkerPortal() {
     }),
   );
 
+  /* Founder, 16 Sep 2026: every row says what the work is, what the worker's
+     money on it is, and what is outstanding, and the card opens that exact
+     section of the job. The "next" map is the worker's side of each status;
+     the client has different work to do at the same points. */
+  const moneyById = new Map(moneyJobs.map((m) => [m.id, m]));
+  const jobHref = (id: string, tail: string) => "/portal/jobs/" + encodeURIComponent(id) + tail;
+  const nextFor = (j: (typeof jobs)[number]): { label: string; href: string } | null => {
+    switch (j.status) {
+      case "open":
+      case "open_for_quotes":
+        return { label: "Send your price", href: jobHref(j.id, "?tab=scope#quotes") };
+      case "quoted":
+        return { label: "Waiting on the client to choose", href: jobHref(j.id, "?tab=scope#quotes") };
+      case "awaiting_payment":
+        return { label: "Nothing yet: the job goes live once the client has paid", href: jobHref(j.id, "?tab=overview") };
+      case "confirmed":
+        return { label: "Confirm the Kickoff Pack, then log your arrival", href: jobHref(j.id, "/pack") };
+      case "in_progress":
+        return { label: "Send tonight's Midnight Work-Log", href: jobHref(j.id, "?tab=evidence#upload") };
+      case "evidence":
+        return { label: "Your evidence is with the client", href: jobHref(j.id, "?tab=evidence#stage-evidence") };
+      case "complete":
+        return { label: "See what you were paid", href: jobHref(j.id, "?tab=approvals#invoices") };
+      default:
+        return null;
+    }
+  };
+  const describe = (j: (typeof jobs)[number]) => {
+    const m = moneyById.get(j.id);
+    const work = [j.job_type, j.size_band].filter((x): x is string => Boolean(x)).join(", ") || j.trade || null;
+    const money = m ? jmd(m.takeHome) + (m.held ? ", held until the job is signed off" : ", released") : null;
+    return { ...j, work, money, next: nextFor(j) };
+  };
+  const liveRows = live.map(describe);
+  const doneRows = done.map(describe);
+  const closedRows = closedQuotes.map(describe);
+
   const heldJobs = moneyJobs.filter((j) => j.held);
   const held = heldJobs.reduce((sum, j) => sum + j.takeHome, 0);
   const released = moneyJobs.filter((j) => !j.held).reduce((sum, j) => sum + j.takeHome, 0);
@@ -291,18 +328,18 @@ export default async function WorkerPortal() {
         <div>
           <JobList
             title="Live work"
-            jobs={live}
+            jobs={liveRows}
             labels={WORKER_STATUS}
             rail
             empty="Nothing live right now. Jobs you are matched to or have quoted on appear here."
           />
 
           {done.length > 0 && (
-            <JobList title="Completed" jobs={done} labels={WORKER_STATUS} rail />
+            <JobList title="Completed" jobs={doneRows} labels={WORKER_STATUS} rail />
           )}
 
           {closedQuotes.length > 0 && (
-            <JobList title="Quotes that closed" jobs={closedQuotes} labels={WORKER_STATUS} rail />
+            <JobList title="Quotes that closed" jobs={closedRows} labels={WORKER_STATUS} rail />
           )}
         </div>
 

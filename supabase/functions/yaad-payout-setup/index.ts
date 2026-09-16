@@ -19,7 +19,7 @@
  *             bank payouts are active.
  *
  * WHAT IT NEVER DOES. It sends no money and it never sees a bank detail.
- * Paying a worker is a later piece, and a named person's click (CLAUDE.md §2).
+ * Paying a worker is yaad-payout-send, a named person's click (CLAUDE.md §2).
  *
  * LIVE KEYS ARE REFUSED unless STRIPE_PAYOUTS_ALLOW_LIVE is exactly "yes",
  * its own switch, separate from card payments' STRIPE_ALLOW_LIVE: taking card

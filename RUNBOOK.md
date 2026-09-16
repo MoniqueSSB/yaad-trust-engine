@@ -5362,6 +5362,8 @@ update app_settings set value = '<Bank>, <account name>, sort code <..>, account
 
 ## Going live with card payments
 
+**Verified live 16 Sep 2026.** A real J$195 card payment on INV-2026-0005 (test job, founder's own card) went portal → `yaad-checkout` → Stripe live → `yaad-stripe-webhook` → `invoice_payments` with `livemode = true`, `status = succeeded`, and the portal read "Card payment received". The live webhook secret is therefore right. The first attempt on 14 Sep had failed silently: the value set as `STRIPE_SECRET_KEY` was the key's Dashboard **ID** (`mk_…`), not the key (`sk_live_…`), and every card attempt from 14 Sep 16:00 to 15 Sep 12:31 returned "Card payment could not be started". **The log line to look for is "Invalid API key provided: mk_…"** in `yaad-checkout`. Standard secret keys cannot be revealed again after creation; make a new one ("Powering an integration you built") and set that.
+
 Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handles a key.**
 
 1. **Stripe Dashboard, live mode** (switch off Test mode / Sandbox): Developers, API keys, copy the **live Secret key** (`sk_live_…`).
@@ -5378,7 +5380,11 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 ## Worker payout setup (Stripe Global Payouts, test mode)
 
-**Coming soon, not in use (14 Sep 2026, `20260914220000`).** Workers are paid by bank transfer only, never cash. `/portal/worker/payouts` says Stripe setup is coming soon and does not call `yaad-payout-setup`, which is deployed and dormant. Take a worker's bank details by phone and save them as a payee in the business bank app; never on the desk, never by WhatsApp. The steps below are for switching Stripe on once Global Payouts is approved: put the button back on that page first.
+**Back on the page, 16 Sep 2026.** The Set up with Stripe button is on `/portal/worker/payouts` again, beside the Wise form, and `yaad-payout-setup` is called. Paying through Stripe is the section "Paying a worker through Stripe" below. (14 to 16 Sep the button was off and the function dormant while Stripe was asked whether Jamaica was live.)
+
+**Enabled after all (Dashboard, 16 Sep 2026).** Global Payouts, Recipients, Add recipient opens a form that offers Jamaica; there is no Get started gate. The paragraph below records what support said the same day, kept because the steps are the right ones if a gate ever appears. **Support said, 16 Sep 2026:** Global Payouts is switched on from the Dashboard, not by support: Global Payouts in the left navigation, **Get started**, accept the Global Payouts Terms of Service, complete any missing business detail. Usually minutes; occasionally 2 to 3 weeks of Enhanced Due Diligence. Until that is done every recipient call fails with "not enabled" (step 4 below). Jamaica is on Stripe's supported table for a UK sender: individual, JMD, local bank, email and name. The Terms of Service are the licensing note the decisions log says a solicitor should see first.
+
+**What Stripe confirmed (15 Sep 2026, support email plus the pricing page).** The worker receives J$; Stripe converts from GBP before it lands. Cost per payout from a UK sender to Jamaica: 0.50 GBP, plus 0.50% cross-border, plus 2% FX, about £7.63 on a £285 payment, charged to Yaadly's financial account and never taken from the worker. Landing time 1 to 7 business days. The exact figures show live in the Dashboard once set up; check them there before quoting anyone. Details and what it means for margin: `DECISIONS.md`, 2026-09-15.
 
 **What it is.** Since 14 Sep 2026 (`20260914200000`) a worker sets up how Yaadly pays them at `/portal/worker/payouts`, on Stripe's own form. Yaadly never sees or stores their bank details; `worker_profiles.stripe_recipient_status` says `none`, `started`, `ready` or `needs_info`. The booking WhatsApp points them there.
 
@@ -5388,9 +5394,25 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 4. **"Setting up payment is not available right now."** Supabase, Edge Functions, `yaad-payout-setup`, Logs. A Stripe answer naming the API version: set the secret `STRIPE_V2_VERSION` to the version Stripe names. A Stripe answer saying Global Payouts or recipients are not enabled: that is the Stripe account, not the code; switch it on in the Dashboard for the mode the key is in.
 5. **A worker is stuck on "Stripe needs something from you".** Open the recipient in the Stripe Dashboard, Global Payouts, Recipients, and read what it asks for. The worker fixes it through the same button.
 6. **Going live** is its own decision: live key, `STRIPE_PAYOUTS_ALLOW_LIVE=yes`, cross-border payouts enabled by Stripe support. Until then every recipient is a test one.
-7. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.
+7. **A worker says a Stripe payout has not arrived.** Up to 7 business days is normal. After that: Stripe Dashboard, Global Payouts, open the payout, copy the **Trace ID** from its details, and give it to the worker to quote to their bank. Only their bank can see where it is.
+8. **Never ask a worker to send bank details by WhatsApp, text or email,** and never type them into the desk. If a worker sends them anyway, delete the message where you can and ask them to use the portal button.
 
-## Paying a worker, until Stripe payouts reach Jamaica
+## Paying a worker through Stripe (Global Payouts, 20260916120000)
+
+**What it is.** Since 16 Sep 2026 a worker who has set up Stripe in their portal ("How Yaadly pays you", Set up with Stripe) can be paid from the desk's **Pay workers** view with **Pay with Stripe**. Two clicks, by design: the first shows you Stripe's quote (fee, exchange rate, what lands in J$, what leaves the GBP account, and the GBP available); the second, the confirm box with those figures in it, sends. The invoice is then marked paid with your name, and the worker gets the usual WhatsApp. Wise and Mark as sent are unchanged and still there.
+
+1. **Switching it on, in this order.** Apply `20260916120000`. From `main`: `supabase/functions/sync-shared.sh`, then `supabase functions deploy yaad-payout-send --project-ref leffyisvfvjwzilydlwf` (platform JWT check stays ON, no flag), `supabase functions deploy yaad-payout-setup --project-ref leffyisvfvjwzilydlwf` (same), `supabase functions deploy yaad-notify-client --project-ref leffyisvfvjwzilydlwf --no-verify-jwt` (on the CLAUDE.md §12 list). Then the web app, then the desk.
+2. **Check it is behind the login:** `curl -s -o /dev/null -w "%{http_code}\n" -X POST https://leffyisvfvjwzilydlwf.supabase.co/functions/v1/yaad-payout-send` must answer 401.
+3. **Money in first.** Stripe pays out of Yaadly's Global Payouts financial account, not the card balance. Stripe Dashboard, Payouts (left menu), **Add money**, by Faster Payments from the business bank; free. Pay with Stripe refuses when the GBP available is short and says how much is needed.
+4. **Test mode first.** With the test key set, the worker sets up on Stripe's test form (test bank numbers on Stripe's Global Payouts testing page), you press Pay with Stripe, and the confirm box says "Test mode: no real money moves." Check `select invoice_id, status, livemode, debited_value, fx_rate from stripe_payouts order by created_at desc limit 5;`.
+5. **Going live** is `STRIPE_PAYOUTS_ALLOW_LIVE=yes` with the live key, your terminal only. The confirm box then says "THIS IS LIVE MONEY." The first live payout should be small.
+6. **"Stripe would not quote this payout"** with a Stripe code: read the code. `outbound_payment_quote_missing` or a 404 on quotes means Stripe's quote endpoint is gated on the account; the desk then shows the published fees labelled as an estimate and asks you to accept that. `recipient_feature_not_active`: the worker has not finished Stripe setup. `insufficient_funds`: step 3.
+7. **"The payout WENT OUT ... but could not be recorded"** or **"... but the invoice could not be marked paid".** Money has moved. Do not press again: the function's idempotency key returns the same payout for the same invoice, but do not rely on it. Note the Stripe id in the message. The `stripe_payouts` row exists in the second case, so **Mark as paid** by Stripe on the desk is refused only until the row is there; if it is, mark it by hand with method stripe and that id.
+8. **A payout shows failed or returned** (red on Pay workers, after **Check**). The invoice stays paid, by design: paid records are frozen. Read the reason (usually the bank rejected the account), open the payout in Stripe, Payouts, and decide: fix the worker's details with them and pay again from Wise, or send again through Stripe once they have updated Stripe. The money comes back to the financial account. Write a note on the job.
+9. **A worker says nothing has arrived.** Posted means it left Stripe; the worker's bank can take up to 7 business days. Press **Check**: the message carries the Trace ID for them to quote to their bank.
+10. **Proving the gates hold:** `supabase/tests/worker_pay_guards.sql` still passes (bank transfer unchanged), and a hand `select mark_worker_paid('<sent worker invoice>', 'stripe', 'obp_made_up')` must be refused with "No Stripe payout with id ... is recorded", because paid-by-Stripe can only follow a real payout.
+
+## Paying a worker from Wise, by hand
 
 **What it is.** Since 14 Sep 2026 (`20260914230000`) a worker's pay invoice is paid from the desk's **Pay workers** view, the same shape as materials money: you pay from the business bank app, then record it. Yaadly stores no worker bank details; the payee lives in your bank app.
 
