@@ -5,15 +5,20 @@ name: Keep-alive and uptime
 # webhook. This makes one harmless database round trip on a schedule so that
 # never happens, and checks the public surfaces are answering while it is there.
 #
+# Since 16 Sep 2026 the project is on Supabase Pro, which does not pause, so
+# the first job is no longer what keeps the site alive. It stays because it is
+# still the uptime check: it catches RLS leaks, a front door redeployed without
+# --no-verify-jwt, and a retired endpoint coming back.
+#
 # Free: GitHub-hosted runners cost nothing on public repositories.
 #
 # Two things worth knowing:
 #  1. GitHub disables scheduled workflows on a repository with no activity for
 #     60 days. If you go quiet over the winter, re-enable this in the Actions
 #     tab, or it stops silently.
-#  2. This is a substitute for Supabase Pro, not a replacement. Pro also buys
-#     daily backups and point-in-time recovery, which no cron job can fake.
-#     Backups are handled separately by scripts/backup-db.sh.
+#  2. Backups are not this file's job. Pro keeps daily backups for 7 days;
+#     scripts/backup-db.sh is the off-site copy. Point-in-time recovery is a
+#     paid add-on and is not switched on.
 
 on:
   schedule:

@@ -13,6 +13,13 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **The signed Worker Guidelines move to version 1.7.** The pay sentence is the one place the promise is in a document a worker signs, so it changes with a version bump: 7 days, by bank transfer through Stripe or Wise, never cash. The same sentence still said "Lynk wallet or remittance pick-up", which stopped being true on 14 Sep, so it is corrected in the same version rather than left contradicting the product. Workers who signed 1.6 are asked to read and sign 1.7 before quoting again; today those are the two seed test workers.
 
 **Xero (founder, 16 Sep 2026: "want to use Xero").** Xero is the system of accounts for Yaadly Ltd: bank feeds from Tide, Wise and Stripe, reconciliation, VAT when it comes, year-end. Yaadly's own invoices remain the system of record for jobs, because marking one paid is what starts a job and approving a stage is what raises the worker's pay; Xero never raises a job invoice. For the pilot, invoices and payments are entered into Xero by hand or by export; pushing them automatically through Xero's API is a later piece, and only once an accountant has said how Stripe, Wise and JMD should be set up in it. Not built now, on purpose: the pilot stays lean.
+## 2026-09-16 · Supabase moved from the free plan to Pro
+
+**Why.** Founder decision, 16 Sep 2026, ahead of real client data. At the time the database was 65 MB of the free 500 MB and file storage 2 MB of 1 GB, so no limit forced it. The reasons were the free plan having no backups at all, evidence photographs and work-log video filling 1 GB within a handful of pilot jobs (uploads simply stop at the limit), and the risk of a paused project on a system that now takes card payments.
+
+**What it buys.** Daily backups kept 7 days, no pausing for inactivity, 8 GB database and 100 GB storage included, at $25 a month with the $10 compute credit covering the smallest instance. Spend cap left on.
+
+**What did not change.** Point-in-time recovery, larger compute and the Team plan are extras and are not switched on. `scripts/backup-db.sh` stays as the off-site copy, because Supabase's own backups sit in the same account and only restore the whole database. The keep-alive workflow stays as the uptime check. Nothing in the schema, RLS or functions moved. Older entries that describe free-plan limits are history and are left as written.
 
 ## 2026-09-16 · Both portal overviews say what each job is, what it costs or pays, and what is next, and every card opens that section
 
