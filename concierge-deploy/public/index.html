@@ -182,6 +182,42 @@ tr.unpriced td{background:rgba(245,158,11,.07)}
 /* ---------- alerts ---------- */
 .alert{display:flex;gap:12px;padding:13px 15px;border-radius:12px;margin-top:9px;border:1px solid;align-items:flex-start}
 .alert.crit{background:rgba(248,113,113,.06);border-color:rgba(248,113,113,.28)}
+.dlvbar{display:flex;height:14px;border-radius:100px;overflow:hidden;gap:2px;background:var(--panel2)}
+.dlvbar i{display:block;min-width:6px}
+.dlvkeys{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:12px;color:var(--mute)}
+.dlvkey b{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.dlvissue{border:1px solid var(--line);border-left:3px solid var(--coral);border-radius:12px;padding:13px 15px;margin-top:10px;background:var(--panel2)}
+.dlvissue.warn{border-left-color:var(--mango)}
+.dlvih{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.dlvih .sp{margin-left:auto;font-size:11.5px;color:var(--dim)}
+.dlvto{margin:9px 0 2px;font-size:14px}
+.dlvsub{font-size:11.5px;color:var(--dim);margin-left:8px}
+.thrquote{font-size:13px;line-height:1.55;color:var(--ink);margin:6px 0 8px;padding-left:10px;border-left:2px solid var(--line2)}
+.thrchat{display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto;padding:4px 2px}
+.thrb{max-width:82%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+.thrb.them{align-self:flex-start;background:var(--panel2);border:1px solid var(--line);border-bottom-left-radius:4px}
+.thrb.bot{align-self:flex-end;background:rgba(155,115,245,.14);border-bottom-right-radius:4px}
+.thrb.desk{align-self:flex-end;background:rgba(245,158,11,.14);border-bottom-right-radius:4px}
+.thrw{display:block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+.thrsys{align-self:center;font-size:11px;color:var(--dim);margin:2px 0}
+.dlvwhat{font-size:12.5px;color:var(--mute);margin:2px 0 8px}
+.dlvfix{font-size:12.5px;line-height:1.55;margin:0 0 12px}
+.dlvissue .brow{display:flex;flex-wrap:wrap;gap:8px}
+.dlvstory{margin-bottom:6px}
+.dlvrail{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:4px 0 16px}
+.dlvst{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;font-size:11px;color:var(--dim);position:relative}
+.dlvst i{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2);font-style:normal;font-weight:700;font-size:13px;background:var(--panel)}
+.dlvst.done{color:var(--ink)}
+.dlvst.done i{background:rgba(196,170,255,.16);border-color:transparent;color:var(--tealb)}
+.dlvst.stop{color:var(--coral)}
+.dlvst.stop i{background:rgba(248,113,113,.16);border-color:transparent;color:var(--coral)}
+.dlvgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;font-size:13px}
+.dlvbox{border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-top:10px;font-size:13px;line-height:1.55}
+.dlvbox.fix{border-color:rgba(196,170,255,.3);background:rgba(196,170,255,.05)}
+.dlvstory.crit .dlvbox:first-of-type{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.05)}
+.dlvbox p{margin:4px 0 0}
+.dlvgrid .dk,.dlvbox .dk{display:block;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+@media (max-width:560px){.dlvgrid{grid-template-columns:1fr}.dlvrail span{font-size:10px}}
 .alert.warn{background:rgba(245,158,11,.06);border-color:rgba(245,158,11,.28)}
 .alert.ok{background:rgba(196,170,255,.05);border-color:rgba(196,170,255,.24)}
 .alert .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;flex:0 0 auto;font-size:12px;font-weight:700}
@@ -740,6 +776,8 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 #skEdit .obsrow select{width:auto;font-size:12px;padding:3px 6px}
 #skEdit .obsrow .pro{font-size:11.5px;color:var(--dim);display:flex;gap:4px;align-items:center;white-space:nowrap}
 #skEdit .btn.sm{font-size:11.5px;padding:4px 9px}
+.tg .ctl{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.tg .ctl .btn.sm{font-size:11.5px;padding:4px 10px}
 #skEdit textarea{width:100%;font-size:13px}
 #skEdit label{font-size:11px}
 
@@ -772,6 +810,14 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 @media(max-width:700px){.dfield{grid-template-columns:1fr;gap:3px}.drw{padding:14px 16px 40px}}
 tbody tr[data-i]{cursor:pointer}
 tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
+/* Tick boxes for acting on several rows at once (Enquiries). The label fills
+   the cell so a slightly missed tick does not open the drawer instead. */
+th.bkc,td.bkc{width:34px;padding-right:0}
+.bkc label{display:flex;align-items:center;justify-content:center;min-height:28px;cursor:pointer}
+.bkc input{width:16px;height:16px;accent-color:var(--teal);cursor:pointer}
+.bkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;min-height:34px;font-size:12.5px}
+.bkbar .n{color:var(--ink);font-weight:700}
+.bkbar .msg{margin:0;flex:1 1 100%}
 
 /* ---------- mobile ---------- */
 /* On a phone the rail used to be a strip of thirty-seven links scrolling
@@ -1127,7 +1173,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <!-- ============================================ PAY WORKERS -->
 <section class="view" data-view="workerpay">
   <h1 class="vh">Pay workers</h1>
-  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then pay it from Wise, to the recipient saved there, and press Mark as sent. That marks the invoice paid, stamped with you and the time, once, and sends the worker a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number. Stripe payouts come here once Stripe has switched on payments to Jamaica.</p>
+  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then either pay it from Wise, to the recipient saved there, and press Mark as sent; or, for a worker who has set up Stripe, press Pay with Stripe: it shows you Stripe's fee, exchange rate and what lands in J$, and sends only when you confirm. Either way the invoice is marked paid, stamped with you and the time, once, and the worker gets a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number.</p>
   <div id="wpMsg"></div>
   <div id="wpBody"><div class="empty"><b>Reading worker pay invoices&hellip;</b></div></div>
 </section>
@@ -1180,6 +1226,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 const SUPABASE_URL = "https://leffyisvfvjwzilydlwf.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NS1flo5NWLLsktXHg5FHdQ_7ctM8Xvz";
 const FN = SUPABASE_URL + "/functions/v1/yaad-invoice";
+const FN_PAYOUT = SUPABASE_URL + "/functions/v1/yaad-payout-send";
 const REPLY_FN = SUPABASE_URL + "/functions/v1/yaad-desk-reply";
 const AGENT_FN = SUPABASE_URL + "/functions/v1/yaad-agent";
 const SHORT_FN = SUPABASE_URL + "/functions/v1/yaad-shortlist";
@@ -2371,21 +2418,26 @@ const VIEWS = [
 
   { k:"threads", g:"Inbox", label:"Conversations", icon:"chat",
     title:"Conversations", table:"intake_threads",
-    sub:"The full back and forth with anybody who wrote in by WhatsApp, email or the chat on the website, kept word for word. A web row has a random token where the number would be; reply into their chat window from here, and if they have left the page they were given a WhatsApp button with their reference, whose first message carries the whole web conversation onto that number, held for you. You do not need the WhatsApp number on your phone to read these: the assistant holds the conversation and this is the record of it. Open a WhatsApp row to reply yourself, from the Yaadly number, so it lands in the same chat they wrote to. A thread marked with you is one the assistant has handed over: it keeps the record and pings your phone, but says nothing until you hand it back. Newest message is the last thing said, so you can triage without opening rows. Your notes are yours: the client never sees them and the assistant never reads them. To correct what the job itself says before workers see it, open the job under Jobs and use Correct what this job says.",
+    sub:"Everybody who has written to Yaadly, by WhatsApp or the chat on the website, word for word. The box at the top lists only the people waiting on you, oldest first, with the button to answer each one. Open any row to read it as a chat and reply from there, from the Yaadly number, so it lands in the chat they already have. A conversation marked with you is one the assistant has handed over: it keeps the record but says nothing until you hand it back. Your notes are yours: the client never sees them and the assistant never reads them. To correct what a job says before workers see it, open the job under Jobs.",
     select:"*",
     order:"last_at", search:["job_id","from_addr","transcript","channel"],
     empty:["No conversations yet","When somebody writes in by WhatsApp or email, the whole thread is kept here."],
+    viz:false, pre: preThreads, panel: panelThreads,
+    titleOf: r => r.job_id || r.from_addr || "Conversation",
+    detailTop: thrStory_, foldFields:true,
     cols:[
-      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("no job yet")},
-      {h:"From", f:r => esc(r.from_addr || "unknown") + sub_(r.channel || "")},
-      {h:"Who has it", f:r => r.human_handling ? chip_("warn","with you") : chip_("mute","assistant")},
-      {h:"Turns", n:true, f:r => String(r.turns ?? 0)},
+      {h:"From", f:r => id_(r.channel === "web" ? "website visitor" : (r.from_addr || "unknown")) + sub_(r.job_id ? r.job_id : (r.channel || ""))},
+      {h:"Where it stands", f:r => { const st = thrState_(r); return chip_(st.tone, st.chip) + (st.since ? sub_(st.since) : ""); }},
       {h:"Newest message", f:r => lastSaid_(r.transcript)},
-      {h:"The conversation", f:r => transcript_(r.transcript)},
+      {h:"Our messages", f:r => thrDeliveryCell_(r)},
       {h:"Your notes", f:r => r.desk_notes ? said_(r.desk_notes) : mute_("none")},
       {h:"Last heard", f:r => mute_(ago_(r.last_at))},
     ],
     actions:[
+      { label:"See why our message did not arrive", cls:"g",
+        when:r => { const d = thrDelivery_(r); return !!(d && d.problem); },
+        says:() => "Opens Did it arrive filtered to this number, with the plain-English reason and what to do about it.",
+        nav:r => { $("srch").value = r.from_addr; go("delivery"); } },
       { label:"Reply from the Yaadly number",
         when:r => r.channel === "whatsapp" || r.channel === "sms",
         says:r => "Sends your words, exactly as typed, from the Yaadly number, so your reply continues the chat they already have. Sending also marks the thread as with you: the assistant keeps the record but stays quiet until you hand it back. WhatsApp only carries a typed reply within 24 hours of their last message. Outside that your words are not lost: they are saved, a short approved message goes telling them a reply is waiting, and yours goes out in full the moment they write back. You can see anything waiting under Waiting to send.",
@@ -2425,17 +2477,37 @@ const VIEWS = [
 
   { k:"delivery", g:"Inbox", label:"Did it arrive", icon:"pulse",
     title:"Message delivery", table:"message_deliveries",
-    sub:"What actually happened to the messages Yaadly sent. Twilio accepting a message is not the same as a phone receiving one: a number that has left WhatsApp, a handset that never comes online, a message a carrier drops, all look like success from our side. This is where the real answer lands. Read means they opened it. Failed or undelivered means somebody is waiting on a message that is never coming, and that is the only row here worth acting on.",
-    select:"*",
-    order:"sent_at", search:["to_addr","job_id","message_sid","status"],
+    sub:"Every WhatsApp Yaadly sends, and whether it actually reached the phone. Most rows are fine and need nothing from you. The box at the top lists only the ones that did not arrive, says why in plain English, and gives you the button to follow each one up. Open any row to see its whole journey.",
+    select:"*", viz:false,
+    order:"sent_at", search:["to_addr","job_id","message_sid","status","kind"],
     empty:["Nothing recorded yet","Delivery reporting starts once yaad-message-status is deployed and the callback URL is set."],
+    pre: preDelivery, panel: panelDelivery,
+    titleOf: r => dlvOutcome_(r).head,
+    detailTop: dlvStory_, foldFields:true,
     cols:[
-      {h:"To", f:r => id_(r.to_addr || "unknown") + sub_(r.channel || "")},
-      {h:"Job", f:r => r.job_id ? id_(r.job_id) : mute_("none")},
-      {h:"What it was", f:r => esc(r.kind || "a message")},
-      {h:"Outcome", f:r => deliveryTone_(r)},
+      {h:"To", f:r => id_(r.to_addr || "unknown") + sub_(dlvWho_(r))},
+      {h:"What it was", f:r => r.kind ? esc(r.kind) + (r.job_id ? sub_(r.job_id) : "") : mute_("not recorded")},
+      {h:"Outcome", f:r => { const o = dlvOutcome_(r); return chip_(o.tone, o.chip) + (r.followed_up_at ? sub_("followed up") : ""); }},
+      {h:"Why", f:r => { const o = dlvOutcome_(r); return o.problem ? esc(o.short) : mute_("nothing wrong"); }},
       {h:"Sent", f:r => mute_(ago_(r.sent_at))},
-      {h:"Last heard", f:r => mute_(ago_(r.updated_at))},
+    ],
+    actions:[
+      { label:"Open their conversation", cls:"",
+        when:r => !!dlvThread_(r),
+        says:() => "Opens the WhatsApp conversation with this number, where you can read what was said and reply. A reply sent more than 24 hours after they last wrote waits under Waiting to send until they write back.",
+        nav:r => dlvOpenThread_(r) },
+      { label:"Show every message to this number", cls:"g",
+        says:r => `Filters this page to ${r.to_addr}, so you can see whether anything reached them before or since.`,
+        nav:r => { $("srch").value = r.to_addr; go("delivery"); } },
+      { label:"Look it up in Twilio", cls:"g",
+        says:() => "Opens this exact message in the Twilio console, in a new tab. Twilio will ask you to sign in if you are not already.",
+        nav:r => window.open("https://console.twilio.com/us1/monitor/logs/sms?frameUrl=%2Fconsole%2Fsms%2Flogs%2F" + encodeURIComponent(r.message_sid), "_blank", "noopener") },
+      { label:"Mark as followed up", cls:"g",
+        when:r => dlvOutcome_(r).problem && !r.followed_up_at,
+        says:() => "Records that you have dealt with this person and what you did, so every message to them that did not arrive drops out of the box at the top. It sends nothing and changes nothing about the message itself.",
+        ask:[{ k:"note", label:"What you did", type:"long", from:() => "",
+               placeholder:"Rang him on his mobile, he has a new number. Updated the job." }],
+        call: dlvFollowedUp_ },
     ]},
 
   { k:"waiting", g:"Inbox", label:"Waiting to send", icon:"clock",
@@ -2490,6 +2562,17 @@ const VIEWS = [
     order:"created_at", search:["name","contact","topic","message"],
     empty:["No enquiries","The contact form at the bottom of the website writes here."],
     detailTop: r => contactCard(r), titleOf: r => r.name || r.contact || "Enquiry",
+    // Several at once. Same two functions the waiting queue calls, one call
+    // per enquiry, so each is logged as her decision on that enquiry.
+    bulkWhen: r => !["replied","converted","test","binned"].includes(r.status || "new"),
+    bulk:[
+      { label:"Mark replied", cls:"",
+        rpc:"mark_enquiry_replied", args:r => ({ p_enquiry:r.id }),
+        says:n => `Takes ${n === 1 ? "this enquiry" : "these " + n + " enquiries"} off the list and stamps the reply clock on each. It sends nothing. The one working day figure counts from this, so only tick ones you have actually answered.` },
+      { label:"Mark as test", cls:"g",
+        rpc:"mark_enquiry_test", args:r => ({ p_enquiry:r.id }),
+        says:n => `Clears ${n === 1 ? "this enquiry" : "these " + n + " enquiries"} as tests or junk. It sends nothing and does not count as a reply.` },
+    ],
     cols:[
       {h:"Who", f:r => esc(r.name || "no name") + sub_(r.contact || "")},
       {h:"Reach them", f:r => reachChips(r)},
@@ -2701,6 +2784,358 @@ const WA_LANE_LABEL = {
 // Only failed and undelivered are red: those are the ones where somebody is
 // waiting on a message that is not coming. Accepted and queued are honestly
 // unknown rather than good, so they stay neutral instead of reading as a tick.
+// ---------------------------------------------------------------- did it arrive
+//
+// Rebuilt 16 Sep 2026 on the founder's instruction that the page say what the
+// actual issue is and give her a button to act on it, rather than a list of
+// Twilio statuses she has to decode.
+//
+// Twilio's error codes, in plain English. Only codes we are sure of are here;
+// anything else says so and links Twilio's own page for that code.
+const DLV_ERR = {
+  "63016": { short:"More than 24 hours since they last wrote",
+    what:"WhatsApp only lets a business send an ordinary message within 24 hours of the person's last message to it. After that, only a pre-approved template message is allowed. This one was an ordinary message, so WhatsApp refused it. Nothing is wrong with their number.",
+    fix:"Get them to message the Yaadly number (a call or text from your own phone asking them to say hi is enough), then send it again. A reply you type on the desk already waits for them automatically. A message sent by the system, such as an alert, does not wait and has to be re-sent." },
+  "63003": { short:"Number is not on WhatsApp",
+    what:"WhatsApp could not find an account for this number. They may have changed number, left WhatsApp, or the number was typed wrongly.",
+    fix:"Check the number with them by phone or email. If it has changed, correct it on their job or profile." },
+  "63024": { short:"Not a valid WhatsApp recipient",
+    what:"WhatsApp says this number cannot receive messages from a business. Usually the number is wrong or is not a WhatsApp account.",
+    fix:"Confirm the number with them by phone or email and correct it where it is stored." },
+  "63018": { short:"Sent too fast",
+    what:"Too many messages went out in a short time and WhatsApp slowed some down. Nothing is wrong with their number.",
+    fix:"Send it again. If it keeps happening, tell Claude so the sending can be spaced out." },
+  "63015": { short:"Test number not joined",
+    what:"This went through the Twilio test sandbox, and the number has not joined it.",
+    fix:"Nothing for a real client. For a test phone, send the join code to the sandbox number first." },
+  "63049": { short:"WhatsApp chose not to deliver it",
+    what:"Meta chose not to deliver this one, which it does to limit how many business messages a person gets.",
+    fix:"Reach them another way (a call or email) if it matters, and try WhatsApp again later." },
+  "30003": { short:"Phone off or out of signal",
+    what:"The phone could not be reached. It may be switched off or out of signal for a long time.",
+    fix:"Try again later, or call them." },
+  "30005": { short:"Number does not exist",
+    what:"The carrier says this number is unknown.",
+    fix:"Confirm the number with them another way and correct it." },
+  "30006": { short:"Landline or unreachable carrier",
+    what:"The number is a landline or on a network that cannot receive this message.",
+    fix:"Ask them for a mobile number." },
+  "30007": { short:"Blocked as spam by the carrier",
+    what:"The phone network filtered this message out.",
+    fix:"Reach them another way. If it repeats, tell Claude so the wording can be looked at." },
+};
+
+// One verdict per row. A row carrying an error code is a problem whatever its
+// status says: Twilio's callbacks can arrive out of order, and a late "sent"
+// has been seen overwriting an earlier "undelivered" (live, 13 and 14 Sep).
+function dlvOutcome_(r){
+  const s = String(r.status || "").toLowerCase();
+  const code = String(r.error_code || "");
+  const e = DLV_ERR[code];
+  const staleSent = s === "sent" && !code && Date.now() - new Date(r.sent_at).getTime() > 24 * 3600e3;
+  if (code || s === "failed" || s === "undelivered") {
+    return { problem:true, tone:"crit", chip:"did not arrive", step:s === "sent" ? 2 : 1,
+      head:"Did not arrive",
+      short: e ? e.short : (code ? `Twilio error ${code}` : "Twilio gave no reason"),
+      what: e ? e.what : (code ? `Twilio reported error ${code}. This desk does not have a plain-English explanation for that code yet; Twilio's own page for it is linked below.` : "Twilio marked it " + s + " without an error code."),
+      fix: e ? e.fix : "Reach them another way if it matters, and send Claude the code so it can be explained here.",
+      odd: s === "sent" && code ? "Twilio's status updates arrived out of order, so this row still says sent. The error code is the real answer: it did not arrive." : "" };
+  }
+  if (staleSent) return { problem:true, tone:"warn", chip:"no news", step:2, head:"No news for over a day",
+      short:"Sent, never confirmed",
+      what:"Twilio handed it to WhatsApp but never heard that it reached the phone. Usually the phone has been off or offline since, or the person has blocked the Yaadly number.",
+      fix:"If it mattered, check with them another way. If they have since written in, it probably arrived and this row simply never got its update." };
+  if (s === "read") return { problem:false, tone:"ok", chip:"read", step:4, head:"Arrived and read" };
+  if (s === "delivered") return { problem:false, tone:"ok", chip:"arrived", step:3, head:"Arrived, not opened yet" };
+  if (s === "sent") return { problem:false, tone:"mute", chip:"on its way", step:2, head:"On its way" };
+  return { problem:false, tone:"mute", chip:s || "unknown", step:1, head:"Accepted by Twilio" };
+}
+
+const dlvDigits_ = (v) => String(v || "").replace(/\D/g, "");
+let DLV_THREADS = {};
+
+async function preDelivery(){
+  DLV_THREADS = {};
+  const { data } = await sb.from("intake_threads").select("from_addr,channel,job_id").eq("channel", "whatsapp").limit(500);
+  for (const t of data || []) { const d = dlvDigits_(t.from_addr); if (d) DLV_THREADS[d] = t; }
+}
+const dlvThread_ = (r) => DLV_THREADS[dlvDigits_(r.to_addr)] || null;
+const dlvWho_ = (r) => { const t = dlvThread_(r); return t && t.job_id ? "conversation on " + t.job_id : (r.channel || ""); };
+
+async function dlvOpenThread_(r){
+  const want = dlvDigits_(r.to_addr);
+  go("threads");
+  for (let n = 0; n < 40; n++) {
+    await new Promise(ok => setTimeout(ok, 150));
+    const hit = (ROWS.threads || []).find(t => dlvDigits_(t.from_addr) === want && t.channel === "whatsapp");
+    if (hit && document.querySelector('[data-view="threads"] table')) return openDetail("threads", hit.__i);
+  }
+}
+
+async function dlvFollowedUp_(r, vals){
+  const note = String(vals.note || "").trim();
+  if (note.length < 5) throw new Error("Say in a few words what you did, so the next person reading this knows.");
+  // Following up is done with a person, not a message, so it clears every
+  // open problem to the same number in one go. The desk can only read this
+  // table; mark_delivery_followed_up (20260916140000) is the one write, and it
+  // records who from the signed-in session, not from this page.
+  const { error } = await sb.rpc("mark_delivery_followed_up", { p_to_addr: r.to_addr, p_note: note });
+  if (error) throw new Error(error.message);
+}
+
+// The journey of one message: four steps, filled to where it got.
+function dlvRail_(o){
+  const steps = ["Accepted by Twilio", "Handed to WhatsApp", "Reached the phone", "Opened"];
+  return `<div class="dlvrail">` + steps.map((t, i) => {
+    const n = i + 1;
+    const cls = n <= o.step ? "done" : (o.problem && n === o.step + 1 ? "stop" : "");
+    return `<div class="dlvst ${cls}"><i>${cls === "stop" ? "&times;" : n <= o.step ? "&#10003;" : ""}</i><span>${esc(t)}</span></div>`;
+  }).join("") + `</div>`;
+}
+
+function dlvStory_(r){
+  const o = dlvOutcome_(r);
+  const code = r.error_code ? `<a href="https://www.twilio.com/docs/api/errors/${encodeURIComponent(r.error_code)}" target="_blank" rel="noopener">Twilio's page for error ${esc(r.error_code)}</a>` : "";
+  const what = r.kind
+    ? `<b>${esc(r.kind)}</b>${r.job_id ? " on " + id_(r.job_id) : ""}`
+    : `<span style="color:var(--dim)">Not recorded.</span> The sending code does not yet write down what a message was or which job it belonged to, only where it went. That is a gap on Yaadly's side, not something wrong with this message.`;
+  return `<div class="dlvstory ${o.tone}">`
+    + dlvRail_(o)
+    + `<div class="dlvgrid">`
+    + `<div><span class="dk">To</span><div>${id_(r.to_addr || "unknown")} ${sub_(ago_(r.sent_at) + " ago")}</div></div>`
+    + `<div><span class="dk">What it was</span><div>${what}</div></div>`
+    + `</div>`
+    + (o.problem
+      ? `<div class="dlvbox"><span class="dk">What went wrong</span><p>${esc(o.what)}</p>${o.odd ? `<p class="mute">${esc(o.odd)}</p>` : ""}</div>`
+        + `<div class="dlvbox fix"><span class="dk">What to do</span><p>${esc(o.fix)}</p>${code ? `<p>${code}</p>` : ""}</div>`
+        + (r.followed_up_at ? `<div class="dlvbox"><span class="dk">Followed up ${esc(ago_(r.followed_up_at))} ago</span><p>${esc(r.followed_up_note || "")}</p></div>` : "")
+      : `<div class="dlvbox"><span class="dk">Nothing to do</span><p>${o.step >= 3 ? "It reached their phone." : "It is still on its way. Check back later; no news after a day will show in the box at the top."}</p></div>`)
+    + `</div>`;
+}
+
+// The top of the page: a picture of the last 14 days, then only the problems,
+// grouped by the person who did not get them, each with its buttons.
+function panelDelivery(rows){
+  if (!(rows || []).length) return "";
+  const recent = rows.filter(r => Date.now() - new Date(r.sent_at).getTime() < 14 * 86400e3);
+  const tally = { read:0, arrived:0, way:0, quiet:0, bad:0 };
+  for (const r of recent) {
+    const o = dlvOutcome_(r);
+    if (o.problem && o.tone === "warn") tally.quiet++; else if (o.problem) tally.bad++; else if (o.step >= 4) tally.read++; else if (o.step === 3) tally.arrived++; else tally.way++;
+  }
+  const total = recent.length || 1;
+  const seg = (n, col, label) => n ? `<i style="flex:${n};background:${col}" title="${esc(label)}: ${n}"></i>` : "";
+  const key = (n, col, label) => `<span class="dlvkey"><b style="background:${col}"></b>${n} ${esc(label)}</span>`;
+  const picture = `<div class="card dlvpic"><div class="chd"><h3>Last 14 days</h3><span class="sp">${recent.length} message${recent.length === 1 ? "" : "s"} sent</span></div>`
+    + `<div class="dlvbar">${seg(tally.read, "#9B73F5", "read")}${seg(tally.arrived, "#C4AAFF", "arrived")}${seg(tally.way, "#4A4A72", "on its way")}${seg(tally.quiet, "#F59E0B", "no news")}${seg(tally.bad, "#F87171", "did not arrive")}</div>`
+    + `<div class="dlvkeys">${key(tally.read, "#9B73F5", "read")}${key(tally.arrived, "#C4AAFF", "arrived, not opened")}${key(tally.way, "#4A4A72", "on its way")}${key(tally.quiet, "#F59E0B", "no news for a day")}${key(tally.bad, "#F87171", "did not arrive")}</div>`
+    + `<p class="conseq">${Math.round(100 * (tally.read + tally.arrived) / total)}% reached the phone.</p></div>`;
+
+  const open = rows.filter(r => dlvOutcome_(r).problem && !r.followed_up_at);
+  if (!open.length) {
+    return picture + `<div class="alert ok"><span class="ic">&#10003;</span><div><b>Nothing to follow up</b><p>Every message either arrived or has been dealt with. Nobody is waiting on something that is not coming.</p></div></div>`;
+  }
+  const groups = {};
+  for (const r of open) (groups[dlvDigits_(r.to_addr)] = groups[dlvDigits_(r.to_addr)] || []).push(r);
+  const people = Object.values(groups).sort((a, b) => new Date(b[0].sent_at) - new Date(a[0].sent_at));
+  const cards = people.map(list => {
+    const r = list[0], o = dlvOutcome_(r), t = dlvThread_(r);
+    const whats = list.map(x => x.kind || "a message (not recorded)");
+    return `<div class="dlvissue ${o.tone}">`
+      + `<div class="dlvih"><span class="chip ${o.tone} dot">${esc(o.short)}</span><span class="sp">${list.length > 1 ? list.length + " messages, newest " : ""}${esc(ago_(r.sent_at))} ago</span></div>`
+      + `<div class="dlvto">${id_(r.to_addr)}${t && t.job_id ? ` <span class="dlvsub">conversation on ${esc(t.job_id)}</span>` : ""}</div>`
+      + `<p class="dlvwhat">Did not get: ${esc([...new Set(whats)].join(", "))}</p>`
+      + `<p class="dlvfix"><b>What to do:</b> ${esc(o.fix)}</p>`
+      + `<div class="brow">`
+      + `<button class="btn" data-dlopen="${r.__i}">See exactly what happened</button>`
+      + (t ? `<button class="btn g" data-dlthread="${r.__i}">Open their conversation</button>` : "")
+      + `<button class="btn g" data-dldone="${r.__i}">Mark as followed up</button>`
+      + `</div></div>`;
+  }).join("");
+  return picture + `<div class="card"><div class="chd"><h3>Needs you</h3><span class="chip crit dot">${people.length} ${people.length === 1 ? "person" : "people"}</span><span class="sp">${open.length} message${open.length === 1 ? "" : "s"} to follow up</span></div>${cards}</div>`
+    + `<p class="sechd">Every message</p>`;
+}
+
+function wireDelivery(){
+  const host = $("v-delivery"); if (!host) return;
+  const rowOf = (el, attr) => (ROWS.delivery || []).find(r => r.__i === Number(el.getAttribute(attr)));
+  host.querySelectorAll("[data-dlopen]").forEach(b => b.addEventListener("click", () => openDetail("delivery", Number(b.dataset.dlopen))));
+  host.querySelectorAll("[data-dlthread]").forEach(b => b.addEventListener("click", () => dlvOpenThread_(rowOf(b, "data-dlthread"))));
+  host.querySelectorAll("[data-dldone]").forEach(b => b.addEventListener("click", () => {
+    const i = Number(b.dataset.dldone);
+    openDetail("delivery", i);
+    const acts = VIEW.delivery.actions.filter(a => !a.when || a.when(rowOf(b, "data-dldone")));
+    const n = acts.findIndex(a => a.label === "Mark as followed up");
+    const btn = document.querySelector(`.drw [data-act="${n}"]`);
+    if (btn) btn.click();
+  }));
+}
+
+// ---------------------------------------------------------------- conversations
+//
+// Rebuilt alongside Did it arrive, 16 Sep 2026, so the two pages read the same
+// way: a picture, then only the people who need her, then the record.
+
+// Who said a turn. Only Yaadly's own prefixes count as us: anything else,
+// including the "What needs doing:" lines a web form writes, is them.
+function thrTurns_(t){
+  const parts = Array.isArray(t)
+    ? t.map(x => typeof x === "string" ? x : ((x && (x.who === "assistant" ? "Yaadly: " : "")) || "") + (x && (x.text || x.body) || ""))
+    : String(t || "").split(/\n\s*\n/);
+  return parts.map(x => String(x).trim()).filter(Boolean).map(x => {
+    let m;
+    if ((m = /^(Monique|Yaadly) \(from the desk\):\s*/.exec(x))) return { who:"desk", text:x.slice(m[0].length) };
+    if ((m = /^Yaadly:\s*/.exec(x))) return { who:"bot", text:x.slice(m[0].length) };
+    if (/^\[.*\]$/.test(x)) return { who:"sys", text:x.slice(1, -1) };
+    return { who:"them", text:x };
+  });
+}
+
+function thrState_(r){
+  if (r.is_test) return { key:"test", tone:"mute", chip:"test" };
+  if (r.awaiting_human_since) {
+    const h = (Date.now() - new Date(r.awaiting_human_since).getTime()) / 3600e3;
+    return { key:"waiting", tone:h >= 24 ? "crit" : "warn", chip:"waiting on you", since:ago_(r.awaiting_human_since) + (h >= 24 ? ", past a working day" : ""), hours:h };
+  }
+  if (r.human_handling) return { key:"yours", tone:"ok", chip:"with you, answered" };
+  return { key:"bot", tone:"mute", chip:"assistant has it" };
+}
+
+let THR_DLV = {};
+async function preThreads(){
+  THR_DLV = {};
+  const { data } = await sb.from("message_deliveries").select("*").order("sent_at", { ascending:false }).limit(500);
+  for (const d of data || []) {
+    const k = dlvDigits_(d.to_addr); if (!k) continue;
+    const o = dlvOutcome_(d);
+    const e = THR_DLV[k] || (THR_DLV[k] = { last:d, lastOutcome:o, problems:[] });
+    if (o.problem && !d.followed_up_at) e.problems.push(d);
+  }
+}
+const thrDelivery_ = (r) => {
+  if (r.channel !== "whatsapp" && r.channel !== "sms") return null;
+  const e = THR_DLV[dlvDigits_(r.from_addr)];
+  return e ? { last:e.last, lastOutcome:e.lastOutcome, problems:e.problems, problem:e.problems.length > 0 } : null;
+};
+function thrDeliveryCell_(r){
+  const d = thrDelivery_(r);
+  if (!d) return mute_(r.channel === "web" ? "website chat" : "none sent");
+  if (d.problem) return chip_("crit", d.problems.length + " did not arrive");
+  return chip_(d.lastOutcome.tone, d.lastOutcome.chip);
+}
+
+function thrWhatToDo_(r, st, d){
+  if (d && d.problem) return "A message we sent them did not arrive, so they may think nobody answered. " + dlvOutcome_(d.problems[0]).fix;
+  if (st.key === "waiting") return r.channel === "web"
+    ? "Reply in their website chat. If they have left the page, they had a WhatsApp button with their reference, so expect them there."
+    : "Reply from the Yaadly number. If it has been more than 24 hours since they last wrote, your reply is kept and goes out the moment they write back.";
+  return "";
+}
+
+// A conversation as a chat: them on the left, Yaadly on the right.
+function thrChat_(r){
+  const turns = thrTurns_(r.transcript);
+  if (!turns.length) return `<p class="conseq">Nothing recorded on this conversation.</p>`;
+  const shown = turns.slice(-30);
+  return `<div class="thrchat">`
+    + (turns.length > shown.length ? `<p class="thrsys">${turns.length - shown.length} earlier messages under Every field</p>` : "")
+    + shown.map(t => t.who === "sys"
+        ? `<p class="thrsys">${esc(t.text)}</p>`
+        : `<div class="thrb ${t.who}"><span class="thrw">${t.who === "them" ? "Them" : t.who === "desk" ? "You, from the desk" : "The assistant"}</span>${esc(t.text)}</div>`).join("")
+    + `</div>`;
+}
+
+function thrStory_(r){
+  const st = thrState_(r), d = thrDelivery_(r);
+  const todo = thrWhatToDo_(r, st, d);
+  const del = d
+    ? (d.problem
+        ? `<div class="dlvbox" style="border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.05)"><span class="dk">Our messages to them</span><p>${d.problems.length} did not arrive: ${esc(dlvOutcome_(d.problems[0]).short.toLowerCase())}.</p></div>`
+        : `<div class="dlvbox"><span class="dk">Our last message to them</span><p>${esc(d.lastOutcome.head)}, ${esc(ago_(d.last.sent_at))} ago.</p></div>`)
+    : "";
+  return `<div class="dlvstory">`
+    + `<div class="dlvgrid">`
+    + `<div><span class="dk">From</span><div>${id_(r.channel === "web" ? "website visitor" : (r.from_addr || "unknown"))} ${sub_(r.channel || "")}</div></div>`
+    + `<div><span class="dk">Where it stands</span><div>${chip_(st.tone, st.chip)}${st.since ? sub_(st.since) : ""}</div></div>`
+    + `<div><span class="dk">Job</span><div>${r.job_id ? id_(r.job_id) : mute_("none yet, only a question so far")}</div></div>`
+    + `<div><span class="dk">Messages</span><div>${thrTurns_(r.transcript).length}, last ${esc(ago_(r.last_at))} ago</div></div>`
+    + `</div>`
+    + (todo ? `<div class="dlvbox fix"><span class="dk">What to do</span><p>${esc(todo)}</p></div>` : "")
+    + del
+    + (r.desk_notes ? `<div class="dlvbox"><span class="dk">Your notes</span><p>${esc(r.desk_notes)}</p></div>` : "")
+    + `<p class="sechd" style="margin:18px 0 8px">The conversation</p>`
+    + thrChat_(r)
+    + `</div>`;
+}
+
+function panelThreads(rows){
+  if (!(rows || []).length) return "";
+  const recent = rows.filter(r => Date.now() - new Date(r.last_at).getTime() < 14 * 86400e3);
+  const t = { waiting:0, yours:0, bot:0, test:0 };
+  for (const r of recent) t[thrState_(r).key]++;
+  const seg = (n, col, label) => n ? `<i style="flex:${n};background:${col}" title="${esc(label)}: ${n}"></i>` : "";
+  const key = (n, col, label) => `<span class="dlvkey"><b style="background:${col}"></b>${n} ${esc(label)}</span>`;
+  const badDel = rows.filter(r => { const d = thrDelivery_(r); return d && d.problem; }).length;
+  const picture = `<div class="card dlvpic"><div class="chd"><h3>Last 14 days</h3><span class="sp">${recent.length} conversation${recent.length === 1 ? "" : "s"} active</span></div>`
+    + `<div class="dlvbar">${seg(t.waiting, "#F87171", "waiting on you")}${seg(t.yours, "#C4AAFF", "with you, answered")}${seg(t.bot, "#9B73F5", "assistant has it")}${seg(t.test, "#4A4A72", "test")}</div>`
+    + `<div class="dlvkeys">${key(t.waiting, "#F87171", "waiting on you")}${key(t.yours, "#C4AAFF", "with you, answered")}${key(t.bot, "#9B73F5", "assistant has it")}${key(t.test, "#4A4A72", "test")}</div>`
+    + (badDel ? `<p class="conseq">${badDel} of these ${badDel === 1 ? "has" : "have"} a message from us that did not arrive. <a href="#" data-thrdlv="1">See them on Did it arrive</a></p>` : "")
+    + `</div>`;
+
+  const need = rows.filter(r => { const st = thrState_(r), d = thrDelivery_(r); return st.key !== "test" && (st.key === "waiting" || (d && d.problem)); })
+    // People waiting on a reply come first, oldest first; a conversation whose
+    // only problem is a message that did not arrive comes after them.
+    .sort((a, b) => (thrState_(a).key === "waiting" ? 0 : 1) - (thrState_(b).key === "waiting" ? 0 : 1)
+      || new Date(a.awaiting_human_since || a.last_at) - new Date(b.awaiting_human_since || b.last_at));
+  if (!need.length) {
+    return picture + `<div class="alert ok"><span class="ic">&#10003;</span><div><b>Nobody is waiting on you</b><p>Every conversation handed to you has been answered, and every message we sent arrived or has been followed up.</p></div></div>`;
+  }
+  const cards = need.map(r => {
+    const st = thrState_(r), d = thrDelivery_(r);
+    const turns = thrTurns_(r.transcript).filter(x => x.who === "them");
+    const said = turns.length ? turns[turns.length - 1].text.replace(/\s+/g, " ") : "";
+    const tone = d && d.problem ? "crit" : st.tone;
+    const chip = st.key === "waiting" ? `waiting on you ${ago_(r.awaiting_human_since)}` : "our message did not arrive";
+    const replyLabel = r.channel === "web" ? "Reply in their chat" : "Reply now";
+    return `<div class="dlvissue ${tone}">`
+      + `<div class="dlvih"><span class="chip ${tone} dot">${esc(chip)}</span>${d && d.problem && st.key === "waiting" ? `<span class="chip crit dot">message did not arrive</span>` : ""}<span class="sp">last heard ${esc(ago_(r.last_at))} ago</span></div>`
+      + `<div class="dlvto">${id_(r.channel === "web" ? "website visitor" : r.from_addr)}<span class="dlvsub">${r.job_id ? esc(r.job_id) : "no job yet"}</span></div>`
+      + (said ? `<p class="thrquote">&ldquo;${esc(said.length > 200 ? said.slice(0, 200) + "…" : said)}&rdquo;</p>` : "")
+      + `<p class="dlvfix"><b>What to do:</b> ${esc(thrWhatToDo_(r, st, d))}</p>`
+      + `<div class="brow">`
+      + (st.key === "waiting" ? `<button class="btn" data-thrreply="${r.__i}">${esc(replyLabel)}</button>` : "")
+      + `<button class="btn ${st.key === "waiting" ? "g" : ""}" data-thropen="${r.__i}">Read the conversation</button>`
+      + (d && d.problem ? `<button class="btn g" data-thrwhy="${r.__i}">Why it did not arrive</button>` : "")
+      + `</div></div>`;
+  }).join("");
+  const late = need.filter(r => thrState_(r).hours >= 24).length;
+  return picture + `<div class="card"><div class="chd"><h3>Needs you</h3><span class="chip crit dot">${need.length} ${need.length === 1 ? "person" : "people"}</span><span class="sp">${late ? late + " past a working day" : "waiting on a reply come first"}</span></div>${cards}</div>`
+    + `<p class="sechd">Every conversation</p>`;
+}
+
+function wireThreads(){
+  const host = $("v-threads"); if (!host) return;
+  const rowOf = (i) => (ROWS.threads || []).find(r => r.__i === Number(i));
+  const pressAction = (i, label) => {
+    openDetail("threads", Number(i));
+    const b = [...document.querySelectorAll(".drw [data-act]")].find(x => x.textContent === label);
+    if (b) b.click();
+    // The reply box sits under the conversation, so take her straight to it.
+    const box = document.querySelector(".drw #drwMsg textarea");
+    if (box) { box.scrollIntoView({ block:"center" }); box.focus(); }
+  };
+  host.querySelectorAll("[data-thropen]").forEach(b => b.addEventListener("click", () => openDetail("threads", Number(b.dataset.thropen))));
+  host.querySelectorAll("[data-thrreply]").forEach(b => b.addEventListener("click", () => {
+    const r = rowOf(b.dataset.thrreply);
+    pressAction(b.dataset.thrreply, r && r.channel === "web" ? "Reply in their website chat" : "Reply from the Yaadly number");
+  }));
+  host.querySelectorAll("[data-thrwhy]").forEach(b => b.addEventListener("click", () => {
+    const r = rowOf(b.dataset.thrwhy); if (!r) return;
+    $("srch").value = r.from_addr; go("delivery");
+  }));
+  host.querySelectorAll("[data-thrdlv]").forEach(a => a.addEventListener("click", (e) => { e.preventDefault(); go("delivery"); }));
+}
+
 function deliveryTone_(r){
   const s = String(r.status || "").toLowerCase();
   const code = r.error_code ? sub_("Twilio " + r.error_code) : "";
@@ -2729,9 +3164,9 @@ function lastSaid_(t){
   const last = parts[parts.length - 1].replace(/\s+/g, " ");
   // Three speakers now, since 4 Sep 2026: the client, you, and the assistant.
   // Saying which one had the last word is most of the value of this column.
-  const mine = /^Monique \(from the desk\):/.test(last);
+  const mine = /^(Monique|Yaadly) \(from the desk\):/.test(last);
   const bot = /^Yaadly:/.test(last);
-  const body = last.replace(/^(Monique \(from the desk\)|Yaadly):\s*/, "");
+  const body = last.replace(/^(Monique \(from the desk\)|Yaadly \(from the desk\)|Yaadly):\s*/, "");
   const cut = body.length > 90 ? body.slice(0, 90) + "\u2026" : body;
   const who = mine ? sub_("your reply, the last word so far")
             : bot  ? sub_("the assistant, waiting on them")
@@ -4569,12 +5004,14 @@ const SETTING_META = {
   sketch_stamp:         ["The stamp on every sketch pack", "sketch_guard_approval puts this on the document and refuses to approve a pack carrying a measurement.", false],
   booking_link:         ["Your calendar link", "A page where a client picks a time for a call with you (a Google Calendar appointment page, Calendly, or similar). The Enquiries view puts it into every WhatsApp and email draft it opens for you, so answering an enquiry and offering a call is one message. Leave empty and the drafts simply do not mention a call.", false],
   purge_cron_secret_sha256: ["Deletion clock secret, hashed", "A SHA-256, never the secret itself. yaad-vetting-purge compares against it so a caller cannot run the deletion clock without the real value.", false],
+  invoice_bank_details: ["Bank details a client pays an invoice into", "Written exactly as a client should read it: bank, account name, sort code, account number. Shown under every unpaid Yaadly invoice in the client portal and in the footer of every emailed invoice, with the invoice number as the reference. Empty means no bank transfer option is shown anywhere, and no account is invented. Use the Yaadly Ltd business account, never a personal one.", false],
 };
 const SETTING_GROUP = {
   agents_paused:"Agents", trade_list:"Agents",
   worker_guidelines_version:"Documents in force", client_guidelines_version:"Documents in force", sketch_stamp:"Documents in force",
   ntfy_topic:"Notifications and addresses", desk_url:"Notifications and addresses", admin_email:"Notifications and addresses",
   desk_phone:"Notifications and addresses", booking_link:"Notifications and addresses",
+  invoice_bank_details:"Money",
 };
 
 // The value of a text setting, or empty. Quotes stripped the same way the
@@ -4592,21 +5029,22 @@ function panelSet(rows){
     const g = SETTING_GROUP[r.key] || "Everything else";
     (groups[g] = groups[g] || []).push(r);
   }
-  const order = ["Agents","Documents in force","Notifications and addresses","Everything else"];
+  const order = ["Agents","Documents in force","Notifications and addresses","Money","Everything else"];
   const cards = order.filter(g => groups[g]).map(g => {
     const body = groups[g].map(r => {
       const meta = SETTING_META[r.key] || [r.key, "Nothing in this codebase reads this row. It is a note to yourself, not a switch.", false];
       const val = clean(r.value);
       const control = isBool(r.value)
         ? `<div class="sw${boolOf(r.value) ? " on" : ""}" data-set="${esc(r.key)}" role="switch" tabindex="0" aria-checked="${boolOf(r.value)}" aria-label="${esc(meta[0])}"></div>`
-        : `<span class="chip ${val ? "ok" : "mute"}" title="${esc(val)}">${esc(val.length > 30 ? val.slice(0,30) + "…" : (val || "empty"))}</span>`;
+        : `<span class="ctl"><span class="chip ${val ? "ok" : "mute"}" title="${esc(val)}">${esc(val.length > 30 ? val.slice(0,30) + "…" : (val || "empty"))}</span>`
+          + `<button class="btn sm g" data-edit="${esc(r.key)}" aria-label="Edit ${esc(meta[0])}">Edit</button></span>`;
       return `<div class="tg"><div><b>${esc(meta[0])}</b><span>${meta[1]}</span>`
            + `<span class="mono" style="color:var(--dim);letter-spacing:0;text-transform:none;font-size:10px">${esc(r.key)}</span></div>${control}</div>`;
     }).join("");
     return `<div class="card"><div class="chd"><h3>${esc(g)}</h3></div>${body}</div>`;
   });
   return `<div class="grid2">${cards.join("")}</div>`
-    + `<p class="conseq">These are the live rows in <span class="mono">app_settings</span>, not a picture of them. A switch writes the row the moment you click it. Anything without a switch is text: change it in the table below, or in the function that reads it.</p>`
+    + `<p class="conseq">These are the live rows in <span class="mono">app_settings</span>, not a picture of them. A switch writes the row the moment you click it. Anything without a switch is text: press Edit, type the new value, and it is written the moment you press OK. Until 14 Sep 2026 this sentence sent you to the table below, which only ever displayed the rows, so text settings could not be changed from this desk at all.</p>`
     + `<div class="sechd">Every row, as it is stored</div>`;
 }
 
@@ -4726,17 +5164,90 @@ function buildSections(){
   anchor.insertAdjacentHTML("beforebegin", out);
 }
 
-function tableCard(v, rows){
+function tableCard(v, rows, k){
   if (!rows.length) {
     return `<div class="card"><div class="empty"><b>${esc(v.empty[0])}</b>${esc(v.empty[1])}</div></div>`;
   }
-  const head = v.cols.map(c => `<th${c.n ? ' class="num"' : ""}>${esc(c.h)}</th>`).join("");
+  // Tick boxes only where the view declares bulk actions and the caller said
+  // which view this is. The Overview draws Service bookings through here too,
+  // with no key, and gets the plain table.
+  const bk = !!(k && v.bulk);
+  const picked = bk ? bulkSet(k) : null;
+  const tickable = bk ? rows.filter(r => v.bulkWhen(r)) : [];
+  const allOn = tickable.length > 0 && tickable.every(r => picked.has(String(r.id)));
+  const head = (bk ? `<th class="bkc">${tickable.length ? `<label title="Tick every row shown"><input type="checkbox" class="bk-all" data-k="${k}"${allOn ? " checked" : ""}></label>` : ""}</th>` : "")
+    + v.cols.map(c => `<th${c.n ? ' class="num"' : ""}>${esc(c.h)}</th>`).join("");
   const body = rows.map(r =>
-    `<tr data-i="${r.__i}">` + v.cols.map(c => `<td${c.n ? ' class="num"' : ""}>${c.f(r)}</td>`).join("") + "</tr>"
+    `<tr data-i="${r.__i}">`
+    + (bk ? `<td class="bkc">${v.bulkWhen(r) ? `<label><input type="checkbox" class="bk" data-k="${k}" data-id="${esc(String(r.id))}"${picked.has(String(r.id)) ? " checked" : ""}></label>` : ""}</td>` : "")
+    + v.cols.map(c => `<td${c.n ? ' class="num"' : ""}>${c.f(r)}</td>`).join("") + "</tr>"
   ).join("");
-  return `<div class="card pad0"><div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
-       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.table)}</span>. Click any row to open it.</p>`;
+  return (bk ? `<div class="bkbar" id="bk-${k}"></div>` : "")
+       + `<div class="card pad0"><div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
+       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.table)}</span>. Click any row to open it${bk ? ", or tick several to act on them together" : ""}.</p>`;
 }
+
+// ---- Acting on several rows at once.
+//
+// Added 16 Sep 2026 for Enquiries, where clearing a backlog one drawer at a
+// time was the whole complaint. It is not a shortcut around a decision: she
+// still ticks each row and confirms once, and the write is the same database
+// function the single action uses, called once per row, so every enquiry gets
+// its own agent_actions line with her email. One refusal does not stop the
+// rest; the bar names which ones did not go through and why.
+const BULK = {};      // view key -> Set of ticked row ids
+const BULK_MSG = {};  // view key -> html shown in the bar after a run
+function bulkSet(k){ return BULK[k] || (BULK[k] = new Set()); }
+
+function bulkBar(k){
+  const el = $("bk-" + k); if (!el) return;
+  const v = VIEW[k], n = bulkSet(k).size;
+  const msg = BULK_MSG[k] || "";
+  if (!n) { el.innerHTML = msg || `<span class="hint" style="margin:0">Tick the box on a row, or the one in the header for every row shown, to act on several at once.</span>`; return; }
+  el.innerHTML = `<span class="n">${n} ticked</span>`
+    + v.bulk.map((a, i) => `<button class="btn ${a.cls || ""}" data-bk-run="${i}" data-k="${k}">${esc(a.label)}</button>`).join("")
+    + `<button class="btn g" data-bk-clear="${k}">Untick all</button>` + msg;
+}
+
+async function runBulk(k, a, btn){
+  const ids = [...bulkSet(k)];
+  const rows = (ROWS[k] || []).filter(r => ids.includes(String(r.id)) && VIEW[k].bulkWhen(r));
+  if (!rows.length) return;
+  if (!confirm(a.says(rows.length) + "\n\n" + a.label + " for " + rows.length + "?")) return;
+  document.querySelectorAll(`#bk-${k} button`).forEach(b => b.disabled = true);
+  const failed = [];
+  let done = 0;
+  for (const r of rows) {
+    btn.innerHTML = `<span class="spin"></span>${done + failed.length + 1} of ${rows.length}`;
+    const { error } = await sb.rpc(a.rpc, a.args(r));
+    if (error) failed.push(`<b>${esc(VIEW[k].titleOf ? VIEW[k].titleOf(r) : String(r.id))}</b>: ${esc(error.message)}`);
+    else done++;
+  }
+  BULK[k] = new Set();
+  BULK_MSG[k] = failed.length
+    ? `<div class="msg err"><b>${done} done, ${failed.length} did not go through.</b> Those are still on the list.<br>${failed.join("<br>")}</div>`
+    : `<div class="msg ok">${done} done.</div>`;
+  await loadTableView(k);
+}
+
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!t.classList || !(t.classList.contains("bk") || t.classList.contains("bk-all"))) return;
+  const k = t.dataset.k, set = bulkSet(k);
+  delete BULK_MSG[k];
+  if (t.classList.contains("bk-all")) {
+    document.querySelectorAll(`input.bk[data-k="${k}"]`).forEach(b => {
+      b.checked = t.checked;
+      t.checked ? set.add(b.dataset.id) : set.delete(b.dataset.id);
+    });
+  } else {
+    t.checked ? set.add(t.dataset.id) : set.delete(t.dataset.id);
+    const all = document.querySelector(`input.bk-all[data-k="${k}"]`);
+    const boxes = [...document.querySelectorAll(`input.bk[data-k="${k}"]`)];
+    if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked);
+  }
+  bulkBar(k);
+});
 
 const ROWS = {};   // last loaded rows per view, so search can filter without refetching
 
@@ -4792,12 +5303,21 @@ function renderTableView(k){
   const panel = vizStrip(k, v, all) + (v.panel ? v.panel(all) : "");
   $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
-    : tableCard(v, rows));
+    : tableCard(v, rows, k));
+  // A tick on a row the search has just hidden is dropped, never carried: a
+  // bulk action must only ever touch rows she can see.
+  if (v.bulk) {
+    const seen = new Set(rows.filter(r => v.bulkWhen(r)).map(r => String(r.id)));
+    for (const id of [...bulkSet(k)]) if (!seen.has(id)) bulkSet(k).delete(id);
+    bulkBar(k);
+  }
   // A panel is inert markup until something wires it. Two panels have a
   // control, Reports and the held drafts on Kickoff packs, so these are
   // two calls and not a framework.
   if (k === "reports") wireReportDrafter();
   if (k === "kick") wireHeldDrafts();
+  if (k === "delivery") wireDelivery();
+  if (k === "threads") wireThreads();
 }
 
 // The one panel with a button in it.
@@ -4912,7 +5432,7 @@ function openDetail(k, i){
   // page that hides a value is worse than a dump that shows it.
   const body = v.page
     ? v.page(row) + `<details class="allfields"><summary>Every field, as stored</summary>${fields}</details>`
-    : top + fields;
+    : top + (v.foldFields ? `<details class="allfields"><summary>Every field, as stored</summary>${fields}</details>` : fields);
 
   const acts = (v.actions || []).filter(a => !a.when || a.when(row));
   const actHtml = acts.length
@@ -5044,6 +5564,9 @@ async function writeAction(k, a, row, vals){
 }
 
 async function runAction(k, a, row, btn){
+  // A NAV action takes you somewhere: another page, or Twilio in a new tab.
+  // It writes nothing, so there is nothing to confirm.
+  if (a.nav) { closeDrawer(); return a.nav(row); }
   if (a.ask) return drawAsk(k, a, row, btn);
   // A READ action asks a question and shows the answer. It writes nothing, so
   // it skips the confirm (there is nothing to be sure about), leaves the
@@ -5123,6 +5646,19 @@ document.addEventListener("click", (e) => {
     setAgentsPaused(next);
     return;
   }
+  const ed = e.target.closest("[data-edit]");
+  if (ed) {
+    // A text setting. The prompt shows the value as stored so what is typed
+    // replaces it whole; the empty string is a real value (it switches the
+    // bank transfer line off), so only Cancel leaves the row alone.
+    const key = ed.dataset.edit;
+    const meta = SETTING_META[key] || [key];
+    const cur = settingOf(key);
+    const next = prompt(meta[0] + "\n\nStored as " + key + ". This is written the moment you press OK.", cur);
+    if (next === null) return;
+    writeSetting(key, next.trim(), ed);
+    return;
+  }
   const sw = e.target.closest("[data-set]");
   if (sw) {
     const key = sw.dataset.set, on = sw.classList.contains("on");
@@ -5142,6 +5678,11 @@ document.addEventListener("click", (e) => {
   }
   const r = e.target.closest("[data-v]");
   if (r) { go(r.dataset.v); return; }
+  const bkr = e.target.closest("[data-bk-run]");
+  if (bkr) { runBulk(bkr.dataset.k, VIEW[bkr.dataset.k].bulk[Number(bkr.dataset.bkRun)], bkr); return; }
+  const bkc = e.target.closest("[data-bk-clear]");
+  if (bkc) { const k = bkc.dataset.bkClear; BULK[k] = new Set(); delete BULK_MSG[k]; renderTableView(k); return; }
+  if (e.target.closest("td.bkc, th.bkc")) return;
   const tr = e.target.closest("tr[data-i]");
   if (tr && !e.target.closest(".drw")) { openDetail(currentView, Number(tr.dataset.i)); return; }
 });
@@ -5725,7 +6266,7 @@ async function loadOverview(){
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
-    countOf("enquiries",   q => q.not("status", "in", "(replied,converted)")),
+    countOf("enquiries",   q => q.not("status", "in", "(replied,converted,test,binned)")),
     countOf("questions",   q => q.eq("published", false)),
   ]);
 
@@ -7796,8 +8337,13 @@ async function loadWorkerPay(keepMsg){
   const emails = [...new Set([...list.map((i) => i.worker_email), ...(booked || []).map((j) => j.worker_email)].filter(Boolean))];
   const [{ data: jobs }, { data: workers }] = await Promise.all([
     jobIds.length ? sb.from("jobs").select("id,title,is_test").in("id", jobIds) : Promise.resolve({ data: [] }),
-    emails.length ? sb.from("worker_profiles").select("worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by").in("worker_email", emails) : Promise.resolve({ data: [] }),
+    emails.length ? sb.from("worker_profiles").select("worker_email,name,phone,wise_recipient_set_at,bank_callback_at,bank_callback_by,stripe_recipient_status").in("worker_email", emails) : Promise.resolve({ data: [] }),
   ]);
+  // Stripe payouts already sent for these invoices (20260916120000), so a
+  // paid-by-Stripe row can show Stripe's own status, and a failed or returned
+  // one shows red until a person deals with it.
+  const { data: payouts } = list.length ? await sb.from("stripe_payouts").select("invoice_id,outbound_payment_id,status,status_detail,receipt_url,trace_id,expected_arrival,debited_value,debited_currency,fees,fx_rate,quote_is_estimate,sent_by,created_at").in("invoice_id", list.map((i) => i.id)) : { data: [] };
+  const payoutByInv = new Map((payouts || []).map((x) => [x.invoice_id, x]));
   const jobById = new Map((jobs || []).map((j) => [j.id, j]));
   const workerByEmail = new Map((workers || []).map((w) => [String(w.worker_email || "").toLowerCase(), w]));
 
@@ -7824,6 +8370,10 @@ async function loadWorkerPay(keepMsg){
     return [...by.entries()].map(([c, p]) => feeAmt(p, c)).join(" + ");
   };
 
+  const stripeReady = (i) => {
+    const w = workerByEmail.get(String(i.worker_email || "").toLowerCase());
+    return !!(w && w.stripe_recipient_status === "ready") && (i.currency || "JMD") === "JMD";
+  };
   const owed = list.filter((i) => i.status === "sent");
   const paid = list.filter((i) => i.status === "paid").sort((a, b) => String(b.paid_at || "").localeCompare(String(a.paid_at || ""))).slice(0, 30);
   const drafts = list.filter((i) => i.status === "draft");
@@ -7839,20 +8389,34 @@ async function loadWorkerPay(keepMsg){
       <td class="num"><b>${feeAmt(i.total_pence, i.currency)}</b>${sub_("owed since " + since)}</td>
       <td>${wait}</td>
       <td><input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">
-        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button></td>
+        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button>
+        ${stripeReady(i) ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}" title="Shows Stripe's fee and rate first; sends only when you confirm">Pay with Stripe</button>` : `<span style="opacity:.55" title="The worker has not finished setting up Stripe in their portal">Stripe: not set up</span>`}</td>
     </tr>`;
   }).join("");
 
   const paidRows = paid.map((i) => {
-    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : "marked paid";
+    const how = i.paid_method === "bank_transfer" ? "by bank transfer" : i.paid_method === "stripe" ? "by Stripe" : "marked paid";
     const ref = String(i.paid_reference || "").trim();
+    const sp = i.paid_method === "stripe" ? payoutByInv.get(i.id) : null;
+    // Stripe's own word on the payout, as last read. Red until a person has dealt with a failed or returned one.
+    const spChip = !sp ? chip_("ok", "sent")
+      : sp.status === "posted" ? chip_("ok", "posted")
+      : sp.status === "processing" ? chip_("warn", "processing")
+      : chip_("crit", sp.status + (sp.status_detail ? ": " + sp.status_detail : ""));
+    const spDetail = sp ? [
+      sp.debited_value != null ? "£" + (Number(sp.debited_value) / 100).toFixed(2) + " left the Stripe account" : "",
+      sp.fx_rate ? "rate " + sp.fx_rate : "",
+      sp.quote_is_estimate ? "fees were an estimate" : "",
+      sp.expected_arrival ? "expected " + String(sp.expected_arrival).slice(0, 10) : "",
+      sp.trace_id ? "trace " + sp.trace_id : "",
+    ].filter(Boolean).join(" · ") : "";
     return `<tr>
       <td>${whoCell(i)}</td>
       <td>${jobCell(i)}</td>
       <td>${forCell(i)}</td>
       <td class="num">${feeAmt(i.total_pence, i.currency)}</td>
-      <td>${chip_("ok", "sent")}</td>
-      <td>${esc(how)}${ref ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}</td>
+      <td>${spChip}${sp ? ` <button class="btn" data-wp-refresh="${esc(i.id)}" title="Ask Stripe where this payout is">Check</button>` : ""}</td>
+      <td>${esc(how)}${ref && !sp ? ", ref " + esc(ref) : ""}, ${esc(String(i.paid_at || "").slice(0, 10))}${sub_(i.paid_by || "")}${spDetail ? sub_(spDetail) : ""}${sp && sp.receipt_url ? ` <a href="${esc(sp.receipt_url)}" target="_blank" rel="noopener">receipt</a>` : ""}</td>
     </tr>`;
   }).join("");
 
@@ -7931,6 +8495,63 @@ async function loadWorkerPay(keepMsg){
         if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
         say("wpMsg", "err", hint);
       }
+      await loadWorkerPay(true);
+    });
+  });
+
+  // Pay with Stripe (yaad-payout-send, 20260916120000). Two clicks, on
+  // purpose. The first asks Stripe for a quote and shows the person the fee,
+  // the exchange rate, what lands in J$ and what leaves the GBP account. Only
+  // the second, a confirm() with those figures in it, sends. The function
+  // then marks the invoice paid under THIS person's session, so paid_by is
+  // them. Nothing here or in the function sends without that confirm.
+  const payoutFn = async (payload) => {
+    const r = await fetch(FN_PAYOUT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY, Authorization: "Bearer " + (await token()) },
+      body: JSON.stringify(payload),
+    });
+    const j = await r.json().catch(() => ({ error: "the payout function returned something unreadable" }));
+    if (!r.ok) { const err = new Error(j.error || ("http " + r.status)); err.body = j; throw err; }
+    return j;
+  };
+  const gbp = (minor) => "£" + (Number(minor) / 100).toFixed(2);
+  const feeLine = (f) => ({ standard_payout_fee: "Stripe payout fee", cross_border_payout_fee: "cross-border fee", foreign_exchange_fee: "currency conversion fee" }[f.type] || f.type) + " " + (f.currency === "GBP" ? gbp(f.value) : f.value + " " + f.currency);
+  host.querySelectorAll("[data-wp-stripe]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.wpStripe, name = btn.dataset.wpWho;
+      btn.disabled = true;
+      say("wpMsg", "", "");
+      try {
+        const q = await payoutFn({ action: "quote", invoice: id });
+        const lands = q.credited ? jmdFmt(Math.round(q.credited.value / 100)) : "the invoice amount";
+        const leaves = q.debited ? gbp(q.debited.value) : "not quoted";
+        const fees = (q.fees || []).map(feeLine).join(", ") || "not quoted";
+        const total = q.fees_total ? gbp(q.fees_total.value) : "see receipt";
+        const bal = q.balance_available_gbp_pence != null ? gbp(q.balance_available_gbp_pence) : "unknown";
+        const text = q.estimate
+          ? `Pay ${name} ${lands} through Stripe for ${id}?\n\nStripe would not quote this in advance. Published fees for a UK sender to Jamaica: £0.50 + 0.50% cross-border + 2% currency conversion, charged to Yaadly. The exact GBP figure shows on Stripe's receipt afterwards.\n\nGBP available in Yaadly's Stripe account: ${bal}.\n\n${q.livemode ? "THIS IS LIVE MONEY." : "Test mode: no real money moves."}\n\nThis sends the payout now, marks ${id} paid with your name, and WhatsApps ${name}. It cannot be cancelled once posted.`
+          : `Pay ${name} ${lands} through Stripe for ${id}?\n\nLeaves Yaadly's GBP account: ${leaves}\nStripe's fees (charged to Yaadly): ${fees} = ${total}\nRate: 1 GBP = ${q.fx_rate || "?"} JMD, locked until ${q.expires_at ? new Date(q.expires_at).toLocaleTimeString("en-GB") : "shortly"}\nGBP available in Yaadly's Stripe account: ${bal}${q.enough === false ? " (NOT ENOUGH)" : ""}\n\n${q.livemode ? "THIS IS LIVE MONEY." : "Test mode: no real money moves."}\n\nThis sends the payout now, marks ${id} paid with your name, and WhatsApps ${name}. It cannot be cancelled once posted.`;
+        if (q.enough === false) { say("wpMsg", "err", `Not enough GBP in Yaadly's Stripe account (${bal} available, ${leaves} needed). Add money in Stripe, Global Payouts, then try again.`); btn.disabled = false; return; }
+        if (!confirm(text)) { btn.disabled = false; return; }
+        const out = await payoutFn({ action: "send", invoice: id, quote_id: q.quote_id, estimate: q.estimate === true, acknowledged: true });
+        say("wpMsg", "ok", `Sent ${lands} to ${name} through Stripe (${out.outbound_payment_id}, ${out.status}). ${id} is now paid, and ${name} is being sent a WhatsApp.${out.expected_arrival ? " Stripe expects it to land by " + String(out.expected_arrival).slice(0, 10) + "." : ""}`);
+      } catch (e) {
+        let hint = e.message;
+        if (/Admin only/i.test(hint)) hint = "This account is not on the Yaadly admin list.";
+        if (e.body && e.body.outbound_payment_id) hint += ` Stripe payout id: ${e.body.outbound_payment_id}.`;
+        say("wpMsg", "err", hint);
+      }
+      await loadWorkerPay(true);
+    });
+  });
+  host.querySelectorAll("[data-wp-refresh]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        const st = await payoutFn({ action: "refresh", invoice: btn.dataset.wpRefresh });
+        say("wpMsg", st.status === "posted" || st.status === "processing" ? "ok" : "err", `Stripe says ${btn.dataset.wpRefresh}: ${st.status}${st.detail ? ", " + st.detail : ""}${st.trace_id ? ". Trace ID " + st.trace_id : ""}.`);
+      } catch (e) { say("wpMsg", "err", e.message); }
       await loadWorkerPay(true);
     });
   });
