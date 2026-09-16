@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-16 · Supabase moved from the free plan to Pro
+
+**Why.** Founder decision, 16 Sep 2026, ahead of real client data. At the time the database was 65 MB of the free 500 MB and file storage 2 MB of 1 GB, so no limit forced it. The reasons were the free plan having no backups at all, evidence photographs and work-log video filling 1 GB within a handful of pilot jobs (uploads simply stop at the limit), and the risk of a paused project on a system that now takes card payments.
+
+**What it buys.** Daily backups kept 7 days, no pausing for inactivity, 8 GB database and 100 GB storage included, at $25 a month with the $10 compute credit covering the smallest instance. Spend cap left on.
+
+**What did not change.** Point-in-time recovery, larger compute and the Team plan are extras and are not switched on. `scripts/backup-db.sh` stays as the off-site copy, because Supabase's own backups sit in the same account and only restore the whole database. The keep-alive workflow stays as the uptime check. Nothing in the schema, RLS or functions moved. Older entries that describe free-plan limits are history and are left as written.
+
 ## 2026-09-16 · Both portal overviews say what each job is, what it costs or pays, and what is next, and every card opens that section
 
 **Why.** Founder, 16 Sep 2026, reading the worker's and then the client's overview: an invoice number alone does not tell anyone where it belongs; a money line must say which job it comes from; a job card must say what the work is, not only where it is; "everything should be clickable and take the worker to the exact section that is still outstanding"; and a professional service "is also a live job and needs that attention", not a side list.
