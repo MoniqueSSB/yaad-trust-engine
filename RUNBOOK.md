@@ -112,7 +112,7 @@ If the whole row has wrapped onto two lines, something in it grew. Since 9 Sep 2
 
 ## 5b. The keep-alive workflow is red
 
-`.github/workflows/keepalive.yml` runs every second day. It exists so Supabase's free plan never pauses the project for inactivity, and it checks the public surfaces while it is there. Read the failed step's name first; each one points at a different fault.
+`.github/workflows/keepalive.yml` runs every second day. It was built so Supabase's free plan never paused the project for inactivity; since the move to Pro on 16 Sep 2026 pausing no longer applies, and it stays as the uptime check on the public surfaces. Read the failed step's name first; each one points at a different fault.
 
 1. **Touch the database.** A non-200 means Supabase is paused, over quota, or down: open the dashboard. A non-empty body means the anon role can read `waitlist`, which is a row-level security fault, see section 7.
 2. **Live site and app.** `yaadly.co.uk` is section 5, `app.yaadly.co.uk` is section 4.

@@ -2,12 +2,18 @@
 #
 # Yaadly database backup.
 #
-# Why this exists: the Supabase free tier has no daily backups and no
-# point-in-time recovery. This database holds client names, phone numbers,
+# Why this exists: it was written while Supabase was on the free tier, which
+# has no backups at all. This database holds client names, phone numbers,
 # property addresses, photographs of people's homes, worker government photo
 # ID, proof of address, and JCF police record checks. Running that with no
-# restore path is not a saving, it is an exposure. Until Pro is affordable,
-# this is the restore path.
+# restore path is not a saving, it is an exposure.
+#
+# Since 16 Sep 2026 the project is on Pro, which keeps daily backups for 7
+# days. This script still earns its place: those backups live inside the same
+# Supabase account, go back only a week, and restore the whole database at
+# once. A dump you hold yourself survives a lost account, reaches further back,
+# and lets you pull out one table. Point-in-time recovery is a paid add-on and
+# is not switched on.
 #
 # The dump is written OUTSIDE any git repository, on purpose. A database dump
 # in a repo, or in a CI artifact on a public repo, is downloadable by anyone.
