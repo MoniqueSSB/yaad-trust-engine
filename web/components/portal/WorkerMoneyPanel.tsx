@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { recordPayInfo } from "@/app/portal/worker-actions";
 import { jmd } from "@/lib/money";
 
@@ -32,6 +33,7 @@ export type MoneyJob = {
 
 const METHOD_LABEL: Record<string, string> = {
   bank_transfer: "Bank transfer",
+  stripe: "Bank transfer through Stripe",
 };
 
 export function WorkerMoneyPanel({ jobs }: { jobs: MoneyJob[] }) {
@@ -56,7 +58,12 @@ function MoneyRow({ job }: { job: MoneyJob }) {
   return (
     <li className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <b className="min-w-[180px] flex-1 text-[14.5px]">{job.title ?? "Untitled job"}</b>
+        {/* Founder, 16 Sep 2026: every money line says which job it comes
+            from, by name and by job number, and opens that job. */}
+        <Link href={`/portal/jobs/${encodeURIComponent(job.id)}`} className="group min-w-[180px] flex-1">
+          <b className="block text-[14.5px] group-hover:underline">{job.title ?? "Untitled job"}</b>
+          <span className="mt-0.5 block font-mono text-[11px] text-dim">{job.id} · open the job</span>
+        </Link>
         <span
           className={
             "rounded-full border px-2.5 py-1 text-[11px] font-bold " +
