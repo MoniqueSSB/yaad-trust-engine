@@ -47,12 +47,14 @@ begin
        where i.id in (v_w1, v_w2)
          and exists (select 1 from public.worker_profiles w where lower(w.worker_email) = lower(i.worker_email));
 
-      -- 2. a method that is not live yet is refused
+      -- 2. "paid by Stripe" cannot be typed: it only follows a recorded payout
+      --    (20260916120000). Before that migration the same call was refused
+      --    as "only a bank transfer"; either way it must be refused.
       begin
-        perform public.mark_worker_paid(v_w1, 'stripe', '');
-        res := res || '2. Stripe cannot be recorded before it is set up: FAIL, it was'::text;
+        perform public.mark_worker_paid(v_w1, 'stripe', 'obp_made_up');
+        res := res || '2. Stripe cannot be recorded without a real payout: FAIL, it was'::text;
       exception when others then
-        res := res || ('2. Stripe cannot be recorded before it is set up: ' || case when sqlerrm ilike '%only a bank transfer%' then 'PASS' else 'FAIL, ' || sqlerrm end);
+        res := res || ('2. Stripe cannot be recorded without a real payout: ' || case when sqlerrm ilike '%No Stripe payout%' or sqlerrm ilike '%only a bank transfer%' then 'PASS' else 'FAIL, ' || sqlerrm end);
       end;
 
       -- 3. a client's bill is not a worker's pay
