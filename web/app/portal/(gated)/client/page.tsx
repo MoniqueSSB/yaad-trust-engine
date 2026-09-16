@@ -197,6 +197,48 @@ export default async function ClientPortal() {
     return { ...j, work, money, next: nextFor(j) };
   };
 
+  /* Founder, 16 Sep 2026: a booked service is live work with its own steps,
+     not a side note. Each one is drawn as a full card in the main column,
+     the same shape as a job, keyed on the six-step service track. Two steps
+     wait on the client: sending what was asked for, and reading the draft. */
+  const SERVICE_STATUS: Record<string, { label: string; tone: "waiting" | "moving" | "done" | "idle" }> = {
+    "0": { label: "Booked and paid", tone: "moving" },
+    "1": { label: "Intake: Yaadly needs some things from you", tone: "waiting" },
+    "2": { label: "Documents received", tone: "moving" },
+    "3": { label: "Desk work under way", tone: "moving" },
+    "4": { label: "Draft with you", tone: "waiting" },
+    "5": { label: "Delivered", tone: "done" },
+  };
+  const SERVICE_NEXT = [
+    "Yaadly is getting started. You will be asked for a few documents",
+    "Send the documents Yaadly asked for",
+    "Yaadly is checking what you sent",
+    "Yaadly is working on it, checked against real costs and day rates",
+    "Read the draft and tell Yaadly about anything that is wrong",
+    "Your report is ready to download and keep",
+  ];
+  const serviceRows: Job[] = services.map((sv) => {
+    const i = svcStage(sv.stage);
+    const href = "/portal/services/" + encodeURIComponent(sv.id) + (i === 5 ? "/pack" : "");
+    return {
+      id: sv.id,
+      title: sv.type ?? "Professional service",
+      trade: "professional service",
+      parish: sv.parish,
+      stage: i,
+      status: String(i),
+      client_email: email,
+      worker_email: null,
+      updated_at: null,
+      work: SERVICE_TRACK[i].detail,
+      money: sv.price ? sv.price + ", paid on booking" : null,
+      next: { label: SERVICE_NEXT[i], href },
+    };
+  });
+  const liveServices = serviceRows.filter((r) => r.status !== "5");
+  const doneServices = serviceRows.filter((r) => r.status === "5");
+  const servicesWaiting = liveServices.filter((r) => SERVICE_STATUS[r.status].tone === "waiting").length;
+
   const live = jobs.filter((j) => j.status !== "complete");
   const closed = jobs.filter((j) => j.status === "complete");
 
@@ -206,7 +248,7 @@ export default async function ClientPortal() {
      dashboard is not a reason to start guessing one. "Waiting on you" counts
      live jobs whose status tone is waiting (quotes in, evidence to review,
      portal setup), the same gold the pills below use. */
-  const waitingOnYou = live.filter((j) => CLIENT_STATUS[j.status]?.tone === "waiting").length;
+  const waitingOnYou = live.filter((j) => CLIENT_STATUS[j.status]?.tone === "waiting").length + servicesWaiting;
   const cards: StatCard[] = [
     {
       label: "Live jobs",
@@ -220,7 +262,7 @@ export default async function ClientPortal() {
       value: String(waitingOnYou),
       tone: waitingOnYou > 0 ? "waiting" : "idle",
       icon: "todo",
-      note: waitingOnYou === 0 ? "Nothing needs you right now" : "Quotes or evidence to look at",
+      note: waitingOnYou === 0 ? "Nothing needs you right now" : "Quotes, evidence or a service to look at",
     },
     {
       label: "Closed",
@@ -231,10 +273,10 @@ export default async function ClientPortal() {
     },
     {
       label: "Services",
-      value: String(services.length),
-      tone: services.length > 0 ? "moving" : "idle",
+      value: String(liveServices.length),
+      tone: liveServices.length > 0 ? "moving" : "idle",
       icon: "service",
-      note: services.length === 0 ? "No checks or reports booked" : "Checks and reports you booked",
+      note: services.length === 0 ? "No checks or reports booked" : liveServices.length === 0 ? "All delivered" : "Checks and reports under way",
     },
   ];
 
@@ -386,8 +428,16 @@ export default async function ClientPortal() {
             empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
           />
 
+          {liveServices.length > 0 && (
+            <JobList title="Professional services" jobs={liveServices} labels={SERVICE_STATUS} rail />
+          )}
+
           {closed.length > 0 && (
             <JobList title="Closed" jobs={(closed as Described[]).map(describe)} labels={CLIENT_STATUS} rail />
+          )}
+
+          {doneServices.length > 0 && (
+            <JobList title="Delivered services" jobs={doneServices} labels={SERVICE_STATUS} rail />
           )}
         </div>
 
@@ -401,41 +451,6 @@ export default async function ClientPortal() {
               <span className="text-[12.5px] text-dim">every job on each one, in one place</span>
               <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
             </Link>
-          )}
-          {services.length > 0 && (
-            <section className="mt-8">
-              <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
-                Professional services
-              </h2>
-              <ul className="grid gap-3">
-                {services.map((s) => (
-                  <li key={s.id}>
-                    <Link
-                      href={"/portal/services/" + encodeURIComponent(s.id)}
-                      className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-line2"
-                    >
-                      <b className="text-[14.5px]">{s.type ?? "Service"}</b>
-                      <span className="text-[12.5px] text-dim">{s.id}</span>
-                      {s.parish && (
-                        <span className="text-[12.5px] text-dim">{s.parish}</span>
-                      )}
-                      {s.price && (
-                        <span className="ml-auto text-[13px] font-bold text-tealb">
-                          {s.price}
-                        </span>
-                      )}
-                      {/* Founder, 16 Sep 2026: the row says where the service
-                          is and what happens at that step, the same track the
-                          service page draws. */}
-                      <span className="basis-full text-[12.5px] text-mute">
-                        <b className="text-ink">Now: {SERVICE_TRACK[svcStage(s.stage)].name}.</b>{" "}
-                        {SERVICE_TRACK[svcStage(s.stage)].detail}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
           )}
         </aside>
       </div>
