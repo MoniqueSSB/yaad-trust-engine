@@ -1620,7 +1620,7 @@ silent failure leaves a promise nobody kept and nobody knows.
 unknown rather than good, so they stay neutral rather than reading as a tick.
 Read means they opened it.
 
-### Following one up (from 16 September 2026, migration 20260916120000)
+### Following one up (from 16 September 2026, migration 20260916140000)
 
 The page opens with a bar for the last 14 days and a **Needs you** box: only
 the messages that did not arrive, grouped by person, each with the reason in
@@ -1638,7 +1638,7 @@ thread drawn as a chat.
 1. **"Mark as followed up" says "Nothing to follow up for that number".** Every
    message to it arrived or was already followed up. Reload the page.
 2. **It says "Could not find the function mark_delivery_followed_up".** The
-   migration is not applied yet. Apply 20260916120000.
+   migration is not applied yet. Apply 20260916140000.
 3. **"What it was" still reads "not recorded" on a new row.** Every function
    that sends through Twilio now records the kind and job the moment Twilio
    accepts, through `recordAccepted()` in `_shared/twilio-status.ts`, into

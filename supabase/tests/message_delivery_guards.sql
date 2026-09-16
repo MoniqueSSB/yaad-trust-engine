@@ -1,6 +1,6 @@
 -- Proof that a delivery status only moves forward, that a sender's kind and
 -- job survive the callback landing first, and that following a failure up is
--- one named admin's act. Run with execute_sql once 20260916120000 is applied.
+-- one named admin's act. Run with execute_sql once 20260916140000 is applied.
 --
 -- NOTHING HERE PERSISTS. Every row is written inside a block that ends by
 -- raising, which throws the lot away; the results come back as the text of

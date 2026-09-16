@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
       p_status: status || "unknown", p_error_code: errorCode,
     });
 
-    // Until migration 20260916120000 is applied the function does not exist.
+    // Until migration 20260916140000 is applied the function does not exist.
     // Fall back to the old write rather than stop recording deliveries, so
     // deploying this before the migration loses nothing.
     if (error && /record_message_delivery|PGRST202|does not exist/i.test(`${error.code ?? ""} ${error.message}`)) {

@@ -2877,7 +2877,7 @@ async function dlvFollowedUp_(r, vals){
   if (note.length < 5) throw new Error("Say in a few words what you did, so the next person reading this knows.");
   // Following up is done with a person, not a message, so it clears every
   // open problem to the same number in one go. The desk can only read this
-  // table; mark_delivery_followed_up (20260916120000) is the one write, and it
+  // table; mark_delivery_followed_up (20260916140000) is the one write, and it
   // records who from the signed-in session, not from this page.
   const { error } = await sb.rpc("mark_delivery_followed_up", { p_to_addr: r.to_addr, p_note: note });
   if (error) throw new Error(error.message);
