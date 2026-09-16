@@ -40,7 +40,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
-import { withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -154,6 +154,7 @@ async function sendTwilio(
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, channel, { kind: "sign-in code" });
       if (r.ok) return { sent: true, via: `twilio ${channel}` };
       const d = await r.json().catch(() => null) as { code?: number; message?: string } | null;
       const reason = d?.code === 63016

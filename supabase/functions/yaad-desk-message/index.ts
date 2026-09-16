@@ -43,6 +43,7 @@
  */
 
 import { httpAttrs, SpanKind, Trace } from "./otel.ts";
+import { recordAccepted, type SendMeta } from "./twilio-status.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -88,7 +89,7 @@ type Sent = { sent: boolean; reason?: string; code?: number; sid?: string };
 
 /* Twilio WhatsApp, free text only. A copy rather than a shared module, for
    the reason recorded in yaad-desk-reply and yaad-portal-code. */
-async function sendWhatsApp(to: string, body: string, trace: Trace): Promise<Sent> {
+async function sendWhatsApp(to: string, body: string, trace: Trace, meta: SendMeta = { kind: "desk_message" }): Promise<Sent> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -114,6 +115,7 @@ async function sendWhatsApp(to: string, body: string, trace: Trace): Promise<Sen
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, "whatsapp", meta);
       if (r.ok) {
         const accepted = await r.json().catch(() => null) as { sid?: string } | null;
         return { sent: true, sid: accepted?.sid };
@@ -213,7 +215,7 @@ Deno.serve(async (req: Request) => {
 
     root.setAttributes({ "yaadly.job.id": jobId, "yaadly.desk_message.to": to, "yaadly.desk_message.channel": channel });
     const sent = channel === "whatsapp"
-      ? await sendWhatsApp(addr, text, trace)
+      ? await sendWhatsApp(addr, text, trace, { kind: "desk_message", job_id: jobId })
       : await sendEmail(addr, subject, text, trace);
     if (!sent.sent) return json({ error: sent.reason || "It did not send." }, sent.code === 63016 ? 409 : 502);
 

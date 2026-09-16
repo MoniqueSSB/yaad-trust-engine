@@ -52,7 +52,7 @@ import { pickTextProvider, providerAttrs, chatWithFailover } from "./textmodel.t
 import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, visionAttrs } from "./visionmodel.ts";
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
-import { withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -107,6 +107,7 @@ async function sha256Hex(s: string): Promise<string> {
 async function sendTwilio(
   to: string, body: string, channel: "whatsapp" | "sms", trace: Trace, mediaUrls: string[] = [],
   template?: { sid: string; vars: Record<string, string> },
+  meta: SendMeta = { kind: "notification" },
 ) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
@@ -145,6 +146,7 @@ async function sendTwilio(
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, channel, meta);
       if (r.ok) return { sent: true, via: `twilio ${channel}` };
       const d = await r.json().catch(() => null) as { code?: number; message?: string } | null;
       const reason = d?.code === 63016
@@ -833,6 +835,8 @@ Deno.serve(async (req: Request) => {
     const kind = String(b.kind ?? "") as Kind;
     const isService = SERVICE_KINDS.includes(kind);
     const meta = (b.meta ?? {}) as Record<string, unknown>;
+    // What "Did it arrive" shows against each message this sends.
+    const sendMeta: SendMeta = { kind: kind.replace(/_/g, " "), job_id: jobId || serviceId };
     // Which quote's Kickoff Pack this is, for kickoff_pack_ready. A job can
     // carry more than one pack in flight since 1 Sep 2026 (a client can
     // accept more than one quote and compare), so job_id alone no longer
@@ -1682,7 +1686,7 @@ Deno.serve(async (req: Request) => {
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos);
+      wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
       // the approved template is the fallback for exactly that failure,
@@ -1691,13 +1695,13 @@ Deno.serve(async (req: Request) => {
       // and never in place of the free-text attempt when that can still
       // be sent.
       if (!wa.sent && waTemplate && wa.reason === "outside WhatsApp's 24 hour window, needed an approved template") {
-        wa = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], waTemplate);
+        wa = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], waTemplate, sendMeta);
       }
       if (!wa.sent) {
         const metaResult = await sendMetaWhatsApp(recipientPhone, line, trace);
         if (metaResult.sent) wa = { ...metaResult, via: "meta whatsapp" };
         else {
-          const sms = await sendTwilio(recipientPhone, smsText || line, "sms", trace);
+          const sms = await sendTwilio(recipientPhone, smsText || line, "sms", trace, [], undefined, sendMeta);
           if (sms.sent) wa = { ...sms, via: "twilio sms" };
         }
       }
@@ -1712,7 +1716,7 @@ Deno.serve(async (req: Request) => {
       // the report and the typed code still works, so a missing button is a
       // worse experience and not a lost message.
       if (approveButton && wa.sent && wa.via === "twilio whatsapp") {
-        const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton);
+        const btn = await sendTwilio(recipientPhone, "", "whatsapp", trace, [], approveButton, { kind: "approve button", job_id: jobId });
         root.setAttributes({ "yaadly.notify.approve_button": btn.sent });
         if (!btn.sent) console.error(`approve button not sent for ${jobId}: ${btn.reason ?? "unknown"}`);
       }

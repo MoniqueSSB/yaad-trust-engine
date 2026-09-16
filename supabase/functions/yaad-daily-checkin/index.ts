@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 
 // The daily worker prompt. Founder's own instruction, 1 Sep 2026: "when a
 // job is live and has been accepted by a worker, there should be a ping
@@ -57,7 +57,7 @@ const CORS = {
 // Same helper shape as yaad-job-health's own copy, kept separate rather
 // than shared: this repository's own house style for small per-function
 // helpers, called out by name in yaad-portal-code's header.
-async function sendTwilioTemplate(to: string, vars: Record<string, string>, trace: Trace) {
+async function sendTwilioTemplate(to: string, vars: Record<string, string>, trace: Trace, meta: SendMeta = { kind: "daily check-in" }) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -77,6 +77,7 @@ async function sendTwilioTemplate(to: string, vars: Record<string, string>, trac
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, "whatsapp", meta);
       if (r.ok) return { sent: true };
       const d = await r.json().catch(() => null) as { code?: number; message?: string } | null;
       s.recordError(d?.message ?? `twilio ${r.status}`);
@@ -166,7 +167,7 @@ Deno.serve(async (req: Request) => {
       const { data: profile } = await admin.from("worker_profiles").select("phone").ilike("worker_email", j.worker_email).maybeSingle();
       if (!profile?.phone) { skippedNoPhone++; continue; }
 
-      const result = await sendTwilioTemplate(String(profile.phone), { "1": j.title ?? j.id }, trace);
+      const result = await sendTwilioTemplate(String(profile.phone), { "1": j.title ?? j.id }, trace, { kind: "daily check-in", job_id: j.id });
       // Logged once per job per day regardless of delivery, same reasoning
       // as mark_job_nudged: this is a once-a-day ask, not a retry queue,
       // and a Twilio outage should not turn into the same worker getting

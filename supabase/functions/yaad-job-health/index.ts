@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 
 // The daily stall check. Founder's own framing, 31 Aug 2026: "prompt to the
 // workers ensuring he does this so the client is updated... if there is
@@ -43,7 +43,7 @@ const CORS = {
 // Same shape as yaad-notify-client's own copy. Kept separate rather than
 // shared, matching this repository's own house style for small per-function
 // helpers: yaad-portal-code's header calls this out by name as deliberate.
-async function sendTwilioWhatsApp(to: string, body: string, trace: Trace) {
+async function sendTwilioWhatsApp(to: string, body: string, trace: Trace, meta: SendMeta = { kind: "job health nudge" }) {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -61,6 +61,7 @@ async function sendTwilioWhatsApp(to: string, body: string, trace: Trace) {
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, "whatsapp", meta);
       if (r.ok) return { sent: true };
       const d = await r.json().catch(() => null) as { code?: number } | null;
       const reason = d?.code === 63016 ? "outside WhatsApp's 24 hour window" : `twilio ${r.status}`;
@@ -205,6 +206,7 @@ Deno.serve(async (req: Request) => {
             String(profile.phone),
             `Yaadly here. Nothing has come in on ${c.title} for a few days. Send a photo or check in on site when you can, the client is waiting to see progress.`,
             trace,
+            { kind: "worker nudge, job quiet", job_id: c.job_id },
           );
         }
       }

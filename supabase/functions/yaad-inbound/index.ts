@@ -24,7 +24,7 @@ import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
 import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { replyFromCard } from "./reply-from-card.ts";
-import { withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 
 // Inbound intake, on whatever channel is actually available.
 //
@@ -595,7 +595,7 @@ async function mintPortalUploadLink(admin: any, email: string, jobId: string): P
 // person than the one who sent this request, so that mechanism cannot
 // reach them: this is a genuine outbound send, same shape as the ones
 // yaad-notify-client and yaad-job-health already carry their own copy of.
-async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<boolean> {
+async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: SendMeta = { kind: "message" }): Promise<boolean> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
@@ -612,6 +612,7 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<b
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, "whatsapp", meta);
       return r.ok;
     } catch (e) {
       s.recordError(String(e).slice(0, 200));
@@ -666,6 +667,7 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      await recordAccepted(r, digits, "whatsapp", { kind: "section menu" });
       if (!r.ok) {
         const d = await r.json().catch(() => null) as { message?: string } | null;
         s.recordError(d?.message ?? `twilio ${r.status}`);
@@ -1706,7 +1708,7 @@ async function flushPendingDeskReplies(admin: any, from: string, channel: string
   if (channel !== "whatsapp" && channel !== "sms") return 0;
   try {
     const { data: waiting } = await admin.from("pending_desk_replies")
-      .select("id, body, attempts").eq("to_addr", from).is("sent_at", null)
+      .select("id, body, attempts, job_id").eq("to_addr", from).is("sent_at", null)
       .order("created_at", { ascending: true }).limit(10);
     if (!waiting?.length) return 0;
 
@@ -1720,7 +1722,7 @@ async function flushPendingDeskReplies(admin: any, from: string, channel: string
         .eq("id", row.id).is("sent_at", null).select("id");
       if (!claimed?.length) continue;
 
-      const ok = await sendWhatsAppTo(from, String(row.body ?? ""), trace);
+      const ok = await sendWhatsAppTo(from, String(row.body ?? ""), trace, { kind: "desk_reply", job_id: row.job_id ?? "" });
       if (ok) { sent++; continue; }
       // Put it back rather than lose it. attempts keeps climbing, so a row
       // that keeps failing is visible at the desk instead of silently retried
@@ -3161,6 +3163,7 @@ Deno.serve(async (req: Request) => {
                 String(jobRow.client_phone),
                 `The worker replied on ${job.id} (${job.title}): "${msg.text.trim().slice(0, 300)}"\n\nReply with the code ${job.id} to approve, or say more and we will pass it on.`,
                 trace,
+                { kind: "worker reply passed to client", job_id: job.id },
               );
             }
             root.setAttributes({ "yaadly.evidence_comment.client_notified": notified });
@@ -3469,6 +3472,7 @@ Deno.serve(async (req: Request) => {
                 String(worker.phone),
                 `A note from the client on ${job.id} (${job.title}), stage ${job.stage}: "${msg.text.trim().slice(0, 300)}"\n\nReply to this number to answer, and it goes straight back to them.`,
                 trace,
+                { kind: "client note passed to worker", job_id: job.id },
               );
             }
           }

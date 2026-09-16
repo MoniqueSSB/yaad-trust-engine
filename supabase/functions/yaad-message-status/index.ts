@@ -76,17 +76,30 @@ Deno.serve(async (req: Request) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Upsert rather than update. A callback for a SID nothing recorded is a
-    // send from a path this function has not been told about, and that is a
-    // fact worth keeping rather than an error worth dropping.
-    const { error } = await admin.from("message_deliveries").upsert({
-      message_sid: sid,
-      to_addr: to,
-      channel: (f.get("To") ?? "").startsWith("whatsapp:") ? "whatsapp" : "sms",
-      status: status || "unknown",
-      error_code: errorCode,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: "message_sid" });
+    const channel = (f.get("To") ?? "").startsWith("whatsapp:") ? "whatsapp" : "sms";
+
+    // Through record_message_delivery, 16 Sep 2026, not a plain upsert.
+    // Twilio's callbacks are not guaranteed to arrive in order, and a plain
+    // upsert let a late "sent" overwrite an earlier "undelivered": two refused
+    // messages read as fine on the desk for days. The function only moves a
+    // status forward, keeps an error code once one is known, and still creates
+    // the row for a SID nothing recorded, because a send from a path nobody
+    // told this function about is a fact worth keeping.
+    let { error } = await admin.rpc("record_message_delivery", {
+      p_sid: sid, p_to: to, p_channel: channel,
+      p_status: status || "unknown", p_error_code: errorCode,
+    });
+
+    // Until migration 20260916140000 is applied the function does not exist.
+    // Fall back to the old write rather than stop recording deliveries, so
+    // deploying this before the migration loses nothing.
+    if (error && /record_message_delivery|PGRST202|does not exist/i.test(`${error.code ?? ""} ${error.message}`)) {
+      ({ error } = await admin.from("message_deliveries").upsert({
+        message_sid: sid, to_addr: to, channel,
+        status: status || "unknown", error_code: errorCode,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "message_sid" }));
+    }
 
     if (error) console.error(`yaad-message-status: could not record ${sid} (${status}):`, error.message);
 
