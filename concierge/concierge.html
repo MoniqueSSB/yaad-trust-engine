@@ -1452,7 +1452,7 @@ const TONE = {
   // jobs / services
   open:"warn", live:"warn", quoting:"warn", done:"ok", closed:"mute", cancelled:"mute",
   // applications
-  submitted:"warn", reviewing:"warn", passed:"ok", approved:"warn", declined:"mute", blocked:"crit",
+  submitted:"warn", reviewing:"warn", passed:"ok", approved:"warn", declined:"mute", blocked:"crit", test:"mute",
   // quotes
   sent:"warn", accepted:"ok", rejected:"mute", withdrawn:"mute",
   // invoices / packs
@@ -2009,15 +2009,25 @@ const VIEWS = [
     // is the hardest thing to stand behind six months later, but a forced box
     // gets filled with a full stop, so it is offered rather than demanded.
     actions:[
-      { label:"Pass", cls:"", when:r => r.status !== "passed",
+      // Every application on 16 September 2026 was a test, and this list had
+      // no way to say so. Marking a test is not a vetting decision: Pass, Gap
+      // and Block hide while it is marked, and "This one is real" sends a test
+      // that had been decided back to the waiting queue to be decided again.
+      { label:"That was me testing", cls:"g", when:r => r.status !== "test",
+        rpc:"mark_application_test", args:(r) => ({ p_id: r.id, p_is_test: true }),
+        says:r => `Marks ${esc(r.name || "this application")} as your own test. It leaves the waiting count and shows a test chip here. Documents, ID checks and any worker profile are untouched. Recorded in the ledger as your decision.` },
+      { label:"This one is real", cls:"g", when:r => r.status === "test",
+        rpc:"mark_application_test", args:(r) => ({ p_id: r.id, p_is_test: false }),
+        says:r => `Takes the test mark off ${esc(r.name || "this application")}. If it had already been passed, gapped or blocked, it goes back to waiting so you decide it again. Recorded in the ledger as your decision.` },
+      { label:"Pass", cls:"", when:r => r.status !== "passed" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "passed", p_note: v.note || null }),
         ask:[{ k:"note", label:"What convinced you? (optional, kept on the record)", placeholder:"references checked, ID matches, 8 years verifiable" }],
         says:r => `Says ${r.name || "this applicant"} has cleared vetting by your judgement. Publishing their profile is a separate step and is what actually lets them quote.` },
-      { label:"Send the gap back", cls:"g", when:r => r.status !== "gap",
+      { label:"Send the gap back", cls:"g", when:r => r.status !== "gap" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "gap", p_note: v.note || null }),
         ask:[{ k:"note", label:"Which document is missing? (optional, kept on the record)", placeholder:"proof of address, and the second reference never replied" }],
         says:() => "Records the application as waiting on a document, with your name, the time and your note. It sends nothing to the applicant: nobody is told until you tell them. Use Reach them at the top of this panel to send it from your own WhatsApp or email, naming the document, because a gap that is not named cannot be closed." },
-      { label:"Block", cls:"d", when:r => r.status !== "blocked",
+      { label:"Block", cls:"d", when:r => r.status !== "blocked" && r.status !== "test",
         rpc:"decide_application", args:(r, v) => ({ p_id: r.id, p_status: "blocked", p_note: v.note || null }),
         ask:[{ k:"note", label:"Why? (optional, but this is the one worth writing down)", placeholder:"ID did not match the name on the certificate" }],
         says:r => `Blocks ${r.name || "this applicant"}. This is a safety finding, not a tidy-up, and it should be said to them plainly.` },
