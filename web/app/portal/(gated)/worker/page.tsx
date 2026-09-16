@@ -268,7 +268,7 @@ export default async function WorkerPortal() {
             value: jmd(released),
             tone: released > 0 ? "done" : "idle",
             icon: "released",
-            note: "Paid straight to you by bank transfer, within 7 working days. Never cash.",
+            note: "Paid straight to you by bank transfer, within 7 days. Never cash.",
           },
         ] satisfies StatCard[])
       : []),
@@ -298,7 +298,7 @@ export default async function WorkerPortal() {
       </h1>
       <p className="mt-3 max-w-[62ch] text-[14px] leading-relaxed text-mute">
         The jobs you are on, what each one is waiting for, and what you are owed.
-        Paid within 7 working days of Yaadly signing the stage off.
+        Paid within 7 days of Yaadly signing the stage off.
       </p>
 
       {error && (

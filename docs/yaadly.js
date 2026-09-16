@@ -16,7 +16,7 @@
     ['Materials bought, receipt filed against the job.','J$66,800','J$0','Not yet paid','Working'],
     ['Same angle, after. That is the standard.','J$66,800','J$0','Not yet paid','Working'],
     ['Walk-round clip. Nothing hidden off camera.','J$66,800','J$0','Not yet paid','Evidence complete'],
-    ['<b>You signed it off.</b> Paid, and only now.','J$0','J$66,800','Paid','Paid in 7 working days']
+    ['<b>You signed it off.</b> Paid, and only now.','J$0','J$66,800','Paid','Paid in 7 days']
   ];
 
   var $ = function(id){ return document.getElementById(id) };
@@ -51,7 +51,7 @@
     eng.classList.add('open'); lock.innerHTML = OPEN;
     cap.innerHTML = '<b>You signed it off.</b> Paid, and only now.';
     lab.textContent = 'Paid'; you.textContent = 'J$0'; wk.textContent = 'J$66,800';
-    you2.textContent = 'Approved by you'; w2.textContent = 'Paid in 7 working days';
+    you2.textContent = 'Approved by you'; w2.textContent = 'Paid in 7 days';
     return;
   }
   if('IntersectionObserver' in window){
