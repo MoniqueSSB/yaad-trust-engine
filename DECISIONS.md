@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-16 · An application can be marked as a test
+
+**Why.** Founder, 16 Sep 2026: every item in the desk was a test, and she needs anything real that arrives to stand out. Jobs, workers, conversations and enquiries already had a test mark; applications did not, so the fifteen test applications were cleared in SQL by setting `status = 'test'`, with the old status written to the ledger.
+
+**What.** Migration `20260916200000_an_application_can_be_marked_as_a_test.sql` adds `applications.status_before_test` and `mark_application_test(p_id, p_is_test)`, admin only, attributed to the signed-in email and logged in `agent_actions`. The desk's Applications list gets "That was me testing" and "This one is real", matching the Jobs list. It uses the status value rather than a separate `is_test` flag because the waiting counts already key on status, so a test drops out of them with no other change, the same way enquiries work.
+
+**The line it does not cross.** Marking a test is not a vetting decision. Pass, Gap and Block are hidden while an application is marked, and "This one is real" returns a test that had been passed, gapped, blocked, approved or declined to `submitted`, so a named person decides it again rather than the old decision coming back without anybody making it. A status that was never a decision comes back exactly as it was.
+
 ## 2026-09-16 · Workers are paid within 7 days, and Xero is the system of accounts
 
 **7 days, calendar, not working (founder, 16 Sep 2026: "make it 7 days due to timeline", then "within 7 days" when shown "7 working days").** Every promise of pay "within 3 working days" becomes 7: the worker portal, the application form, the public FAQ, the WhatsApp assistant's answer, the marketing site's worked example. The reason is Stripe's own figure: a Global Payout to Jamaica lands in 1 to 7 business days after it is sent, so a 3 day promise could be broken by the bank on the far end with nothing Yaadly could do. Flagged and accepted by the founder: Stripe's worst case of 7 business days is about 9 calendar days, so "within 7 days" can still be missed by a slow Jamaican bank; Wise typically lands in 1 to 2 days. The clock runs from a named person at Yaadly signing the stage off, never from the client, and the runbook carries the Trace ID step for a late one.
