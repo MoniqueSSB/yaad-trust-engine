@@ -103,6 +103,20 @@ Deno.serve(async (req: Request) => {
 
     if (error) console.error(`yaad-message-status: could not record ${sid} (${status}):`, error.message);
 
+    // The account half of the desk's link to this message in the Twilio
+    // console (migration 20260916230000). Every blank row, not just this one:
+    // there is one Twilio account behind the business, so this also mends the
+    // rows written before the column existed. Only rows still blank, so a row
+    // is written once. Best effort: a failure here costs a link, never a status.
+    const accountSid = (f.get("AccountSid") ?? "").trim();
+    if (/^AC[0-9a-f]{32}$/i.test(accountSid)) {
+      const { error: accErr } = await admin.from("message_deliveries")
+        .update({ account_sid: accountSid }).eq("account_sid", "");
+      if (accErr && !/account_sid/i.test(accErr.message)) {
+        console.error("yaad-message-status: could not record the account id:", accErr.message);
+      }
+    }
+
     root.setAttributes({
       "yaadly.status.sid": sid, "yaadly.status.value": status || "unknown",
       "yaadly.status.error_code": errorCode || "none",

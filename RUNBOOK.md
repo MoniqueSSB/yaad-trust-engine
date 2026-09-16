@@ -5549,3 +5549,11 @@ No redeploy needed; both are read on every request.
 ## "no", "ok" or "share location" from a worker was filed as evidence, or sent to the client
 
 Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A bare acknowledgement (no, ok, yes, thanks, hi) is neither a question nor an update: at the report prompt nothing is sent and the prompt is repeated ("yes" and "ok" do not send a report, only "1" does, on purpose); at the section question it is asked again; in the plain update lane it is answered "Noted, nothing filed" and nobody is woken. A short instruction naming something the app explains ("share location", "send video", "photos", up to four words) is answered as the question it was. The app's own answers now cover: sharing a location, sending a video, sending photos, receipts, what the section words mean, what the client sees next, and the published pay fact (3 working days after a named person signs the stage off, by bank transfer, never cash). The pay sentence is copied from `faq.ts` and must change with it. Anything else still goes to you.
+
+## "Look it up in Twilio" on the desk is missing, or opens the wrong page (20260916230000)
+
+1. The button opens `console.twilio.com/.../sms/logs/<AccountSid>/<MessageSid>`. Before 16 Sep 2026 it had no AccountSid and landed on the general logs page.
+2. The AccountSid comes from Twilio's signed delivery receipt, recorded by `yaad-message-status` into `message_deliveries.account_sid`. The button is hidden on a row with no account id yet.
+3. Every button hidden: no receipt has arrived since the deploy. Check `select count(*) filter (where account_sid = '') from message_deliveries;`. The next receipt fills every blank row, because there is one Twilio account.
+4. Still blank after a message has gone out: check `yaad-message-status` logs for "could not record the account id", and that the status callback URL is still set.
+5. It opens Twilio but not the message: Twilio has changed its console address. Fix the URL in `concierge/concierge.html` (search "Look it up in Twilio"), copy it to `concierge-deploy/public/index.html`, and redeploy the desk.

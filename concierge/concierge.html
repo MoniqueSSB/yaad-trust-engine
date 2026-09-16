@@ -2509,9 +2509,15 @@ const VIEWS = [
       { label:"Show every message to this number", cls:"g",
         says:r => `Filters this page to ${r.to_addr}, so you can see whether anything reached them before or since.`,
         nav:r => { $("srch").value = r.to_addr; go("delivery"); } },
+      // Twilio addresses one message by account AND message. With only the
+      // message half the link landed on the general logs page, 16 Sep 2026.
+      // The account id comes from Twilio's own signed receipt (migration
+      // 20260916230000), so the button waits until one has arrived.
       { label:"Look it up in Twilio", cls:"g",
+        when:r => /^AC[0-9a-f]{32}$/i.test(r.account_sid || "") && !!r.message_sid,
         says:() => "Opens this exact message in the Twilio console, in a new tab. Twilio will ask you to sign in if you are not already.",
-        nav:r => window.open("https://console.twilio.com/us1/monitor/logs/sms?frameUrl=%2Fconsole%2Fsms%2Flogs%2F" + encodeURIComponent(r.message_sid), "_blank", "noopener") },
+        nav:r => window.open("https://console.twilio.com/us1/monitor/logs/sms?frameUrl="
+          + encodeURIComponent(`/console/sms/logs/${r.account_sid}/${r.message_sid}`), "_blank", "noopener") },
       { label:"Mark as followed up", cls:"g",
         when:r => dlvOutcome_(r).problem && !r.followed_up_at,
         says:() => "Records that you have dealt with this person and what you did, so every message to them that did not arrive drops out of the box at the top. It sends nothing and changes nothing about the message itself.",
