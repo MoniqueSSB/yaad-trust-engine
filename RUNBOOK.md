@@ -3225,6 +3225,8 @@ What each one is waiting on:
 
    Until it is filed the site carries no address at all, which leaves the Regulation 25 disclosure (part of the UK, registered number, registered office address) unmet on the third element. That is a known and accepted gap, chosen over republishing a home address on all eleven pages of a site fed by a 9,000 follower TikTok. It was briefly published on 3 September and reverted the same evening when the founder chose the service address instead; nothing reached `main`, so it was never live.
 
+   Update 16 September 2026, founder decision: the registered office (55 Remington Road, N15 6SS) is now on the privacy page and the cancellation page, because the ICO public register entry ZC249018 already shows it, so withholding it from the site no longer hid anything. The eleven page footers still carry the company number without an address; that is the remaining part of the Regulation 25 disclosure and is a separate decision.
+
    When the address exists, it goes in three places: the footer of all eleven pages in `docs/`, the "who we are" table in `docs/privacy.html`, and the postal route in `docs/cancellation.html`. Find them all with:
 
 ```bash
@@ -3233,7 +3235,7 @@ grep -rn "TO BE INSERTED\|no. 17358077" docs/*.html
 
    Honest limit worth knowing before you spend the money: a home address used as a registered office cannot be removed from the Companies House register. Filing the change protects the record going forward and historic filings stay visible. Suppressing it from other documents is a separate application at £32 per document, and a serving director has to supply an alternative address to replace it.
 
-2. **ICO registration number** (privacy). Register at ico.org.uk, around £52, then paste the number in.
+2. ~~**ICO registration number** (privacy).~~ Done 15 September 2026: Yaadly Ltd is ZC249018 on the ICO register, paid by direct debit, and the number is on the privacy page. Renews annually by direct debit; the entry is amended (trading names, nature of work, contact) at ico.org.uk with the application number and the contact security number, which live in the founder's password manager and nowhere in this repository.
 3. **Retention periods** (privacy). Legal decision, not a technical one. Identity document retention especially. Do not invent a number to close the box.
 4. **The model cancellation form and the statutory instructions** (cancellation). The text is substantially prescribed by Schedules 3 and 4 of the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. Take it from legislation.gov.uk verbatim and adapt only the company details. Note that legislation.gov.uk is blocked by the remote session's egress proxy, so this one has to be fetched from a normal browser and pasted in. Do not write it from memory.
 5. **Whether United States and Canada clients get the same cancellation rights, and whose law governs** (cancellation, terms). Genuinely open, with the adviser. In the meantime the site applies the 14 day right to every consumer client, wherever they are, as Yaadly's own commitment.
