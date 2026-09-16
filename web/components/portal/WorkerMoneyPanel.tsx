@@ -14,7 +14,7 @@ import { jmd } from "@/lib/money";
  *
  * Released does not mean paid. Nothing in this repository moves money
  * (CLAUDE.md 9): a released figure is what Yaadly's part is done with,
- * cleared to be paid off-platform within 3 working days. Recording how that
+ * cleared to be paid off-platform within 7 days. Recording how that
  * actually happened (bank transfer; never cash, 20260914220000), and what reference
  * it carried, is the worker's own note for their own record, through
  * record_pay_info() in Postgres, not a payment confirmation Yaadly makes.

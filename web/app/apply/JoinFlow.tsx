@@ -1935,7 +1935,7 @@ export function JoinFlow() {
                         start, and your materials are paid at cost on top of it.{" "}
                         <b className="text-ink">You are paid per stage, not one
                         lump at the end: a stage signed off is a stage paid,
-                        within 3 working days of Yaadly signing the stage
+                        within 7 days of Yaadly signing the stage
                         off.</b>{" "}
                         By bank transfer. Yaadly does not pay in cash.
                       </p>

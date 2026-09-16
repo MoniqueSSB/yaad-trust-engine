@@ -3429,7 +3429,7 @@ Deno.serve(async (req: Request) => {
           // raise_worker_pay_invoice_on_stage_approval, which RAISES a
           // payable. Both documents are still admin-raised and admin-marked-
           // paid off platform (DECISIONS.md, 3 Sep), and the published FAQ
-          // says the worker is paid within three working days of approval. So
+          // says the worker is paid within seven days of approval. So
           // the old sentence told the client money had moved when it had not,
           // and set the worker up to be asked why it had not arrived.
           return twiml(`Approved. ${label} of ${target.title} is confirmed and the worker's payment is raised. Nothing else for you to do on this stage.`);
