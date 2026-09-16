@@ -144,6 +144,19 @@ This is an RLS problem, not a login problem. Cloudflare Access and the portal si
 
 ---
 
+## 7a. The Supabase security advisor shows errors or warnings
+
+Tidied 16 Sep 2026 (`20260916160000_tidy_security_advisor_function_grants.sql`). Some findings are deliberate and must not be "fixed". Before acting on one, check it against this list.
+
+1. **`security_definer_view` on `open_jobs`, `public_worker_profiles`, `public_worker_checks`, `public_portfolio`, `published_reviews`, `worker_scores`.** Leave them. These are shop windows: they show a few safe columns of tables the public cannot read. The advisor's fix (security invoker) would need the public to be granted the whole underlying table, which is the leak the views exist to prevent.
+2. **`rls_enabled_no_policy` on the `*_attempts` throttle tables, `_inv_out`, `daily_checkin_log`, `evidence_landed_pending`, `job_followups`, `portal_claims`, `wa_inbound_seen`.** Leave them. RLS with no policy means only the service role reads them, which is the intent.
+3. **`anon_security_definer_function_executable`.** Should only list functions the public genuinely calls: the code lookups (`job_for_code`, `quotes_for_code`), `ask_question` (throttled), and helpers the RLS policies call (`job_client_email_matches`, `client_may_see_quote`, `job_open_for_quotes`, `job_worker_choice`, `current_doc_version`). Revoking anon on a policy helper makes signed-out reads of that table error instead of returning nothing. Anything else on the list is new: check that its body refuses a caller with no session, then revoke anon in a migration.
+4. **`authenticated_security_definer_function_executable`.** Portal and desk actions that signed-in users are meant to call, each checking who is asking. Read the function before revoking.
+5. **A new trigger function appears in either list.** Supabase grants EXECUTE to everybody by default on every new function. For a trigger function it is harmless (it cannot be called through the API and EXECUTE is only checked when the trigger is created), but revoke it from `public, anon, authenticated` in the same migration to keep the list honest.
+6. **`function_search_path_mutable`.** Add `set search_path = ''` (or `= public` if the body names tables without a schema).
+
+---
+
 ## 8. The engine needs a different model provider
 
 Environment variables only, no code change:
