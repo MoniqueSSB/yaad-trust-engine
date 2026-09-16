@@ -29,3 +29,61 @@ export function withStatusCallback(params: URLSearchParams): URLSearchParams {
   if (url) params.set("StatusCallback", url);
   return params;
 }
+
+/* ── What the message was ────────────────────────────────────────────────────
+ *
+ * Added 16 September 2026. The status callback says where a message got to,
+ * never what it was: Twilio does not send the body back and we would not store
+ * it if it did. So every row on the desk's "Did it arrive" page read "a
+ * message" with no job, and the one question worth asking about a failure
+ * (who was waiting on what) had no answer.
+ *
+ * The sender is the only thing that knows, so the sender says, at the moment
+ * Twilio accepts. It goes through record_message_delivery(), the same function
+ * the callback uses, which never moves a status backwards and never blanks a
+ * kind, so it does not matter which of the two lands first.
+ *
+ * WHY NOT PUT THE KIND ON THE CALLBACK URL. It would be one line, and it
+ * would break every callback: Twilio signs the full URL including the query
+ * string, and checkTwilioSignature rebuilds the URL without one. The status
+ * page would go quiet and nothing would say why.
+ *
+ * NEVER THROWS AND NEVER HOLDS A SEND UP FOR LONG. The message has already
+ * gone by the time this runs. Failing to record it is logged and forgotten,
+ * and the callback still writes the row, just without the kind. Call it
+ * before reading the response body yourself: it reads a clone.
+ */
+export type SendMeta = { kind: string; job_id?: string | null };
+
+export async function recordAccepted(
+  res: Response,
+  to: string,
+  channel: "whatsapp" | "sms",
+  meta: SendMeta,
+): Promise<void> {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!url || !key || !res.ok) return;
+  try {
+    const accepted = await res.clone().json().catch(() => null) as { sid?: string } | null;
+    const sid = String(accepted?.sid ?? "");
+    if (!sid) return;
+    const digits = to.replace(/\D/g, "");
+    const r = await fetch(`${url.replace(/\/+$/, "")}/rest/v1/rpc/record_message_delivery`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_sid: sid,
+        p_to: digits ? `+${digits}` : "",
+        p_channel: channel,
+        p_kind: String(meta.kind ?? "").slice(0, 80),
+        p_job: String(meta.job_id ?? ""),
+        p_status: "accepted",
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!r.ok) console.error(`recordAccepted: could not record ${sid}:`, r.status, (await r.text()).slice(0, 200));
+  } catch (e) {
+    console.error("recordAccepted threw:", String(e).slice(0, 200));
+  }
+}

@@ -1620,6 +1620,44 @@ silent failure leaves a promise nobody kept and nobody knows.
 unknown rather than good, so they stay neutral rather than reading as a tick.
 Read means they opened it.
 
+### Following one up (from 16 September 2026, migration 20260916120000)
+
+The page opens with a bar for the last 14 days and a **Needs you** box: only
+the messages that did not arrive, grouped by person, each with the reason in
+plain English, what to do, and three buttons. **See exactly what happened**
+opens the message's journey. **Open their conversation** goes to the thread.
+**Mark as followed up** asks what you did and records it against every open
+problem to that number, under your signed-in email, through
+`mark_delivery_followed_up()`. It sends nothing.
+
+A row carrying an error code counts as did not arrive whatever its status says.
+Conversations has the same shape: a bar, a Needs you box of people waiting on a
+reply (oldest first) or with a message from us that did not arrive, and the
+thread drawn as a chat.
+
+1. **"Mark as followed up" says "Nothing to follow up for that number".** Every
+   message to it arrived or was already followed up. Reload the page.
+2. **It says "Could not find the function mark_delivery_followed_up".** The
+   migration is not applied yet. Apply 20260916120000.
+3. **"What it was" still reads "not recorded" on a new row.** Every function
+   that sends through Twilio now records the kind and job the moment Twilio
+   accepts, through `recordAccepted()` in `_shared/twilio-status.ts`, into
+   `record_message_delivery()`. A blank kind on a new row means either the
+   function was deployed from before this change, or the record call failed:
+   search that function's logs for `recordAccepted`. Two sends deliberately
+   still record as "message" with no job, because guard tests hold their exact
+   wording: the alert to your own phone and a reply you send from your phone
+   through the desk lane in `yaad-inbound`. Rows written before 16 Sep stay
+   blank; there is nothing true to fill them with.
+4. **A status went backwards.** It cannot now: `record_message_delivery()`
+   only moves a status forward, and failed or undelivered is the end. If
+   `yaad-message-status` was deployed before the migration it falls back to the
+   old write, which can; apply the migration.
+
+To prove the database side without changing anything, run
+`supabase/tests/message_delivery_guards.sql`; it rolls everything back and
+returns ten PASS lines as the text of its final error.
+
 ### Turning it on
 
 Deploy the function **with the flag**, because Twilio holds no Supabase
@@ -3844,14 +3882,13 @@ through it in this order.
    request it cannot resolve rather than recording a name nobody vetted.
 2. **Did the worker get told?** The message fires when the job goes LIVE, not
    when the draft is saved, so a job still sitting as a draft has correctly
-   told nobody. There is no per-notification log on this path:
-   `yaad-notify-client` does not write `message_deliveries`, only
-   `yaad-desk-reply` does, so do not go looking for a row that was never
-   written. Check two things instead. First, does the worker have a phone
-   number on their profile: without one there is nobody to send to and the
-   function stops quietly. Second, the Supabase logs for `yaad-notify-client`
-   around the time the job went live, which is the only place this send leaves
-   a trace.
+   told nobody. Since 16 September 2026 `yaad-notify-client` records every
+   WhatsApp it sends in `message_deliveries`, with the kind and the job, so
+   look on Did it arrive for that job first. If there is no row, check two
+   things. First, does the worker have a phone number on their profile:
+   without one there is nobody to send to and the function stops quietly.
+   Second, the Supabase logs for `yaad-notify-client` around the time the job
+   went live.
 3. **The worker cannot find the job.** It is deliberately NOT on the open
    board while the hold is live. It appears at the top of app.yaadly.co.uk/jobs
    for that worker only, in a gold panel, and only when they are signed in and

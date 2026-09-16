@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { Trace, SpanKind, httpAttrs } from "./otel.ts";
-import { withStatusCallback } from "./twilio-status.ts";
+import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
 
 // The contact form at the bottom of yaadly.co.uk posts here.
 //
@@ -255,6 +255,7 @@ Deno.serve(async (req: Request) => {
         })),
         signal: AbortSignal.timeout(15000),
       });
+      await recordAccepted(r, phone, "whatsapp", { kind: "enquiry receipt" });
       if (!r.ok) console.error("enquiry whatsapp receipt", r.status, (await r.text()).slice(0, 200));
     } catch (e) {
       console.error("enquiry whatsapp receipt threw", String(e).slice(0, 200));
