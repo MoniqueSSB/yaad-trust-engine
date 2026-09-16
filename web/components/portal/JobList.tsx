@@ -32,6 +32,17 @@ export type Job = {
   /** True when the reader is a worker who has quoted but is not booked, so
    *  the address exists and is deliberately not theirs to see yet. */
   addr_hidden?: boolean;
+  /** What the work is, in words: job type and size, falling back to the
+   *  trade. Founder, 16 Sep 2026: a row must say what the job is, not only
+   *  where it is. Optional: the client list has its own description. */
+  work?: string | null;
+  /** The reader's money on this job, in words ("J$45,000, held until sign
+   *  off"). Worker list only. */
+  money?: string | null;
+  /** What is outstanding, and where on the job page it is. When set, the
+   *  whole card opens that section rather than the top of the job. Founder,
+   *  16 Sep 2026: everything clickable, landing on the thing still to do. */
+  next?: { label: string; href: string } | null;
 };
 
 /**
@@ -80,6 +91,7 @@ export function WhereText({
  *  worker portal passes its own map rather than reusing this one. */
 export const CLIENT_STATUS: Record<string, StatusLabel> = {
   awaiting_client_setup: { label: "Waiting on your portal setup", tone: "waiting" },
+  awaiting_payment: { label: "Waiting on your payment", tone: "waiting" },
   draft: { label: "Draft, not live yet", tone: "idle" },
   open: { label: "Open for quotes", tone: "moving" },
   open_for_quotes: { label: "Open for quotes", tone: "moving" },
@@ -92,6 +104,7 @@ export const CLIENT_STATUS: Record<string, StatusLabel> = {
 
 export const WORKER_STATUS: Record<string, StatusLabel> = {
   awaiting_client_setup: { label: "Client still setting up", tone: "idle" },
+  awaiting_payment: { label: "Booked, waiting on the client's payment", tone: "idle" },
   draft: { label: "Not live yet", tone: "idle" },
   open: { label: "Open, you can quote", tone: "waiting" },
   open_for_quotes: { label: "Open, you can quote", tone: "waiting" },
@@ -148,7 +161,7 @@ export function JobList({
             return (
               <li key={j.id}>
                 <Link
-                  href={"/portal/jobs/" + encodeURIComponent(j.id)}
+                  href={j.next?.href ?? "/portal/jobs/" + encodeURIComponent(j.id)}
                   className={
                     "block rounded-2xl border border-line bg-panel p-4 transition hover:border-line2" +
                     (rail ? " border-l-4 " + STATUS_RAIL[s.tone] : "")
@@ -174,6 +187,24 @@ export function JobList({
                     <dd className="text-ink">
                       <WhereText addr={j.addr} parish={j.parish} hidden={j.addr_hidden} />
                     </dd>
+                    {j.work && (
+                      <>
+                        <dt className="text-dim">Work</dt>
+                        <dd className="text-ink">{j.work}</dd>
+                      </>
+                    )}
+                    {j.money && (
+                      <>
+                        <dt className="text-dim">Your pay</dt>
+                        <dd className="text-ink">{j.money}</dd>
+                      </>
+                    )}
+                    {j.next && (
+                      <>
+                        <dt className="text-dim">Next</dt>
+                        <dd className="font-bold text-tealb">{j.next.label}</dd>
+                      </>
+                    )}
                   </dl>
                   {/*
                     "Stage 0" used to sit in this row. It is the rail's internal
