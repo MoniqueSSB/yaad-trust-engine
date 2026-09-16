@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-16 · Both portal overviews say what each job is, what it costs or pays, and what is next, and every card opens that section
+
+**Why.** Founder, 16 Sep 2026, reading the worker's and then the client's overview: an invoice number alone does not tell anyone where it belongs; a money line must say which job it comes from; a job card must say what the work is, not only where it is; "everything should be clickable and take the worker to the exact section that is still outstanding"; and a professional service "is also a live job and needs that attention", not a side list.
+
+**What changed.** The shared job row (`web/components/portal/JobList.tsx`) gains three optional lines, Work, Your pay or Your cost, and Next, and when a Next is given the whole card links to that section rather than to the top of the job. Each portal supplies its own Next map, because the two sides have different work at the same status: the worker is told to send a price, confirm the Kickoff Pack, send tonight's Midnight Work-Log; the client is told to choose from N quotes, pay the invoice, say where materials are kept, approve the evidence. The worker's money panel and pay invoices name the job by title and number and open it. On the client's overview a booked service is drawn as a full card in the main column on the six-step service track, the two steps that wait on the client (Intake, Draft with you) count in "Waiting on you", and a delivered one moves down under Closed. `awaiting_payment` is named in words on both sides instead of showing the raw status.
+
+**Where the figures come from.** The worker's pay is the same 95% of labour plus materials the money panel already showed. The client's cost is `clientBill()` on the accepted quote, the same arithmetic as the job page, and it is blank until a quote is accepted rather than guessed. Work is the job type and size the client gave, falling back to the trade. Nothing new is stored.
+
+**What it is not.** Wording and navigation only. No gate moved, nothing is approved or paid from a card, and the deep links land on sections that already existed.
+
 ## 2026-09-16 · A worker can be paid through Stripe Global Payouts, by a named person, two clicks
 
 **Why.** Founder, 16 Sep 2026: "build this out", once it was clear that Global Payouts was already enabled on the live account, that Jamaica was offered as a recipient country, that card payments were proven live, and that paying a subcontractor as the principal is exactly what the product is for. Wise stays; this is a second way, not a replacement.
