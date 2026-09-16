@@ -154,7 +154,7 @@ export YAAD_BASE_URL="https://..."
 export YAAD_MODEL="..."
 ```
 
-Unset `YAAD_API_KEY` to fall back to mock mode. See [`DECISIONS.md`](DECISIONS.md) on why the provider is a configuration value and why the current one has to change before real data flows.
+Unset `YAAD_API_KEY` to fall back to mock mode. The built-in default is Mistral (`https://api.mistral.ai/v1`, `mistral-small-latest`) since 15 September 2026, the same provider as the live functions, so a Mistral key alone is enough. See [`DECISIONS.md`](DECISIONS.md) on why the provider is a configuration value.
 
 This is the Python engine only. The live Edge Functions are step 9.
 
@@ -274,6 +274,23 @@ Then check `verify_jwt` still reads the same after deploying. A deploy that sile
 ---
 
 ## 9a. Mistral says 429, and the two account questions behind it
+
+**Settled 15 September 2026, by Monique, in the Mistral console.** The
+organisation is on API pay-as-you-go (the free Experiment plan and the
+Vibe "Upgrade" button are different things; pay-as-you-go is the one that
+lifts the API rate limits). Billing name Yaadly Ltd, card on file, monthly
+overage spending cap set to EUR 20 on the Subscription page. The "Allow the
+use of your API calls to train Mistral's AI models" box on the sign-up form
+was left unticked, which is the opt-out: Mistral's own wording on the form is
+that new interactions, and those of your users, will not be used to train its
+models. The Data Processing Addendum at legal.mistral.ai is incorporated by
+reference into the commercial terms she accepted on the same form, so no
+separate signature was needed. `docs/privacy.html` now says the opt-out is
+in place; if the setting under Admin, API, Privacy ever reads differently,
+the page is wrong and this paragraph is wrong, fix both. If the 429s return
+on a paid plan, that is a per-model rate limit to read under Limits, not the
+free tier, and raising it is a support request to Mistral. The rest of this
+section is kept as the history of how the question was found.
 
 Two separate things, both in Mistral's console and neither of them in this
 repository. They are written here because they keep being described as done.
@@ -3982,6 +3999,30 @@ the key and the model through `supabase/functions/_shared/visionmodel.ts`, the
 same way text goes through `textmodel.ts`. No function types the endpoint out
 itself, and CI fails one that does.
 
+**Since 15 September 2026, job photographs go to Mistral in the EU; the
+vetting read stays on NVIDIA.** Founder instruction ("move the photos to
+Mistral"), the same morning the Mistral account went on to pay-as-you-go with
+training off. `pickVisionProvider("evidence")` and `pickVisionProvider("sketch")`
+resolve to `api.mistral.ai` whenever `MISTRAL_API_KEY` is set, model
+`MISTRAL_VISION_MODEL` or `mistral-small-latest`. `pickVisionProvider("vetting")`
+still resolves to NVIDIA, because an applicant's paperwork is not "the photos"
+and CLAUDE.md section 6 says applicant documents get no new destination
+without her asking by name; `MISTRAL_VISION_JOBS` in `visionmodel.ts` is the
+set, and widening it is her call. The NVIDIA branch is kept beneath Mistral:
+if the Mistral key is ever unset, job photographs go back to NVIDIA and the
+log says so (`visionmodel: MISTRAL_API_KEY is not set, ... going to NVIDIA`).
+The three functions were redeployed the same day (`yaad-notify-client` v102,
+`yaad-sketch` v86, `yaad-vetting-review` v71), each with its existing
+`verify_jwt` setting. `docs/privacy.html` and `docs/how-we-use-ai.html` say
+photographs go to Mistral and paperwork to NVIDIA; change one, change both.
+
+**Proving it after a deploy.** On the desk, open any job with walkthrough
+stills and run Describe, or wait for the next evidence stage to land. Then in
+the function logs look for the vision span: `gen_ai.system` is `mistral`,
+`server.address` is `api.mistral.ai` and `yaadly.model.region` is `eu`. A
+line reading `nvidia_nim` on a `photo_review` or `sketch_frames` span means
+the Mistral key is missing from the project.
+
 **Move one job without touching the others.** Each has its own secret, read
 first, falling back to the shared `NVIDIA_VISION_MODEL` and then to a default:
 
@@ -4324,7 +4365,7 @@ Yaadly never sees the key value in chat, so this step is Monique's.
 The desk flow is Pull the stills, Describe, name the rooms, Build the pack, Add the map. Each step fails in its own way, and the log names which. Read it with the function id for `yaad-sketch`, or `supabase functions logs yaad-sketch --project-ref leffyisvfvjwzilydlwf`.
 
 - **Pull the stills says MP4 only, or every still is black.** The video is an iPhone .mov (HEVC). Send it to yourself on WhatsApp and use the copy that comes back, which is an MP4. No code is involved.
-- **Describe stops on one still, or says N of 12 described.** The log line `yaad-sketch frame:` says what the model answered. "not in JSON, asking once more strictly" is normal and self-healing. "not in JSON, twice" on many stills means the model has changed behaviour; check `NVIDIA_SKETCH_MODEL` and the default in `_shared/visionmodel.ts`. "gave no answer in 40s" twice means NVIDIA is not answering; there is no second vision provider, so wait.
+- **Describe stops on one still, or says N of 12 described.** The log line `yaad-sketch frame:` says what the model answered. "not in JSON, asking once more strictly" is normal and self-healing. "not in JSON, twice" on many stills means the model has changed behaviour; check `NVIDIA_SKETCH_MODEL` and the default in `_shared/visionmodel.ts`. "gave no answer in 40s" twice means the vision provider (Mistral since 15 September 2026, NVIDIA before) is not answering; there is no automatic failover between the two, so wait, or move the job with `VISION_MODEL_API`.
 - **The pack has the wrong rooms.** Not a bug: name them. Click the stills for a room, type the name, Apply, repeat. The server merges same-named rooms and will not split a name you gave.
 - **Build the pack says not in JSON.** The text model's answer had no JSON object after its thinking. The log line `yaad-sketch assemble:` shows the start of the answer. If the provider was MiniMax, `answerText()` should have stripped the `<think>` block; if the block has changed shape, that helper in `_shared/textmodel.ts` is the place.
 - **Add the map.** No key is needed. With no `GOOGLE_MAPS_API_KEY` set, the map comes from OpenStreetMap: the address is geocoded by Nominatim, a three by three grid of tiles is fetched, and they are assembled into one SVG with a marker. Both services are the OpenStreetMap Foundation's, in the EU, free, no account. If it says no map could be made, Nominatim did not recognise the address: try it more plainly, with the parish, for example "Hope Road, Kingston, Jamaica".
@@ -5394,3 +5435,65 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 6. **"Saving bank details is not switched on yet"** means `WISE_API_TOKEN` is not set. **"Not available right now"**: Supabase, Edge Functions, `yaad-wise-recipient`, Logs. Only the HTTP status and Wise's error codes are logged, never the details.
 7. **If the key may have leaked:** revoke it in Wise at once, create a new one, set the secret again. Recipients already in Wise are unaffected. Treat it as a possible exposure of workers' bank details and note it in the data protection record.
 8. **Proving the rules hold:** run `supabase/tests/worker_bank_callback_guards.sql` with `execute_sql`. Eight lines, all PASS; nothing is kept.
+
+## A worker's question went to the client as their report, or was filed as evidence
+
+**What it looked like, 15 September 2026.** The worker was asked "reply 1 to send this report or send your own version", typed "how do i share my location", and the assistant sent that sentence to the client as the status update ("Sent to the client, your own words"). Two further replies, "no" and "share location", were filed as evidence text on the job. Every worker prompt on WhatsApp was greedy: it treated any reply as the answer it was waiting for.
+
+**What happens now (`supabase/functions/yaad-inbound/worker-question.ts`).** A reply that reads as a question, a trailing question mark or an opening question word in English or Patois, is stopped at four prompts: the report confirm, "what does this show?", "which section is this?", and the plain update lane for a worker on a live job. Nothing is sent, nothing is filed, the session is kept, and the reply repeats what is still wanted. Two questions the app answers itself with a fixed sentence: how to share a location and how to send a video. Everything else goes to you: a high-priority push titled "Worker question: JOB-…" and a text to your phone with their exact words, and the worker is told "Someone at Yaadly will answer it here." The thread is NOT handed over, so their photos still file while they wait.
+
+**To answer them:** desk, Conversations, their number, "Reply from the Yaadly number". Your reply holds the thread, as any desk reply does, so press "Hand back to the assistant" afterwards or their next photo lands in the held branch instead of on the job.
+
+**If a real update is being stopped as a question:** the detector is two expressions at the top of `worker-question.ts` and the negative cases are the bulk of `worker-question_test.ts`. Add the sentence that was wrongly caught to that list first, then adjust the expression until the suite passes. Never widen the question side without adding a negative case, because a false positive here means a worker's real update quietly stops reaching the client.
+
+**"Someone at Yaadly has this" on a worker's plain text:** the number is held (`human_handling` true on `intake_threads`) and their words are going to you, which is the hold working. **Since 15 Sep 2026 a held number that is a worker on a live job still files evidence:** photos and videos, a location pin, the code and section answers after a photo, and the "1" confirming a drafted report all run through the evidence lanes as normal, and the reply is the evidence reply, not the holding sentence. If a held worker's PHOTO is getting "Someone at Yaadly has this", they are not resolving as a worker on a live job: check `worker_profiles.phone` and that a job in `jobs.worker_email` is not complete or cancelled (the same check as "A worker's WhatsApp evidence never landed" above). The trace attribute `yaadly.held.worker_evidence_open` says which way it went. A held client is held for everything; nothing changed there.
+
+## The section menu: "which is this?" as rows a worker taps, not letters
+
+**Until `TWILIO_CONTENT_SID_PHASE` is set, the question goes out as text with the letters, exactly as before.** Founder, 15 Sep 2026: "the letters would be confusing and not clear", she wants separate words they can click. `askPhase()` in `yaad-inbound` is now the one place the question is asked: on WhatsApp it first tries `sendPhaseMenu()`, which sends a Twilio Content Template through the Messages API and answers the webhook with an empty response; if the secret is missing or Twilio refuses, it sends the typed question instead. The menu is an upgrade, never a gap.
+
+**Why a list and not buttons.** WhatsApp allows three Quick Reply buttons per message. This question has six answers. A List Picker shows one button ("Choose") that opens up to ten rows.
+
+**Why no Meta approval is needed here, unlike the daily check-in.** A worker has just sent a photo, so Yaadly is inside the 24 hour customer-service window and a Content Template can be sent without approval. The template still has to exist in Twilio.
+
+**Switched on 15 September 2026, from the server, not the console.** The Twilio key is a function secret nobody can read back, so `yaad-twilio-setup` creates the template from `supabase/functions/yaad-twilio-setup/content.ts` (the six rows, tested) and writes its ContentSid to `app_settings.twilio_content_sid_phase`, which `yaad-inbound` reads whenever the `TWILIO_CONTENT_SID_PHASE` secret is unset. Live template: `yaadly_section_menu_v1`, created that day, visible on the desk under Settings as `twilio_content_sid_phase`. To recreate it after a Twilio account change, run the function once with the cron secret (the same way the scheduled jobs present it) or from an admin session, `{"action":"create-section-menu"}`; it reuses an existing template of that name rather than making a second. `{"action":"list"}` shows every template on the account. **Blanking the `twilio_content_sid_phase` row on the desk turns the menu off** and the typed letters go out again; that is the switch.
+
+**Doing it by hand instead, in the Twilio console:** Messaging, Content Template Builder (Products and Services, then Templates, on the newer console), **Create new template**:
+
+| Field | What to put in it |
+|---|---|
+| Template name | `yaadly_section_menu_v1` |
+| Template language | English |
+| Select content type | **List Picker** (`twilio/list-picker`) |
+| Body | `{{1}} Which section is this? Tap Choose and pick one.` |
+| Button text | `Choose` |
+| Variable 1 sample | `Got it, going on JOB-WEB-1789253807959, stage 1.` |
+
+The six rows, in this order. **The Item ID column is the whole point: it must be the single letter, exactly as shown**, because the letter is what the typed version has always accepted and what `readPhaseAnswer()` reads. Item name is what the worker sees; the description column can stay empty.
+
+| Item ID | Item name |
+|---|---|
+| `B` | Before |
+| `D` | During the work |
+| `A` | After |
+| `P` | A problem with the work |
+| `N` | Something new I found |
+| `S` | Skip |
+
+Save. No submission for WhatsApp approval is needed for in-session use, but submitting it as **Utility** costs nothing and lets it go out later if ever needed outside the window. Copy its ContentSid (`HX...`) and either paste it into the `twilio_content_sid_phase` setting on the desk, or set it as a secret, which wins over the setting:
+
+```bash
+supabase secrets set TWILIO_CONTENT_SID_PHASE=HX... --project-ref leffyisvfvjwzilydlwf
+```
+
+No redeploy needed; both are read on every request.
+
+**To check it worked:** send a photo on a live job from a linked worker number, answer the job code and the "what does this show" question. The section question should arrive with a Choose button. Tap After: the reply is "Filed 1 item against JOB-…, marked as the after", the same words as typing A. In the trace, the send shows as `twilio.send.whatsapp` with `yaadly.template = phase_menu` and the reply as `yaadly.reply.template = true`.
+
+**If the menu never appears:** the function log line `sendPhaseMenu: Twilio refused the template:` carries Twilio's reason. The usual ones are a wrong ContentSid, the template's variable count not matching (it takes exactly one), or the row ids not being the bare letters. The typed question still went, so nothing was lost.
+
+**An "after" that answers a particular before still needs typing.** A tap carries only the letter. The hint "put its code after the letter, like A P3" still goes out in the lead sentence, and a worker who types that gets the pairing; a worker who taps After gets an unpaired after, which the desk can link.
+
+## "no", "ok" or "share location" from a worker was filed as evidence, or sent to the client
+
+Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A bare acknowledgement (no, ok, yes, thanks, hi) is neither a question nor an update: at the report prompt nothing is sent and the prompt is repeated ("yes" and "ok" do not send a report, only "1" does, on purpose); at the section question it is asked again; in the plain update lane it is answered "Noted, nothing filed" and nobody is woken. A short instruction naming something the app explains ("share location", "send video", "photos", up to four words) is answered as the question it was. The app's own answers now cover: sharing a location, sending a video, sending photos, receipts, what the section words mean, what the client sees next, and the published pay fact (3 working days after a named person signs the stage off, by bank transfer, never cash). The pay sentence is copied from `faq.ts` and must change with it. Anything else still goes to you.

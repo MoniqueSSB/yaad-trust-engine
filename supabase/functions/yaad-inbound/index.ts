@@ -22,6 +22,7 @@ import { shouldEscapeLane, wantsAPerson } from "./escape-hatch.ts";
 import { samePhone, digitsOf } from "./phone.ts";
 import { Deadline } from "./deadline.ts";
 import { inboundText, wasTapped } from "./button-tap.ts";
+import { answerWorkerQuestion, isBareAcknowledgement, looksLikeQuestion, wantsHelpWith } from "./worker-question.ts";
 import { replyFromCard } from "./reply-from-card.ts";
 import { withStatusCallback } from "./twilio-status.ts";
 
@@ -127,13 +128,16 @@ async function parseInbound(req: Request, raw: string): Promise<Inbound> {
     // whitespace-only payload is not a tap, and the button's visible label
     // never enters the message.
     const buttonPayload = f.get("ButtonPayload");
+    // A row picked from a List Picker (the section menu). Same rule, second
+    // parameter: see button-tap.ts.
+    const listId = f.get("ListId");
 
     return {
       channel: isWa ? "whatsapp" : "sms",
       from: isWa ? rawFrom.slice("whatsapp:".length) : rawFrom,
       name: s(f.get("ProfileName")),
-      text: inboundText(buttonPayload, f.get("Body")),
-      tapped: wasTapped(buttonPayload),
+      text: inboundText(buttonPayload, f.get("Body"), listId),
+      tapped: wasTapped(buttonPayload, listId),
       // A dropped location pin. WhatsApp has sent these natively for years and
       // Twilio puts the coordinates straight on the webhook; Address and Label
       // are only present when the sender picked a named place rather than
@@ -608,6 +612,65 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace): Promise<b
         signal: AbortSignal.timeout(15000),
       });
       s.setAttributes({ "http.response.status_code": r.status });
+      return r.ok;
+    } catch (e) {
+      s.recordError(String(e).slice(0, 200));
+      return false;
+    }
+  });
+}
+
+/** The section question as a tappable menu, 15 September 2026.
+ *
+ *  Founder, on seeing "Reply B for before, D for during...": "the letters
+ *  would be confusing and not clear", "i want this to be separate words they
+ *  can click". WhatsApp allows three Quick Reply buttons and this question
+ *  has six answers, so it is a List Picker: one "Choose" button that opens
+ *  rows reading Before, During the work, After, A problem with the work,
+ *  Something new I found, Skip. Each row's id is the letter the typed version
+ *  always accepted (B, D, A, P, N, S), and Twilio hands the id back as
+ *  ListId, which button-tap.ts reads exactly as typed text. So a tap changes
+ *  nothing downstream: readPhaseAnswer() sees "A" whether it was tapped or
+ *  typed.
+ *
+ *  A template cannot go out as a webhook reply, only through the Messages
+ *  API, so the caller sends this first and then answers Twilio with an empty
+ *  response. Inside the 24 hour window a worker's own photo has just opened,
+ *  which is always the case here, a Twilio Content Template needs no Meta
+ *  approval to be sent. False means "did not go", and the caller falls back
+ *  to the typed question, so the menu is an upgrade and never a gap:
+ *  until a template id exists (the TWILIO_CONTENT_SID_PHASE secret, or the
+ *  app_settings row yaad-twilio-setup writes; RUNBOOK.md, "The section
+ *  menu") nothing changes at all. The lead sentence goes in as {{1}}. */
+async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace: Trace): Promise<boolean> {
+  const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
+  const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
+  const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+  const digits = to.replace(/\D/g, "");
+  if (!contentSid || !sid || !tok || !from || digits.length < 7) return false;
+  // The lead is made of fixed strings and a stage label, but it reaches a
+  // phone, so it is screened like every other reply. A finding means the
+  // typed fallback runs instead, and that goes through twiml()'s own screen.
+  if (guardrails.scan(lead).length) return false;
+  return await trace.span("twilio.send.whatsapp", SpanKind.CLIENT, {
+    "server.address": "api.twilio.com", "messaging.system": "twilio", "yaadly.template": "phase_menu",
+  }, async (s) => {
+    try {
+      const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: "POST",
+        headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
+        body: withStatusCallback(new URLSearchParams({
+          To: `whatsapp:+${digits}`, From: from, ContentSid: contentSid,
+          ContentVariables: JSON.stringify({ "1": lead.slice(0, 900) }),
+        })),
+        signal: AbortSignal.timeout(15000),
+      });
+      s.setAttributes({ "http.response.status_code": r.status });
+      if (!r.ok) {
+        const d = await r.json().catch(() => null) as { message?: string } | null;
+        s.recordError(d?.message ?? `twilio ${r.status}`);
+        console.error("sendPhaseMenu: Twilio refused the template:", d?.message ?? r.status);
+      }
       return r.ok;
     } catch (e) {
       s.recordError(String(e).slice(0, 200));
@@ -1536,6 +1599,37 @@ async function pushToDesk(
   } catch (_) { /* never let a notification break intake */ }
 }
 
+// A worker's question, asked while a prompt was waiting for something else.
+//
+// Answers the two the app can answer itself (worker-question.ts), and puts
+// every other one in front of a person, as a note on the desk and a text to
+// her phone with the worker's own words. Either way the reply repeats what
+// the waiting prompt still wants, because the prompt is left exactly where it
+// was: nothing is sent to the client, nothing is filed, no session is
+// deleted. Deliberately does NOT hand the thread over: a held number
+// silences every worker lane on it, which is the wrong price for asking how
+// to send a clip. Her reply from the desk will hold it, as any desk reply
+// does, and the desk hands it back.
+async function answerOrRaiseWorkerQuestion(
+  supabase: SettingsReader,
+  msg: { text: string; from: string; channel: string },
+  jobId: string,
+  stillWanted: string,
+  trace: Trace,
+): Promise<string> {
+  const canned = answerWorkerQuestion(msg.text);
+  if (canned) return `${canned} ${stillWanted}`;
+  await pushToDesk(supabase, {
+    target: { channel: msg.channel, from_addr: msg.from || "unknown" },
+    title: `Worker question${jobId ? `: ${jobId}` : ""}`,
+    priority: "high",
+    tags: "question",
+    body: `${jobId ? `${jobId}: ` : ""}a worker asked something the assistant does not answer. Their words are on your phone. The job lane is still open for them.`,
+    alsoText: `Yaadly, a worker has a question.\n\nThey asked:\n"${msg.text.trim().slice(0, 700)}"\n\nFrom ${msg.from || "an unknown number"} on ${msg.channel}.${jobId ? ` Job ${jobId}.` : ""} Nothing was sent to the client and nothing was filed. Reply from the desk to answer them.`,
+  }, trace);
+  return `That reads as a question, so it has not gone to the client and it is not on the job record. Someone at Yaadly will answer it here. ${stillWanted}`;
+}
+
 async function notifyAdmin(
   supabase: SettingsReader,
   job: { id: string; trade: string; parish: string; title: string; urgency: string;
@@ -1810,6 +1904,31 @@ Deno.serve(async (req: Request) => {
       `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${safe}</Message></Response>`,
       { status: 200, headers: { "Content-Type": "text/xml" } },
     );
+  };
+
+  // The empty reply: Twilio gets nothing to send because the message already
+  // went out through the Messages API (the section menu). Same span close as
+  // twiml(), no screen because no text.
+  const twimlSilent = () => {
+    root.setAttributes({ "http.response.status_code": 200, "yaadly.reply.template": true });
+    root.end(); trace.flush();
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', { status: 200, headers: { "Content-Type": "text/xml" } });
+  };
+
+  // The one place the section question is asked. Menu on WhatsApp when the
+  // template exists and the send worked, the typed question otherwise, same
+  // lead sentence either way. Keeping the fallback here and not at each
+  // caller is what stops three sites drifting into three questions.
+  // The template id: the secret if set, else the row yaad-twilio-setup wrote
+  // when it created the template (app_settings.twilio_content_sid_phase).
+  const askPhase = async (settings: SettingsReader, to: string, channel: string, lead: string) => {
+    if (channel === "whatsapp") {
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE")
+        || (await readSettings(settings, ["twilio_content_sid_phase"])).twilio_content_sid_phase
+        || "";
+      if (contentSid && await sendPhaseMenu(to, lead, contentSid, trace)) return twimlSilent();
+    }
+    return twiml(`${lead} ${PHASE_QUESTION}`);
   };
 
   // The web sibling of twiml(): same screen, same refusal, a JSON body the
@@ -2284,6 +2403,31 @@ Deno.serve(async (req: Request) => {
     } | null;
     const deskHasThisNumber = prior?.human_handling === true;
 
+    // A held number's EVIDENCE still files, 15 September 2026.
+    //
+    // The hold silences the assistant on a conversation Monique has taken
+    // over, and every worker lane below used to check it, so a worker whose
+    // number was held (they asked for a person, or she replied to them from
+    // the desk, on any thread) could not file a photo, a location pin, an
+    // arrival or a report confirmation on any job until somebody pressed
+    // "Hand back to the assistant". Found on the first live job: the
+    // founder's own test phone was held from an earlier client-side chat and
+    // her worker replies landed in that chat's transcript, answered with
+    // "Someone at Yaadly has this", with nothing on the job.
+    //
+    // So the hold now has two strengths. What a held worker SAYS in plain
+    // text still goes to her and nowhere else: that is the conversation she
+    // took over. What they FILE, photos and videos, a pin, the code and
+    // section answers that follow a photo, and the "1" that confirms a
+    // drafted report, runs through the evidence lanes as it would for any
+    // worker, because none of that is a conversation and all of it is the
+    // job's record. Filing evidence releases nothing and rules on nothing,
+    // so the governing rule is untouched. Only a number that IS a worker on
+    // a live job gets this; a held client is held for everything.
+    const heldWorker = deskHasThisNumber ? await lookupWorkerWithActiveJobs(supabase, msg.from) : null;
+    const evidenceHeld = deskHasThisNumber && !heldWorker;
+    root.setAttributes({ "yaadly.held.worker_evidence_open": Boolean(heldWorker) });
+
     // One read, alongside the other "who is holding this conversation" state.
     // Any value but the string "true" leaves the assistant running: a switch
     // that fails closed on a missing row would take intake down the first time
@@ -2509,9 +2653,27 @@ Deno.serve(async (req: Request) => {
       // typed is read as their own version and that is what goes out
       // instead. Founder's own requirement, 31 Aug 2026, confirmed to the
       // worker to decide, not routed through anyone else first.
-      if (!deskHasThisNumber && reportSession && !msg.media.length && msg.text.trim()) {
+      if (!evidenceHeld && reportSession && !msg.media.length && msg.text.trim()) {
         const a = reportSession.answers as any;
         const said = msg.text.trim();
+        // A question is not their own version of the report. On 15 September
+        // 2026 "how do i share my location" went to the client as the status
+        // update. The draft stays waiting; see worker-question.ts.
+        // "no" is not their own version either: nothing goes to the client
+        // and the draft waits. "yes" and "ok" are not "1" on purpose; a
+        // report reaching a client is confirmed with the one reply asked for.
+        if (said !== "1" && isBareAcknowledgement(said)) {
+          root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "acknowledgement_not_report" });
+          return twiml("Nothing sent. Reply 1 to send the report as drafted, or send your own words and those go to the client instead.");
+        }
+        if (said !== "1" && (looksLikeQuestion(said) || wantsHelpWith(said))) {
+          root.setAttributes({ "yaadly.report_confirm.job": a.job_id, "yaadly.report_confirm.outcome": "question_not_report" });
+          return twiml(await answerOrRaiseWorkerQuestion(
+            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""),
+            "Your report to the client is still waiting: reply 1 to send it as drafted, or send your own words and those go instead.",
+            trace,
+          ));
+        }
         const overrideText = said === "1" ? String(a.draft_text ?? "") : said;
         const { error } = await supabase.rpc("relay_confirmed_report", {
           p_job: a.job_id, p_override_text: overrideText, p_ai_summary: a.ai_summary ?? "",
@@ -2583,7 +2745,7 @@ Deno.serve(async (req: Request) => {
       // context to here, the text itself was always the whole update.
       // The job-code answer to a pin that named more than one possible job.
       const arrivalSession = sess && String((sess.answers as any)?._lane ?? "") === "arrival" ? sess : null;
-      if (!deskHasThisNumber && arrivalSession && msg.text.trim()) {
+      if (!evidenceHeld && arrivalSession && msg.text.trim()) {
         const a = arrivalSession.answers as any;
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
@@ -2604,7 +2766,7 @@ Deno.serve(async (req: Request) => {
         return twiml(`Checked in on ${pick.id} (${pick.title}). That is on the Arrival Log now.`);
       }
 
-      if (!deskHasThisNumber && textUpdateSession && !msg.media.length && msg.text.trim()) {
+      if (!evidenceHeld && textUpdateSession && !msg.media.length && msg.text.trim()) {
         const a = textUpdateSession.answers as any;
         const choices: { id: string; title: string; stage: number }[] = a.job_choices ?? [];
         const pick = pickJobChoice(msg.text, choices);
@@ -2656,7 +2818,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      if (!deskHasThisNumber && evSession) {
+      if (!evidenceHeld && evSession) {
         const answers = evSession.answers as any;
         const pending: PendingEvidence[] = answers.pending ?? [];
         const choices: { id: string; title: string; stage: number }[] = answers.job_choices ?? [];
@@ -2690,12 +2852,12 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             })
             .eq("wa_id", msg.from);
-          const prompt = stepBack
-            ? "What do these show?"
-            : awaitingPhase ? PHASE_QUESTION : confirmedJob ? "What do these show?" : codePrompt(choices);
-          return twiml(items.length
-            ? `Got that too, ${next.length} so far. ${prompt}`
-            : `That one did not come through. ${prompt}`);
+          const lead = items.length
+            ? `Got that too, ${next.length} so far.`
+            : "That one did not come through.";
+          if (!stepBack && awaitingPhase) return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, lead);
+          const prompt = stepBack ? "What do these show?" : confirmedJob ? "What do these show?" : codePrompt(choices);
+          return twiml(`${lead} ${prompt}`);
         }
 
         // ── which section of the job this belongs to ──────────────────────────────────────
@@ -2715,6 +2877,22 @@ Deno.serve(async (req: Request) => {
         // approved without a before is a separate question, and a human's, not
         // this webhook's.
         if (awaitingPhase && confirmedJob) {
+          // A question is not a section answer, and "never blocks" must not
+          // mean a worker's question gets filed as an unmarked photo caption.
+          // The photos stay parked and the question stays asked.
+          if (looksLikeQuestion(msg.text) || wantsHelpWith(msg.text)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_phase" });
+            const lead = await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, confirmedJob.id,
+              "Your photos are still waiting to be filed.", trace,
+            );
+            return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, lead);
+          }
+          // "ok" is not a section either. Asked again, not filed unmarked.
+          if (isBareAcknowledgement(msg.text)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "acknowledgement_while_awaiting_phase" });
+            return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, "Your photos are still waiting to be filed.");
+          }
           const phase = readPhaseAnswer(msg.text) ?? null;
 
           // An after may name the before it answers on the same reply, "A P3".
@@ -2756,6 +2934,14 @@ Deno.serve(async (req: Request) => {
         // it shows rather than it being filed as "Sent on WhatsApp" and
         // left for the client to guess at.
         if (confirmedJob) {
+          // Same rule as the section question: a question is not a caption.
+          if (looksLikeQuestion(msg.text) || wantsHelpWith(msg.text)) {
+            root.setAttributes({ "yaadly.evidence_intake.outcome": "question_while_awaiting_context" });
+            return twiml(await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, confirmedJob.id,
+              "Your photos are still waiting to be filed. What do they show? A line on what was done is enough.", trace,
+            ));
+          }
           const context = msg.text.trim().slice(0, 140);
           const described = context
             ? pending.map((p) => p.hasCaption ? p : { ...p, label: context, hasCaption: true })
@@ -2767,7 +2953,7 @@ Deno.serve(async (req: Request) => {
             .update({ answers: { ...answers, pending: described, awaiting_phase: true }, updated_at: new Date().toISOString() })
             .eq("wa_id", msg.from);
           root.setAttributes({ "yaadly.evidence_intake.outcome": "context_taken_asked_phase" });
-          return twiml(`Got it, going on ${confirmedJob.id}, ${await stageSaid(supabase, confirmedJob.id, confirmedJob.stage)}. ${PHASE_QUESTION}${pairHint(await beforesOnJob(supabase, confirmedJob.id))}`);
+          return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, going on ${confirmedJob.id}, ${await stageSaid(supabase, confirmedJob.id, confirmedJob.stage)}.${pairHint(await beforesOnJob(supabase, confirmedJob.id))}`);
         }
 
         const pick = pickJobChoice(msg.text, choices);
@@ -2797,7 +2983,7 @@ Deno.serve(async (req: Request) => {
           })
           .eq("wa_id", msg.from);
         root.setAttributes({ "yaadly.evidence_intake.outcome": "confirmed_asked_phase" });
-        return twiml(`Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage. ${PHASE_QUESTION}${pairHint(await beforesOnJob(supabase, pick.id))}`);
+        return askPhase(supabase as unknown as SettingsReader, msg.from, msg.channel, `Got it, that's for ${pick.id} (${pick.title}), ${await stageSaid(supabase, pick.id, pick.stage)}. Anything you send now files against that stage.${pairHint(await beforesOnJob(supabase, pick.id))}`);
       }
 
       if (sess && Date.now() - new Date(sess.updated_at as string).getTime() > 48 * 3600_000) {
@@ -2826,7 +3012,7 @@ Deno.serve(async (req: Request) => {
       // lanes already use.
       const hasPin = Number.isFinite(msg.lat) && Number.isFinite(msg.lon)
         && !(msg.lat === 0 && msg.lon === 0);
-      if (!deskHasThisNumber && hasPin) {
+      if (!evidenceHeld && hasPin) {
         const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
         if (found) {
           const where = msg.place ? ` from ${msg.place}` : "";
@@ -2910,7 +3096,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const evidenceMedia = msg.media.filter((m) => m.mime.startsWith("image/") || m.mime.startsWith("video/"));
-      if (!deskHasThisNumber && evidenceMedia.length) {
+      if (!evidenceHeld && evidenceMedia.length) {
         const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
         if (found) {
           const { email: workerEmail, jobs: activeJobs } = found;
@@ -3364,6 +3550,23 @@ Deno.serve(async (req: Request) => {
         const text = msg.text.trim();
         if (text) {
           const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+          // A worker's question is not a site update and must not become the
+          // basis of a drafted report. Only for a number that IS a worker on
+          // a live job: anyone else falls through to intake as before.
+          // "no" on its own is not a site update. Said back, not filed, and
+          // nobody woken: the founder's own "no" went on a job as evidence on
+          // 15 September 2026.
+          if (found && isBareAcknowledgement(text)) {
+            root.setAttributes({ "yaadly.worker_update.outcome": "acknowledgement_not_update" });
+            return twiml("Noted, nothing filed. When you have a moment, send a few words on how the work went, a photo, or a voice note, and it goes on the job.");
+          }
+          if (found && (looksLikeQuestion(text) || wantsHelpWith(text))) {
+            root.setAttributes({ "yaadly.worker_update.outcome": "question_not_update" });
+            return twiml(await answerOrRaiseWorkerQuestion(
+              supabase as unknown as SettingsReader, msg, found.jobs.length === 1 ? found.jobs[0].id : "",
+              "Anything you send about the work itself still goes on the job record as normal.", trace,
+            ));
+          }
           if (found && found.jobs.length === 1) {
             const job = found.jobs[0];
             const { error } = await supabase.from("evidence").insert({

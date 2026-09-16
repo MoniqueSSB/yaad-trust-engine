@@ -774,6 +774,14 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 @media(max-width:700px){.dfield{grid-template-columns:1fr;gap:3px}.drw{padding:14px 16px 40px}}
 tbody tr[data-i]{cursor:pointer}
 tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
+/* Tick boxes for acting on several rows at once (Enquiries). The label fills
+   the cell so a slightly missed tick does not open the drawer instead. */
+th.bkc,td.bkc{width:34px;padding-right:0}
+.bkc label{display:flex;align-items:center;justify-content:center;min-height:28px;cursor:pointer}
+.bkc input{width:16px;height:16px;accent-color:var(--teal);cursor:pointer}
+.bkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;min-height:34px;font-size:12.5px}
+.bkbar .n{color:var(--ink);font-weight:700}
+.bkbar .msg{margin:0;flex:1 1 100%}
 
 /* ---------- mobile ---------- */
 /* On a phone the rail used to be a strip of thirty-seven links scrolling
@@ -2493,6 +2501,17 @@ const VIEWS = [
     order:"created_at", search:["name","contact","topic","message"],
     empty:["No enquiries","The contact form at the bottom of the website writes here."],
     detailTop: r => contactCard(r), titleOf: r => r.name || r.contact || "Enquiry",
+    // Several at once. Same two functions the waiting queue calls, one call
+    // per enquiry, so each is logged as her decision on that enquiry.
+    bulkWhen: r => !["replied","converted","test","binned"].includes(r.status || "new"),
+    bulk:[
+      { label:"Mark replied", cls:"",
+        rpc:"mark_enquiry_replied", args:r => ({ p_enquiry:r.id }),
+        says:n => `Takes ${n === 1 ? "this enquiry" : "these " + n + " enquiries"} off the list and stamps the reply clock on each. It sends nothing. The one working day figure counts from this, so only tick ones you have actually answered.` },
+      { label:"Mark as test", cls:"g",
+        rpc:"mark_enquiry_test", args:r => ({ p_enquiry:r.id }),
+        says:n => `Clears ${n === 1 ? "this enquiry" : "these " + n + " enquiries"} as tests or junk. It sends nothing and does not count as a reply.` },
+    ],
     cols:[
       {h:"Who", f:r => esc(r.name || "no name") + sub_(r.contact || "")},
       {h:"Reach them", f:r => reachChips(r)},
@@ -4732,17 +4751,90 @@ function buildSections(){
   anchor.insertAdjacentHTML("beforebegin", out);
 }
 
-function tableCard(v, rows){
+function tableCard(v, rows, k){
   if (!rows.length) {
     return `<div class="card"><div class="empty"><b>${esc(v.empty[0])}</b>${esc(v.empty[1])}</div></div>`;
   }
-  const head = v.cols.map(c => `<th${c.n ? ' class="num"' : ""}>${esc(c.h)}</th>`).join("");
+  // Tick boxes only where the view declares bulk actions and the caller said
+  // which view this is. The Overview draws Service bookings through here too,
+  // with no key, and gets the plain table.
+  const bk = !!(k && v.bulk);
+  const picked = bk ? bulkSet(k) : null;
+  const tickable = bk ? rows.filter(r => v.bulkWhen(r)) : [];
+  const allOn = tickable.length > 0 && tickable.every(r => picked.has(String(r.id)));
+  const head = (bk ? `<th class="bkc">${tickable.length ? `<label title="Tick every row shown"><input type="checkbox" class="bk-all" data-k="${k}"${allOn ? " checked" : ""}></label>` : ""}</th>` : "")
+    + v.cols.map(c => `<th${c.n ? ' class="num"' : ""}>${esc(c.h)}</th>`).join("");
   const body = rows.map(r =>
-    `<tr data-i="${r.__i}">` + v.cols.map(c => `<td${c.n ? ' class="num"' : ""}>${c.f(r)}</td>`).join("") + "</tr>"
+    `<tr data-i="${r.__i}">`
+    + (bk ? `<td class="bkc">${v.bulkWhen(r) ? `<label><input type="checkbox" class="bk" data-k="${k}" data-id="${esc(String(r.id))}"${picked.has(String(r.id)) ? " checked" : ""}></label>` : ""}</td>` : "")
+    + v.cols.map(c => `<td${c.n ? ' class="num"' : ""}>${c.f(r)}</td>`).join("") + "</tr>"
   ).join("");
-  return `<div class="card pad0"><div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
-       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.table)}</span>. Click any row to open it.</p>`;
+  return (bk ? `<div class="bkbar" id="bk-${k}"></div>` : "")
+       + `<div class="card pad0"><div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
+       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.table)}</span>. Click any row to open it${bk ? ", or tick several to act on them together" : ""}.</p>`;
 }
+
+// ---- Acting on several rows at once.
+//
+// Added 16 Sep 2026 for Enquiries, where clearing a backlog one drawer at a
+// time was the whole complaint. It is not a shortcut around a decision: she
+// still ticks each row and confirms once, and the write is the same database
+// function the single action uses, called once per row, so every enquiry gets
+// its own agent_actions line with her email. One refusal does not stop the
+// rest; the bar names which ones did not go through and why.
+const BULK = {};      // view key -> Set of ticked row ids
+const BULK_MSG = {};  // view key -> html shown in the bar after a run
+function bulkSet(k){ return BULK[k] || (BULK[k] = new Set()); }
+
+function bulkBar(k){
+  const el = $("bk-" + k); if (!el) return;
+  const v = VIEW[k], n = bulkSet(k).size;
+  const msg = BULK_MSG[k] || "";
+  if (!n) { el.innerHTML = msg || `<span class="hint" style="margin:0">Tick the box on a row, or the one in the header for every row shown, to act on several at once.</span>`; return; }
+  el.innerHTML = `<span class="n">${n} ticked</span>`
+    + v.bulk.map((a, i) => `<button class="btn ${a.cls || ""}" data-bk-run="${i}" data-k="${k}">${esc(a.label)}</button>`).join("")
+    + `<button class="btn g" data-bk-clear="${k}">Untick all</button>` + msg;
+}
+
+async function runBulk(k, a, btn){
+  const ids = [...bulkSet(k)];
+  const rows = (ROWS[k] || []).filter(r => ids.includes(String(r.id)) && VIEW[k].bulkWhen(r));
+  if (!rows.length) return;
+  if (!confirm(a.says(rows.length) + "\n\n" + a.label + " for " + rows.length + "?")) return;
+  document.querySelectorAll(`#bk-${k} button`).forEach(b => b.disabled = true);
+  const failed = [];
+  let done = 0;
+  for (const r of rows) {
+    btn.innerHTML = `<span class="spin"></span>${done + failed.length + 1} of ${rows.length}`;
+    const { error } = await sb.rpc(a.rpc, a.args(r));
+    if (error) failed.push(`<b>${esc(VIEW[k].titleOf ? VIEW[k].titleOf(r) : String(r.id))}</b>: ${esc(error.message)}`);
+    else done++;
+  }
+  BULK[k] = new Set();
+  BULK_MSG[k] = failed.length
+    ? `<div class="msg err"><b>${done} done, ${failed.length} did not go through.</b> Those are still on the list.<br>${failed.join("<br>")}</div>`
+    : `<div class="msg ok">${done} done.</div>`;
+  await loadTableView(k);
+}
+
+document.addEventListener("change", (e) => {
+  const t = e.target;
+  if (!t.classList || !(t.classList.contains("bk") || t.classList.contains("bk-all"))) return;
+  const k = t.dataset.k, set = bulkSet(k);
+  delete BULK_MSG[k];
+  if (t.classList.contains("bk-all")) {
+    document.querySelectorAll(`input.bk[data-k="${k}"]`).forEach(b => {
+      b.checked = t.checked;
+      t.checked ? set.add(b.dataset.id) : set.delete(b.dataset.id);
+    });
+  } else {
+    t.checked ? set.add(t.dataset.id) : set.delete(t.dataset.id);
+    const all = document.querySelector(`input.bk-all[data-k="${k}"]`);
+    const boxes = [...document.querySelectorAll(`input.bk[data-k="${k}"]`)];
+    if (all) all.checked = boxes.length > 0 && boxes.every(b => b.checked);
+  }
+  bulkBar(k);
+});
 
 const ROWS = {};   // last loaded rows per view, so search can filter without refetching
 
@@ -4798,7 +4890,14 @@ function renderTableView(k){
   const panel = vizStrip(k, v, all) + (v.panel ? v.panel(all) : "");
   $("v-" + k).innerHTML = panel + (term && !rows.length
     ? '<div class="card"><div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div></div>'
-    : tableCard(v, rows));
+    : tableCard(v, rows, k));
+  // A tick on a row the search has just hidden is dropped, never carried: a
+  // bulk action must only ever touch rows she can see.
+  if (v.bulk) {
+    const seen = new Set(rows.filter(r => v.bulkWhen(r)).map(r => String(r.id)));
+    for (const id of [...bulkSet(k)]) if (!seen.has(id)) bulkSet(k).delete(id);
+    bulkBar(k);
+  }
   // A panel is inert markup until something wires it. Two panels have a
   // control, Reports and the held drafts on Kickoff packs, so these are
   // two calls and not a framework.
@@ -5161,6 +5260,11 @@ document.addEventListener("click", (e) => {
   }
   const r = e.target.closest("[data-v]");
   if (r) { go(r.dataset.v); return; }
+  const bkr = e.target.closest("[data-bk-run]");
+  if (bkr) { runBulk(bkr.dataset.k, VIEW[bkr.dataset.k].bulk[Number(bkr.dataset.bkRun)], bkr); return; }
+  const bkc = e.target.closest("[data-bk-clear]");
+  if (bkc) { const k = bkc.dataset.bkClear; BULK[k] = new Set(); delete BULK_MSG[k]; renderTableView(k); return; }
+  if (e.target.closest("td.bkc, th.bkc")) return;
   const tr = e.target.closest("tr[data-i]");
   if (tr && !e.target.closest(".drw")) { openDetail(currentView, Number(tr.dataset.i)); return; }
 });
@@ -5744,7 +5848,7 @@ async function loadOverview(){
     countOf("feedback",    null),
     countOf("kickoff_packs", q => q.eq("status", "draft")),
     countOf("jobs",        q => q.eq("status", "awaiting_client_setup")),
-    countOf("enquiries",   q => q.not("status", "in", "(replied,converted)")),
+    countOf("enquiries",   q => q.not("status", "in", "(replied,converted,test,binned)")),
     countOf("questions",   q => q.eq("published", false)),
   ]);
 
