@@ -6,6 +6,22 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-16 · A worker can be paid through Stripe Global Payouts, by a named person, two clicks
+
+**Why.** Founder, 16 Sep 2026: "build this out", once it was clear that Global Payouts was already enabled on the live account, that Jamaica was offered as a recipient country, that card payments were proven live, and that paying a subcontractor as the principal is exactly what the product is for. Wise stays; this is a second way, not a replacement.
+
+**How (`20260916120000`, `yaad-payout-send`).** The desk's Pay workers view gains **Pay with Stripe** on any owed invoice whose worker has finished Stripe setup. The first click asks the function for a quote: it reads the invoice, the worker's Stripe recipient, Yaadly's GBP financial account and its balance, and asks Stripe for the fee, the exchange rate, what the worker receives and what leaves the account. It moves nothing. The second click, a confirm box carrying those figures, sends: the function re-reads everything, refuses if the quote changed or the balance is short, creates the OutboundPayment with an idempotency key tied to the invoice, records it in the new `stripe_payouts` table, and then calls `mark_worker_paid` under the person's own session, so `paid_by` is the person and never the function. The worker's WhatsApp says "by bank transfer through Stripe".
+
+**The amount is what the worker receives.** The quote and the payment are asked for in JMD, the invoice figure, from a GBP account. Stripe converts and Yaadly carries the fee, which is the corridor Stripe support confirmed. Stripe refuses a payment whose money fields differ from its quote, which is the protection wanted, so both bodies come from one function.
+
+**"Paid by Stripe" cannot be typed.** `mark_worker_paid` and `mark_materials_sent` accept `stripe` only when a `stripe_payouts` row for that invoice or tranche carries the same Stripe id and is processing or posted. A person cannot record a Stripe payment by hand on the desk; it can only follow a payout that went out. The call-back gate of 14 Sep stands for every method, checked by the function before it sends as well as by the database when it marks, so a payout can never go out and then fail to be recorded against its invoice for that reason.
+
+**Why a failed payout does not un-pay the invoice.** Stripe settles asynchronously and a payout can fail or be returned days later. Paid records are frozen (14 Sep). The `stripe_payouts` row carries the later status, the desk shows it red with Stripe's reason and a Check button, and a person decides. Nothing flips a money record on its own.
+
+**When Stripe will not quote.** The quotes endpoint is gated on some accounts and answers 404. Then the desk shows the published fees (£0.50 + 0.50% + 2%) labelled an estimate, asks the person to accept that explicitly, and the real debit is read back off the payout. `quote_is_estimate` records that this is what happened.
+
+**Not built, deliberately.** Materials tranches through Stripe: the table and the gate already allow it, the desk button is a later piece. Webhooks for payout status (v2 event destinations are a different system from the card webhook): status is read on demand with Check instead. Any automatic sending: still refused, CLAUDE.md §2 and §3, and this entry is not a licence.
+
 ## 2026-09-16 · Card payment on a job invoice is proven live, and the 14 Sep switch had not taken
 
 **What happened.** The founder paid INV-2026-0005 (J$195, a seed test job pointed at her own address for the purpose) with her own card. Stripe live took it, the live webhook was accepted and `invoice_payments` recorded it with `livemode = true`. That is the first live card payment through the system and the proof that the live key, the live webhook secret and the recording all hold. A named person still marks the invoice paid at the desk; that step was exercised as part of the same proof and is unchanged.
