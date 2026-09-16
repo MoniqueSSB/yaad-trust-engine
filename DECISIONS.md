@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-16 · Card payment on a job invoice is proven live, and the 14 Sep switch had not taken
+
+**What happened.** The founder paid INV-2026-0005 (J$195, a seed test job pointed at her own address for the purpose) with her own card. Stripe live took it, the live webhook was accepted and `invoice_payments` recorded it with `livemode = true`. That is the first live card payment through the system and the proof that the live key, the live webhook secret and the recording all hold. A named person still marks the invoice paid at the desk; that step was exercised as part of the same proof and is unchanged.
+
+**What the proof found.** The 14 Sep "going live" step had set the key's Dashboard ID (`mk_…`) as `STRIPE_SECRET_KEY` instead of the key. The function refused every card attempt for the next twenty hours with the generic portal message and a precise log line. Nothing in the desk or the portal surfaced that a payment provider was misconfigured. Noted, not yet built: a desk-visible check that the Stripe key answers, so a wrong secret is seen the day it is set rather than at the first client's attempt.
+
+**Two data facts learned.** An invoice carries its own `client_email`, copied at raise time, and `yaad-checkout` checks ownership against that field, not the job's. Repointing a job to a new client address without the invoice returns "That invoice is not one of yours". And the seed test client `test.client@yaadly.co.uk` has no reachable mailbox, so live proofs on seed jobs need the job and its invoices repointed to a real address, then put back.
+
 ## 2026-09-15 · Stripe support confirmed how a Global Payout reaches a worker in Jamaica
 
 **What was asked (14 Sep 2026, treasury support) and answered (15 Sep, Nayan at Stripe).** Three open questions on the Global Payouts route to Jamaica now have answers, recorded here so nobody has to ask again.

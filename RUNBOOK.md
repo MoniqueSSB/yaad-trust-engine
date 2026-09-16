@@ -5321,6 +5321,8 @@ update app_settings set value = '<Bank>, <account name>, sort code <..>, account
 
 ## Going live with card payments
 
+**Verified live 16 Sep 2026.** A real J$195 card payment on INV-2026-0005 (test job, founder's own card) went portal → `yaad-checkout` → Stripe live → `yaad-stripe-webhook` → `invoice_payments` with `livemode = true`, `status = succeeded`, and the portal read "Card payment received". The live webhook secret is therefore right. The first attempt on 14 Sep had failed silently: the value set as `STRIPE_SECRET_KEY` was the key's Dashboard **ID** (`mk_…`), not the key (`sk_live_…`), and every card attempt from 14 Sep 16:00 to 15 Sep 12:31 returned "Card payment could not be started". **The log line to look for is "Invalid API key provided: mk_…"** in `yaad-checkout`. Standard secret keys cannot be revealed again after creation; make a new one ("Powering an integration you built") and set that.
+
 Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handles a key.**
 
 1. **Stripe Dashboard, live mode** (switch off Test mode / Sandbox): Developers, API keys, copy the **live Secret key** (`sk_live_…`).
