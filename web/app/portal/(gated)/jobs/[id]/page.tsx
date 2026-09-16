@@ -784,10 +784,10 @@ export default async function JobRoom({
        Nothing here marks anything paid. */
     outstanding.push({
       who: "yaadly",
-      title: "Card payment received. Yaadly is confirming it",
+      title: "Card payment received. A person at Yaadly signs it off",
       detail:
         "Your card payment for " + amount(feeInvoice.total_pence, feeInvoice.currency) +
-        " came through. Yaadly checks it and marks the bill paid, and the job starts then. There is nothing more to pay on it.",
+        " came through. A person at Yaadly checks it and signs it off. Then the bill shows as Paid and the project starts. There is nothing more to pay on it.",
       href: jobBase + "?tab=approvals#invoice-" + feeInvoice.id,
       cta: "See it",
     });
@@ -923,8 +923,8 @@ export default async function JobRoom({
       /* Paid by card and recorded; a person at Yaadly still marks it paid. */
       outstanding.push({
         who: "yaadly",
-        title: "Card payment received for " + inv.id + ". Yaadly is confirming it",
-        detail: "It came through by card. Yaadly checks it and marks the invoice paid. There is nothing more to pay on it.",
+        title: "Card payment received for " + inv.id + ". A person at Yaadly signs it off",
+        detail: "It came through by card. A person at Yaadly checks it and signs it off, then the invoice shows as Paid. There is nothing more to pay on it.",
         href: jobBase + "?tab=approvals#invoice-" + inv.id,
         cta: "See it",
       });
@@ -1682,7 +1682,7 @@ export default async function JobRoom({
             "paid" until Yaadly confirms it. */}
         {role === "client" && cardParam === "paid" && (
           <p className="mb-3.5 rounded-2xl border border-softline bg-soft px-4 py-3 text-[13px] leading-relaxed text-mute">
-            <b className="font-semibold text-ink">Thank you.</b> Stripe is confirming your card payment. It shows on the invoice below as received, and Yaadly marks the invoice paid.
+            <b className="font-semibold text-ink">Thank you.</b> Stripe is confirming your card payment. It shows on the invoice below as received. A person at Yaadly then signs it off, and the project starts from there.
           </p>
         )}
         {role === "client" && cardParam === "cancelled" && (

@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
+import { clientBill } from "@/lib/jobs/client-bill";
+import { SERVICE_TRACK, svcStage } from "@/lib/portal/journey";
+import { jmd } from "@/lib/money";
 import { WorkerPipeline, WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
 import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";
 import {
@@ -52,7 +55,7 @@ export default async function ClientPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type,worker_choice",
+      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type,worker_choice,job_type,size_band",
     )
     .order("updated_at", { ascending: false });
 
@@ -70,6 +73,7 @@ export default async function ClientPortal() {
     type: string | null;
     parish: string | null;
     price: string | null;
+    stage: number | null;
   }[];
 
   /* The signature that opens the board, at the exact version in force. A
@@ -137,6 +141,104 @@ export default async function ClientPortal() {
      is the only closed status in the live jobs_status_check vocabulary; anything
      else, including disputed and cancelled, stays in the live list because it
      still has something outstanding about it. */
+  /* Founder, 16 Sep 2026: every row says what the work is, what it costs the
+     client, and what is next, and the card opens that exact section. The
+     accepted quote gives the cost (labour, Yaadly's 15% on labour, materials
+     at cost, the same arithmetic as the job page); open quotes give the
+     count a client still has to choose from. */
+  type Described = Job & { job_type?: string | null; size_band?: string | null; materials_store?: string | null };
+  const jobIds = jobs.map((j) => j.id);
+  const { data: quoteRows } = jobIds.length
+    ? await supabase.from("job_quotes").select("job_id,status,labour_jmd,materials_jmd").in("job_id", jobIds)
+    : { data: [] as { job_id: string; status: string; labour_jmd: number | null; materials_jmd: number | null }[] };
+  const acceptedByJob = new Map<string, { labour_jmd: number | null; materials_jmd: number | null }>();
+  const openQuotesByJob = new Map<string, number>();
+  for (const q of quoteRows ?? []) {
+    if (q.status === "accepted") acceptedByJob.set(q.job_id, q);
+    else if (q.status !== "withdrawn" && q.status !== "declined" && q.status !== "not_selected") {
+      openQuotesByJob.set(q.job_id, (openQuotesByJob.get(q.job_id) ?? 0) + 1);
+    }
+  }
+  const jobHref = (id: string, tail: string) => "/portal/jobs/" + encodeURIComponent(id) + tail;
+  const nextFor = (j: Described): { label: string; href: string } | null => {
+    const n = openQuotesByJob.get(j.id) ?? 0;
+    switch (j.status) {
+      case "awaiting_client_setup":
+        return { label: "Finish setting up, then go live", href: jobHref(j.id, "?tab=overview#go-live") };
+      case "draft":
+        return { label: "Go live so tradespeople can quote", href: jobHref(j.id, "?tab=overview#go-live") };
+      case "open":
+      case "open_for_quotes":
+        return { label: n ? `${n} quote${n === 1 ? "" : "s"} in so far` : "Waiting for quotes", href: jobHref(j.id, "?tab=scope#quotes") };
+      case "quoted":
+        return { label: n ? `Choose from ${n} quote${n === 1 ? "" : "s"}` : "Choose a quote", href: jobHref(j.id, "?tab=scope#quotes") };
+      case "awaiting_payment":
+        return { label: "Pay the invoice to start the job", href: jobHref(j.id, "?tab=approvals#invoices") };
+      case "confirmed":
+        return j.materials_store
+          ? { label: "Booked. Work starts soon", href: jobHref(j.id, "?tab=overview") }
+          : { label: "Say where materials are kept", href: jobHref(j.id, "?tab=materials#materials") };
+      case "in_progress":
+        return { label: "Work under way. Evidence arrives as it is logged", href: jobHref(j.id, "?tab=evidence#stage-evidence") };
+      case "evidence":
+        return { label: "Look at the evidence and approve the stage", href: jobHref(j.id, "?tab=approvals#approve") };
+      case "complete":
+        return { label: "Closed. See the record and the invoices", href: jobHref(j.id, "?tab=approvals#invoices") };
+      default:
+        return null;
+    }
+  };
+  const describe = (j: Described): Job => {
+    const won = acceptedByJob.get(j.id);
+    const work = [j.job_type, j.size_band].filter((x): x is string => Boolean(x)).join(", ") || j.trade || null;
+    const money = won && won.labour_jmd != null
+      ? jmd(clientBill(won.labour_jmd, won.materials_jmd).total) + " all in, agreed price"
+      : null;
+    return { ...j, work, money, next: nextFor(j) };
+  };
+
+  /* Founder, 16 Sep 2026: a booked service is live work with its own steps,
+     not a side note. Each one is drawn as a full card in the main column,
+     the same shape as a job, keyed on the six-step service track. Two steps
+     wait on the client: sending what was asked for, and reading the draft. */
+  const SERVICE_STATUS: Record<string, { label: string; tone: "waiting" | "moving" | "done" | "idle" }> = {
+    "0": { label: "Booked and paid", tone: "moving" },
+    "1": { label: "Intake: Yaadly needs some things from you", tone: "waiting" },
+    "2": { label: "Documents received", tone: "moving" },
+    "3": { label: "Desk work under way", tone: "moving" },
+    "4": { label: "Draft with you", tone: "waiting" },
+    "5": { label: "Delivered", tone: "done" },
+  };
+  const SERVICE_NEXT = [
+    "Yaadly is getting started. You will be asked for a few documents",
+    "Send the documents Yaadly asked for",
+    "Yaadly is checking what you sent",
+    "Yaadly is working on it, checked against real costs and day rates",
+    "Read the draft and tell Yaadly about anything that is wrong",
+    "Your report is ready to download and keep",
+  ];
+  const serviceRows: Job[] = services.map((sv) => {
+    const i = svcStage(sv.stage);
+    const href = "/portal/services/" + encodeURIComponent(sv.id) + (i === 5 ? "/pack" : "");
+    return {
+      id: sv.id,
+      title: sv.type ?? "Professional service",
+      trade: "professional service",
+      parish: sv.parish,
+      stage: i,
+      status: String(i),
+      client_email: email,
+      worker_email: null,
+      updated_at: null,
+      work: SERVICE_TRACK[i].detail,
+      money: sv.price ? sv.price + ", paid on booking" : null,
+      next: { label: SERVICE_NEXT[i], href },
+    };
+  });
+  const liveServices = serviceRows.filter((r) => r.status !== "5");
+  const doneServices = serviceRows.filter((r) => r.status === "5");
+  const servicesWaiting = liveServices.filter((r) => SERVICE_STATUS[r.status].tone === "waiting").length;
+
   const live = jobs.filter((j) => j.status !== "complete");
   const closed = jobs.filter((j) => j.status === "complete");
 
@@ -146,7 +248,7 @@ export default async function ClientPortal() {
      dashboard is not a reason to start guessing one. "Waiting on you" counts
      live jobs whose status tone is waiting (quotes in, evidence to review,
      portal setup), the same gold the pills below use. */
-  const waitingOnYou = live.filter((j) => CLIENT_STATUS[j.status]?.tone === "waiting").length;
+  const waitingOnYou = live.filter((j) => CLIENT_STATUS[j.status]?.tone === "waiting").length + servicesWaiting;
   const cards: StatCard[] = [
     {
       label: "Live jobs",
@@ -160,7 +262,7 @@ export default async function ClientPortal() {
       value: String(waitingOnYou),
       tone: waitingOnYou > 0 ? "waiting" : "idle",
       icon: "todo",
-      note: waitingOnYou === 0 ? "Nothing needs you right now" : "Quotes or evidence to look at",
+      note: waitingOnYou === 0 ? "Nothing needs you right now" : "Quotes, evidence or a service to look at",
     },
     {
       label: "Closed",
@@ -171,10 +273,10 @@ export default async function ClientPortal() {
     },
     {
       label: "Services",
-      value: String(services.length),
-      tone: services.length > 0 ? "moving" : "idle",
+      value: String(liveServices.length),
+      tone: liveServices.length > 0 ? "moving" : "idle",
       icon: "service",
-      note: services.length === 0 ? "No checks or reports booked" : "Checks and reports you booked",
+      note: services.length === 0 ? "No checks or reports booked" : liveServices.length === 0 ? "All delivered" : "Checks and reports under way",
     },
   ];
 
@@ -320,14 +422,22 @@ export default async function ClientPortal() {
         <div>
           <JobList
             title={closed.length > 0 ? "Live jobs" : "Your jobs"}
-            jobs={live}
+            jobs={(live as Described[]).map(describe)}
             labels={CLIENT_STATUS}
             rail
             empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
           />
 
+          {liveServices.length > 0 && (
+            <JobList title="Professional services" jobs={liveServices} labels={SERVICE_STATUS} rail />
+          )}
+
           {closed.length > 0 && (
-            <JobList title="Closed" jobs={closed} labels={CLIENT_STATUS} rail />
+            <JobList title="Closed" jobs={(closed as Described[]).map(describe)} labels={CLIENT_STATUS} rail />
+          )}
+
+          {doneServices.length > 0 && (
+            <JobList title="Delivered services" jobs={doneServices} labels={SERVICE_STATUS} rail />
           )}
         </div>
 
@@ -341,34 +451,6 @@ export default async function ClientPortal() {
               <span className="text-[12.5px] text-dim">every job on each one, in one place</span>
               <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
             </Link>
-          )}
-          {services.length > 0 && (
-            <section className="mt-8">
-              <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
-                Professional services
-              </h2>
-              <ul className="grid gap-3">
-                {services.map((s) => (
-                  <li key={s.id}>
-                    <Link
-                      href={"/portal/services/" + encodeURIComponent(s.id)}
-                      className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel px-4 py-3.5 transition hover:border-line2"
-                    >
-                      <b className="text-[14.5px]">{s.type ?? "Service"}</b>
-                      <span className="text-[12.5px] text-dim">{s.id}</span>
-                      {s.parish && (
-                        <span className="text-[12.5px] text-dim">{s.parish}</span>
-                      )}
-                      {s.price && (
-                        <span className="ml-auto text-[13px] font-bold text-tealb">
-                          {s.price}
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
           )}
         </aside>
       </div>

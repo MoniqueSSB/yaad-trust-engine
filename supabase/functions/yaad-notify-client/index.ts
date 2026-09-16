@@ -1247,7 +1247,8 @@ Deno.serve(async (req: Request) => {
       const cur = String(inv.currency ?? "JMD").toUpperCase();
       // JMD is stored as whole dollars in total_pence; anything else is pence.
       const amt = cur === "JMD" ? money(Number(inv.total_pence)) : `${cur} ${(Number(inv.total_pence) / 100).toFixed(2)}`;
-      const how = inv.paid_method === "bank_transfer" ? " by bank transfer" : "";
+      // 20260916120000: stripe means a bank transfer too, made through Stripe.
+      const how = inv.paid_method === "bank_transfer" ? " by bank transfer" : inv.paid_method === "stripe" ? " by bank transfer through Stripe" : "";
       const ref = String(inv.paid_reference ?? "").trim();
       const what = String(inv.period_label ?? "").trim() || (inv.stage ? `stage ${inv.stage}` : "the work");
       subject = `Payment sent: ${job.title}`;
