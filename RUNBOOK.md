@@ -3225,6 +3225,8 @@ What each one is waiting on:
 
    Until it is filed the site carries no address at all, which leaves the Regulation 25 disclosure (part of the UK, registered number, registered office address) unmet on the third element. That is a known and accepted gap, chosen over republishing a home address on all eleven pages of a site fed by a 9,000 follower TikTok. It was briefly published on 3 September and reverted the same evening when the founder chose the service address instead; nothing reached `main`, so it was never live.
 
+   Update 16 September 2026, founder decision: the registered office (55 Remington Road, N15 6SS) is now on the privacy page and the cancellation page, because the ICO public register entry ZC249018 already shows it, so withholding it from the site no longer hid anything. The eleven page footers still carry the company number without an address; that is the remaining part of the Regulation 25 disclosure and is a separate decision.
+
    When the address exists, it goes in three places: the footer of all eleven pages in `docs/`, the "who we are" table in `docs/privacy.html`, and the postal route in `docs/cancellation.html`. Find them all with:
 
 ```bash
