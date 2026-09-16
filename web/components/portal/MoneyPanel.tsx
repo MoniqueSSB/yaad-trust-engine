@@ -290,7 +290,7 @@ export function MoneyPanel({
                       cardPayments[inv.id] ? (
                         <p className="mt-2 text-[12px] leading-relaxed text-tealb">
                           {cardPayments[inv.id] === "succeeded"
-                            ? "Card payment received. Yaadly confirms it and marks this invoice paid."
+                            ? "Card payment received. A person at Yaadly signs it off, then this invoice shows as Paid" + (inv.starts_job ? " and the project starts." : ".")
                             : "A card payment arrived that does not match this invoice. Yaadly is checking it."}
                         </p>
                       ) : (
