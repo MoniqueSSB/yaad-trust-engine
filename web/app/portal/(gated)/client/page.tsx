@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
+import { clientBill } from "@/lib/jobs/client-bill";
+import { SERVICE_TRACK, svcStage } from "@/lib/portal/journey";
+import { jmd } from "@/lib/money";
 import { WorkerPipeline, WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
 import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";
 import {
@@ -52,7 +55,7 @@ export default async function ClientPortal() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type,worker_choice",
+      "id,title,trade,parish,addr,stage,status,client_email,worker_email,updated_at,open,materials_store,materials_store_type,worker_choice,job_type,size_band",
     )
     .order("updated_at", { ascending: false });
 
@@ -70,6 +73,7 @@ export default async function ClientPortal() {
     type: string | null;
     parish: string | null;
     price: string | null;
+    stage: number | null;
   }[];
 
   /* The signature that opens the board, at the exact version in force. A
@@ -137,6 +141,62 @@ export default async function ClientPortal() {
      is the only closed status in the live jobs_status_check vocabulary; anything
      else, including disputed and cancelled, stays in the live list because it
      still has something outstanding about it. */
+  /* Founder, 16 Sep 2026: every row says what the work is, what it costs the
+     client, and what is next, and the card opens that exact section. The
+     accepted quote gives the cost (labour, Yaadly's 15% on labour, materials
+     at cost, the same arithmetic as the job page); open quotes give the
+     count a client still has to choose from. */
+  type Described = Job & { job_type?: string | null; size_band?: string | null; materials_store?: string | null };
+  const jobIds = jobs.map((j) => j.id);
+  const { data: quoteRows } = jobIds.length
+    ? await supabase.from("job_quotes").select("job_id,status,labour_jmd,materials_jmd").in("job_id", jobIds)
+    : { data: [] as { job_id: string; status: string; labour_jmd: number | null; materials_jmd: number | null }[] };
+  const acceptedByJob = new Map<string, { labour_jmd: number | null; materials_jmd: number | null }>();
+  const openQuotesByJob = new Map<string, number>();
+  for (const q of quoteRows ?? []) {
+    if (q.status === "accepted") acceptedByJob.set(q.job_id, q);
+    else if (q.status !== "withdrawn" && q.status !== "declined" && q.status !== "not_selected") {
+      openQuotesByJob.set(q.job_id, (openQuotesByJob.get(q.job_id) ?? 0) + 1);
+    }
+  }
+  const jobHref = (id: string, tail: string) => "/portal/jobs/" + encodeURIComponent(id) + tail;
+  const nextFor = (j: Described): { label: string; href: string } | null => {
+    const n = openQuotesByJob.get(j.id) ?? 0;
+    switch (j.status) {
+      case "awaiting_client_setup":
+        return { label: "Finish setting up, then go live", href: jobHref(j.id, "?tab=overview#go-live") };
+      case "draft":
+        return { label: "Go live so tradespeople can quote", href: jobHref(j.id, "?tab=overview#go-live") };
+      case "open":
+      case "open_for_quotes":
+        return { label: n ? `${n} quote${n === 1 ? "" : "s"} in so far` : "Waiting for quotes", href: jobHref(j.id, "?tab=scope#quotes") };
+      case "quoted":
+        return { label: n ? `Choose from ${n} quote${n === 1 ? "" : "s"}` : "Choose a quote", href: jobHref(j.id, "?tab=scope#quotes") };
+      case "awaiting_payment":
+        return { label: "Pay the invoice to start the job", href: jobHref(j.id, "?tab=approvals#invoices") };
+      case "confirmed":
+        return j.materials_store
+          ? { label: "Booked. Work starts soon", href: jobHref(j.id, "?tab=overview") }
+          : { label: "Say where materials are kept", href: jobHref(j.id, "?tab=materials#materials") };
+      case "in_progress":
+        return { label: "Work under way. Evidence arrives as it is logged", href: jobHref(j.id, "?tab=evidence#stage-evidence") };
+      case "evidence":
+        return { label: "Look at the evidence and approve the stage", href: jobHref(j.id, "?tab=approvals#approve") };
+      case "complete":
+        return { label: "Closed. See the record and the invoices", href: jobHref(j.id, "?tab=approvals#invoices") };
+      default:
+        return null;
+    }
+  };
+  const describe = (j: Described): Job => {
+    const won = acceptedByJob.get(j.id);
+    const work = [j.job_type, j.size_band].filter((x): x is string => Boolean(x)).join(", ") || j.trade || null;
+    const money = won && won.labour_jmd != null
+      ? jmd(clientBill(won.labour_jmd, won.materials_jmd).total) + " all in, agreed price"
+      : null;
+    return { ...j, work, money, next: nextFor(j) };
+  };
+
   const live = jobs.filter((j) => j.status !== "complete");
   const closed = jobs.filter((j) => j.status === "complete");
 
@@ -320,14 +380,14 @@ export default async function ClientPortal() {
         <div>
           <JobList
             title={closed.length > 0 ? "Live jobs" : "Your jobs"}
-            jobs={live}
+            jobs={(live as Described[]).map(describe)}
             labels={CLIENT_STATUS}
             rail
             empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
           />
 
           {closed.length > 0 && (
-            <JobList title="Closed" jobs={closed} labels={CLIENT_STATUS} rail />
+            <JobList title="Closed" jobs={(closed as Described[]).map(describe)} labels={CLIENT_STATUS} rail />
           )}
         </div>
 
@@ -364,6 +424,13 @@ export default async function ClientPortal() {
                           {s.price}
                         </span>
                       )}
+                      {/* Founder, 16 Sep 2026: the row says where the service
+                          is and what happens at that step, the same track the
+                          service page draws. */}
+                      <span className="basis-full text-[12.5px] text-mute">
+                        <b className="text-ink">Now: {SERVICE_TRACK[svcStage(s.stage)].name}.</b>{" "}
+                        {SERVICE_TRACK[svcStage(s.stage)].detail}
+                      </span>
                     </Link>
                   </li>
                 ))}
