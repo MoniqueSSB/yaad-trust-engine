@@ -69,7 +69,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -912,7 +912,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -954,7 +954,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1149,6 +1149,25 @@ Deno.serve(async (req: Request) => {
         // worker types to this number is kept with the job and read by the
         // intake and reporting steps, so bank details must never be sent in it.
         `Yaadly pays you by bank transfer, never cash. Add your bank details securely here, and Yaadly will call you to check them: ${APP_URL}/portal/worker/payouts. Never type bank details into this chat.`;
+    } else if (kind === "job_live_worker") {
+      // 17 Sep 2026, founder instruction. booked_worker tells the worker not
+      // to start and promises a message on this number once the client's
+      // invoice to Yaadly is paid. Nothing sent that message. Fired by
+      // notify_client_on_job_change (20260917120000) when the job leaves
+      // awaiting_payment for work, and checked again here off the row itself,
+      // so a stray call cannot tell a worker to start on a job that has not
+      // been paid. Says nothing about materials money or pay: those have their
+      // own messages, sent when a person marks them.
+      if (!["in_progress", "evidence"].includes(String(job.status ?? "")) || !job.worker_email) {
+        root.setAttributes({ "yaadly.notify.outcome": "job_not_live" });
+        return json({ ok: true, kind, told: false, reason: "That job is not live with a worker on it." });
+      }
+      const firstStage = Math.max(Number(job.stage ?? 0), 1);
+      subject = `The job is live: ${job.title}`;
+      line = `The client's invoice to Yaadly is paid, so ${job.id} (${job.title}) is live and you can start, beginning with ${await stageLabel(admin, jobId, firstStage)}. ` +
+        `When you arrive on site, check in before you start work: in this chat, tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. ` +
+        `That goes on the Arrival Log as proof you were there. Check in the same way each day you are on site.\n\n` +
+        `Photos, videos and a few words on the work can be sent here as you go. The job in your portal: ${roomLink}`;
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
