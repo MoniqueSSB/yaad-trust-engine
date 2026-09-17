@@ -1189,20 +1189,6 @@ export default async function JobRoom({
         &larr; All your jobs
       </Link>
 
-      {job.worker_email && (
-        <CalBand
-          side={role === "worker" ? "worker" : "client"}
-          owner={job.worker_email.toLowerCase()}
-          jobId={job.id}
-          kind="job"
-          base={"/portal/jobs/" + encodeURIComponent(job.id)}
-          cal={cal}
-          sel={d}
-          viewerEmail={email}
-          stageNames={packStages.map((s) => s.stage)}
-        />
-      )}
-
       <JobSummaryCard
         title={job.title ?? "Untitled job"}
         jobId={job.id}
@@ -1264,6 +1250,24 @@ export default async function JobRoom({
       <Outstanding items={outstanding} otherSideLabel={otherSideLabel} />
 
       <JobProgress phases={phases} />
+
+      {/* The calendar supports the job, it does not lead it. It sat above the
+          summary card until 17 Sep 2026, when the founder asked for the job
+          card, what is outstanding and the progress to be the hero. Still
+          always visible, never behind a click (PORTAL-SPEC calBand). */}
+      {job.worker_email && (
+        <CalBand
+          side={role === "worker" ? "worker" : "client"}
+          owner={job.worker_email.toLowerCase()}
+          jobId={job.id}
+          kind="job"
+          base={"/portal/jobs/" + encodeURIComponent(job.id)}
+          cal={cal}
+          sel={d}
+          viewerEmail={email}
+          stageNames={packStages.map((s) => s.stage)}
+        />
+      )}
 
       {/*
         The client's two controls on their own listing: edit the words, add a

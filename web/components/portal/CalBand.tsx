@@ -51,7 +51,6 @@ export async function CalBand({
   base,
   cal,
   sel,
-  viewerEmail,
   stageNames,
 }: {
   side: "worker" | "client" | "service";
@@ -192,23 +191,23 @@ export async function CalBand({
   const selEvents = sel ? (eventDays.get(sel) ?? []) : [];
 
   return (
-    <section className="mt-5 grid gap-4 rounded-2xl border border-line bg-panel p-3.5 md:grid-cols-[262px_1fr]">
+    <section className="mt-5 grid gap-4 rounded-2xl border border-line bg-panel p-3 md:grid-cols-[214px_1fr]">
       <div>
-        <div className="mb-2 flex items-center gap-2">
-          <h3 className="font-display text-[15px] uppercase">
+        <div className="mb-1.5 flex items-center gap-2">
+          <h3 className="font-display text-[13px] uppercase">
             {MONTHS[cm].slice(0, 3)} {cy}
           </h3>
-          <div className="ml-auto flex gap-1.5">
-            <Link href={`${base}?cal=${prev}${keepSel}`} aria-label="Previous month"
-              className="grid size-7 place-items-center rounded-lg border border-line text-mute hover:border-teal hover:text-tealb">&lsaquo;</Link>
-            <Link href={`${base}?cal=${next}${keepSel}`} aria-label="Next month"
-              className="grid size-7 place-items-center rounded-lg border border-line text-mute hover:border-teal hover:text-tealb">&rsaquo;</Link>
+          <div className="ml-auto flex gap-1">
+            <Link scroll={false} href={`${base}?cal=${prev}${keepSel}`} aria-label="Previous month"
+              className="grid size-6 place-items-center rounded-md border border-line text-[12px] text-mute hover:border-teal hover:text-tealb">&lsaquo;</Link>
+            <Link scroll={false} href={`${base}?cal=${next}${keepSel}`} aria-label="Next month"
+              className="grid size-6 place-items-center rounded-md border border-line text-[12px] text-mute hover:border-teal hover:text-tealb">&rsaquo;</Link>
           </div>
         </div>
-        <div className="grid grid-cols-7 gap-[3px] text-center text-[8px] font-bold uppercase tracking-widest text-dim">
+        <div className="grid grid-cols-7 gap-[2px] text-center text-[7.5px] font-bold uppercase tracking-widest text-dim">
           {DOW.map((d, i) => <span key={i} className="py-0.5">{d}</span>)}
         </div>
-        <div className="mt-1 grid grid-cols-7 gap-[3px]">
+        <div className="mt-1 grid grid-cols-7 gap-[2px]">
           {Array.from({ length: pad }).map((_, i) => <span key={"p" + i} />)}
           {Array.from({ length: daysIn }).map((_, i) => {
             const d = i + 1;
@@ -222,7 +221,7 @@ export async function CalBand({
             const state = didWork ? "worked" : hasConfirmed ? "booked" : hasPending ? "pending" : dayEvents.length ? "event" : openDays.has(k) ? "free" : "closed";
             const quiet = past && dayVisits.length === 0 && dayEvents.length === 0;
             const cls =
-              "flex min-h-[32px] flex-col items-center justify-center gap-[2px] rounded-[7px] border text-[11.5px] transition " +
+              "flex min-h-[25px] flex-col items-center justify-center gap-[1px] rounded-[6px] border text-[10.5px] transition " +
               (state === "worked" ? "border-green/45 bg-green/[0.14] font-bold text-green"
                 : state === "booked" ? "border-mango/40 bg-mango/10 font-bold text-mango"
                 : state === "pending" ? "border-coral/35 bg-coral/10 text-coral"
@@ -238,7 +237,7 @@ export async function CalBand({
                 <span className="leading-none">{d}</span>
                 {kinds.length > 0 && (
                   <span className="flex gap-[2px]" aria-hidden>
-                    {kinds.map((kd) => <i key={kd} className={"size-[4px] rounded-full " + DOT[kd]} />)}
+                    {kinds.map((kd) => <i key={kd} className={"size-[3px] rounded-full " + DOT[kd]} />)}
                   </span>
                 )}
               </>
@@ -246,42 +245,42 @@ export async function CalBand({
             return quiet ? (
               <span key={k} className={cls}>{body}</span>
             ) : (
-              <Link key={k} href={`${base}?cal=${cy}-${cm + 1}&d=${k === sel ? "" : k}`} className={cls}
+              <Link key={k} scroll={false} href={`${base}?cal=${cy}-${cm + 1}&d=${k === sel ? "" : k}`} className={cls}
                 aria-label={dayEvents.length ? `${shortDay(k)}, ${dayEvents.length} stage event${dayEvents.length === 1 ? "" : "s"}` : undefined}>
                 {body}
               </Link>
             );
           })}
         </div>
-        <div className="mt-2.5 flex flex-wrap gap-2.5 border-t border-line pt-2 text-[10px] text-dim">
-          <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-soft ring-1 ring-inset ring-softline" />Open</span>
-          <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-mango/35" />Booked</span>
-          <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-[3px] bg-coral/30" />Pending</span>
+        <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 border-t border-line pt-1.5 text-[9.5px] text-dim">
+          <span className="flex items-center gap-1"><i className="size-2 rounded-[2px] bg-soft ring-1 ring-inset ring-softline" />Open</span>
+          <span className="flex items-center gap-1"><i className="size-2 rounded-[2px] bg-mango/35" />Booked</span>
+          <span className="flex items-center gap-1"><i className="size-2 rounded-[2px] bg-coral/30" />Pending</span>
           {presentKinds.has("arrived") && (
-            <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-green" />On site</span>
+            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-green" />On site</span>
           )}
           {presentKinds.has("evidence") && (
-            <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-purpleb" />Evidence</span>
+            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-purpleb" />Evidence</span>
           )}
           {presentKinds.has("approved") && (
-            <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-goldb" />Approved</span>
+            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-goldb" />Approved</span>
           )}
           {(presentKinds.has("paid") || presentKinds.has("materials")) && (
-            <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-ink" />Paid or released</span>
+            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-ink" />Paid or released</span>
           )}
           {presentKinds.has("agreed") && (
-            <span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-dim" />Agreed</span>
+            <span className="flex items-center gap-1"><i className="size-2 rounded-full bg-dim" />Agreed</span>
           )}
         </div>
       </div>
 
       <div className="min-w-0">
-        <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-mango">
+        <h4 className="mb-1.5 text-[10px] font-bold uppercase tracking-[.2em] text-mango">
           {side === "worker" ? "Your diary" : side === "service" ? "Book time with Yaadly" : "Coming up"}
         </h4>
 
         {upcoming.length === 0 ? (
-          <p className="rounded-xl border border-line bg-bg px-3 py-2.5 text-[12px] text-dim">
+          <p className="text-[12px] leading-relaxed text-dim">
             Nothing booked yet.{" "}
             {side === "worker"
               ? "Tap a day to open it; clients can only request days you have opened."
@@ -370,50 +369,60 @@ export async function CalBand({
             )}
           </div>
         )}
-        {viewerEmail.toLowerCase() === owner.toLowerCase() && side !== "worker" ? null : null}
-      </div>
 
-      {history.length > 0 && (
-        <div className="min-w-0 border-t border-line pt-3 md:col-span-2">
-          <h4 className="text-[10px] font-bold uppercase tracking-[.2em] text-mango">Stage history</h4>
-          <p className="mb-2 mt-0.5 text-[11px] text-dim">
-            When each stage happened, by the day in Jamaica. Tap a date to see that day.
-          </p>
-          {agreed && (
-            <Link href={dayHref(agreed.day)} className="mb-1.5 flex w-fit items-center gap-1.5 text-[11.5px] text-mute hover:text-tealb">
-              <i className={"size-2 rounded-full " + DOT.agreed} />
-              {eventLabel(agreed, viewSide)}
-              <span className="font-mono-app text-[10.5px]">{shortDay(agreed.day)}</span>
-            </Link>
-          )}
-          <ul className="grid gap-1.5">
-            {history.map((r) => {
-              const steps = HISTORY_STEPS.filter(([k]) => r.firsts[k]);
-              return (
-                <li key={r.stage} className="flex flex-wrap items-center gap-x-3.5 gap-y-1 rounded-xl border border-line bg-bg px-3 py-2 text-[11.5px]">
-                  <b className="text-[12px] text-ink">
-                    Stage {r.stage}{r.name ? " · " + r.name : ""}
-                  </b>
-                  {steps.length === 0 ? (
-                    <span className="text-dim">Nothing recorded yet</span>
-                  ) : (
-                    steps.map(([k, label]) => {
+        {/* Stage history sits beside the calendar, 17 Sep 2026. It used to
+            run the full width underneath, which left the diary column mostly
+            empty and pushed the job itself halfway down the page. Founder's
+            instruction: the job card and what is outstanding are the hero,
+            the calendar supports them. Stages with nothing recorded share one
+            line rather than a box each. */}
+        {history.length > 0 && (() => {
+          const done = history.filter((r) => HISTORY_STEPS.some(([k]) => r.firsts[k]));
+          const empty = history.filter((r) => !HISTORY_STEPS.some(([k]) => r.firsts[k]));
+          const nums = empty.map((r) => r.stage);
+          const emptyLabel =
+            nums.length === 1
+              ? "Stage " + nums[0] + (empty[0].name ? " · " + empty[0].name : "")
+              : "Stages " + nums.slice(0, -1).join(", ") + " and " + nums[nums.length - 1];
+          return (
+            <div className="mt-3 border-t border-line pt-2.5">
+              <h4 className="text-[10px] font-bold uppercase tracking-[.2em] text-mango">Stage history</h4>
+              <ul className="mt-1.5 grid gap-1 text-[11.5px]">
+                {agreed && (
+                  <li>
+                    <Link scroll={false} href={dayHref(agreed.day)} className="flex w-fit items-center gap-1.5 text-mute hover:text-tealb">
+                      <i className={"size-1.5 rounded-full " + DOT.agreed} />
+                      {eventLabel(agreed, viewSide)}
+                      <span className="font-mono-app text-[10px]">{shortDay(agreed.day)}</span>
+                    </Link>
+                  </li>
+                )}
+                {done.map((r) => (
+                  <li key={r.stage} className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                    <b className="text-[12px] text-ink">
+                      Stage {r.stage}{r.name ? " · " + r.name : ""}
+                    </b>
+                    {HISTORY_STEPS.filter(([k]) => r.firsts[k]).map(([k, label]) => {
                       const e = r.firsts[k]!;
                       return (
-                        <Link key={k} href={dayHref(e.day)} className="flex items-center gap-1.5 text-mute hover:text-tealb">
-                          <i className={"size-2 rounded-full " + DOT[k]} />
+                        <Link key={k} scroll={false} href={dayHref(e.day)} className="flex items-center gap-1 text-mute hover:text-tealb">
+                          <i className={"size-1.5 rounded-full " + DOT[k]} />
                           {label}
-                          <span className="font-mono-app text-[10.5px]">{shortDay(e.day)}</span>
+                          <span className="font-mono-app text-[10px]">{shortDay(e.day)}</span>
                         </Link>
                       );
-                    })
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+                    })}
+                  </li>
+                ))}
+                {empty.length > 0 && (
+                  <li className="text-dim">{emptyLabel} · nothing recorded yet</li>
+                )}
+              </ul>
+            </div>
+          );
+        })()}
+      </div>
+
     </section>
   );
 }
