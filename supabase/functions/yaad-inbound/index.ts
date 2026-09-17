@@ -457,7 +457,7 @@ async function downloadAndStageEvidence(admin: any, url: string, mime: string, c
   return { path, mime, bytes: got.bytes.byteLength, sha256, label: (trimmed || "Sent on WhatsApp").slice(0, 140), hasCaption: !!trimmed };
 }
 
-async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence): Promise<boolean> {
+async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence, batchId: string | null = null): Promise<boolean> {
   const ext = item.path.split(".").pop();
   const finalPath = `${jobId}/${crypto.randomUUID()}.${ext}`;
   const { error: moveErr } = await admin.storage.from(EVIDENCE_MEDIA_BUCKET).move(item.path, finalPath);
@@ -470,6 +470,9 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
     // honest answer in itself and never blocks the filing. See 20260906000700.
     phase: item.phase ?? null,
     pairs_with: item.pairsWith ?? null,
+    // One id for everything confirmed together, so the page draws one update
+    // rather than a card per photo. See 20260917130000.
+    batch_id: batchId,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });
   if (insErr) {
@@ -2963,7 +2966,8 @@ Deno.serve(async (req: Request) => {
 
           const stamped = pending.map((item) => ({ ...item, phase, pairsWith }));
           let filed = 0;
-          for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
+          const batchId = stamped.length > 1 ? crypto.randomUUID() : null;
+          for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item, batchId)) filed++;
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({
             "yaadly.evidence_intake.outcome": filed ? "filed_after_phase" : "phase_but_nothing_filed",
