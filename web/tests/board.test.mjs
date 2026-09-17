@@ -1,0 +1,122 @@
+/**
+ * Tests for lib/portal/board.ts, which puts a client's jobs into the three
+ * columns of the stage board.
+ *
+ * Why this file exists. The one failure that matters here is a job vanishing
+ * from a client's portal because its status is new or unusual. A client who
+ * cannot see a disputed job assumes it has been dropped. So the test that an
+ * unmapped status still lands in a column is the one to keep, whatever else
+ * changes.
+ *
+ * Run: npm test   (from web/)
+ */
+
+import { test, describe, before } from "node:test";
+import assert from "node:assert/strict";
+import { register } from "node:module";
+import { pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+register(pathToFileURL(join(HERE, "ts-resolve-hooks.mjs")));
+
+let b;
+before(async () => {
+  b = await import(pathToFileURL(join(HERE, "../lib/portal/board.ts")).href);
+});
+
+describe("groupForBoard", () => {
+  test("every job lands in exactly one column", () => {
+    const statuses = [
+      "awaiting_client_setup", "draft", "open", "open_for_quotes", "quoted",
+      "awaiting_payment", "confirmed", "in_progress", "evidence", "complete",
+      "disputed", "cancelled", "something_new",
+    ];
+    const jobs = statuses.map((status, i) => ({ id: "JOB-" + i, status }));
+    const g = b.groupForBoard(jobs);
+    const total = g.quotes.length + g.under_way.length + g.closed.length;
+    assert.equal(total, jobs.length);
+  });
+
+  test("an unmapped status still shows, in the middle column", () => {
+    const g = b.groupForBoard([{ id: "J", status: "disputed" }]);
+    assert.deepEqual(g.under_way.map((j) => j.id), ["J"]);
+  });
+
+  test("only complete is closed", () => {
+    const g = b.groupForBoard([
+      { id: "A", status: "complete" },
+      { id: "B", status: "evidence" },
+      { id: "C", status: "cancelled" },
+    ]);
+    assert.deepEqual(g.closed.map((j) => j.id), ["A"]);
+  });
+
+  test("paying the invoice is still before the job is booked", () => {
+    assert.equal(b.columnOf("awaiting_payment"), "quotes");
+    assert.equal(b.columnOf("confirmed"), "under_way");
+  });
+
+  test("order within a column is kept", () => {
+    const g = b.groupForBoard([
+      { id: "1", status: "open" },
+      { id: "2", status: "quoted" },
+      { id: "3", status: "draft" },
+    ]);
+    assert.deepEqual(g.quotes.map((j) => j.id), ["1", "2", "3"]);
+  });
+});
+
+describe("stepOf", () => {
+  test("the ladder runs 1 to JOB_STEPS", () => {
+    assert.equal(b.stepOf("draft"), 1);
+    assert.equal(b.stepOf("complete"), b.JOB_STEPS);
+  });
+
+  test("a status off the ladder has no step, not a guessed one", () => {
+    assert.equal(b.stepOf("disputed"), null);
+  });
+});
+
+describe("pickFocusJob", () => {
+  const waiting = (j) => j.status === "quoted" || j.status === "evidence";
+
+  test("a job waiting on the client comes first, even behind a newer one", () => {
+    const f = b.pickFocusJob([
+      { id: "NEW", status: "in_progress" },
+      { id: "OLD", status: "evidence" },
+    ], waiting);
+    assert.equal(f.id, "OLD");
+  });
+
+  test("with nothing waiting, work under way beats getting quotes", () => {
+    const f = b.pickFocusJob([
+      { id: "Q", status: "open" },
+      { id: "U", status: "confirmed" },
+    ], waiting);
+    assert.equal(f.id, "U");
+  });
+
+  test("a closed job is never the focus", () => {
+    assert.equal(b.pickFocusJob([{ id: "C", status: "complete" }], waiting), null);
+  });
+});
+
+describe("the worker's board", () => {
+  test("waiting on the client's payment is already won, for the worker", () => {
+    assert.equal(b.columnOf("awaiting_payment", "worker"), "under_way");
+    assert.equal(b.columnOf("awaiting_payment", "client"), "quotes");
+  });
+
+  test("every status still lands in exactly one column", () => {
+    const statuses = ["draft", "open", "quoted", "awaiting_payment", "confirmed", "in_progress", "evidence", "complete", "disputed"];
+    const g = b.groupForBoard(statuses.map((status, i) => ({ id: String(i), status })), "worker");
+    assert.equal(g.quotes.length + g.under_way.length + g.closed.length, statuses.length);
+    assert.deepEqual(g.closed.map((j) => j.status), ["complete"]);
+  });
+
+  test("the focus job is never a closed one, for the worker either", () => {
+    assert.equal(b.pickFocusJob([{ id: "C", status: "complete" }], () => true, "worker"), null);
+  });
+});

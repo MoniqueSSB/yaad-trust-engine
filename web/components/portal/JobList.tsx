@@ -135,6 +135,7 @@ export function JobList({
   labels,
   empty,
   rail = false,
+  moneyLabel = "Your pay",
 }: {
   title: string;
   jobs: Job[];
@@ -143,6 +144,10 @@ export function JobList({
   /** A coloured left edge in the status tone, so the card reads before the
    *  pill does. Off by default: the client portal keeps its existing rows. */
   rail?: boolean;
+  /** The label beside the money line. "Your pay" is the worker's reading;
+   *  a client's services list passes "Cost", because a client reading
+   *  "Your pay" beside what they paid is being told the wrong thing. */
+  moneyLabel?: string;
 }) {
   return (
     <section className="mt-8">
@@ -195,7 +200,7 @@ export function JobList({
                     )}
                     {j.money && (
                       <>
-                        <dt className="text-dim">Your pay</dt>
+                        <dt className="text-dim">{moneyLabel}</dt>
                         <dd className="text-ink">{j.money}</dd>
                       </>
                     )}
