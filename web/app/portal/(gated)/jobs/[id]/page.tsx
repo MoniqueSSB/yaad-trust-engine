@@ -2074,6 +2074,7 @@ export default async function JobRoom({
           workerName={won?.worker_name ?? job.worker_name ?? null}
           jobBase={jobBase}
           moneyHref={jobBase + "?tab=approvals"}
+          active={tab}
         />
       </div>
     </>

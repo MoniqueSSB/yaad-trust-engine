@@ -1,4 +1,11 @@
 import Link from "next/link";
+import type { TabKey } from "@/components/portal/TabBar";
+
+const JOB_LINKS: { tab: TabKey; label: string; hint: string }[] = [
+  { tab: "evidence", label: "Progress evidence", hint: "Photos and videos for each stage" },
+  { tab: "approvals", label: "Approvals", hint: "Sign off stages and pay invoices" },
+  { tab: "overview", label: "Overview & documents", hint: "The brief, documents and your job link" },
+];
 
 /**
  * The side rail: the two or three things a person keeps glancing back at
@@ -34,6 +41,7 @@ export function JobRail({
   jobBase,
   moneyHref,
   check = null,
+  active,
 }: {
   side: "client" | "worker";
   money: (n: number | null | undefined) => string | null;
@@ -50,6 +58,8 @@ export function JobRail({
   moneyHref: string;
   /** The independent check the client added, already included in allIn. */
   check?: { label: string; jmd: number } | null;
+  /** The tab the page is showing, so its row is marked rather than linked. */
+  active: TabKey;
 }) {
   const headline = side === "client" ? allIn : takeHome;
   const initials = (workerName ?? "")
@@ -132,16 +142,52 @@ export function JobRail({
       )}
 
       <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
-        <div className="mb-1 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.16em] text-dim">This job</div>
-        <Link href={jobBase + "?tab=evidence"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Progress evidence <span className="text-dim">&rarr;</span>
-        </Link>
-        <Link href={jobBase + "?tab=approvals"} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Approvals <span className="text-dim">&rarr;</span>
-        </Link>
-        <Link href={jobBase} className="flex items-center justify-between py-2.5 text-[13px] text-mute transition hover:text-purpleb">
-          Overview &amp; documents <span className="text-dim">&rarr;</span>
-        </Link>
+        <div className="mb-2.5 font-mono-app text-[9.5px] font-semibold uppercase tracking-[0.16em] text-dim">This job</div>
+        {/* These were links from 2 Sep 2026 but read as grey text: no shape,
+            no sign of which section you were on, and a tap on the section you
+            were already in did nothing visible. Founder, 17 Sep 2026: "make
+            this clickable". Each row is now a card with a line saying what is
+            there, and the one you are on is marked, not linked. */}
+        <nav aria-label="Go to" className="flex flex-col gap-2">
+          {JOB_LINKS.map((l) => {
+            const here = l.tab === active;
+            const body = (
+              <>
+                <span className="min-w-0">
+                  <b className="block text-[13px] font-semibold leading-tight text-ink group-hover:text-tealb">
+                    {l.label}
+                  </b>
+                  <span className="mt-0.5 block text-[11.5px] leading-snug text-mute">
+                    {here ? "You are here" : l.hint}
+                  </span>
+                </span>
+                {here ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 shrink-0 fill-none stroke-teal stroke-[2.5]" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                ) : (
+                  <span aria-hidden="true" className="grid size-6.5 shrink-0 place-items-center rounded-full bg-teal/15 text-[13px] text-tealb transition group-hover:translate-x-0.5 group-hover:bg-teal/25">
+                    &rarr;
+                  </span>
+                )}
+              </>
+            );
+            const box = "flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3";
+            return here ? (
+              <div key={l.tab} aria-current="page" className={box + " border-teal/60 bg-teal/[0.08]"}>
+                {body}
+              </div>
+            ) : (
+              <Link
+                key={l.tab}
+                href={jobBase + (l.tab === "overview" ? "" : "?tab=" + l.tab)}
+                className={box + " group border-line bg-panel2 transition hover:border-teal/50 hover:bg-teal/[0.06] active:scale-[0.98]"}
+              >
+                {body}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
 
       <div className="rounded-2xl border border-line bg-green/[0.05] px-4.5 py-4">
