@@ -30,3 +30,31 @@ export function sectionMenuContent() {
     },
   };
 }
+
+// The worker update template, 17 Sep 2026. The one Yaadly template that goes
+// out to people who have NOT written in within 24 hours, so unlike the section
+// menu it needs Meta's approval before it is any use, and the setting that
+// switches it on is written only once that approval comes back. The body is
+// held word for word against yaad-notify-client/worker-template.ts by the test
+// next to this file: that file supplies the sentence that fills {{2}}.
+export const WORKER_UPDATE_NAME = "yaadly_worker_job_update_v1";
+
+export const WORKER_UPDATE_BODY =
+  "Yaadly update on your job {{1}}: {{2}}. The full details are on the job in your Yaadly portal: {{3}} Reply here if you have a question.";
+
+export function workerUpdateContent() {
+  return {
+    friendly_name: WORKER_UPDATE_NAME,
+    language: "en",
+    variables: {
+      "1": "Replace stair rails (JOB-WEB-1789253807959)",
+      "2": "the client has paid, so the job is live and you can start. When you arrive on site, send your location in this chat to check in",
+      "3": "https://app.yaadly.co.uk/portal/jobs/JOB-WEB-1789253807959",
+    },
+    types: { "twilio/text": { body: WORKER_UPDATE_BODY } },
+  };
+}
+
+/** What Meta is asked to approve it as. Utility: it is about a job the worker
+ *  is already part of, never marketing. */
+export const WORKER_UPDATE_APPROVAL = { name: WORKER_UPDATE_NAME, category: "UTILITY" };
