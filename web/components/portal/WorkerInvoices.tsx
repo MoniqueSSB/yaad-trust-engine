@@ -75,8 +75,14 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
           <li key={j.jobId} className="rounded-2xl border border-line bg-panel p-4">
             {/* Founder, 16 Sep 2026: an invoice number on its own tells the
                 worker nothing. Every group names the job, carries its job
-                number, and links to the job page the invoice belongs to. */}
-            <Link href={`/portal/jobs/${encodeURIComponent(j.jobId)}`} className="group block">
+                number, and links to the job page the invoice belongs to.
+                17 Sep 2026: on the job's pay invoices, not its top, and each
+                invoice below opens its own row there (MoneyPanel's
+                "invoice-<id>" anchor). */}
+            <Link
+              href={`/portal/jobs/${encodeURIComponent(j.jobId)}?tab=approvals#invoices`}
+              className="group block"
+            >
               <b className="text-[14.5px] group-hover:underline">{j.jobTitle ?? "Job"}</b>
               <span className="mt-0.5 block font-mono text-[11px] text-dim">
                 {j.jobId} · open the job
@@ -92,10 +98,11 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                    spans the top on a phone; the money and its status stay
                    together on the row below, which is the pairing that has
                    to survive. */
-                <li
-                  key={inv.id}
-                  className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-bg px-3 py-2 text-[12.5px] max-[560px]:grid-cols-1"
-                >
+                <li key={inv.id}>
+                  <Link
+                    href={`/portal/jobs/${encodeURIComponent(j.jobId)}?tab=approvals#invoice-${encodeURIComponent(inv.id)}`}
+                    className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1.5 rounded-xl border border-line bg-bg px-3 py-2 text-[12.5px] hover:border-teal max-[560px]:grid-cols-1"
+                  >
                   <span className="text-mute max-[560px]:col-span-full">{inv.periodLabel}</span>
                   <span className="flex flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">
                   <span className="font-bold text-tealb">{jmd(inv.totalPence)}</span>
@@ -116,6 +123,7 @@ export function WorkerInvoices({ jobs }: { jobs: WorkerInvoiceJob[] }) {
                       {inv.paidRef ? ", reference " + inv.paidRef : ""}.
                     </span>
                   )}
+                  </Link>
                 </li>
               ))}
             </ul>

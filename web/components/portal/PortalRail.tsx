@@ -239,7 +239,7 @@ export function WorkerRail({
       {focus && <FocusRing job={focus} labels={labels} />}
       <div>
         <Tiles cards={cards} title="Work and money" />
-        <MoneySplit held={held} released={released} heldLabel="Held" releasedLabel="Released" />
+        <MoneySplit held={held} released={released} heldLabel="Due on sign-off" releasedLabel="Signed off" />
       </div>
       <Link
         href="/portal/worker/payouts"

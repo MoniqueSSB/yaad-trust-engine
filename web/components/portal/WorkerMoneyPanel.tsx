@@ -59,8 +59,13 @@ function MoneyRow({ job }: { job: MoneyJob }) {
     <li className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex flex-wrap items-center gap-3">
         {/* Founder, 16 Sep 2026: every money line says which job it comes
-            from, by name and by job number, and opens that job. */}
-        <Link href={`/portal/jobs/${encodeURIComponent(job.id)}`} className="group min-w-[180px] flex-1">
+            from, by name and by job number, and opens that job. 17 Sep 2026:
+            it opens on the job's pay invoices, the same place the job list's
+            "See what you were paid" lands, not the top of the job. */}
+        <Link
+          href={`/portal/jobs/${encodeURIComponent(job.id)}?tab=approvals#invoices`}
+          className="group min-w-[180px] flex-1"
+        >
           <b className="block text-[14.5px] group-hover:underline">{job.title ?? "Untitled job"}</b>
           <span className="mt-0.5 block font-mono text-[11px] text-dim">{job.id} · open the job</span>
         </Link>
@@ -70,7 +75,7 @@ function MoneyRow({ job }: { job: MoneyJob }) {
             (job.held ? "border-mango/40 text-mango" : "border-softline bg-soft text-tealb")
           }
         >
-          {job.held ? "Held" : "Released"}
+          {job.held ? "Due on sign-off" : "Signed off"}
         </span>
         <span className="text-[15px] font-bold text-tealb">{jmd(job.takeHome)}</span>
       </div>

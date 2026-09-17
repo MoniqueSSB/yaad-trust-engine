@@ -57,7 +57,7 @@ export function MoneySplit({
       <div
         className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-panel2"
         role="img"
-        aria-label={`${heldPct}% of your money is held, ${releasedPct}% released`}
+        aria-label={`${heldPct}% of your money is due on sign-off, ${releasedPct}% signed off`}
       >
         <span className="bg-gold" style={{ width: heldPct + "%" }} />
         <span className="bg-green" style={{ width: releasedPct + "%" }} />
