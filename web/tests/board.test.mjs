@@ -54,8 +54,8 @@ describe("groupForBoard", () => {
   });
 
   test("paying the invoice is still before the job is booked", () => {
-    assert.equal(b.clientColumnOf("awaiting_payment"), "quotes");
-    assert.equal(b.clientColumnOf("confirmed"), "under_way");
+    assert.equal(b.columnOf("awaiting_payment"), "quotes");
+    assert.equal(b.columnOf("confirmed"), "under_way");
   });
 
   test("order within a column is kept", () => {
@@ -68,14 +68,14 @@ describe("groupForBoard", () => {
   });
 });
 
-describe("clientStepOf", () => {
-  test("the ladder runs 1 to CLIENT_STEPS", () => {
-    assert.equal(b.clientStepOf("draft"), 1);
-    assert.equal(b.clientStepOf("complete"), b.CLIENT_STEPS);
+describe("stepOf", () => {
+  test("the ladder runs 1 to JOB_STEPS", () => {
+    assert.equal(b.stepOf("draft"), 1);
+    assert.equal(b.stepOf("complete"), b.JOB_STEPS);
   });
 
   test("a status off the ladder has no step, not a guessed one", () => {
-    assert.equal(b.clientStepOf("disputed"), null);
+    assert.equal(b.stepOf("disputed"), null);
   });
 });
 
@@ -100,5 +100,23 @@ describe("pickFocusJob", () => {
 
   test("a closed job is never the focus", () => {
     assert.equal(b.pickFocusJob([{ id: "C", status: "complete" }], waiting), null);
+  });
+});
+
+describe("the worker's board", () => {
+  test("waiting on the client's payment is already won, for the worker", () => {
+    assert.equal(b.columnOf("awaiting_payment", "worker"), "under_way");
+    assert.equal(b.columnOf("awaiting_payment", "client"), "quotes");
+  });
+
+  test("every status still lands in exactly one column", () => {
+    const statuses = ["draft", "open", "quoted", "awaiting_payment", "confirmed", "in_progress", "evidence", "complete", "disputed"];
+    const g = b.groupForBoard(statuses.map((status, i) => ({ id: String(i), status })), "worker");
+    assert.equal(g.quotes.length + g.under_way.length + g.closed.length, statuses.length);
+    assert.deepEqual(g.closed.map((j) => j.status), ["complete"]);
+  });
+
+  test("the focus job is never a closed one, for the worker either", () => {
+    assert.equal(b.pickFocusJob([{ id: "C", status: "complete" }], () => true, "worker"), null);
   });
 });

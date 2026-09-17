@@ -3,16 +3,20 @@ import { STATUS_DOT, type StatusLabel, type StatusTone } from "./statusTone";
 import { WhereText, type Job } from "./JobList";
 import { whenDate } from "@/lib/date";
 import {
-  CLIENT_BOARD_COLUMNS,
-  CLIENT_STEPS,
-  clientStepOf,
+  JOB_STEPS,
+  columnsFor,
+  stepOf,
   groupForBoard,
+  type BoardAudience,
   type BoardColumnKey,
 } from "@/lib/portal/board";
 
 /**
- * The client's jobs as three columns by stage, 17 Sep 2026, from the Portal
- * Overview design.
+ * A portal's jobs as three columns by stage, 17 Sep 2026, from the Portal
+ * Overview design. The client portal and the worker portal both use it; the
+ * audience decides the column titles and where awaiting_payment sits
+ * (lib/portal/board.ts). The wording on each card still comes from the
+ * portal's own status map.
  *
  * It replaces the pill strip and the two stacked lists (live, then closed)
  * for jobs. Services keep their own list below it: they have a six step
@@ -63,7 +67,7 @@ const BAR: Record<StatusTone, string> = {
 
 function BoardCard({ job, labels }: { job: Job; labels: Record<string, StatusLabel> }) {
   const s = labels[job.status] ?? { label: job.status, tone: "idle" as StatusTone };
-  const step = clientStepOf(job.status);
+  const step = stepOf(job.status);
   const updated = whenDate(job.updated_at);
   const tag = s.tone === "waiting" ? "Needs you" : job.trade;
 
@@ -97,7 +101,7 @@ function BoardCard({ job, labels }: { job: Job; labels: Record<string, StatusLab
           </span>
           {step != null && (
             <span className="shrink-0 font-mono-app text-[11px] text-dim">
-              Step {step} of {CLIENT_STEPS}
+              Step {step} of {JOB_STEPS}
             </span>
           )}
         </div>
@@ -106,11 +110,11 @@ function BoardCard({ job, labels }: { job: Job; labels: Record<string, StatusLab
           <div
             className="h-[5px] overflow-hidden rounded-full bg-panel2"
             role="img"
-            aria-label={`Step ${step} of ${CLIENT_STEPS}`}
+            aria-label={`Step ${step} of ${JOB_STEPS}`}
           >
             <span
               className={"block h-full rounded-full " + BAR[s.tone]}
-              style={{ width: Math.round((step / CLIENT_STEPS) * 100) + "%" }}
+              style={{ width: Math.round((step / JOB_STEPS) * 100) + "%" }}
             />
           </div>
         )}
@@ -141,10 +145,12 @@ export function StageBoard({
   jobs,
   labels,
   empty,
+  audience = "client",
 }: {
   jobs: Job[];
   labels: Record<string, StatusLabel>;
   empty: string;
+  audience?: BoardAudience;
 }) {
   if (jobs.length === 0) {
     return (
@@ -157,7 +163,7 @@ export function StageBoard({
     );
   }
 
-  const groups = groupForBoard(jobs);
+  const groups = groupForBoard(jobs, audience);
 
   return (
     <section className="mt-8 lg:mt-0">
@@ -165,7 +171,7 @@ export function StageBoard({
         Your jobs, by stage
       </h2>
       <div className="grid items-start gap-3 md:grid-cols-3">
-        {CLIENT_BOARD_COLUMNS.map((col) => {
+        {columnsFor(audience).map((col) => {
           const list = groups[col.key];
           const folded = col.key === "closed" && list.length > CLOSED_SHOWN;
           const shown = folded ? list.slice(0, CLOSED_SHOWN) : list;
@@ -195,7 +201,7 @@ export function StageBoard({
               {rest.length > 0 && (
                 <details className="group">
                   <summary className="cursor-pointer list-none rounded-2xl border border-dashed border-line2 px-3 py-3 text-center text-[12px] font-semibold text-mute transition hover:border-softline hover:text-purpleb">
-                    <span className="group-open:hidden">Show {rest.length} more closed</span>
+                    <span className="group-open:hidden">Show {rest.length} more</span>
                     <span className="hidden group-open:inline">Show fewer</span>
                   </summary>
                   <ul className="mt-2.5 flex flex-col gap-2.5">

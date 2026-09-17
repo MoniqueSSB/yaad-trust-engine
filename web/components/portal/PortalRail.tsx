@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { type Job, type StatusLabel } from "./JobList";
 import { STATUS_DOT, type StatusTone } from "./statusTone";
-import type { StatCard } from "./WorkerOverview";
-import { CLIENT_STEPS, clientStepOf } from "@/lib/portal/board";
+import { MoneySplit, type StatCard } from "./WorkerOverview";
+import { LinkWorkerPhone } from "./LinkWorkerPhone";
+import type { PayoutReadiness } from "@/lib/portal/payout-status";
+import { JOB_STEPS, stepOf } from "@/lib/portal/board";
 import { amount } from "@/lib/money";
 import type { ToPay } from "@/lib/portal/to-pay";
 
 /**
- * The client portal's right-hand panel, 17 Sep 2026, from the Portal Overview
+ * The portals' right-hand panels, 17 Sep 2026, from the Portal Overview
  * design. Beside the stage board on a wide screen, above it on a phone.
+ * ClientRail first; WorkerRail, which shares the ring and the tiles, is at
+ * the bottom of this file.
+ *
+ * The client's panel:
  *
  * Three cards, each built only from rows the page already reads:
  *
@@ -37,7 +43,7 @@ const RING = 2 * Math.PI * 56;
 
 function FocusRing({ job, labels }: { job: Job; labels: Record<string, StatusLabel> }) {
   const s = labels[job.status] ?? { label: job.status, tone: "idle" as StatusTone };
-  const step = clientStepOf(job.status);
+  const step = stepOf(job.status);
   const waiting = s.tone === "waiting";
   const stroke = waiting ? "stroke-gold" : "stroke-purple";
 
@@ -65,12 +71,12 @@ function FocusRing({ job, labels }: { job: Job; labels: Record<string, StatusLab
               className={"fill-none stroke-[13] " + stroke}
               strokeLinecap="round"
               strokeDasharray={RING}
-              strokeDashoffset={RING * (1 - step / CLIENT_STEPS)}
+              strokeDashoffset={RING * (1 - step / JOB_STEPS)}
             />
           </svg>
-          <span className="text-center" role="img" aria-label={`Step ${step} of ${CLIENT_STEPS}`}>
+          <span className="text-center" role="img" aria-label={`Step ${step} of ${JOB_STEPS}`}>
             <b className="block font-mono-app text-[24px] font-semibold leading-none">Step {step}</b>
-            <span className="text-[11px] text-dim">of {CLIENT_STEPS}</span>
+            <span className="text-[11px] text-dim">of {JOB_STEPS}</span>
           </span>
         </div>
       )}
@@ -88,17 +94,22 @@ function FocusRing({ job, labels }: { job: Job; labels: Record<string, StatusLab
   );
 }
 
-function Tiles({ cards }: { cards: StatCard[] }) {
+function Tiles({ cards, title = "Jobs" }: { cards: StatCard[]; title?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-[rgba(13,13,40,0.5)] px-4.5 py-4">
-      <div className="mb-3 font-mono-app text-[9.5px] font-semibold uppercase tracking-[.16em] text-dim">Jobs</div>
+      <div className="mb-3 font-mono-app text-[9.5px] font-semibold uppercase tracking-[.16em] text-dim">{title}</div>
       <div className="grid grid-cols-2 gap-2">
         {cards.map((c) => (
           <div key={c.label} className={"rounded-xl border px-3 py-2.5 " + TILE[c.tone].box} title={c.note}>
             <div className="font-mono-app text-[9px] font-semibold uppercase tracking-[.12em] text-dim">{c.label}</div>
             <div className="mt-1 flex items-center gap-1.5">
-              <i className={"h-[15px] w-[2px] " + TILE[c.tone].bar} aria-hidden />
-              <b className="font-mono-app text-[18px] font-semibold leading-none">{c.value}</b>
+              <i className={"h-[15px] w-[2px] shrink-0 " + TILE[c.tone].bar} aria-hidden />
+              {/* A J$ figure is wider than a count, and the tile is a quarter
+                  of a 290px panel, so a long value steps down a size rather
+                  than breaking onto two lines. */}
+              <b className={"min-w-0 font-mono-app font-semibold leading-none " + (c.value.length > 7 ? "text-[13px]" : "text-[18px]")}>
+                {c.value}
+              </b>
             </div>
           </div>
         ))}
@@ -189,6 +200,70 @@ export function ClientRail({
           <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
         </Link>
       )}
+    </aside>
+  );
+}
+
+/**
+ * The worker's panel. The ring and the tiles are the client's, fed the
+ * worker's own status wording and figures. Below them, the held and released
+ * bar the page already had, then where the worker stands on being paid.
+ *
+ * What the design had and this does not: a bank details form with account
+ * number and branch fields. Yaadly stores no bank details (14 Sep 2026). The
+ * card links to /portal/worker/payouts, where the worker gives them to Stripe
+ * or Wise, and says which step is next (payout-status.ts). The design's
+ * "Payout in 1 working day" is also not carried over: workers are paid within
+ * 7 days, and that sentence already sits on the Released tile.
+ */
+export function WorkerRail({
+  focus,
+  labels,
+  cards,
+  held,
+  released,
+  payout,
+  phone,
+}: {
+  focus: Job | null;
+  labels: Record<string, StatusLabel>;
+  cards: StatCard[];
+  held: number;
+  released: number;
+  payout: PayoutReadiness;
+  phone: string | null;
+}) {
+  const ready = payout.state === "ready";
+  return (
+    <aside className="flex min-w-0 flex-col gap-3">
+      {focus && <FocusRing job={focus} labels={labels} />}
+      <div>
+        <Tiles cards={cards} title="Work and money" />
+        <MoneySplit held={held} released={released} heldLabel="Held" releasedLabel="Released" />
+      </div>
+      <Link
+        href="/portal/worker/payouts"
+        className={
+          "block rounded-2xl border p-4.5 transition " +
+          (ready ? "border-green/25 bg-green/[0.04] hover:border-green/45" : "border-gold/30 bg-gold/[0.06] hover:border-gold/60")
+        }
+      >
+        <div className="flex items-center gap-2">
+          <span className={"font-mono-app text-[9.5px] font-semibold uppercase tracking-[.16em] " + (ready ? "text-green" : "text-goldb")}>
+            How Yaadly pays you
+          </span>
+        </div>
+        <b className="mt-1.5 block font-display text-[17px] font-normal leading-tight">{payout.title}</b>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-mute">{payout.detail}</p>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-dim">By bank transfer into your own account, within 7 days. Never cash.</p>
+        <span className={"mt-3 block border-t pt-3 text-[12.5px] font-semibold " + (ready ? "border-green/20 text-green" : "border-gold/20 text-goldb")}>
+          {payout.cta} &rarr;
+        </span>
+      </Link>
+      {/* LinkWorkerPhone brings its own mt-4; the panel's gap already spaces it. */}
+      <div className="-mt-4">
+        <LinkWorkerPhone phone={phone} />
+      </div>
     </aside>
   );
 }

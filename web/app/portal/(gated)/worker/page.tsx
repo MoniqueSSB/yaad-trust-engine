@@ -2,11 +2,13 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import { JobList, WORKER_STATUS, type Job } from "@/components/portal/JobList";
-import { MoneySplit, WorkerPipeline, WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
+import { type StatCard } from "@/components/portal/WorkerOverview";
+import { StageBoard } from "@/components/portal/StageBoard";
+import { WorkerRail } from "@/components/portal/PortalRail";
+import { pickFocusJob } from "@/lib/portal/board";
+import { payoutReadiness, type PayoutProfile } from "@/lib/portal/payout-status";
 import { WorkerMoneyPanel, type MoneyJob } from "@/components/portal/WorkerMoneyPanel";
 import { WorkerInvoices, type WorkerInvoiceJob } from "@/components/portal/WorkerInvoices";
-import { LinkWorkerPhone } from "@/components/portal/LinkWorkerPhone";
-import Link from "next/link";
 import { LIVE_QUOTE, type Tender } from "@/components/portal/QuotedJobRoom";
 import { jmd } from "@/lib/money";
 
@@ -55,7 +57,7 @@ export default async function WorkerPortal() {
 
   const { data: profile } = await supabase
     .from("worker_profiles")
-    .select("phone")
+    .select("phone,wise_recipient_set_at,bank_callback_at,stripe_recipient_status")
     .eq("worker_user", user.id)
     .maybeSingle();
 
@@ -288,6 +290,9 @@ export default async function WorkerPortal() {
     },
   ];
 
+  const focus = pickFocusJob(liveRows, (j) => WORKER_STATUS[j.status]?.tone === "waiting", "worker");
+  const payout = payoutReadiness((profile ?? null) as PayoutProfile | null);
+
   return (
     <>
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -310,61 +315,48 @@ export default async function WorkerPortal() {
         </p>
       )}
 
-      <WorkerStatCards cards={cards} />
+      {/*
+        The same layout as the client portal, 17 Sep 2026, from the Portal
+        Overview design: the work by stage on the left, the panel on the right
+        (WorkerRail: the job to act on first, the money and job counts, the
+        held and released bar, and where the worker stands on being paid). On
+        a phone the panel comes first, where the figures have always been.
 
-      <MoneySplit
-        held={held}
-        released={released}
-        heldLabel="Held"
-        releasedLabel="Released"
-      />
-
-      <WorkerPipeline jobs={live} labels={WORKER_STATUS} />
-
-      {/* Two columns on a wide screen: the work on the left, because that is
-          what changes day to day, and the money trail on the right beside it.
-          On a phone they stack in the same order, work first. */}
-      <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        <div>
-          <JobList
-            title="Live work"
-            jobs={liveRows}
+        The board replaced the pill strip and the live then completed lists.
+        Quotes that closed keep their own list under it: they are not this
+        worker's work any more, and a column would read as if they were.
+        The money panel and the invoice trail follow, full width, because
+        they are job by job lists and need the room.
+      */}
+      <div className="mt-6 grid items-start gap-x-5 gap-y-2 lg:grid-cols-[minmax(0,1fr)_290px]">
+        <div className="lg:order-last">
+          <WorkerRail
+            focus={focus}
             labels={WORKER_STATUS}
-            rail
+            cards={cards}
+            held={held}
+            released={released}
+            payout={payout}
+            phone={profile?.phone ?? null}
+          />
+        </div>
+
+        <div className="min-w-0">
+          <StageBoard
+            audience="worker"
+            jobs={[...liveRows, ...doneRows]}
+            labels={WORKER_STATUS}
             empty="Nothing live right now. Jobs you are matched to or have quoted on appear here."
           />
-
-          {done.length > 0 && (
-            <JobList title="Completed" jobs={doneRows} labels={WORKER_STATUS} rail />
-          )}
 
           {closedQuotes.length > 0 && (
             <JobList title="Quotes that closed" jobs={closedRows} labels={WORKER_STATUS} rail />
           )}
-        </div>
 
-        <aside>
           <WorkerMoneyPanel jobs={moneyJobs} />
 
           <WorkerInvoices jobs={invoiceJobs} />
-
-          {/* LinkWorkerPhone brings its own mt-4; together that is the mt-8
-              every other section in this column starts with. */}
-          <div className="mt-4">
-            <LinkWorkerPhone phone={profile?.phone ?? null} />
-            {/* How Yaadly pays them: bank transfer only for now, never cash
-                (20260914220000). Stripe setup is coming soon. */}
-            <section className="mt-4 rounded-2xl border border-line bg-panel p-4">
-              <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">How Yaadly pays you</p>
-              <p className="mt-1 text-[12px] leading-relaxed text-dim">
-                By bank transfer, into your own bank account. Never cash.
-              </p>
-              <Link href="/portal/worker/payouts" className="mt-2.5 inline-block text-[12.5px] font-bold text-tealb underline-offset-2 hover:underline">
-                See how
-              </Link>
-            </section>
-          </div>
-        </aside>
+        </div>
       </div>
     </>
   );

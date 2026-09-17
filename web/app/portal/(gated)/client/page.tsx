@@ -8,7 +8,7 @@ import { SERVICE_TRACK, svcStage } from "@/lib/portal/journey";
 import { jmd } from "@/lib/money";
 import { type StatCard } from "@/components/portal/WorkerOverview";
 import { StageBoard } from "@/components/portal/StageBoard";
-import { ClientRail } from "@/components/portal/ClientRail";
+import { ClientRail } from "@/components/portal/PortalRail";
 import { pickFocusJob } from "@/lib/portal/board";
 import { toPay, type ToPayInvoice } from "@/lib/portal/to-pay";
 import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";

@@ -1,6 +1,9 @@
 /**
- * The client portal's stage board: which column a job sits in, and how far
- * along the job ladder it is.
+ * The portal stage board: which column a job sits in, and how far along the
+ * job ladder it is. Client portal from 17 Sep 2026, worker portal the same
+ * day. The ladder is the same statuses for both; the columns differ, because
+ * "waiting on the client's payment" is still getting started for a client
+ * and already won for the worker.
  *
  * Founder, 17 Sep 2026, from the Portal Overview design: a client's jobs laid
  * out in three columns by stage rather than as one long list. Kept apart from
@@ -20,12 +23,32 @@
  */
 
 export type BoardColumnKey = "quotes" | "under_way" | "closed";
+export type BoardAudience = "client" | "worker";
 
 export const CLIENT_BOARD_COLUMNS: { key: BoardColumnKey; title: string }[] = [
   { key: "quotes", title: "Getting quotes" },
   { key: "under_way", title: "Booked and under way" },
   { key: "closed", title: "Closed" },
 ];
+
+export const WORKER_BOARD_COLUMNS: { key: BoardColumnKey; title: string }[] = [
+  { key: "quotes", title: "Quoting" },
+  { key: "under_way", title: "Won and working" },
+  { key: "closed", title: "Paid and closed" },
+];
+
+const WORKER_COLUMN_OF: Record<string, BoardColumnKey> = {
+  awaiting_client_setup: "quotes",
+  draft: "quotes",
+  open: "quotes",
+  open_for_quotes: "quotes",
+  quoted: "quotes",
+  awaiting_payment: "under_way",
+  confirmed: "under_way",
+  in_progress: "under_way",
+  evidence: "under_way",
+  complete: "closed",
+};
 
 const CLIENT_COLUMN_OF: Record<string, BoardColumnKey> = {
   awaiting_client_setup: "quotes",
@@ -41,8 +64,8 @@ const CLIENT_COLUMN_OF: Record<string, BoardColumnKey> = {
 };
 
 /** The ladder in the order a job climbs it. Two statuses on one rung share a
- *  step because they mean the same thing to the client. */
-const CLIENT_STEP_OF: Record<string, number> = {
+ *  step because they mean the same thing to whoever is reading. */
+const STEP_OF: Record<string, number> = {
   awaiting_client_setup: 1,
   draft: 1,
   open: 2,
@@ -55,28 +78,34 @@ const CLIENT_STEP_OF: Record<string, number> = {
   complete: 8,
 };
 
-export const CLIENT_STEPS = 8;
+export const JOB_STEPS = 8;
 
-export function clientColumnOf(status: string): BoardColumnKey {
-  return CLIENT_COLUMN_OF[status] ?? "under_way";
+export function columnOf(status: string, audience: BoardAudience = "client"): BoardColumnKey {
+  const map = audience === "worker" ? WORKER_COLUMN_OF : CLIENT_COLUMN_OF;
+  return map[status] ?? "under_way";
+}
+
+export function columnsFor(audience: BoardAudience) {
+  return audience === "worker" ? WORKER_BOARD_COLUMNS : CLIENT_BOARD_COLUMNS;
 }
 
 /** The rung a status sits on, or null for a status that is not on the ladder. */
-export function clientStepOf(status: string): number | null {
-  return CLIENT_STEP_OF[status] ?? null;
+export function stepOf(status: string): number | null {
+  return STEP_OF[status] ?? null;
 }
 
 /** Jobs split into the three columns, keeping the order they came in. */
 export function groupForBoard<T extends { status: string }>(
   jobs: T[],
+  audience: BoardAudience = "client",
 ): Record<BoardColumnKey, T[]> {
   const out: Record<BoardColumnKey, T[]> = { quotes: [], under_way: [], closed: [] };
-  for (const j of jobs) out[clientColumnOf(j.status)].push(j);
+  for (const j of jobs) out[columnOf(j.status, audience)].push(j);
   return out;
 }
 
 /**
- * The one job the right-hand panel's ring is about.
+ * The one job the right-hand panel's ring is about, for either portal.
  *
  * The design showed a "Selected" job with no rule for choosing it. The rule
  * here: the first job waiting on the client, because that is the one they
@@ -91,11 +120,12 @@ export function groupForBoard<T extends { status: string }>(
 export function pickFocusJob<T extends { status: string }>(
   jobs: T[],
   isWaiting: (j: T) => boolean,
+  audience: BoardAudience = "client",
 ): T | null {
-  const live = jobs.filter((j) => clientColumnOf(j.status) !== "closed");
+  const live = jobs.filter((j) => columnOf(j.status, audience) !== "closed");
   return (
     live.find(isWaiting) ??
-    live.find((j) => clientColumnOf(j.status) === "under_way") ??
+    live.find((j) => columnOf(j.status, audience) === "under_way") ??
     live[0] ??
     null
   );
