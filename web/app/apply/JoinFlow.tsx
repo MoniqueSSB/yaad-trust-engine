@@ -204,21 +204,14 @@ const WHO: { yes: string; why: string }[] = [
     why: "The call happens before you can take work over £500. Nobody reaches a client's gate unverified." },
 ];
 
-/* What it takes, split at the point a person says yes. Said before anybody
-   types, so nobody starts on a phone and stalls hunting for a document that
-   was never needed today. */
-const NEED_NOW = [
-  "Your name",
-  "A phone number or an email address, either one",
-  "The trades you take",
-  "The parishes you will travel to",
-];
-const NEED_LATER = [
-  "Government photo ID",
-  "Your TRN, the nine digit number",
-  "Proof of address dated within the last three months",
-  "Three people who will vouch for you",
-];
+/* Years at the trade, as four bands rather than a free number (founder's
+   design, 17 Sep 2026). Still optional and still never a gate. It travels as
+   the band's own words, so the desk reads "3 to 10" rather than a guess. */
+const YEARS = ["Under 3", "3 to 10", "10 to 20", "20+"];
+
+/* What was on the first screen as "what you need now" and "what you need
+   later" is now the bottom bar (the four ticks) and one line inside "Who this
+   is for". Said once rather than twice. */
 
 /* Upload limits, in one place and stated on every row that takes a file.
    50MB is the bucket's own cap in yaad-vetting-upload, and before this the
@@ -239,19 +232,24 @@ const MAX_MB = 50;
    possible, and reachable here from the confirmation screen for anybody who
    would rather do it in a browser. Nothing was deleted, it was moved to the
    point where it is earned. */
+/* Copy for the three Phase 1 screens follows the founder's design of
+   17 Sep 2026 (Claude Design, "Join as a Pro"): short headings, and the
+   requirement shown next to each field rather than explained in a paragraph.
+   `p` and `note` are empty on purpose where the design has none; both are
+   only drawn when they say something. */
 const PHASE1_STEPS: Step[] = [
 { phase: 1, n: "Your trades", body: "form",
     h: "Your trades, and every parish you cover",
-    p: "Take as many trades as you actually do, and name one yourself if it is not on our list. Pick every parish you will travel to, a job in a parish you have not ticked never reaches you.",
-    note: "Your trades and job types come from the same list a client picks from. That is the only reason a client's roofing job and your roofing profile can find each other at all." },
-{ phase: 1, n: "Your work", body: "port",
-    h: "Show us the work, however you have it",
-    p: "A CV, a portfolio, a link to your site or socials, photos of finished jobs. <b>Any one of these is enough to start</b>, but the more you show the faster vetting moves. If you hold a certificate, upload it, we verify it with the body that issued it, not just look at the picture.",
-    note: "We accept CVs. Plenty of good tradespeople have one and nobody has ever asked them for it." },
+    p: "",
+    note: "" },
+{ phase: 1, n: "Your track record", body: "port",
+    h: "Anything here makes your quote land harder",
+    p: "All of it is optional and can wait. Skip straight to sending if you would rather.",
+    note: "" },
 { phase: 1, n: "Check and send", body: "live",
-    h: "This is how a client will see you",
-    p: "Check it reads the way you would say it yourself. <b>Nothing here is fixed</b>, you can change any of it later, and the badge and the score fill in as you complete jobs.",
-    note: "Free to join, free to quote, win or lose. Your price is agreed with you per job, before you start." },
+    h: "This is what goes to a person",
+    p: "",
+    note: "" },
 ];
 
 const LATER_STEPS: Step[] = [
@@ -357,6 +355,9 @@ async function call(body: Record<string, unknown>): Promise<Record<string, unkno
 
 export function JoinFlow() {
   const [step, setStep] = useState(0);
+  /* "Who this is for", folded by default so the first screen opens on the
+     form. Not saved: it is a reading aid, not part of the application. */
+  const [showWho, setShowWho] = useState(false);
   /* The step heading, so advancing can move focus to it. Without this a screen
      reader user pressed Continue and heard nothing at all: focus stayed on a
      button that had just been replaced, the page swapped underneath, and the
@@ -925,13 +926,9 @@ export function JoinFlow() {
   if (savedLater) {
     return (
       <>
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Saved</p>
-        <h1 className="mt-2 font-display text-[clamp(28px,5vw,52px)] uppercase leading-[.95]">
-          That is added to
-          <br />
-          <span className="bg-gradient-to-r from-mango to-coral bg-clip-text text-transparent">
-            {sentRef}.
-          </span>
+        <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-goldb">Saved</p>
+        <h1 className="mt-2 font-display text-[clamp(26px,6vw,32px)] font-light leading-[1.15] tracking-[-0.02em]">
+          That is added to <span className="font-mono text-[0.8em]">{sentRef}</span>.
         </h1>
         <div className="mt-6 max-w-[62ch] rounded-2xl border border-softline bg-soft p-6 text-[14.5px] leading-relaxed text-mute">
           <b className="text-ink">What you have just added</b>
@@ -968,40 +965,47 @@ export function JoinFlow() {
   /* ── the sent screen ───────────────────────────────────────────────── */
 
   if (sentRef && !continuing) {
+    /* "Sent" first, in the founder's design (17 Sep 2026). The reference
+       stays right under it: it is the only thing that gets somebody back to
+       this application from another phone, so it is not optional furniture. */
+    const firstName = name.trim().split(/\s+/)[0];
+    const tradesSent = [...trades, tradeOther.trim()].filter(Boolean);
     return (
-      <>
-        <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">Application sent</p>
-        <h1 className="mt-2 font-display text-[clamp(28px,5vw,52px)] uppercase leading-[.95]">
-          It is with a person now.
-          <br />
-          <span className="bg-gradient-to-r from-mango to-coral bg-clip-text text-transparent">
-            Your reference is {sentRef}.
-          </span>
-        </h1>
-        <div className="mt-6 max-w-[62ch] rounded-2xl border border-softline bg-soft p-6 text-[14.5px] leading-relaxed text-mute">
-          <b className="text-ink">What happens next, in order.</b>
-          <p className="mt-3">
-            <b className="text-ink">A person at the Yaadly desk reads every page
-            from cold</b>, then telephones your referees. That is the part
-            nothing automates, and it is the reason a client believes the badge
-            on your profile.{" "}
-            {sentConsent === "granted"
-              ? "Your paperwork goes to the model you agreed to first, and your identity documents go nowhere near it."
-              : "Nothing about your documents is sent outside Yaadly."}{" "}
-            Allow <b className="text-ink">within 24 hours</b>.
+      <div className="jwrap jwrap-sent">
+        <div className="jrise flex flex-col gap-4 pt-6">
+          <span className="grid size-[52px] place-items-center rounded-[15px] border border-green/35 bg-green/10 text-[23px] text-green" aria-hidden="true">✓</span>
+          <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim">Application sent</p>
+          <h1 className="font-display text-[clamp(26px,6vw,32px)] font-light leading-[1.15] tracking-[-0.02em]">
+            Sent. A person reads it inside 24 hours.
+          </h1>
+          <p className="text-[15px] leading-relaxed text-mute text-pretty">
+            {firstName ? `${firstName}, your` : "Your"} application for{" "}
+            {tradesSent.length ? tradesSent.slice(0, 2).join(" and ") : "your trade"} is
+            in. You get a straight answer either way, and the verification steps
+            come after that. Allow <b className="text-ink">within 24 hours</b>, and
+            quote your reference if you contact us first.
           </p>
-          <p className="mt-3">
-            You will hear back on whichever way you gave us to reach you. Quote
-            your reference if you contact us first.
-          </p>
-          <CopyRef reference={sentRef} />
+          <div className="rounded-2xl border border-line px-4 py-3">
+            <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim">Your reference</span>
+            <CopyRef reference={sentRef} />
+          </div>
+          <a href={WA_JOIN} target="_blank" rel="noopener noreferrer" className="jwa">
+            <span className="flex flex-col">
+              <b className="text-[14.5px] text-ink">Want it faster?</b>
+              <span className="text-[12.5px] leading-snug text-mute">
+                Say hello on WhatsApp and give your reference. It is where we
+                chase the next steps.
+              </span>
+            </span>
+            <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>
+          </a>
         </div>
 
         {/* WHAT THIS IS NOT. The page said "it is with a person now" and left
             it there, which a tradesperson can reasonably read as being in.
             Applying is not acceptance, and the honest version of that has to
             be on the one screen everybody who applies reaches. */}
-        <div className="mt-4 max-w-[62ch] rounded-2xl border border-line2 bg-bg p-5 text-[13.5px] leading-relaxed text-mute">
+        <div className="mt-4 rounded-2xl border border-line2 bg-bg p-5 text-[13.5px] leading-relaxed text-mute">
           <b className="text-ink">Where you stand, plainly.</b>
           <p className="mt-2">
             Your profile exists from the moment you sent this, and it is{" "}
@@ -1017,7 +1021,7 @@ export function JoinFlow() {
         {/* Checks, drawn from `done`, which only ever ticks when the thing is
             actually true. It is the standing rule for this file: no row here
             may describe a check the code has not performed. */}
-        <div className="mt-4 max-w-[62ch] rounded-2xl border border-line bg-panel p-5">
+        <div className="mt-4 rounded-2xl border border-line bg-panel p-5">
           <b className="text-[15px] text-ink">Where your application stands</b>
           <ul className="mt-3 grid gap-2 text-[13px] leading-relaxed">
             <li className="flex items-start gap-2">
@@ -1076,7 +1080,7 @@ export function JoinFlow() {
             here is required to have been done for the desk to read it. */}
         <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
           <b className="text-[15px] text-ink">Want to get ahead of it?</b>
-          <p className="mt-2 max-w-[62ch] text-[13.5px] leading-relaxed text-mute">
+          <p className="mt-2 text-[13.5px] leading-relaxed text-mute">
             Your ID check, your referees and the Worker Guidelines are the next
             things we ask for, and we normally chase them on WhatsApp once a
             person has read your application. You can do them now instead. It
@@ -1089,7 +1093,7 @@ export function JoinFlow() {
           </button>
         </div>
 
-        <p className="mt-4 max-w-[62ch] text-[12.5px] leading-relaxed text-dim">
+        <p className="mt-4 text-[12.5px] leading-relaxed text-dim">
           {persona.state === "done" ? (
             <>Your ID and selfie are held by Persona, the identity service that
             ran your check, under Yaadly&rsquo;s account there. Every document
@@ -1103,32 +1107,62 @@ export function JoinFlow() {
             passport.</>
           )}
         </p>
-      </>
+      </div>
     );
   }
 
   /* ── the flow ──────────────────────────────────────────────────────── */
 
+  /* The four things that open Phase 1, as the bottom bar ticks them. The same
+     test as step1Ready, split so each tick is true only when its own part is. */
+  const needs: [string, boolean][] = [
+    ["Trade", trades.length > 0],
+    ["Parish", parishes.length > 0],
+    ["Name", name.trim().length > 1],
+    ["Contact", hasPhone || hasEmail],
+  ];
+  const req = (ok: boolean, yes: string, no: string) => (
+    <span className={"ml-auto font-mono text-[10.5px] font-semibold uppercase tracking-[.1em] " + (ok ? "text-green" : "text-goldb")}>
+      {ok ? yes : no}
+    </span>
+  );
+
   return (
-    <>
-      <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-mango">
-        For tradespeople
-      </p>
-      <h1 className="mt-2 font-display text-[clamp(28px,5vw,52px)] uppercase leading-[.95]">
-        Getting on the board
-        <br />
-        <span className="bg-gradient-to-r from-mango to-coral bg-clip-text text-transparent">
-          is not a form. It is a check.
-        </span>
-      </h1>
-      <p className="mt-4 max-w-[62ch] text-[16px] leading-relaxed text-mute">
-        Free to join. Free to quote, win or lose. But nobody reaches a client&rsquo;s
-        gate unverified, and that is the reason a client trusts the quote you send
-        them.
-      </p>
+    <div className={"jwrap" + (continuing ? "" : " jwrap-p1")}>
+      {/* The sitting, and how far through it. Phase 1 only: it is three
+          screens, and "step 2 of 3" is reassuring in a way a count across both
+          sittings would not be (see Progress). Phase 2 keeps its own dots. */}
+      {!continuing && (
+        <div className="jtop">
+          <span className="jtop-tag">Step {at + 1} of {STEPS.length} · about 2 minutes</span>
+          <div className="jtop-bar" role="presentation">
+            <i style={{ width: `${((at + 1) / STEPS.length) * 100}%` }} />
+          </div>
+        </div>
+      )}
+
+      {at === 0 && !continuing && (
+        <div className="jrise mt-6 flex flex-col gap-3.5">
+          <span className="self-start rounded-full border border-gold/30 bg-gold/10 px-3 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-goldb">
+            For tradespeople
+          </span>
+          <h1 className="font-display text-[clamp(28px,6vw,34px)] font-light leading-[1.12] tracking-[-0.02em] text-pretty">
+            Getting on the board is not a form. It is a check.
+          </h1>
+          <p className="text-[15.5px] leading-relaxed text-mute text-pretty">
+            Two minutes now. A real person reads it inside 24 hours and gives you
+            a straight answer either way.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <span className="jpill">Free to join</span>
+            <span className="jpill">Free to quote, win or lose</span>
+            <span className="jpill jpill-green">Answer in 24 hours</span>
+          </div>
+        </div>
+      )}
 
       {claim && (
-        <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-dim">
+        <p className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-dim">
           <span>
             <b className="font-normal text-mute">Saved on this phone.</b> Close
             it and come back, your reference is{" "}
@@ -1143,82 +1177,6 @@ export function JoinFlow() {
         </p>
       )}
 
-      {/* ── WHO SHOULD APPLY, and what it takes ─────────────────────────────
-          Neither of these existed. The page opened on "For tradespeople" and
-          went straight into eighteen trade chips, so the only way to find out
-          whether you qualified, or what you would be asked for, was to fill
-          the thing in and see.
-
-          Only on the first screen of the first sitting. Somebody who has come
-          back to add their ID has already answered this. */}
-      {at === 0 && !continuing && (
-        <>
-          <div className="mt-6 rounded-2xl border border-line bg-panel p-5">
-            <b className="text-[15.5px] text-ink">Who this is for</b>
-            <p className="mt-1.5 max-w-[62ch] text-[13px] leading-relaxed text-dim">
-              Four things. If all four are true, this is worth your two minutes.
-            </p>
-            <ul className="mt-3 grid gap-3">
-              {WHO.map((w) => (
-                <li key={w.yes} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 text-tealb" aria-hidden="true">✓</span>
-                  <span className="text-[13.5px] leading-relaxed">
-                    <b className="text-ink">{w.yes}.</b>{" "}
-                    <span className="text-mute">{w.why}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {/* Said plainly, because nothing on this page said it. A page
-                headed "getting on the board" can be read as a sign-up. */}
-            <p className="mt-4 rounded-xl border border-line2 bg-bg px-4 py-3 text-[13px] leading-relaxed text-mute">
-              <b className="text-ink">What applying gets you is a real person
-              reading it,</b> within 24 hours, and a straight answer either way.
-              It is the start of the check rather than the end of it: the
-              verification steps come next, and the board opens to you once
-              they clear. Worth knowing before you spend the two minutes.
-            </p>
-          </div>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-softline bg-soft p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <b className="text-[14.5px] text-ink">What you need now</b>
-                <span className="src ok">Two minutes</span>
-              </div>
-              <ul className="mt-2.5 grid gap-1.5 text-[13px] leading-relaxed text-mute">
-                {NEED_NOW.map((x) => (
-                  <li key={x} className="flex items-start gap-2">
-                    <span className="text-tealb" aria-hidden="true">•</span><span>{x}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
-                That is the whole first sitting. Everything else on these three
-                screens is optional and can wait.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-line bg-bg p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <b className="text-[14.5px] text-ink">What you need later</b>
-                <span className="src opt">Not today</span>
-              </div>
-              <ul className="mt-2.5 grid gap-1.5 text-[13px] leading-relaxed text-mute">
-                {NEED_LATER.map((x) => (
-                  <li key={x} className="flex items-start gap-2">
-                    <span className="text-dim" aria-hidden="true">•</span><span>{x}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2.5 text-[12px] leading-relaxed text-dim">
-                Asked for after a person has read your application and said
-                yes. Do not go hunting for any of it now.
-              </p>
-            </div>
-          </div>
-        </>
-      )}
-
       {/* The WhatsApp door. Most of the supply side is on a phone, on
           WhatsApp, and a form on a website is a worse door than the chat they
           are already in. The prefill is not decoration: the webhook classifies
@@ -1228,185 +1186,232 @@ export function JoinFlow() {
           The number is deliberately not printed. It is a WhatsApp Business
           sender, so anybody who reads it as a phone number and rings it
           reaches nobody. */}
-      {!claim && (
-        <a
-          href={WA_JOIN}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-softline bg-soft p-4 no-underline transition hover:border-teal sm:p-5"
-        >
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-[#25D366]">
-            <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="var(--onbrand)"
-                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {!claim && at === 0 && !continuing && (
+        <a href={WA_JOIN} target="_blank" rel="noopener noreferrer" className="jwa mt-5">
+          <span className="jwa-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor"
+                 strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a8 8 0 0 1-8 8H7l-4 3 1.2-4.2A8 8 0 1 1 21 12Z" />
             </svg>
           </span>
-          <span className="min-w-[210px] flex-1">
-            <b className="block text-[15.5px] text-ink">Rather do this on WhatsApp?</b>
-            <span className="mt-0.5 block text-[13px] leading-relaxed text-mute">
-              Answer five short questions in the chat, one at a time, and send a
-              photo of a finished job. Patois or English. Your ID check comes
-              back to you on WhatsApp too.
+          <span className="flex flex-col">
+            <b className="text-[14.5px] text-ink">Rather do this on WhatsApp?</b>
+            <span className="text-[12.5px] leading-snug text-mute">
+              Five short questions in the chat, Patois or English.
             </span>
           </span>
-          <span className="whitespace-nowrap font-bold text-tealb">Open WhatsApp &rarr;</span>
+          <span className="ml-auto font-mono text-[13px] font-semibold text-green" aria-hidden="true">&rarr;</span>
         </a>
+      )}
+
+      {/* ── WHO SHOULD APPLY ─────────────────────────────────────────────────
+          Folded away behind one tap in the founder's design (17 Sep 2026), so
+          the first screen is the form and not a reading list. Every line is
+          still something that actually happens further down this flow or at
+          the desk. Only on the first screen of the first sitting. */}
+      {at === 0 && !continuing && (
+        <>
+          <button type="button" className="jwho-btn mt-4" aria-expanded={showWho}
+            aria-controls="jwho" onClick={() => setShowWho(!showWho)}>
+            <span className="text-purpleb">Who this is for · 4 checks</span>
+            <span className="ml-auto font-mono text-[11px] font-semibold text-dim">{showWho ? "Hide" : "Show"}</span>
+          </button>
+          {showWho && (
+            <div id="jwho" className="jwho mt-2">
+              {WHO.map((w) => (
+                <div key={w.yes} className="jwho-row">
+                  <span className="font-bold text-green" aria-hidden="true">✓</span>
+                  <span><b className="font-semibold text-ink">{w.yes}.</b> {w.why}</span>
+                </div>
+              ))}
+              <div className="px-4 py-3 text-[12.5px] leading-relaxed text-dim">
+                ID, TRN, proof of address and three referees come{" "}
+                <b className="font-semibold text-mute">after</b> a person says
+                yes. Do not go hunting for any of it now. What applying gets you
+                is a real person reading it and a straight answer, which is the
+                start of the check rather than the end of it.
+              </div>
+            </div>
+          )}
+          <div className="my-5 h-px bg-line" />
+        </>
       )}
 
       <div className="jlane">
         <div>
-          <div className="jhead">
-            {/* The phase, not a running count. "Step 4 of 9" tells somebody
-                on a phone how much is left and nothing about why, and the
-                founder's design groups this work into three sittings rather
-                than one long climb. */}
-            <span className="jbadge">{PHASES[d.phase].name}</span>
-            <p className="mt-2 max-w-[58ch] text-[12.5px] leading-relaxed text-dim">
-              {PHASES[d.phase].sub}
-            </p>
-            {/* Scoped to this sitting, never across both. See Progress below
-                for why that boundary matters. */}
-            <Progress n={at} total={STEPS.length} name={d.n} />
+          <div className={continuing ? "jhead" : "jhead-p1 jrise"} key={at}>
+            {/* Phase 2 keeps the phase badge and its dots. Phase 1 has the bar
+                at the top, so the heading carries only where you are. */}
+            {continuing && (
+              <>
+                <span className="jbadge">{PHASES[d.phase].name}</span>
+                <p className="mt-2 max-w-[58ch] text-[12.5px] leading-relaxed text-dim">
+                  {PHASES[d.phase].sub}
+                </p>
+                {/* Scoped to this sitting, never across both. See Progress below
+                    for why that boundary matters. */}
+                <Progress n={at} total={STEPS.length} name={d.n} />
+              </>
+            )}
+            {!continuing && (
+              <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-dim" aria-current="step">
+                {at + 1} of {STEPS.length} · {d.n}{d.body === "port" ? " · optional" : ""}
+              </span>
+            )}
             {/* tabIndex -1 so it can be focused programmatically without
                 becoming a tab stop. The outline is left visible: somebody who
                 has just been moved here should be able to see where they are. */}
             <h2
               ref={headingRef}
               tabIndex={-1}
-              className="font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none focus:outline-none"
+              className={continuing
+                ? "font-display text-[clamp(22px,3.4vw,32px)] uppercase leading-none focus:outline-none"
+                : "mt-1.5 font-display text-[25px] font-light leading-[1.15] tracking-[-0.015em] focus:outline-none"}
             >
               {shown.h}
             </h2>
-            <p
-              className="mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-mute"
-              dangerouslySetInnerHTML={{ __html: shown.p }}
-            />
+            {shown.p && (
+              <p
+                className={continuing
+                  ? "mt-3 max-w-[62ch] text-[14.5px] leading-relaxed text-mute"
+                  : "mt-1.5 text-[14px] leading-relaxed text-mute"}
+                dangerouslySetInnerHTML={{ __html: shown.p }}
+              />
+            )}
           </div>
 
-          <div className="mt-4 rounded-2xl border border-line bg-panel p-5">
+          <div className={continuing ? "mt-4 rounded-2xl border border-line bg-panel p-5" : "mt-6"}>
             {d.body === "form" && (
-              <>
-                <div className="fgroup">
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-baseline gap-2.5">
+                    <b className="text-[14.5px]" id="lbl-jf-trades">Trades you take</b>
+                    {req(trades.length > 0, `${trades.length} picked`, "Pick at least one")}
+                  </div>
                   {/* Named group, announced state, and an explicit button type.
-                      These were bare buttons in a plain div: a screen reader
-                      heard eighteen unrelated buttons with no way to tell which
-                      were ticked, on the page where a tradesperson decides
-                      whether this is worth the effort. Multi-select here, so
-                      aria-pressed is exactly right. */}
-                  <label className="fl" id="lbl-jf-trades">
-                    Your trades, tick every one you take{" "}
-                    <span className={"src " + (trades.length > 0 ? "ok" : "req")}>
-                      {trades.length > 0 ? `${trades.length} selected` : "Required, pick at least one"}
-                    </span>
-                  </label>
-                  <div className="chips" role="group" aria-labelledby="lbl-jf-trades">
+                      Multi-select, so aria-pressed is exactly right. */}
+                  <div className="jchips" role="group" aria-labelledby="lbl-jf-trades">
                     {TRADES.map((t) => (
                       <button key={t} type="button" aria-pressed={trades.includes(t)}
                         className={trades.includes(t) ? "on" : ""}
                         onClick={() => toggle(trades, setTrades, t)}>
-                        <span aria-hidden="true">{trades.includes(t) ? "✓ " : "+ "}</span>{t}
+                        <span className="mk" aria-hidden="true">{trades.includes(t) ? "✓" : "+"}</span>{t}
                       </button>
                     ))}
                   </div>
-                  <input className="jf mt-2.5" placeholder="Not on the list? Type what you do (optional)"
+                  <input className="jin" placeholder="Not on the list? Name your trade"
                     aria-label="A trade that is not on the list, optional"
                     value={tradeOther} onChange={(e) => setTradeOther(e.target.value)} />
-                  <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-                    We would rather know what you actually do than squeeze you into
-                    the nearest box.
-                  </p>
+                  <span className="text-[12.5px] leading-relaxed text-dim">
+                    A client picks from this same list. It is how their roofing job
+                    finds your roofing profile.
+                  </span>
                 </div>
 
-                <div className="fgroup">
-                  <label className="fl" id="lbl-jf-parishes">
-                    Parishes you will travel to{" "}
-                    <span className={"src " + (parishes.length > 0 ? "ok" : "req")}>
-                      {parishes.length > 0 ? `${parishes.length} selected` : "Required, pick at least one"}
-                    </span>
-                  </label>
-                  {/* The launch area, in one tap. The three parishes and the
-                      reasoning now live in lib/taxonomy as LAUNCH_PARISHES, so
-                      this button and the client funnel cannot disagree about
-                      where the business operates. It adds to what is already
-                      ticked rather than replacing it. */}
-                  <div className="jquick">
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-baseline gap-2.5">
+                    <b className="text-[14.5px]" id="lbl-jf-parishes">Parishes you travel to</b>
+                    {req(parishes.length > 0, `${parishes.length} picked`, "Pick at least one")}
+                  </div>
+                  {/* The launch area, in one tap. The parishes live in
+                      lib/taxonomy as LAUNCH_PARISHES, so this button and the
+                      client funnel cannot disagree about where the business
+                      operates. It adds to what is already ticked rather than
+                      replacing it. */}
+                  <div className="jquick2">
+                    <button type="button" onClick={() => setParishes([...PARISHES])}>
+                      All fourteen
+                    </button>
                     <button type="button"
                       onClick={() => setParishes(Array.from(new Set([...parishes, ...LAUNCH_PARISHES])))}>
-                      + Kingston and Portmore
-                    </button>
-                    <button type="button" onClick={() => setParishes([...PARISHES])}>
-                      + All fourteen
+                      Kingston and Portmore
                     </button>
                     {parishes.length > 0 && (
-                      <button type="button" onClick={() => setParishes([])}>
-                        Clear all
+                      <button type="button" className="clear" onClick={() => setParishes([])}>
+                        Clear
                       </button>
                     )}
                   </div>
-                  <div className="chips" role="group" aria-labelledby="lbl-jf-parishes">
+                  <div className="jchips" role="group" aria-labelledby="lbl-jf-parishes">
                     {PARISHES.map((p) => (
                       <button key={p} type="button" aria-pressed={parishes.includes(p)}
                         className={parishes.includes(p) ? "on" : ""}
                         onClick={() => toggle(parishes, setParishes, p)}>
-                        <span aria-hidden="true">{parishes.includes(p) ? "✓ " : "+ "}</span>{p}
+                        <span className="mk" aria-hidden="true">{parishes.includes(p) ? "✓" : "+"}</span>{p}
                       </button>
                     ))}
                   </div>
-                  <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
+                  <span className="text-[12.5px] leading-relaxed text-dim">
                     A job posted in a parish you have not ticked never reaches you.
                     Tick wide, decline what you do not want.
-                  </p>
+                  </span>
                 </div>
 
-                <div className="fgroup">
-                  <label className="fl">
-                    How we reach you{" "}
-                    <span className={"src " + (name.trim().length > 1 && (hasPhone || hasEmail) ? "ok" : "req")}>
-                      {name.trim().length > 1 && (hasPhone || hasEmail)
-                        ? "Done"
-                        : "Required, your name and one way to reach you"}
-                    </span>
-                  </label>
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-baseline gap-2.5">
+                    <b className="text-[14.5px]">How we reach you</b>
+                    {req(name.trim().length > 1 && (hasPhone || hasEmail), "Done", "Name and one contact")}
+                  </div>
+                  <input className="jin" placeholder="Your name" autoComplete="name"
+                    enterKeyHint="next" aria-label="Your full name, required"
+                    value={name} onChange={(e) => setName(e.target.value)} />
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                    <input className="jf" placeholder="Your full name (required)" autoComplete="name"
-                      enterKeyHint="next" aria-label="Your full name, required"
-                      value={name} onChange={(e) => setName(e.target.value)} />
-                    <input className="jf" placeholder="Years at the trade (optional)" inputMode="numeric"
-                      enterKeyHint="next" aria-label="Years at the trade, optional"
-                      value={years} onChange={(e) => setYears(e.target.value)} />
-                    <input className="jf" placeholder="Phone number (or give an email)" inputMode="tel" autoComplete="tel"
+                    <input className="jin" placeholder="Phone number" inputMode="tel" autoComplete="tel"
                       enterKeyHint="next" aria-label="Your phone number, or give an email address instead"
                       value={phone} onChange={(e) => setPhone(e.target.value)} />
-                    <input className="jf" placeholder="Email address (or give a phone)" inputMode="email" autoComplete="email"
+                    <input className="jin" placeholder="Email address" inputMode="email" autoComplete="email"
                       enterKeyHint="done" aria-label="Your email address, or give a phone number instead"
                       value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
-                  <p className="mt-2 text-[12.5px] leading-relaxed text-dim">
-                    <b className="text-mute">A phone number or an email address, whichever
-                    you would rather.</b> Both is useful and neither is required twice.
-                    If you give a number, give the one you actually answer, because it
-                    is the one we ring about a job.
-                  </p>
+                  <span className="text-[12.5px] leading-relaxed text-dim">
+                    One of the two is enough. If you give a number, give the one you
+                    actually answer. It is the one we ring about a job.
+                  </span>
                 </div>
-              </>
+              </div>
             )}
 
             {d.body === "port" && (
-              <div className="grid gap-3">
-                {/* Nothing here blocks the Continue button, and saying so is
-                    better than letting somebody sit on a phone hunting for a
-                    certificate before they are allowed to move. It genuinely
-                    helps them, which is a reason to ask, not a reason to gate. */}
-                <div className="rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed">
-                  <b className="text-ink">All of this is optional</b>{" "}
-                  <span className="src ok">Nothing here is required</span>
-                  <p className="mt-2 text-mute">
-                    You can send your application without any of it. Showing one
-                    piece of work is the single fastest way to be taken
-                    seriously, so it is worth a minute if you have a photo on
-                    your phone, and you can add the rest later.
-                  </p>
+              <div className="flex flex-col gap-5">
+                {/* Nothing here blocks Continue. The step label says optional and
+                    the line under the heading says so again, which is better
+                    than somebody on a phone hunting for a certificate before
+                    they are allowed to move. */}
+                <div className="flex flex-col gap-2.5">
+                  <b className="text-[14.5px]" id="lbl-jf-years">Years at the trade</b>
+                  <div className="jchips" role="radiogroup" aria-labelledby="lbl-jf-years">
+                    {YEARS.map((y) => (
+                      <button key={y} type="button" role="radio" aria-checked={years === y}
+                        className={years === y ? "on" : ""}
+                        onClick={() => setYears(years === y ? "" : y)}>
+                        {y}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <div className="flex flex-col gap-2.5">
+                  <label className="text-[14.5px] font-bold" htmlFor="jf-work">One line about your work</label>
+                  <textarea id="jf-work" className="jin min-h-[96px] resize-y" rows={3} value={work}
+                    onChange={(e) => setWork(e.target.value)}
+                    placeholder="e.g. 15 years on roofs across St Catherine and Kingston. Hurricane strapping, zinc and shingle." />
+                </div>
+
+                {/* One row, not the design's three boxes: every document type
+                    holds one file, so three boxes would be two that did
+                    nothing. A PDF or several photos in one go is the honest
+                    shape of it. */}
+                <div className="flex flex-col gap-2.5">
+                  <b className="text-[14.5px]">Photos of a finished job</b>
+                  <Upload label="Your finished work" hint="One photo, or a PDF of several"
+                    accept={PAPERS} doc="portfolio" docs={docs} onFile={upload} optional />
+                  <span className="text-[12.5px] leading-relaxed text-dim">
+                    Your own finished work, not stock pictures. One good photo does
+                    more than a paragraph.
+                  </span>
+                </div>
+
+                <b className="mt-2 text-[14.5px]">More you can add</b>
                 {/* A photograph of the person. Founder instruction, 3 Sep 2026.
                 
                     WHAT THIS COPY MAY AND MAY NOT SAY. The file goes into the
@@ -1432,7 +1437,7 @@ export function JoinFlow() {
                     <b className="text-ink">It goes to the person reading your
                     application</b>, so they can put a face to the name instead
                     of a form. For photographs of your finished work, use the
-                    portfolio row below, which takes several in one file.
+                    finished work row above, which takes several as one PDF.
                   </p>
                   <Upload label="Your photograph" hint="A clear picture of your face, or you on a job"
                     accept={IMAGES} doc="profile_photo" docs={docs} onFile={upload} optional />
@@ -1448,8 +1453,6 @@ export function JoinFlow() {
 
                 <Upload label="A CV or a written history" hint="A photo of it is fine"
                   accept={CVFILE} doc="cv" docs={docs} onFile={upload} optional />
-                <Upload label="A portfolio, or photos of finished jobs" hint="One file, or a PDF of several"
-                  accept={PAPERS} doc="portfolio" docs={docs} onFile={upload} optional />
                 <Upload label="Trade certificates, if you hold any" hint="Verified with the body that issued them, not read off the picture"
                   accept={PAPERS} doc="certificate" docs={docs} onFile={upload} optional />
 
@@ -1497,16 +1500,6 @@ export function JoinFlow() {
                     screen before the first send. See AiConsent for why the
                     position is load bearing rather than tidy. */}
                 <AiConsent value={aiConsent} onChange={setAiConsent} />
-
-                <div>
-                  <label className="fl" htmlFor="jf-work">
-                    In your own words, what do you do{" "}
-                    <span className="src opt">Optional</span>
-                  </label>
-                  <textarea id="jf-work" className="jf min-h-[110px] resize-y" value={work}
-                    onChange={(e) => setWork(e.target.value)}
-                    placeholder="The kind of jobs you take, the biggest one you have done, anything a client should know." />
-                </div>
               </div>
             )}
 
@@ -1845,122 +1838,85 @@ export function JoinFlow() {
 
             {d.body === "live" && (
               <div className="grid gap-3">
-                {/* The profile preview. This screen used to be a sentence
-                    saying nothing had been sent yet and a button, which gave
-                    somebody nothing to check and no reason to be on it. What
-                    belongs here is the thing they are actually about to hand
-                    over, drawn from the same fields the public profile reads,
-                    so what they see is what a client sees.
-
-                    It deliberately shows the UNVETTED state, because that is
-                    the true one on the day they send: no score, no verified
-                    badge, "Building a record". A preview that flatters is a
-                    preview that lies, and this page has spent three screens
-                    telling them the check is the point. */}
+                {/* What goes to a person, read back line by line (founder's
+                    design, 17 Sep 2026). It replaced a mock client profile:
+                    the honest thing to check before sending is what you are
+                    sending, and every row here is drawn from the same fields
+                    the send call carries, so nothing on it is decoration. */}
                 {!sentRef && (
                   <>
-                    <p className="text-[12.5px] leading-relaxed text-dim">
-                      This is your profile as a client will see it. Nothing here
-                      is fixed, you can change any of it later.
-                    </p>
-
-                    <div className="flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-panel p-5">
-                      {/* The photograph if this page still has it in memory,
-                          initials otherwise. After a reload there is nothing to
-                          fetch, because the file sits in a bucket no browser
-                          can read, so the fallback says the picture is on file
-                          rather than pretending it was never sent. */}
-                      {photoPreview ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={photoPreview} alt="The photograph you uploaded of yourself"
-                          className="size-16 flex-none rounded-2xl object-cover" />
-                      ) : (
-                        <span className="grid size-16 flex-none place-items-center rounded-2xl bg-linear-to-br from-tealb to-teal font-display text-[26px] text-onbrand">
-                          {(name.trim() || "W").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase()}
-                        </span>
+                    <div className="jreview">
+                      {[
+                        ["Trades", [...trades, tradeOther.trim()].filter(Boolean).join(", ") || "None picked yet"],
+                        ["Parishes", parishes.length === PARISHES.length ? "All fourteen" : (parishes.join(", ") || "None picked yet")],
+                        ["Reach you", [name.trim(), phone.trim(), email.trim()].filter(Boolean).join(" · ") || "Not given yet"],
+                        ["Track record", (() => {
+                          const files = Object.entries(docs)
+                            .filter(([, v]) => v.state === "done")
+                            .map(([k]) => (k === "portfolio" ? "finished work" : k === "profile_photo" ? "your photograph" : k.replace(/_/g, " ")));
+                          return [
+                            years ? `${years} years` : "",
+                            ...files,
+                            ...links.map((l) => l.replace(/^https?:\/\//, "")),
+                            work.trim(),
+                          ].filter(Boolean).join(" · ") || "Left for later, which is fine";
+                        })()],
+                      ].map(([k, v]) => (
+                        <div key={k} className="jreview-row">
+                          <span className="jreview-k">{k}</span>
+                          <span className="min-w-0 break-words text-[14px] leading-normal text-ink">{v}</span>
+                        </div>
+                      ))}
+                      {/* The photograph, if this page still has it in memory.
+                          After a reload there is nothing to fetch, because the
+                          file sits in a bucket no browser can read, so the row
+                          says it is on file rather than pretending it was never
+                          sent. */}
+                      {(photoPreview || docs.profile_photo?.state === "done") && (
+                        <div className="jreview-row items-center">
+                          <span className="jreview-k">Photograph</span>
+                          {photoPreview ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={photoPreview} alt="The photograph you uploaded of yourself"
+                              className="size-12 rounded-xl object-cover" />
+                          ) : (
+                            <span className="text-[14px] text-ink">On file</span>
+                          )}
+                        </div>
                       )}
-                      <span className="min-w-[220px] flex-1">
-                        <h3 className="font-display text-[clamp(20px,3.4vw,28px)] uppercase leading-none">
-                          {name.trim() || "Your name"}
-                        </h3>
-                        <p className="mt-1.5 text-[13.5px] text-mute">
-                          {[
-                            trades.length ? trades.join(", ") : "General trades",
-                            tradeOther.trim(),
-                            parishes.length ? parishes.join(", ") : "",
-                            years.trim() ? `Trading ${years.trim()} years` : "",
-                          ].filter(Boolean).join(" · ")}
-                        </p>
-                      </span>
-                      <span className="text-right">
-                        <span className="rounded-full border border-softline bg-soft px-3 py-1.5 text-[11.5px] font-bold text-tealb">
-                          Building a record
-                        </span>
-                        <p className="mt-1.5 text-[11.5px] text-dim">
-                          The Yaad Score starts at the first signed-off job
-                        </p>
-                        {!photoPreview && docs.profile_photo?.state === "done" && (
-                          <p className="mt-1.5 text-[11.5px] text-tealb">
-                            Your photograph is on file. It cannot be shown here
-                            after a reload, because the store it sits in is not
-                            readable by a browser.
-                          </p>
-                        )}
-                      </span>
                     </div>
 
-                    <div className="rounded-xl border border-line bg-bg px-4 py-3 text-[12.5px] leading-relaxed text-mute">
-                      <b className="text-ink">Work you have shown us:</b>{" "}
-                      {(() => {
-                        const shown = Object.entries(docs)
-                          .filter(([, v]) => v.state === "done")
-                          .map(([k]) => k.replace(/_/g, " "));
-                        const all = [...shown, ...links.map((l) => l.replace(/^https?:\/\//, ""))];
-                        return all.length
-                          ? all.join(", ")
-                          : "nothing yet. You can still send this, and add work later.";
-                      })()}
+                    <div className="jnext">
+                      <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[.16em] text-purpleb">
+                        What happens next
+                      </span>
+                      {[
+                        ["01", "A person reads it, inside 24 hours.", "A straight answer either way, by the contact you gave."],
+                        ["02", "Then the check starts.", "Your photo ID, your TRN and a proof of address dated in the last three months. We chase these on WhatsApp."],
+                        ["03", "Three referees, then the board.", "We telephone them before you can take work over £500. Your profile stays held back from clients until the checks clear."],
+                      ].map(([i, t, dd]) => (
+                        <div key={i} className="flex gap-3 text-[13.5px] leading-normal text-mute">
+                          <span className="w-[18px] flex-none pt-0.5 font-mono text-[11px] font-semibold text-goldb">{i}</span>
+                          <span><b className="font-semibold text-ink">{t}</b> {dd}</span>
+                        </div>
+                      ))}
                     </div>
 
                     {/* The payoff, said where it means most: at the point
-                        somebody is deciding whether this is worth their time.
-                        It sat on the last of nine steps before, which nobody
-                        reached. */}
-                    <div className="rounded-xl border border-softline bg-soft px-4 py-4 text-[13.5px] leading-relaxed text-mute">
-                      <b className="text-ink">What this costs you: nothing.</b>
-                      <p className="mt-2">
-                        Free to join and <b className="text-ink">free to quote,
-                        win or lose</b>. You are never charged for a lead. Your
-                        price is agreed with you per job, in writing, before you
-                        start, and your materials are paid at cost on top of it.{" "}
-                        <b className="text-ink">You are paid per stage, not one
-                        lump at the end: a stage signed off is a stage paid,
-                        within 7 days of Yaadly signing the stage
-                        off.</b>{" "}
-                        By bank transfer. Yaadly does not pay in cash.
-                      </p>
+                        somebody is deciding whether this is worth their time. */}
+                    <div className="rounded-2xl border border-line px-4 py-4 text-[13.5px] leading-relaxed text-mute">
+                      <b className="text-ink">What this costs you: nothing.</b>{" "}
+                      Free to join and free to quote, win or lose. You are never
+                      charged for a lead. Your price is agreed with you per job, in
+                      writing, before you start, and your materials are paid at cost
+                      on top of it. You are paid per stage, within 7 days of Yaadly
+                      signing the stage off, by bank transfer. Yaadly does not pay in
+                      cash.
                       <p className="mt-2.5 text-[12.5px] text-dim">
-                        <b className="text-mute">Yaadly pays you, the client
-                        does not.</b> You are Yaadly&rsquo;s subcontractor: the
-                        client buys the job from Yaadly, and Yaadly engages and
-                        pays you. Your money does not wait on the client
-                        approving anything. You are told this before you turn up
-                        rather than after, and it is set out in the Worker
-                        Guidelines you sign.
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-line bg-bg px-4 py-4 text-[13.5px] leading-relaxed text-mute">
-                      <b className="text-ink">What happens after you send.</b>
-                      <p className="mt-2">
-                        <b className="text-ink">Your profile is created the
-                        moment you send this.</b> A person at the Yaadly desk
-                        reads it, not a queue, and you hear back within 24
-                        hours. The ID check and your referees come next, and we
-                        chase those on WhatsApp so you do not have to sit here
-                        for them. <b className="text-ink">Your profile goes
-                        public once those checks clear</b>, not before, which is
-                        the same rule every worker on the board was held to.
+                        <b className="text-mute">Yaadly pays you, the client does
+                        not.</b> You are Yaadly&rsquo;s subcontractor: the client
+                        buys the job from Yaadly, and Yaadly engages and pays you.
+                        It is set out in the Worker Guidelines you sign.
                       </p>
                     </div>
                   </>
@@ -1992,73 +1948,98 @@ export function JoinFlow() {
                   </div>
                 )}
 
-                <button onClick={send} disabled={busy || !step1Ready}
-                  className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                  {busy
-                    ? (continuing ? "Saving…" : "Sending…")
-                    : continuing ? "Save what I have added" : "Send my application"}
-                </button>
-                {!step1Ready && (
-                  <p className="text-[12.5px] text-dim">
-                    Not quite ready. We need your name, one way to reach you, at
-                    least one trade and at least one parish.
-                  </p>
+                {/* Phase 1 sends from the bottom bar. The second sitting keeps
+                    its button here, under the error it needs to be read with. */}
+                {continuing && (
+                  <>
+                    <button onClick={send} disabled={busy || !step1Ready}
+                      className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-3 text-[14px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                      {busy
+                        ? (continuing ? "Saving…" : "Sending…")
+                        : continuing ? "Save what I have added" : "Send my application"}
+                    </button>
+                    {!step1Ready && (
+                      <p className="text-[12.5px] text-dim">
+                        Not quite ready. We need your name, one way to reach you, at
+                        least one trade and at least one parish.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}
           </div>
 
-          <p className="mt-3 text-[12.5px] leading-relaxed text-dim">{shown.note}</p>
+          {shown.note && (
+            <p className="mt-3 text-[12.5px] leading-relaxed text-dim">{shown.note}</p>
+          )}
 
-          {/* Said once, plainly, and always on screen rather than only when
-              something is missing. Somebody filling a form on a phone should
-              never have to guess which of these is going to stop them. */}
-          {d.body === "form" && (
-            <div className="mt-4 rounded-xl border border-line2 bg-bg px-4 py-3 text-[12.5px] leading-relaxed">
-              <b className="text-ink">What is needed to carry on</b>
-              <ul className="mt-2 grid gap-1.5">
-                {[
-                  ["At least one trade", trades.length > 0],
-                  ["At least one parish", parishes.length > 0],
-                  ["Your name", name.trim().length > 1],
-                  ["A phone number or an email address, either one", hasPhone || hasEmail],
-                ].map(([label, ok]) => (
-                  <li key={String(label)} className="flex items-start gap-2">
-                    <span className={ok ? "text-tealb" : "text-dim"}>{ok ? "✓" : "•"}</span>
-                    <span className={ok ? "text-mute" : "text-ink"}>{label}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2.5 text-dim">
-                Everything else on this page is optional, including years at the
-                trade and anything you upload. You can add it later.
-              </p>
+          {/* The second sitting's Back and Continue, unchanged. On a phone it
+              sticks to the bottom of the viewport; on the send screen it stays
+              in the flow, because Send sits inside the panel. */}
+          {continuing && (
+            <div className={"jnav" + (d.body === "live" ? " jnav-flow" : "")}>
+              {at > 0 && (
+                <button onClick={() => setStep(at - 1)}
+                  className="rounded-full border border-line2 px-5 py-2.5 text-[13px] font-bold transition hover:border-teal hover:text-tealb">
+                  Back
+                </button>
+              )}
+              {d.body !== "live" && (
+                <button disabled={busy} onClick={() => { setError(""); setStep(at + 1); }}
+                  className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
+                  Continue
+                </button>
+              )}
             </div>
           )}
 
-          {/* On a phone this bar sticks to the bottom of the viewport. Continue
-              sat below thirty-two chips at the end of a long scroll, which is
-              the one control on the screen a thumb has to be able to find.
-              `at`, not `step`, so a restored step past the end of this sitting
-              steps from where the screen actually is.
+          {error && continuing && d.body !== "live" && (
+            <p className="mt-3 text-[13px] text-coral">{error}</p>
+          )}
+        </div>
+      </div>
 
-              It stops being sticky on the send screens, where the primary
-              action is Send, inside the panel and directly under the error
-              line it needs to be read with. Pinning a bar that holds nothing
-              but Back would spend seventy pixels of a phone on the one control
-              nobody is reaching for. */}
-          <div className={"jnav" + (d.body === "live" ? " jnav-flow" : "")}>
-            {at > 0 && (
-              <button onClick={() => setStep(at - 1)}
-                className="rounded-full border border-line2 px-5 py-2.5 text-[13px] font-bold transition hover:border-teal hover:text-tealb">
-                Back
-              </button>
+      {/* ── the Phase 1 bar ────────────────────────────────────────────────
+          Fixed to the bottom of the screen on every size (founder's design,
+          17 Sep 2026). The four ticks are the four things that open the
+          application, each true only when its own part is, so the reason
+          Continue will not move is always on screen next to Continue.
+
+          Step 1 opens the application on the server as you leave it, exactly
+          as before. Step 3 sends from here; a failed send says so on the bar
+          as well as in full above it, because the bar is where the thumb is.
+
+          The right end is kept clear below 980px. The Ask Yaadly chat pill is
+          fixed bottom-right on every page of this app (founder instruction,
+          2 Sep 2026), and a full-width button would sit under it. */}
+      {!continuing && (
+        <div className="jbar">
+          <div className="jbar-in">
+            {error && (
+              <p className="text-[12.5px] leading-snug text-coral" role="alert">{error}</p>
             )}
-            {d.body !== "live" && (
+            <div className="jbar-needs" aria-label="What is needed to carry on">
+              {needs.map(([k, ok]) => (
+                <span key={k} className={ok ? "text-green" : "text-dim"}>
+                  <span aria-hidden="true">{ok ? "✓" : "•"}</span> {k}
+                  <span className="sr-only">{ok ? ", done" : ", still needed"}</span>
+                </span>
+              ))}
+            </div>
+            <div className="jbar-row">
+              {at > 0 && (
+                <button type="button" className="jbar-back" onClick={() => { setError(""); setStep(at - 1); }}>
+                  Back
+                </button>
+              )}
               <button
-                disabled={busy || (d.body === "form" && !step1Ready)}
+                type="button"
+                className="jbar-cta"
+                disabled={busy || !step1Ready}
                 onClick={async () => {
                   setError("");
+                  if (d.body === "live") { await send(); return; }
                   if (d.body === "form") {
                     setBusy(true);
                     try { await ensureApplication(); }
@@ -2066,35 +2047,22 @@ export function JoinFlow() {
                     setBusy(false);
                   }
                   setStep(at + 1);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
-                className="rounded-full bg-linear-to-r from-teal to-mango px-5 py-2.5 text-[13px] font-bold text-onbrand transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
-                {busy && d.body === "form" ? "Starting…" : "Continue"}
+              >
+                {busy
+                  ? (d.body === "live" ? "Sending…" : "Starting…")
+                  : !step1Ready
+                    ? "Fill the four above to continue"
+                    : d.body === "form" ? "Continue"
+                    : d.body === "port" ? "Review and send"
+                    : "Send my application"}
               </button>
-            )}
-            {/* Why Continue is grey, next to Continue. It used to be a line of
-                small print further up the page, above the chips, so on a phone
-                the button and the reason it will not move were never on screen
-                together. */}
-            {d.body === "form" && !step1Ready && !busy && (
-              <span className="jwhy">
-                Still needed:{" "}
-                {[
-                  !(trades.length > 0) && "a trade",
-                  !(parishes.length > 0) && "a parish",
-                  !(name.trim().length > 1) && "your name",
-                  !(hasPhone || hasEmail) && "a phone number or an email",
-                ].filter(Boolean).join(", ")}.
-              </span>
-            )}
+            </div>
           </div>
-
-          {error && d.body !== "live" && (
-            <p className="mt-3 text-[13px] text-coral">{error}</p>
-          )}
         </div>
-
-      </div>
-    </>
+      )}
+    </div>
   );
 }
 

@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-17 · Join as a pro takes the Claude Design layout, over the real behaviour
+
+**Why.** Founder, 17 Sep 2026: put the "Join as a Pro" design from Claude Design live. The design is a shorter Phase 1: a progress strip, the "who this is for" checks folded behind one tap, a bar fixed to the bottom that ticks Trade, Parish, Name and Contact, and a read-back screen before sending.
+
+**What was not copied, with her agreement.** The design is a mockup, and four parts of it would have removed working behaviour. Its three photo boxes upload nothing, so step 2 keeps the real upload rows (finished work, photograph, CV, certificates, links), because the page must never show a check it does not perform. It has no AI review question, which stays: dropping it once recorded a refusal nobody gave on every application. Its sent screen has no reference and no way into the ID check, so both stay. And the "saved on this phone" line stays, so a lost tab on mobile data costs nothing. One design line carried a dash and was reworded.
+
+**Smaller choices.** Years at the trade moves to step 2 as four bands ("Under 3" to "20+") and travels as those words. The sending and Persona logic, the consent versions and the Phase 2 screens are unchanged.
+
 ## 2026-09-16 · An application can be marked as a test
 
 **Why.** Founder, 16 Sep 2026: every item in the desk was a test, and she needs anything real that arrives to stand out. Jobs, workers, conversations and enquiries already had a test mark; applications did not, so the fifteen test applications were cleared in SQL by setting `status = 'test'`, with the old status written to the ledger.
