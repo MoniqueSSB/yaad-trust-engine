@@ -1139,7 +1139,11 @@ Deno.serve(async (req: Request) => {
         `Yaadly is engaging you for it at your quoted labour price less 5%, plus materials at cost: ${money(pay)} owed to you by Yaadly. ` +
         `Materials money is sent to you to buy the goods once the client has paid for them; your labour is paid as the stages are signed off. ` +
         `Do not start yet. The job goes live once the client's invoice to Yaadly is paid, and you will get a message on this number when it is. ` +
-        `Your Arrival Log on day one is what opens the first stage.\n\n` +
+        // 17 Sep 2026, founder instruction. The pin was the only way to check
+        // in over WhatsApp and nothing told a worker it existed until they
+        // asked, so the steps are said here, the first message they get.
+        `When you arrive on site, check in before you start work: in this chat, tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. ` +
+        `That goes on the Arrival Log as proof you were there, and your check-in on day one is what opens the first stage. Check in the same way each day you are on site.\n\n` +
         // 20260914200000, reworded 20260914220000 (bank transfer only, no cash, Stripe coming soon). How the worker is paid, pointing at a page
         // in their own portal and never asking for a reply here: anything a
         // worker types to this number is kept with the job and read by the
