@@ -5580,3 +5580,14 @@ Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A
 3. Every button hidden: no receipt has arrived since the deploy. Check `select count(*) filter (where account_sid = '') from message_deliveries;`. The next receipt fills every blank row, because there is one Twilio account.
 4. Still blank after a message has gone out: check `yaad-message-status` logs for "could not record the account id", and that the status callback URL is still set.
 5. It opens Twilio but not the message: Twilio has changed its console address. Fix the URL in `concierge/concierge.html` (search "Look it up in Twilio"), copy it to `concierge-deploy/public/index.html`, and redeploy the desk.
+
+## Invoices: picking lines, the fee on its own, Live jobs (17 Sep 2026)
+
+1. **Clicking a line does not pick it.** Only a draft whole-job bill can be split, so picking only works there: a sent bill, a part, a service invoice or a worker's pay has no pick column. Clicks on a box you type in (description, quantity, amount) are ignored on purpose; click the grey space, the amount, or the tick box.
+2. **Email and Mark as sent are greyed out.** Lines are picked. Unpick them to send the whole bill, or press Request to make the picked lines their own draft.
+3. **Preview shows the whole bill with nothing highlighted, although lines are picked.** The desk matches rows to lines by position. If the numbers differ (a line added or removed and not reloaded), it shows the invoice unmarked rather than guess. Reopen the invoice and preview again.
+4. **"Raise the fee on its own" says the fee is no longer a line on this bill.** It was already requested as a part. Refresh the list; the fee row now shows Preview the fee on the part carrying it.
+5. **A job shows "On hold: the 15% is not marked paid" but the client says they paid.** Paid is only what is marked paid. Check Outstanding for a card payment Stripe reported, then press Mark as paid on the invoice carrying the fee. The job moves on by itself (`start_job_on_agency_fee_paid`).
+6. **A job is missing from Live jobs.** It lists booked jobs only (a tradesperson chosen), leaves out cancelled ones, and drops a finished job once every client invoice and worker pay on it is marked paid. It reads the latest 50 booked jobs.
+7. **Job type says "job type not set".** `jobs.trade` is empty on that job; set it on the job.
+
