@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-17 · Portal pages filter invoices to their own side, not only RLS
+
+**Why.** The worker portal showed another worker's pay invoice and two unsent drafts as the founder's own pay. Row level security was right for every real client and worker: `invoices_worker_read` returns a worker only their own sent invoices, and `invoices_client_read` a client only their own, with worker payables carrying the sentinel `payable@yaadly.invalid` so a client can never match one (20260903a). But `invoices_admin` returns an admin everything, and the founder is the admin and also the test client and worker. The pages trusted RLS alone and so showed an admin a screen no real user ever sees, which is the worst kind of test: it reports bugs that are not there and hides the view that is.
+
+**What.** The pages now filter as well as RLS, the same way the jobs list already filtered by `worker_email`. The worker portal takes only invoices payable to the worker, matching the signed-in email, never a draft. The job page shows the client side's invoices to the client and the worker's pay invoices to the worker, never a draft. The service page leaves out drafts. RLS stays the control; these filters only make an admin see what the real person would. The worker portal also stops saying "Held" and "Released" about money (CLAUDE.md 8): "Due on sign-off" and "Signed off".
+
+**Data.** INV-2026-0008, 0009 and 0010 on JOB-TEST-WAPAY-3 were raised on 2 Sep under the old "pay them directly" shape, with no 5%, and voided on the founder's instruction on 17 Sep. They stay on the record.
+
 ## 2026-09-17 · Join as a pro takes the Claude Design layout, over the real behaviour
 
 **Why.** Founder, 17 Sep 2026: put the "Join as a Pro" design from Claude Design live. The design is a shorter Phase 1: a progress strip, the "who this is for" checks folded behind one tap, a bar fixed to the bottom that ticks Trade, Parish, Name and Contact, and a read-back screen before sending.

@@ -54,7 +54,6 @@ function invoiceStatus(status: string, paid: boolean): StatusLabel {
   if (status === "paid") return { label: "Paid", tone: "done" };
   if (status === "sent" && !paid) return { label: "Pending", tone: "waiting" };
   if (status === "sent") return { label: "Recorded paid", tone: "done" };
-  if (status === "draft") return { label: "Draft, not sent", tone: "idle" };
   return { label: status, tone: "idle" };
 }
 

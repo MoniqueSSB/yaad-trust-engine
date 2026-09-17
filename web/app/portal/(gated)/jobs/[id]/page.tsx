@@ -634,7 +634,16 @@ export default async function JobRoom({
      state this page already loaded; nothing here invents a task or a
      number, and every branch is one a job can actually be in. */
 
-  const invoices = (invoiceRows ?? []) as InvoiceRow[];
+  /* Each side sees its own invoices, never a draft. For a client or a
+     worker RLS already does this, but invoices_admin returns an admin every
+     invoice on the job, drafts included, so an admin who is the client or
+     the worker on a test job saw the other side's documents and unsent
+     drafts in their own money panel. Same fix as the worker portal's
+     invoice list, 17 Sep 2026. A worker payable carries a sentinel client
+     email (20260903a), so a real client could never read one anyway. */
+  const invoices = ((invoiceRows ?? []) as InvoiceRow[]).filter(
+    (i) => i.status !== "draft" && (role === "client" ? i.payable_to !== "worker" : i.payable_to === "worker"),
+  );
 
   /* Card payments Stripe has reported against these invoices (phase 1,
      14 Sep 2026). RLS lets a client read only their own. Read defensively:
