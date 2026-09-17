@@ -53,6 +53,7 @@ import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, vi
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -1702,6 +1703,35 @@ Deno.serve(async (req: Request) => {
       emailReason = "no recipient email on the job";
     }
 
+    // A worker who has not written in for 23 hours gets the approved template
+    // instead of free text, which WhatsApp would accept and then fail as
+    // 63016 after this function had returned. Read before sending, because
+    // that failure never comes back here. Only once the template is approved:
+    // the setup function writes the setting then, and not before. See
+    // worker-template.ts. 17 Sep 2026.
+    let workerTemplate: { sid: string; vars: Record<string, string> } | undefined;
+    if (recipientPhone && recipientPhone === workerPhone && job && hasWorkerTemplateDecision(kind)) {
+      const summary = workerTemplateSummary(kind);
+      let sid = Deno.env.get("TWILIO_CONTENT_SID_WORKER_UPDATE") ?? "";
+      if (!sid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_worker_update").maybeSingle();
+        try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+      }
+      if (summary && /^HX[0-9a-f]{32}$/i.test(sid)) {
+        const { data: seen } = await admin.from("wa_inbound_seen")
+          .select("from_addr, seen_at").eq("channel", "whatsapp")
+          .gte("seen_at", new Date(Date.now() - WINDOW_MS).toISOString())
+          .order("seen_at", { ascending: false }).limit(500);
+        const last = (seen ?? []).find((r: { from_addr: string }) => samePhoneDigits(r.from_addr, recipientPhone));
+        if (!insideWindow(last?.seen_at ?? null)) {
+          // A job the worker is not booked on opens nothing for them, so those two go to the portal itself.
+          const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal` : roomLink;
+          workerTemplate = { sid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": templateVar(summary, 300), "3": link } };
+        }
+      }
+      root.setAttributes({ "yaadly.notify.worker_template": Boolean(workerTemplate) });
+    }
+
     let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no recipient phone on the job" };
     if (recipientPhone) {
       // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
@@ -1709,7 +1739,9 @@ Deno.serve(async (req: Request) => {
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+      wa = workerTemplate
+        ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], workerTemplate, sendMeta)
+        : await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
       // the approved template is the fallback for exactly that failure,

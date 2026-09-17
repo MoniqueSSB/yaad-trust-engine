@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { SECTION_MENU_NAME, sectionMenuContent } from "./content.ts";
+import { SECTION_MENU_NAME, sectionMenuContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -16,9 +16,10 @@ import { SECTION_MENU_NAME, sectionMenuContent } from "./content.ts";
 //
 // Creates content only. It sends nothing to anybody and touches no job. The
 // template is used in-session (inside the 24 hour window a worker's own photo
-// opened), which needs no Meta approval; a "submit for approval" action is
-// deliberately not here, because what goes out under the business's WhatsApp
-// identity to people who have NOT written in first is the founder's call.
+// opened), which needs no Meta approval. The worker update template is the one
+// exception, submitted for approval on the founder's instruction of 17 Sep 2026
+// ("fix this"); what else goes out under the business's WhatsApp identity to
+// people who have NOT written in first is still the founder's call.
 //
 // Gated like the scheduled functions: the cron secret (env, or its SHA-256 as
 // held in app_settings for any of the cron jobs), or a signed-in admin.
@@ -145,6 +146,53 @@ Deno.serve(async (req: Request) => {
     );
     if (error) return json({ error: `Template exists (${sid}) but app_settings would not take it: ${error.message}` }, 500);
     return json({ ok: true, sid, reused: Boolean(existing), setting: "twilio_content_sid_phase" });
+  }
+
+  // The worker update template (17 Sep 2026, founder: "fix this"). Creates it,
+  // or finds it, and submits it to Meta for WhatsApp approval. Records the
+  // ContentSid as PENDING only: yaad-notify-client reads the live setting,
+  // which "worker-update-status" writes once Meta has approved, so nothing
+  // is sent with a template WhatsApp would refuse.
+  if (action === "create-worker-update") {
+    const existing = (await listAll()).find((c) => c.friendly_name === WORKER_UPDATE_NAME);
+    let sid = existing?.sid ?? "";
+    if (!sid) {
+      const r = await call("/Content", { method: "POST", body: JSON.stringify(workerUpdateContent()) });
+      if (!r.ok) return json({ error: "Twilio refused the template.", twilio: r }, 502);
+      sid = String((r.body as { sid?: string })?.sid ?? "");
+    }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "No ContentSid came back." }, 502);
+    const approval = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, {
+      method: "POST", body: JSON.stringify(WORKER_UPDATE_APPROVAL),
+    });
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_content_sid_worker_update_pending", value: JSON.stringify(sid) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `Template ${sid} exists but app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, sid, reused: Boolean(existing), approval: { status: approval.status, body: approval.body } });
+  }
+
+  // Asks Twilio where Meta's approval stands. Switches the template on, by
+  // writing the setting yaad-notify-client reads, only when it is approved.
+  if (action === "worker-update-status") {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_worker_update_pending").maybeSingle();
+    let sid = "";
+    try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) return json({ error: "Nothing pending. Run create-worker-update first." }, 400);
+    const r = await call(`/Content/${sid}/ApprovalRequests`);
+    const wa = (r.body as { whatsapp?: { status?: string; rejection_reason?: string } })?.whatsapp ?? {};
+    const status = String(wa.status ?? "unknown").toLowerCase();
+    let switchedOn = false;
+    if (status === "approved") {
+      const { error } = await admin.from("app_settings").upsert(
+        { key: "twilio_content_sid_worker_update", value: JSON.stringify(sid) },
+        { onConflict: "key" },
+      );
+      if (error) return json({ error: `Approved, but app_settings would not take it: ${error.message}` }, 500);
+      switchedOn = true;
+    }
+    return json({ sid, status, rejection_reason: wa.rejection_reason ?? null, switchedOn });
   }
 
   return json({ error: "Unknown action." }, 400);
