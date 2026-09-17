@@ -61,13 +61,14 @@ export default async function ServiceRoom({
   if (!svc) notFound();
 
   // RLS (invoices_client_read) already refuses a draft to anyone but an
-  // admin, so what reaches this query is exactly what this client is
-  // allowed to see: nothing here needs its own status filter to be safe,
-  // only to be readable.
+  // admin. The draft filter is here for that admin: without it, an admin
+  // viewing a service they booked saw unsent drafts a client never would
+  // (17 Sep 2026, the same fix as the worker portal's invoice list).
   const { data: invoiceRows } = await supabase
     .from("invoices")
     .select("id,status,period_label,notes,total_pence,issue_date,due_date,sent_at,paid_at")
     .eq("service_id", svc.id)
+    .neq("status", "draft")
     .order("issue_date", { ascending: false });
   const invoices = (invoiceRows ?? []) as {
     id: string; status: string; period_label: string; notes: string;
