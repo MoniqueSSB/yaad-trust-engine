@@ -74,3 +74,29 @@ export function groupForBoard<T extends { status: string }>(
   for (const j of jobs) out[clientColumnOf(j.status)].push(j);
   return out;
 }
+
+/**
+ * The one job the right-hand panel's ring is about.
+ *
+ * The design showed a "Selected" job with no rule for choosing it. The rule
+ * here: the first job waiting on the client, because that is the one they
+ * came to act on; failing that, the first job booked and under way; failing
+ * that, the first one getting quotes. Closed jobs are never chosen: a ring at
+ * step 8 of 8 answers nothing. "First" is the order the page passes in, which
+ * is most recently moved first.
+ *
+ * isWaiting is passed in rather than read from a label map so this stays a
+ * pure function with nothing to render.
+ */
+export function pickFocusJob<T extends { status: string }>(
+  jobs: T[],
+  isWaiting: (j: T) => boolean,
+): T | null {
+  const live = jobs.filter((j) => clientColumnOf(j.status) !== "closed");
+  return (
+    live.find(isWaiting) ??
+    live.find((j) => clientColumnOf(j.status) === "under_way") ??
+    live[0] ??
+    null
+  );
+}

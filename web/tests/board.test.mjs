@@ -78,3 +78,27 @@ describe("clientStepOf", () => {
     assert.equal(b.clientStepOf("disputed"), null);
   });
 });
+
+describe("pickFocusJob", () => {
+  const waiting = (j) => j.status === "quoted" || j.status === "evidence";
+
+  test("a job waiting on the client comes first, even behind a newer one", () => {
+    const f = b.pickFocusJob([
+      { id: "NEW", status: "in_progress" },
+      { id: "OLD", status: "evidence" },
+    ], waiting);
+    assert.equal(f.id, "OLD");
+  });
+
+  test("with nothing waiting, work under way beats getting quotes", () => {
+    const f = b.pickFocusJob([
+      { id: "Q", status: "open" },
+      { id: "U", status: "confirmed" },
+    ], waiting);
+    assert.equal(f.id, "U");
+  });
+
+  test("a closed job is never the focus", () => {
+    assert.equal(b.pickFocusJob([{ id: "C", status: "complete" }], waiting), null);
+  });
+});

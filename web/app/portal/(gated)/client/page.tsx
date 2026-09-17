@@ -6,8 +6,11 @@ import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
 import { clientBill } from "@/lib/jobs/client-bill";
 import { SERVICE_TRACK, svcStage } from "@/lib/portal/journey";
 import { jmd } from "@/lib/money";
-import { WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
+import { type StatCard } from "@/components/portal/WorkerOverview";
 import { StageBoard } from "@/components/portal/StageBoard";
+import { ClientRail } from "@/components/portal/ClientRail";
+import { pickFocusJob } from "@/lib/portal/board";
+import { toPay, type ToPayInvoice } from "@/lib/portal/to-pay";
 import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";
 import {
   jobGates,
@@ -281,6 +284,39 @@ export default async function ClientPortal() {
     },
   ];
 
+  /* "To pay now", for the right-hand panel (17 Sep 2026). Every invoice RLS
+     lets this reader see that is sent and not paid; toPay() re-checks the
+     email, because an admin's copy of this query is everybody's. Card
+     payments are read defensively, the same way the job room reads them. */
+  const { data: invoiceRows } = await supabase
+    .from("invoices")
+    .select("id,status,total_pence,currency,payable_to,client_email,job_id,service_id")
+    .eq("status", "sent")
+    .order("created_at", { ascending: true });
+  const sentInvoices = (invoiceRows ?? []) as ToPayInvoice[];
+  const cardPaid = new Set<string>();
+  if (sentInvoices.length) {
+    const { data: payRows } = await supabase
+      .from("invoice_payments")
+      .select("invoice_id,status")
+      .in("invoice_id", sentInvoices.map((i) => i.id));
+    for (const r of (payRows ?? []) as { invoice_id: string; status: string }[]) {
+      if (r.status === "succeeded") cardPaid.add(r.invoice_id);
+    }
+  }
+  const pay = toPay(sentInvoices, email, cardPaid);
+  const oldest = pay.unpaid[0];
+  const payHref = !oldest
+    ? null
+    : oldest.job_id
+      ? jobHref(oldest.job_id, "?tab=approvals#invoices")
+      : oldest.service_id
+        ? "/portal/services/" + encodeURIComponent(oldest.service_id)
+        : null;
+
+  const describedJobs = (jobs as Described[]).map(describe);
+  const focus = pickFocusJob(describedJobs, (j) => CLIENT_STATUS[j.status]?.tone === "waiting");
+
   return (
     <>
       <p className="text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
@@ -303,8 +339,6 @@ export default async function ClientPortal() {
           Could not load your jobs: {error.message}
         </p>
       )}
-
-      <WorkerStatCards cards={cards} />
 
       {/*
         The list, at the top, on the way in.
@@ -404,24 +438,38 @@ export default async function ClientPortal() {
       )}
 
       {/*
-        The jobs as three columns by stage, 17 Sep 2026, from the Portal
-        Overview design. It replaced the pill strip and the live then closed
-        lists, which themselves replaced one list ordered by updated_at that
-        put closed jobs above the one needing the client. The columns keep
-        that fix: closed jobs have their own column and fold away after three.
-        Within a column the recency order is kept.
-      */}
-      <StageBoard
-        jobs={(jobs as Described[]).map(describe)}
-        labels={CLIENT_STATUS}
-        empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
-      />
+        Two columns on a wide screen, 17 Sep 2026: the jobs by stage on the
+        left, the panel on the right (ClientRail: the job that needs the
+        client first, the four counts, and what is to pay now). On a phone
+        the panel comes first, where the counts have always been, and the
+        board follows.
 
-      {/* Services beside the property link on a wide screen, stacked on a
-          phone. They keep their own list: a service has a six step track of
-          its own and does not fit the job columns. */}
-      <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        <div>
+        The board replaced the pill strip and the live then closed lists,
+        which themselves replaced one list ordered by updated_at that put
+        closed jobs above the one needing the client. The columns keep that
+        fix: closed jobs have their own column and fold away after three.
+        Services keep their own list under the board: a service has a six
+        step track of its own and does not fit the job columns.
+      */}
+      <div className="mt-6 grid items-start gap-x-5 gap-y-2 lg:grid-cols-[minmax(0,1fr)_290px]">
+        <div className="lg:order-last">
+          <ClientRail
+            focus={focus}
+            labels={CLIENT_STATUS}
+            cards={cards}
+            pay={pay}
+            payHref={payHref}
+            properties={hasPortfolio ? properties.length : null}
+          />
+        </div>
+
+        <div className="min-w-0">
+          <StageBoard
+            jobs={describedJobs}
+            labels={CLIENT_STATUS}
+            empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
+          />
+
           {liveServices.length > 0 && (
             <JobList title="Professional services" jobs={liveServices} labels={SERVICE_STATUS} moneyLabel="Cost" rail />
           )}
@@ -430,19 +478,6 @@ export default async function ClientPortal() {
             <JobList title="Delivered services" jobs={doneServices} labels={SERVICE_STATUS} moneyLabel="Cost" rail />
           )}
         </div>
-
-        <aside>
-          {hasPortfolio && (
-            <Link
-              href="/portal/properties"
-              className="mt-8 flex flex-wrap items-baseline gap-x-2 rounded-2xl border border-line bg-panel px-5 py-4 transition hover:border-line2"
-            >
-              <b className="text-[14px] text-ink">See all {properties.length} of your properties</b>
-              <span className="text-[12.5px] text-dim">every job on each one, in one place</span>
-              <span className="ml-auto text-[13px] text-tealb">&rarr;</span>
-            </Link>
-          )}
-        </aside>
       </div>
     </>
   );

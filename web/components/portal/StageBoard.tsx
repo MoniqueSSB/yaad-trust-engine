@@ -148,7 +148,7 @@ export function StageBoard({
 }) {
   if (jobs.length === 0) {
     return (
-      <section className="mt-8">
+      <section className="mt-8 lg:mt-0">
         <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">Your jobs</h2>
         <div className="rounded-2xl border border-line bg-panel p-6">
           <p className="text-[13.5px] leading-relaxed text-mute">{empty}</p>
@@ -160,7 +160,7 @@ export function StageBoard({
   const groups = groupForBoard(jobs);
 
   return (
-    <section className="mt-8">
+    <section className="mt-8 lg:mt-0">
       <h2 className="mb-3 text-[10.5px] font-bold uppercase tracking-[.2em] text-tealb">
         Your jobs, by stage
       </h2>
