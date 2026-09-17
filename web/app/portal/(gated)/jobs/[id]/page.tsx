@@ -92,6 +92,7 @@ type Evidence = {
   stage: number | null;
   /* The before this after answers, by id. Null on everything else. */
   pairs_with: string | null;
+  batch_id: string | null;
   /* P1, P2, P3: the short per-job code a worker types to name one item. */
   item_code: string | null;
   /* Which section of the job this belongs to. Null means nobody said. */
@@ -290,7 +291,7 @@ export default async function JobRoom({
     await Promise.all([
       supabase
         .from("evidence")
-        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage,phase,kind,pairs_with,item_code")
+        .select("id,label,meta,img,storage_path,ok,created_at,uploaded_by,sha256,stage,phase,kind,pairs_with,item_code,batch_id")
         .eq("job_id", id)
         .order("created_at", { ascending: true }),
       supabase

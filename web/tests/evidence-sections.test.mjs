@@ -272,3 +272,28 @@ describe("which stage is open for evidence", () => {
     assert.equal(sections.stageLock(1, undefined), "locked");
   });
 });
+
+describe("one update, one card", () => {
+  const withBatch = (id, batch_id) => ({ ...item(id, "after"), batch_id });
+
+  test("items confirmed together are one update, in the order they arrived", () => {
+    const u = sections.updatesOf([withBatch("a", "B1"), withBatch("b", "B1"), withBatch("c", "B2")]);
+    assert.deepEqual(u.map((g) => g.map((e) => e.id)), [["a", "b"], ["c"]]);
+  });
+
+  test("an item with no batch is its own update, never folded into a neighbour", () => {
+    const u = sections.updatesOf([withBatch("a", null), withBatch("b", undefined), withBatch("c", "B1"), withBatch("d", null)]);
+    assert.deepEqual(u.map((g) => g.map((e) => e.id)), [["a"], ["b"], ["c"], ["d"]]);
+  });
+
+  test("a batch split by another filing still comes back whole, where it first appeared", () => {
+    const u = sections.updatesOf([withBatch("a", "B1"), withBatch("x", null), withBatch("b", "B1")]);
+    assert.deepEqual(u.map((g) => g.map((e) => e.id)), [["a", "b"], ["x"]]);
+  });
+
+  test("nothing is lost or repeated", () => {
+    const input = [withBatch("a", "B1"), withBatch("b", null), withBatch("c", "B1"), withBatch("d", "B2")];
+    const flat = sections.updatesOf(input).flat().map((e) => e.id).sort();
+    assert.deepEqual(flat, ["a", "b", "c", "d"]);
+  });
+});

@@ -8,6 +8,7 @@ import { pickJobChoice } from "./job-match.ts";
 import { docExt, fileLabel, guessFileKind, isDocMime, isFileableStatus } from "./job-file-lane.ts";
 import { matchApprovingJob } from "./approval-match.ts";
 import { pickEvidenceItem } from "./evidence-item-match.ts";
+import { DRAFT_STILL_WAITING, draftReadBack, readDraftReply, tooShortToBeAnUpdate } from "./update-draft.ts";
 import { visitorTokenOk, originAllowed, WEB_CHAT_MAX_CHARS, webReferenceIn, WEB_SAFE_FALLBACK } from "./web-chat.ts";
 import {
   ALERT_CONSENT_VERSION, ALERT_TERMS, ALERTS_PHRASE, ALERTS_STOP,
@@ -456,7 +457,7 @@ async function downloadAndStageEvidence(admin: any, url: string, mime: string, c
   return { path, mime, bytes: got.bytes.byteLength, sha256, label: (trimmed || "Sent on WhatsApp").slice(0, 140), hasCaption: !!trimmed };
 }
 
-async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence): Promise<boolean> {
+async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, workerEmail: string, item: PendingEvidence, batchId: string | null = null): Promise<boolean> {
   const ext = item.path.split(".").pop();
   const finalPath = `${jobId}/${crypto.randomUUID()}.${ext}`;
   const { error: moveErr } = await admin.storage.from(EVIDENCE_MEDIA_BUCKET).move(item.path, finalPath);
@@ -469,6 +470,9 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
     // honest answer in itself and never blocks the filing. See 20260906000700.
     phase: item.phase ?? null,
     pairs_with: item.pairsWith ?? null,
+    // One id for everything confirmed together, so the page draws one update
+    // rather than a card per photo. See 20260917190100.
+    batch_id: batchId,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });
   if (insErr) {
@@ -2458,6 +2462,9 @@ Deno.serve(async (req: Request) => {
       const fileSession = sess && String((sess.answers as any)?._lane ?? "") === "job_file" ? sess : null;
       const reportSession = sess && String((sess.answers as any)?._lane ?? "") === "report_confirm" ? sess : null;
       const textUpdateSession = sess && String((sess.answers as any)?._lane ?? "") === "text_update" ? sess : null;
+      // A worker's typed update, read back and waiting on a reply of 1. See update-draft.ts.
+      const draftSession = sess && String((sess.answers as any)?._lane ?? "") === "update_draft"
+        && Date.now() - new Date(sess.updated_at as string).getTime() <= 48 * 3600_000 ? sess : null;
 
       // ── the job alert list ──────────────────────────────────────────────
       //
@@ -2784,6 +2791,56 @@ Deno.serve(async (req: Request) => {
           : `Got it, on record for ${pick.id} (${pick.title}). The client hears about it once it is drafted. If you need a person instead, just say so.`);
       }
 
+      // ── a typed update waiting on a reply of 1 ────────────────────────────
+      //
+      // 17 Sep 2026, founder instruction: the job record shows only what the
+      // worker approved, never the chat around it. The general door further
+      // down holds a worker's words and reads them back; this is the reply.
+      // Only 1 files. No drops it. Real words fall through to the general door
+      // and replace the draft, so a stray message is never filed, only read
+      // back. A voice note falls through the same way, because it carries
+      // media and is transcribed there.
+      if (!evidenceHeld && draftSession && !msg.media.length && msg.text.trim()) {
+        const a = draftSession.answers as any;
+        const said = msg.text.trim();
+        if (said !== "1" && (looksLikeQuestion(said) || wantsHelpWith(said))) {
+          root.setAttributes({ "yaadly.worker_update.outcome": "question_while_draft_waiting" });
+          return twiml(await answerOrRaiseWorkerQuestion(
+            supabase as unknown as SettingsReader, msg, String(a.job_id ?? ""), DRAFT_STILL_WAITING, trace,
+          ));
+        }
+        const reply = readDraftReply(said, isBareAcknowledgement);
+        if (reply === "keep") {
+          root.setAttributes({ "yaadly.worker_update.outcome": "draft_kept" });
+          return twiml(DRAFT_STILL_WAITING);
+        }
+        if (reply === "discard") {
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          root.setAttributes({ "yaadly.worker_update.outcome": "draft_dropped" });
+          return twiml("Dropped, nothing went on the job.");
+        }
+        if (reply === "file") {
+          // The job is read again rather than trusted from the draft: it may
+          // have moved stage, or closed, since the words were read back.
+          const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
+          const job = found?.jobs.find((j) => j.id === a.job_id);
+          await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
+          if (!found || !job) {
+            root.setAttributes({ "yaadly.worker_update.outcome": "draft_job_not_open" });
+            return twiml(`${a.job_id} is not open for updates any more, so nothing was filed. If you need a person, just say so.`);
+          }
+          const { error } = await supabase.from("evidence").insert({
+            job_id: job.id, label: String(a.text ?? "").slice(0, 1000), stage: job.stage,
+            kind: "work", uploaded_by: found.email,
+          });
+          root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
+          return twiml(error
+            ? "That did not save properly. Reply 1 again in a moment."
+            : `On record for ${job.id} (${job.title}). The client hears about it once it is drafted. If you need a person instead, just say so.`);
+        }
+        // "replace": falls through to the general door below.
+      }
+
       // ── a document waiting on "which job", answered ───────────────────────
       //
       // The reply to codePrompt() for a staged document, from a worker or a
@@ -2909,7 +2966,8 @@ Deno.serve(async (req: Request) => {
 
           const stamped = pending.map((item) => ({ ...item, phase, pairsWith }));
           let filed = 0;
-          for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item)) filed++;
+          const batchId = stamped.length > 1 ? crypto.randomUUID() : null;
+          for (const item of stamped) if (await finalizeEvidenceItem(supabase, confirmedJob.id, confirmedJob.stage, workerEmail, item, batchId)) filed++;
           await supabase.from("wa_intake_sessions").delete().eq("wa_id", msg.from);
           root.setAttributes({
             "yaadly.evidence_intake.outcome": filed ? "filed_after_phase" : "phase_but_nothing_filed",
@@ -3102,7 +3160,12 @@ Deno.serve(async (req: Request) => {
         const found = await lookupWorkerWithActiveJobs(supabase, msg.from);
         if (found) {
           const { email: workerEmail, jobs: activeJobs } = found;
-          const items = (await Promise.all(evidenceMedia.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text, deadline)))).filter(Boolean) as PendingEvidence[];
+          // Words waiting as a typed update travel with the photos as their
+          // caption, so one visit is one filing rather than words on one line
+          // and photos on another. Only when the photos came with no words of
+          // their own. The session row is replaced by the photo lane below.
+          const waitingWords = draftSession ? String((draftSession.answers as any)?.text ?? "") : "";
+          const items = (await Promise.all(evidenceMedia.map((m) => downloadAndStageEvidence(supabase, m.url, m.mime, msg.text.trim() ? msg.text : waitingWords, deadline)))).filter(Boolean) as PendingEvidence[];
           if (!items.length) {
             return twiml("That did not come through properly. Try sending it again, or if it is a longer video, use the portal instead.");
           }
@@ -3571,16 +3634,24 @@ Deno.serve(async (req: Request) => {
               "Anything you send about the work itself still goes on the job record as normal.", trace,
             ));
           }
+          // A lone "1" or a stray character is not an update. With a draft
+          // waiting it is handled above; without one there is nothing to file.
+          if (found && tooShortToBeAnUpdate(text)) {
+            root.setAttributes({ "yaadly.worker_update.outcome": "too_short_not_update" });
+            return twiml("Nothing is waiting to be filed. Send a few words on how the work went, a photo, or a voice note.");
+          }
+          // Held and read back, never filed on arrival (17 Sep 2026). The
+          // reply of 1 is handled by the update_draft lane above.
           if (found && found.jobs.length === 1) {
             const job = found.jobs[0];
-            const { error } = await supabase.from("evidence").insert({
-              job_id: job.id, label: text.slice(0, 1000), stage: job.stage,
-              kind: "work", uploaded_by: found.email,
+            await supabase.from("wa_intake_sessions").upsert({
+              wa_id: msg.from,
+              answers: { _lane: "update_draft", worker_email: found.email, job_id: job.id, job_title: job.title, text: text.slice(0, 1000) },
+              photo_count: 0,
+              updated_at: new Date().toISOString(),
             });
-            root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": error ? "insert_failed" : "filed" });
-            return twiml(error
-              ? "That did not save properly. Try sending it again."
-              : `Got it, on record for ${job.id}. The client hears about it once it is drafted. If you need a person instead, just say so.`);
+            root.setAttributes({ "yaadly.worker_update.job": job.id, "yaadly.worker_update.outcome": "held_for_confirm" });
+            return twiml(draftReadBack(job.id, job.title, text));
           }
           if (found && found.jobs.length > 1) {
             await supabase.from("wa_intake_sessions").upsert({

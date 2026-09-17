@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { EvidenceItemComment } from "./EvidenceItemComment";
 import { whenDateTime } from "@/lib/date";
-import { phaseBadge, sectionsOf, stageLock } from "@/lib/portal/evidence-sections";
+import { phaseBadge, sectionsOf, stageLock, updatesOf } from "@/lib/portal/evidence-sections";
 
 export type EvidenceItem = {
   id: string;
@@ -42,6 +42,8 @@ export type EvidenceItem = {
   pairs_with?: string | null;
   /** P1, P2, P3: the short per-job code. */
   item_code?: string | null;
+  /** Shared by everything confirmed together in one WhatsApp batch. See 20260917190100. */
+  batch_id?: string | null;
 };
 
 type StageState = "done" | "now" | "todo";
@@ -290,16 +292,28 @@ export function EvidenceLedger({
                         {sec.note}
                       </p>
                       <ul className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {sec.items.map((e) => (
-                          <EvidenceCard
-                            key={e.id}
-                            e={e}
-                            answers={e.pairs_with ? byId.get(e.pairs_with) : undefined}
-                            answeredBy={answered.get(e.id)}
-                            role={role}
-                            jobId={jobId}
-                          />
-                        ))}
+                        {/* One update, one card (17 Sep 2026): photos the
+                            worker confirmed together are drawn together. */}
+                        {updatesOf(sec.items).map((group) =>
+                          group.length === 1 ? (
+                            <EvidenceCard
+                              key={group[0].id}
+                              e={group[0]}
+                              answers={group[0].pairs_with ? byId.get(group[0].pairs_with) : undefined}
+                              answeredBy={answered.get(group[0].id)}
+                              role={role}
+                              jobId={jobId}
+                            />
+                          ) : (
+                            <EvidenceUpdateCard
+                              key={group[0].id}
+                              group={group}
+                              answers={group[0].pairs_with ? byId.get(group[0].pairs_with) : undefined}
+                              role={role}
+                              jobId={jobId}
+                            />
+                          ),
+                        )}
                       </ul>
                     </section>
                   ))}
@@ -345,6 +359,86 @@ export function EvidenceLedger({
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Several items the worker confirmed together, drawn as the one update they
+ * were sent as: every photo, the words once, one time. The words are shown
+ * once only when every item carries the same words; otherwise each photo
+ * keeps its own caption underneath it, because merging two different captions
+ * into one would say something nobody sent. Each item's fingerprint is still
+ * listed separately in the stage record below.
+ */
+function EvidenceUpdateCard({
+  group,
+  answers,
+  role,
+  jobId,
+}: {
+  group: EvidenceItem[];
+  answers?: EvidenceItem;
+  role: "client" | "worker";
+  jobId?: string;
+}) {
+  const first = group[0];
+  const badge = phaseBadge(first.phase, first.kind);
+  const labels = new Set(group.map((e) => (e.label ?? "").trim()));
+  const oneLabel = labels.size === 1 ? first.label : null;
+  const allChecked = group.every((e) => e.ok === true);
+  const anyAwaiting = group.some((e) => e.ok != null && e.ok !== true);
+  return (
+    <li className="overflow-hidden rounded-xl border border-line bg-panel sm:col-span-2">
+      <div className="grid grid-cols-2 gap-0.5 bg-line sm:grid-cols-3">
+        {group.map((e) => (
+          <figure key={e.id} className="bg-panel2">
+            {e.img ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={e.img} alt={e.label ?? "Evidence photo"} className="h-32 w-full object-cover" />
+            ) : (
+              <div className="grid h-32 w-full place-items-center text-[11px] text-dim">No image</div>
+            )}
+            {!oneLabel && e.label && (
+              <figcaption className="px-2 py-1 text-[11px] leading-snug text-mute">{e.label}</figcaption>
+            )}
+          </figure>
+        ))}
+      </div>
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-2">
+          <b className="text-[13px] leading-snug">
+            {badge && (
+              <span className="mr-1.5 rounded-full bg-tealb/15 px-1.5 py-0.5 align-middle text-[9.5px] font-bold uppercase tracking-wide text-tealb">
+                {badge}
+              </span>
+            )}
+            {oneLabel ?? "One update"}
+          </b>
+          {(allChecked || anyAwaiting) && (
+            <span
+              className={
+                "flex-none rounded-full px-2 py-0.5 text-[9.5px] font-bold " +
+                (allChecked ? "bg-tealb/15 text-tealb" : "bg-mango/15 text-mango")
+              }
+            >
+              {allChecked ? "Checked" : "Awaiting check"}
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 text-[11px] text-dim">
+          {group.length} items sent together{first.created_at ? " · " + stamp(first.created_at) : ""}
+        </p>
+        {answers && (
+          <p className="mt-1 text-[11px] text-mute">
+            Answers {answers.item_code ?? "the before"}
+            {answers.label ? ", " + answers.label : ""}
+          </p>
+        )}
+        {role === "client" && jobId && (
+          <EvidenceItemComment jobId={jobId} evidenceId={first.id} />
+        )}
+      </div>
+    </li>
   );
 }
 

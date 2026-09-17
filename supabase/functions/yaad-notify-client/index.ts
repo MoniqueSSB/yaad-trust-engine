@@ -53,6 +53,7 @@ import { NO_VISION_PROVIDER_MESSAGE, pickVisionProvider, type VisionProvider, vi
 import * as guardrails from "./guardrails.ts";
 import { checkAttrs, deskPack, runEvidenceChecks, workerGaps, workerNotes } from "./evidence-checks.ts";
 import { recordAccepted, type SendMeta, withStatusCallback } from "./twilio-status.ts";
+import { hasWorkerTemplateDecision, insideWindow, samePhoneDigits, templateVar, WINDOW_MS, workerTemplateSummary } from "./worker-template.ts";
 import { Image } from "jsr:@matmen/imagescript";
 import { encodeBase64 } from "jsr:@std/encoding/base64";
 
@@ -69,7 +70,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
+const KINDS = ["quote_arrived", "quote_recommended", "quote_awaiting_worker_confirm", "quote_accepted", "booked_worker", "job_live_worker", "evidence_landed", "dispute_raised", "dispute_raised_worker", "desk_alert", "stage_released", "stage_released_worker", "worker_on_site", "walkthrough_notes_ready", "walkthrough_requested", "job_delayed", "evidence_comment", "evidence_report_confirmed", "kickoff_pack_ready", "worker_requested", "request_declined", "quote_not_selected", "materials_sent_worker", "worker_paid", "service_booked", "service_confirmed", "service_live"] as const;
 type Kind = (typeof KINDS)[number];
 
 // The services lane (2 Sep 2026): the same hub, the same channel ladder,
@@ -912,7 +913,7 @@ Deno.serve(async (req: Request) => {
       const { data: q } = await admin.from("job_quotes").select("worker_email").eq("id", quoteId).maybeSingle();
       if (q?.worker_email) kickoffWorkerEmail = q.worker_email;
     }
-    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
+    if ((kind === "evidence_comment" || kind === "evidence_landed" || kind === "stage_released_worker" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") && job.worker_email) {
       const { data: worker } = await admin.from("worker_profiles")
         .select("phone").ilike("worker_email", job.worker_email).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
@@ -954,7 +955,7 @@ Deno.serve(async (req: Request) => {
         .select("phone").ilike("worker_email", quoteWorkerEmail).maybeSingle();
       workerPhone = String(worker?.phone ?? "").trim();
     }
-    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
+    if (kind === "evidence_comment" || kind === "evidence_landed" || kind === "kickoff_pack_ready" || kind === "quote_awaiting_worker_confirm" || kind === "quote_not_selected" || kind === "stage_released_worker" || kind === "worker_requested" || kind === "booked_worker" || kind === "job_live_worker" || kind === "dispute_raised_worker" || kind === "materials_sent_worker" || kind === "worker_paid" || kind === "walkthrough_requested") {
       recipientEmail = "";
       recipientPhone = workerPhone;
     }
@@ -1149,6 +1150,25 @@ Deno.serve(async (req: Request) => {
         // worker types to this number is kept with the job and read by the
         // intake and reporting steps, so bank details must never be sent in it.
         `Yaadly pays you by bank transfer, never cash. Add your bank details securely here, and Yaadly will call you to check them: ${APP_URL}/portal/worker/payouts. Never type bank details into this chat.`;
+    } else if (kind === "job_live_worker") {
+      // 17 Sep 2026, founder instruction. booked_worker tells the worker not
+      // to start and promises a message on this number once the client's
+      // invoice to Yaadly is paid. Nothing sent that message. Fired by
+      // notify_client_on_job_change (20260917190000) when the job leaves
+      // awaiting_payment for work, and checked again here off the row itself,
+      // so a stray call cannot tell a worker to start on a job that has not
+      // been paid. Says nothing about materials money or pay: those have their
+      // own messages, sent when a person marks them.
+      if (!["in_progress", "evidence"].includes(String(job.status ?? "")) || !job.worker_email) {
+        root.setAttributes({ "yaadly.notify.outcome": "job_not_live" });
+        return json({ ok: true, kind, told: false, reason: "That job is not live with a worker on it." });
+      }
+      const firstStage = Math.max(Number(job.stage ?? 0), 1);
+      subject = `The job is live: ${job.title}`;
+      line = `The client's invoice to Yaadly is paid, so ${job.id} (${job.title}) is live and you can start, beginning with ${await stageLabel(admin, jobId, firstStage)}. ` +
+        `When you arrive on site, check in before you start work: in this chat, tap the plus sign (or the paperclip) next to the message box, choose Location, then Send your current location. ` +
+        `That goes on the Arrival Log as proof you were there. Check in the same way each day you are on site.\n\n` +
+        `Photos, videos and a few words on the work can be sent here as you go. The job in your portal: ${roomLink}`;
     } else if (kind === "quote_accepted") {
       // Fired once, from the jobs row itself (notify_client_on_job_change,
       // 20260831zzzz), the moment worker_email is first set, whichever of
@@ -1683,6 +1703,35 @@ Deno.serve(async (req: Request) => {
       emailReason = "no recipient email on the job";
     }
 
+    // A worker who has not written in for 23 hours gets the approved template
+    // instead of free text, which WhatsApp would accept and then fail as
+    // 63016 after this function had returned. Read before sending, because
+    // that failure never comes back here. Only once the template is approved:
+    // the setup function writes the setting then, and not before. See
+    // worker-template.ts. 17 Sep 2026.
+    let workerTemplate: { sid: string; vars: Record<string, string> } | undefined;
+    if (recipientPhone && recipientPhone === workerPhone && job && hasWorkerTemplateDecision(kind)) {
+      const summary = workerTemplateSummary(kind);
+      let sid = Deno.env.get("TWILIO_CONTENT_SID_WORKER_UPDATE") ?? "";
+      if (!sid) {
+        const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_worker_update").maybeSingle();
+        try { sid = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { sid = String(st?.value ?? ""); }
+      }
+      if (summary && /^HX[0-9a-f]{32}$/i.test(sid)) {
+        const { data: seen } = await admin.from("wa_inbound_seen")
+          .select("from_addr, seen_at").eq("channel", "whatsapp")
+          .gte("seen_at", new Date(Date.now() - WINDOW_MS).toISOString())
+          .order("seen_at", { ascending: false }).limit(500);
+        const last = (seen ?? []).find((r: { from_addr: string }) => samePhoneDigits(r.from_addr, recipientPhone));
+        if (!insideWindow(last?.seen_at ?? null)) {
+          // A job the worker is not booked on opens nothing for them, so those two go to the portal itself.
+          const link = kind === "worker_requested" || kind === "quote_not_selected" ? `${APP_URL}/portal` : roomLink;
+          workerTemplate = { sid, vars: { "1": templateVar(`${job.title ?? "your job"} (${job.id})`), "2": templateVar(summary, 300), "3": link } };
+        }
+      }
+      root.setAttributes({ "yaadly.notify.worker_template": Boolean(workerTemplate) });
+    }
+
     let wa: { sent: boolean; reason?: string; via?: string } = { sent: false, reason: "no recipient phone on the job" };
     if (recipientPhone) {
       // Photos ride only on the WhatsApp attempt. A fallback to Meta or SMS
@@ -1690,7 +1739,9 @@ Deno.serve(async (req: Request) => {
       // good for five minutes has likely aged past useful by the time a
       // second attempt runs; the text and the portal link still carry the
       // fact either way.
-      wa = await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
+      wa = workerTemplate
+        ? await sendTwilio(recipientPhone, "", "whatsapp", trace, [], workerTemplate, sendMeta)
+        : await sendTwilio(recipientPhone, line, "whatsapp", trace, attachPhotos, undefined, sendMeta);
       // The rich, scope-carrying message could not be delivered at all,
       // specifically because it landed outside WhatsApp's 24 hour window:
       // the approved template is the fallback for exactly that failure,

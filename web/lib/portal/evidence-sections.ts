@@ -163,3 +163,34 @@ export function stageLock(n: number, currentStage: number): StageLock {
   if (n === cur) return "now";
   return "locked";
 }
+
+/**
+ * One update, one card. Founder, 17 Sep 2026: an update is meant to carry
+ * everything sent together, not come apart into a line per photo.
+ *
+ * Items filed in the same confirmed WhatsApp batch share evidence.batch_id
+ * (20260917190100). Grouped by that and by nothing else: never by label, time
+ * or uploader, because two separate filings that happen to say the same thing
+ * a minute apart are two filings. An item with no batch_id is its own update,
+ * which is every portal upload and everything filed before the column existed.
+ * Order is the order the first item of each update appears in.
+ */
+export function updatesOf<T extends { id: string; batch_id?: string | null }>(items: T[]): T[][] {
+  const out: T[][] = [];
+  const byBatch = new Map<string, T[]>();
+  for (const e of items) {
+    const b = e.batch_id ?? null;
+    if (!b) {
+      out.push([e]);
+      continue;
+    }
+    const group = byBatch.get(b);
+    if (group) group.push(e);
+    else {
+      const fresh = [e];
+      byBatch.set(b, fresh);
+      out.push(fresh);
+    }
+  }
+  return out;
+}

@@ -3638,6 +3638,14 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 
 **Rejected.** Putting the kind on the callback URL as a query string: one line, and it would have broken every callback, because Twilio signs the full URL and `checkTwilioSignature` rebuilds it without the query. A desk insert or update policy on the table: its value is that the desk did not write it. Changing the wording of the two guard tests that hold the desk-lane reply and the alert to her phone to their exact call, so those could carry a kind too: a failing guard test means the change is wrong, and a label is not worth loosening a test about sending her words exactly as typed. Those two record as "message".
 
+## 2026-09-17 · A worker's update is confirmed before it is filed, and is shown as one update
+
+**Why.** The founder's test job carried "done", "no", "share location" and "1" as evidence: any plain message from a worker with one live job was filed on arrival. Her instruction: the record shows only what the person sending it approved, and an update carries everything sent together.
+
+**How.** Typed words are held in an `update_draft` session and read back; only a reply of 1 files them (`yaad-inbound/update-draft.ts`). Photos sent while words are waiting take them as their caption. Everything filed in one confirmed WhatsApp batch shares `evidence.batch_id` (20260917190100), and the ledger draws a batch as one card (`updatesOf()` in `web/lib/portal/evidence-sections.ts`). Each item keeps its own row and its own fingerprint.
+
+**Rejected.** Grouping by label or time on the page with no column: two separate filings a minute apart saying the same thing are two filings, and inferring otherwise would overstate the record. Backfilling `batch_id` on old rows for the same reason. A single evidence row holding several files: every gate, fingerprint and comment is per item, and the change would have touched all of them.
+
 ## 2026-09-17 · A worker is paid only after the client has paid for the work
 
 **Why.** The founder, once Stripe and Wise were both set up for paying workers: paying should be blocked "until I have received confirmation that the client has paid for this stage", with "a back end where there's a check that the stage has been paid for by the client before the worker is paid." Before this, a worker's pay invoice could be marked sent while the client's bill for the same stage was unpaid, so Yaadly carried the whole of a non-paying client.
