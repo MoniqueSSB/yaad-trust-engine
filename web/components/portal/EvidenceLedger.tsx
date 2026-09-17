@@ -42,7 +42,7 @@ export type EvidenceItem = {
   pairs_with?: string | null;
   /** P1, P2, P3: the short per-job code. */
   item_code?: string | null;
-  /** Shared by everything confirmed together in one WhatsApp batch. See 20260917130000. */
+  /** Shared by everything confirmed together in one WhatsApp batch. See 20260917190100. */
   batch_id?: string | null;
 };
 

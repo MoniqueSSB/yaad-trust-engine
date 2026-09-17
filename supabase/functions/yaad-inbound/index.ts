@@ -471,7 +471,7 @@ async function finalizeEvidenceItem(admin: any, jobId: string, stage: number, wo
     phase: item.phase ?? null,
     pairs_with: item.pairsWith ?? null,
     // One id for everything confirmed together, so the page draws one update
-    // rather than a card per photo. See 20260917130000.
+    // rather than a card per photo. See 20260917190100.
     batch_id: batchId,
     sha256: item.sha256, captured_at: null, uploaded_by: workerEmail, ok: null,
   });

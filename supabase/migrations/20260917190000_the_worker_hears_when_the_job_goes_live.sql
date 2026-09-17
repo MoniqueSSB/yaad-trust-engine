@@ -83,7 +83,7 @@ as $function$
       -- The job has gone live with a worker on it: the client's invoice that
       -- starts the job is paid, and sync_job_status has moved it off
       -- awaiting_payment. booked_worker promised the worker a message when
-      -- this happened. 20260917120000.
+      -- this happened. 20260917190000.
       if coalesce(new.worker_email, '') <> ''
          and new.status in ('in_progress', 'evidence')
          and coalesce(old.status, '') not in ('in_progress', 'evidence', 'disputed', 'complete', 'cancelled')

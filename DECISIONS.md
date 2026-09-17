@@ -3642,6 +3642,15 @@ Two refusals keep money on one document. A bill with a live part cannot be voide
 
 **Why.** The founder's test job carried "done", "no", "share location" and "1" as evidence: any plain message from a worker with one live job was filed on arrival. Her instruction: the record shows only what the person sending it approved, and an update carries everything sent together.
 
-**How.** Typed words are held in an `update_draft` session and read back; only a reply of 1 files them (`yaad-inbound/update-draft.ts`). Photos sent while words are waiting take them as their caption. Everything filed in one confirmed WhatsApp batch shares `evidence.batch_id` (20260917130000), and the ledger draws a batch as one card (`updatesOf()` in `web/lib/portal/evidence-sections.ts`). Each item keeps its own row and its own fingerprint.
+**How.** Typed words are held in an `update_draft` session and read back; only a reply of 1 files them (`yaad-inbound/update-draft.ts`). Photos sent while words are waiting take them as their caption. Everything filed in one confirmed WhatsApp batch shares `evidence.batch_id` (20260917190100), and the ledger draws a batch as one card (`updatesOf()` in `web/lib/portal/evidence-sections.ts`). Each item keeps its own row and its own fingerprint.
 
 **Rejected.** Grouping by label or time on the page with no column: two separate filings a minute apart saying the same thing are two filings, and inferring otherwise would overstate the record. Backfilling `batch_id` on old rows for the same reason. A single evidence row holding several files: every gate, fingerprint and comment is per item, and the change would have touched all of them.
+
+## 2026-09-17 · A worker is paid only after the client has paid for the work
+
+**Why.** The founder, once Stripe and Wise were both set up for paying workers: paying should be blocked "until I have received confirmation that the client has paid for this stage", with "a back end where there's a check that the stage has been paid for by the client before the worker is paid." Before this, a worker's pay invoice could be marked sent while the client's bill for the same stage was unpaid, so Yaadly carried the whole of a non-paying client.
+
+**How.** One function, `worker_pay_client_unpaid()`, decides, and three places ask it: `mark_worker_paid()` (bank transfer and Stripe both end there), `yaad-payout-send` on quote and on send (a Stripe payout leaves before the invoice is marked, so the database gate alone would have been too late), and the desk, which greys the buttons and shows the reason. Billed by stage, the stage's own client bill plus the fee and materials bills must be paid; billed in full, the whole bill and every part of it. It fails closed: no client bill, a draft, or an error all refuse. It adds a refusal and removes none; the call-back gate and the named person on every payment are unchanged.
+
+**Rejected.** Checking only on the desk: the desk is not the control, and a hand RPC call would walk past it. Counting a paid fee bill as enough on a stage-billed job: the fee is not the stage's money. Gating materials tranches the same way: the worker needs that money to buy the goods, so it goes out first. Founder confirmed, 17 Sep 2026.
+

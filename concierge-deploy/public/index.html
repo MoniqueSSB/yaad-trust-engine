@@ -1173,7 +1173,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <!-- ============================================ PAY WORKERS -->
 <section class="view" data-view="workerpay">
   <h1 class="vh">Pay workers</h1>
-  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then either pay it from Wise, to the recipient saved there, and press Mark as sent; or, for a worker who has set up Stripe, press Pay with Stripe: it shows you Stripe's fee, exchange rate and what lands in J$, and sends only when you confirm. Either way the invoice is marked paid, stamped with you and the time, once, and the worker gets a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number.</p>
+  <p class="vsub">Every pay invoice Yaadly owes a worker, raised when a stage is approved. Each row links to the pay invoice, the job's invoices and the job's record of who approved the work, and shows whether the client has paid for it. Nobody is paid until the client's bill for that work is marked paid: the buttons stay grey and the database refuses, for Wise and Stripe alike. First call the worker back to check their bank details and press Call-back done; the database refuses Mark as sent until you have, and again whenever they change their details. Then either pay it from Wise, to the recipient saved there, and press Mark as sent; or, for a worker who has set up Stripe, press Pay with Stripe: it shows you Stripe's fee, exchange rate and what lands in J$, and sends only when you confirm. Either way the invoice is marked paid, stamped with you and the time, once, and the worker gets a WhatsApp. Yaadly stores no worker bank details, and a worker should never send them to the Yaadly WhatsApp number.</p>
   <div id="wpMsg"></div>
   <div id="wpBody"><div class="empty"><b>Reading worker pay invoices&hellip;</b></div></div>
 </section>
@@ -8360,6 +8360,21 @@ async function loadWorkerPay(keepMsg){
   // one shows red until a person deals with it.
   const { data: payouts } = list.length ? await sb.from("stripe_payouts").select("invoice_id,outbound_payment_id,status,status_detail,receipt_url,trace_id,expected_arrival,debited_value,debited_currency,fees,fx_rate,quote_is_estimate,sent_by,created_at").in("invoice_id", list.map((i) => i.id)) : { data: [] };
   const payoutByInv = new Map((payouts || []).map((x) => [x.invoice_id, x]));
+  // What the client has paid on these jobs, and who approved each stage, so a
+  // row can be checked here before paying. 20260917180000.
+  const owedIds = list.filter((i) => i.status === "sent").map((i) => i.id);
+  const [{ data: clientInvs }, { data: approvals }, gates] = await Promise.all([
+    jobIds.length ? sb.from("invoices").select("id,job_id,stage,part_of,status,total_pence,currency,paid_at").in("job_id", jobIds).neq("payable_to", "worker").neq("status", "void") : Promise.resolve({ data: [] }),
+    jobIds.length ? sb.from("stage_approvals").select("job_id,stage,approved_by,approved_at").in("job_id", jobIds).limit(1000) : Promise.resolve({ data: [] }),
+    // The database's own answer to "has the client paid for this work",
+    // the same function mark_worker_paid and Pay with Stripe refuse on.
+    // An error counts as not paid: this view never guesses in favour of paying.
+    Promise.all(owedIds.map((id) => sb.rpc("worker_pay_client_unpaid", { p_invoice: id })
+      .then(({ data, error: e }) => [id, e ? "Could not check whether the client has paid: " + e.message : (data || null)]))),
+  ]);
+  const clientBy = new Map();
+  for (const c of clientInvs || []) { if (Number(c.total_pence || 0) > 0) (clientBy.get(c.job_id) || clientBy.set(c.job_id, []).get(c.job_id)).push(c); }
+  const blockedBy = new Map(gates);
   const jobById = new Map((jobs || []).map((j) => [j.id, j]));
   const workerByEmail = new Map((workers || []).map((w) => [String(w.worker_email || "").toLowerCase(), w]));
 
@@ -8379,7 +8394,26 @@ async function loadWorkerPay(keepMsg){
     const j = jobById.get(i.job_id);
     return esc((j && j.title) || i.job_id || "") + (j && j.is_test ? " " + chip_("mute", "test") : "") + sub_(i.job_id || "");
   };
-  const forCell = (i) => esc(String(i.period_label || "").trim() || (i.stage ? "Stage " + i.stage : "Work completed")) + sub_(i.id);
+  // Who signed off the work this pay is for, from stage_approvals.
+  const approvedLine = (i) => {
+    const a = (approvals || []).filter((x) => x.job_id === i.job_id && (i.stage == null || x.stage === i.stage))
+      .sort((x, y) => String(y.approved_at).localeCompare(String(x.approved_at)))[0];
+    return a ? "approved by " + a.approved_by + ", " + String(a.approved_at).slice(0, 10) : "no stage approval on record";
+  };
+  const forCell = (i) => esc(String(i.period_label || "").trim() || (i.stage ? "Stage " + i.stage : "Work completed")) + sub_(i.id) + sub_(approvedLine(i));
+  // The client's bills on the job, as a short list, paid ones first.
+  const clientCell = (i) => {
+    const why = blockedBy.get(i.id);
+    const bills = (clientBy.get(i.job_id) || []).slice().sort((a, b) => (a.status === "paid" ? 0 : 1) - (b.status === "paid" ? 0 : 1) || String(a.id).localeCompare(String(b.id)));
+    const billLine = bills.map((c) => c.id + (c.stage != null ? " stage " + c.stage : c.part_of ? " part" : " whole job") + " " + (c.status === "paid" ? "paid " + String(c.paid_at || "").slice(0, 10) : c.status)).join(" · ");
+    return (why ? chip_("warn", "client not paid") + sub_(why) : chip_("ok", "client paid")) + (billLine ? sub_(billLine) : "");
+  };
+  const linksRow = (i) => `<div class="brow" style="margin-top:6px">
+      <button class="btn g" data-wp-open="${esc(i.id)}" title="Open this pay invoice in Invoices">Pay invoice</button>
+      ${i.job_id ? `<button class="btn g" data-wp-jobinv="${esc(i.job_id)}" title="The client's bills and the worker's pay for this job, together">Job invoices</button>
+      <button class="btn g" data-wp-job="${esc(i.job_id)}" title="The job's record: stage approvals and evidence">Job record</button>` : ""}
+      <a class="btn g" href="https://wise.com/home" target="_blank" rel="noopener" title="Opens Wise in a new tab. Pay to the recipient saved there, then come back and press Mark as sent">Open Wise</a>
+    </div>`;
   const totals = (rows) => {
     const by = new Map();
     for (const r of rows) by.set(r.currency || "JMD", (by.get(r.currency || "JMD") || 0) + Number(r.total_pence || 0));
@@ -8395,6 +8429,7 @@ async function loadWorkerPay(keepMsg){
   const drafts = list.filter((i) => i.status === "draft");
 
   const owedRows = owed.map((i) => {
+    const why = blockedBy.get(i.id);
     const since = i.sent_at ? String(i.sent_at).slice(0, 10) : "";
     const days = i.sent_at ? Math.floor((Date.now() - new Date(i.sent_at).getTime()) / 86400000) : 0;
     const wait = days >= 1 ? chip_(days >= 3 ? "crit" : "warn", days === 1 ? "1 day" : days + " days") : chip_("ok", "today");
@@ -8403,10 +8438,12 @@ async function loadWorkerPay(keepMsg){
       <td>${jobCell(i)}</td>
       <td>${forCell(i)}</td>
       <td class="num"><b>${feeAmt(i.total_pence, i.currency)}</b>${sub_("owed since " + since)}</td>
+      <td>${clientCell(i)}</td>
       <td>${wait}</td>
-      <td><input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">
-        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}">Mark as sent</button>
-        ${stripeReady(i) ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}" title="Shows Stripe's fee and rate first; sends only when you confirm">Pay with Stripe</button>` : `<span style="opacity:.55" title="The worker has not finished setting up Stripe in their portal">Stripe: not set up</span>`}</td>
+      <td>${why ? `<span style="opacity:.55" title="${esc(why)}">Waiting for the client to pay</span>` : `<input type="text" placeholder="transfer ref, optional" data-wp-ref="${esc(i.id)}" style="width:150px">`}
+        <button class="btn" data-wp-sent="${esc(i.id)}" data-wp-amt="${esc(feeAmt(i.total_pence, i.currency))}" data-wp-who="${esc(who(i))}"${why ? ` disabled title="${esc(why)}"` : ""}>Mark as sent</button>
+        ${stripeReady(i) ? `<button class="btn" data-wp-stripe="${esc(i.id)}" data-wp-who="${esc(who(i))}"${why ? ` disabled title="${esc(why)}"` : ` title="Shows Stripe's fee and rate first; sends only when you confirm"`}>Pay with Stripe</button>` : `<span style="opacity:.55" title="The worker has not finished setting up Stripe in their portal">Stripe: not set up</span>`}
+        ${linksRow(i)}</td>
     </tr>`;
   }).join("");
 
@@ -8459,19 +8496,25 @@ async function loadWorkerPay(keepMsg){
       <div class="tw"><table><thead><tr><th>Worker</th><th>Phone on file</th><th>Details</th><th></th></tr></thead><tbody>${checkRows}</tbody></table></div>
     </div>` : "";
 
-  const head = `<thead><tr><th>Worker</th><th>Job</th><th>For</th><th class="num">Amount</th><th>Waiting</th><th></th></tr></thead>`;
+  const head = `<thead><tr><th>Worker</th><th>Job</th><th>For</th><th class="num">Amount</th><th>Client</th><th>Waiting</th><th></th></tr></thead>`;
   host.innerHTML = checkCard + `
     <div class="card">
       <div class="chd"><h3>Owed now${owed.length ? ": " + owed.length + ", " + totals(owed) : ""}</h3></div>
       ${owed.length ? `<div class="tw"><table>${head}<tbody>${owedRows}</tbody></table></div>`
         : `<div class="empty"><b>Nobody is owed anything right now</b>A pay invoice lands here the moment a stage is approved.</div>`}
+      ${owed.some((i) => blockedBy.get(i.id)) ? `<p class="vsub" style="margin-top:8px">${owed.filter((i) => blockedBy.get(i.id)).length} of these cannot be paid yet: the client has not paid for that work. Mark their bill paid on Invoices when the money arrives, and the buttons open here.</p>` : ""}
     </div>
     <div class="card">
       <div class="chd"><h3>Sent${paid.length ? ", latest " + paid.length : ""}</h3></div>
-      ${paid.length ? `<div class="tw"><table>${head.replace("<th>Waiting</th>", "<th></th>")}<tbody>${paidRows}</tbody></table></div>`
+      ${paid.length ? `<div class="tw"><table>${head.replace("<th>Client</th><th>Waiting</th>", "<th></th>")}<tbody>${paidRows}</tbody></table></div>`
         : `<div class="empty"><b>No worker has been marked paid yet</b></div>`}
     </div>
     ${drafts.length ? `<p class="vsub">${drafts.length} worker pay invoice${drafts.length > 1 ? "s are" : " is"} still a draft, not yet owed: ${drafts.map((d) => esc(d.id)).join(", ")}.</p>` : ""}`;
+
+  // Links: open the pay invoice, the job's invoices, or the job's record.
+  host.querySelectorAll("[data-wp-open]").forEach((b) => b.addEventListener("click", () => openInvoice(b.dataset.wpOpen)));
+  host.querySelectorAll("[data-wp-jobinv]").forEach((b) => b.addEventListener("click", () => go("invoices:job:" + b.dataset.wpJobinv)));
+  host.querySelectorAll("[data-wp-job]").forEach((b) => b.addEventListener("click", () => { $("srch").value = b.dataset.wpJob; go("jobs"); }));
 
   // Call-back done: a named person saying they phoned the worker and checked
   // their bank details (confirm_bank_callback). Stamped by the database.

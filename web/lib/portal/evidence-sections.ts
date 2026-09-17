@@ -169,7 +169,7 @@ export function stageLock(n: number, currentStage: number): StageLock {
  * everything sent together, not come apart into a line per photo.
  *
  * Items filed in the same confirmed WhatsApp batch share evidence.batch_id
- * (20260917130000). Grouped by that and by nothing else: never by label, time
+ * (20260917190100). Grouped by that and by nothing else: never by label, time
  * or uploader, because two separate filings that happen to say the same thing
  * a minute apart are two filings. An item with no batch_id is its own update,
  * which is every portal upload and everything filed before the column existed.

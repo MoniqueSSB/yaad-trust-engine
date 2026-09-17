@@ -1154,7 +1154,7 @@ Deno.serve(async (req: Request) => {
       // 17 Sep 2026, founder instruction. booked_worker tells the worker not
       // to start and promises a message on this number once the client's
       // invoice to Yaadly is paid. Nothing sent that message. Fired by
-      // notify_client_on_job_change (20260917120000) when the job leaves
+      // notify_client_on_job_change (20260917190000) when the job leaves
       // awaiting_payment for work, and checked again here off the row itself,
       // so a stray call cannot tell a worker to start on a job that has not
       // been paid. Says nothing about materials money or pay: those have their

@@ -20,6 +20,6 @@
 alter table public.evidence add column if not exists batch_id uuid;
 
 comment on column public.evidence.batch_id is
-  'Items filed together in one confirmed WhatsApp batch share this. Null = filed on its own. Display grouping only, never a gate. 20260917130000.';
+  'Items filed together in one confirmed WhatsApp batch share this. Null = filed on its own. Display grouping only, never a gate. 20260917190100.';
 
 create index if not exists evidence_batch_id_idx on public.evidence (batch_id) where batch_id is not null;
