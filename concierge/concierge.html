@@ -913,6 +913,49 @@ th.bkc,td.bkc{width:34px;padding-right:0}
 .ivsum th{background:none;border:0}
 @media(max-width:600px){.ivsum{min-width:0;border-spacing:4px 4px;margin:4px -4px 2px}.ivsum th,.ivsum tbody th{white-space:normal;letter-spacing:0;text-transform:none;font-size:10.5px;padding:0 2px}.ivsum thead th span{display:none}.ivcell{padding:7px 8px}.ivcell .a{font-size:14px}}
 .ivact .btn{margin-left:6px}
+#lineRows tr.pkable{cursor:pointer}
+#lineRows tr.pkable:hover td{background:var(--soft)}
+#lineRows tr.pkon td{background:rgba(155,115,245,.16)!important}
+#lineRows tr.pkon td:first-child{box-shadow:inset 3px 0 0 var(--tealb)}
+#lineRows tr.pkoff td{opacity:.4}
+#lineRows td.pkcell{width:34px;text-align:center}
+#lineRows td.pkcell input{width:18px;height:18px;cursor:pointer;accent-color:#9B73F5}
+.pkbar{margin:12px 0 0;padding:11px 14px;border-radius:10px;border:1px dashed var(--line2);font-size:13px;color:var(--mute)}
+.pkbar.on{border-style:solid;border-color:var(--tealb);background:var(--soft);color:var(--ink)}
+.jitable tr.ivgrp td{padding:9px 18px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);background:var(--panel2)}
+.ivjobmoney{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:8px 0 4px}
+.ivjm{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel2)}
+.ivjm h5{margin:0 0 8px;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.ivjm .r{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px;color:var(--mute)}
+.ivjm .r b{font-family:var(--disp);font-weight:500;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ivjm .r.big b{font-size:19px}
+.ivjm .r.due b{color:var(--mango)}
+.ivjm .r.ok b{color:var(--tealb)}
+.ivjm .s{font-size:11px;color:var(--dim);margin-top:4px}
+.paidsign,.duesign,.draftsign,.voidsign{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;white-space:nowrap;line-height:1.4}
+.paidsign{background:var(--teal);color:#fff;border:1px solid var(--teal)}
+.duesign{background:#2b2210;color:var(--mango);border:1px solid #4a3a12}
+.draftsign{background:var(--panel2);color:var(--mute);border:1px solid var(--line2)}
+.voidsign{color:var(--dim);border:1px solid var(--line);text-decoration:line-through}
+.jitable tr.ivjobrow td{border-bottom:0;padding-bottom:6px}
+.jitable tr.ivsub td{padding:0 18px 16px}
+.ivsublist{display:flex;flex-direction:column;gap:6px;border-left:2px solid var(--line2);padding-left:14px;margin-left:2px}
+.ivsubi{display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--mute);flex-wrap:wrap}
+.ivsubi b{color:var(--ink);font-family:var(--mono);font-size:12px;font-weight:600}
+.ivsubi .amt{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink);font-family:var(--mono);font-size:12px}
+.ivsubi.paid .amt{color:var(--tealb)}
+.ivsubi.void{opacity:.5}
+.ivsubi:hover b{text-decoration:underline}
+.ivcount{margin-top:6px;font-size:11px;color:var(--dim)}
+.jpinv{margin-top:10px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+.jpinv .ivsubi{font-size:12px}
+.ivsec{font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);margin:6px 0 2px;display:flex;gap:10px;align-items:center}
+.ivsec:first-child{margin-top:0}
+.ivsec .paidsign{font-size:10px;padding:1px 8px;letter-spacing:0;text-transform:none}
+.holdsign{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700;background:rgba(248,113,113,.12);color:var(--coral);border:1px solid rgba(248,113,113,.35);white-space:nowrap}
+.ivjoblink{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:2px 9px;border-radius:100px;border:1px solid var(--line2);font-size:11.5px;font-weight:600;color:var(--tealb);background:var(--soft)}
+.ivjoblink:hover{border-color:var(--tealb)}
+.ivtype{display:inline-block;padding:2px 9px;border-radius:100px;border:1px solid var(--line2);font-size:11px;color:var(--mute);background:var(--panel2)}
 tr.ivdue td{background:rgba(245,158,11,.05)}
 .ivgrp td{padding:9px 18px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:700;background:var(--panel2)}
 </style>
@@ -3582,7 +3625,7 @@ async function preJobs(rows){
     sb.from("stage_approvals").select("job_id,stage,approved_by,approved_at,confirmed_method,evidence").in("job_id", ids).limit(2000),
     sb.from("kickoff_packs").select("job_id,status,approved_by,approved_at,both_confirmed_at,rev").in("job_id", ids).order("rev", { ascending:false }).limit(1000),
     sb.from("job_quotes").select("job_id,worker_name,worker_email,labour_jmd,materials_jmd,status,updated_at").in("job_id", ids).limit(2000),
-    sb.from("invoices").select("job_id,status,total_pence,currency,paid_at,sent_at,payable_to").in("job_id", ids).limit(2000),
+    sb.from("invoices").select("id,job_id,status,total_pence,currency,paid_at,sent_at,payable_to,part_of,stage,created_at").in("job_id", ids).limit(2000),
     sb.from("evidence").select("job_id,stage,ok").in("job_id", ids).limit(4000),
   ]);
   const by = (res) => {
@@ -3874,6 +3917,7 @@ function jobPage(r){
           <span class="k2">Client paid Yaadly</span><span class="v2">${paidC.length ? curText(sumByCur(paidC)) : outC.length ? `<span style="color:var(--mango)">${curText(sumByCur(outC))} out</span>` : mute_("nothing raised")}</span>
           <span class="k2">Paid to tradesperson</span><span class="v2">${paidW.length ? curText(sumByCur(paidW)) : mute_("nothing yet")}</span>
         </div>
+        ${invs.length ? `<div class="jpinv">${invJobList(invs, false)}</div>` : ""}
         <button class="btn g" data-v="invoices:job:${esc(r.id)}" style="margin-top:10px">Every invoice on this job</button></div>
       <div class="jpc"><h6>Site</h6>
         <div class="jpv"><span>Materials kept</span><div class="jpvv">${matStore(r)}</div></div>
@@ -7190,7 +7234,7 @@ async function reload(id){
     const { data: rb } = await sb.from("invoices").select("id,status").eq("replaces", id);
     replacedBy = rb || [];
   }
-  CURRENT = { invoice: inv, lines: lines || [], parts, cardPays, replacedBy, questions: CURRENT?.questions || [] };
+  CURRENT = { invoice: inv, lines: lines || [], parts, cardPays, replacedBy, questions: CURRENT?.questions || [], highlight: CURRENT?.highlight };
   renderInvoice();
   await loadInvoices();
 }
@@ -7243,7 +7287,8 @@ function renderInvoice(){
   const opts = (sel) => CATALOGUE.map(c => `<option value="${esc(c.id)}"${c.id === sel ? " selected" : ""}>${esc(c.name)}</option>`).join("");
 
   const rows = lines.map(l => `
-    <tr class="${l.price_source === "needs_price" ? "unpriced" : ""}" data-id="${l.id}">
+    <tr class="${l.price_source === "needs_price" ? "unpriced" : canPart ? "pkable" : ""}" data-id="${l.id}">
+      ${canPart ? `<td class="pkcell">${l.price_source === "needs_price" ? "" : `<input type="checkbox" class="pk" title="Pick this line for a part" aria-label="Pick ${esc(l.description)}">`}</td>` : ""}
       <td>${draft ? `<input class="d" value="${esc(l.description)}">` : esc(l.description)}</td>
       <td style="width:150px">${draft ? `<select class="c"><option value="">not on the list</option>${opts(l.catalogue_id)}</select>` : esc(l.catalogue_id || "bespoke")}</td>
       <td style="width:110px">${draft ? `<select class="t">
@@ -7256,13 +7301,13 @@ function renderInvoice(){
         ? `<input class="u" type="number" min="0" step="${jmd ? 1 : 0.01}" style="width:90px" value="${toUnit(l.unit_amount_pence)}">`
         : l.price_source === "needs_price" ? '<span class="chip crit">not set</span>' : amt(l.unit_amount_pence)}</td>
       <td class="num">${l.price_source === "needs_price" ? "&mdash;" : amt(l.line_total_pence)}</td>
-      ${canPart ? `<td class="num" style="min-width:150px">${l.price_source === "needs_price" ? "" : `<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end"><input type="checkbox" class="pk" title="Request this line now"><input class="pa" type="number" min="1" step="${jmd ? 1 : 0.01}" style="width:88px" value="${toUnit(l.line_total_pence)}"${l.is_fee ? ' readonly title="The Guarantee &amp; Support fee is requested whole. Paying whichever invoice carries it starts the job."' : ""}></div>`}</td>` : ""}
+      ${canPart ? `<td class="num" style="min-width:150px">${l.price_source === "needs_price" ? "" : `<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end"><input class="pa" type="number" min="1" step="${jmd ? 1 : 0.01}" style="width:88px" value="${toUnit(l.line_total_pence)}"${l.is_fee ? ' readonly title="The Guarantee &amp; Support fee is requested whole. Paying whichever invoice carries it starts the job."' : ""}></div>`}</td>` : ""}
       <td class="num">${draft ? `<button class="btn d rm">Remove</button>` : ""}</td>
     </tr>`).join("");
 
   const partsHtml = isBill && parts.length ? `
     <div class="qs" style="margin-top:14px"><h4>Requested in parts</h4><ul>${parts.map(p => `
-      <li><a href="#" data-openinv="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(INV_CHIP, p.status)} <b>${amt(p.total_pence)}</b>
+      <li>${invSign(p)} <a href="#" data-openinv="${esc(p.id)}">${esc(p.id)}</a> <b>${amt(p.total_pence)}</b>
         &middot; ${esc((p.lines || []).map(x => x.description).join(", "))}${p.starts_job && p.status !== "void" ? " &middot; <b>paying this starts the job</b>" : ""}${p.sent_at ? " &middot; sent " + esc(String(p.sent_at).slice(0, 10)) : ""}${p.paid_at ? " &middot; paid " + esc(String(p.paid_at).slice(0, 10)) + (p.paid_reference ? ", ref " + esc(p.paid_reference) : "") : ""}</li>`).join("")}</ul>
       <p style="margin:8px 0 0">${(() => {
         const all = sumOf(liveParts) + (inv.status === "void" ? 0 : inv.total_pence);
@@ -7291,9 +7336,10 @@ function renderInvoice(){
     ${(CURRENT.replacedBy || []).length ? `<p class="vsub" style="margin:0 0 10px">Replaced by ${CURRENT.replacedBy.map(r => `<a href="#" data-openinv="${esc(r.id)}">${esc(r.id)}</a> (${esc(r.status)})`).join(", ")}.</p>` : ""}
     ${inv.part_of ? `<p class="vsub" style="margin:0 0 10px">Part of <a href="#" data-openinv="${esc(inv.part_of)}">${esc(inv.part_of)}</a>, the whole-job bill for ${esc(inv.job_id || "")}.${inv.starts_job ? " It carries the Guarantee &amp; Support fee, so paying it starts the job." : ""}</p>` : ""}
     <div class="tw"><table>
-      <thead><tr><th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th>${canPart ? '<th class="num">Request now</th>' : ""}<th></th></tr></thead>
+      <thead><tr>${canPart ? '<th title="Pick">&#10003;</th>' : ""}<th>Description</th><th>Service</th><th>Price tier</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Amount</th>${canPart ? '<th class="num">Amount to request</th>' : ""}<th></th></tr></thead>
       <tbody id="lineRows">${rows}</tbody>
     </table></div>
+    ${canPart ? '<div class="pkbar" id="pkBar"></div>' : ""}
     <div class="grand">${amt(inv.total_pence)}</div>
     ${partsHtml}
     ${cardHtml}
@@ -7323,10 +7369,117 @@ function renderInvoice(){
 
   let dirty = false;
   $("invBody").querySelectorAll("#lineRows .d, #lineRows .q, #lineRows .u").forEach(x => x.addEventListener("input", () => { dirty = true; }));
+  // Picking lines for a part, asked for on 17 Sep 2026: "when I click on each
+  // of the lines it should then raise that line", and the preview should show
+  // what is going to be paid highlighted and the rest greyed. A click anywhere
+  // on a line that is not a box you type in picks it or unpicks it. Picked
+  // lines light up, the rest go grey, and the bar under the table adds them
+  // up. Nothing is written until Request is pressed.
+  const picks = () => {
+    const m = new Map();
+    if (canPart) {
+      for (const tr of $("lineRows").querySelectorAll("tr")) {
+        const pk = tr.querySelector(".pk");
+        if (pk && pk.checked) m.set(Number(tr.dataset.id), fromUnit(tr.querySelector(".pa").value));
+      }
+    } else {
+      for (const id of CURRENT.highlight || []) {
+        const l = lines.find(x => Number(x.id) === Number(id));
+        if (l) m.set(Number(l.id), Number(l.line_total_pence));
+      }
+    }
+    return m;
+  };
+
+  // The preview is the invoice as the server renders it. With lines picked,
+  // those rows are highlighted and the rest greyed, and a note says this is a
+  // preview of a part that is not written yet. Rows are matched by position:
+  // the server and this card both read the lines in sort, id order. If the
+  // counts differ the whole invoice is shown unmarked rather than guessed at.
+  const showPreview = () => {
+    const html = CURRENT.previewHtml;
+    if (!html) return;
+    const p = picks();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const trs = doc.querySelectorAll("table tbody tr");
+    if (!p.size || trs.length !== lines.length) { $("preview").srcdoc = html; return; }
+    let sum = 0;
+    lines.forEach((l, i) => {
+      const tr = trs[i], id = Number(l.id);
+      if (!p.has(id)) return tr.classList.add("rest");
+      const v = p.get(id);
+      sum += v;
+      tr.classList.add("pick");
+      if (v !== Number(l.line_total_pence)) tr.lastElementChild.innerHTML = `${esc(amt(v))}<div class="of">of ${esc(amt(l.line_total_pence))}</div>`;
+    });
+    const st = doc.createElement("style");
+    st.textContent = "tr.rest td{opacity:.35}tr.pick td{background:#E8F6F4;font-weight:700}tr.pick td:first-child{box-shadow:inset 3px 0 0 #14B8A6;padding-left:12px}"
+      + ".of{font-size:11px;font-weight:400;color:#5E7772}.partnote{margin-top:22px;padding:12px 16px;background:#E8F6F4;border:1px solid #9FDCD4;border-radius:8px;font-size:13px}"
+      + ".totals .whole{opacity:.45}.totals .part{background:#E8F6F4;border-radius:6px;padding:9px 10px;margin-top:8px;font-weight:700;font-size:17px}";
+    doc.head.appendChild(st);
+    const n = p.size, one = n === 1;
+    const note = doc.createElement("div");
+    note.className = "partnote";
+    note.innerHTML = canPart
+      ? `<b>Preview of a part, not requested yet.</b> The highlighted line${one ? " is" : "s are"} what the new invoice will bill: <b>${esc(amt(sum))}</b>. The greyed lines stay on ${esc(inv.id)}, not billed yet. The client sees only the highlighted line${one ? "" : "s"}, on a new invoice number, once you press Request, preview that and send it.`
+      : `<b>Highlighted: ${esc(amt(sum))}.</b> The greyed lines are the rest of ${esc(inv.id)}, which ${inv.status === "draft" ? "is a draft" : "was " + esc(inv.status)} as one invoice, so the client ${inv.status === "paid" ? "paid" : "pays"} all of it together.`;
+    const table = doc.querySelector("table");
+    if (table) table.before(note);
+    const grand = doc.querySelector(".totals .grand");
+    if (grand) {
+      grand.classList.add("whole");
+      if (grand.firstElementChild) grand.firstElementChild.textContent = "Whole bill";
+      const part = doc.createElement("div");
+      part.className = "part";
+      part.innerHTML = `<span>${canPart ? "This part" : "Highlighted"}</span><span>${esc(amt(sum))}</span>`;
+      grand.after(part);
+    }
+    $("preview").srcdoc = "<!doctype html>" + doc.documentElement.outerHTML;
+  };
+
+  const markTicks = () => {
+    if (!canPart) return;
+    const p = picks(), on = p.size > 0;
+    for (const tr of $("lineRows").querySelectorAll("tr")) {
+      const pk = tr.querySelector(".pk"), t = !!(pk && pk.checked);
+      tr.classList.toggle("pkon", t);
+      tr.classList.toggle("pkoff", on && !t);
+    }
+    const sum = [...p.values()].reduce((t, v) => t + v, 0);
+    const fee = lines.some(l => l.is_fee && p.has(Number(l.id)));
+    $("pkBar").classList.toggle("on", on);
+    $("pkBar").innerHTML = on
+      ? `<b>Picked: ${p.size} line${p.size === 1 ? "" : "s"}, ${esc(amt(sum))}</b> &middot; stays on ${esc(inv.id)}, not billed yet: ${esc(amt(inv.total_pence - sum))}${fee ? " &middot; the 15% fee is picked, so paying this part starts the job" : ""}`
+      : "Click a line to pick it. Picked lines light up and the rest go grey. Nothing is written until you press Request.";
+    $("partBtn").textContent = on ? `Request ${amt(sum)} as a part` : "Request the picked lines as a part";
+    $("partBtn").disabled = !on;
+    $("previewBtn").textContent = on ? "Preview the picked lines" : "Preview";
+    // While lines are picked, sending the whole bill is not what is being
+    // looked at, so those two buttons wait until nothing is picked.
+    for (const id of ["emailBtn", "sendBtn"]) {
+      const b = $(id);
+      if (!b) continue;
+      if (b.dataset.base == null) b.dataset.base = b.disabled ? "1" : "";
+      b.disabled = on || b.dataset.base === "1";
+      b.title = on ? "Unpick the lines to send the whole bill" : "";
+    }
+    if (!$("previewCard").classList.contains("hidden")) showPreview();
+  };
+
   $("invBody").querySelectorAll("#lineRows .pa").forEach(x => x.addEventListener("input", () => {
     const pk = x.closest("tr").querySelector(".pk");
     if (pk) pk.checked = true;
+    markTicks();
   }));
+  $("invBody").querySelectorAll("#lineRows .pk").forEach(x => x.addEventListener("change", markTicks));
+  $("invBody").querySelectorAll("#lineRows tr.pkable").forEach(tr => tr.addEventListener("click", (e) => {
+    if (e.target.closest("input, select, button, a, textarea")) return;
+    const pk = tr.querySelector(".pk");
+    if (!pk) return;
+    pk.checked = !pk.checked;
+    markTicks();
+  }));
+  markTicks();
   $("invBody").querySelectorAll("[data-openinv]").forEach(a => a.addEventListener("click", async (e) => {
     e.preventDefault();
     say("invMsg", "", "");
@@ -7421,7 +7574,8 @@ function renderInvoice(){
   $("previewBtn").addEventListener("click", async () => {
     try {
       const { html } = await fn({ action: "render", invoice_id: inv.id, as: "json" });
-      $("preview").srcdoc = html;
+      CURRENT.previewHtml = html;
+      showPreview();
       show("previewCard", true);
       $("previewCard").scrollIntoView({ behavior: "smooth" });
     } catch (e) { say("invMsg","err",e.message); }
@@ -7435,7 +7589,7 @@ function renderInvoice(){
       if (!pk || !pk.checked) continue;
       items.push({ line: Number(tr.dataset.id), amount: fromUnit(tr.querySelector(".pa").value) });
     }
-    if (!items.length) return say("invMsg","err","Tick at least one line to request.");
+    if (!items.length) return say("invMsg","err","Pick at least one line to request.");
     const sum = items.reduce((t, i) => t + i.amount, 0);
     if (!confirm("Request " + amt(sum) + " from " + inv.id + " as its own invoice?\n\nThis writes a new numbered draft for the ticked amounts and takes them off this bill. It emails nobody: you preview it and send it from the next screen.")) return;
     try {
@@ -7558,6 +7712,8 @@ const INV_TABS = [
     hint:"Money in, marked paid by you, newest first, one month at a time." },
   { k:"fees", label:"Agency fees", col:"#2BB3A3", has:() => false,
     hint:"" },
+  { k:"jobs", label:"Live jobs", col:"#C4AAFF", has:() => false,
+    hint:"Every booked job still running, or finished with money still to settle. Click a job to see every invoice on it, paid and not paid." },
   { k:"void", label:"Void", col:"#6b6b80", has:i => i.status === "void",
     hint:"Cancelled. Kept on the record, never deleted." },
 ];
@@ -7620,6 +7776,50 @@ function invFeeSummary(){
   };
   return `<div class="tw"><table class="ivsum"><thead><tr><th></th>${heads.map(h => `<th><b>${esc(h[0])}</b><span>${esc(h[1])}</span></th>`).join("")}</tr></thead>`
     + `<tbody>${rows.map(r => `<tr><th>${esc(r.label)}</th>${r.cols.map(s => cell(r.list, s)).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+// Paid means you marked it paid, and nothing else does: a card payment Stripe
+// has reported still shows as not paid until Mark as paid is pressed. So the
+// sign below is exactly what has and has not been marked.
+function invSign(i){
+  if (i.status === "paid") return `<span class="paidsign">&#10003; Paid, done${i.paid_at ? " " + esc(day_(i.paid_at)) : ""}</span>`;
+  if (i.status === "sent") return `<span class="duesign">Not paid yet${i.sent_at ? ", sent " + esc(day_(i.sent_at)) : ""}</span>`;
+  if (i.status === "void") return `<span class="voidsign">Void</span>`;
+  return `<span class="draftsign">Not sent yet</span>`;
+}
+// Whether the 15% on a job is marked paid. The invoice carrying it
+// (starts_job) is what moves the job on, in the database, not on this page.
+function invFeePaid(jobId){
+  return INV_LIST.some(i => i.job_id === jobId && i.starts_job && i.status === "paid");
+}
+function invHoldSign(paid, what){
+  return paid ? `<span class="paidsign">&#10003; 15% paid, job can go ahead</span>`
+    : `<span class="holdsign">&#9888; On hold: ${esc(what)}</span>`;
+}
+
+function invKind(i){
+  if (i.payable_to === "worker") return "pay to the tradesperson" + (i.stage != null ? ", stage " + i.stage : "");
+  if (i.part_of) return "part of " + i.part_of;
+  if (i.job_id) return "job bill";
+  return "service";
+}
+// Every invoice on a job as a short list, client money first, then what
+// Yaadly pays the tradesperson, oldest first within each. Used under each
+// live job, and on the job's own page.
+function invJobList(list, links = true){
+  const byAge = (a, b) => (a.status === "void") - (b.status === "void") || String(a.created_at || "").localeCompare(String(b.created_at || ""));
+  const sec = (title, l, none) => {
+    const live = l.filter(i => i.status !== "void"), done = live.filter(i => i.status === "paid").length;
+    const head = `<div class="ivsec">${esc(title)} <span>${live.length ? `${done} of ${live.length} marked paid` : ""}</span>${live.length && done === live.length ? '<span class="paidsign">&#10003; all done</span>' : ""}</div>`;
+    return head + (l.length ? rows(l.slice().sort(byAge)) : `<div class="ivsubi">${esc(none)}</div>`);
+  };
+  return sec("Client invoices, the client pays Yaadly", list.filter(i => i.payable_to !== "worker"), "No client invoice yet.")
+    + sec("Worker pay, Yaadly pays the tradesperson", list.filter(i => i.payable_to === "worker"), "No pay raised yet. It is raised as each stage is approved.");
+  function rows(l){ return l
+    .map(i => {
+      const inner = `${invSign(i)}<b>${esc(i.id || "")}</b><span>${esc(invKind(i))}</span><span class="amt">${esc(curAmt(i.total_pence, i.currency))}</span>`;
+      return links && i.id ? `<a href="#" class="ivsubi ${esc(i.status)}" data-ivopen="${esc(i.id)}">${inner}</a>` : `<div class="ivsubi ${esc(i.status)}">${inner}</div>`;
+    }).join(""); }
 }
 
 const invWhen = (i) => i.status === "paid" ? "paid " + day_(i.paid_at)
@@ -7701,7 +7901,7 @@ function invFees(){
     if (line) {
       const st = feeStateOf(line.inv.status);
       if (st !== "paid" || invInMonth(line.inv.paid_at))
-        job.push({ j, q, state: st, currency: line.inv.currency, total_pence: line.line_total_pence, inv: line.inv });
+        job.push({ j, q, state: st, currency: line.inv.currency, total_pence: line.line_total_pence, inv: line.inv, line });
     } else {
       job.push({ j, q, state: billed ? "check" : "todo", currency: "JMD", total_pence: Math.round(labour * 0.15), inv: null, billed });
     }
@@ -7747,7 +7947,7 @@ function invFeeRows(q){
       <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; 15% of labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}</div></td>
       <td class="jistagepct">${x.inv ? `on ${esc(x.inv.id)}${x.inv.part_of ? ", a part" : ""}<br>${esc(when(x.inv))}` : x.state === "check" ? "the job has a bill, but no 15% line on it" : "no bill yet"}</td>
       <td class="num"><span class="jiamt">${curAmt(x.total_pence, x.currency)}</span></td>
-      <td class="ivact">${x.inv ? `<button class="btn g" data-ivopen="${esc(x.inv.id)}">Open</button>` : !x.billed ? `<button class="btn" data-ivraise="${esc(x.j.id)}">Raise draft</button>` : ""}</td>
+      <td class="ivact">${x.inv ? invFeeButtons(x.inv, x.line) : !x.billed ? `<button class="btn" data-ivraise="${esc(x.j.id)}">Raise draft</button>` : ""}</td>
     </tr>`));
 
   const svcs = f.svc.filter(x => hit(x.inv.id + " " + (x.inv.client_name || "") + " " + (x.inv.client_email || "")));
@@ -7770,6 +7970,75 @@ function invFeeRows(q){
   return out;
 }
 
+// The 15% fee's buttons, wherever the fee is listed. While the fee is still
+// a line on a draft whole-job bill it can be raised on its own: that opens the
+// bill with only the fee ticked, and the preview shows it highlighted with the
+// rest greyed. Raising still writes a draft through request_invoice_part and
+// emails nobody. Once the fee is on its own part, or the bill has gone out,
+// the preview highlights the fee on the invoice that carries it.
+// Asked for on 17 Sep 2026: "when I go into the agency fees I should be able
+// to raise the amount for the agency fees".
+function invFeeButtons(inv, line){
+  const lid = line && line.id != null ? esc(String(line.id)) : "";
+  const onBill = inv.status === "draft" && invIsBill(inv) && lid;
+  return (onBill ? `<button class="btn" data-ivfee="${esc(inv.id)}" data-line="${lid}">Raise the fee on its own</button>`
+      : lid ? `<button class="btn g" data-ivfeeprev="${esc(inv.id)}" data-line="${lid}">Preview the fee</button>` : "")
+    + `<button class="btn g" data-ivopen="${esc(inv.id)}">Open</button>`;
+}
+
+// One job's client money, fee and tradesperson pay, from the invoices already
+// read. Every invoice on a booked job is read by loadInvoices, whatever its
+// month, so these add up from the complete set.
+function invJobMoney(jobId){
+  const rows = INV_LIST.filter(i => i.job_id === jobId && i.status !== "void");
+  const client = rows.filter(i => (i.payable_to || "yaadly") === "yaadly");
+  const pay = rows.filter(i => i.payable_to === "worker");
+  const s = (l) => l.reduce((t, i) => t + Number(i.total_pence || 0), 0);
+  return { cur: (client[0] || {}).currency || "JMD", n: client.length,
+    all: s(client), paid: s(client.filter(i => i.status === "paid")),
+    sent: s(client.filter(i => i.status === "sent")), draft: s(client.filter(i => i.status === "draft")),
+    pay: s(pay), payPaid: s(pay.filter(i => i.status === "paid")) };
+}
+
+// Live jobs: a booked job that is not cancelled, and is either still running
+// or finished with client money or tradesperson pay not yet settled.
+// Asked for on 17 Sep 2026: "a section that showcases all the live jobs so
+// then I can click on it and then see all the invoices linked to that job".
+function invLiveJobs(){
+  return INV_JOBS.filter(j => j.status !== "cancelled").map(j => {
+    const m = invJobMoney(j.id), q = INV_QUOTES.get(j.id);
+    const due = INV_DUE.find(d => d.job.id === j.id);
+    return { j, m, q, due };
+  }).filter(x => x.j.status !== "complete" || x.m.all > x.m.paid || x.m.pay > x.m.payPaid);
+}
+
+function invJobRows(qs){
+  const hit = (s) => !qs || String(s).toLowerCase().includes(qs);
+  return invLiveJobs().filter(x => hit([x.j.id, x.j.title, x.j.client_email].join(" "))).map(x => {
+    const a = (v) => curAmt(v, x.m.cur);
+    const line = INV_FEELINES.find(l => l.inv.job_id === x.j.id);
+    const hold = x.q ? invHoldSign(invFeePaid(x.j.id), "the 15% is not marked paid") : "";
+    const fee = line ? `<span class="chip ${FEE_STATE[feeStateOf(line.inv.status)][1]}">15% ${esc(curAmt(line.line_total_pence, line.inv.currency))}, ${esc(FEE_STATE[feeStateOf(line.inv.status)][0])}</span>`
+      : x.q ? `<span class="chip mute">15% ${esc(jmdFmt(Math.round((Number(x.q.labour_jmd) || 0) * 0.15)))}, not billed yet</span>` : "";
+    const money = x.m.n
+      ? `<span class="jiamt">${esc(a(x.m.all - x.m.paid))}</span><div class="jistagepct">not paid yet, of ${esc(a(x.m.all))}<br>${esc(a(x.m.paid))} paid</div>`
+      : x.due ? `<span class="jiamt">${esc(jmdFmt(x.due.bill))}</span><div class="jistagepct">no bill raised yet</div>` : `<span class="jistagepct">no accepted quote</span>`;
+    return `<tr class="ivjobrow">
+      <td><a href="#" class="jistagename" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="ivtags">${hold}</div><div class="ivtags">${fee}</div></td>
+      <td><div><span class="ivtype">${esc(x.j.trade || "job type not set")}</span></div><div style="margin-top:4px">${esc(x.j.client_email || "")}</div><div class="jicond">${esc(x.j.title || "")}${x.q && x.q.worker_name ? " &middot; worker " + esc(x.q.worker_name) : ""}</div></td>
+      <td class="jistagepct">${esc(String(x.j.status || "").replace(/_/g, " "))}</td>
+      <td class="num">${money}</td>
+      <td class="ivact"><button class="btn g" data-ivjob="${esc(x.j.id)}">See its invoices</button></td>
+    </tr>
+    <tr class="ivsub"><td colspan="5">${(() => {
+      const l = INV_LIST.filter(i => i.job_id === x.j.id);
+      if (!l.length) return `<div class="ivsublist"><span class="ivsubi">${x.due ? "No invoices yet. The quote is accepted, so the bill can be raised from Preview." : "No invoices yet."}</span></div>`;
+      const live = l.filter(i => i.status !== "void"), done = live.filter(i => i.status === "paid").length;
+      return `<div class="ivsublist">${invJobList(l)}</div>${done === live.length ? '<div class="ivcount"><span class="paidsign">&#10003; Every invoice on this job is marked paid, done</span></div>' : ""}`;
+    })()}</td></tr>`;
+  });
+}
+
 // ---------------------------------------------------------------- one job's invoices
 //
 // Asked for on 14 Sep 2026: "I should be able to click on a job and it show
@@ -7782,7 +8051,7 @@ async function loadInvoiceJob(){
   const id = INV_JOB;
   const [{ data: rows, error }, { data: job }, { data: qs }] = await Promise.all([
     sb.from("invoices").select(INV_COLS).eq("job_id", id).order("created_at", { ascending: true }),
-    sb.from("jobs").select("id,title,client_name,client_email,worker_name,status").eq("id", id).maybeSingle(),
+    sb.from("jobs").select("id,title,client_name,client_email,worker_name,status,trade").eq("id", id).maybeSingle(),
     sb.from("job_quotes").select("worker_name,labour_jmd,materials_jmd").eq("job_id", id).eq("status", "accepted").limit(1),
   ]);
   if (error) { INV_JOB_INFO = { id, error: error.message }; return; }
@@ -7791,7 +8060,7 @@ async function loadInvoiceJob(){
   let fee = null;
   const live = list.filter(i => (i.payable_to || "yaadly") === "yaadly" && i.status !== "void");
   if (live.length) {
-    const { data: fl } = await sb.from("invoice_lines").select("invoice_id,description,line_total_pence,is_fee").in("invoice_id", live.map(i => i.id));
+    const { data: fl } = await sb.from("invoice_lines").select("id,invoice_id,description,line_total_pence,is_fee").in("invoice_id", live.map(i => i.id));
     const l = (fl || []).find(isFeeLine);
     if (l) fee = { ...l, inv: live.find(i => i.id === l.invoice_id) };
   }
@@ -7832,35 +8101,57 @@ function renderInvoiceJob(){
   const sum = (l) => l.reduce((t, i) => t + Number(i.total_pence || 0), 0);
   const a = (v) => curAmt(v, cur);
   const all = sum(client), paid = sum(client.filter(i => i.status === "paid"));
-  const cells = [
-    ["The whole job", a(all), plural_(client.length, "client invoice", "client invoices")],
-    ["Paid", a(paid), "marked paid by you"],
-    ["Waiting for money", a(sum(client.filter(i => i.status === "sent"))), "sent, not paid yet"],
-    ["Not sent yet", a(sum(client.filter(i => i.status === "draft"))), "drafted, or left on the bill"],
-    ["Still owed", a(all - paid), "the whole job less what is paid"],
-  ];
+  const sent = sum(client.filter(i => i.status === "sent")), drafted = sum(client.filter(i => i.status === "draft"));
   const labour = q ? Math.round(Number(q.labour_jmd) || 0) : 0;
   const fee15 = x.fee ? `${curAmt(x.fee.line_total_pence, x.fee.inv.currency)} on ${esc(x.fee.inv.id)}, ${esc(FEE_STATE[feeStateOf(x.fee.inv.status)][0])}`
     : q ? `${jmdFmt(Math.round(labour * 0.15))}, not billed yet` : "no accepted quote yet";
   const allPaid = pay.length && pay.every(p => p.status === "paid");
   const fee5 = q ? `${jmdFmt(Math.round(labour * 0.05))}, ${j.status === "complete" ? (allPaid ? "deducted, rest paid" : "finished, pay not sent") : "job not finished"}` : "no accepted quote yet";
   const worker = (q && q.worker_name) || j.worker_name || "the tradesperson";
+  const payAll = sum(pay), payPaid = sum(pay.filter(p => p.status === "paid"));
+  const pa = (v) => curText(sumByCur(v)) || curAmt(0, "JMD");
+  const r = (label, val, cls) => `<div class="r ${cls || ""}"><span>${label}</span><b>${esc(val)}</b></div>`;
+  const moneyHtml = `<div class="ivjobmoney">`
+    + `<div class="ivjm"><h5>The client</h5>`
+      + (client.length && all === paid ? `<div style="margin:0 0 6px"><span class="paidsign">&#10003; Client has paid in full, done</span></div>` : "")
+      + (client.length ? r("The whole job", a(all), "big") + r("Paid", a(paid), "ok") + r("Not paid yet", a(all - paid), all - paid ? "due" : "")
+        + `<div class="s">${sent ? esc(a(sent)) + " sent and waiting" : "nothing sent and waiting"}${drafted ? " &middot; " + esc(a(drafted)) + " not sent yet" : ""}</div>`
+        : `<div class="s">No client invoice yet.${q ? " The quote is accepted, so the bill can be raised." : ""}</div>`)
+    + `</div>`
+    + `<div class="ivjm"><h5>Yaadly's agency fee</h5>`
+      + (q ? `<div style="margin:0 0 6px">${invHoldSign(rows.some(i => i.starts_job && i.status === "paid"), "the job cannot move forward until the 15% is marked paid")}</div>` : "")
+      + r("15% Guarantee &amp; Support", x.fee ? curAmt(x.fee.line_total_pence, x.fee.inv.currency) : q ? jmdFmt(Math.round(labour * 0.15)) : "none", x.fee && x.fee.inv.status === "paid" ? "ok" : "due")
+      + `<div class="s">${x.fee ? esc(FEE_STATE[feeStateOf(x.fee.inv.status)][0]) + " on " + esc(x.fee.inv.id) : q ? "not billed yet" : "no accepted quote yet"}</div>`
+      + (x.fee ? `<div class="s">${invFeeButtons(x.fee.inv, x.fee)}</div>` : "")
+      + r("5% from " + esc(worker), q ? jmdFmt(Math.round(labour * 0.05)) : "none", "")
+      + `<div class="s">${esc(q ? (j.status === "complete" ? (allPaid ? "deducted, rest paid" : "finished, pay not sent") : "job not finished") : "no accepted quote yet")}</div>`
+    + `</div>`
+    + `<div class="ivjm"><h5>${esc(worker)}</h5>`
+      + (pay.length ? r("Pay raised", pa(pay)) + r("Paid to them", pa(pay.filter(p => p.status === "paid")), "ok") + r("Still to pay them", pa(pay.filter(p => p.status !== "paid")), payAll - payPaid ? "due" : "")
+        : `<div class="s">No pay raised yet. It is raised as each stage is approved.</div>`)
+    + `</div></div>`;
 
   $("ivSplit").innerHTML = `<div class="ivjobhd">${back}<h4>${esc(j.id)}${j.title ? " &middot; " + esc(j.title) : ""}</h4>`
-    + `<span class="jicond">${esc(j.client_name || j.client_email || "")}${j.client_name && j.client_email ? " (" + esc(j.client_email) + ")" : ""} &middot; ${esc(worker)}${j.status ? " &middot; " + esc(String(j.status).replace(/_/g, " ")) : ""}</span></div>`
-    + (client.length ? `<div class="tw"><table class="ivsum"><thead><tr>${cells.map(c => `<th><b>${esc(c[0])}</b><span>${esc(c[2])}</span></th>`).join("")}</tr></thead>`
-      + `<tbody><tr>${cells.map(c => `<td><div class="ivcell static"><span class="a">${esc(c[1])}</span></div></td>`).join("")}</tr></tbody></table></div>` : "")
-    + `<div class="ivjobfees"><span><b>Yaadly's 15%</b>${fee15}</span><span><b>5% from ${esc(worker)}</b>${esc(fee5)}</span>`
-    + `<span><b>Paid to ${esc(worker)}</b>${pay.length ? `${esc(curText(sumByCur(pay.filter(p => p.status === "paid"))))} of ${esc(curText(sumByCur(pay)))} raised` : "nothing raised yet"}</span></div>`;
+    + `<span class="ivtype">${esc(j.trade || "job type not set")}</span><span class="jicond">${esc(j.client_name || j.client_email || "")}${j.client_name && j.client_email ? " (" + esc(j.client_email) + ")" : ""} &middot; ${esc(worker)}${j.status ? " &middot; " + esc(String(j.status).replace(/_/g, " ")) : ""}</span></div>`
+    + moneyHtml;
   wireBack();
 
-  $("ivHint").textContent = "Every invoice on this job, oldest first, whatever the month: the client's bill and its parts, and what Yaadly pays the tradesperson. Void ones stay on the record.";
+  $("ivHint").textContent = "Every invoice on this job, whatever the month, in two sections: the client's invoices, and the worker's pay. Paid, done means you marked it paid. Void ones stay on the record, at the bottom of their section.";
 
   const qs = ($("srch").value || "").trim().toLowerCase();
   const shown = rows.filter(i => !qs || [i.id, i.client_name, i.client_email, i.part_of].join(" ").toLowerCase().includes(qs));
   const raise = !client.length && q ? `<button class="btn" data-ivraise="${esc(j.id)}">Raise draft</button>` : "";
+  const grp = (title, l) => l.length ? [`<tr class="ivgrp"><td colspan="5">${esc(title)} &middot; ${l.length}</td></tr>`].concat(l.map(invRowHtml)) : [];
+  const secGrp = (title, l) => {
+    const live = l.filter(i => i.status !== "void"), done = live.filter(i => i.status === "paid").length;
+    return [`<tr class="ivgrp"><td colspan="5">${esc(title)} &middot; ${done} of ${live.length} marked paid${live.length && done === live.length ? ' &middot; <span class="paidsign">&#10003; all done</span>' : ""}</td></tr>`]
+      .concat(l.length ? l.slice().sort((a, b) => (a.status === "void") - (b.status === "void")).map(invRowHtml) : [`<tr><td colspan="5" class="jistagepct">None yet.</td></tr>`]);
+  };
+  const grouped = [].concat(
+    secGrp("Client invoices, the client pays Yaadly", shown.filter(i => i.payable_to !== "worker")),
+    secGrp("Worker pay, Yaadly pays the tradesperson", shown.filter(i => i.payable_to === "worker")));
   $("ivList").innerHTML = shown.length
-    ? `<div class="tw"><table class="jitable"><thead><tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr></thead><tbody>${shown.map(invRowHtml).join("")}</tbody></table></div>`
+    ? `<div class="tw"><table class="jitable"><thead><tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr></thead><tbody>${grouped.join("")}</tbody></table></div>`
     : `<div class="empty"><b>${qs ? "Nothing on this job matches that" : "No invoices on this job yet"}</b>${raise ? "The quote is accepted, so its bill can be raised now. " + raise : ""}</div>`;
   invWireList();
 }
@@ -7877,6 +8168,7 @@ function renderInvoiceList(){
 
   $("ivTabs").innerHTML = INV_TABS.map(t => {
     if (t.k === "fees") return invFeeTab(t, t.k === tab.k);
+    if (t.k === "jobs") return `<button class="ivtab${t.k === tab.k ? " on" : ""}" data-ivtab="jobs"><i style="background:${t.col}"></i>${esc(t.label)}<span class="n">${invLiveJobs().length}</span></button>`;
     const l = INV_LIST.filter(t.has);
     const n = l.length + (t.k === "preview" ? INV_DUE.length : 0);
     const v = "";
@@ -7906,12 +8198,13 @@ function renderInvoiceList(){
 
   const invRows = rows.map(invRowHtml);
 
-  const all = tab.k === "fees" ? invFeeRows(q) : dueRows.concat(invRows);
+  const all = tab.k === "fees" ? invFeeRows(q) : tab.k === "jobs" ? invJobRows(q) : dueRows.concat(invRows);
   $("ivList").innerHTML = all.length
     ? `<div class="tw"><table class="jitable">
-        <thead>${tab.k === "fees" ? '<tr><th>Fee</th><th>Job or client</th><th>Where it is</th><th class="num">Amount</th><th></th></tr>' : '<tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr>'}</thead>
+        <thead>${tab.k === "fees" ? '<tr><th>Fee</th><th>Job or client</th><th>Where it is</th><th class="num">Amount</th><th></th></tr>' : tab.k === "jobs" ? '<tr><th>Job</th><th>Job type and client</th><th>Status</th><th class="num">Client not paid yet</th><th></th></tr>' : '<tr><th>Invoice</th><th>Client</th><th>When</th><th class="num">Amount</th><th></th></tr>'}</thead>
         <tbody>${all.join("")}</tbody></table></div>`
     : q ? '<div class="empty"><b>Nothing here matches that</b>Clear the search box, or try another group.</div>'
+    : tab.k === "jobs" ? '<div class="empty"><b>No live jobs</b>A job shows here once a tradesperson is booked on it, and stays until it is finished and every invoice on it is paid.</div>'
     : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "paid" || tab.k === "fees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
 
   $("ivTabs").querySelectorAll("[data-ivtab]").forEach(b => b.addEventListener("click", () => { INV_TAB = b.dataset.ivtab; renderInvoiceList(); }));
@@ -7927,6 +8220,7 @@ function renderInvoiceList(){
 function invRowHtml(i){
   const card = INV_CARD[i.id] || {};
   const tags = [
+    invSign(i),
     i.payable_to === "worker" ? '<span class="chip mute">Yaadly pays the worker</span>' : "",
     i.part_of ? `<span class="chip mute">part of ${esc(i.part_of)}</span>` : "",
     i.replaces ? `<span class="chip mute">replaces ${esc(i.replaces)}</span>` : "",
@@ -7937,10 +8231,10 @@ function invRowHtml(i){
   ].filter(Boolean).join("");
   return `<tr>
     <td><a href="#" class="jistagename" data-ivopen="${esc(i.id)}">${esc(i.id)}</a>${tags ? `<div class="ivtags">${tags}</div>` : ""}</td>
-    <td><div>${esc(i.client_name || "")}</div><div class="jicond">${i.job_id ? `<a href="#" data-ivjob="${esc(i.job_id)}">Job ${esc(i.job_id)}</a>` : "Service"}</div>${INV_JOB ? "" : invBalanceHtml(i)}</td>
+    <td><div>${esc(i.client_name || "")}</div><div class="jicond">${i.job_id ? (INV_JOB ? `Job ${esc(i.job_id)}` : `<a href="#" class="ivjoblink" data-ivjob="${esc(i.job_id)}" title="The job and every invoice on it">Job ${esc(i.job_id)} &rsaquo;</a>`) : "Service"}</div>${INV_JOB ? "" : invBalanceHtml(i)}</td>
     <td class="jistagepct">${esc(invWhen(i))}</td>
     <td class="num"><span class="jiamt">${curAmt(i.total_pence, i.currency)}</span></td>
-    <td class="ivact">${i.status === "draft" && invIsBill(i) ? `<button class="btn g" data-ivsplit="${esc(i.id)}">Split into parts</button>` : ""}<button class="btn g" data-ivopen="${esc(i.id)}">${i.status === "draft" ? "Edit" : "Open"}</button><button class="btn g" data-ivprev="${esc(i.id)}">Preview</button>${i.status === "sent" && !card.bad && i.payable_to === "worker" ? `<button class="btn" data-ivpayworker="1">Pay the worker</button>` : ""}${i.status === "sent" && !card.bad && i.payable_to !== "worker" ? `<button class="btn" data-ivpaid="${esc(i.id)}">Mark as paid</button>` : ""}</td>
+    <td class="ivact">${i.job_id && !INV_JOB ? `<button class="btn g" data-ivjob="${esc(i.job_id)}">See the job</button>` : ""}${i.status === "draft" && invIsBill(i) ? `<button class="btn g" data-ivsplit="${esc(i.id)}">Split into parts</button>` : ""}<button class="btn g" data-ivopen="${esc(i.id)}">${i.status === "draft" ? "Edit" : "Open"}</button><button class="btn g" data-ivprev="${esc(i.id)}">Preview</button>${i.status === "sent" && !card.bad && i.payable_to === "worker" ? `<button class="btn" data-ivpayworker="1">Pay the worker</button>` : ""}${i.status === "sent" && !card.bad && i.payable_to !== "worker" ? `<button class="btn" data-ivpaid="${esc(i.id)}">Mark as paid</button>` : ""}</td>
   </tr>`;
 }
 
@@ -7948,7 +8242,39 @@ function invRowHtml(i){
 function invWireList(){
   $("ivList").querySelectorAll("[data-ivjob]").forEach(a => a.addEventListener("click", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     openInvoiceJob(a.dataset.ivjob);
+  }));
+
+  // Raise the fee on its own: open the bill with only the fee ticked and the
+  // preview showing it. Nothing is written until Request is pressed there.
+  const feeWire = (root) => {
+    root.querySelectorAll("[data-ivfee]").forEach(b => b.addEventListener("click", async () => {
+      say("invMsg", "", "");
+      CURRENT = { questions: [] };
+      await reload(b.dataset.ivfee);
+      const pk = $("lineRows") && $("lineRows").querySelector(`tr[data-id="${b.dataset.line}"] .pk`);
+      if (!pk) return say("invMsg", "err", "The fee is no longer a line on this bill. It may already have been requested as a part: refresh the list.");
+      pk.checked = true;
+      pk.dispatchEvent(new Event("change"));
+      say("invMsg", "ok", "Only the 15% Guarantee & Support fee is ticked. The preview shows it highlighted and the rest of the bill greyed. Press Request as a part to write it as its own draft invoice. Nothing is emailed.");
+      $("previewBtn").click();
+    }));
+    root.querySelectorAll("[data-ivfeeprev]").forEach(b => b.addEventListener("click", async () => {
+      say("invMsg", "", "");
+      CURRENT = { questions: [], highlight: [Number(b.dataset.line)] };
+      await reload(b.dataset.ivfeeprev);
+      $("previewBtn").click();
+    }));
+  };
+  feeWire($("ivList"));
+  feeWire($("ivSplit"));
+  $("ivSplit").querySelectorAll("[data-ivopen]").forEach(a => a.addEventListener("click", async (e) => {
+    e.preventDefault();
+    say("invMsg", "", "");
+    CURRENT = { questions: [] };
+    await reload(a.dataset.ivopen);
+    $("invCard").scrollIntoView({ behavior: "smooth" });
   }));
 
   $("ivList").querySelectorAll("[data-ivopen]").forEach(a => a.addEventListener("click", async (e) => {
@@ -8035,7 +8361,7 @@ async function loadInvoices(){
     sb.from("invoices").select(COLS).in("status", ["draft", "sent"]).order("created_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "paid").gte("paid_at", from).lt("paid_at", to).order("paid_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "void").order("created_at", { ascending: false }).limit(50),
-    sb.from("jobs").select("id,title,client_email,status")
+    sb.from("jobs").select("id,title,client_email,status,trade")
       .not("worker_email", "is", null).order("updated_at", { ascending: false }).limit(50),
   ]);
   const error = open.error || paidM.error || voids.error;
@@ -8084,7 +8410,7 @@ async function loadInvoices(){
   INV_FEELINES = [];
   const jobInvs = INV_LIST.filter(i => i.job_id && (i.payable_to || "yaadly") === "yaadly" && i.status !== "void");
   if (jobInvs.length) {
-    const { data: fl } = await sb.from("invoice_lines").select("invoice_id,description,line_total_pence,is_fee").in("invoice_id", jobInvs.map(i => i.id));
+    const { data: fl } = await sb.from("invoice_lines").select("id,invoice_id,description,line_total_pence,is_fee").in("invoice_id", jobInvs.map(i => i.id));
     INV_FEELINES = (fl || []).filter(isFeeLine).map(l => ({ ...l, inv: jobInvs.find(i => i.id === l.invoice_id) }));
   }
 
