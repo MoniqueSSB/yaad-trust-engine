@@ -172,6 +172,13 @@ Deno.serve(async (req: Request) => {
     // can never go out and then fail to be recorded against the invoice.
     const { data: checked } = await admin.rpc("worker_bank_checked", { p_worker_email: workerEmail });
     if (checked !== true) return fail(`Call ${wp?.name ?? workerEmail} back on the number you have for them, check their bank details, and press Call-back done on Pay workers first.`, 409);
+    // 20260917180000: the client pays for the work before the worker is paid
+    // for it. mark_worker_paid refuses the same, but a Stripe payout leaves
+    // before that runs, so it is checked here, on the quote and on the send.
+    // Fails closed: an error reading it refuses too.
+    const { data: unpaid, error: unpaidErr } = await admin.rpc("worker_pay_client_unpaid", { p_invoice: inv.id });
+    if (unpaidErr) return fail(`Could not check the client has paid for this work, so nothing was sent: ${unpaidErr.message}`, 502);
+    if (unpaid) return fail(String(unpaid), 409);
 
     const acct = await stripe("GET", `/v2/core/accounts/${encodeURIComponent(recipient)}?include=configuration.recipient`);
     if (!acct.ok) return fail(`Stripe could not read the worker's recipient record: ${stripeMessage(acct)}`, 502);
