@@ -141,14 +141,21 @@ export default async function WorkerPortal() {
     .filter((x): x is MoneyJob => x !== null);
 
   // The real document trail, not the computed estimate above: the actual
-  // invoices raised in this worker's own name (20260902n), job by job. No
-  // .eq() on worker_email for the same reason as the jobs query: RLS
-  // (invoices_worker_read) already scopes this to the signed-in worker.
+  // invoices raised in this worker's own name (20260902n), job by job.
+  //
+  // 17 Sep 2026: filtered here as well as by RLS, the same as `booked`
+  // above. invoices_worker_read already returns a worker only their own
+  // sent invoices, but invoices_admin returns an admin every worker's, and
+  // drafts too, so an admin opening this page saw another worker's invoice
+  // (JOB-TEST-KICKOFF-1) and unsent drafts listed as their own pay. The
+  // email match is case-insensitive with its wildcards escaped, and drafts
+  // are left out because a worker never sees one.
   const { data: myInvoices } = await supabase
     .from("invoices")
     .select("id,job_id,stage,period_label,total_pence,status,sent_at,paid_at,paid_method,paid_reference")
     .eq("payable_to", "worker")
-    .neq("status", "void")
+    .ilike("worker_email", email.replace(/[\\%_]/g, "\\$&"))
+    .not("status", "in", "(void,draft)")
     .order("stage", { ascending: true, nullsFirst: true });
 
   // The page's own `jobs` list is scoped to this worker's live/won stake
@@ -218,7 +225,7 @@ export default async function WorkerPortal() {
   const describe = (j: (typeof jobs)[number]) => {
     const m = moneyById.get(j.id);
     const work = [j.job_type, j.size_band].filter((x): x is string => Boolean(x)).join(", ") || j.trade || null;
-    const money = m ? jmd(m.takeHome) + (m.held ? ", held until the job is signed off" : ", released") : null;
+    const money = m ? jmd(m.takeHome) + (m.held ? ", due once the job is signed off" : ", signed off") : null;
     return { ...j, work, money, next: nextFor(j) };
   };
   const liveRows = live.map(describe);
@@ -243,7 +250,7 @@ export default async function WorkerPortal() {
      pays. See docs/COPY-GUIDELINES.md section 3. */
   const heldNote =
     heldJobs.length === 0
-      ? "Nothing held right now"
+      ? "Nothing waiting on sign-off"
       : heldJobs.length === 1
         ? `Waiting on sign-off for ${heldJobs[0].title ?? "this job"}`
         : `Waiting on sign-off for ${heldJobs.length} jobs. See job by job below.`;
@@ -255,14 +262,14 @@ export default async function WorkerPortal() {
     ...(moneyJobs.length > 0
       ? ([
           {
-            label: "Held right now",
+            label: "Due on sign-off",
             value: jmd(held),
             tone: held > 0 ? "waiting" : "idle",
             icon: "held",
             note: heldNote,
           },
           {
-            label: "Released",
+            label: "Signed off",
             /* "Paid off-platform" was honest and meant nothing to the person
                reading it. Say the thing itself: how it comes, and how long.
                Nothing here claims the money has moved; WorkerInvoices says
