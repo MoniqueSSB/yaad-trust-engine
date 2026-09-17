@@ -6,7 +6,8 @@ import { JobList, CLIENT_STATUS, type Job } from "@/components/portal/JobList";
 import { clientBill } from "@/lib/jobs/client-bill";
 import { SERVICE_TRACK, svcStage } from "@/lib/portal/journey";
 import { jmd } from "@/lib/money";
-import { WorkerPipeline, WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
+import { WorkerStatCards, type StatCard } from "@/components/portal/WorkerOverview";
+import { StageBoard } from "@/components/portal/StageBoard";
 import { groupIntoProperties, type PropertyJob } from "@/lib/portal/properties";
 import {
   jobGates,
@@ -403,41 +404,30 @@ export default async function ClientPortal() {
       )}
 
       {/*
-        Live jobs first, closed ones after, rather than one list ordered by
-        whatever moved last. A client with nine jobs was seeing four closed
-        ones above the one that needed them, because closing a job updates it
-        and updated_at is all the order knew about. The status tones make the
-        difference visible; they did not make it ORDERED, and a list you have
-        to scan in full is not answering "what is waiting on me".
-
-        Within each group the recency order is kept, because among live jobs
-        the most recently moved genuinely is the most interesting one.
+        The jobs as three columns by stage, 17 Sep 2026, from the Portal
+        Overview design. It replaced the pill strip and the live then closed
+        lists, which themselves replaced one list ordered by updated_at that
+        put closed jobs above the one needing the client. The columns keep
+        that fix: closed jobs have their own column and fold away after three.
+        Within a column the recency order is kept.
       */}
-      <WorkerPipeline jobs={live} labels={CLIENT_STATUS} />
+      <StageBoard
+        jobs={(jobs as Described[]).map(describe)}
+        labels={CLIENT_STATUS}
+        empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
+      />
 
-      {/* Two columns on a wide screen: the jobs on the left, the property
-          link and the professional services beside them. On a phone they
-          stack, jobs first. */}
+      {/* Services beside the property link on a wide screen, stacked on a
+          phone. They keep their own list: a service has a six step track of
+          its own and does not fit the job columns. */}
       <div className="grid gap-x-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <div>
-          <JobList
-            title={closed.length > 0 ? "Live jobs" : "Your jobs"}
-            jobs={(live as Described[]).map(describe)}
-            labels={CLIENT_STATUS}
-            rail
-            empty="When a job is set up for you it appears here, with its evidence and its documents. If you have posted one and cannot see it, it is probably still a draft."
-          />
-
           {liveServices.length > 0 && (
-            <JobList title="Professional services" jobs={liveServices} labels={SERVICE_STATUS} rail />
-          )}
-
-          {closed.length > 0 && (
-            <JobList title="Closed" jobs={(closed as Described[]).map(describe)} labels={CLIENT_STATUS} rail />
+            <JobList title="Professional services" jobs={liveServices} labels={SERVICE_STATUS} moneyLabel="Cost" rail />
           )}
 
           {doneServices.length > 0 && (
-            <JobList title="Delivered services" jobs={doneServices} labels={SERVICE_STATUS} rail />
+            <JobList title="Delivered services" jobs={doneServices} labels={SERVICE_STATUS} moneyLabel="Cost" rail />
           )}
         </div>
 
