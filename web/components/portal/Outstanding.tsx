@@ -39,11 +39,11 @@ export function Outstanding({
   return (
     <section className="mt-4 overflow-hidden rounded-[18px] border border-line2 bg-[rgba(13,13,40,0.5)]">
       <LandOnLoad />
-      <div className="flex items-center gap-3 border-b border-line bg-bg/40 px-5 py-4">
-        <h2 className="text-[14px] font-bold">Everything outstanding</h2>
+      <div className="flex items-center gap-3 border-b border-line bg-bg/40 px-4 py-2.5">
+        <h2 className="text-[13px] font-bold">Everything outstanding</h2>
         <span
           className={
-            "ml-auto rounded-full border px-3 py-0.5 font-mono-app text-[11px] font-semibold " +
+            "ml-auto rounded-full border px-2.5 py-0.5 font-mono-app text-[10.5px] font-semibold " +
             (items.length === 0
               ? "border-green/30 bg-green/10 text-green"
               : "border-gold/30 bg-gold/[0.14] text-goldb")
@@ -54,7 +54,7 @@ export function Outstanding({
       </div>
 
       {items.length === 0 ? (
-        <div className="flex items-center gap-3 p-5">
+        <div className="flex items-center gap-3 px-4 py-3">
           <svg viewBox="0 0 24 24" className="size-5 shrink-0 fill-none stroke-green stroke-[2.2]" strokeLinecap="round" strokeLinejoin="round">
             <path d="m5 13 4 4L19 7" />
           </svg>
@@ -73,7 +73,7 @@ export function Outstanding({
             <>
             <span
               className={
-                "mt-0.5 min-w-[74px] shrink-0 rounded-md border px-2 py-1 text-center font-mono-app text-[9px] font-semibold uppercase tracking-[0.1em] " +
+                "min-w-[64px] shrink-0 rounded border px-1.5 py-0.5 text-center font-mono-app text-[8.5px] font-semibold uppercase tracking-[0.08em] " +
                 (o.who === "you"
                   ? "border-gold/30 bg-gold/[0.14] text-goldb"
                   : o.who === "them"
@@ -84,17 +84,17 @@ export function Outstanding({
               {label(o.who)}
             </span>
             <span className="min-w-0 flex-1">
-              <b className="block text-[13.5px] font-semibold leading-snug text-ink">{o.title}</b>
-              <span className="mt-0.5 block text-[12px] leading-relaxed text-dim">{o.detail}</span>
+              <b className="block text-[13px] font-semibold leading-snug text-ink">{o.title}</b>
+              <span className="block text-[11.5px] leading-snug text-dim">{o.detail}</span>
             </span>
             {o.href && (
-              <span className="mt-0.5 shrink-0 whitespace-nowrap text-[12.5px] font-bold text-goldb transition group-hover:opacity-80">
+              <span className="shrink-0 whitespace-nowrap text-[12px] font-bold text-goldb transition group-hover:opacity-80">
                 {o.cta ?? "Open"} &rarr;
               </span>
             )}
             </>
           );
-          const rowClass = "flex items-start gap-3.5 border-b border-line px-5 py-3.5 last:border-b-0";
+          const rowClass = "flex items-center gap-3 border-b border-line px-4 py-2.5 last:border-b-0";
           return o.href ? (
             <LandingLink
               key={i}
