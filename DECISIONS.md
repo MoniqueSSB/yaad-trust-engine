@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · Invoices: a Sent section, and the 5% named as Yaadly's money
+
+**Why.** Founder, 19 Sep 2026: "the section needs to showcase sent invoices as a section", and of the 5% row, "this is paid to yaadly not the worker". Nothing on the page held what had actually gone out to clients: Outstanding drops an invoice the moment it is marked paid, and Paid is money in, so an invoice that was sent and paid in the same month appeared in neither as a thing that was *sent*. And the 5% group read as money moving to the tradesperson, when it is Yaadly's, kept out of their pay.
+
+**What.** Desk only, `concierge/concierge.html`, no database change. A Sent tab between Preview and Outstanding, and a Sent column in the summary table. Sent is every invoice with a `sent_at` in the month on screen, whatever state it is in now, newest sent first, with the same month arrows as Paid. The same invoice is therefore counted again under Outstanding or Paid, and the hint under the table says so rather than leaving her to work out why the columns do not sum.
+
+**Why Sent is a month at a time, not everything ever.** `loadInvoices` reads unsent and unpaid invoices whole however old, but paid ones only for the month on screen, so the list scales past a few hundred jobs. An all-time Sent tab would have quietly shown every unpaid invoice ever sent next to only this month's paid ones, which reads as a complete record and is not. So Sent is scoped by `sent_at` and reads its own month with one more query. If a later change makes Sent all-time, that query has to change with it.
+
+**The 5%.** Wording only, no arithmetic touched. The group is "Yaadly's 5%, kept out of each tradesperson's pay when the job is finished", each row is "Yaadly's 5% from <name>" over "Yaadly keeps 5% of quoted labour J$X, the tradesperson is paid the rest", the chip reads "kept by Yaadly, rest paid", the 15% and service groups say "paid to Yaadly by the client", and the tab opens "Everything on this tab is money to Yaadly." An empty group now says "none kept in <month> yet" instead of "nothing in yet", which did not say what was not in. It is still a figure worked out from each accepted quote at today's 5%, not read from an invoice, and the screen still says so.
+
 ## 2026-09-19 · A row on a panel opens the record it names, and closing it comes back
 
 **Why.** Founder, 19 Sep 2026, on the Intake queue: make the sections clickable "so i can actually close out actions". The section under that queue, "Built a job, never signed", was a printed table. It listed every job stuck at `awaiting_client_setup` and carried no click, no button and no way to finish a row, so the one screen that named her leads was the one screen that could do nothing about them. Reading the live table while fixing it found the second half of the same problem: all twenty four rows there were her own tests, unmarked, so the page was also reporting twenty four people waiting on her when nobody was.

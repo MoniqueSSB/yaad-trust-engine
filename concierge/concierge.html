@@ -1078,7 +1078,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <!-- ============================================ INVOICES -->
 <section class="view" data-view="invoices">
   <h1 class="vh">Invoices</h1>
-  <p class="vsub">Every invoice in one place: services, job bills and the parts of a bill. <b>Preview</b> is drafted and not sent, so no client has seen it. <b>Outstanding</b> is sent and waiting for the money. <b>Paid</b> is money in. Prices come from your service list or the accepted quote, never from the model. Only you send one, and only you mark one paid.</p>
+  <p class="vsub">Every invoice in one place: services, job bills and the parts of a bill. <b>Preview</b> is drafted and not sent, so no client has seen it. <b>Sent</b> is every invoice that actually went out to a client. <b>Outstanding</b> is sent and waiting for the money. <b>Paid</b> is money in. Prices come from your service list or the accepted quote, never from the model. Only you send one, and only you mark one paid.</p>
   <div id="ivMsg"></div>
 
   <div class="card">
@@ -7778,6 +7778,8 @@ let INV_JOB = null, INV_JOB_INFO = null;
 const INV_TABS = [
   { k:"preview", label:"Preview", col:"#4A4A72", has:i => i.status === "draft",
     hint:"Drafted, not sent. No client has seen these. Open one to check it and preview it, then email it." },
+  { k:"sent", label:"Sent", col:"#5B8DEF", has:i => !!i.sent_at && invInMonth(i.sent_at),
+    hint:"Every invoice that actually went to a client, one month at a time, newest first. Whatever happened next: one still waiting for the money is in Outstanding as well, one you have marked paid is in Paid as well." },
   { k:"out", label:"Outstanding", col:"#F59E0B", has:i => i.status === "sent",
     hint:"Sent and waiting for the money, longest waiting first. A card payment Stripe has reported shows beside the invoice; marking it paid is still your click." },
   { k:"paid", label:"Paid", col:"#9B73F5", has:i => i.status === "paid" && invInMonth(i.paid_at),
@@ -7813,13 +7815,15 @@ function invMonthNav(){
 // only: what Yaadly pays a tradesperson is in the lists, labelled, not here.
 const CUR_LABEL = { JMD: "Jamaican dollars", GBP: "Pounds" };
 function invSummary(clientInv){
+  const of = (k) => INV_TABS.find(t => t.k === k).has;
   const cols = [
-    { k:"preview", label:"Preview", sub:"drafted, not sent", has:INV_TABS[0].has },
-    { k:"out", label:"Outstanding", sub:"sent, waiting for the money", has:INV_TABS[1].has },
-    { k:"paid", label:"Paid", sub:"in " + invMonthName(), has:INV_TABS[2].has },
+    { k:"preview", label:"Preview", sub:"drafted, not sent", has:of("preview") },
+    { k:"sent", label:"Sent", sub:"went out in " + invMonthName(), has:of("sent") },
+    { k:"out", label:"Outstanding", sub:"sent, waiting for the money", has:of("out") },
+    { k:"paid", label:"Paid", sub:"in " + invMonthName(), has:of("paid") },
   ];
   const curs = curOrder(clientInv.filter(i => cols.some(c => c.has(i))).map(i => i.currency || "GBP"));
-  if (!curs.length) return `<p class="hint">Nothing drafted, outstanding or paid in ${esc(invMonthName())}.</p>`;
+  if (!curs.length) return `<p class="hint">Nothing drafted, sent, outstanding or paid in ${esc(invMonthName())}.</p>`;
   const cell = (c, cur) => {
     const l = clientInv.filter(i => (i.currency || "GBP") === cur && c.has(i));
     const t = l.reduce((a, i) => a + Number(i.total_pence || 0), 0);
@@ -7827,7 +7831,7 @@ function invSummary(clientInv){
   };
   return `<div class="tw"><table class="ivsum"><thead><tr><th></th>${cols.map(c => `<th><b>${esc(c.label)}</b><span>${esc(c.sub)}</span></th>`).join("")}</tr></thead>`
     + `<tbody>${curs.map(cur => `<tr><th>${esc(CUR_LABEL[cur] || cur)}</th>${cols.map(c => cell(c, cur)).join("")}</tr>`).join("")}</tbody></table></div>`
-    + `<p class="hint" style="margin-top:2px">Money coming in only, each currency added up on its own. What Yaadly pays tradespeople is in the lists, labelled, and not in these figures.</p>`;
+    + `<p class="hint" style="margin-top:2px">Money coming in only, each currency added up on its own. What Yaadly pays tradespeople is in the lists, labelled, and not in these figures. Sent counts what went out this month whatever happened after, so the same invoice is counted again under Outstanding or Paid.</p>`;
 }
 
 // The same shape for Agency fees: one row per kind of fee, and when it is
@@ -7837,11 +7841,11 @@ function invFeeSummary(){
   const rows = [
     { label:"Yaadly's 15% on jobs", list:f.job, cols:[["paid"], ["out"], ["draft", "todo", "check"]] },
     { label:"Services", list:f.svc, cols:[["paid"], ["out"], ["draft"]] },
-    { label:"5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
+    { label:"Yaadly's 5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
   ];
   const heads = [["Taken", "in " + m], ["Waiting for money", "sent, not paid yet"], ["Still to come", "not billed, or job not finished"]];
   const cell = (list, states) => {
-    if (!states) return `<td><div class="ivcell static zero"><span class="a">not invoiced</span><span class="c">taken off their pay</span></div></td>`;
+    if (!states) return `<td><div class="ivcell static zero"><span class="a">not invoiced</span><span class="c">kept out of their pay</span></div></td>`;
     const l = list.filter(x => states.includes(x.state));
     const t = sumByCur(l), cs = curOrder(Object.keys(t).filter(c => t[c]));
     return `<td><div class="ivcell static${l.length ? "" : " zero"}"><span class="a">${cs.length ? cs.map(c => esc(curAmt(t[c], c))).join("<br>") : "none"}</span><span class="c">${plural_(l.length, "fee", "fees")}</span></div></td>`;
@@ -7957,7 +7961,7 @@ const FEE_STATE = {
   paid:  ["paid, taken", "ok"], out:  ["sent, not paid yet", "warn"],
   draft: ["drafted, not sent", "mute"], todo: ["not billed yet", "mute"],
   check: ["not found on its bill", "crit"],
-  kept:  ["deducted, rest paid", "ok"], due: ["finished, pay not sent", "warn"],
+  kept:  ["kept by Yaadly, rest paid", "ok"], due: ["finished, pay not sent", "warn"],
   come:  ["job not finished", "mute"],
 };
 const feeStateOf = (status) => status === "paid" ? "paid" : status === "sent" ? "out" : "draft";
@@ -7998,8 +8002,9 @@ function invFeeTab(t, on){
 }
 
 function invFeeHint(){
-  return "The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. "
-    + "The 5% is deducted once the job is finished, when the tradesperson's pay goes out; it is worked out from each accepted quote at today's rate, not read from an invoice.";
+  return "Everything on this tab is money to Yaadly. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. "
+    + "The 5% is Yaadly's too: it is kept out of what the tradesperson is paid, once the job is finished, so it is never a payment going out and never an invoice. "
+    + "It is worked out from each accepted quote at today's rate, not read from an invoice.";
 }
 
 function invFeeRows(q){
@@ -8007,14 +8012,14 @@ function invFeeRows(q){
   const hit = (s) => !q || String(s).toLowerCase().includes(q);
   const chip = (st) => `<span class="chip ${FEE_STATE[st][1]}">${esc(FEE_STATE[st][0])}</span>`;
   const when = (i) => i.status === "paid" ? "paid " + day_(i.paid_at) : i.status === "sent" ? "sent " + day_(i.sent_at) + invWaited(i.sent_at) : "drafted " + day_(i.created_at);
-  const grp = (title, list, word) => {
+  const grp = (title, list, word, zero) => {
     const s = sumByCur(list.filter(x => ["paid", "kept"].includes(x.state)));
-    return `<tr class="ivgrp"><td colspan="5">${esc(title)} &middot; ${list.length} &middot; ${Object.values(s).some(Boolean) ? word + " " + esc(curText(s)) : "nothing in yet"}</td></tr>`;
+    return `<tr class="ivgrp"><td colspan="5">${esc(title)} &middot; ${list.length} &middot; ${Object.values(s).some(Boolean) ? word + " " + esc(curText(s)) : esc(zero)}</td></tr>`;
   };
   const out = [];
 
   const jobs = f.job.filter(x => hit(x.j.id + " " + (x.j.title || "") + " " + (x.j.client_email || "") + " " + (x.inv ? x.inv.id : "")));
-  if (jobs.length) out.push(grp("Yaadly's 15% on each job", jobs, "taken in " + invMonthName()), ...jobs.map(x => `<tr>
+  if (jobs.length) out.push(grp("Yaadly's 15% on each job, paid to Yaadly by the client", jobs, "taken in " + invMonthName(), "none taken in " + invMonthName() + " yet"), ...jobs.map(x => `<tr>
       <td><div class="jistagename">15% Guarantee &amp; Support</div><div class="ivtags">${chip(x.state)}</div></td>
       <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; 15% of labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}</div></td>
       <td class="jistagepct">${x.inv ? `on ${esc(x.inv.id)}${x.inv.part_of ? ", a part" : ""}<br>${esc(when(x.inv))}` : x.state === "check" ? "the job has a bill, but no 15% line on it" : "no bill yet"}</td>
@@ -8023,7 +8028,7 @@ function invFeeRows(q){
     </tr>`));
 
   const svcs = f.svc.filter(x => hit(x.inv.id + " " + (x.inv.client_name || "") + " " + (x.inv.client_email || "")));
-  if (svcs.length) out.push(grp("Services, the whole price", svcs, "paid in " + invMonthName()), ...svcs.map(x => `<tr>
+  if (svcs.length) out.push(grp("Services, the whole price, paid to Yaadly by the client", svcs, "paid in " + invMonthName(), "none paid in " + invMonthName() + " yet"), ...svcs.map(x => `<tr>
       <td><div class="jistagename">${esc(x.inv.id)}</div><div class="ivtags">${chip(x.state)}</div></td>
       <td><div>${esc(x.inv.client_name || "")}</div><div class="jicond">Service</div></td>
       <td class="jistagepct">${esc(when(x.inv))}</td>
@@ -8032,9 +8037,9 @@ function invFeeRows(q){
     </tr>`));
 
   const ws = f.worker.filter(x => hit(x.j.id + " " + (x.j.title || "") + " " + (x.q.worker_name || "")));
-  if (ws.length) out.push(grp("The 5% deducted from each tradesperson when the job is finished", ws, "deducted in " + invMonthName()), ...ws.map(x => `<tr>
-      <td><div class="jistagename">5% from ${esc(x.q.worker_name || "the tradesperson")}</div><div class="ivtags">${chip(x.state)}</div></td>
-      <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; 5% of quoted labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}</div></td>
+  if (ws.length) out.push(grp("Yaadly's 5%, kept out of each tradesperson's pay when the job is finished", ws, "kept in " + invMonthName(), "none kept in " + invMonthName() + " yet"), ...ws.map(x => `<tr>
+      <td><div class="jistagename">Yaadly's 5% from ${esc(x.q.worker_name || "the tradesperson")}</div><div class="ivtags">${chip(x.state)}</div></td>
+      <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; Yaadly keeps 5% of quoted labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}, the tradesperson is paid the rest</div></td>
       <td class="jistagepct">${x.j.status === "complete" ? "job finished" : "job not finished"}<br>${x.pays.length ? `${x.paid.length} of ${x.pays.length} pay invoice${x.pays.length === 1 ? "" : "s"} paid` : "no pay raised yet"}</td>
       <td class="num"><span class="jiamt">${curAmt(x.total_pence, x.currency)}</span></td>
       <td class="ivact">${x.pays.length ? `<button class="btn g" data-ivopen="${esc(x.pays[x.pays.length - 1].id)}">Open pay</button>` : ""}</td>
@@ -8253,12 +8258,13 @@ function renderInvoiceList(){
     + (tab.k === "out" && unbilled.length ? ` Job bills split into parts also have ${curText(sumByCur(unbilled))} not billed yet, on ${unbilled.map(i => i.id).join(", ")}.` : "");
 
   if (tab.k === "fees") $("ivHint").textContent = invFeeHint();
-  if (tab.k === "paid" || tab.k === "fees") $("ivHint").insertAdjacentHTML("afterbegin", invMonthNav());
+  if (tab.k === "sent" || tab.k === "paid" || tab.k === "fees") $("ivHint").insertAdjacentHTML("afterbegin", invMonthNav());
 
   const due = tab.k === "preview" ? INV_DUE.filter(d => hit(d.job.id + " " + (d.job.title || "") + " " + (d.job.client_email || ""))) : [];
   let rows = INV_LIST.filter(tab.has).filter(i => hit([i.id, i.client_name, i.client_email, i.job_id, i.part_of].join(" ")));
   if (tab.k === "out") rows = rows.slice().sort((x, y) => String(x.sent_at || x.created_at).localeCompare(String(y.sent_at || y.created_at)));
   if (tab.k === "paid") rows = rows.slice().sort((x, y) => String(y.paid_at || "").localeCompare(String(x.paid_at || "")));
+  if (tab.k === "sent") rows = rows.slice().sort((x, y) => String(y.sent_at || "").localeCompare(String(x.sent_at || "")));
 
   const dueRows = due.map(d => `<tr class="ivdue">
       <td><a href="#" class="jistagename" data-ivjob="${esc(d.job.id)}">${esc(d.job.id)}</a><div class="ivtags"><span class="jichip ready"><span class="dot"></span>No bill yet</span></div></td>
@@ -8277,7 +8283,7 @@ function renderInvoiceList(){
         <tbody>${all.join("")}</tbody></table></div>`
     : q ? '<div class="empty"><b>Nothing here matches that</b>Clear the search box, or try another group.</div>'
     : tab.k === "jobs" ? '<div class="empty"><b>No live jobs</b>A job shows here once a tradesperson is booked on it, and stays until it is finished and every invoice on it is paid.</div>'
-    : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "paid" || tab.k === "fees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
+    : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "sent" || tab.k === "paid" || tab.k === "fees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "sent" || tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
 
   $("ivTabs").querySelectorAll("[data-ivtab]").forEach(b => b.addEventListener("click", () => { INV_TAB = b.dataset.ivtab; renderInvoiceList(); }));
   $("ivHint").querySelectorAll("[data-ivmonth]").forEach(b => b.addEventListener("click", async () => {
@@ -8429,14 +8435,15 @@ async function loadInvoices(){
   const COLS = INV_COLS;
   const [y, mo] = INV_MONTH.split("-").map(Number);
   const from = new Date(y, mo - 1, 1).toISOString(), to = new Date(y, mo, 1).toISOString();
-  const [open, paidM, voids, { data: jobs }] = await Promise.all([
+  const [open, paidM, sentM, voids, { data: jobs }] = await Promise.all([
     sb.from("invoices").select(COLS).in("status", ["draft", "sent"]).order("created_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "paid").gte("paid_at", from).lt("paid_at", to).order("paid_at", { ascending: false }),
+    sb.from("invoices").select(COLS).gte("sent_at", from).lt("sent_at", to).order("sent_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "void").order("created_at", { ascending: false }).limit(50),
     sb.from("jobs").select("id,title,client_email,status,trade")
       .not("worker_email", "is", null).order("updated_at", { ascending: false }).limit(50),
   ]);
-  const error = open.error || paidM.error || voids.error;
+  const error = open.error || paidM.error || sentM.error || voids.error;
   if (error) {
     $("ivList").innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read invoices</b><p>${esc(error.message)}</p></div></div>`;
     return;
@@ -8451,7 +8458,7 @@ async function loadInvoices(){
     billIds.length ? sb.from("invoices").select(COLS).in("id", billIds) : none,
   ]);
   const byId = new Map();
-  for (const i of [].concat(openRows, paidM.data || [], voids.data || [], onJobs.data || [], byBill.data || [], bills.data || [])) byId.set(i.id, i);
+  for (const i of [].concat(openRows, paidM.data || [], sentM.data || [], voids.data || [], onJobs.data || [], byBill.data || [], bills.data || [])) byId.set(i.id, i);
   INV_LIST = [...byId.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 
   // Ready to raise: a booked job with an accepted quote and no live client
