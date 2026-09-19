@@ -1,5 +1,5 @@
 -- Proof that a worker is paid only after the client has paid for the work.
--- Run with execute_sql once 20260917180000 is applied.
+-- Run with execute_sql once 20260917180000 and 20260919160000 are applied.
 --
 -- NOTHING HERE PERSISTS AND NOTHING LEAVES. It reads TEST jobs that already
 -- exist, adds throwaway draft pay invoices inside a subtransaction, and
@@ -35,17 +35,27 @@ begin
 
     perform set_config('request.jwt.claims', json_build_object('email', v_admin, 'role', 'authenticated')::text, true);
 
-    -- 3. by stage, stage 2 not billed or paid: refused, and says stage 2
+    -- 3. by stage, but no client bill carries stage 2, so the check falls back
+    --    to the whole job and names the bill that is actually outstanding.
+    --    THIS EXPECTATION WAS CHANGED by 20260919160000, on Monique's
+    --    instruction of 19 Sep 2026. It used to be "the message says stage 2".
+    --    Nothing was weakened to make it pass: this is still a refusal, and
+    --    the refusal now names a bill that can be paid. Before the change no
+    --    click could clear this row, because nothing since 20260913233000 can
+    --    raise a stage-numbered client bill.
     s := public.worker_pay_client_unpaid('INV-2026-0016');
-    res := res || ('3. stage 2 pay is refused while the client has not paid stage 2: ' ||
-      case when s ilike '%stage 2%' then 'PASS' else 'FAIL, ' || coalesce(s, 'it was allowed') end);
+    res := res || ('3. stage 2 pay is refused while the whole-job bill is unpaid: ' ||
+      case when s ilike '%INV-2026-0024%' then 'PASS' else 'FAIL, ' || coalesce(s, 'it was allowed') end);
 
     -- 4. by stage, stage 1 paid, but the whole-job bill and its part are not: refused, naming them
     insert into public.invoices (id, client_name, client_email, job_id, payable_to, stage, currency, total_pence)
     values ('TEST-WPCU-1', 'Test', 'test@example.invalid', 'JOB-TEST-KICKOFF-1', 'worker', 1, 'JMD', 100);
     s := public.worker_pay_client_unpaid('TEST-WPCU-1');
-    res := res || ('4. stage 1 is paid but the fee bill is not, so still refused: ' ||
-      case when s ilike '%INV-2026-0025%' then 'PASS' else 'FAIL, ' || coalesce(s, 'it was allowed') end);
+    -- The named bill moved from INV-2026-0025 to INV-2026-0024 because the fee
+    -- part was marked paid on 19 Sep 2026. The stage branch is what is being
+    -- proved here, and it still applies: stage 1 IS billed on this job.
+    res := res || ('4. stage 1 is paid but the whole-job bill is not, so still refused: ' ||
+      case when s ilike '%INV-2026-0024%' then 'PASS' else 'FAIL, ' || coalesce(s, 'it was allowed') end);
 
     -- 5. in full, whole-job bill paid, nothing else owed: allowed
     insert into public.invoices (id, client_name, client_email, job_id, payable_to, stage, currency, total_pence)
@@ -69,14 +79,38 @@ begin
       perform public.mark_worker_paid('INV-2026-0016', 'bank_transfer', 'FT-TEST');
       res := res || '7. Mark as sent is refused while the client has not paid: FAIL, it was marked'::text;
     exception when others then
+      -- The wording moved with 20260919160000: this row now refuses by naming
+      -- the unpaid whole-job bill rather than the stage. It is the same
+      -- refusal, from the same gate, for the same reason.
       res := res || ('7. Mark as sent is refused while the client has not paid: ' ||
-        case when sqlerrm ilike '%client has not paid%' then 'PASS' else 'FAIL, ' || sqlerrm end);
+        case when sqlerrm ilike '%not marked paid%' then 'PASS' else 'FAIL, ' || sqlerrm end);
     end;
 
     -- 8. a client bill cannot stand in for a worker's pay
     s := public.worker_pay_client_unpaid('INV-2026-0007');
     res := res || ('8. a client bill is not treated as a worker''s pay: ' ||
       case when s ilike '%client''s bill%' then 'PASS' else 'FAIL, ' || coalesce(s, 'it was allowed') end);
+
+    -- 9. 20260919160000: a stage the client was never billed for is checked
+    --    against the whole job. On JOB-TEST-WAPAY-3 the only client bill,
+    --    INV-2026-0007, is paid. A draft stage 1 bill makes the job read as
+    --    stage-billed; a stage 3 payable has no bill of its own, falls back to
+    --    the whole job, and is allowed.
+    insert into public.invoices (id, client_name, client_email, job_id, payable_to, stage, currency, total_pence)
+    values ('TEST-WPCU-4', 'Test', 'test@example.invalid', 'JOB-TEST-WAPAY-3', 'yaadly', 1, 'JMD', 100);
+    insert into public.invoices (id, client_name, client_email, job_id, payable_to, stage, currency, total_pence)
+    values ('TEST-WPCU-5', 'Test', 'test@example.invalid', 'JOB-TEST-WAPAY-3', 'worker', 3, 'JMD', 100);
+    s := public.worker_pay_client_unpaid('TEST-WPCU-5');
+    res := res || ('9. a stage the client was never billed for falls back to the whole job: ' ||
+      case when s is null then 'PASS' else 'FAIL, ' || s end);
+
+    -- 10. and the stage rule still bites where that stage IS billed: a stage 1
+    --     payable on the same job, whose stage 1 bill is the draft above.
+    insert into public.invoices (id, client_name, client_email, job_id, payable_to, stage, currency, total_pence)
+    values ('TEST-WPCU-6', 'Test', 'test@example.invalid', 'JOB-TEST-WAPAY-3', 'worker', 1, 'JMD', 100);
+    s := public.worker_pay_client_unpaid('TEST-WPCU-6');
+    res := res || ('10. the stage rule still applies where that stage is billed: ' ||
+      case when s ilike '%stage 1%' then 'PASS' else 'FAIL, ' || coalesce(s, 'it was allowed') end);
 
     raise exception 'undo';
   exception when others then
