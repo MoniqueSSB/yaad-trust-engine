@@ -18,6 +18,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · A count on a side page is what wants a person, not how many rows were read
+
+**Why.** Founder, 19 Sep 2026, on Quote Pack Drafts: "this 200 needs to be removed as there is nothing outstanding and it is raising as if something is happening." She was right about the reading. The page led with a 44 point **200**, which was the page's own read limit, and under it the rail carried a 200 badge. The live table holds 347 drafts across 15 jobs, 308 of them approved by the guardrail without anybody touching them, 38 failed on a model rate limit that the next run retries, and exactly one at `ready`, which is the only state a person can act on. So the desk was showing a queue of 200 where the true queue was one, and doing it in the two places she looks first.
+
+**What.** Desk only, `concierge/concierge.html`; no database change and no new action. A table view may now declare `viz:{ want, wants }`: `want` is a predicate over one row, `wants` is what to call those rows. Where it is declared, the count widget leads with that number, in mango when there are any and teal when there are none, and demotes "200 loaded, 14 in the last 7 days" to the small line underneath; the rail badge counts the same thing, so the two cannot disagree, and it disappears at zero like every other badge. Quote Pack Drafts declares it as `status === "ready"`, "held for a person". Every other view has no `want` and is byte for byte what it was.
+
+**What it does not change.** Nothing about what is approved, by whom, or when. A held draft is still held until a named human clears it, Approve is still refused by the database while the guardrail flags the wording, and the table underneath still lists every draft it read, approved ones included, because the log is the point of keeping them. The "newest 200" chip stays in the widget header: the read is still capped, and hiding that would be the opposite of this change.
+
+**Left alone, on purpose.** One draft has been held since 7 Sep on JOB-WEB-1788281626906, flagged for price language, 12 days and counting, and that job is still open for quotes. And 166 of the 347 drafts were written against a single job on 1 Sep, which is a drafter that ran away and has since settled to one or two a day. Both are real; neither is a counting problem, so neither was fixed here.
+
+---
+
 ## 2026-09-19 · Invoices: a Sent section, and the 5% named as Yaadly's money
 
 **Why.** Founder, 19 Sep 2026: "the section needs to showcase sent invoices as a section", and of the 5% row, "this is paid to yaadly not the worker". Nothing on the page held what had actually gone out to clients: Outstanding drops an invoice the moment it is marked paid, and Paid is money in, so an invoice that was sent and paid in the same month appeared in neither as a thing that was *sent*. And the 5% group read as money moving to the tradesperson, when it is Yaadly's, kept out of their pay.
