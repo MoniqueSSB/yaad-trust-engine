@@ -16,6 +16,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **The Read more text, same change.** Two things were missing from it. It said nothing about her own tests being in the table, which is now what the number on top turns on. And on materials store it named the weaker of the two refusals: the database does block a materials tranche and materials evidence without an answer, but `trg_enforce_store_before_open` also refuses to put the job on the board at all, which is the refusal she will actually meet, pressing Open it to the board. Both are now in the paragraph.
 
+**Deployed** 19 September 2026, `yaadly-concierge` version `11327152`, from this branch after merging `origin/main` into it first. Main had moved twice while this was being written, and deploying without that merge would have reverted the Sketch packs badge and the evidence-ownership change, both of which were already live. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302 in front of the hostname.
+
 ---
 
 ## 2026-09-19 · Nothing waits on Monique unless a client raised it, and evidence.ok is not the record
