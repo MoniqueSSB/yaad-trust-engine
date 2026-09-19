@@ -13,6 +13,13 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **What changed.** Desk only, `concierge/concierge.html` and its deploy copy. No database change, no function change, no gate moved. Where both are outstanding the row now reads "Waiting on the client: the bill is not paid yet, and where materials are kept". Where one is, it names that one. Bill first, because that is the gate that actually holds the money, and it matches the wording the Pay workers view took the same day.
 
 **What did not move.** The store gate stays in `trg_enforce_store_before_open` and the two guards in `20260828c`, and the paid-for test stays in `materials_paid_jmd()`, which has the last word. This panel shows those refusals and has never re-checked them.
+## 2026-09-19 · Desk deployed: concierge version 3ed5934a, after the deploy copy had gone stale
+
+**What went live.** Everything on `main` at the time: the evidence, intake and money work from this session, plus another session's Overview to-do band and its badge rule. `yaadly-concierge` version `3ed5934a`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
+
+**Caught on the way out.** `concierge-deploy/public/index.html` on `main` was three merges behind `concierge/concierge.html`: a desk change had been merged without syncing the copy the Worker actually serves. Deploying as it stood would have reverted the to-do band live, off disk, which is the failure the separate copy exists to catch and which happened on this repository on 6 September. Synced in its own commit first, then deployed. **The lesson is the order: compare the two files before every hand deploy, not after.**
+
+**Nothing else needed deploying.** No Edge Function and no `web/` change had landed since the previous deploy, checked with `git log` against the range rather than assumed. All four migrations dated 19 September are applied in production, including the two that closed the public write door on `intakes` and four other dead tables, so the open `INSERT ... WITH CHECK (true)` flagged earlier today is gone: `intakes` now carries only `admin all intakes`.
 
 ## 2026-09-19 · A stage the client was never billed for is checked against the whole job
 
@@ -37,6 +44,28 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **The sweep is the actual fix.** A sentence corrected by hand comes back. `scripts/check-copy.mjs` greps `concierge/`, `docs/` and `preview/` for the exact phrases in COPY-GUIDELINES section 6, and runs in CI in the Admin desk job. It is deliberately narrow, exact phrases and three folders of pure page copy, for the reason already written over that job: a check that cries wolf gets switched off. `web/` and `supabase/` are left out on purpose, because their source comments discuss these phrases in order to ban them and they carry their own guardrail suites. `docs/` keeps the one sanctioned exception, the explicit "does not operate an escrow service" denial a worried reader needs answered.
 
 **It paid for itself on the first run.** Two more copies of the same false sentence that nobody had found by reading: `concierge/README.md`, where the desk's own documentation asserted it, and `preview/index.html`, the clickable prototype. Both fixed in the same commit. **Correction, an hour later:** that entry first said the prototype is "served at yaadly.co.uk/preview/", which is what CLAUDE.md section 11 says and is not true. GitHub Pages publishes `docs/` and there is no `docs/preview/`, so `https://yaadly.co.uk/preview/` returns 404 and always has. The prototype is read locally. Checked by fetching the URL rather than by reading the table, which is the whole reason section 11 tells you to confirm anything load bearing against the code. It also caught the first replacement wording written for the Money view, which said "no money is held on anybody's behalf": true, but a denial, which is the thing section 2 says not to write. That is the check doing its job on the person adding it.
+
+## 2026-09-19 · The Overview leads with a list of work, and a rail badge is only ever a claim about work
+
+**Why.** Founder, 19 Sep 2026: "the dashboard on the side should showcase what needs to be done", and then "it is not clear". Two separate things were unclear and both were true.
+
+**The Overview had no list of work on it.** It is eight widgets, and every one of them measures something: what came in over fourteen days, live jobs by stage, whose move it is, money both ways, jobs on the record. The only thing on the screen that said what to DO was a bar chart in the third widget. Measurement is not a move, and a screen where the work is a bar inside a chart is a screen you read rather than a screen you work from.
+
+**A rail badge meant two different things depending on whether you had opened the page.** If `loadOverview` had worked the number out, it was a claim about work. If you had opened the view yourself, `loadTableView` overwrote it with however many rows the read returned, unless the view declared `viz.want`. Same pill, same colour, same position, two meanings. Live, "Invoices 7" meant seven invoices exist and was read, reasonably, as seven things to do.
+
+**What.** Desk only, `concierge/concierge.html`. No database change, no new read, no migration. A band at the top of the Overview, above the grid, drawn by `renderTodo()` from the same `QUEUE` array that already feeds the bars on The day and on How the desk is doing, so the band, the charts and the rail cannot disagree about what is waiting. One pill per queue with something in it, blocked first in coral and the rest in gold, each one a click straight to that queue. The Overview and its grid are wrapped in a flex column so the band takes its height off the charts rather than pushing them past the fold.
+
+**The band is filtered to her lanes, and says so.** A queue whose `tone` is `"client"` is somebody else's move. Those are named underneath in one grey line rather than counted in with the rest, because a number she cannot act on sitting beside seven she can is how a to-do list stops being believed. Nothing is hidden; it is sorted.
+
+**Deliberately no grand total on the band.** The sentence at the top of the screen and the "Want you" number below it are both counts of open moves; a third number here counting queue items would have sat between them saying a different thing in the same words. The band's only figure is how many queues have something in them, and each pill carries its own count.
+
+**The badge rule, stated once.** A badge is a claim about work. A view that cannot say which of its rows want a person now gets no badge at all, rather than one carrying a row count. `BADGED` records which links hold a number that was worked out as work, so a view loading its own rows can never overwrite one. Every badge also carries the words, as a title: "7 invoices drafted and never sent", "2 quote packs held, and a held pack is a job stopped", singular and plural both written out because "1 calls requested" is the kind of small wrongness that makes a person stop trusting the rest of the sentence.
+
+**Widened from eight badged links to thirteen.** Enquiries, Quote Pack Drafts, Questions, Waiting on you and Stalled jobs were all on the queue list, all had a rail link, and none had a badge. A missing badge is a claim too: it says that place is clear. Jobs is still deliberately unbadged, for the reason already in the code, that its old badge carried the open-dispute count and put a coral pill on a link that does not go to disputes.
+
+**Known and left alone.** The "Waiting on you" bar chart on the Overview now says the same thing as the band, in the same order. It is a duplicate. Cutting it re-lays the twelve column grid, which is a separate change rather than a free one.
+
+**Reviewed as a clickable demo before the live file was touched,** per the way this desk is always changed: the same patch script, exact match anchors, applied first to a copy with a stand in Supabase client and invented rows, then to `concierge/concierge.html` unchanged. `scripts/check-desk-script.mjs` passes.
 
 ## 2026-09-19 · Outstanding counts real money: not her own tests, and not what Yaadly owes
 
