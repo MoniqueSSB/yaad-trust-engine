@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · The copy sweep reaches the app, and the public board counts one parish as one
+
+**Why.** "Do the same" again, so the public surfaces were audited the way the desk was: the app at `app.yaadly.co.uk`, the marketing site, and what a stranger actually sees when they load either.
+
+**The audit came back clean on the thing being looked for**, and that is worth writing down rather than quietly finding something else to change. The public board and the public directory both read database views that already exclude her own test rows (`open_jobs` and `public_worker_profiles`, both filtering `is_test` since 9 September), so neither page has ever shown a seed row to a stranger. Both empty states are honest: the directory says "0 of 0 shown" over "the worker network is being built parish by parish, and nobody is listed before both checks are complete", and the board prints "0 identity checked workers" on its own front page rather than hiding it. Every hit for a banned phrase inside `web/` and `supabase/functions/` turned out to be a comment recording that the copy was NOT built, a guardrail's own banned list, or a model instruction forbidding it.
+
+**Two real things were found.**
+
+**The sweep did not read the app at all.** `scripts/check-copy.mjs`, added earlier the same day, covered `concierge/`, `docs/` and `preview/` and deliberately skipped `web/`, because the app's source comments quote the banned phrases in order to record that the comp asked for them and they were refused. That reason was real and the conclusion was wrong: the app is the surface a real client and a real worker read, so it is the one that most needs the guard. It now reads `web/app` and `web/components` with comments stripped first, block and line, so those comments stay exactly where they are and a banned phrase inside a rendered string is still a finding. Proved both ways before committing: the same sentence trips the check in a JSX string and passes in a comment.
+
+**"1 parishes covered"** sat on the public job board, which is the page a tradesperson reads while deciding whether this is a real network or an empty shell. Three of its four stat cards had plural-only labels. Each now carries a singular used at one.
+
 ## 2026-09-19 · Workers counts supply, and the sweep for the rest came back clean
 
 **Why.** Founder, "do the same", after the evidence, intake and money passes. So the desk was swept for the same three defects rather than one more view being picked by hand: a badge or headline that counts rows instead of work, a count that includes her own test rows, and a queue attributed to the wrong person.
