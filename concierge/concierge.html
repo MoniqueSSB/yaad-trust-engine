@@ -2229,6 +2229,10 @@ const VIEWS = [
     sub:"Yaadly's own starting draft for a worker's quote, written for every open, unassigned job. A guardrail-clean draft is approved automatically and folds into whichever quote the worker actually submits; a dirty one is held here, exactly as it was written, until a named human clears it or a fresh draft replaces it. Nothing here is client-facing on its own.",
     select:"id,job_id,status,model,docs,guardrail,error,approved_by,approved_at,created_at,finished_at",
     order:"created_at", search:["id","job_id"], hide:["docs"],
+    // Only a draft at ready is waiting on you. Approved cleared itself and
+    // failed is the drafter's own model error, which the next run retries.
+    // Without this the page led with the number of rows it had read.
+    viz:{ want:r => r.status === "ready", wants:"held for a person" },
     empty:["No drafts yet","A draft is written when yaad-quote-pack-check finds a live, unassigned job with none yet."],
     detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${qpDocsHtml(r.docs)}</div></div>`,
     cols:[
@@ -5378,7 +5382,10 @@ async function loadTableView(k){
   if (v.pre) { try { await v.pre(ROWS[k]); } catch (e) { console.warn(v.table + " side fetch:", e.message); } }
 
   renderTableView(k);
-  setCount(k, ROWS[k].length, false);
+  // The badge counts what wants a person where the view can say, not how many
+  // rows the read happened to return. See wantCount.
+  const want = wantCount(v, ROWS[k]);
+  setCount(k, want === null ? ROWS[k].length : want, false);
 }
 
 function renderTableView(k){
@@ -6044,6 +6051,15 @@ function vizFields(v, rows){
   return { date, state, cat };
 }
 
+// How many of these rows want a person. A view says so with viz.want, a
+// predicate over one row. Null when the view has not said, which means the
+// honest answer is "we do not know" and the count falls back to rows loaded.
+// The rail badge and the count widget both read this, so they cannot disagree.
+function wantCount(v, rows){
+  const f = v.viz && v.viz.want;
+  return typeof f === "function" ? (rows || []).filter(f).length : null;
+}
+
 function vizStrip(k, v, rows){
   if (v.viz === false || !(rows || []).length) return "";
   const { date, state, cat } = vizFields(v, rows);
@@ -6051,10 +6067,24 @@ function vizStrip(k, v, rows){
   const out = [];
 
   // The count, and how many arrived in the last seven days.
+  //
+  // A view that can say which of its rows want a person leads with that
+  // number instead, and demotes the row count to the line underneath. Quote
+  // Pack Drafts is the case that prompted this, 19 September 2026: a big 200
+  // on a page where 199 of those drafts had cleared themselves reads as a
+  // queue of 200, and a number on this desk is meant to be a claim about
+  // work. Declared as viz:{want, wants}; a view without it is unchanged.
   const week = date ? rows.filter(r => looksDate(r[date]) && Date.now() - new Date(r[date]).getTime() < 7 * 86400e3).length : null;
+  const want = wantCount(v, rows);
+  const weekLine = week !== null ? `${week} in the last 7 days` : "";
+  const big = want === null
+    ? `<span class="v">${rows.length}</span><span class="k">${rows.length === 1 ? "row" : "rows"} loaded</span>`
+      + (weekLine ? `<span class="s">${weekLine}</span>` : "")
+    : `<span class="v" style="color:${want ? "var(--mango)" : "var(--teal)"}">${want}</span>`
+      + `<span class="k">${esc(v.viz.wants || "want a person")}</span>`
+      + `<span class="s">${rows.length} loaded${weekLine ? ", " + weekLine : ""}</span>`;
   out.push(`<div class="wg vz-n"><div class="wgh"><span>${esc(v.label)}</span>${rows.length >= 200 ? `<span class="n">newest 200</span>` : ""}</div>`
-    + `<div class="vzbig"><span class="v">${rows.length}</span><span class="k">${rows.length === 1 ? "row" : "rows"} loaded</span>`
-    + (week !== null ? `<span class="s">${week} in the last 7 days</span>` : "") + `</div></div>`);
+    + `<div class="vzbig">${big}</div></div>`);
 
   // Arrivals by day, when the view has a date to count by.
   if (date) {
