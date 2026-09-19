@@ -19,7 +19,16 @@ Deno.test("the section menu's row ids are the letters the typed question accepts
   assert(c.types["twilio/list-picker"].body.startsWith("{{1}}"));
 });
 
+import { SECTION_MENU_APPROVAL, SECTION_MENU_NAME } from "./content.ts";
 import { WORKER_UPDATE_APPROVAL, WORKER_UPDATE_BODY, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+
+Deno.test("the section menu is submitted for approval as itself, as Utility", () => {
+  assertEquals(SECTION_MENU_APPROVAL.name, SECTION_MENU_NAME);
+  assert(/^[a-z0-9_]+$/.test(SECTION_MENU_APPROVAL.name), "Meta template names are lowercase, digits and underscores");
+  assert(SECTION_MENU_APPROVAL.name.length <= 512);
+  // A question about a job the worker is already doing. Never marketing.
+  assertEquals(SECTION_MENU_APPROVAL.category, "UTILITY");
+});
 
 Deno.test("the worker update template is the one yaad-notify-client fills", async () => {
   const other = await Deno.readTextFile(new URL("../yaad-notify-client/worker-template.ts", import.meta.url));

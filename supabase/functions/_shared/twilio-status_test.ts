@@ -109,3 +109,31 @@ Deno.test("every function that sends a Twilio message records what it was", () =
   }
   assertEquals(missing, []);
 });
+
+/* ── the rule that cost four days ─────────────────────────────────────────
+   Twilio: "A Messaging Service is a prerequisite for using Content
+   Templates." A send carrying a ContentSid and only a From is refused with
+   20422 Invalid Parameter, every time, before Twilio tries anything. Plain
+   Body sends are unaffected, which is exactly how the section menu managed
+   to fail on every attempt from 15 to 19 September 2026 while every other
+   message from the same number went out normally.
+
+   Checked against the functions themselves, not against a memo, because
+   four functions had the same bug and the fifth would have been written the
+   same way. */
+Deno.test("every ContentSid send names a Messaging Service", () => {
+  const root = new URL("../", import.meta.url);
+  const missing: string[] = [];
+  for (const entry of Deno.readDirSync(root)) {
+    if (!entry.isDirectory || !entry.name.startsWith("yaad-")) continue;
+    let src = "";
+    try { src = Deno.readTextFileSync(new URL(`${entry.name}/index.ts`, root)); } catch { continue; }
+    // The setup function's probe send is the one deliberate exception: it
+    // exists to reproduce the refusal on demand, so it must be able to send
+    // exactly the request that fails.
+    if (entry.name === "yaad-twilio-setup") continue;
+    if (!/ContentSid:/.test(src)) continue;
+    if (!src.includes("withMessagingService") && !src.includes("MessagingServiceSid")) missing.push(entry.name);
+  }
+  assertEquals(missing, []);
+});

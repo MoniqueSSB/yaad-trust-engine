@@ -647,12 +647,24 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: Send
  *  until a template id exists (the TWILIO_CONTENT_SID_PHASE secret, or the
  *  app_settings row yaad-twilio-setup writes; RUNBOOK.md, "The section
  *  menu") nothing changes at all. The lead sentence goes in as {{1}}. */
-async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace: Trace): Promise<boolean> {
+async function sendPhaseMenu(to: string, lead: string, contentSid: string, messagingServiceSid: string, trace: Trace): Promise<boolean> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
   const digits = to.replace(/\D/g, "");
   if (!contentSid || !sid || !tok || !from || digits.length < 7) return false;
+  // "A Messaging Service is a prerequisite for using Content Templates",
+  // Twilio's own words, and the reason this send was refused with 20422
+  // Invalid Parameter every time from 15 to 19 September 2026 while plain
+  // text sends from the same number went out fine: a Body needs no Messaging
+  // Service and a ContentSid does. The From number does NOT have to be in
+  // the service's sender pool, so naming the service is the whole fix.
+  // Without one there is nothing to try, so the typed question goes instead
+  // of a send that is certain to fail.
+  if (!messagingServiceSid) {
+    console.error("sendPhaseMenu: no Messaging Service is set, so the menu cannot be sent. See RUNBOOK, the section menu.");
+    return false;
+  }
   // The lead is made of fixed strings and a stage label, but it reaches a
   // phone, so it is screened like every other reply. A finding means the
   // typed fallback runs instead, and that goes through twiml()'s own screen.
@@ -665,7 +677,8 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
         body: withStatusCallback(new URLSearchParams({
-          To: `whatsapp:+${digits}`, From: from, ContentSid: contentSid,
+          To: `whatsapp:+${digits}`, From: from, MessagingServiceSid: messagingServiceSid,
+          ContentSid: contentSid,
           ContentVariables: JSON.stringify({ "1": lead.slice(0, 900) }),
         })),
         signal: AbortSignal.timeout(15000),
@@ -673,9 +686,24 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace
       s.setAttributes({ "http.response.status_code": r.status });
       await recordAccepted(r, digits, "whatsapp", { kind: "section menu" });
       if (!r.ok) {
-        const d = await r.json().catch(() => null) as { message?: string } | null;
-        s.recordError(d?.message ?? `twilio ${r.status}`);
-        console.error("sendPhaseMenu: Twilio refused the template:", d?.message ?? r.status);
+        // Twilio's numbered code is the part that names the cause, and until
+        // 19 September 2026 this line threw it away and logged the sentence
+        // alone. What that produced was "Invalid Parameter", four days of a
+        // menu that never once went out, and a typed fallback covering for it
+        // so well that nothing looked wrong. The code, the sentence, Twilio's
+        // own help link and the template id now all go to the function log,
+        // which is private to this project. No customer text goes with them.
+        const d = await r.json().catch(() => null) as { code?: number; message?: string; more_info?: string } | null;
+        const detail = [
+          `HTTP ${r.status}`,
+          d?.code ? `Twilio code ${d.code}` : "",
+          d?.message ?? "",
+          d?.more_info ?? "",
+          `ContentSid ${contentSid}`,
+        ].filter(Boolean).join(" | ");
+        s.recordError(detail.slice(0, 300));
+        s.setAttributes({ "yaadly.twilio.error_code": String(d?.code ?? r.status) });
+        console.error("sendPhaseMenu: Twilio refused the template:", detail);
       }
       return r.ok;
     } catch (e) {
@@ -1929,10 +1957,12 @@ Deno.serve(async (req: Request) => {
   // when it created the template (app_settings.twilio_content_sid_phase).
   const askPhase = async (settings: SettingsReader, to: string, channel: string, lead: string) => {
     if (channel === "whatsapp") {
-      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE")
-        || (await readSettings(settings, ["twilio_content_sid_phase"])).twilio_content_sid_phase
-        || "";
-      if (contentSid && await sendPhaseMenu(to, lead, contentSid, trace)) return twimlSilent();
+      const set = await readSettings(settings, ["twilio_content_sid_phase", "twilio_messaging_service_sid"]);
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE") || set.twilio_content_sid_phase || "";
+      // Both are needed, and either one blank turns the menu off and leaves
+      // the typed letters, which is still the switch.
+      const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
+      if (contentSid && await sendPhaseMenu(to, lead, contentSid, serviceSid, trace)) return twimlSilent();
     }
     return twiml(`${lead} ${PHASE_QUESTION}`);
   };
@@ -2739,12 +2769,25 @@ Deno.serve(async (req: Request) => {
       // Said when the photo is first parked and again if a reply does not
       // match a job, not on every message: a clock repeated four times in a
       // row reads as nagging and stops being heard.
-      const UNFILED_NOTICE = "It is not attached to a job or a stage until you send the code, and an unattached photo is deleted after 72 hours.";
+      const UNFILED_NOTICE = "It is not attached to a job or a stage until you confirm which job it is, and an unattached photo is deleted after 72 hours.";
       const UNFILED_NOTICE_SHORT = "It is not on the job until you answer, and an unfiled photo is deleted after 72 hours.";
 
       const codePrompt = (choices: { id: string; title: string }[]) =>
         choices.length === 1
-          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply with the code ${choices[0].id} to confirm, or tell us the right job.`
+          // One job, so ask for one keystroke. Founder, 19 Sep 2026: "I want
+          // the whatsapp to say 1 for ... it is that job". Reading a
+          // twenty-character code off the screen above and typing it back on
+          // a phone, mid-job, was never a real ask. "1" was already accepted
+          // here and always has been (pickJobChoice takes an ordinal inside
+          // this session); the message simply never said so, which is the
+          // worst of both, a shortcut that exists and is kept secret. The
+          // code still works for anyone who sends it.
+          //
+          // "Confirm", never "approve". Approving is a named human deciding
+          // about money or a stage (HUMAN_ONLY_DECISIONS). Saying which job a
+          // photograph belongs to is neither, and the two must not start
+          // sharing a word in front of workers.
+          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply 1 to confirm it is that job, or tell us the right job.`
           : `Which job is this for? Reply with the code:  ${choices.map((c) => `${c.id} (${c.title})`).join("  ")}`;
 
       // The job-code answer to a freeform update that named more than one
