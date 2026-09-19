@@ -5591,3 +5591,14 @@ Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A
 6. **A job is missing from Live jobs.** It lists booked jobs only (a tradesperson chosen), leaves out cancelled ones, and drops a finished job once every client invoice and worker pay on it is marked paid. It reads the latest 50 booked jobs.
 7. **Job type says "job type not set".** `jobs.trade` is empty on that job; set it on the job.
 
+
+## The Evidence screen says something is waiting on you, or says nothing is when something is (19 Sep 2026)
+
+The rule, set by the founder on 19 Sep 2026: a filed set reaches you on an open dispute or a comment the client wrote, and on nothing else. Approving the work is the client's, in their portal.
+
+1. **Whose move it is comes from `stage_approvals`, never from `evidence.ok`.** A set is "signed off" when a row in `stage_approvals` covers its job and stage; otherwise it is "with the client". `evidence.ok` is a dead column: it defaults to `true`, nothing writes it, and most rows carry `null`. Nothing on the desk reads it any more. Do not put it back.
+2. **A row reads "with the client" and you think it was approved.** Check the record: `select * from stage_approvals where job_id = '<job>' and stage = <n>;`. No row means no approval, whatever was said on the phone. An approval taken in person or over WhatsApp still has to be recorded, or the desk is right and the memory is wrong.
+3. **A row reads "the client wrote about this" and you cannot see what they said.** Open the row: the comment is quoted at the top of the drawer. In SQL: `select body, created_at, origin from evidence_comments where job_id = '<job>' and from_role = 'client' order by created_at;`. A comment with a null `evidence_id` came over WhatsApp, where a client can only name a stage, so it marks every item in that stage.
+4. **A whole job's evidence reads "dispute, waiting on you".** That is the job, not the photographs: `select * from disputes where job_id = '<job>' and state <> 'resolved';`. It clears when the dispute is resolved by a named person.
+5. **The Evidence badge in the rail shows a bigger number than the one thing waiting on you.** Opening any list view on this desk overwrites its badge with the number of rows loaded (`setCount(k, ROWS[k].length, false)` in `loadView`). That is how every view has always behaved. The badge is correct on a fresh load and after the Overview refreshes it; it is rows loaded once you are inside the view.
+6. **"Evidence with clients" on the Overview reads zero and you know sets are filed.** It used to always read zero, because it counted `ok = false`. It is now `evidenceOwnership()`, which reads `evidence`, `stage_approvals`, `disputes` and `evidence_comments` and splits them. A zero now means every filed set really is approved or really is yours.
