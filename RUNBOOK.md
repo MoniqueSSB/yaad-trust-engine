@@ -5742,3 +5742,48 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 3. **A real worker reads as a test.** Open the row and press "This one is real" (`mark_worker_test`). It is recorded as your decision.
 4. **A real, active worker still is not counted.** Check `active`: a profile that is not published cannot quote, so it is not supply. Publishing is done from Applications.
 5. **The Overview's people card says the same thing in words**, and names the tests beside the real count rather than adding them in.
+
+## Clearing test jobs off one client portal (19 Sep 2026)
+
+The client portal lists every job carrying that signed-in email, `is_test` rows
+included. Only the public job board at `/jobs` filters test rows out. So a
+portal that has been used for testing fills with test jobs and there is no
+screen that hides them: they are cleared from the database or not at all.
+
+Before deleting anything, take a snapshot outside the repo. Supabase Pro keeps
+seven daily backups but a restore brings back the whole database, not these
+rows, so the snapshot is the only surgical way back.
+
+Deleting a job does not just delete a job. Twenty-nine tables carry a foreign
+key to `jobs`; most cascade, eight do not, and `invoices` is `SET NULL`, which
+silently orphans the money records rather than blocking. Two more hang off the
+quotes and the pack rather than the job, and those are the ones that bite:
+`quote_agreements` on `job_quotes`, and `kickoff_pack_agreements` on
+`kickoff_packs`. Delete those two first or the whole statement fails on a
+foreign key violation.
+
+Do it as one statement with data-modifying CTEs, never as a sequence. The
+foreign key triggers fire at the end of the statement, so ordering inside it
+does not matter, and a failure part way through rolls the whole thing back
+instead of leaving half a job behind. Deleting in sequence is how you get an
+invoice pointing at a job that no longer exists.
+
+The delete set, in the order that works: `kickoff_pack_agreements` by pack,
+`quote_agreements` by quote, `invoice_payments` and `invoices` by invoice, then
+by job: `quote_pack_drafts`, `kickoff_drafts`, `kickoff_packs`,
+`scope_agreements`, `reviews`, `portal_contacts`, `messages`, `disputes`,
+`evidence`, `job_photos`, `job_quotes`, `quote_reviews`, `reports`,
+`sketch_packs`, and `jobs` last. Everything else cascades off `jobs`.
+
+Afterwards, check for orphans: any row in `invoices`, `evidence`, `job_quotes`,
+`job_photos` or `kickoff_packs` whose `job_id` no longer matches a job. Those
+five tables have no cascade path. Note that a couple of orphaned `job_photos`
+rows already exist from older deletions, so a non-zero count there is not
+necessarily yours.
+
+Invoice numbers are sequential and deleting leaves gaps. Fine for test rows,
+worth knowing before doing this to anything real.
+
+Two things to leave alone: `JOB-DEMO-PHOTOS`, which is the deliberate demo
+listing and is the only job in the database not flagged `is_test`, and whatever
+account current testing is running on.
