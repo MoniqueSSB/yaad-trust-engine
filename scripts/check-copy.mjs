@@ -55,15 +55,30 @@ const BANNED = [
 // and the prototype may not say it at all.
 const ESCROW_OK = "does not operate an escrow service";
 
-const TARGETS = ["concierge", "docs", "preview"];
+const TARGETS = ["concierge", "docs", "preview", "web/app", "web/components"];
 const SKIP_FILES = new Set(["docs/COPY-GUIDELINES.md"]);
+
+// web/ is the app a real client and a real worker read, so it is swept too,
+// added 19 September 2026. It was left out at first because its source
+// comments quote these phrases in order to record that the copy was NOT
+// built: the comp for the public board said "Money is held before you lift a
+// tool" and the file says so, above the true version. Those comments are the
+// institutional memory and must not be deleted to quiet a check, so the
+// check reads past them instead. Comments only; a banned phrase inside a
+// string is still a finding, because a string is what gets rendered.
+const CODE = /\.(tsx?|jsx?|mjs)$/i;
+function stripComments(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, " ")   // block, which also covers {/* JSX */}
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1"); // line, but not the // in https://
+}
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) walk(p, out);
-    else if (/\.(html|md)$/i.test(name)) out.push(p);
+    else if (/\.(html|md)$/i.test(name) || CODE.test(name)) out.push(p);
   }
   return out;
 }
@@ -74,7 +89,8 @@ for (const t of TARGETS) {
   try { files = walk(t); } catch { continue; }   // a missing folder is not a failure
   for (const file of files) {
     if (SKIP_FILES.has(file)) continue;
-    const lines = readFileSync(file, "utf8").split(/\r?\n/);
+    const raw = readFileSync(file, "utf8");
+    const lines = (CODE.test(file) ? stripComments(raw) : raw).split(/\r?\n/);
     lines.forEach((line, i) => {
       const low = line.toLowerCase();
       for (const b of BANNED) {

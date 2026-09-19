@@ -400,14 +400,17 @@ export default async function Board({
               is a number this page already had and did not have to invent. */}
           <div className="grid min-w-[280px] grid-cols-2 gap-3.5">
             {[
-              { n: jobs.length, label: "open to quote", tone: "text-ink", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
-              { n: statUrgent, label: "marked urgent", tone: "text-goldb", box: "border-gold/30 bg-linear-to-b from-gold/[0.09] to-[rgba(12,12,38,0.6)]" },
-              { n: statParishes, label: "parishes covered", tone: "text-ink", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
-              { n: workers.length, label: "identity checked workers", tone: "text-green", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
+              { n: jobs.length, label: "open to quote", one: "open to quote", tone: "text-ink", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
+              { n: statUrgent, label: "marked urgent", one: "marked urgent", tone: "text-goldb", box: "border-gold/30 bg-linear-to-b from-gold/[0.09] to-[rgba(12,12,38,0.6)]" },
+              { n: statParishes, label: "parishes covered", one: "parish covered", tone: "text-ink", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
+              { n: workers.length, label: "identity checked workers", one: "identity checked worker", tone: "text-green", box: "border-line bg-linear-to-b from-[rgba(19,19,50,0.8)] to-[rgba(12,12,38,0.6)]" },
             ].map((s) => (
               <div key={s.label} className={"min-w-[130px] rounded-[14px] border px-4 py-3.5 " + s.box}>
                 <b className={"block font-mono-app text-[26px] font-semibold tabular-nums " + s.tone}>{s.n}</b>
-                <span className="mt-0.5 block text-[11.5px] leading-tight text-dim">{s.label}</span>
+                {/* Singular when there is one of it. "1 parishes covered" sat on
+                    the public board, which a tradesperson reads before deciding
+                    whether this is a real network. */}
+                <span className="mt-0.5 block text-[11.5px] leading-tight text-dim">{s.n === 1 ? s.one : s.label}</span>
               </div>
             ))}
           </div>
