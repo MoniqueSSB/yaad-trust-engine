@@ -6,6 +6,12 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · Desk deployed: concierge version cf2dfddd
+
+**What went live.** Everything on `main` at 09:38 UTC, which over the previous deploy (`3ed5934a`) is one change: the Materials releases row now naming both gates instead of only the materials store. `yaadly-concierge` version `cf2dfddd`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
+
+**Checked in the order the last entry asked for.** `concierge/concierge.html` and `concierge-deploy/public/index.html` compared to each other and both compared to `origin/main` before the deploy, not after, all three identical. Nothing else needed deploying: no Edge Function, no migration and no `web/` change landed in that merge, which was desk copy and this log only.
+
 ## 2026-09-19 · A materials tranche has two gates, so the desk names both
 
 **Why.** Founder, reading the Materials releases view: "Waiting on the client's materials store, what is this mean". The chip was true and it was not the whole truth. Two separate things hold a tranche, the client naming where materials are kept and the client actually paying the materials line on their bill, and both can be outstanding at the same time. The panel tested the store first and showed that chip alone, so an unpaid bill was invisible behind a question about a cupboard. Answer the store and the chip would simply change to the money one, with nothing having moved and no warning that a second gate was ever there.
