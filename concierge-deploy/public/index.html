@@ -808,8 +808,8 @@ iframe{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;b
 .dv.empty{color:var(--dim)}
 .dacts{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:14px 0 0;margin-top:18px}
 @media(max-width:700px){.dfield{grid-template-columns:1fr;gap:3px}.drw{padding:14px 16px 40px}}
-tbody tr[data-i]{cursor:pointer}
-tbody tr[data-i]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
+tbody tr[data-i],tbody tr[data-openjob]{cursor:pointer}
+tbody tr[data-i]:hover td:first-child,tbody tr[data-openjob]:hover td:first-child{box-shadow:inset 2px 0 0 var(--tealb)}
 /* Tick boxes for acting on several rows at once (Enquiries). The label fills
    the cell so a slightly missed tick does not open the drawer instead. */
 th.bkc,td.bkc{width:34px;padding-right:0}
@@ -1078,7 +1078,7 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
 <!-- ============================================ INVOICES -->
 <section class="view" data-view="invoices">
   <h1 class="vh">Invoices</h1>
-  <p class="vsub">Every invoice in one place: services, job bills and the parts of a bill. <b>Preview</b> is drafted and not sent, so no client has seen it. <b>Outstanding</b> is sent and waiting for the money. <b>Paid</b> is money in. Prices come from your service list or the accepted quote, never from the model. Only you send one, and only you mark one paid.</p>
+  <p class="vsub">Every invoice in one place: services, job bills and the parts of a bill. <b>Preview</b> is drafted and not sent, so no client has seen it. <b>Sent</b> is every invoice that actually went out to a client. <b>Outstanding</b> is sent and waiting for the money. <b>Paid</b> is money in. Prices come from your service list or the accepted quote, never from the model. Only you send one, and only you mark one paid.</p>
   <div id="ivMsg"></div>
 
   <div class="card">
@@ -2229,6 +2229,10 @@ const VIEWS = [
     sub:"Yaadly's own starting draft for a worker's quote, written for every open, unassigned job. A guardrail-clean draft is approved automatically and folds into whichever quote the worker actually submits; a dirty one is held here, exactly as it was written, until a named human clears it or a fresh draft replaces it. Nothing here is client-facing on its own.",
     select:"id,job_id,status,model,docs,guardrail,error,approved_by,approved_at,created_at,finished_at",
     order:"created_at", search:["id","job_id"], hide:["docs"],
+    // Only a draft at ready is waiting on you. Approved cleared itself and
+    // failed is the drafter's own model error, which the next run retries.
+    // Without this the page led with the number of rows it had read.
+    viz:{ want:r => r.status === "ready", wants:"held for a person" },
     empty:["No drafts yet","A draft is written when yaad-quote-pack-check finds a live, unassigned job with none yet."],
     detailExtra: r => `<div class="dfield"><span class="dk">documents</span><div class="reqlist" style="margin-top:0">${qpDocsHtml(r.docs)}</div></div>`,
     cols:[
@@ -3953,24 +3957,56 @@ function jobPage(r){
 // that tells the truth about whether this is still stuck.
 async function preIntake(){
   const { data } = await sb.from("jobs")
-    .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at")
+    .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at,is_test")
     .eq("status", "awaiting_client_setup").order("updated_at", { ascending:false }).limit(50);
   INTAKE_DRAFTS = data || [];
 }
 
-function panelIntake(){
-  if (!INTAKE_DRAFTS.length) return "";
-  const rows = INTAKE_DRAFTS.map(r =>
-    `<tr><td>${id_(r.id)}${sub_(r.title || "")}</td>`
+// This panel was a printed table until 19 September 2026: no click, no button,
+// nothing that could finish a row. Every row now opens the job itself, which
+// is where opening it to the board, cancelling it, correcting what it says and
+// marking it as your own test already live. Nothing can be decided here that
+// could not be decided there. What changed is that you can reach it.
+//
+// Her own tests are separated out and folded away. On the day this was written
+// all twenty-four rows at this stage were tests, and a list that calls them
+// leads reads as twenty-four people waiting on her, which is a lie the screen
+// was telling every time she opened it.
+function draftRow(r){
+  return `<tr data-openjob="${esc(r.id)}">`
+  + `<td>${id_(r.id)}${r.is_test ? " " + chip_("mute", "test") : ""}${sub_(r.title || "")}</td>`
   + `<td>${esc(r.trade || "not classified")}${sub_(r.parish || "")}</td>`
   + `<td>${esc(r.client_name || "no name")}${sub_(r.client_phone || r.client_email || "no way to reply")}</td>`
   + `<td>${tone_(r.status)}</td>`
-  + `<td>${mute_(ago_(r.updated_at))}</td></tr>`).join("");
-  return `<div class="sechd">Built a job, never signed</div>`
-    + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send.</p>`
-    + `<div class="card pad0"><div class="tw"><table><thead><tr><th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th></tr></thead><tbody>${rows}</tbody></table></div></div>`
-    + `<p class="hint">${INTAKE_DRAFTS.length} row${INTAKE_DRAFTS.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">status</span> is <span class="mono">awaiting_client_setup</span>. These are not in the queue below; they are already jobs.</p>`
-    + `<div class="sechd">The queue</div>`;
+  + `<td>${mute_(ago_(r.updated_at))}</td></tr>`;
+}
+
+const draftTable = (rows) => `<div class="card pad0"><div class="tw"><table><thead><tr>`
+  + `<th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th>`
+  + `</tr></thead><tbody>${rows.map(draftRow).join("")}</tbody></table></div></div>`;
+
+function panelIntake(){
+  const tail = `<div class="sechd">The queue</div>`;
+  if (!INTAKE_DRAFTS.length) return `<div class="sechd">Built a job, never signed</div>`
+    + `<p class="vsub" style="margin-top:0">Nobody is stuck at sign-up. Anyone who builds a job and walks away before an account exists lands here.</p>`
+    + tail;
+
+  const mine = INTAKE_DRAFTS.filter(r => r.is_test);
+  const real = INTAKE_DRAFTS.filter(r => !r.is_test);
+
+  let out = `<div class="sechd">Built a job, never signed</div>`
+    + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send. <b>Click any row to open the job</b>, and finish it there: open it to the board, cancel it, correct what it says, or mark it as your own test.</p>`;
+
+  out += real.length
+    ? draftTable(real)
+      + `<p class="hint">${real.length} row${real.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">status</span> is <span class="mono">awaiting_client_setup</span>. These are not in the queue below; they are already jobs.</p>`
+    : `<div class="card"><div class="empty"><b>No lead is stuck at sign-up</b>Everything sitting at this stage is your own testing, folded away below.</div></div>`;
+
+  if (mine.length) out += `<details class="allfields"><summary>${mine.length} of your own test job${mine.length === 1 ? "" : "s"} at this stage</summary>`
+    + `<p class="vsub">Marked as testing by you, so they are already off the public board. They stay here until you cancel them; open one to do it.</p>`
+    + draftTable(mine) + `</details>`;
+
+  return out + tail;
 }
 
 // ---- Evidence: the review card the framework puts at the top of this view.
@@ -5346,7 +5382,10 @@ async function loadTableView(k){
   if (v.pre) { try { await v.pre(ROWS[k]); } catch (e) { console.warn(v.table + " side fetch:", e.message); } }
 
   renderTableView(k);
-  setCount(k, ROWS[k].length, false);
+  // The badge counts what wants a person where the view can say, not how many
+  // rows the read happened to return. See wantCount.
+  const want = wantCount(v, ROWS[k]);
+  setCount(k, want === null ? ROWS[k].length : want, false);
 }
 
 function renderTableView(k){
@@ -5463,10 +5502,17 @@ function fieldValue(val){
 
 let OPEN = null;   // { k, row }
 
+// Where to go back to when this drawer shuts. Set only when a job was opened
+// from another view's panel, so closing it, or finishing an action on it,
+// puts her back on the list she was working through rather than stranding
+// her on Jobs. Cleared as it is used: one journey back, not a history.
+let BACK_TO = null;
+
 function closeDrawer(){
   const o = document.querySelector(".ovl");
   if (o) o.remove();
   OPEN = null;
+  if (BACK_TO) { const v = BACK_TO; BACK_TO = null; go(v); }
 }
 
 function openDetail(k, i){
@@ -5684,6 +5730,11 @@ function go(v){
   if (String(v).startsWith("invoices:job:")) { jobPick = v.slice(13); v = "invoices"; }
   else if (String(v).startsWith("invoices:")) { INV_TAB = v.slice(9); v = "invoices"; }
   if (v === "invoices" && typeof INV_JOB !== "undefined") { INV_JOB = jobPick; INV_JOB_INFO = null; }
+  // A journey back is only owed while she is still on the job she opened. A
+  // link out of that drawer (every invoice on this job, say) ends it, so a
+  // drawer she closes an hour later does not jump her somewhere she has left.
+  // openJobById sets BACK_TO after its own go("jobs"), so this never eats it.
+  if (v !== "jobs") BACK_TO = null;
   currentView = v;
   document.querySelectorAll(".rlink").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.dataset.view === v));
@@ -5693,7 +5744,33 @@ function go(v){
   foldIntro(v);
   window.scrollTo({ top:0, behavior:"instant" });
   const b = BESPOKE[v];
-  if (b) b(); else if (VIEW[v] && VIEW[v].table) loadTableView(v);
+  // Handed back, not just fired: openJobById has to wait for the rows before
+  // it can open one. Every other caller ignores this and behaves as before.
+  if (b) return b();
+  if (VIEW[v] && VIEW[v].table) return loadTableView(v);
+}
+
+// ---- Open one job from somewhere that is not the Jobs table.
+//
+// A row on another view's panel knows a job id and nothing else. This moves to
+// Jobs, waits for the read, and opens that job's page with every action on it.
+// Deliberately no second copy of those actions anywhere else: a button that
+// cancels a job should exist once, on the page that shows what is being
+// cancelled.
+async function openJobById(id){
+  const from = currentView;
+  await go("jobs");
+  const row = (ROWS.jobs || []).find(r => String(r.id) === String(id));
+  if (row) {
+    openDetail("jobs", row.__i);
+    // Set after the drawer exists, never before: a BACK_TO left standing
+    // because nothing opened would fire on the next drawer she closes.
+    if (from && from !== "jobs") BACK_TO = from;
+    return;
+  }
+  // Jobs reads the newest 200. Older than that, say so plainly rather than
+  // opening the wrong record or silently doing nothing.
+  alert(id + " is not in the newest 200 jobs, so it could not be opened from here. Search for it on the Jobs view.");
 }
 
 document.addEventListener("click", (e) => {
@@ -5743,6 +5820,8 @@ document.addEventListener("click", (e) => {
   const bkc = e.target.closest("[data-bk-clear]");
   if (bkc) { const k = bkc.dataset.bkClear; BULK[k] = new Set(); delete BULK_MSG[k]; renderTableView(k); return; }
   if (e.target.closest("td.bkc, th.bkc")) return;
+  const oj = e.target.closest("tr[data-openjob]");
+  if (oj && !e.target.closest(".drw")) { openJobById(oj.dataset.openjob); return; }
   const tr = e.target.closest("tr[data-i]");
   if (tr && !e.target.closest(".drw")) { openDetail(currentView, Number(tr.dataset.i)); return; }
 });
@@ -5972,6 +6051,15 @@ function vizFields(v, rows){
   return { date, state, cat };
 }
 
+// How many of these rows want a person. A view says so with viz.want, a
+// predicate over one row. Null when the view has not said, which means the
+// honest answer is "we do not know" and the count falls back to rows loaded.
+// The rail badge and the count widget both read this, so they cannot disagree.
+function wantCount(v, rows){
+  const f = v.viz && v.viz.want;
+  return typeof f === "function" ? (rows || []).filter(f).length : null;
+}
+
 function vizStrip(k, v, rows){
   if (v.viz === false || !(rows || []).length) return "";
   const { date, state, cat } = vizFields(v, rows);
@@ -5979,10 +6067,24 @@ function vizStrip(k, v, rows){
   const out = [];
 
   // The count, and how many arrived in the last seven days.
+  //
+  // A view that can say which of its rows want a person leads with that
+  // number instead, and demotes the row count to the line underneath. Quote
+  // Pack Drafts is the case that prompted this, 19 September 2026: a big 200
+  // on a page where 199 of those drafts had cleared themselves reads as a
+  // queue of 200, and a number on this desk is meant to be a claim about
+  // work. Declared as viz:{want, wants}; a view without it is unchanged.
   const week = date ? rows.filter(r => looksDate(r[date]) && Date.now() - new Date(r[date]).getTime() < 7 * 86400e3).length : null;
+  const want = wantCount(v, rows);
+  const weekLine = week !== null ? `${week} in the last 7 days` : "";
+  const big = want === null
+    ? `<span class="v">${rows.length}</span><span class="k">${rows.length === 1 ? "row" : "rows"} loaded</span>`
+      + (weekLine ? `<span class="s">${weekLine}</span>` : "")
+    : `<span class="v" style="color:${want ? "var(--mango)" : "var(--teal)"}">${want}</span>`
+      + `<span class="k">${esc(v.viz.wants || "want a person")}</span>`
+      + `<span class="s">${rows.length} loaded${weekLine ? ", " + weekLine : ""}</span>`;
   out.push(`<div class="wg vz-n"><div class="wgh"><span>${esc(v.label)}</span>${rows.length >= 200 ? `<span class="n">newest 200</span>` : ""}</div>`
-    + `<div class="vzbig"><span class="v">${rows.length}</span><span class="k">${rows.length === 1 ? "row" : "rows"} loaded</span>`
-    + (week !== null ? `<span class="s">${week} in the last 7 days</span>` : "") + `</div></div>`);
+    + `<div class="vzbig">${big}</div></div>`);
 
   // Arrivals by day, when the view has a date to count by.
   if (date) {
@@ -7706,6 +7808,8 @@ let INV_JOB = null, INV_JOB_INFO = null;
 const INV_TABS = [
   { k:"preview", label:"Preview", col:"#4A4A72", has:i => i.status === "draft",
     hint:"Drafted, not sent. No client has seen these. Open one to check it and preview it, then email it." },
+  { k:"sent", label:"Sent", col:"#5B8DEF", has:i => !!i.sent_at && invInMonth(i.sent_at),
+    hint:"Every invoice that actually went to a client, one month at a time, newest first. Whatever happened next: one still waiting for the money is in Outstanding as well, one you have marked paid is in Paid as well." },
   { k:"out", label:"Outstanding", col:"#F59E0B", has:i => i.status === "sent",
     hint:"Sent and waiting for the money, longest waiting first. A card payment Stripe has reported shows beside the invoice; marking it paid is still your click." },
   { k:"paid", label:"Paid", col:"#9B73F5", has:i => i.status === "paid" && invInMonth(i.paid_at),
@@ -7741,13 +7845,15 @@ function invMonthNav(){
 // only: what Yaadly pays a tradesperson is in the lists, labelled, not here.
 const CUR_LABEL = { JMD: "Jamaican dollars", GBP: "Pounds" };
 function invSummary(clientInv){
+  const of = (k) => INV_TABS.find(t => t.k === k).has;
   const cols = [
-    { k:"preview", label:"Preview", sub:"drafted, not sent", has:INV_TABS[0].has },
-    { k:"out", label:"Outstanding", sub:"sent, waiting for the money", has:INV_TABS[1].has },
-    { k:"paid", label:"Paid", sub:"in " + invMonthName(), has:INV_TABS[2].has },
+    { k:"preview", label:"Preview", sub:"drafted, not sent", has:of("preview") },
+    { k:"sent", label:"Sent", sub:"went out in " + invMonthName(), has:of("sent") },
+    { k:"out", label:"Outstanding", sub:"sent, waiting for the money", has:of("out") },
+    { k:"paid", label:"Paid", sub:"in " + invMonthName(), has:of("paid") },
   ];
   const curs = curOrder(clientInv.filter(i => cols.some(c => c.has(i))).map(i => i.currency || "GBP"));
-  if (!curs.length) return `<p class="hint">Nothing drafted, outstanding or paid in ${esc(invMonthName())}.</p>`;
+  if (!curs.length) return `<p class="hint">Nothing drafted, sent, outstanding or paid in ${esc(invMonthName())}.</p>`;
   const cell = (c, cur) => {
     const l = clientInv.filter(i => (i.currency || "GBP") === cur && c.has(i));
     const t = l.reduce((a, i) => a + Number(i.total_pence || 0), 0);
@@ -7755,7 +7861,7 @@ function invSummary(clientInv){
   };
   return `<div class="tw"><table class="ivsum"><thead><tr><th></th>${cols.map(c => `<th><b>${esc(c.label)}</b><span>${esc(c.sub)}</span></th>`).join("")}</tr></thead>`
     + `<tbody>${curs.map(cur => `<tr><th>${esc(CUR_LABEL[cur] || cur)}</th>${cols.map(c => cell(c, cur)).join("")}</tr>`).join("")}</tbody></table></div>`
-    + `<p class="hint" style="margin-top:2px">Money coming in only, each currency added up on its own. What Yaadly pays tradespeople is in the lists, labelled, and not in these figures.</p>`;
+    + `<p class="hint" style="margin-top:2px">Money coming in only, each currency added up on its own. What Yaadly pays tradespeople is in the lists, labelled, and not in these figures. Sent counts what went out this month whatever happened after, so the same invoice is counted again under Outstanding or Paid.</p>`;
 }
 
 // The same shape for Agency fees: one row per kind of fee, and when it is
@@ -7765,11 +7871,11 @@ function invFeeSummary(){
   const rows = [
     { label:"Yaadly's 15% on jobs", list:f.job, cols:[["paid"], ["out"], ["draft", "todo", "check"]] },
     { label:"Services", list:f.svc, cols:[["paid"], ["out"], ["draft"]] },
-    { label:"5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
+    { label:"Yaadly's 5% from tradespeople", list:f.worker, cols:[["kept"], null, ["due", "come"]] },
   ];
   const heads = [["Taken", "in " + m], ["Waiting for money", "sent, not paid yet"], ["Still to come", "not billed, or job not finished"]];
   const cell = (list, states) => {
-    if (!states) return `<td><div class="ivcell static zero"><span class="a">not invoiced</span><span class="c">taken off their pay</span></div></td>`;
+    if (!states) return `<td><div class="ivcell static zero"><span class="a">not invoiced</span><span class="c">kept out of their pay</span></div></td>`;
     const l = list.filter(x => states.includes(x.state));
     const t = sumByCur(l), cs = curOrder(Object.keys(t).filter(c => t[c]));
     return `<td><div class="ivcell static${l.length ? "" : " zero"}"><span class="a">${cs.length ? cs.map(c => esc(curAmt(t[c], c))).join("<br>") : "none"}</span><span class="c">${plural_(l.length, "fee", "fees")}</span></div></td>`;
@@ -7885,7 +7991,7 @@ const FEE_STATE = {
   paid:  ["paid, taken", "ok"], out:  ["sent, not paid yet", "warn"],
   draft: ["drafted, not sent", "mute"], todo: ["not billed yet", "mute"],
   check: ["not found on its bill", "crit"],
-  kept:  ["deducted, rest paid", "ok"], due: ["finished, pay not sent", "warn"],
+  kept:  ["kept by Yaadly, rest paid", "ok"], due: ["finished, pay not sent", "warn"],
   come:  ["job not finished", "mute"],
 };
 const feeStateOf = (status) => status === "paid" ? "paid" : status === "sent" ? "out" : "draft";
@@ -7926,8 +8032,9 @@ function invFeeTab(t, on){
 }
 
 function invFeeHint(){
-  return "The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. "
-    + "The 5% is deducted once the job is finished, when the tradesperson's pay goes out; it is worked out from each accepted quote at today's rate, not read from an invoice.";
+  return "Everything on this tab is money to Yaadly. The 15% is taken when the client pays the invoice that carries it, which starts the job. Services are the whole price. "
+    + "The 5% is Yaadly's too: it is kept out of what the tradesperson is paid, once the job is finished, so it is never a payment going out and never an invoice. "
+    + "It is worked out from each accepted quote at today's rate, not read from an invoice.";
 }
 
 function invFeeRows(q){
@@ -7935,14 +8042,14 @@ function invFeeRows(q){
   const hit = (s) => !q || String(s).toLowerCase().includes(q);
   const chip = (st) => `<span class="chip ${FEE_STATE[st][1]}">${esc(FEE_STATE[st][0])}</span>`;
   const when = (i) => i.status === "paid" ? "paid " + day_(i.paid_at) : i.status === "sent" ? "sent " + day_(i.sent_at) + invWaited(i.sent_at) : "drafted " + day_(i.created_at);
-  const grp = (title, list, word) => {
+  const grp = (title, list, word, zero) => {
     const s = sumByCur(list.filter(x => ["paid", "kept"].includes(x.state)));
-    return `<tr class="ivgrp"><td colspan="5">${esc(title)} &middot; ${list.length} &middot; ${Object.values(s).some(Boolean) ? word + " " + esc(curText(s)) : "nothing in yet"}</td></tr>`;
+    return `<tr class="ivgrp"><td colspan="5">${esc(title)} &middot; ${list.length} &middot; ${Object.values(s).some(Boolean) ? word + " " + esc(curText(s)) : esc(zero)}</td></tr>`;
   };
   const out = [];
 
   const jobs = f.job.filter(x => hit(x.j.id + " " + (x.j.title || "") + " " + (x.j.client_email || "") + " " + (x.inv ? x.inv.id : "")));
-  if (jobs.length) out.push(grp("Yaadly's 15% on each job", jobs, "taken in " + invMonthName()), ...jobs.map(x => `<tr>
+  if (jobs.length) out.push(grp("Yaadly's 15% on each job, paid to Yaadly by the client", jobs, "taken in " + invMonthName(), "none taken in " + invMonthName() + " yet"), ...jobs.map(x => `<tr>
       <td><div class="jistagename">15% Guarantee &amp; Support</div><div class="ivtags">${chip(x.state)}</div></td>
       <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; 15% of labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}</div></td>
       <td class="jistagepct">${x.inv ? `on ${esc(x.inv.id)}${x.inv.part_of ? ", a part" : ""}<br>${esc(when(x.inv))}` : x.state === "check" ? "the job has a bill, but no 15% line on it" : "no bill yet"}</td>
@@ -7951,7 +8058,7 @@ function invFeeRows(q){
     </tr>`));
 
   const svcs = f.svc.filter(x => hit(x.inv.id + " " + (x.inv.client_name || "") + " " + (x.inv.client_email || "")));
-  if (svcs.length) out.push(grp("Services, the whole price", svcs, "paid in " + invMonthName()), ...svcs.map(x => `<tr>
+  if (svcs.length) out.push(grp("Services, the whole price, paid to Yaadly by the client", svcs, "paid in " + invMonthName(), "none paid in " + invMonthName() + " yet"), ...svcs.map(x => `<tr>
       <td><div class="jistagename">${esc(x.inv.id)}</div><div class="ivtags">${chip(x.state)}</div></td>
       <td><div>${esc(x.inv.client_name || "")}</div><div class="jicond">Service</div></td>
       <td class="jistagepct">${esc(when(x.inv))}</td>
@@ -7960,9 +8067,9 @@ function invFeeRows(q){
     </tr>`));
 
   const ws = f.worker.filter(x => hit(x.j.id + " " + (x.j.title || "") + " " + (x.q.worker_name || "")));
-  if (ws.length) out.push(grp("The 5% deducted from each tradesperson when the job is finished", ws, "deducted in " + invMonthName()), ...ws.map(x => `<tr>
-      <td><div class="jistagename">5% from ${esc(x.q.worker_name || "the tradesperson")}</div><div class="ivtags">${chip(x.state)}</div></td>
-      <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; 5% of quoted labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}</div></td>
+  if (ws.length) out.push(grp("Yaadly's 5%, kept out of each tradesperson's pay when the job is finished", ws, "kept in " + invMonthName(), "none kept in " + invMonthName() + " yet"), ...ws.map(x => `<tr>
+      <td><div class="jistagename">Yaadly's 5% from ${esc(x.q.worker_name || "the tradesperson")}</div><div class="ivtags">${chip(x.state)}</div></td>
+      <td><a href="#" data-ivjob="${esc(x.j.id)}">${esc(x.j.id)}</a><div class="jicond">${esc(x.j.title || "")} &middot; Yaadly keeps 5% of quoted labour ${jmdFmt(Number(x.q.labour_jmd) || 0)}, the tradesperson is paid the rest</div></td>
       <td class="jistagepct">${x.j.status === "complete" ? "job finished" : "job not finished"}<br>${x.pays.length ? `${x.paid.length} of ${x.pays.length} pay invoice${x.pays.length === 1 ? "" : "s"} paid` : "no pay raised yet"}</td>
       <td class="num"><span class="jiamt">${curAmt(x.total_pence, x.currency)}</span></td>
       <td class="ivact">${x.pays.length ? `<button class="btn g" data-ivopen="${esc(x.pays[x.pays.length - 1].id)}">Open pay</button>` : ""}</td>
@@ -8181,12 +8288,13 @@ function renderInvoiceList(){
     + (tab.k === "out" && unbilled.length ? ` Job bills split into parts also have ${curText(sumByCur(unbilled))} not billed yet, on ${unbilled.map(i => i.id).join(", ")}.` : "");
 
   if (tab.k === "fees") $("ivHint").textContent = invFeeHint();
-  if (tab.k === "paid" || tab.k === "fees") $("ivHint").insertAdjacentHTML("afterbegin", invMonthNav());
+  if (tab.k === "sent" || tab.k === "paid" || tab.k === "fees") $("ivHint").insertAdjacentHTML("afterbegin", invMonthNav());
 
   const due = tab.k === "preview" ? INV_DUE.filter(d => hit(d.job.id + " " + (d.job.title || "") + " " + (d.job.client_email || ""))) : [];
   let rows = INV_LIST.filter(tab.has).filter(i => hit([i.id, i.client_name, i.client_email, i.job_id, i.part_of].join(" ")));
   if (tab.k === "out") rows = rows.slice().sort((x, y) => String(x.sent_at || x.created_at).localeCompare(String(y.sent_at || y.created_at)));
   if (tab.k === "paid") rows = rows.slice().sort((x, y) => String(y.paid_at || "").localeCompare(String(x.paid_at || "")));
+  if (tab.k === "sent") rows = rows.slice().sort((x, y) => String(y.sent_at || "").localeCompare(String(x.sent_at || "")));
 
   const dueRows = due.map(d => `<tr class="ivdue">
       <td><a href="#" class="jistagename" data-ivjob="${esc(d.job.id)}">${esc(d.job.id)}</a><div class="ivtags"><span class="jichip ready"><span class="dot"></span>No bill yet</span></div></td>
@@ -8205,7 +8313,7 @@ function renderInvoiceList(){
         <tbody>${all.join("")}</tbody></table></div>`
     : q ? '<div class="empty"><b>Nothing here matches that</b>Clear the search box, or try another group.</div>'
     : tab.k === "jobs" ? '<div class="empty"><b>No live jobs</b>A job shows here once a tradesperson is booked on it, and stays until it is finished and every invoice on it is paid.</div>'
-    : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "paid" || tab.k === "fees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
+    : `<div class="empty"><b>Nothing in ${esc(tab.label)}${tab.k === "sent" || tab.k === "paid" || tab.k === "fees" ? " for " + esc(invMonthName()) : ""}</b>${tab.k === "preview" ? "Raise a new invoice from the button above, or from a booked job when its quote is accepted." : tab.k === "sent" || tab.k === "paid" ? "Use the arrows beside the month to look at another one." : ""}</div>`;
 
   $("ivTabs").querySelectorAll("[data-ivtab]").forEach(b => b.addEventListener("click", () => { INV_TAB = b.dataset.ivtab; renderInvoiceList(); }));
   $("ivHint").querySelectorAll("[data-ivmonth]").forEach(b => b.addEventListener("click", async () => {
@@ -8357,14 +8465,15 @@ async function loadInvoices(){
   const COLS = INV_COLS;
   const [y, mo] = INV_MONTH.split("-").map(Number);
   const from = new Date(y, mo - 1, 1).toISOString(), to = new Date(y, mo, 1).toISOString();
-  const [open, paidM, voids, { data: jobs }] = await Promise.all([
+  const [open, paidM, sentM, voids, { data: jobs }] = await Promise.all([
     sb.from("invoices").select(COLS).in("status", ["draft", "sent"]).order("created_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "paid").gte("paid_at", from).lt("paid_at", to).order("paid_at", { ascending: false }),
+    sb.from("invoices").select(COLS).gte("sent_at", from).lt("sent_at", to).order("sent_at", { ascending: false }),
     sb.from("invoices").select(COLS).eq("status", "void").order("created_at", { ascending: false }).limit(50),
     sb.from("jobs").select("id,title,client_email,status,trade")
       .not("worker_email", "is", null).order("updated_at", { ascending: false }).limit(50),
   ]);
-  const error = open.error || paidM.error || voids.error;
+  const error = open.error || paidM.error || sentM.error || voids.error;
   if (error) {
     $("ivList").innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>Could not read invoices</b><p>${esc(error.message)}</p></div></div>`;
     return;
@@ -8379,7 +8488,7 @@ async function loadInvoices(){
     billIds.length ? sb.from("invoices").select(COLS).in("id", billIds) : none,
   ]);
   const byId = new Map();
-  for (const i of [].concat(openRows, paidM.data || [], voids.data || [], onJobs.data || [], byBill.data || [], bills.data || [])) byId.set(i.id, i);
+  for (const i of [].concat(openRows, paidM.data || [], sentM.data || [], voids.data || [], onJobs.data || [], byBill.data || [], bills.data || [])) byId.set(i.id, i);
   INV_LIST = [...byId.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
 
   // Ready to raise: a booked job with an accepted quote and no live client
