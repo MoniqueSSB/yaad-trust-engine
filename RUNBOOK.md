@@ -4335,6 +4335,42 @@ correcting one is ordinary. Doing it silently would not be.
 Materials is refused a section, here and everywhere: it is its own thing on
 `evidence.kind` and the database constraint will not take a phase on it.
 
+## A sketch pack cannot be sent to the client, or the desk says "no job attached"
+
+A client reads a pack through their job. The row policy `sketch_client_read`
+wants `status = 'issued'` **and** a job on the pack whose `client_email` is the
+reader's. No job on the pack, no reader, however far you take it.
+
+Every pack made before 19 September 2026 has `job_id` null, because the capture
+form collected "Job reference" as free text into `job_ref` and the desk never
+sent `job_id` at all. Live job ids look like `JOB-WEB-1789253807959`, so nobody
+was ever going to type one into that box.
+
+To fix one: open the pack on the desk while it is still a **draft**, pick the
+job in "Job this belongs to", press Attach. An approved pack is frozen, so
+reopening it to attach a job starts a new revision, which is why the picker is
+only on drafts. New packs pick the job in the capture form before you build
+them.
+
+`job_ref` is a different field and is left alone: it is the client's **own**
+reference, free text, printed on the report, and it is edited on the draft.
+
+## Voiding several sketch packs at once
+
+Tick them in the packs list and press Void selected. Only packs at `draft` or
+`approved` can be ticked; issued and void ones are the log.
+
+The database still refuses a void from anything that is not a signed-in Yaadly
+admin (`sketch_guard_approval`, which raises "only a signed-in Yaadly admin may
+void a sketch pack"). That gate is untouched and is not overridable: a Claude
+session cannot do this over SQL or the Supabase MCP, because that connection
+carries no `auth.jwt()` and `is_admin()` is false. The bulk tick saves the
+repetition, not the decision. Each pack is written one at a time, so a refusal
+names the pack it refused rather than failing the set anonymously.
+
+Voiding deletes nothing. The row stays, marked void, and a void pack can be set
+back to draft later.
+
 ## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
 
 The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
