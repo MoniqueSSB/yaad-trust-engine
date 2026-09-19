@@ -5501,7 +5501,9 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 ## A worker cannot be paid because the client has not paid (20260917180000)
 
-**What it is.** Founder decision, 17 Sep 2026: nobody is paid for work until the client's bill for that work is marked paid. On **Pay workers** each owed row shows a **Client** column (client paid, or client not paid with the reason and the job's client bills), who approved the stage, and four links: **Pay invoice**, **Job invoices**, **Job record**, **Open Wise**. While the client has not paid, **Mark as sent** and **Pay with Stripe** are greyed. The desk is not the control: `mark_worker_paid()` refuses too, and `yaad-payout-send` refuses before it quotes and again before it sends, because a Stripe payout leaves before the invoice is marked.
+**What it is.** Founder decision, 17 Sep 2026: nobody is paid for work until the client's bill for that work is marked paid. On **Pay workers** each owed row shows a **Client paid?** column (paid, or not yet with the short reason; the database's full sentence and the job's client bills are on that chip's tooltip), who approved the stage, and three links: **Pay invoice**, **Job invoices**, **Job record**.
+
+Since 19 Sep 2026 a blocked row carries no payment controls at all. It says **Waiting on the client**, names which bill is unpaid, and offers one button, **Open the client's bill**. There is no greyed Mark as sent and no greyed Pay with Stripe, because a button that only ever refuses is not information. The desk was never the control and still is not: `mark_worker_paid()` refuses too, and `yaad-payout-send` refuses before it quotes and again before it sends, because a Stripe payout leaves before the invoice is marked.
 
 1. **The rule** is `worker_pay_client_unpaid(invoice)`, which returns nothing when the worker may be paid and a plain-English reason otherwise. Billed by stage (accepted quote says `by_stage`, or a client bill has stage 1 or more): the client's bill for that stage must be paid, and so must the whole-job fee bill and any stage 0 materials bill. Billed in full: every whole-job bill and every part of one, and the materials bill. A bill with nothing left on it (every line moved into parts) is ignored. It fails closed.
 2. **"Client not paid" but the money has arrived.** Mark the client's bill paid on **Invoices** (Job invoices link). Come back and the buttons open. Never mark a worker paid some other way to get round it.
@@ -5509,15 +5511,15 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 4. **Deploy order:** apply `20260917180000`, then deploy `yaad-payout-send` from disk (`supabase functions deploy yaad-payout-send --project-ref leffyisvfvjwzilydlwf`, no `--no-verify-jwt`), then the desk. The desk before the migration shows every row as not checkable and greys the buttons, which is safe.
 5. **Proving it holds:** run `supabase/tests/worker_pay_client_paid_guards.sql` with `execute_sql`. Eight lines, all PASS. It relies on the TEST jobs JOB-TEST-KICKOFF-1, JOB-TEST-WAPAY-3 and JOB-TEST-WA-CONFIRM as they stood on 17 Sep 2026; if those change, a FAIL there means the data moved, so read the reason before touching the function.
 6. **Materials tranches are not covered, on purpose.** `mark_materials_sent()` keeps its own rule: the money goes out before the goods are bought, because the worker needs it to buy them. Founder confirmed 17 Sep 2026. Do not add the client-paid check there.
-7. **Open Wise** opens wise.com in a new tab, not a particular recipient: Wise has no stable link to one. Pay the recipient saved there, then Mark as sent.
+7. **Pay by Wise** opens wise.com in a new tab, not a particular recipient: Wise has no stable link to one. Pay the recipient saved there, then use the **Confirm the Wise transfer** button it reveals underneath.
 
 ## Paying a worker from Wise, by hand
 
 **What it is.** Since 14 Sep 2026 (`20260914230000`) a worker's pay invoice is paid from the desk's **Pay workers** view, the same shape as materials money: you pay from the business bank app, then record it. Yaadly stores no worker bank details; the payee lives in your bank app.
 
-1. **Who is owed.** Desk, Documents & money, **Pay workers**. "Owed now" lists every sent worker pay invoice, oldest first, with how many days it has waited (amber from one day, red from three) and whether the worker has set up Stripe yet.
-2. **Pay it.** From your business bank app, to the payee saved there. Get the worker's bank details from them by phone or in person, never over the Yaadly WhatsApp number: messages there are filed as job evidence and can reach a client report.
-3. **Record it.** Type the transfer reference if you have one and press **Mark as sent**. It asks first, because it sends the worker a WhatsApp that cannot be unsent. It marks the invoice paid, stamped with your email and the time, once. It cannot be changed afterwards; a mistake is corrected with a note.
+1. **Who is owed.** Desk, Documents & money, **Pay workers**. "Owed now" lists every sent worker pay invoice, oldest first, with how many days it has waited (amber from one day, red from three), and a line under the heading saying how many you can pay now and how many are waiting on a client.
+2. **Pay it.** Press **Pay by Wise**. It opens wise.com in a new tab and reveals the reference box and the confirm underneath it, in that order on purpose: pay first, record second. Pay to the payee saved there. Get the worker's bank details from them by phone or in person, never over the Yaadly WhatsApp number: messages there are filed as job evidence and can reach a client report.
+3. **Record it.** Type the transfer reference if you have one and press **Confirm the Wise transfer** (called Mark as sent before 19 Sep 2026; it is the same `mark_worker_paid` call). It asks first, because it sends the worker a WhatsApp that cannot be unsent. It marks the invoice paid, stamped with your email and the time, once. It cannot be changed afterwards; a mistake is corrected with a note.
 4. **"Pay the worker from your business bank app, then press Mark as sent..."** Somebody pressed the old Mark as paid on a worker's pay invoice, or wrote to the table directly. The database now refuses that, because it would skip the record and the WhatsApp. Use Pay workers. The invoice screens show a **Pay the worker** button that goes there.
 5. **The worker says no WhatsApp arrived.** It is free text, so it only arrives if they have messaged the Yaadly number in the last 24 hours. Check Supabase, Edge Functions, `yaad-notify-client`, Logs, for kind `worker_paid`, and tell them by phone. Their portal shows the invoice as Paid, with the date and reference, either way.
 6. **Proving the rules hold:** run `supabase/tests/worker_pay_guards.sql` with `execute_sql`. Eleven lines, all PASS (a SKIP means there was no test invoice to borrow). Nothing is kept, and the WhatsApp it queues is thrown away with everything else.
@@ -5615,3 +5617,31 @@ Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A
 6. **A job is missing from Live jobs.** It lists booked jobs only (a tradesperson chosen), leaves out cancelled ones, and drops a finished job once every client invoice and worker pay on it is marked paid. It reads the latest 50 booked jobs.
 7. **Job type says "job type not set".** `jobs.trade` is empty on that job; set it on the job.
 
+
+## The Evidence screen says something is waiting on you, or says nothing is when something is (19 Sep 2026)
+
+The rule, set by the founder on 19 Sep 2026: a filed set reaches you on an open dispute or a comment the client wrote, and on nothing else. Approving the work is the client's, in their portal.
+
+1. **Whose move it is comes from `stage_approvals`, never from `evidence.ok`.** A set is "signed off" when a row in `stage_approvals` covers its job and stage; otherwise it is "with the client". `evidence.ok` is a dead column: it defaults to `true`, nothing writes it, and most rows carry `null`. Nothing on the desk reads it any more. Do not put it back.
+2. **A row reads "with the client" and you think it was approved.** Check the record: `select * from stage_approvals where job_id = '<job>' and stage = <n>;`. No row means no approval, whatever was said on the phone. An approval taken in person or over WhatsApp still has to be recorded, or the desk is right and the memory is wrong.
+3. **A row reads "the client wrote about this" and you cannot see what they said.** Open the row: the comment is quoted at the top of the drawer. In SQL: `select body, created_at, origin from evidence_comments where job_id = '<job>' and from_role = 'client' order by created_at;`. A comment with a null `evidence_id` came over WhatsApp, where a client can only name a stage, so it marks every item in that stage.
+4. **A whole job's evidence reads "dispute, waiting on you".** That is the job, not the photographs: `select * from disputes where job_id = '<job>' and state <> 'resolved';`. It clears when the dispute is resolved by a named person.
+5. **The Evidence badge in the rail, and the number the view leads with.** Both count the same thing, the rows a client raised, through `viz:{ want, wants }` on the view (`want: r => evOwner(r).who === "you"`). They read the maps `preEvidence()` fills, which `loadView` runs before either is drawn. If the badge ever shows rows loaded instead, that `viz.want` has been removed: `wantCount()` falls back to the row count when a view does not say.
+6. **"Evidence with clients" on the Overview reads zero and you know sets are filed.** It used to always read zero, because it counted `ok = false`. It is now `evidenceOwnership()`, which reads `evidence`, `stage_approvals`, `disputes` and `evidence_comments` and splits them. A zero now means every filed set really is approved or really is yours.
+
+## The day says messages did not arrive, "Did it arrive" says nothing is outstanding (19 Sep 2026)
+
+Fixed on 19 September 2026. Both numbers now come from the same rule, `dlvOutcome_()`, and both ignore anything already followed up. If they ever disagree again:
+
+1. Open "Did it arrive". The box at the top, "Needs you", is the truth: it counts every message not yet followed up, not only the newest 200 rows the table below loads.
+2. If the day panel's "Not arrived" line shows a different number, the merge in `preDelivery()` or the count in `loadOverview()` has drifted apart again. They are about forty lines apart in `concierge/concierge.html`; both call `dlvOutcome_()` and both filter `followed_up_at` null. Neither should ever count rows the other does not.
+3. A number that is high and will not clear usually means the follow-up write is failing, not that the count is wrong. Press the tick and read the red line it gives you: it is the database's own words.
+
+## Following one up will not save (19 Sep 2026, 20260919120000)
+
+The note is optional as of 19 September 2026: press "Mark as followed up" on the card, then "Done, followed up" with the box empty, or type a few words and press Enter. If it refuses:
+
+- **"Say in a few words what you did"** means the database still has the old function. Apply `supabase/migrations/20260919120000_following_one_up_is_a_tick_and_the_words_are_optional.sql`.
+- **"Nothing to follow up for that number"** is also the old function. The new one returns 0 quietly and the row simply disappears on reload.
+- **"That is not a usable number"** is real: the row's `to_addr` has fewer than seven digits, so there is nobody to have followed up with. Nothing to do but leave it.
+- **"Admin only"** or **"No signed-in email on this session"** means the desk session is not what it should be. Sign out and back in.
