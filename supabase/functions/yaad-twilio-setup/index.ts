@@ -148,6 +148,41 @@ Deno.serve(async (req: Request) => {
     return json({ ok: true, sid, reused: Boolean(existing), setting: "twilio_content_sid_phase" });
   }
 
+  // Read back what Twilio actually holds for the section menu, 19 Sep 2026.
+  //
+  // The menu has never once been accepted. yaad-inbound logged "Twilio
+  // refused the template: Invalid Parameter" and fell back to the typed
+  // B / D / A question, which is the fallback doing its job, and is also why
+  // nobody noticed for four days: a template that never sends looks exactly
+  // like a template that does. Answering "why" needs Twilio's own copy of the
+  // template next to the one content.ts says it created, so here it is.
+  //
+  // Reads only. Creates nothing, sends nothing, writes no setting. Safe to
+  // run on a live account at any time.
+  if (action === "describe-section-menu") {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_phase").maybeSingle();
+    let recorded = "";
+    try { recorded = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { recorded = String(st?.value ?? ""); }
+    const named = (await listAll()).find((c) => c.friendly_name === SECTION_MENU_NAME) ?? null;
+    const sid = recorded || named?.sid || "";
+    if (!/^HX[0-9a-f]{32}$/i.test(sid)) {
+      return json({ error: "No section menu template is recorded or findable by name.", recorded, foundByName: named }, 404);
+    }
+    const live = await call(`/Content/${sid}`);
+    const approval = await call(`/Content/${sid}/ApprovalRequests`);
+    return json({
+      sid,
+      recordedInAppSettings: recorded || null,
+      // A mismatch here means yaad-inbound is sending a template id that is
+      // not the one this file's content.ts describes, which on its own would
+      // explain a refusal.
+      sameAsTemplateNamed: named ? named.sid === sid : null,
+      twilioHolds: { status: live.status, body: live.body },
+      approval: { status: approval.status, body: approval.body },
+      codeWouldCreate: sectionMenuContent(),
+    });
+  }
+
   // The worker update template (17 Sep 2026, founder: "fix this"). Creates it,
   // or finds it, and submits it to Meta for WhatsApp approval. Records the
   // ContentSid as PENDING only: yaad-notify-client reads the live setting,

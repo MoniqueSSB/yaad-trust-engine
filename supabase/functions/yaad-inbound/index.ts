@@ -673,9 +673,24 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace
       s.setAttributes({ "http.response.status_code": r.status });
       await recordAccepted(r, digits, "whatsapp", { kind: "section menu" });
       if (!r.ok) {
-        const d = await r.json().catch(() => null) as { message?: string } | null;
-        s.recordError(d?.message ?? `twilio ${r.status}`);
-        console.error("sendPhaseMenu: Twilio refused the template:", d?.message ?? r.status);
+        // Twilio's numbered code is the part that names the cause, and until
+        // 19 September 2026 this line threw it away and logged the sentence
+        // alone. What that produced was "Invalid Parameter", four days of a
+        // menu that never once went out, and a typed fallback covering for it
+        // so well that nothing looked wrong. The code, the sentence, Twilio's
+        // own help link and the template id now all go to the function log,
+        // which is private to this project. No customer text goes with them.
+        const d = await r.json().catch(() => null) as { code?: number; message?: string; more_info?: string } | null;
+        const detail = [
+          `HTTP ${r.status}`,
+          d?.code ? `Twilio code ${d.code}` : "",
+          d?.message ?? "",
+          d?.more_info ?? "",
+          `ContentSid ${contentSid}`,
+        ].filter(Boolean).join(" | ");
+        s.recordError(detail.slice(0, 300));
+        s.setAttributes({ "yaadly.twilio.error_code": String(d?.code ?? r.status) });
+        console.error("sendPhaseMenu: Twilio refused the template:", detail);
       }
       return r.ok;
     } catch (e) {

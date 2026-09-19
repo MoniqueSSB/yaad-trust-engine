@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · The tappable section menu has never once sent, and "Yes for that job" was refused
+
+**What the founder saw.** She filed a photo on JOB-WEB-1789253807959 over WhatsApp. Two things went wrong in one exchange. She answered the "which job" question with "Yes for that job" and was told it did not match a job. Then she was asked the section question as letters, B for before, D for during, four days after that question was rebuilt as a tappable list on her own instruction.
+
+**The menu is built, merged and deployed, and Twilio refuses it.** At 09:33:16 UTC `yaad-inbound` logged `sendPhaseMenu: Twilio refused the template: Invalid Parameter` and fell back to the typed question, which is the fallback working exactly as written. `message_deliveries` holds no row of kind `section menu`, ever, so this is not a regression: it has failed every time since 15 September and the fallback covered for it so completely that nothing looked wrong. **A fallback that is good enough to hide a permanent failure needs the failure logged loudly, and this one logged four words.** `sendPhaseMenu` now records the HTTP status, Twilio's numbered code, its message, its help link and the ContentSid. That is the change; the fallback itself is right and stays.
+
+**Ruled out by reading Twilio's own copy, not by guessing.** `yaad-twilio-setup` gained `describe-section-menu`, read only: it returns the recorded ContentSid, the template as Twilio holds it, its WhatsApp approval status and what `content.ts` would create. The ContentSid is right, the template exists, it is a `twilio/list-picker`, it takes one variable, and all six row ids are the bare letters. None of the three causes the runbook listed. **Its WhatsApp approval status is `unsubmitted`,** which the runbook says should not matter for an in-session send. That claim is now marked unproven rather than quietly trusted. The numbered code off the next refusal decides it.
+
+**"Yes for that job" now confirms. A bare "yes" still does not, on purpose.** `pickJobChoice` took the job code, an ordinal, or a title, and nothing else. On 15 September a bare "yes" was deliberately ruled out, because a stray yes in a chat is the one way a photograph lands on a job nobody meant, and there is a test holding that. That test was not touched. What was added is narrower: when exactly one job has been named in the question, an affirmative that also points at the job confirms it. "Yes for that job", "yes that one", "correct" confirm; "yes", "yes please", "yes but the other one", "no not that one" do not, and get the code prompt again. With two jobs on the table no yes means anything, whatever it points at. The client approval path (`matchApprovingJob`) is untouched and stays code-only: that one releases money.
+
 ## 2026-09-19 · Desk deployed: concierge version 3ed5934a, after the deploy copy had gone stale
 
 **What went live.** Everything on `main` at the time: the evidence, intake and money work from this session, plus another session's Overview to-do band and its badge rule. `yaadly-concierge` version `3ed5934a`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.

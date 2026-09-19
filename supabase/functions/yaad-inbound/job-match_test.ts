@@ -6,7 +6,7 @@
 // Run: deno test supabase/functions/yaad-inbound/job-match_test.ts
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { pickJobChoice, type JobChoice } from "./job-match.ts";
+import { pickJobChoice, readsAsYes, type JobChoice } from "./job-match.ts";
 
 const ONE: JobChoice[] = [{ id: "JOB-0042", title: "Kitchen tap replacement", stage: 2 }];
 const TWO: JobChoice[] = [
@@ -32,6 +32,41 @@ Deno.test("the bare digits without the code's own letters do not match", () => {
 
 Deno.test("a bare 'yes' never confirms anything, even with only one job", () => {
   assertEquals(pickJobChoice("yes", ONE), null);
+});
+
+/* ── a yes that points at the job, one candidate only ─────────────────────
+   19 Sep 2026. "Yes for that job" was refused on a live job where exactly
+   one job had just been named in the question. The bare "yes" rule above is
+   untouched and stays: this only reads a yes that says which job it means. */
+
+Deno.test("a yes that points at the job confirms, with only one job", () => {
+  for (const said of ["Yes for that job", "yes that one", "yeah that job", "yes it", "correct", "that one", "confirmed", "yep thats the job"]) {
+    assertEquals(pickJobChoice(said, ONE)?.id, "JOB-0042", `should confirm: ${said}`);
+  }
+});
+
+Deno.test("a pointing yes still confirms nothing when two jobs are on the table", () => {
+  for (const said of ["Yes for that job", "yes that one", "correct", "that one"]) {
+    assertEquals(pickJobChoice(said, TWO), null, `must not guess between two jobs: ${said}`);
+  }
+});
+
+Deno.test("a yes carrying a doubt, a refusal or a real sentence is not a yes", () => {
+  for (const said of [
+    "yes", "yes please", "ok", "no", "nah", "no not that one", "yes but the other one",
+    "yes the wrong job", "yes i am on site now", "yes but which one do you mean",
+  ]) {
+    assertEquals(pickJobChoice(said, ONE), null, `must not confirm: ${said}`);
+  }
+});
+
+Deno.test("readsAsYes is narrow on its own terms", () => {
+  assert(readsAsYes("Yes for that job"));
+  assert(readsAsYes("correct"));
+  assert(!readsAsYes("yes"));
+  assert(!readsAsYes("yes please"));
+  assert(!readsAsYes("no"));
+  assert(!readsAsYes("yes that one is done and the next one starts tomorrow"));
 });
 
 Deno.test("an ordinal number still works as a convenience", () => {
