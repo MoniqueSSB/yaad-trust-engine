@@ -5428,11 +5428,12 @@ Since 14 September 2026 (`20260914112000`) materials money goes to the worker **
 | The row says | What is true | Whose move |
 |---|---|---|
 | The materials are not on a bill yet | No invoice on the job carries a "Materials, at cost" line, or the ones that do are void | **Yours.** Raise or amend the client's bill so it carries the materials line |
-| Waiting on the client: the bill is not paid yet | The line is on a bill and the bill is not marked paid | Theirs to pay, yours to mark paid |
+| The bill for them has not gone out yet | The line is on a bill that is still a draft, so the client has never seen it | **Yours.** Send it from Invoices |
+| Waiting on the client: the bill is not paid yet | The bill carrying the line was sent and is not marked paid | Theirs to pay, yours to mark paid |
 | Waiting on the client: where materials are kept | No nominated store on the job | Theirs, or yours at the desk writing down what they said on the phone |
 | Ready to release | Store named, materials billed and paid | Yours |
 
-Until 19 September the row tested the store first and showed that chip alone, and when it did mention money it said "not paid" whether or not anything had been billed. Two jobs had every bill paid, no materials line on any of them, and read as the client's fault.
+Until 19 September the row tested the store first and showed that chip alone, and when it did mention money it said "not paid" whatever the state of the bill. Two jobs had every bill paid with no materials line on any of them, and a third had the line on a draft that had never been sent. All three read as the client's fault when the next move was Yaadly's.
 
 1. **Release it.** Desk, Materials view. The row shows what the client has paid for, what has gone out and what is left. Press **Release materials money**. The receipt box can stay empty; it usually comes later.
 2. **"The client has paid J$X for materials..."** The bill carrying the materials is not marked paid yet. Mark it paid on Invoices first (or, on a bill in parts, the part carrying the materials line). The database counts only paid invoices, and only lines that still read "Materials, at cost". If somebody retyped that line in the invoice editor, it no longer counts: put the wording back rather than working round it.

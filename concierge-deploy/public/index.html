@@ -9589,20 +9589,22 @@ async function loadMaterials(keepMsg){
   const [{ data: quotes }, { data: rels }, { data: invs }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
     sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
-    sb.from("invoices").select("job_id,currency,status,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").neq("status", "void"),
+    sb.from("invoices").select("job_id,currency,status,sent_at,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").neq("status", "void"),
   ]);
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
-  const paidMatByJob = new Map(), billedMatByJob = new Map();
+  const paidMatByJob = new Map(), sentMatByJob = new Map(), billedMatByJob = new Map();
   for (const inv of invs || []) {
     if (String(inv.currency || "JMD").toUpperCase() !== "JMD") continue;
     const m = (inv.invoice_lines || [])
       .filter((l) => /^materials, at cost/i.test(l.description || ""))
       .reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
     if (!m) continue;
-    billedMatByJob.set(inv.job_id, (billedMatByJob.get(inv.job_id) || 0) + m);
-    if (inv.status === "paid") paidMatByJob.set(inv.job_id, (paidMatByJob.get(inv.job_id) || 0) + m);
+    const add = (map) => map.set(inv.job_id, (map.get(inv.job_id) || 0) + m);
+    add(billedMatByJob);
+    if (inv.sent_at) add(sentMatByJob);
+    if (inv.status === "paid") add(paidMatByJob);
   }
 
   const rows = jobs.map((job) => {
@@ -9611,11 +9613,13 @@ async function loadMaterials(keepMsg){
     const quoted = Number(q.materials_jmd);
     const paidFor = paidMatByJob.get(job.id) || 0;
     const billedFor = billedMatByJob.get(job.id) || 0;
+    const sentFor = sentMatByJob.get(job.id) || 0;
     const done = relByJob.get(job.id) || [];
     const soFar = done.reduce((t, r) => t + Number(r.amount_jmd || 0), 0);
     const left = Math.max(quoted - soFar, 0);
     const canGo = Math.max(Math.min(quoted, paidFor) - soFar, 0);
     const billedLeft = Math.max(Math.min(quoted, billedFor) - soFar, 0);
+    const sentLeft = Math.max(Math.min(quoted, sentFor) - soFar, 0);
     const storeOk = !!job.materials_store_type;
     const full = left <= 0;
     const receiptsDue = done.filter((r) => r.sent_at && !String(r.receipt_ref || "").trim()).length;
@@ -9635,22 +9639,25 @@ async function loadMaterials(keepMsg){
         // cupboard: answer the store and the chip simply changed to the money
         // one, with nothing having moved.
         //
-        // "Not paid" and "not billed" are not the same waiting, and saying the
-        // first when the second is true sends you to chase a client who owes
-        // nothing. On 19 September two jobs had every bill paid and no
-        // materials line on any of them, and read as the client's fault.
-        // Billing the materials is yours; paying and naming the store are
-        // theirs, and the chip says whose move it is.
+        // "Not paid" is only the client's move once a bill for the materials
+        // has actually reached them, and there are two ways it has not. On
+        // 19 September two jobs had every bill paid with no materials line on
+        // any of them, and a third had the line sitting on a draft that had
+        // never been sent. All three read as the client's fault. Chasing
+        // somebody who owes nothing is the wrong move and the real one is
+        // yours, so the money side is three states, not one.
         ? (() => {
             // Every string here is a literal, so it is written straight in.
+            const yours = [
+              billedLeft <= 0 ? "The materials are not on a bill yet" : "",
+              billedLeft > 0 && sentLeft <= 0 ? "The bill for them has not gone out yet" : "",
+            ].filter(Boolean);
             const theirs = [
-              billedLeft > 0 && canGo <= 0 ? "the bill is not paid yet" : "",
+              sentLeft > 0 && canGo <= 0 ? "the bill is not paid yet" : "",
               !storeOk ? "where materials are kept" : "",
             ].filter(Boolean);
-            const said = [
-              billedLeft <= 0 ? "The materials are not on a bill yet" : "",
-              theirs.length ? "Waiting on the client: " + theirs.join(", and ") : "",
-            ].filter(Boolean).join(" &middot; ");
+            const said = yours.concat(theirs.length ? ["Waiting on the client: " + theirs.join(", and ")] : [])
+              .join(" &middot; ");
             return `<span class="jichip"><span class="dot"></span>${said}</span>`;
           })()
         : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
