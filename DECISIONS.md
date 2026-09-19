@@ -18,6 +18,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **What this figure now says out loud.** Zero tradespeople who can take a job. That was true before today and the screen was hiding it behind eight.
 
+**Deployed** 19 September 2026, `yaadly-concierge` version `82b427c3`, from `origin/main` off disk. One modified asset uploaded, Access still answering 302.
+
 ## 2026-09-19 · Desk deployed: concierge version cf2dfddd
 
 **What went live.** Everything on `main` at 09:38 UTC, which over the previous deploy (`3ed5934a`) is one change: the Materials releases row now naming both gates instead of only the materials store. `yaadly-concierge` version `cf2dfddd`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
