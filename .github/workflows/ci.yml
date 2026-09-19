@@ -263,6 +263,19 @@ jobs:
       - name: The desk has no dead zone reads
         run: node scripts/check-desk-script.mjs
 
+      # Added 19 September 2026. CLAUDE.md section 8 says guardrails.scan does
+      # not read page copy, so the rule falls on whoever writes the page. The
+      # marketing site was swept by hand and the admin desk was not: from 3 to
+      # 19 September the Money view said "Holding goes live once PI insurance
+      # is in force", a fortnight after Yaadly became the principal contractor
+      # and stopped holding anybody's money. No single word in that sentence is
+      # banned, which is the exact failure section 8 warns about, so only a
+      # phrase sweep finds it. The same sweep then found it in concierge/
+      # README.md and preview/index.html as well. Exact phrases only; see the
+      # comment at the top of the script for why it is deliberately narrow.
+      - name: Page copy carries no banned language
+        run: node scripts/check-copy.mjs
+
   migrations:
     name: New migrations sort last
     runs-on: ubuntu-latest
