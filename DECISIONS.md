@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · The menu sends, and I cannot prove why, so the entry below is corrected not deleted
+
+**What happened.** At 14:01 the probe sent the section menu to the founder's phone: HTTP 201, delivered four seconds later. The menu works. The entry below says the cause was a missing Messaging Service and that naming it was the fix. **That claim does not survive the evidence and is withdrawn.**
+
+**Why it does not survive.** The probe carries `To`, `From`, `ContentSid` and `StatusCallback` and no `MessagingServiceSid`; Twilio's response confirms `messaging_service_sid: null`. That is the same request, in the same shape, that Twilio refused with 20422 at 13:42:32 the same afternoon. The request did not change between the failure and the success. Something on Twilio's or Meta's side did.
+
+**The most likely candidate, stated as a candidate.** Inside that window Meta approved `yaadly_worker_job_update_v1`, the first template ever approved on this WhatsApp sender. A sender being unable to send interactive content until its business account has cleared an approval is plausible and unproven. It is written here as a lead for the next person, not as a cause.
+
+**What stays anyway.** The `MessagingServiceSid` change and its cross-function test stay, because Twilio's documentation does say a Messaging Service is a prerequisite for Content Templates: correct by the documentation, just not demonstrated to be the fix. The error logging stays and is the reason any of this was visible. What does not stay is the confident sentence.
+
+**The rule this is really about.** A fix that lands beside a change you did not make is not a proven fix. Today already contained one four-day failure that looked fine from the outside; writing down an unproven cause as settled is how the next one gets built on top of it. **When the thing starts working and you cannot say which change did it, write that sentence down, in those words.**
+
 ## 2026-09-19 · The tappable section menu has never once sent, and "Yes for that job" was refused
 
 **What the founder saw.** She filed a photo on JOB-WEB-1789253807959 over WhatsApp. Two things went wrong in one exchange. She answered the "which job" question with "Yes for that job" and was told it did not match a job. Then she was asked the section question as letters, B for before, D for during, four days after that question was rebuilt as a tappable list on her own instruction.
