@@ -9620,11 +9620,18 @@ async function loadMaterials(keepMsg){
       ? (receiptsDue
           ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
           : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
-      : !storeOk
-        ? `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`
-        : canGo <= 0
-          ? `<span class="jichip"><span class="dot"></span>Waiting on the client paying for the materials</span>`
-          : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
+      : (!storeOk || canGo <= 0)
+        // Two separate things gate a tranche and both can be outstanding at
+        // once. This used to test the store first and show that chip alone,
+        // so an unpaid bill was invisible behind a question about a cupboard:
+        // answer the store and the chip simply changed to the money one, with
+        // nothing having moved. Name whichever are outstanding, bill first,
+        // because that is the one that actually holds the money.
+        ? `<span class="jichip"><span class="dot"></span>Waiting on the client: ${[
+            canGo <= 0 ? "the bill is not paid yet" : null,
+            !storeOk ? "where materials are kept" : null,
+          ].filter(Boolean).join(", and ")}</span>`
+        : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
 
     const history = done.length
       ? `<div class="jicond" style="margin-top:6px">` + done.map((r) => {
@@ -9844,7 +9851,33 @@ async function loadWorkerPay(keepMsg){
   // words in the action cell, the disabled button's tooltip, and a footnote
   // under the table. It is now said once, here, in four words. The database's
   // full sentence and the job's bill list are on the tooltip, not lost.
-  const shortWhy = (i) => "the client's " + (i.stage != null ? "stage " + i.stage + " bill" : "bill") + " is not paid yet";
+  //
+  // Corrected 19 Sep 2026, same day, by 20260919160000. This used to build the
+  // sentence from the pay invoice's own stage number and never read the
+  // database at all, so a stage 2 payable always read "the client's stage 2
+  // bill is not paid yet". Since that migration a stage the client was never
+  // billed separately for is checked against the WHOLE-JOB bill, so on those
+  // rows the invented sentence pointed at a document that does not exist and
+  // cannot be made, which is the exact confusion the migration removed. It now
+  // names whatever the database named, and falls back to its own wording only
+  // when there is nothing to read.
+  const shortWhy = (i) => {
+    const why = String(blockedBy.get(i.id) || "");
+    const bill = (why.match(/INV-\d{4}-\d{4}/) || [])[0];
+    if (bill) return bill + " is not paid yet";
+    // This one names a stage AND says there is no bill for it, so it has to be
+    // read before the stage match below or it comes out as the false sentence
+    // this change exists to remove.
+    if (/never billed separately/i.test(why)) return "the client's bill for this job is not paid yet";
+    const st = (why.match(/\bstage (\d+)\b/i) || [])[1];
+    if (st) return "the client's stage " + st + " bill is not paid yet";
+    // The check itself failed to run, so the desk knows nothing about which
+    // bill is outstanding and says so rather than guessing one.
+    if (/could not check/i.test(why)) return "the client's payment could not be checked";
+    // Last resort. Deliberately says no stage number: inventing one is what
+    // this whole function was corrected for.
+    return "the client's bill is not paid yet";
+  };
   const clientCell = (i) => {
     const why = blockedBy.get(i.id);
     const bills = (clientBy.get(i.job_id) || []).slice().sort((a, b) => (a.status === "paid" ? 0 : 1) - (b.status === "paid" ? 0 : 1) || String(a.id).localeCompare(String(b.id)));

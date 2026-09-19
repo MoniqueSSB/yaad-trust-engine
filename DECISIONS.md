@@ -18,6 +18,13 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **What this figure now says out loud.** Zero tradespeople who can take a job. That was true before today and the screen was hiding it behind eight.
 
+## 2026-09-19 · A materials tranche has two gates, so the desk names both
+
+**Why.** Founder, reading the Materials releases view: "Waiting on the client's materials store, what is this mean". The chip was true and it was not the whole truth. Two separate things hold a tranche, the client naming where materials are kept and the client actually paying the materials line on their bill, and both can be outstanding at the same time. The panel tested the store first and showed that chip alone, so an unpaid bill was invisible behind a question about a cupboard. Answer the store and the chip would simply change to the money one, with nothing having moved and no warning that a second gate was ever there.
+
+**What changed.** Desk only, `concierge/concierge.html` and its deploy copy. No database change, no function change, no gate moved. Where both are outstanding the row now reads "Waiting on the client: the bill is not paid yet, and where materials are kept". Where one is, it names that one. Bill first, because that is the gate that actually holds the money, and it matches the wording the Pay workers view took the same day.
+
+**What did not move.** The store gate stays in `trg_enforce_store_before_open` and the two guards in `20260828c`, and the paid-for test stays in `materials_paid_jmd()`, which has the last word. This panel shows those refusals and has never re-checked them.
 ## 2026-09-19 · Desk deployed: concierge version 3ed5934a, after the deploy copy had gone stale
 
 **What went live.** Everything on `main` at the time: the evidence, intake and money work from this session, plus another session's Overview to-do band and its badge rule. `yaadly-concierge` version `3ed5934a`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
@@ -37,6 +44,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **What did not move.** Every other refusal in `20260917180000` stands word for word, it still fails closed on no job, no client bill or a bill in draft, and where a stage genuinely is billed the stage message is unchanged. The call-back gate, the Stripe payout gate and `mark_worker_paid()`'s admin check are untouched. No human gate moved: a named person still marks the client's bill paid, and a named person still sends the worker's money. `yaad-payout-send` needed no change, because it calls the same function by name.
 
 **Scope, checked rather than assumed.** Every worker payable currently owed across the database was read before the change. One was in this shape, and it was the test job, so no real money was ever stuck. The shape can recur on any job that carries a pre-13-September stage bill.
+
+**The desk had to follow, and did not at first.** Pay workers built its one-line reason from the pay invoice's own stage number and never read the database's answer, so the row still read "the client's stage 2 bill is not paid yet" after the rule had stopped asking for one. Fixed the same day: the line now names whatever the database named, prints a stage number only where the database printed one, and says the payment could not be checked when the check failed rather than guessing a bill. A rule corrected in the database and left wrong on the screen is not corrected, because the screen is what she reads.
 
 **Proof.** `supabase/tests/worker_pay_client_paid_guards.sql`, ten lines, all PASS, run against production inside a transaction that was rolled back, and the rollback verified afterwards by reading the live function back and confirming it still had the old body. Three existing expectations changed wording with the rule; each still asserts a refusal, and the test file says so beside each one rather than quietly.
 
