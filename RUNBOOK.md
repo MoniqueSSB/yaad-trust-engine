@@ -5721,6 +5721,6 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 ## Where the prototype in `preview/` is actually served (19 Sep 2026)
 
 1. **Nowhere public.** GitHub Pages publishes `docs/`, and there is no `docs/preview/`, so `https://yaadly.co.uk/preview/` returns 404 and always has. Verified by fetching it, 19 September 2026.
-2. **CLAUDE.md section 11 says otherwise.** Its table gives `preview/` the home `yaadly.co.uk/preview/`. That line is wrong. The section says itself that it describes what got built rather than a rule, and to confirm anything load bearing against the code; this is what that warning is for. The file is Monique's, so it is recorded here rather than edited.
+2. **CLAUDE.md section 11 used to say otherwise**, giving `preview/` the home `yaadly.co.uk/preview/`. Corrected in that file on 19 September 2026 on Monique's instruction. The section says itself that it describes what got built rather than a rule, and to confirm anything load bearing against the code; this is what that warning is for. Every other host in that table was checked in the same pass and is right: `yaadly.co.uk` 200, `app.yaadly.co.uk` 307 to its sign-in, `concierge.yaadly.co.uk` 302 to Access.
 3. **To read it:** `python3 -m http.server 8934 --directory preview`, or the entry in `.claude/launch.json`.
 4. **To publish it**, if that is ever wanted, it has to move to or be copied into `docs/preview/`, which also means the copy sweep and every claim in it becomes public. Decide that before copying, not after.
