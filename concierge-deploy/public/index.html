@@ -2212,6 +2212,11 @@ const VIEWS = [
     order:"updated_at", search:["name","worker_email","trade","parish"],
     empty:["No published workers","Publishing an application puts a worker here and lets them quote."],
     pre: preWorkers,
+    // Supply, not rows. On 19 September 2026 all eight profiles were her own
+    // test rows, and the screen led with 8, which reads as eight tradespeople
+    // who can take a job. A worker counts here when they are real and can
+    // quote; the test rows stay in the table with their chip.
+    viz:{ want:r => !r.is_test && !!r.active, wants:"real, can quote" },
     // The candidate files, with links to open them. Publishing somebody's
     // face is a decision, and a decision needs to be made looking at the
     // thing, so the links are here rather than a button firing blind.
@@ -7464,7 +7469,7 @@ async function loadOverview(){
   // Columns named one by one, and budget_band deliberately absent. It is the
   // client's private figure and the rule is that it never arrives in this page,
   // not that the page fetches it and declines to draw it. Same rule as Jobs.
-  const [jobQ, quoteQ, invQ, testQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
+  const [jobQ, quoteQ, invQ, testQ, dispQ, kickQ, revNoReply, workersN, workersMine] = await Promise.all([
     sb.from("jobs").select("id,parish,trade,stage,status,open,owed,updated_at").eq("open", true).limit(300),
     sb.from("job_quotes").select("job_id").limit(600),
     sb.from("invoices").select("id,job_id,client_name,status,total_pence,currency,created_at,payable_to").limit(600),
@@ -7472,7 +7477,8 @@ async function loadOverview(){
     sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
     sb.from("kickoff_packs").select("job_id,status").limit(300),
     countOf("reviews", q => q.is("reply", null)),
-    countOf("worker_profiles", null),
+    countOf("worker_profiles", q => q.not("is_test", "is", true)),
+    countOf("worker_profiles", q => q.is("is_test", true)),
   ]);
   const JOBS = jobQ.data || [];
   const staleReplies = revNoReply;
@@ -7908,7 +7914,11 @@ async function loadOverview(){
       "Both directions are tied to a completed job. Replying is your call.", "Read", "reviews"));
   if (!appsWaiting)
     people.push(ansRow("ok", "Clear", false, "Applications and vetting, nothing waiting",
-      plural(workersN, "worker profile", "worker profiles") + " on file. The agent flags, you decide.", null, null));
+      (workersN
+        ? plural(workersN, "worker profile", "worker profiles") + " on file"
+          + (workersMine ? ", and " + workersMine + " more you marked as your own testing" : "")
+        : (workersMine ? "No real worker on file yet. " + plural(workersMine, "profile is", "profiles are") + " your own testing" : "No worker profile on file yet"))
+      + ". The agent flags, you decide.", null, null));
   $("ovPeople").innerHTML = `<h6>People</h6>` + (people.length ? people.join("") : ansRow("ok", "Clear", false, "Nothing on the people side", "No vetting outstanding, no diary clash, no review waiting on a reply.", null, null));
 
   const words = [];
@@ -9572,21 +9582,29 @@ async function loadMaterials(keepMsg){
   // materials, not against a receipt, so this reads what has been paid:
   // materials lines on the job's paid Yaadly invoices, the same test
   // materials_paid_jmd() applies in the database, which has the last word.
-  const [{ data: quotes }, { data: rels }, { data: paidInvs }] = await Promise.all([
+  //
+  // Unpaid bills are read too, for the reason in the chip below: "paid" and
+  // "on a bill at all" are different questions and only one of them is the
+  // client's to answer. Void bills are left out of both, they were cancelled.
+  const [{ data: quotes }, { data: rels }, { data: invs }] = await Promise.all([
     sb.from("job_quotes").select("job_id,worker_name,materials_jmd").eq("status", "accepted").in("job_id", jobIds),
     sb.from("materials_releases").select("id,job_id,amount_jmd,released_at,receipt_ref,receipt_at,stage,sent_at,sent_by,sent_method,sent_ref").in("job_id", jobIds).not("released_at", "is", null).order("released_at", { ascending: true }),
-    sb.from("invoices").select("job_id,currency,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").eq("status", "paid"),
+    sb.from("invoices").select("job_id,currency,status,sent_at,invoice_lines(description,line_total_pence)").in("job_id", jobIds).eq("payable_to", "yaadly").neq("status", "void"),
   ]);
   const quoteByJob = new Map((quotes || []).map((q) => [q.job_id, q]));
   const relByJob = new Map();
   for (const r of rels || []) { const a = relByJob.get(r.job_id) || []; a.push(r); relByJob.set(r.job_id, a); }
-  const paidMatByJob = new Map();
-  for (const inv of paidInvs || []) {
+  const paidMatByJob = new Map(), sentMatByJob = new Map(), billedMatByJob = new Map();
+  for (const inv of invs || []) {
     if (String(inv.currency || "JMD").toUpperCase() !== "JMD") continue;
     const m = (inv.invoice_lines || [])
       .filter((l) => /^materials, at cost/i.test(l.description || ""))
       .reduce((t, l) => t + Number(l.line_total_pence || 0), 0);
-    paidMatByJob.set(inv.job_id, (paidMatByJob.get(inv.job_id) || 0) + m);
+    if (!m) continue;
+    const add = (map) => map.set(inv.job_id, (map.get(inv.job_id) || 0) + m);
+    add(billedMatByJob);
+    if (inv.sent_at) add(sentMatByJob);
+    if (inv.status === "paid") add(paidMatByJob);
   }
 
   const rows = jobs.map((job) => {
@@ -9594,10 +9612,14 @@ async function loadMaterials(keepMsg){
     if (!q || !(Number(q.materials_jmd) > 0)) return "";
     const quoted = Number(q.materials_jmd);
     const paidFor = paidMatByJob.get(job.id) || 0;
+    const billedFor = billedMatByJob.get(job.id) || 0;
+    const sentFor = sentMatByJob.get(job.id) || 0;
     const done = relByJob.get(job.id) || [];
     const soFar = done.reduce((t, r) => t + Number(r.amount_jmd || 0), 0);
     const left = Math.max(quoted - soFar, 0);
     const canGo = Math.max(Math.min(quoted, paidFor) - soFar, 0);
+    const billedLeft = Math.max(Math.min(quoted, billedFor) - soFar, 0);
+    const sentLeft = Math.max(Math.min(quoted, sentFor) - soFar, 0);
     const storeOk = !!job.materials_store_type;
     const full = left <= 0;
     const receiptsDue = done.filter((r) => r.sent_at && !String(r.receipt_ref || "").trim()).length;
@@ -9610,11 +9632,35 @@ async function loadMaterials(keepMsg){
       ? (receiptsDue
           ? `<span class="jichip ready"><span class="dot"></span>Released, ${receiptsDue} receipt${receiptsDue === 1 ? "" : "s"} to come</span>`
           : `<span class="jichip paid"><span class="dot"></span>Fully released and receipted</span>`)
-      : !storeOk
-        ? `<span class="jichip"><span class="dot"></span>Waiting on the client's materials store</span>`
-        : canGo <= 0
-          ? `<span class="jichip"><span class="dot"></span>Waiting on the client paying for the materials</span>`
-          : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
+      : (!storeOk || canGo <= 0)
+        // Three separate things gate a tranche and more than one can be
+        // outstanding at once. This used to test the store first and show that
+        // chip alone, so the money was invisible behind a question about a
+        // cupboard: answer the store and the chip simply changed to the money
+        // one, with nothing having moved.
+        //
+        // "Not paid" is only the client's move once a bill for the materials
+        // has actually reached them, and there are two ways it has not. On
+        // 19 September two jobs had every bill paid with no materials line on
+        // any of them, and a third had the line sitting on a draft that had
+        // never been sent. All three read as the client's fault. Chasing
+        // somebody who owes nothing is the wrong move and the real one is
+        // yours, so the money side is three states, not one.
+        ? (() => {
+            // Every string here is a literal, so it is written straight in.
+            const yours = [
+              billedLeft <= 0 ? "The materials are not on a bill yet" : "",
+              billedLeft > 0 && sentLeft <= 0 ? "The bill for them has not gone out yet" : "",
+            ].filter(Boolean);
+            const theirs = [
+              sentLeft > 0 && canGo <= 0 ? "the bill is not paid yet" : "",
+              !storeOk ? "where materials are kept" : "",
+            ].filter(Boolean);
+            const said = yours.concat(theirs.length ? ["Waiting on the client: " + theirs.join(", and ")] : [])
+              .join(" &middot; ");
+            return `<span class="jichip"><span class="dot"></span>${said}</span>`;
+          })()
+        : `<span class="jichip ready"><span class="dot"></span>Ready to release</span>`;
 
     const history = done.length
       ? `<div class="jicond" style="margin-top:6px">` + done.map((r) => {
@@ -9834,7 +9880,33 @@ async function loadWorkerPay(keepMsg){
   // words in the action cell, the disabled button's tooltip, and a footnote
   // under the table. It is now said once, here, in four words. The database's
   // full sentence and the job's bill list are on the tooltip, not lost.
-  const shortWhy = (i) => "the client's " + (i.stage != null ? "stage " + i.stage + " bill" : "bill") + " is not paid yet";
+  //
+  // Corrected 19 Sep 2026, same day, by 20260919160000. This used to build the
+  // sentence from the pay invoice's own stage number and never read the
+  // database at all, so a stage 2 payable always read "the client's stage 2
+  // bill is not paid yet". Since that migration a stage the client was never
+  // billed separately for is checked against the WHOLE-JOB bill, so on those
+  // rows the invented sentence pointed at a document that does not exist and
+  // cannot be made, which is the exact confusion the migration removed. It now
+  // names whatever the database named, and falls back to its own wording only
+  // when there is nothing to read.
+  const shortWhy = (i) => {
+    const why = String(blockedBy.get(i.id) || "");
+    const bill = (why.match(/INV-\d{4}-\d{4}/) || [])[0];
+    if (bill) return bill + " is not paid yet";
+    // This one names a stage AND says there is no bill for it, so it has to be
+    // read before the stage match below or it comes out as the false sentence
+    // this change exists to remove.
+    if (/never billed separately/i.test(why)) return "the client's bill for this job is not paid yet";
+    const st = (why.match(/\bstage (\d+)\b/i) || [])[1];
+    if (st) return "the client's stage " + st + " bill is not paid yet";
+    // The check itself failed to run, so the desk knows nothing about which
+    // bill is outstanding and says so rather than guessing one.
+    if (/could not check/i.test(why)) return "the client's payment could not be checked";
+    // Last resort. Deliberately says no stage number: inventing one is what
+    // this whole function was corrected for.
+    return "the client's bill is not paid yet";
+  };
   const clientCell = (i) => {
     const why = blockedBy.get(i.id);
     const bills = (clientBy.get(i.job_id) || []).slice().sort((a, b) => (a.status === "paid" ? 0 : 1) - (b.status === "paid" ? 0 : 1) || String(a.id).localeCompare(String(b.id)));

@@ -26,6 +26,92 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **"Yes for that job" now confirms. A bare "yes" still does not, on purpose.** `pickJobChoice` took the job code, an ordinal, or a title, and nothing else. On 15 September a bare "yes" was deliberately ruled out, because a stray yes in a chat is the one way a photograph lands on a job nobody meant, and there is a test holding that. That test was not touched. What was added is narrower: when exactly one job has been named in the question, an affirmative that also points at the job confirms it. "Yes for that job", "yes that one", "correct" confirm; "yes", "yes please", "yes but the other one", "no not that one" do not, and get the code prompt again. With two jobs on the table no yes means anything, whatever it points at. The client approval path (`matchApprovingJob`) is untouched and stays code-only: that one releases money.
 
+## 2026-09-19 · A drafted bill is not the client's fault either
+
+**Why.** Same fault as the entry below, found by checking the same data one level deeper. Splitting "billed" from "paid" fixed two jobs and left a third wrong: JOB-TEST-KICKOFF-1 has the materials line on INV-2026-0024, which is a draft that has never been sent. The row called that the client not paying. The client has not seen the bill.
+
+**What changed.** Desk only, both copies. The money side is three states rather than two, from three sums over the job's non-void Yaadly invoices: billed at all, sent, paid. Nothing billed and the bill still a draft are both Yaadly's move and say so. Only a bill that actually reached the client can read as waiting on them. The store question is unchanged and still theirs.
+
+**The general shape, worth remembering.** Twice in one day the desk turned Yaadly's own next move into a sentence blaming the client, because the code tested the last gate in the chain and named it. When a row says somebody is waiting, the useful question is not which gate is shut but whose hand is on it.
+
+**What did not move.** No database change, no gate. `materials_paid_jmd()` still decides whether a tranche can go, and it still counts only paid invoices.
+
+## 2026-09-19 · Everything deployed reconciled against main, and two functions found running ahead of it
+
+**Why.** Founder: "fix everything outstanding". `scripts/check-deploy-drift.sh` says "No drift", and it compares names, not content, so it cannot see a function whose deployed code is a different version of the same file. Every one of the 44 deployed functions was downloaded and diffed against `main` instead.
+
+**Eleven were behind and were redeployed.** The one that mattered: `yaad-quote-pack-rescan` was running the guardrails list from before 5 September, the version that still prescribed "held safely with a licensed payment provider" as the replacement for escrow and carried neither pattern that now bans it. A live function screening client-facing text against a superseded banned list is precisely the split CLAUDE.md section 2 exists to prevent, and the repository, the tests and CI were all green throughout, because none of them read what is deployed. Also redeployed: stale `textmodel.ts` copies in `yaad-agent`, `yaad-completion`, `yaad-kickoff` and `yaad-quote-pack` (missing `answerText` and `firstJsonObject`, imported by none of them, so nothing was broken), a stale `stripe.ts` in `yaad-stripe-webhook`, and comment-only drift in `yaad-kickoff-check`, `yaad-notify-client`, `yaad-portal-signup`, `yaad-report` and `yaad-vetting-purge`. `--no-verify-jwt` was preserved on exactly the two that carry it, `yaad-notify-client` and `yaad-stripe-webhook`, and the live list is still exactly the fourteen in section 12, checked after.
+
+**Two are running AHEAD of main, and that is the one to act on.** `yaad-inbound` and `yaad-twilio-setup` are deployed from `claude/job-photo-filing-2917ca`, which is open as PR #277 and not merged. The deployed code was diffed against that branch and matches it exactly. So live behaviour includes a Twilio error-logging fix and a `describe-section-menu` read-back that `main` does not have, and **anyone redeploying either function from `main` would silently revert them**, which is the 6 September incident with a different filename. Left alone deliberately: merging somebody else's open PR is not this session's call. Until it merges, those two are the exception to "deploy from main".
+
+**Also brought level.** The desk twice (`15d2a202`, then `14b95bae` after the chip fix above), and the app once, `763449e6`, carrying PR #280. Each proved by `wrangler deployments list` rather than by reading the deploy output, Access still 302 on the desk, `app.yaadly.co.uk` and `yaadly.co.uk` both answering.
+
+**What this says about the control.** The drift script's own line, "No drift. Deployed and this branch agree", was true and useless: it compares the set of function names. The content check that found all of this was a download-and-diff of every function, which took about ten minutes and is worth adding to that script rather than repeating by hand.
+
+## 2026-09-19 · "Not paid" and "not billed" are different waiting, and the desk had been saying the wrong one
+
+**What happened.** This morning's change made the Materials releases row name both gates instead of one. Reading the live data afterwards showed the money half of it was still wrong. Two jobs, JOB-TEST-WAPAY-2 and JOB-TEST-WAPAY-3, had every client bill paid and no "Materials, at cost" line on any of them. The row said the bill was not paid. It was. Nobody had billed the materials.
+
+**Why that matters more than a wording slip.** It points the wrong way. "The client has not paid" sends you to chase somebody who owes nothing, and the thing actually missing is a bill only Yaadly can raise. On a real job that is a call to a client in London asking for money they already sent.
+
+**What changed.** Desk only, both copies. The panel now reads unpaid bills as well as paid ones, void ones excluded, and separates two sums: what has been billed for materials, and what has been paid. Three outcomes instead of two. Not billed says so and is Yaadly's move. Billed and unpaid names the client. The store question names the client. More than one can show at once, separated by a middot, and the reader can tell whose move each is. `RUNBOOK.md` carries the table.
+
+**What did not move.** No database change and no gate. `materials_paid_jmd()` still has the last word on whether a tranche can go, and it still counts only paid invoices. This panel reports; it has never re-checked.
+## 2026-09-19 · A filed receipt closes the worker's row, and hands it to Yaadly
+
+**Why.** Founder, testing the worker portal on her own seed job. Materials money of J$48,000 was marked sent to the worker that morning, she uploaded the supplier receipt under Files that afternoon, and "Everything outstanding" still read **Send the materials receipt and a photo**, addressed to her, with her own file visible on the same page. A room that keeps asking for a thing it is already showing is not a to-do list, it is a bug the reader cannot clear.
+
+**Why it did that.** The row was derived from one column, `materials_releases.receipt_ref`, which only a person at the desk writes through `record_materials_receipt()`. That is correct for the money: the receipt is accounted against the release by a named human, and nothing in this change touches that. But it meant the portal had only two states where the worker experiences three: money sent, receipt with Yaadly, receipt recorded. The middle one had nowhere to be shown, so it displayed as the first.
+
+**What.** A pure module, `web/lib/portal/materials-receipt.ts`, returns `none`, `due` or `filed` from the releases and the job's files, held by `web/tests/materials-receipt.test.mjs`. `due` is the row exactly as it read before. `filed` is a new row attributed to **Yaadly**, not to the worker: "Materials receipt filed, with Yaadly", "A person at Yaadly checks it against the J$48,000 released and records it." The client's side of the same row says the worker has filed it and where to read it. A receipt only counts if it is the worker's, of kind `receipt`, and filed at or after the money was marked sent: an older receipt or a quote uploaded last week is not proof of what this money bought.
+
+**No gate moves, and this is the change most likely to be mistaken for one.** Nothing here records a receipt, releases money, approves a stage or pays anybody. `receipt_ref` is still written by one named person at the desk, and the row only stops appearing when they write it. What changed is who the room says it is waiting on, which is the truth in all three states rather than in two.
+
+**Deployed** 19 September 2026, `yaadly-app` version `73e541e3`, `app.yaadly.co.uk`, built and deployed with `npm run deploy` off `origin/main`. Proved by `wrangler deployments list`: the new version is the one serving 100% of traffic, over `0ae07dcb`. The app answers normally, and the portal still redirects a signed-out reader to sign in.
+
+**Not built: a client confirmation.** The founder asked for the closed row to read "awaiting client confirmation". No such step exists on this product: a client approves stage evidence, and Yaadly records the materials receipt against the money. Writing that sentence would have named a confirmation nobody is asked for and no button can give, so the row names Yaadly and tells the client they can read the receipt. If a real client sign-off on materials receipts is wanted it is a new gate, a column and a button, and it is hers to call.
+
+## 2026-09-19 · The copy sweep reaches the app, and the public board counts one parish as one
+
+**Why.** "Do the same" again, so the public surfaces were audited the way the desk was: the app at `app.yaadly.co.uk`, the marketing site, and what a stranger actually sees when they load either.
+
+**The audit came back clean on the thing being looked for**, and that is worth writing down rather than quietly finding something else to change. The public board and the public directory both read database views that already exclude her own test rows (`open_jobs` and `public_worker_profiles`, both filtering `is_test` since 9 September), so neither page has ever shown a seed row to a stranger. Both empty states are honest: the directory says "0 of 0 shown" over "the worker network is being built parish by parish, and nobody is listed before both checks are complete", and the board prints "0 identity checked workers" on its own front page rather than hiding it. Every hit for a banned phrase inside `web/` and `supabase/functions/` turned out to be a comment recording that the copy was NOT built, a guardrail's own banned list, or a model instruction forbidding it.
+
+**Two real things were found.**
+
+**The sweep did not read the app at all.** `scripts/check-copy.mjs`, added earlier the same day, covered `concierge/`, `docs/` and `preview/` and deliberately skipped `web/`, because the app's source comments quote the banned phrases in order to record that the comp asked for them and they were refused. That reason was real and the conclusion was wrong: the app is the surface a real client and a real worker read, so it is the one that most needs the guard. It now reads `web/app` and `web/components` with comments stripped first, block and line, so those comments stay exactly where they are and a banned phrase inside a rendered string is still a finding. Proved both ways before committing: the same sentence trips the check in a JSX string and passes in a comment.
+
+**"1 parishes covered"** sat on the public job board, which is the page a tradesperson reads while deciding whether this is a real network or an empty shell. Three of its four stat cards had plural-only labels. Each now carries a singular used at one.
+
+**Deployed** 19 September 2026, the app this time rather than the desk: `yaadly-app` version `0ae07dcb`, `app.yaadly.co.uk`, built and deployed with `npm run deploy` from `origin/main`. Confirmed live by fetching the board: it now reads "1 parish covered". The desk, the marketing site and the app all answered normally afterwards.
+
+## 2026-09-19 · Workers counts supply, and the sweep for the rest came back clean
+
+**Why.** Founder, "do the same", after the evidence, intake and money passes. So the desk was swept for the same three defects rather than one more view being picked by hand: a badge or headline that counts rows instead of work, a count that includes her own test rows, and a queue attributed to the wrong person.
+
+**What was left.** One thing. `Workers` reported **8 profiles on file, and all eight carry `is_test`**. Six of them are even marked active, which is the flag that lets somebody quote. So the one figure on this desk that answers "how much supply do I actually have" read eight when the answer is none. The Overview's people card said the same in words.
+
+**What.** Desk only, no database change. `Workers` declares `viz:{ want, wants }` with "real, can quote", so the view and its rail badge lead with profiles that are not tests and are active, over "8 loaded" in the small line underneath. The Overview's line counts real profiles and names the tests beside them rather than adding them in: "No real worker on file yet, 8 profiles are your own testing." The test rows stay in the table with the chip they already had, and "That was me testing" and "This one is real" are untouched, because which is which is her call and not a filter.
+
+**The rest of the sweep, and why nothing else changed.** Every other table view was checked against the same three questions. The badge half was already solved, and better than it would have been done here: another session made a badge conditional on a view being able to say what wants a person, and cleared it otherwise, so no badge on this desk now changes meaning when a view is opened. Only three tables carry `is_test` at all (`jobs`, `worker_profiles`, `intake_threads`), and the other two were already handled: `jobs` by that session's Jobs pass, `intake_threads` by the "waiting on you" count, which already excludes tests, and by the conversation state, which already draws a test chip. `applications`, `job_quotes`, `calls`, `kickoff_packs`, `sketch_packs`, `questions`, `enquiries` have no test flag to filter by, and all but sketch packs are at zero anyway. The three sketch packs are her own, flagged by an earlier session and deliberately left, because voiding her own rows is hers.
+
+**What this figure now says out loud.** Zero tradespeople who can take a job. That was true before today and the screen was hiding it behind eight.
+
+**Deployed** 19 September 2026, `yaadly-concierge` version `82b427c3`, from `origin/main` off disk. One modified asset uploaded, Access still answering 302.
+
+## 2026-09-19 · Desk deployed: concierge version cf2dfddd
+
+**What went live.** Everything on `main` at 09:38 UTC, which over the previous deploy (`3ed5934a`) is one change: the Materials releases row now naming both gates instead of only the materials store. `yaadly-concierge` version `cf2dfddd`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
+
+**Checked in the order the last entry asked for.** `concierge/concierge.html` and `concierge-deploy/public/index.html` compared to each other and both compared to `origin/main` before the deploy, not after, all three identical. Nothing else needed deploying: no Edge Function, no migration and no `web/` change landed in that merge, which was desk copy and this log only.
+
+## 2026-09-19 · A materials tranche has two gates, so the desk names both
+
+**Why.** Founder, reading the Materials releases view: "Waiting on the client's materials store, what is this mean". The chip was true and it was not the whole truth. Two separate things hold a tranche, the client naming where materials are kept and the client actually paying the materials line on their bill, and both can be outstanding at the same time. The panel tested the store first and showed that chip alone, so an unpaid bill was invisible behind a question about a cupboard. Answer the store and the chip would simply change to the money one, with nothing having moved and no warning that a second gate was ever there.
+
+**What changed.** Desk only, `concierge/concierge.html` and its deploy copy. No database change, no function change, no gate moved. Where both are outstanding the row now reads "Waiting on the client: the bill is not paid yet, and where materials are kept". Where one is, it names that one. Bill first, because that is the gate that actually holds the money, and it matches the wording the Pay workers view took the same day.
+
+**What did not move.** The store gate stays in `trg_enforce_store_before_open` and the two guards in `20260828c`, and the paid-for test stays in `materials_paid_jmd()`, which has the last word. This panel shows those refusals and has never re-checked them.
 ## 2026-09-19 · Desk deployed: concierge version 3ed5934a, after the deploy copy had gone stale
 
 **What went live.** Everything on `main` at the time: the evidence, intake and money work from this session, plus another session's Overview to-do band and its badge rule. `yaadly-concierge` version `3ed5934a`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
@@ -45,6 +131,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **What did not move.** Every other refusal in `20260917180000` stands word for word, it still fails closed on no job, no client bill or a bill in draft, and where a stage genuinely is billed the stage message is unchanged. The call-back gate, the Stripe payout gate and `mark_worker_paid()`'s admin check are untouched. No human gate moved: a named person still marks the client's bill paid, and a named person still sends the worker's money. `yaad-payout-send` needed no change, because it calls the same function by name.
 
 **Scope, checked rather than assumed.** Every worker payable currently owed across the database was read before the change. One was in this shape, and it was the test job, so no real money was ever stuck. The shape can recur on any job that carries a pre-13-September stage bill.
+
+**The desk had to follow, and did not at first.** Pay workers built its one-line reason from the pay invoice's own stage number and never read the database's answer, so the row still read "the client's stage 2 bill is not paid yet" after the rule had stopped asking for one. Fixed the same day: the line now names whatever the database named, prints a stage number only where the database printed one, and says the payment could not be checked when the check failed rather than guessing a bill. A rule corrected in the database and left wrong on the screen is not corrected, because the screen is what she reads.
 
 **Proof.** `supabase/tests/worker_pay_client_paid_guards.sql`, ten lines, all PASS, run against production inside a transaction that was rolled back, and the rollback verified afterwards by reading the live function back and confirming it still had the old body. Three existing expectations changed wording with the rule; each still asserts a refusal, and the test file says so beside each one rather than quietly.
 

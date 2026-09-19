@@ -21,6 +21,7 @@ import { PortalCard } from "@/components/portal/PortalCard";
 import { JobBrief } from "@/components/portal/JobBrief";
 import { IntakeThread } from "@/components/portal/IntakeThread";
 import { jobGates } from "@/lib/portal/gates";
+import { materialsReceipt } from "@/lib/portal/materials-receipt";
 import { DocStrip, type Doc } from "@/components/portal/DocStrip";
 import { TabBar, TABS, type TabKey } from "@/components/portal/TabBar";
 import { EvidenceLedger } from "@/components/portal/EvidenceLedger";
@@ -909,20 +910,50 @@ export default async function JobRoom({
   /* The receipt milestone: money only, not a stage. Each release that has
      been SENT with no receipt recorded against it is a receipt still to come.
      A release not yet sent is not: nobody can buy goods with money that has
-     not reached them. */
-  const receiptsDue = matReleases.filter((m) => m.released_at && m.sent_at && !m.receipt_ref?.trim());
-  if (receiptsDue.length && job.status !== "complete") {
-    const dueJmd = receiptsDue.reduce((t, m) => t + Number(m.amount_jmd ?? 0), 0);
+     not reached them.
+
+     Founder, 19 Sep 2026: filing the receipt has to close the worker's row.
+     Read off receipt_ref alone it did not, because only a person at Yaadly
+     writes receipt_ref, so a worker who had uploaded the receipt under Files
+     still read "Send the materials receipt", with their own file on the page
+     in front of them and no way to make the row stop asking. The two states
+     are now separated in lib/portal/materials-receipt.ts: due from the
+     worker, or filed by them and with Yaadly. NO GATE MOVES: recording the
+     receipt against the money is still one named person's decision at the
+     desk, and a filed receipt never records itself. */
+  const receipt = materialsReceipt(matReleases, jobFiles);
+  if (receipt.state === "due" && job.status !== "complete") {
     outstanding.push({
       who: isClient ? "them" : "you",
       title: isClient ? "The materials receipt is due from the worker" : "Send the materials receipt and a photo",
       detail: isClient
-        ? (money(dueJmd) ?? "Materials money") +
+        ? (money(receipt.jmd) ?? "Materials money") +
           " went to the worker to buy the goods. The receipt and a photo of the materials in the store come next, and Yaadly records them."
-        : (money(dueJmd) ?? "Materials money") +
+        : (money(receipt.jmd) ?? "Materials money") +
           " was paid to you to buy the goods. Upload the supplier receipt under Files, and file a photo of the materials in the store as materials evidence.",
       href: isClient ? jobBase + "?tab=materials#materials-money" : jobBase + "#files",
       cta: isClient ? "See it" : "Upload the receipt",
+    });
+  }
+  if (receipt.state === "filed" && job.status !== "complete") {
+    const filedOn = whenDate(receipt.filedAt);
+    outstanding.push({
+      who: "yaadly",
+      title: isClient
+        ? "The worker has filed the materials receipt"
+        : "Materials receipt filed, with Yaadly",
+      detail: isClient
+        ? (money(receipt.jmd) ?? "Materials money") +
+          " went to the worker to buy the goods, and their receipt is on the job" +
+          (filedOn ? ", filed " + filedOn : "") +
+          ". A person at Yaadly checks it against the money released and records it. You can read it under Files."
+        : "Your receipt is on the job" +
+          (filedOn ? ", filed " + filedOn : "") +
+          ". A person at Yaadly checks it against the " +
+          (money(receipt.jmd) ?? "materials money") +
+          " released and records it, and the client can read it under Files. If the photo of the materials in the store is still to come, it goes on Progress evidence.",
+      href: jobBase + "#files",
+      cta: "See it",
     });
   }
   for (const inv of invoices) {

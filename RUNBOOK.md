@@ -5423,6 +5423,18 @@ Job bills are kept in whole Jamaican dollars and service invoices in pence, in t
 
 Since 14 September 2026 (`20260914112000`) materials money goes to the worker **before** the goods are bought, once the client has paid for them. The receipt comes back afterwards.
 
+**What the row says, and whose move it is (19 Sep 2026).** Three things gate a tranche and more than one can be outstanding at once, so the chip names all of them rather than the first it finds.
+
+| The row says | What is true | Whose move |
+|---|---|---|
+| The materials are not on a bill yet | No invoice on the job carries a "Materials, at cost" line, or the ones that do are void | **Yours.** Raise or amend the client's bill so it carries the materials line |
+| The bill for them has not gone out yet | The line is on a bill that is still a draft, so the client has never seen it | **Yours.** Send it from Invoices |
+| Waiting on the client: the bill is not paid yet | The bill carrying the line was sent and is not marked paid | Theirs to pay, yours to mark paid |
+| Waiting on the client: where materials are kept | No nominated store on the job | Theirs, or yours at the desk writing down what they said on the phone |
+| Ready to release | Store named, materials billed and paid | Yours |
+
+Until 19 September the row tested the store first and showed that chip alone, and when it did mention money it said "not paid" whatever the state of the bill. Two jobs had every bill paid with no materials line on any of them, and a third had the line on a draft that had never been sent. All three read as the client's fault when the next move was Yaadly's.
+
 1. **Release it.** Desk, Materials view. The row shows what the client has paid for, what has gone out and what is left. Press **Release materials money**. The receipt box can stay empty; it usually comes later.
 2. **"The client has paid J$X for materials..."** The bill carrying the materials is not marked paid yet. Mark it paid on Invoices first (or, on a bill in parts, the part carrying the materials line). The database counts only paid invoices, and only lines that still read "Materials, at cost". If somebody retyped that line in the invoice editor, it no longer counts: put the wording back rather than working round it.
 3. **"...no materials store nominated..."** The client has not said where materials are kept. Unchanged: ask them.
@@ -5434,6 +5446,7 @@ Since 14 September 2026 (`20260914112000`) materials money goes to the worker **
 9. **The worker says no WhatsApp arrived.** It is free text, so it only arrives if they have messaged the Yaadly number in the last 24 hours. Check Supabase, Edge Functions, `yaad-notify-client`, Logs, for kind `materials_sent_worker`, and tell them by phone. Their portal shows the release as Sent either way.
 10. **Proving the sent rules hold:** run `supabase/tests/materials_sent_guards.sql` with `execute_sql`. Eleven lines, all PASS. Nothing is kept, and the WhatsApp it queues is thrown away with everything else.
 11. **Deploy order for this change:** apply `20260914190000` first, then deploy `yaad-notify-client` (it keeps `--no-verify-jwt`, it is on the CLAUDE.md §12 list), then the web app, then the desk. The portal and the desk read `sent_at`; before the migration that read fails and the release list shows nothing.
+12. **The portal tells you when a receipt has arrived** (19 Sep 2026). Once the worker uploads a file of kind **Receipt** under Files on the job, at or after the money was marked sent, their outstanding row stops asking them for it and moves to **Yaadly**: "Materials receipt filed, with Yaadly". That row is your prompt to open the file, read the reference off it and record it at step 4. Until you do, the release still shows **receipt to come** on the desk and still counts towards overdue at step 7: the portal moved a label, it did not record anything. Nothing in the desk changed. If a worker says they have sent the receipt and the row still reads "Send the materials receipt", check they filed it as Receipt rather than Something else, and that it went on after the money was sent: `select side, kind, created_at from job_files where job_id = '<job>';`
 
 ## Card payment on an invoice (Stripe, phase 1, test mode)
 
@@ -5547,7 +5560,7 @@ Founder's instruction, 14 Sep 2026. **Every step here is hers; no session handle
 
 **What it is.** Founder decision, 17 Sep 2026: nobody is paid for work until the client's bill for that work is marked paid. On **Pay workers** each owed row shows a **Client paid?** column (paid, or not yet with the short reason; the database's full sentence and the job's client bills are on that chip's tooltip), who approved the stage, and three links: **Pay invoice**, **Job invoices**, **Job record**.
 
-Since 19 Sep 2026 a blocked row carries no payment controls at all. It says **Waiting on the client**, names which bill is unpaid, and offers one button, **Open the client's bill**. There is no greyed Mark as sent and no greyed Pay with Stripe, because a button that only ever refuses is not information. The desk was never the control and still is not: `mark_worker_paid()` refuses too, and `yaad-payout-send` refuses before it quotes and again before it sends, because a Stripe payout leaves before the invoice is marked.
+Since 19 Sep 2026 a blocked row carries no payment controls at all. It says **Waiting on the client**, names which bill is unpaid, and offers one button, **Open the client's bill**. The short reason under the chip is taken from the database's own sentence, not built from the pay invoice's stage number, so it names the actual outstanding bill (for example "INV-2026-0024 is not paid yet"). It prints a stage number only when the database printed one, and says "the client's payment could not be checked" when the check failed to run. Before that correction, also 19 Sep, it always read "the client's stage N bill is not paid yet", which after `20260919160000` pointed at a document that does not exist. There is no greyed Mark as sent and no greyed Pay with Stripe, because a button that only ever refuses is not information. The desk was never the control and still is not: `mark_worker_paid()` refuses too, and `yaad-payout-send` refuses before it quotes and again before it sends, because a Stripe payout leaves before the invoice is marked.
 
 1. **The rule** is `worker_pay_client_unpaid(invoice)`, which returns nothing when the worker may be paid and a plain-English reason otherwise. Billed by stage (accepted quote says `by_stage`, or a client bill has stage 1 or more): the client's bill for that stage must be paid, and so must the whole-job fee bill and any stage 0 materials bill. Billed in full: every whole-job bill and every part of one, and the materials bill. A bill with nothing left on it (every line moved into parts) is ignored. It fails closed.
    **Since 19 Sep 2026 (`20260919160000`)** the stage rule applies only where a client bill actually carries that stage number. Where none does, the pay invoice is checked against the whole job instead: a paid whole-job bill must exist, and every whole-job bill and the materials bill must be paid. This was not a loosening for its own sake. Nothing since `20260913233000` can raise a stage-numbered client bill (`raise_job_client_invoice()` takes no stage, and `request_invoice_part()` refuses a bill that has one), so on a job carrying one legacy stage bill the old wording asked for a document that cannot be made, and the row could not be cleared by any click. It still fails closed: with nothing of the client's paid, it still refuses.
@@ -5732,7 +5745,7 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 
 1. **Read the finding.** It names the file, the line and the exact phrase. The phrases come from `docs/COPY-GUIDELINES.md` section 6.
 2. **The copy is wrong, not the list.** Rewrite the sentence to say what happens rather than to deny what does not: the client pays Yaadly one agreed price, and Yaadly engages and pays the tradesperson under its own separate agreement. A denial ("no money is held", "Yaadly holds none of it") trips the check on purpose, because section 2 bans the bare denial too.
-3. **It only reads `concierge/`, `docs/` and `preview/`**, the folders that are page copy end to end. `web/` and `supabase/` are left out on purpose: their source comments discuss these phrases in order to ban them, and they have their own guardrail test suites.
+3. **It reads `concierge/`, `docs/`, `preview/`, `web/app` and `web/components`.** In the code folders it strips comments first, block and line, because those comments quote the banned phrases on purpose, to record that a design asked for them and they were refused. A banned phrase inside a rendered string is still a finding. `supabase/` is left out: it has its own guardrail test suites, and its banned lists are the phrases themselves.
 4. **`docs/` may answer the escrow worry head on**, with the exact words "does not operate an escrow service", and nothing else may say the word at all. That asymmetry is in COPY-GUIDELINES section 2.
 5. **To add or remove a phrase**, change `docs/COPY-GUIDELINES.md` and `scripts/check-copy.mjs` in the same commit, and say so to Monique: the list is a rule about what the business claims, not a lint preference.
 6. **Run it by hand:** `node scripts/check-copy.mjs`. Prints one line when clean.
@@ -5752,3 +5765,11 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 4. **A badge you expected is missing.** Either its queue is at zero, which is the badge working, or `loadOverview` threw. Open the browser console: if the Overview drew nothing at all, read §1 of this file and the note at the top of `scripts/check-desk-script.mjs`, because a `const` declared below its first use is how that has failed twice.
 5. **The band is empty but you know there is work.** The band deliberately leaves out any queue whose `tone` is `"client"`, because those are somebody else's move. They are named in the grey line underneath it. Nothing is hidden, it is sorted.
 6. **The band and the "Waiting on you" bar chart say the same thing.** They do. That is known and left alone for now; cutting the widget re-lays the Overview grid.
+
+## Workers says 0 and you can see rows in the table (19 Sep 2026)
+
+1. **The number is supply, not rows.** It counts profiles that are not marked as your own test AND are `active`, which is the flag that lets somebody quote. The small line underneath still says how many rows were loaded.
+2. **To see the split:** `select is_test, active, count(*) from worker_profiles group by 1,2;`. On 19 September 2026 that was 8 rows, all `is_test = true`, six of them active.
+3. **A real worker reads as a test.** Open the row and press "This one is real" (`mark_worker_test`). It is recorded as your decision.
+4. **A real, active worker still is not counted.** Check `active`: a profile that is not published cannot quote, so it is not supply. Publishing is done from Applications.
+5. **The Overview's people card says the same thing in words**, and names the tests beside the real count rather than adding them in.
