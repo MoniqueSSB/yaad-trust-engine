@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · A filed receipt closes the worker's row, and hands it to Yaadly
+
+**Why.** Founder, testing the worker portal on her own seed job. Materials money of J$48,000 was marked sent to the worker that morning, she uploaded the supplier receipt under Files that afternoon, and "Everything outstanding" still read **Send the materials receipt and a photo**, addressed to her, with her own file visible on the same page. A room that keeps asking for a thing it is already showing is not a to-do list, it is a bug the reader cannot clear.
+
+**Why it did that.** The row was derived from one column, `materials_releases.receipt_ref`, which only a person at the desk writes through `record_materials_receipt()`. That is correct for the money: the receipt is accounted against the release by a named human, and nothing in this change touches that. But it meant the portal had only two states where the worker experiences three: money sent, receipt with Yaadly, receipt recorded. The middle one had nowhere to be shown, so it displayed as the first.
+
+**What.** A pure module, `web/lib/portal/materials-receipt.ts`, returns `none`, `due` or `filed` from the releases and the job's files, held by `web/tests/materials-receipt.test.mjs`. `due` is the row exactly as it read before. `filed` is a new row attributed to **Yaadly**, not to the worker: "Materials receipt filed, with Yaadly", "A person at Yaadly checks it against the J$48,000 released and records it." The client's side of the same row says the worker has filed it and where to read it. A receipt only counts if it is the worker's, of kind `receipt`, and filed at or after the money was marked sent: an older receipt or a quote uploaded last week is not proof of what this money bought.
+
+**No gate moves, and this is the change most likely to be mistaken for one.** Nothing here records a receipt, releases money, approves a stage or pays anybody. `receipt_ref` is still written by one named person at the desk, and the row only stops appearing when they write it. What changed is who the room says it is waiting on, which is the truth in all three states rather than in two.
+
+**Not built: a client confirmation.** The founder asked for the closed row to read "awaiting client confirmation". No such step exists on this product: a client approves stage evidence, and Yaadly records the materials receipt against the money. Writing that sentence would have named a confirmation nobody is asked for and no button can give, so the row names Yaadly and tells the client they can read the receipt. If a real client sign-off on materials receipts is wanted it is a new gate, a column and a button, and it is hers to call.
+
 ## 2026-09-19 · The copy sweep reaches the app, and the public board counts one parish as one
 
 **Why.** "Do the same" again, so the public surfaces were audited the way the desk was: the app at `app.yaadly.co.uk`, the marketing site, and what a stranger actually sees when they load either.
