@@ -647,12 +647,24 @@ async function sendWhatsAppTo(to: string, body: string, trace: Trace, meta: Send
  *  until a template id exists (the TWILIO_CONTENT_SID_PHASE secret, or the
  *  app_settings row yaad-twilio-setup writes; RUNBOOK.md, "The section
  *  menu") nothing changes at all. The lead sentence goes in as {{1}}. */
-async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace: Trace): Promise<boolean> {
+async function sendPhaseMenu(to: string, lead: string, contentSid: string, messagingServiceSid: string, trace: Trace): Promise<boolean> {
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID") ?? "";
   const tok = Deno.env.get("TWILIO_AUTH_TOKEN") ?? "";
   const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
   const digits = to.replace(/\D/g, "");
   if (!contentSid || !sid || !tok || !from || digits.length < 7) return false;
+  // "A Messaging Service is a prerequisite for using Content Templates",
+  // Twilio's own words, and the reason this send was refused with 20422
+  // Invalid Parameter every time from 15 to 19 September 2026 while plain
+  // text sends from the same number went out fine: a Body needs no Messaging
+  // Service and a ContentSid does. The From number does NOT have to be in
+  // the service's sender pool, so naming the service is the whole fix.
+  // Without one there is nothing to try, so the typed question goes instead
+  // of a send that is certain to fail.
+  if (!messagingServiceSid) {
+    console.error("sendPhaseMenu: no Messaging Service is set, so the menu cannot be sent. See RUNBOOK, the section menu.");
+    return false;
+  }
   // The lead is made of fixed strings and a stage label, but it reaches a
   // phone, so it is screened like every other reply. A finding means the
   // typed fallback runs instead, and that goes through twiml()'s own screen.
@@ -665,7 +677,8 @@ async function sendPhaseMenu(to: string, lead: string, contentSid: string, trace
         method: "POST",
         headers: { Authorization: "Basic " + btoa(`${sid}:${tok}`), "Content-Type": "application/x-www-form-urlencoded" },
         body: withStatusCallback(new URLSearchParams({
-          To: `whatsapp:+${digits}`, From: from, ContentSid: contentSid,
+          To: `whatsapp:+${digits}`, From: from, MessagingServiceSid: messagingServiceSid,
+          ContentSid: contentSid,
           ContentVariables: JSON.stringify({ "1": lead.slice(0, 900) }),
         })),
         signal: AbortSignal.timeout(15000),
@@ -1944,10 +1957,12 @@ Deno.serve(async (req: Request) => {
   // when it created the template (app_settings.twilio_content_sid_phase).
   const askPhase = async (settings: SettingsReader, to: string, channel: string, lead: string) => {
     if (channel === "whatsapp") {
-      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE")
-        || (await readSettings(settings, ["twilio_content_sid_phase"])).twilio_content_sid_phase
-        || "";
-      if (contentSid && await sendPhaseMenu(to, lead, contentSid, trace)) return twimlSilent();
+      const set = await readSettings(settings, ["twilio_content_sid_phase", "twilio_messaging_service_sid"]);
+      const contentSid = Deno.env.get("TWILIO_CONTENT_SID_PHASE") || set.twilio_content_sid_phase || "";
+      // Both are needed, and either one blank turns the menu off and leaves
+      // the typed letters, which is still the switch.
+      const serviceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID") || set.twilio_messaging_service_sid || "";
+      if (contentSid && await sendPhaseMenu(to, lead, contentSid, serviceSid, trace)) return twimlSilent();
     }
     return twiml(`${lead} ${PHASE_QUESTION}`);
   };

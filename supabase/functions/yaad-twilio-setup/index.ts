@@ -195,6 +195,55 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // What Messaging Services the account has, and which senders are in them.
+  // 19 Sep 2026: "A Messaging Service is a prerequisite for using Content
+  // Templates" (Twilio's own docs), and Yaadly's menu send passes a From
+  // number and no MessagingServiceSid, which is what Twilio has been
+  // refusing with 20422 since 15 September. Read only: lists, never creates.
+  if (action === "list-messaging-services") {
+    const r = await fetch(`https://messaging.twilio.com/v1/Services?PageSize=50`, {
+      headers: { Authorization: "Basic " + btoa(`${SID}:${TOK}`) },
+      signal: AbortSignal.timeout(20000),
+    });
+    const listed = await r.json().catch(() => null) as { services?: { sid: string; friendly_name: string }[] } | null;
+    const services = listed?.services ?? [];
+    const withSenders = [];
+    for (const svc of services) {
+      const sr = await fetch(`https://messaging.twilio.com/v1/Services/${svc.sid}/PhoneNumbers?PageSize=50`, {
+        headers: { Authorization: "Basic " + btoa(`${SID}:${TOK}`) },
+        signal: AbortSignal.timeout(20000),
+      });
+      const nums = await sr.json().catch(() => null) as { phone_numbers?: { phone_number: string }[] } | null;
+      withSenders.push({
+        sid: svc.sid,
+        friendly_name: svc.friendly_name,
+        numbers: (nums?.phone_numbers ?? []).map((n) => n.phone_number),
+      });
+    }
+    return json({ status: r.status, count: services.length, services: withSenders, whatsappFrom: Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "" });
+  }
+
+  // Record which Messaging Service the menu send names, 19 Sep 2026.
+  // Checked against Twilio before it is written, so a typo cannot quietly
+  // turn the menu off. Blanking the row on the desk turns the menu off and
+  // the typed letters come back, the same switch the template id already is.
+  if (action === "use-messaging-service") {
+    const wanted = String(body.messagingServiceSid ?? "").trim();
+    if (!/^MG[0-9a-f]{32}$/i.test(wanted)) return json({ error: "Give a messagingServiceSid that looks like MG followed by 32 hex characters." }, 400);
+    const r = await fetch(`https://messaging.twilio.com/v1/Services/${wanted}`, {
+      headers: { Authorization: "Basic " + btoa(`${SID}:${TOK}`) },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return json({ error: "Twilio does not know that Messaging Service.", status: r.status }, 404);
+    const svc = await r.json().catch(() => null) as { friendly_name?: string } | null;
+    const { error } = await admin.from("app_settings").upsert(
+      { key: "twilio_messaging_service_sid", value: JSON.stringify(wanted) },
+      { onConflict: "key" },
+    );
+    if (error) return json({ error: `app_settings would not take it: ${error.message}` }, 500);
+    return json({ ok: true, messagingServiceSid: wanted, friendly_name: svc?.friendly_name ?? null, setting: "twilio_messaging_service_sid" });
+  }
+
   // Submit the section menu to Meta for WhatsApp approval, 19 Sep 2026.
   //
   // Founder's instruction, after the read-back above showed the template is
