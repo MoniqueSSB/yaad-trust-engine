@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { SECTION_MENU_NAME, sectionMenuContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
+import { recordAccepted, withStatusCallback } from "./twilio-status.ts";
+import { SECTION_MENU_APPROVAL, SECTION_MENU_NAME, sectionMenuContent, WORKER_UPDATE_APPROVAL, WORKER_UPDATE_NAME, workerUpdateContent } from "./content.ts";
 
 // A one-shot helper for creating Yaadly's WhatsApp content templates in
 // Twilio, 15 September 2026.
@@ -159,6 +160,17 @@ Deno.serve(async (req: Request) => {
   //
   // Reads only. Creates nothing, sends nothing, writes no setting. Safe to
   // run on a live account at any time.
+  // The recorded ContentSid, or the template of that name if nothing is
+  // recorded. One definition, so the read-back, the submission and the test
+  // send can never end up talking about different templates.
+  const sectionMenuSid = async (): Promise<string> => {
+    const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_phase").maybeSingle();
+    let recorded = "";
+    try { recorded = String(JSON.parse(String(st?.value ?? '""'))); } catch (_) { recorded = String(st?.value ?? ""); }
+    const sid = recorded || (await listAll()).find((c) => c.friendly_name === SECTION_MENU_NAME)?.sid || "";
+    return /^HX[0-9a-f]{32}$/i.test(sid) ? sid : "";
+  };
+
   if (action === "describe-section-menu") {
     const { data: st } = await admin.from("app_settings").select("value").eq("key", "twilio_content_sid_phase").maybeSingle();
     let recorded = "";
@@ -181,6 +193,66 @@ Deno.serve(async (req: Request) => {
       approval: { status: approval.status, body: approval.body },
       codeWouldCreate: sectionMenuContent(),
     });
+  }
+
+  // Submit the section menu to Meta for WhatsApp approval, 19 Sep 2026.
+  //
+  // Founder's instruction, after the read-back above showed the template is
+  // correct in every respect except that it has never been submitted, while
+  // Twilio refuses every send of it. Unlike the worker update template,
+  // nothing here waits on approval: yaad-inbound already holds the ContentSid
+  // and already tries the menu on every send, so if approval is what was
+  // missing the menu starts working on its own the moment Meta says yes, and
+  // if approval was not the problem this changes nothing and costs nothing.
+  if (action === "submit-section-menu") {
+    const sid = await sectionMenuSid();
+    if (!sid) return json({ error: "No section menu template to submit. Run create-section-menu first." }, 404);
+    const submitted = await call(`/Content/${sid}/ApprovalRequests/whatsapp`, {
+      method: "POST", body: JSON.stringify(SECTION_MENU_APPROVAL),
+    });
+    const now = await call(`/Content/${sid}/ApprovalRequests`);
+    return json({
+      sid,
+      submitted: { status: submitted.status, body: submitted.body },
+      approvalNow: { status: now.status, body: now.body },
+      askedFor: SECTION_MENU_APPROVAL,
+    });
+  }
+
+  // Send the section menu, once, to a number given in this request, and hand
+  // back whatever Twilio says, 19 Sep 2026.
+  //
+  // THIS SENDS A REAL WHATSAPP MESSAGE. It exists because the refusal that
+  // matters ("Invalid Parameter") only happens on a live send, and waiting
+  // for a worker to file a photo to read an error code is not a diagnosis,
+  // it is a hope. The number is never defaulted and never looked up: it is
+  // typed into the request by whoever runs this, so nobody is messaged by
+  // accident. Twilio's whole error body comes back, code and all, which is
+  // the point. Nothing is filed, no job is touched, no setting is written.
+  if (action === "test-send-section-menu") {
+    const to = String(body.to ?? "").replace(/\D/g, "");
+    if (to.length < 7) return json({ error: "Give a full number in 'to', with the country code." }, 400);
+    const from = Deno.env.get("TWILIO_WHATSAPP_FROM") ?? "";
+    if (!from) return json({ error: "TWILIO_WHATSAPP_FROM is not set on this project." }, 500);
+    const sid = await sectionMenuSid();
+    if (!sid) return json({ error: "No section menu template to send." }, 404);
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${SID}/Messages.json`, {
+      method: "POST",
+      headers: { Authorization: "Basic " + btoa(`${SID}:${TOK}`), "Content-Type": "application/x-www-form-urlencoded" },
+      body: withStatusCallback(new URLSearchParams({
+        To: `whatsapp:+${to}`, From: from, ContentSid: sid,
+        ContentVariables: JSON.stringify({ "1": "Test of the section menu, nothing is filed by this." }),
+      })),
+      signal: AbortSignal.timeout(20000),
+    });
+    // A real message went to a real phone, so it goes on the desk's "Did it
+    // arrive" page like every other send. A test send nobody can see the fate
+    // of is the same blind spot this whole session is about.
+    await recordAccepted(r.clone(), to, "whatsapp", { kind: "section menu test" });
+    const text = await r.text();
+    let parsed: unknown = text;
+    try { parsed = JSON.parse(text); } catch (_) { /* keep raw */ }
+    return json({ sid, sentTo: `+${to}`, ok: r.ok, status: r.status, twilio: parsed });
   }
 
   // The worker update template (17 Sep 2026, founder: "fix this"). Creates it,
