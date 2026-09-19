@@ -69,6 +69,16 @@ Deno.test("readsAsYes is narrow on its own terms", () => {
   assert(!readsAsYes("yes that one is done and the next one starts tomorrow"));
 });
 
+/* The prompt promises "Reply 1 to confirm it is that job" (19 Sep 2026), so
+   1 has to keep confirming the single job. It always did; the message now
+   says so, and this holds the two together. */
+Deno.test("1 confirms the only job on offer, as the prompt now promises", () => {
+  assertEquals(pickJobChoice("1", ONE)?.id, "JOB-0042");
+  assertEquals(pickJobChoice(" 1 ", ONE)?.id, "JOB-0042");
+  // Still nothing else. 2 names a job that was never offered.
+  assertEquals(pickJobChoice("2", ONE), null);
+});
+
 Deno.test("an ordinal number still works as a convenience", () => {
   assertEquals(pickJobChoice("1", TWO)?.id, "JOB-0042");
   assertEquals(pickJobChoice("2", TWO)?.id, "JOB-0099");

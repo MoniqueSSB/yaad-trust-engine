@@ -2754,12 +2754,25 @@ Deno.serve(async (req: Request) => {
       // Said when the photo is first parked and again if a reply does not
       // match a job, not on every message: a clock repeated four times in a
       // row reads as nagging and stops being heard.
-      const UNFILED_NOTICE = "It is not attached to a job or a stage until you send the code, and an unattached photo is deleted after 72 hours.";
+      const UNFILED_NOTICE = "It is not attached to a job or a stage until you confirm which job it is, and an unattached photo is deleted after 72 hours.";
       const UNFILED_NOTICE_SHORT = "It is not on the job until you answer, and an unfiled photo is deleted after 72 hours.";
 
       const codePrompt = (choices: { id: string; title: string }[]) =>
         choices.length === 1
-          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply with the code ${choices[0].id} to confirm, or tell us the right job.`
+          // One job, so ask for one keystroke. Founder, 19 Sep 2026: "I want
+          // the whatsapp to say 1 for ... it is that job". Reading a
+          // twenty-character code off the screen above and typing it back on
+          // a phone, mid-job, was never a real ask. "1" was already accepted
+          // here and always has been (pickJobChoice takes an ordinal inside
+          // this session); the message simply never said so, which is the
+          // worst of both, a shortcut that exists and is kept secret. The
+          // code still works for anyone who sends it.
+          //
+          // "Confirm", never "approve". Approving is a named human deciding
+          // about money or a stage (HUMAN_ONLY_DECISIONS). Saying which job a
+          // photograph belongs to is neither, and the two must not start
+          // sharing a word in front of workers.
+          ? `This looks like it is for ${choices[0].id} (${choices[0].title}). Reply 1 to confirm it is that job, or tell us the right job.`
           : `Which job is this for? Reply with the code:  ${choices.map((c) => `${c.id} (${c.title})`).join("  ")}`;
 
       // The job-code answer to a freeform update that named more than one
