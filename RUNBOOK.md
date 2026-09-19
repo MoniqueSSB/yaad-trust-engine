@@ -499,6 +499,30 @@ If WhatsApp fails outright, a short text goes to the same number, but only if `T
 
 ---
 
+## 10e-i. Working the Intake queue
+
+**Intake is one list over three front doors.** It has no table of its own. It reads `jobs` still at `awaiting_client_setup`, `enquiries`, and `intake_threads`, every time you open it. The hint under the table names all three.
+
+**The box at the top is the work.** It lists only the rows with somebody on the other end of them: nobody has answered them, they left no way back, or the job they built cannot move. Everything else is below it. Click any row in either place to open it.
+
+**What opens.** Three blocks. **Still outstanding**, what is missing or undone and why each one matters. **What they gave you**, every field they actually filled in, and their own words printed whole. **Reach them**, the WhatsApp, call and email buttons with a draft already written, plus the one button that finishes this kind of row: Open the job, Open the conversation, or I have answered this.
+
+**Every Reach them button opens your own app, as you. The desk sends nothing from this screen.** On a conversation, use **Open the conversation** instead and reply from the Yaadly number, so it lands in the chat they already have. A reply from your own number reads to the client as a stranger.
+
+**Your own tests sort to the bottom and are never counted in the box at the top.** A job or a conversation marked `is_test`, and an enquiry marked as a test, all carry a grey "test" state.
+
+**When you cannot answer somebody, close the row.** An enquiry or a conversation with no number and no address will sit at the top of Waiting on you forever otherwise. Open it and press **Close it, nothing to answer**. On an enquiry that marks it binned; it does **not** stamp the reply clock, because you did not reply. On a conversation it stops the clock, hands the number back to the assistant, and saves the reason you type into your own notes on that thread, with your address and the day. It sends nothing and tells them nothing. If they write in again and a person is needed, it comes back on this queue by itself. A closed row shows **closed by you** with your reason on it.
+
+**A job is not closable from here.** Cancelling a job is done on the job page, through **Open the job**, because that is the screen that shows what is being cancelled.
+
+**Nothing on this queue decides anything.** Putting a job on the board is on the job page, converting an enquiry into a booking is under Enquiries, attaching a job to a conversation is under Conversations (10f above). Those buttons exist once each, on the page that shows what is being changed.
+
+**If one door is shut**, the queue says which table could not be read, in red, and shows the other two in full underneath. That is the read failing, not the queue being empty.
+
+**`intakes` is a dead table.** It is still in the database with one test row in it from 12 August 2026. Nothing has written to it since `yaad-website-intake` was retired on 31 August, and nothing reads it any more. Do not put it back on a screen.
+
+---
+
 ## 10f. Turning a conversation into a job
 
 A conversation the assistant read as a question writes **no job row**. That is deliberate, and it is why your job list is not full of people asking how Yaadly works. When one of them turns out to be real work, you promote it yourself.
@@ -4335,6 +4359,42 @@ correcting one is ordinary. Doing it silently would not be.
 Materials is refused a section, here and everywhere: it is its own thing on
 `evidence.kind` and the database constraint will not take a phase on it.
 
+## A sketch pack cannot be sent to the client, or the desk says "no job attached"
+
+A client reads a pack through their job. The row policy `sketch_client_read`
+wants `status = 'issued'` **and** a job on the pack whose `client_email` is the
+reader's. No job on the pack, no reader, however far you take it.
+
+Every pack made before 19 September 2026 has `job_id` null, because the capture
+form collected "Job reference" as free text into `job_ref` and the desk never
+sent `job_id` at all. Live job ids look like `JOB-WEB-1789253807959`, so nobody
+was ever going to type one into that box.
+
+To fix one: open the pack on the desk while it is still a **draft**, pick the
+job in "Job this belongs to", press Attach. An approved pack is frozen, so
+reopening it to attach a job starts a new revision, which is why the picker is
+only on drafts. New packs pick the job in the capture form before you build
+them.
+
+`job_ref` is a different field and is left alone: it is the client's **own**
+reference, free text, printed on the report, and it is edited on the draft.
+
+## Voiding several sketch packs at once
+
+Tick them in the packs list and press Void selected. Only packs at `draft` or
+`approved` can be ticked; issued and void ones are the log.
+
+The database still refuses a void from anything that is not a signed-in Yaadly
+admin (`sketch_guard_approval`, which raises "only a signed-in Yaadly admin may
+void a sketch pack"). That gate is untouched and is not overridable: a Claude
+session cannot do this over SQL or the Supabase MCP, because that connection
+carries no `auth.jwt()` and `is_admin()` is false. The bulk tick saves the
+repetition, not the decision. Each pack is written one at a time, so a refusal
+names the pack it refused rather than failing the set anonymously.
+
+Voiding deletes nothing. The row stays, marked void, and a void pack can be set
+back to draft later.
+
 ## A sketch pack or a report was refused for a measurement, and the sentence looks innocent
 
 The rule is in one place now: `supabase/functions/_shared/measurements.ts`.
@@ -5624,10 +5684,12 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 
 ## Intake says nobody is stuck, or the queue looks empty (19 Sep 2026)
 
+*Written the same day the queue was moved onto the three live tables, and corrected for it. The section above, "Working the Intake queue", is what the screen does now.*
+
 1. **"Built, never signed" reads 0 and you expected a number.** It counts real people only: `NOT (is_test IS TRUE)` on jobs at `awaiting_client_setup`. Your own test jobs are named, never counted. To see the split: `select is_test, count(*) from jobs where status = 'awaiting_client_setup' group by 1;`. On 19 Sep 2026 that was 24 rows, all `true`, and six places on the desk were calling them people waiting on you.
-2. **A real lead is missing from that panel.** It reads the newest 50 at that stage. Check the job's `is_test`: if it was marked as testing by mistake, the row is folded into the details block underneath, not lost. Open it there and unmark it.
-3. **The queue table under the panel is empty or nearly so.** That is correct. Nothing in this repository writes to `public.intakes`: a job now arrives through `yaad-post-job` into `jobs`, a WhatsApp message through `yaad-inbound`, a contact form through `yaad-enquiry`. The newest row in `intakes` is a test from 12 August 2026.
-4. **The Intake badge and the headline number disagree with the rows on screen.** They are not the row count. Both read `viz.want` on the view, which is `status` of `new` or `triaged`, so a screen full of converted and binned rows correctly leads with zero.
+2. **A real lead is missing from the queue.** Each of the three reads takes the newest 150. Check the job's `is_test`: a row marked as testing by mistake is sorted to the bottom of the queue, not lost. Open it and unmark it on the job page.
+3. **You expected rows from `public.intakes`.** There are none, and the queue no longer reads that table. Nothing in this repository has written to it since 31 August 2026. A job arrives through `yaad-post-job` into `jobs`, a WhatsApp message through `yaad-inbound` into `intake_threads`, a contact form through `yaad-enquiry` into `enquiries`, and those three are what the queue reads.
+4. **The rail badge and the headline number disagree.** The badge is set twice: the Overview sets it to people waiting on a reply, then opening the view replaces it with the number of rows loaded. That is every view's behaviour, not Intake's.
 5. **`intakes` can still be written to by anyone with the publishable key.** The policy `public submits requests` is `INSERT ... WITH CHECK (true)`, left over from the old website form. Nothing calls it. If you want it shut, that is a one line migration dropping the policy; flagged 19 Sep 2026, not done, because it is a decision rather than a fix.
 
 ## Outstanding, or any money figure, looks too low (19 Sep 2026)

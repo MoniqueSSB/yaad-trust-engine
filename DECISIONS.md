@@ -22,6 +22,40 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Flagged, not changed.** The Money view still says "Holding goes live once PI insurance is in force" and "Yaadly holds no money today. Holding starts when PI insurance is in force." That is the banned idea CLAUDE.md §8 warns about, the one the guardrail screen cannot see because no single word in it is banned: since 3 September Yaadly is the principal contractor and does not hold anybody's money, before or after any insurance. Correcting it needs a sentence about what the insurance is actually for, which is a legal and insurance fact rather than a display fix, so it is written down here for her and left alone.
 
+## 2026-09-19 · The Intake queue reads the three live front doors, not a dead table
+
+**Why.** Founder, 19 Sep 2026: "i should be able to click and see what is outstanding and ways to follow up with the intakes by email or whatsapp. or what they provided". Building that on the queue as it stood would have produced a good screen over nothing. The view read a table called `intakes`, and that table held exactly one row: a test submitted on 12 August. Nothing had written to it since `yaad-website-intake` was retired on 31 August, when the public "Tell us what needs doing" form was deleted and the app became the only place a job is created. So the screen's own subtitle, "everything that came in through the website form, WhatsApp or a DM", named three doors and showed none of them, and the Overview tile counting the same table reported "queue is clear" every single day by construction rather than by fact. A screen that is reliably empty stops being read, and then the day something does land in it, it is not read either.
+
+**What.** Desk only, `concierge/concierge.html`. No database change, no new RPC, no migration. The view now builds its rows from three live tables in parallel: `jobs` at `awaiting_client_setup` (somebody built a whole job and walked away before an account existed), `enquiries` (the contact form at the bottom of the site) and `intake_threads` (WhatsApp and the chat widget). Each is flattened into one row shape whose computed fields all carry an underscore, so they can never collide with a real column, and the source row's own columns are spread alongside, which is what keeps "Every field, as stored" in the drawer a picture of the record rather than of something this file invented. Opening a row draws three blocks: **Still outstanding**, a named list of what is missing or undone with a sentence on why each one matters; **What they gave you**, every field they actually filled in, and their own words printed whole and never cut; and **Reach them**, the WhatsApp, call and email buttons with a draft written from those words. A read that fails names its own door and leaves the other two standing.
+
+**The framework change behind it.** `loadTableView` now honours a `rows` function on a view as an alternative to `table`, and `readFrom` names the source in the hint line under the table. Everything after the read is untouched, so the search box, the visual strip, the drawer, the page and the actions do not know the difference. Intake is the only view using it and it has to: no single table holds this queue.
+
+**What it does not change.** Not one new way to decide anything. This queue owns no decision: opening a job to the board is on the job page, converting an enquiry is under Enquiries, and answering a conversation from the Yaadly number is under Conversations. Each row carries the button that fits it and nothing else, because a second button that cancels a job is a second place to get it wrong. Every Reach them button opens her own app on her own machine, as her; the desk sends nothing from this screen, and the card says so. On a conversation the card deliberately steers away from her personal WhatsApp: a reply arriving from a number the client does not know reads as a stranger.
+
+**Two Overview counts corrected with it.** "Intake to triage" counted the same dead table and is now "Waiting on a reply", counting people on WhatsApp or the website chat with `awaiting_human_since` set, her own tests excluded. "Built, never signed for" now excludes `is_test`, because on the day this was written all twenty-four rows at that stage were her own tests and the tile was reporting twenty-four people waiting on her when nobody was.
+
+**Closing a row out, added in the same change.** Founder, mid-build: "Have a way to click and close if there is any issues", and straight after it "and we cant answer back". A row with no number and no address sits at the top of Waiting on you forever, because the only thing that would clear it is a reply nobody can send, and a queue with unclearable rows in it stops being read. So an enquiry and a conversation each get **Close it, nothing to answer**. This is hygiene, not a decision about money or about a person, so it is a plain column write rather than a database function, which is what "Mark replied" under Enquiries has always been, and nothing was added to the database for it: each table already had a state meaning closed. An enquiry goes to `binned`, which does not stamp the reply clock, because she did not reply. A conversation has its `awaiting_human_since` cleared and `human_handling` set to **false**, and the reason she types is stamped with her address and the day into `desk_notes`, which is already the column the client never sees and the assistant never reads. Setting `human_handling` true would have been the obvious move and is the wrong one: `yaad-inbound` only stamps `awaiting_human_since` at the moment it hands over, so a thread parked that way would never raise its hand again, and closing a row must not quietly mute somebody. Handed back, the assistant keeps answering them and the row returns to this queue on its own if a person is needed. A closed row reads as closed, with her own sentence on it, so she does not close it twice. A JOB is deliberately not closable from here: cancelling one is a consequential step with a client on the other end, and it stays on the job page where what is being cancelled is on the screen.
+
+**The old panel is gone, and that is not a loss.** "Built a job, never signed" was added to this view on 19 Sep 2026, hours earlier, as a clickable section over those same jobs. Those rows are now rows in the queue itself, sorted with everything else and opening a page rather than jumping straight to the job, with Open the job still one button away. `intakes` is left in the database, untouched, holding its one test row. Nothing reads it any more.
+
+---
+---
+---
+
+## 2026-09-19 · A sketch pack picks its job from a list, and voiding several is still one admin decision each
+
+**Why.** Two things, from the same session. First, the job defect flagged earlier the same day and left open: the capture form collected "Job reference" as free text into `job_ref`, and the desk never sent `job_id` at all, so every pack ever made has `job_id` null. A pack reaches a client only through its job (`sketch_client_read` wants `status = 'issued'` **and** a job whose `client_email` is the reader's), so no pack that existed could be sent to anybody. The field could not have worked even in principle: the placeholder read `JOB-2026-014` and a live job id is `JOB-WEB-1789253807959`. Second, founder instruction to void three test packs, which the database refused from a Claude session, correctly, and the honest answer was nine clicks. She asked for both to be fixed.
+
+**What, the job.** Desk only. `yaad-sketch` already accepted `body.job_id` and there is a foreign key to `jobs(id)`, so nothing server side needed to change and nothing was deployed there. The free-text box is now a picker of real jobs, so what is chosen exists and the foreign key can never be handed a job that does not. A draft pack also carries the same picker with an Attach button, which is the one repair available for every pack made before this, and it is on drafts only because an approved pack is frozen and reopening starts a new revision. A draft with no job says in coral that nobody can read it however far she takes it. `job_ref` is deliberately left alone: it is the client's **own** reference, free text, printed on the report, and writing a Yaadly job id into it would quietly redefine the field.
+
+**What, the voiding.** Tick the packs in the list, one confirm that names every pack it is about to void, and each row is written separately so a refusal names the pack it refused. Only `draft` and `approved` can be ticked. `sketch_guard_approval` still requires `is_admin()` on every single one, which is the point: this removes the repetition and not the decision, and it runs as her, in her browser, on her click.
+
+**The refusal that prompted it, recorded because it was right.** A Claude session cannot void a pack. Over the Supabase MCP or the service role there is no `auth.jwt()`, so `is_admin()` is false and the trigger raises "only a signed-in Yaadly admin may void a sketch pack"; the attempted update rolled back untouched. That is CLAUDE.md section 2 enforced in the database rather than described in a document, and the correct response was to hand the clicks back, not to route around it with a session claim or a softened trigger. Expect the same wherever a trigger stamps a named human.
+
+**One thing found while building it.** A tick inside a list row inherits the desk's blanket `input{width:100%}` rule, which pushed each row off the page. Fixed with a rule beside the table views' own bulk tick, same size and same accent, so a tick means one thing everywhere on this desk.
+
+---
+
 ## 2026-09-19 · Intake: her own tests are not people stuck at sign-up, and the queue table has no writer
 
 **Why.** Founder, 19 Sep 2026, after the Evidence change: "do the same for the intake." Two things were wrong, one worse than the other.
@@ -38,6 +72,11 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Deployed** 19 September 2026, `yaadly-concierge` version `1e207348`, from `origin/main` off disk. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302. This deploy also carried the Jobs count change from the same afternoon, which had been merged but not deployed.
 
+**Partly superseded hours later, same day,** by the entry above. Two sessions worked this screen in parallel and reached the same diagnosis about `public.intakes` from opposite ends. This one kept the table and relabelled the screen honestly as a record; the other took the queue off it and onto the three tables intake actually lands in. The second is what is live, so the `viz:{ want, wants }` on `intakes`, the "Whose move" column, `intakeState()`, `preIntake()` and this entry's `intakePage()` are all gone, along with the subheading and empty state described above. **The count half of this entry stands and is untouched**: `unsignedJobs()`, `real` versus `mine`, and every place that reads them. So does the open `intakes` INSERT policy flagged below, which nothing here has closed.
+
+---
+
+
 ## 2026-09-19 · Jobs leads with real work, not with her own testing
 
 **Why.** Founder, 19 Sep 2026: "Job says 44 and there is only 1 Jobs." Both numbers were right. The `jobs` table holds 44 rows; 43 of them are marked `is_test`, and the one that is not is `JOB-DEMO-PHOTOS`, the villa roof demo listing. The page led with 44 and the rail badge carried 44, because Jobs had never declared `viz:{ want }` and so fell back to counting rows read. This is the same lie the public board was telling on 9 September, when every job on `app.yaadly.co.uk/jobs` was her own test and the public read them as demand. That is what "That was me testing" was built to stop, and the desk had quietly started telling it back to her on the page she opens first.
@@ -49,6 +88,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **The Read more text, same change.** Two things were missing from it. It said nothing about her own tests being in the table, which is now what the number on top turns on. And on materials store it named the weaker of the two refusals: the database does block a materials tranche and materials evidence without an answer, but `trg_enforce_store_before_open` also refuses to put the job on the board at all, which is the refusal she will actually meet, pressing Open it to the board. Both are now in the paragraph.
 
 **Deployed** 19 September 2026, `yaadly-concierge` version `11327152`, from this branch after merging `origin/main` into it first. Main had moved twice while this was being written, and deploying without that merge would have reverted the Sketch packs badge and the evidence-ownership change, both of which were already live. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302 in front of the hostname.
+
+---
+
 
 ---
 
@@ -73,6 +115,9 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **What.** Desk only, no new data. `renderDayViz()` draws a three-widget strip at the top of The day using the chart vocabulary that already existed: the count of moves that want her, the queues ranked longest first and colour-keyed by whose they are, and the four lanes as one stacked bar. Both pictures now read one `QUEUE` array, shared with the measurement tab, so the two can never disagree about what is waiting. `evidencePage()` gives the Evidence view a `page`, so the drawer opens on the photograph at full width, one sentence in the item's own colour saying whose move it is and why, the job, the fingerprint and what the section means, with every raw field folded under "Every field, as stored" one click down.
 
 **Counts only, no scores.** Every figure on both is a count of rows from a named table. No ratio, no percentage, no index. At this volume a percentage swings twenty points on one event, which is the note already written over the dashboard CSS and the reason it holds here too.
+
+---
+
 
 ## 2026-09-19 · A badge lands on the work it counted, and Sketch packs says what issuing really does
 

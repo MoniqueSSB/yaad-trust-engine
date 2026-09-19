@@ -835,6 +835,10 @@ tbody tr[data-i]:hover td:first-child,tbody tr[data-openjob]:hover td:first-chil
 th.bkc,td.bkc{width:34px;padding-right:0}
 .bkc label{display:flex;align-items:center;justify-content:center;min-height:28px;cursor:pointer}
 .bkc input{width:16px;height:16px;accent-color:var(--teal);cursor:pointer}
+/* A tick on a list row. Without this the blanket input rule above gives it
+   width:100% and padding, which pushes the whole row off the page. Same
+   shape and accent as the table-view bulk tick, so a tick means one thing. */
+.list .item input[type=checkbox]{width:16px;height:16px;flex:none;align-self:flex-start;margin-top:4px;padding:0;accent-color:var(--teal);cursor:pointer}
 .bkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px;min-height:34px;font-size:12.5px}
 .bkbar .n{color:var(--ink);font-weight:700}
 .bkbar .msg{margin:0;flex:1 1 100%}
@@ -1173,6 +1177,15 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
     <div class="chd"><h3>Packs</h3><span class="sp" id="skWant"></span></div>
     <div id="skListMsg"></div>
     <div class="list" id="skList"><div class="empty"><b>Reading packs&hellip;</b></div></div>
+    <!-- Voiding several at once. The database still refuses a void from
+         anything that is not a signed-in admin (sketch_guard_approval), and
+         that gate is untouched: this runs as her, in her browser, on her
+         click. It saves the repetition, not the decision. -->
+    <div class="brow hidden" id="skBulkRow" style="margin-top:12px">
+      <button class="btn d" id="skBulkVoid">Void selected</button>
+      <button class="btn g" id="skBulkClear">Clear selection</button>
+    </div>
+    <p class="conseq" id="skBulkNote" style="margin-top:6px"></p>
   </div>
 
   <div class="card">
@@ -1195,7 +1208,17 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
       <div><label>Date filmed</label><input id="skDate" type="date"></div>
       <div><label>Walked by</label><input id="skWho" placeholder="Who was on site"></div>
       <div><label>Conditions on the day</label><input id="skConditions" placeholder="Sunny, dry, after rain overnight"></div>
-      <div><label>Job reference, optional</label><input id="skJobRef" placeholder="JOB-2026-014"></div>
+      <!-- A picker, not free text. This was an input with the placeholder
+           "JOB-2026-014" and it wrote job_ref, a printed string nothing
+           reads. A live job id looks like JOB-WEB-1789253807959, so nobody
+           was ever going to type one, and job_id stayed null on every pack
+           ever made. A pack with no job reaches nobody: the client read
+           policy wants status issued AND a job whose client_email is theirs.
+           The list is the jobs themselves, so what is picked is real and the
+           foreign key can never be given a job that does not exist. The
+           client's own reference is a separate free-text field, filled in on
+           the draft, and this does not touch it. -->
+      <div><label>Job this belongs to</label><select id="skJob"><option value="">No job, this pack will not be sendable</option></select></div>
       <div><label>Contractor, if one is appointed</label><input id="skContractor" placeholder="Nobody appointed yet"></div>
     </div>
     <div class="row">
@@ -1521,6 +1544,10 @@ const ago_  = (v) => {
 const TONE = {
   // intakes
   new:"warn", triaged:"warn", converted:"ok", binned:"mute",
+  // Intake queue, 19 Sep 2026: somebody has been waiting on a human reply.
+  // Coral rather than gold on purpose, because by the time this word is on a
+  // row the clock has already run past a working day.
+  waiting:"crit",
   // jobs / services
   open:"warn", live:"warn", quoting:"warn", done:"ok", closed:"mute", cancelled:"mute",
   // applications
@@ -1611,31 +1638,63 @@ const VIEWS = [
   { k:"day", g:"Run the day", label:"The day", icon:"list", hand:true },
 
   { k:"intake", g:"Run the day", label:"Intake", icon:"inbox",
-    title:"Intake queue", table:"intakes",
-    sub:"The live part of this screen is above: jobs somebody built and walked away from before an account existed, which are leads you still hold everything for. The queue underneath is the old website form's table. Nothing in this repository has written to it since the job form replaced that route, and its newest row is a test from 12 August 2026, so it reads as a record rather than as a queue. A real job now arrives as a job (yaad-post-job), a WhatsApp message as a conversation (yaad-inbound), and a contact form as an enquiry (yaad-enquiry).",
-    select:"*",
-    order:"created_at", search:["req_id","name","place","work_type","descr"],
-    empty:["Nothing in the queue","Nothing has been written to this table since the job form replaced the old website form. A new job lands under Jobs, a message under Conversations, a contact form under Enquiries."],
-    pre: preIntake, panel: panelIntake, page: intakePage,
-    titleOf: r => r.req_id || r.name || r.id,
-    // The badge and the headline count what actually wants triaging, not how
-    // many rows the read returned. Same mechanism the Evidence view uses.
-    viz:{ want:r => ["new","triaged"].includes(String(r.status || "")), wants:"to triage" },
+    title:"Intake queue", rows: intakeRows,
+    readFrom:"jobs, enquiries and intake_threads",
+    sub:"Everything that came in, through the app, the website form, WhatsApp or the website chat, read as one list. Open any row to see what they gave you, what is still outstanding, and a WhatsApp or email draft written from their own words. Nothing on this screen sends anything: every button opens your own app with the words ready. The buttons that finish a row live where the row came from, on the job or under Enquiries and Conversations, and each row carries the one that fits it.",
+    order:"_at",
+    viz:{ date:"_at", state:"_state", cat:"_from" },
+    search:["_ref","_who","_what","_words","_place","_phone","_email","_from"],
+    hide:["_gaps","_gave"],
+    empty:["Nothing has come in","A job posted in the app, an enquiry from the website form, or a message on WhatsApp all land here."],
+    panel: panelIntake, page: intakePage,
+    titleOf: r => r._who || r._ref || "Intake",
     cols:[
-      {h:"Reference", f:r => id_(r.req_id || r.id) + sub_((r.descr || "").slice(0,60))},
-      {h:"Work & area", f:r => esc(r.work_type || "Unclear") + sub_(r.place || "Not given")},
-      {h:"Contact", f:r => esc(r.name || "No name") + sub_(r.email || r.phone || "")},
-      {h:"Urgency", f:r => r.urgency ? chip_(/urgent|emergency/i.test(r.urgency) ? "crit" : "mute", r.urgency) : mute_("not said")},
-      {h:"Whose move", f:r => intakeState(r)},
-      {h:"Age", f:r => mute_(ago_(r.created_at))},
+      {h:"Who", f:r => esc(r._who || r._phone || r._email || "no name") + sub_(r._who ? (r._phone || r._email || "no way back") : r._who || r._phone || r._email ? "" : "no way back")},
+      {h:"Came in by", f:r => esc(r._from) + sub_(r._ref)},
+      {h:"What they want", f:r => esc(r._what || "not said") + sub_(r._place || "")},
+      {h:"In their own words", f:r => said_(r._words)},
+      {h:"Outstanding", f:r => gapsCell_(r)},
+      {h:"State", f:r => tone_(r._state)},
+      {h:"Last heard", f:r => mute_(ago_(r._at))},
     ],
     actions:[
-      { label:"Mark as read", cls:"g", when:r => r.status === "new",
-        set:{ status:"triaged" },
-        says:() => "Says you have read it. It stops counting against you on the Overview." },
-      { label:"Bin it", cls:"d", when:r => r.status !== "binned",
-        set:{ status:"binned" },
-        says:() => "Marks it as not real work. The row stays on the record, it just stops appearing as something waiting." },
+      // Every action here is a NAV or an RPC that already exists somewhere
+      // else. Nothing on this queue owns a decision: a job is opened to the
+      // board on the job page, an enquiry is converted under Enquiries, a
+      // conversation is answered from the Yaadly number under Conversations.
+      // Two buttons that cancel a job would be two places to get it wrong.
+      { label:"Open the job", cls:"",
+        when:r => r._src === "job",
+        says:() => "Opens the job itself, where you can put it on the board, correct what it says, cancel it, or mark it as your own test. Nothing on this queue can do any of that, on purpose: those buttons exist once, on the page that shows what is being changed.",
+        nav:r => openJobById(r._jobId) },
+      { label:"Open the conversation", cls:"",
+        when:r => r._src === "thread",
+        says:() => "Opens Conversations on this person, where you read the whole thread and reply from the Yaadly number so it lands in the chat they already have.",
+        nav:r => { $("srch").value = r._threadFrom || ""; go("threads"); } },
+      { label:"I have answered this", cls:"g",
+        when:r => r._src === "enquiry" && !["replied","converted","test","binned"].includes(String(r.status || "new").toLowerCase()),
+        rpc:"mark_enquiry_replied",
+        args:(r) => ({ p_enquiry:r.id }),
+        says:r => `Takes ${esc(r._who || "this enquiry")} off the list and stamps the reply clock. It sends nothing: an enquiry is answered on WhatsApp or by email, and this records that you did it. Only press it once you actually have.` },
+      { label:"That was me testing", cls:"g",
+        when:r => r._src === "enquiry" && !["replied","converted","test","binned"].includes(String(r.status || "new").toLowerCase()),
+        rpc:"mark_enquiry_test",
+        args:(r) => ({ p_enquiry:r.id }),
+        says:() => "Takes this off the queue as your own test. It sends nothing and it does not count as a reply." },
+      { label:"Close it, nothing to answer", cls:"d",
+        when:r => r._src === "enquiry" && String(r.status || "new").toLowerCase() !== "binned",
+        says:r => `Takes ${esc(r._who || "this enquiry")} off the queue without claiming you answered it. Use it when there is nothing to answer: they left no way back, or it is not real work. The row stays on the record as binned, it just stops being something waiting on you. It does not stamp the reply clock, because you did not reply.`,
+        call: closeEnquiry },
+      { label:"Close it, nothing to answer", cls:"d",
+        when:r => r._src === "thread" && !!r.awaiting_human_since,
+        says:() => "Stops this counting as somebody waiting on you, and hands the conversation back to the assistant so it keeps answering them. Use it when there is no way back to them, or when it needs nothing. It sends nothing and tells them nothing. If they write in again and a person is needed, it lands back on this queue on its own.",
+        ask:[{ k:"why", label:"Why you are closing it, for your own record",
+               placeholder:"Left the page before saying anything. No number, no address, nothing to answer." }],
+        call: closeThread },
+      { label:"Open Enquiries", cls:"g",
+        when:r => r._src === "enquiry",
+        says:() => "Opens Enquiries on this person, where converting them into a booking lives.",
+        nav:r => { $("srch").value = r._who || String(r.contact || ""); go("enq"); } },
     ]},
 
   { k:"reports", g:"Documents & money", label:"Reports", icon:"case",
@@ -3538,7 +3597,6 @@ let   EVID_SUM = null;      // { yours, client, done } counted off the rows on s
 let   KICK_CTX = null;      // { pack, error } for the kickoff panel
 let   KICK_HELD = null;     // { rows, error }, drafts that did not become a pack
 let   KICK_HELD_MSG = null; // the last link result, kept across the redraw after it
-let   INTAKE_DRAFTS = [];   // jobs built but never signed for
 
 const softFail = (what, msg) =>
   `<div class="alert warn"><span class="ic">!</span><div><b>${esc(what)} could not be read</b><p>${esc(msg)}</p></div></div>`;
@@ -4055,131 +4113,423 @@ function jobPage(r){
   </div>`;
 }
 
-// ---- Intake: the drafts that stopped before anybody signed.
+// ---- Intake: the three front doors, read as one queue.
 //
-// A job stuck at awaiting_client_setup is somebody who built the whole thing
-// and walked away before an account existed to attach it to. The trade, the
-// parish and their own words are all still here, which makes it a lead rather
-// than a loss.
+// WHAT WAS HERE BEFORE, AND WHY IT HAD TO CHANGE. This view read a table
+// called `intakes`. On 19 September 2026 that table held exactly one row: a
+// test submitted on 12 August. Nothing had written to it since
+// yaad-website-intake was retired on 31 August, when the public "Tell us what
+// needs doing" form was deleted and the app became the only place a job is
+// created. So a screen whose own subtitle promised "everything that came in
+// through the website form, WhatsApp or a DM" was showing one dead test row,
+// and the Overview tile counting it reported "queue is clear" every single
+// day, because the table it counted could not grow. A screen that is reliably
+// empty stops being read, and then the day something does land in it, it is
+// not read either. That is the failure this replaces.
 //
-// This used to filter on client_user is null. Nothing in this codebase ever
-// writes jobs.client_user, on any intake path, so that filter matched almost
-// every job in the table forever, including live, quoted and finished ones,
-// and never cleared once a client actually did sign up. status is the column
-// client_go_live() itself checks before it will open a job, so it is the one
-// that tells the truth about whether this is still stuck.
-// Whose move a queue row is, in words rather than the raw status. Colours
-// follow concierge/README.md: teal proven, mango held, coral blocked.
-function intakeState(r){
-  const st = String(r.status || "new");
-  if (st === "new")       return chip_("warn","to triage") + sub_("nobody has read it");
-  if (st === "triaged")   return chip_("warn","read, not placed") + sub_("open it to the board or bin it");
-  if (st === "converted") return chip_("ok","on the board") + sub_("it became a job");
-  if (st === "binned")    return chip_("mute","binned") + sub_("kept on the record, not counted");
-  return tone_(st);
+// WHERE INTAKE ACTUALLY LANDS. Three tables, all live:
+//   jobs             somebody built a whole job in the app and walked away
+//                    before an account existed to attach it to, which is the
+//                    status awaiting_client_setup
+//   enquiries        the contact form at the bottom of yaadly.co.uk
+//   intake_threads   WhatsApp, and the chat widget on the website
+//
+// All three are read here and flattened into one row shape. Every computed
+// field carries an underscore so it can never collide with a real column, and
+// the source row's own columns are spread alongside it, which is what keeps
+// "Every field, as stored" in the drawer honest rather than a picture of
+// something this file invented.
+//
+// This queue decides nothing. Enquiries, Conversations and the job page own
+// every button that finishes a row, and each row here carries the one that
+// fits it. Two buttons that cancel a job would be two places to get it wrong.
+let INTAKE_ERRS = [];
+
+// A gap is something the person has not given you or something nobody has
+// done yet. `hard` means it stops the work or somebody is waiting: those are
+// the rows that sort to the top and colour coral.
+const gap_ = (what, why, hard) => ({ what, why, hard: !!hard });
+const gave_ = (label, val) =>
+  (val === null || val === undefined || String(val).trim() === "") ? null : [label, String(val).trim()];
+
+function gapsCell_(r){
+  const g = r._gaps || [];
+  if (r._closed) return chip_("mute", "closed by you") + sub_(r._closed);
+  if (!g.length) return chip_("ok", "nothing missing");
+  return chip_(g.some(x => x.hard) ? "crit" : "warn", g.length + (g.length === 1 ? " thing" : " things"))
+       + sub_(g[0].what);
 }
 
-// One queue row as a page: what the person typed first, because that is the
-// only part nobody else can reconstruct, then how to reach them and where the
-// work is. The raw fields stay one click down.
+// The person's own words, plain text, never cut. ownWords() does the same
+// extraction for a table cell and hands back HTML with the whole thing in a
+// tooltip; here the words are the point of the page, so they come back raw
+// and the page prints all of them.
+function intakeWords_(descr){
+  const raw = String(descr || "");
+  const i = raw.indexOf("In their own words:");
+  const w = i > -1 ? raw.slice(i + 19) : raw;
+  return w.replace(/\n?\[[^\]]*\]/g, "").trim();
+}
+
+// ---- One row per source.
+
+function intakeFromJob(r){
+  const gaps = [gap_("They never finished signing up",
+    "No client account is attached, so this job cannot go on the board however complete it looks. Open it and either invite them back or open it yourself.", true)];
+  if (!r.client_name) gaps.push(gap_("No name",
+    "Nothing to put at the top of an email or a WhatsApp."));
+  if (!hasPhone_(r.client_phone) && !isEmail_(r.client_email)) gaps.push(gap_("No way back to them",
+    "No number and no address, so this one cannot be followed up at all. Everything they typed is still worth reading, but nobody can answer it.", true));
+  if (!r.trade) gaps.push(gap_("Trade not written on it",
+    "Nothing is matched to a worker until the trade is set, and no model sets it."));
+  if (!r.parish) gaps.push(gap_("No parish",
+    "Nobody can be sent to a job that does not say where it is."));
+  if (!String(r.descr || "").trim()) gaps.push(gap_("Nothing typed about the work",
+    "The description is empty, so there is nothing to price or to quote against."));
+  return Object.assign({}, r, {
+    _src:"job", _from:"Posted in the app", _ref:r.id,
+    _who:r.client_name || "", _phone:r.client_phone || "", _email:r.client_email || "",
+    _what:[r.trade, r.title].filter(Boolean).join(" · ") || "",
+    _words:intakeWords_(r.descr), _place:r.parish || "",
+    _state:r.is_test ? "test" : "new", _at:r.updated_at,
+    _gaps:gaps, _gave:[
+      gave_("Their name", r.client_name),
+      gave_("WhatsApp number", r.client_phone),
+      gave_("Email", r.client_email),
+      gave_("Trade", r.trade),
+      gave_("Kind of job", r.job_type),
+      gave_("Parish", r.parish),
+      gave_("Address", r.addr),
+      gave_("Who lets you in", r.access_contact),
+      gave_("How you get in", r.access_type),
+      gave_("Size of it", r.size_band),
+      gave_("How soon", r.urgency),
+      gave_("Budget they had in mind", r.budget_band),
+      gave_("Who buys the materials", r.materials_by),
+      gave_("What they called it", r.title),
+      gave_("Where it came from", r.source),
+    ].filter(Boolean),
+    _jobId:r.id,
+  });
+}
+
+function intakeFromEnquiry(r){
+  const c = String(r.contact || "").trim();
+  const st = String(r.status || "new").toLowerCase();
+  const done = ["replied","converted","test","binned"].includes(st);
+  const gaps = [];
+  if (!done) {
+    if (!hasPhone_(c) && !isEmail_(c)) gaps.push(gap_("No way back to them",
+      "They left no number and no address, so there is nothing to reply to. Close it out below rather than leave it sitting on you.", true));
+    if (String(r.receipt || "").toLowerCase() === "failed") gaps.push(gap_("They have heard nothing at all",
+      "Not even the automatic receipt reached them. Answer this one before anything else on the screen.", true));
+    gaps.push(gap_("Nobody has answered them",
+      "The reply clock on the Overview counts from the moment you press I have answered this, so it is running on this row now.", true));
+    if (!r.name) gaps.push(gap_("No name",
+      "Nothing to put at the top of a reply."));
+    if (!r.topic) gaps.push(gap_("They did not say what it is about",
+      "Worth asking before you quote anything at them."));
+  }
+  return Object.assign({}, r, {
+    _closed: st === "binned" ? "Nothing to answer" : "",
+    _src:"enquiry", _from:"Website form", _ref:String(r.id || "").slice(0, 8),
+    _who:r.name || "", _phone:hasPhone_(c) ? c : "", _email:isEmail_(c) ? c : "",
+    _what:r.topic || "", _words:String(r.message || ""), _place:"",
+    _state:st, _at:r.created_at,
+    _gaps:gaps, _gave:[
+      gave_("Their name", r.name),
+      gave_(isEmail_(c) ? "Email" : "Number", c),
+      gave_("What it is about", r.topic),
+      gave_("Automatic receipt", r.receipt === "sent" ? "reached them" : r.receipt === "failed" ? "did not reach them" : r.receipt),
+    ].filter(Boolean),
+  });
+}
+
+function intakeFromThread(r){
+  const st = thrState_(r);
+  const turns = thrTurns_(r.transcript);
+  const theirs = turns.filter(t => t.who === "them");
+  const c = String(r.from_addr || "");
+  const wa = r.channel === "whatsapp" || r.channel === "sms";
+  const gaps = [];
+  if (st.key === "waiting") gaps.push(gap_(
+    "Nobody has answered them" + (st.hours >= 24 ? ", and it is past a working day" : ""),
+    "Waiting since " + ago_(r.awaiting_human_since) + " ago. Answer it under Conversations, from the Yaadly number, so it lands in the chat they already have rather than arriving from a number they do not know.",
+    st.hours >= 24));
+  if (!r.job_id && !threadClosed_(r)) gaps.push(gap_("No job attached",
+    "Nothing they said is on the board. Attaching a job is a decision and a named human is the only thing that makes it, so that button lives on the conversation."));
+  if (!r.contact_hint && !threadClosed_(r)) gaps.push(gap_("No name given",
+    wa ? "You have the number and not the person."
+       : "Nothing identifies this visitor but the reference the widget gave them."));
+  if (r.channel === "web" && !threadClosed_(r)) gaps.push(gap_("Website chat, so they may have closed the page",
+    "A reply only reaches them while that page is still open. The widget gave them a WhatsApp button carrying this reference, so expect them there instead."));
+  return Object.assign({}, r, {
+    _src:"thread",
+    _from: r.channel === "web" ? "Website chat" : r.channel === "sms" ? "Text message" : "WhatsApp",
+    _ref:c, _who:r.contact_hint || "", _phone:wa ? c : "", _email:isEmail_(c) ? c : "",
+    _what:r.job_id ? "job " + r.job_id : "", _words:theirs.map(t => t.text).join("\n\n"),
+    _place:"",
+    _state: st.key === "test" ? "test" : st.key === "waiting" ? "waiting"
+          : threadClosed_(r) ? "binned"
+          : st.key === "yours" ? "triaged" : r.job_id ? "converted" : "new",
+    _at:r.last_at, _closed: threadClosed_(r) ? closeReason_(r.desk_notes) : "",
+    _gaps:gaps, _gave:[
+      gave_("Their name", r.contact_hint),
+      gave_(wa ? "Number they wrote from" : "Where they wrote from", c),
+      gave_("Messages from them", theirs.length ? String(theirs.length) : ""),
+      gave_("Job already attached", r.job_id),
+      gave_("Your own note on them", r.desk_notes),
+    ].filter(Boolean),
+    _threadChannel:r.channel, _threadFrom:r.from_addr,
+  });
+}
+
+// ---- The read.
+//
+// Three reads in parallel, and one that fails does not take the other two with
+// it: a queue that shows two of its three doors and says which one it could
+// not open is worth more than a red box over the lot. Sorted so anything with
+// somebody waiting on it is at the top and her own tests are at the bottom,
+// because on the day this was written every single job row was a test and a
+// list that calls those leads reads as twenty-four people waiting on her.
+async function intakeRows(){
+  INTAKE_ERRS = [];
+  const [jr, er, tr] = await Promise.all([
+    sb.from("jobs").select("*").eq("status", "awaiting_client_setup")
+      .order("updated_at", { ascending:false }).limit(150),
+    sb.from("enquiries").select("*").order("created_at", { ascending:false }).limit(150),
+    sb.from("intake_threads").select("*").order("last_at", { ascending:false }).limit(150),
+  ]);
+  const out = [];
+  const take = (res, label, fn) => {
+    if (res.error) { INTAKE_ERRS.push([label, res.error.message]); return; }
+    for (const row of res.data || []) { try { out.push(fn(row)); } catch (e) { console.warn(label + " row skipped:", e.message); } }
+  };
+  take(jr, "jobs nobody signed for", intakeFromJob);
+  take(er, "enquiries", intakeFromEnquiry);
+  take(tr, "conversations", intakeFromThread);
+
+  const rank = (r) => r._state === "test" ? 3
+                    : r._gaps.some(g => g.hard) ? 0
+                    : r._gaps.length ? 1 : 2;
+  out.sort((a, b) => rank(a) - rank(b)
+    || new Date(b._at || 0) - new Date(a._at || 0));
+  return out;
+}
+
+// ---- The box at the top: what is actually waiting on you.
+//
+// The number that matters is not how many rows loaded, it is how many have
+// somebody on the other end of them. That is the first line, and the rows
+// behind it are listed by name so the queue can be worked without opening
+// anything first. Clicking one opens it, the same as clicking it below.
+function panelIntake(rows){
+  const all = rows || [];
+  const errs = INTAKE_ERRS.length
+    ? INTAKE_ERRS.map(([what, msg]) => `<div class="alert crit"><span class="ic">!</span><div><b>${esc(what)} could not be read</b><p>${esc(msg)}</p><p>The rest of the queue below is complete. This door is the one that is shut.</p></div></div>`).join("")
+    : "";
+
+  const real = all.filter(r => r._state !== "test");
+  const mine = all.filter(r => r._state === "test");
+  const hot = real.filter(r => !r._closed && (r._gaps || []).some(g => g.hard));
+
+  const counts = {};
+  for (const r of real) counts[r._from] = (counts[r._from] || 0) + 1;
+  const doors = Object.entries(counts).sort((a, b) => b[1] - a[1])
+    .map(([d, n]) => `${chip_("mute", d)} <b>${n}</b>`).join(" &nbsp; ") || mute_("nothing yet");
+
+  let out = `<div class="sechd">Waiting on you</div>`;
+  if (!hot.length) {
+    out += `<div class="card"><div class="empty"><b>Nobody is waiting on a reply</b>`
+        +  `Every row below has either been answered or is missing nothing. ${real.length} live row${real.length === 1 ? "" : "s"} in the queue.</div></div>`;
+  } else {
+    out += `<p class="vsub" style="margin-top:0"><b>${hot.length}</b> of the <b>${real.length}</b> live row${real.length === 1 ? "" : "s"} ${hot.length === 1 ? "has" : "have"} somebody on the other end of it: nobody has answered them, they have no way back, or the job they built cannot move. Click any one to open it.</p>`
+        +  `<div class="card pad0"><div class="tw"><table><thead><tr>`
+        +  `<th>Who</th><th>Came in by</th><th>What is outstanding</th><th>Last heard</th>`
+        +  `</tr></thead><tbody>`
+        +  hot.map(r => `<tr data-i="${r.__i}">`
+             // An enquiry with no name would otherwise print the first eight
+             // characters of its uuid as the person, which reads as a name and
+             // is not one. The number or the address is what she actually has.
+             + `<td>${r._who || r._phone || r._email
+                        ? id_(r._who || r._phone || r._email) + sub_(r._who ? (r._phone || r._email || "no way back") : r._from)
+                        : mute_("no name, no way back") + sub_("reference " + (r._ref || "none"))}</td>`
+             + `<td>${esc(r._from)}${sub_(r._what || "")}</td>`
+             + `<td>${esc(r._gaps.filter(g => g.hard)[0].what)}${sub_(r._gaps.length > 1 ? "and " + (r._gaps.length - 1) + " other" + (r._gaps.length === 2 ? "" : "s") : "")}</td>`
+             + `<td>${mute_(ago_(r._at))}</td></tr>`).join("")
+        +  `</tbody></table></div></div>`;
+  }
+  out += `<p class="hint">Where they came in: ${doors}.`
+       + (mine.length ? ` ${mine.length} more row${mine.length === 1 ? " is" : "s are"} your own testing, sorted to the bottom of the queue and never counted here.` : "")
+       + `</p>`;
+
+  return errs + out + `<div class="sechd">The whole queue</div>`;
+}
+
+// ---- Closing a row out.
+//
+// Founder, 19 September 2026: "Have a way to click and close if there is any
+// issues", and straight after it the case that makes it urgent: "and we cant
+// answer back". A row with no number and no address sits at the top of
+// Waiting on you forever, because the only thing that would clear it is a
+// reply nobody can send. Left alone, the queue grows a permanent layer of
+// rows she has already read and can do nothing about, and a queue with
+// unclearable rows in it stops being read at all.
+//
+// This is hygiene, not a decision about money or about a person, so it is a
+// plain column write rather than a database function: the same thing "Mark
+// replied" under Enquiries has always been. Nothing new was added to the
+// database for it either. Each table already has a state that means closed,
+// and that is what gets written.
+//
+// A JOB is deliberately not closable from here. Cancelling a job is a
+// consequential step with a client on the other end of it, and it belongs on
+// the job page, where what is being cancelled is on the screen. Open the job
+// is on every job row.
+async function closeEnquiry(row){
+  const { error } = await sb.from("enquiries").update({ status:"binned" }).eq("id", row.id);
+  if (error) throw new Error(error.message);
+}
+
+// Cleared rather than handed to you, and the difference matters.
+//
+// Setting human_handling true would take it off this queue AND stop the
+// assistant answering that number, and because yaad-inbound only stamps
+// awaiting_human_since at the moment it hands over, a thread parked that way
+// would never raise its hand again. Closing a row must not quietly mute
+// somebody. So the clock is cleared and the thread goes back to the
+// assistant, which is what "Hand back to the assistant" under Conversations
+// already does: if they write in again and a person is needed, it lands back
+// here on its own.
+//
+// The reason goes in desk_notes, stamped with your address and the day. That
+// column is already yours alone: the client never sees it, the assistant
+// never reads it, and it is never sent to a model.
+// A closed conversation has to look closed. Clearing the clock takes it out
+// of Waiting on you but leaves nothing else changed, so without this the row
+// would read as new the next time the queue is opened and she would close it
+// again. The stamp closeThread writes is the marker, which is why its shape
+// is fixed here rather than left to the sentence she types.
+const CLOSED_MARK = "[closed ";
+const threadClosed_ = (r) => !r.awaiting_human_since && String(r.desk_notes || "").includes(CLOSED_MARK);
+// The newest closing line, without its stamp, so the reason reads back as the
+// sentence she typed rather than as a log entry.
+const closeReason_ = (notes) => {
+  const lines = String(notes || "").split("\n").filter(l => l.includes(CLOSED_MARK));
+  if (!lines.length) return "";
+  const last = lines[lines.length - 1];
+  const i = last.indexOf("] ");
+  return i > -1 ? last.slice(i + 2).trim() : last.trim();
+};
+
+async function closeThread(row, vals){
+  const why = String((vals && vals.why) || "").trim() || "Nothing to answer.";
+  const stamp = CLOSED_MARK + day_(new Date().toISOString()) + " by " + (SESSION_EMAIL || "the desk") + "] " + why;
+  const notes = [String(row.desk_notes || "").trim(), stamp].filter(Boolean).join("\n");
+  const { error } = await sb.from("intake_threads")
+    .update({ awaiting_human_since:null, human_handling:false, desk_notes:notes })
+    .eq("channel", row._threadChannel).eq("from_addr", row._threadFrom);
+  if (error) throw new Error(error.message);
+}
+
+// ---- One intake, opened.
+//
+// Three questions, in the order she actually asks them: what did they give
+// me, what is still missing, and how do I reach them. The words they typed
+// are printed in full and never cut, because on most of these rows the free
+// text is the only thing that tells you whether it is real.
+//
+// The Reach them block is the same promise the Enquiries and Applications
+// cards make: every button opens HER app, on her machine, as her. The desk
+// sends nothing from this screen. A reply from the Yaadly number is a
+// different thing and it lives under Conversations, which is where that row
+// links to.
+function intakeDraft_(r){
+  const first = String(r._who || "").trim().split(/\s+/)[0] || "there";
+  const link = settingOf("booking_link");
+  const about = r._what ? " about " + String(r._what).replace(/\s*·\s*/g, ", ") : "";
+  const body = r._src === "job"
+    ? `Hello ${first}, this is Monique at Yaadly. You started a job with us${about} and it is saved exactly as you left it. Finish setting up your account and I can put it in front of workers, or reply here and I will pick it up with you.`
+    : r._src === "thread"
+    ? `Hello ${first}, this is Monique at Yaadly. Picking up your message${about} now.`
+    : `Hello ${first}, this is Monique at Yaadly. Thank you for your enquiry${about}. I am picking it up now.`;
+  return link ? body + `\n\nIf a call would help, pick a time that suits you here: ${link}` : body;
+}
+
+function intakeReach_(r){
+  const draft = intakeDraft_(r);
+  const phone = r._phone, email = r._email;
+  const btns = [];
+  if (hasPhone_(phone)) {
+    btns.push(`<a class="btn" href="https://wa.me/${digits_(phone)}?text=${encodeURIComponent(draft)}" target="_blank" rel="noopener">Open WhatsApp to them</a>`);
+    btns.push(`<a class="btn g" href="tel:+${digits_(phone)}">Call ${esc(phone)}</a>`);
+  }
+  if (isEmail_(email)) {
+    const subj = r._src === "job" ? "The job you started with Yaadly" : "Your enquiry to Yaadly";
+    btns.push(`<a class="btn${btns.length ? " g" : ""}" href="mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(draft + "\n\nMonique\nYaadly")}" target="_blank" rel="noopener">Open an email to them</a>`);
+  }
+  const how = !btns.length && r._src === "thread"
+    ? `They wrote in from <b>${esc(r._ref)}</b> and left no number and no address, so there is nothing to open from here. <b>The way back is the chat itself</b>: reply under Conversations and it lands in the window they used.`
+    : !btns.length
+    ? `They left no number and no address. <b>There is no way back to this person</b>, so everything below is a record rather than a lead.`
+    : r._src === "thread"
+    ? `They wrote from <b>${esc(r._ref)}</b>. These buttons open your own WhatsApp, as you. To answer <b>in the chat they already have</b>, from the Yaadly number, use Open the conversation below instead: a reply arriving from a different number reads as a stranger.`
+    : hasPhone_(phone) && isEmail_(email)
+    ? `They gave both a number and an address, so either is open to you.`
+    : hasPhone_(phone)
+    ? `They gave a number, <b>${esc(phone)}</b>, so WhatsApp and a call are open to you.`
+    : `They gave an address, <b>${esc(email)}</b>, so email is the way back.`;
+  const cal = !btns.length ? ""
+    : settingOf("booking_link")
+    ? `The draft offers them a time on your calendar page.`
+    : `No calendar link is set, so the draft does not offer a call. Add <span class="mono">booking_link</span> under Settings and it will.`;
+  return `<div class="card" style="margin:12px 0 4px">
+      <div class="chd"><h3>Reach them</h3><span class="sp">${hasPhone_(phone) ? chip_("ok", "WhatsApp") : ""} ${isEmail_(email) ? chip_("ok", "Email") : ""}${!btns.length ? (r._src === "thread" ? chip_("mute", "in the chat only") : chip_("crit", "no way back")) : ""}</span></div>
+      <p class="hint" style="margin:0 0 10px">${how} ${cal}</p>
+      ${btns.length ? `<div class="brow">${btns.join("")}</div>` : ""}
+      ${btns.length
+        ? `<p class="conseq">Each button opens your own app with the draft below ready to send. <b>This desk sends nothing.</b></p><div class="note">${esc(draft)}</div>`
+        : r._src === "thread"
+        ? `<p class="conseq">Nothing on this card can be opened, so the draft is left out of it. Write your own words under Conversations: a reply is worth more than a template when it is the only one they will get.</p>`
+        : `<p class="conseq">There is nothing to open and nothing to send. What is above is the whole record of them.</p>`}
+    </div>`;
+}
+
 function intakePage(r){
-  const st = String(r.status || "new");
-  const chips = [
-    r.work_type ? chip_("mute", r.work_type) : "",
-    r.place ? chip_("mute", r.place) : "",
-    r.urgency ? chip_(/urgent|emergency/i.test(r.urgency) ? "crit" : "mute", r.urgency) : "",
-  ].filter(Boolean).join(" ");
+  const gaps = r._gaps || [], gave = r._gave || [];
+  const hard = gaps.filter(g => g.hard), soft = gaps.filter(g => !g.hard);
 
-  const whose = st === "new" || st === "triaged"
-    ? `<b class="evpyou">Yours.</b><span>${st === "new" ? "Nobody has read this yet." : "You have read it and it has not been placed."} Open it to the board or bin it.</span>`
-    : st === "converted"
-      ? `<b class="evpok">Done.</b><span>This became a job. Nothing here wants anything from anybody.</span>`
-      : `<b class="evpcli">Binned.</b><span>Marked as not real work. It stays on the record and is counted nowhere.</span>`;
+  const head = `<div class="card" style="margin-bottom:4px">
+      <div class="chd"><h3>${esc(r._from)}</h3><span class="sp">${tone_(r._state)}</span></div>
+      <p class="hint" style="margin:0">${esc(r._ref || "no reference")}
+        &middot; last heard ${esc(ago_(r._at))} ago
+        ${r._what ? "&middot; " + esc(r._what) : ""}${r._place ? " in " + esc(r._place) : ""}</p>
+    </div>`;
 
-  // photos is a jsonb column from the old website form, and nothing in this
-  // repository has written to it since. Anything in it is listed as what it
-  // is rather than rendered as a picture, because the shape was never fixed.
-  const pics = Array.isArray(r.photos) ? r.photos : [];
+  const outstanding = `<div class="card" style="margin:12px 0 4px">
+      <div class="chd"><h3>Still outstanding</h3><span class="sp">${r._closed ? chip_("mute", "closed by you") : gaps.length ? chip_(hard.length ? "crit" : "warn", gaps.length + (gaps.length === 1 ? " thing" : " things")) : chip_("ok", "nothing missing")}</span></div>
+      ${r._closed
+        ? `<p class="hint" style="margin:0"><b>You closed this one.</b> Your reason, as you wrote it: ${esc(r._closed)}. It is off the waiting list and stays here as a record.${r._src === "thread" ? " The assistant has this number again, so if they write in and a person is needed it comes back on its own." : ""}</p>`
+        : !gaps.length
+        ? `<p class="hint" style="margin:0">Nothing is missing and nobody is waiting. This one is yours to decide on rather than chase.</p>`
+        : `<div class="reqlist" style="margin-top:0">` + hard.concat(soft).map(g =>
+            `<div class="reqrow ${g.hard ? "miss" : ""}"><i></i><div><b>${esc(g.what)}</b><br>${esc(g.why)}</div></div>`).join("")
+          + `</div>`}
+    </div>`;
 
-  return `<div class="jp evp">
-    <div class="jphead">
-      <div class="jpt">${esc(r.req_id || r.name || "Unreferenced request")}</div>
-      <div class="jpchips">${chips || mute_("nothing classified")}</div>
-      <div class="evpwho">${whose}</div>
-    </div>
-    <div class="jpc" style="margin:14px 0 4px"><h6>In their own words</h6>
-      <div class="jpwords">${esc(r.descr || "Nothing was typed.")}</div></div>
-    <div class="jpgrid two">
-      <div class="jpc"><h6>Who wrote in</h6>
-        <div class="jpv"><span>Name</span><div class="jpvv">${esc(r.name || "not given")}</div></div>
-        <div class="jpv"><span>Email</span><div class="jpvv">${esc(r.email || "not given")}</div></div>
-        <div class="jpv"><span>Phone</span><div class="jpvv">${esc(r.phone || "not given")}</div></div>
-        <div class="jpv"><span>Came in</span><div class="jpvv">${esc(ago_(r.created_at))} ago</div></div>
-      </div>
-      <div class="jpc"><h6>Where the work is</h6>
-        <div class="jpv"><span>Parish or area</span><div class="jpvv">${esc(r.place || "not given")}</div></div>
-        <div class="jpv"><span>Address</span><div class="jpvv">${esc(r.addr || "not given")}</div></div>
-        <div class="jpv"><span>Access</span><div class="jpvv">${esc(r.access || "not said")}</div></div>
-        <div class="jpv"><span>Photographs</span><div class="jpvv">${pics.length
-          ? plural_(pics.length, "entry", "entries") + " on the row: " + esc(pics.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(", ")).slice(0, 300)
-          : mute_("none on this row. Photographs on a real job now arrive through the job form and sit on the job itself")}</div></div>
-      </div>
-    </div>
-  </div>`;
-}
+  const provided = `<div class="card" style="margin:12px 0 4px">
+      <div class="chd"><h3>What they gave you</h3><span class="sp">${gave.length ? chip_("mute", gave.length + " field" + (gave.length === 1 ? "" : "s")) : chip_("crit", "almost nothing")}</span></div>
+      ${gave.length
+        ? gave.map(([k, v]) => `<div class="dfield"><span class="dk">${esc(k)}</span><span class="dv">${esc(v)}</span></div>`).join("")
+        : `<p class="hint" style="margin:0">They filled in nothing beyond what it took to get the message here.</p>`}
+      <div class="sechd" style="margin-top:14px">In their own words</div>
+      ${String(r._words || "").trim()
+        ? `<div class="note" style="margin-top:0">${esc(r._words)}</div>`
+          + `<p class="conseq">Printed whole and never shortened. No model wrote any of this: it is what the person typed, including how they typed it.</p>`
+        : `<p class="hint" style="margin:0">Nothing was typed. Whatever this is, it is not written down yet.</p>`}
+    </div>`;
 
-async function preIntake(){
-  const { data } = await sb.from("jobs")
-    .select("id,title,trade,parish,status,client_name,client_email,client_phone,updated_at,is_test")
-    .eq("status", "awaiting_client_setup").order("updated_at", { ascending:false }).limit(50);
-  INTAKE_DRAFTS = data || [];
-}
-
-// This panel was a printed table until 19 September 2026: no click, no button,
-// nothing that could finish a row. Every row now opens the job itself, which
-// is where opening it to the board, cancelling it, correcting what it says and
-// marking it as your own test already live. Nothing can be decided here that
-// could not be decided there. What changed is that you can reach it.
-//
-// Her own tests are separated out and folded away. On the day this was written
-// all twenty-four rows at this stage were tests, and a list that calls them
-// leads reads as twenty-four people waiting on her, which is a lie the screen
-// was telling every time she opened it.
-function draftRow(r){
-  return `<tr data-openjob="${esc(r.id)}">`
-  + `<td>${id_(r.id)}${r.is_test ? " " + chip_("mute", "test") : ""}${sub_(r.title || "")}</td>`
-  + `<td>${esc(r.trade || "not classified")}${sub_(r.parish || "")}</td>`
-  + `<td>${esc(r.client_name || "no name")}${sub_(r.client_phone || r.client_email || "no way to reply")}</td>`
-  + `<td>${tone_(r.status)}</td>`
-  + `<td>${mute_(ago_(r.updated_at))}</td></tr>`;
-}
-
-const draftTable = (rows) => `<div class="card pad0"><div class="tw"><table><thead><tr>`
-  + `<th>Job</th><th>Trade &amp; area</th><th>Who</th><th>State</th><th>Last touched</th>`
-  + `</tr></thead><tbody>${rows.map(draftRow).join("")}</tbody></table></div></div>`;
-
-function panelIntake(){
-  const tail = `<div class="sechd">The queue</div>`;
-  if (!INTAKE_DRAFTS.length) return `<div class="sechd">Built a job, never signed</div>`
-    + `<p class="vsub" style="margin-top:0">Nobody is stuck at sign-up. Anyone who builds a job and walks away before an account exists lands here.</p>`
-    + tail;
-
-  const mine = INTAKE_DRAFTS.filter(r => r.is_test);
-  const real = INTAKE_DRAFTS.filter(r => !r.is_test);
-
-  let out = `<div class="sechd">Built a job, never signed</div>`
-    + `<p class="vsub" style="margin-top:0">No client account is attached to these, so they cannot go on the board. You still have the trade, the parish and what they typed, which makes each one a lead and an email you can send. <b>Click any row to open the job</b>, and finish it there: open it to the board, cancel it, correct what it says, or mark it as your own test.</p>`;
-
-  out += real.length
-    ? draftTable(real)
-      + `<p class="hint">${real.length} row${real.length === 1 ? "" : "s"}, read from <span class="mono">jobs</span> where <span class="mono">status</span> is <span class="mono">awaiting_client_setup</span>. These are not in the queue below; they are already jobs.</p>`
-    : `<div class="card"><div class="empty"><b>No lead is stuck at sign-up</b>Everything sitting at this stage is your own testing, folded away below.</div></div>`;
-
-  if (mine.length) out += `<details class="allfields"><summary>${mine.length} of your own test job${mine.length === 1 ? "" : "s"} at this stage</summary>`
-    + `<p class="vsub">Marked as testing by you, so they are already off the public board. They stay here until you cancel them; open one to do it.</p>`
-    + draftTable(mine) + `</details>`;
-
-  return out + tail;
+  return head + outstanding + provided + intakeReach_(r);
 }
 
 // ---- Evidence: the review card the framework puts at the top of this view.
@@ -5623,7 +5973,7 @@ function tableCard(v, rows, k){
   ).join("");
   return (bk ? `<div class="bkbar" id="bk-${k}"></div>` : "")
        + `<div class="card pad0"><div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`
-       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.table)}</span>. Click any row to open it${bk ? ", or tick several to act on them together" : ""}.</p>`;
+       + `<p class="hint">${rows.length} row${rows.length === 1 ? "" : "s"}, read from <span class="mono">${esc(v.readFrom || v.table)}</span>. Click any row to open it${bk ? ", or tick several to act on them together" : ""}.</p>`;
 }
 
 // ---- Acting on several rows at once.
@@ -5694,6 +6044,25 @@ async function loadTableView(k){
   const v = VIEW[k];
   const host = $("v-" + k);
   host.innerHTML = '<div class="card"><div class="empty"><span class="spin"></span>Reading.</div></div>';
+
+  // A view whose rows come from more than one table builds them itself.
+  // Intake is the only one, and it has to be: its queue is three front doors
+  // read as one list and no single table holds it. Everything after this
+  // block is identical either way, so the search box, the visual strip, the
+  // drawer, the page and the actions never learn the difference.
+  if (v.rows) {
+    let built = null;
+    try { built = await v.rows(); }
+    catch (e) {
+      host.innerHTML = `<div class="alert crit"><span class="ic">!</span><div><b>${esc(v.readFrom || v.label)} could not be read</b><p>${esc(e && e.message ? e.message : String(e))}</p></div></div>`;
+      return;
+    }
+    ROWS[k] = (built || []).map((r, i) => Object.assign(r, { __i: i }));
+    if (v.pre) { try { await v.pre(ROWS[k]); } catch (e) { console.warn(k + " side fetch:", e.message); } }
+    renderTableView(k);
+    setCount(k, ROWS[k].length, false);
+    return;
+  }
   // A column this page names that the live database does not have (a
   // migration in the repo not yet applied there, 20260905a being the case
   // that prompted this on 10 Sep 2026) used to blank the whole view, because
@@ -6090,7 +6459,7 @@ function go(v){
   // Handed back, not just fired: openJobById has to wait for the rows before
   // it can open one. Every other caller ignores this and behaves as before.
   if (b) return b();
-  if (VIEW[v] && VIEW[v].table) return loadTableView(v);
+  if (VIEW[v] && (VIEW[v].table || VIEW[v].rows)) return loadTableView(v);
 }
 
 // ---- Open one job from somewhere that is not the Jobs table.
@@ -6174,7 +6543,7 @@ document.addEventListener("click", (e) => {
 $("srch").addEventListener("input", () => {
   if (currentView === "invoices") return renderInvoiceList();
   if (currentView === "sketch") return renderSkList();
-  if (VIEW[currentView] && VIEW[currentView].table && ROWS[currentView]) renderTableView(currentView);
+  if (VIEW[currentView] && (VIEW[currentView].table || VIEW[currentView].rows) && ROWS[currentView]) renderTableView(currentView);
 });
 
 // ---------------------------------------------------------------- auth
@@ -6836,7 +7205,13 @@ async function loadOverview(){
   const [intakeNew, appsWaiting, evidOwn, quotesOut, callsNew, disputesOpen,
          pkDraft, pkAppr, jobsOpen, waitN, fbN, kickDraft, unsignedOwn,
          enqNew, asksNew] = await Promise.all([
-    countOf("intakes",     q => q.in("status", ["new","triaged"])),
+    // Was countOf("intakes", ...) until 19 September 2026, which is to say it
+    // counted a table nothing has written to since 31 August. The tile it
+    // feeds said "queue is clear" every single day, and it was not reporting
+    // a clear queue, it was reporting an empty table. This counts the same
+    // thing the Intake view now shows: somebody on WhatsApp or the website
+    // chat who has been waiting on a human, her own tests excluded.
+    countOf("intake_threads", q => q.not("awaiting_human_since", "is", null).not("is_test", "is", true)),
     countOf("applications",q => q.in("status", ["submitted","reviewing"])),
     evidenceOwnership(),
     countOf("job_quotes",  q => q.eq("status", "sent")),
@@ -7076,7 +7451,7 @@ async function loadOverview(){
   $("ovTiles").innerHTML = [
     tile(disputesOpen ? "crit" : "ok", "Disputes open", String(disputesOpen), disputesOpen ? "Nothing moves while one is" : "Nothing in dispute", "jobs"),
     tile("", "Evidence with clients", String(evidWaiting), evidWaiting ? "The client reviews it; you step in on an issue" : "Nothing waiting on a client", "evid"),
-    tile(intakeNew ? "warn" : "ok", "Intake to triage", String(intakeNew), intakeNew ? "Read it and decide" : "Queue is clear", "intake"),
+    tile(intakeNew ? "warn" : "ok", "Waiting on a reply", String(intakeNew), intakeNew ? "Somebody wrote and nobody answered" : "Nobody is waiting", "intake"),
     tile(appsWaiting ? "warn" : "ok", "Applications", String(appsWaiting), appsWaiting ? "Vetting not finished" : "None waiting", "apps"),
     tile(quotesOut ? "warn" : "ok", "Quotes to pass on", String(quotesOut), quotesOut ? "Sitting with you" : "None held", "quotes"),
     tile(callsNew ? "warn" : "ok", "Calls requested", String(callsNew), callsNew ? "Somebody wants to talk" : "None asked", "calls"),
@@ -7215,7 +7590,7 @@ async function loadOverview(){
   if (evidWaiting)
     push(cli, "", "Reviewing", plural(evidWaiting, "evidence item is", "evidence items are") + " with the client to read and approve", "nothing here is yours unless they dispute it or write about it", null, "See them", "evid", false);
   if (intakeNew)
-    push(yours, "warn", "Untriaged", plural(intakeNew, "intake is", "intakes are") + " untriaged", null, null, "Open intake", "intake", false);
+    push(yours, "warn", "Waiting", plural(intakeNew, "person has", "people have") + " written and had no reply", "on WhatsApp or the chat on the website", null, "Open intake", "intake", false);
   if (appsWaiting)
     push(yours, "warn", "Vetting", plural(appsWaiting, "application is", "applications are") + " part way through vetting", "the agent flags, you decide", null, "Open", "apps", false);
   if (quotesOut)
@@ -7276,7 +7651,7 @@ async function loadOverview(){
   // The zero queues, named rather than drawn. Nineteen tiles reading zero was
   // the diagnosis; one line saying which nineteen is the answer to it.
   const zeroes = [
-    [!disputesOpen, "disputes"], [!evidYours, "evidence anybody raised"], [!intakeNew, "intake to triage"],
+    [!disputesOpen, "disputes"], [!evidYours, "evidence anybody raised"], [!intakeNew, "anybody waiting on a reply"],
     [!appsWaiting, "applications"], [!quotesOut, "quotes to pass on"], [!callsNew, "calls requested"],
     [!enqNew, "enquiries to answer"], [!asksNew, "questions to publish"], [!invDraftReal, "invoice drafts"],
     [!pkDraft && !pkAppr, "sketch packs"], [!kickDraft, "kickoff packs"], [!held.length, "quote packs held"],
@@ -7490,7 +7865,7 @@ async function loadOverview(){
   const QUEUE = [
     { label:"Disputes open", n:disputesOpen, view:"jobs", tone:"crit" },
     { label:"Evidence a client raised", n:evidYours, view:"evid", tone:"crit" },
-    { label:"Intake to triage", n:intakeNew, view:"intake" },
+    { label:"Waiting on a reply", n:intakeNew, view:"intake" },
     { label:"Enquiries to answer", n:enqNew, view:"enq" },
     { label:"Threads handed to you", n:waitingNow.length, view:"owed" },
     { label:"Applications in vetting", n:appsWaiting, view:"apps" },
@@ -7537,7 +7912,7 @@ async function loadOverview(){
     lanes: LANES,
     stages: [0, 1, 2, 3, 4, 5].map(i => ({ label:["On the board","Quotes in","Kickoff","Working","Sign-off","Done"][i], n:buckets[i].length, done:i === 5 })),
     waiting: [
-      { label:"Intake to triage", n:intakeNew, view:"intake" },
+      { label:"Waiting on a reply", n:intakeNew, view:"intake" },
       { label:"Enquiries to answer", n:enqNew, view:"enq" },
       { label:"Threads handed to you", n:waitingNow.length, view:"owed" },
       { label:"Quotes to pass on", n:quotesOut, view:"quotes" },
@@ -10052,7 +10427,11 @@ $("skAssemble").addEventListener("click", async () => {
       visit_date: $("skDate").value || null,
       captured_by: $("skWho").value.trim(),
       conditions: $("skConditions").value.trim(),
-      job_ref: $("skJobRef").value.trim(),
+      // job_id is the link that decides who can read the pack. job_ref is a
+      // different thing, the client's OWN reference, free text printed on the
+      // report, and it is filled in on the draft where the label says so.
+      // Putting a Yaadly job id in it would quietly redefine that field.
+      job_id: $("skJob").value || null,
       contractor: $("skContractor").value.trim(),
       visit_notes: $("skVisitNotes").value.trim(),
     });
@@ -10201,6 +10580,11 @@ function skRenderPack(extra){
 
   $("skPackBody").innerHTML = `
     <p class="vsub" style="margin:0 0 10px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}${p.parish ? " &middot; " + esc(p.parish) : ""}</p>
+    ${draft ? `<div class="row" style="align-items:flex-end;margin-bottom:12px">
+      <div style="flex:1"><label>Job this belongs to</label><select id="skPackJob"><option value="">No job, this pack will not be sendable</option>${skJobOptions(p.job_id || "")}</select></div>
+      <div><button class="btn g" id="skPackJobSave">Attach</button></div>
+    </div>
+    ${p.job_id ? "" : `<p class="conseq" style="color:var(--coral);margin-top:-6px">No job attached, so <b>nobody can read this pack</b> however far you take it. A client reads one through their job. Attach it here, on the draft: an approved pack is frozen, and reopening to fix it starts a new revision.</p>`}` : ""}
     <div class="row" style="align-items:flex-end;margin-bottom:12px">
       <div style="flex:1"><label>Property address, printed on the report with a map</label><input id="skAddress" value="${esc(p.address || "")}" placeholder="12 Hope Road, Kingston 6" ${draft ? "" : "disabled"}></div>
       ${draft ? `<div><button class="btn g" id="skMapBtn">${p.map_image ? "Update the map" : "Add the map"}</button></div>` : ""}
@@ -10347,6 +10731,20 @@ function skRenderPack(extra){
     } catch (e) { say("skPackMsg","err", e.message); }
   });
 
+  // Attaching a job to a draft. The one repair for every pack made before the
+  // capture form had a picker, all of which have job_id null. Written straight
+  // to the row: the guard only fires on a status change, so this is an
+  // ordinary edit, and the foreign key refuses a job that does not exist.
+  if ($("skPackJobSave")) $("skPackJobSave").addEventListener("click", async () => {
+    const job = $("skPackJob").value || null;
+    if (job === (p.job_id || null)) return say("skPackMsg","ok","That is already the job on this pack. Nothing changed.");
+    if (!job && !confirm("Take the job off " + p.id + "?\n\nIt goes back to being readable by nobody.")) return;
+    const { error } = await sb.from("sketch_packs").update({ job_id: job }).eq("id", p.id);
+    if (error) return say("skPackMsg","err", error.message);
+    await skReload(p.id);
+    say("skPackMsg","ok", job ? "Attached to " + job + ". It can be issued to that job's client once you approve it." : "Job removed.");
+  });
+
   const setStatus = async (status, confirmText) => {
     if (confirmText && !confirm(confirmText)) return;
     const { error } = await sb.from("sketch_packs").update({ status }).eq("id", p.id);
@@ -10412,10 +10810,11 @@ function renderSkList(){
     const orphan = live && !p.job_id;
     return `
     <div class="item"${live ? "" : ' style="opacity:.62"'}>
-      <div><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
+      ${live ? `<input type="checkbox" data-skpick="${esc(p.id)}"${SK_PICKED.has(p.id) ? " checked" : ""} title="Select for voiding">` : ""}
+      <div style="flex:1"><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
         ${orphan ? '<span class="chip mute">no job attached</span>' : ""}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}</div></div>
-      <div style="color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
+      <div style="flex:none;white-space:nowrap;color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
     </div>`; }).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
           : '<div class="empty"><b>No packs yet</b>Pull the stills from a walkthrough below.</div>');
@@ -10425,9 +10824,83 @@ function renderSkList(){
     await skReload(e.target.dataset.skopen);
     $("skPackCard").scrollIntoView({ behavior:"smooth" });
   }));
+
+  $("skList").querySelectorAll("[data-skpick]").forEach(c => c.addEventListener("change", (e) => {
+    const id = e.target.dataset.skpick;
+    e.target.checked ? SK_PICKED.add(id) : SK_PICKED.delete(id);
+    skBulkBar();
+  }));
+  skBulkBar();
+}
+
+// Which packs are ticked for voiding. Only ones that want a person can be
+// ticked; an issued or void pack is the log and is not going anywhere.
+const SK_PICKED = new Set();
+
+function skBulkBar(){
+  // Drop anything ticked that is no longer voidable, so a stale tick from
+  // before a reload cannot end up in the list the confirm names.
+  for (const id of [...SK_PICKED]) if (!SK_LIST.some(p => p.id === id && SK_WANTS(p))) SK_PICKED.delete(id);
+  const n = SK_PICKED.size;
+  show("skBulkRow", n > 0);
+  $("skBulkNote").textContent = n
+    ? `Voiding keeps the ${n === 1 ? "pack" : "packs"} on the record, marked void, and nothing is deleted. A void pack can be set back to draft later.`
+    : "";
+}
+
+$("skBulkClear").addEventListener("click", () => { SK_PICKED.clear(); renderSkList(); });
+
+$("skBulkVoid").addEventListener("click", async () => {
+  const ids = [...SK_PICKED];
+  if (!ids.length) return;
+  const named = ids.map(id => {
+    const p = SK_LIST.find(x => x.id === id);
+    return "  " + id + (p && p.property_label ? "  (" + p.property_label + ")" : "");
+  }).join("\n");
+  if (!confirm(`Void ${ids.length} pack${ids.length === 1 ? "" : "s"}?\n\n${named}\n\nThey stay on the record, marked void. Nothing is deleted, and a void pack can be set back to draft later.`)) return;
+  $("skBulkVoid").disabled = true;
+  // One at a time, so a refusal names the pack it refused rather than failing
+  // the whole set anonymously. The database checks is_admin() on every one.
+  const failed = [];
+  for (const id of ids) {
+    const { error } = await sb.from("sketch_packs").update({ status:"void" }).eq("id", id);
+    if (error) failed.push(id + ": " + error.message);
+  }
+  $("skBulkVoid").disabled = false;
+  SK_PICKED.clear();
+  await loadSketchPacks();
+  if (failed.length) return say("skListMsg","err", `${ids.length - failed.length} voided. ${failed.length} refused: ${failed.join(" | ")}`);
+  say("skListMsg","ok", `${ids.length} pack${ids.length === 1 ? "" : "s"} voided.`);
+});
+
+// The jobs the pickers offer, newest first. Held here rather than shared with
+// the Jobs view, which loads its own and may never have been opened.
+let SK_JOBS = [];
+
+// One line per job, the same wording in the capture form and on a pack, so a
+// job reads the same wherever it is being attached.
+function skJobLabel(j){
+  return j.id + (j.title ? " \u00b7 " + j.title : "") + (j.parish ? " \u00b7 " + j.parish : "")
+    + (j.client_email ? "" : "  (no client email, cannot be read by anybody yet)");
+}
+function skJobOptions(selected){
+  return SK_JOBS.map(j => `<option value="${esc(j.id)}"${j.id === selected ? " selected" : ""}>${esc(skJobLabel(j))}</option>`).join("");
 }
 
 async function loadSketchPacks(){
+  // Jobs for the pickers. A failure here is not fatal: the packs still list,
+  // the picker is just empty, and it says so rather than looking like there
+  // are no jobs.
+  const jq = await sb.from("jobs").select("id,title,parish,client_email")
+    .order("updated_at", { ascending: false }).limit(200);
+  SK_JOBS = jq.data || [];
+  const sel = $("skJob");
+  if (sel) {
+    const keep = sel.value;
+    sel.innerHTML = `<option value="">${SK_JOBS.length ? "No job, this pack will not be sendable" : "No jobs could be read, so none can be attached"}</option>`
+      + skJobOptions(keep);
+  }
+
   const { data, error } = await sb.from("sketch_packs")
     .select("id,property_label,client_name,status,created_at,rev,job_id")
     .order("created_at", { ascending: false }).limit(15);
