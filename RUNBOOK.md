@@ -5717,3 +5717,10 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 4. **`docs/` may answer the escrow worry head on**, with the exact words "does not operate an escrow service", and nothing else may say the word at all. That asymmetry is in COPY-GUIDELINES section 2.
 5. **To add or remove a phrase**, change `docs/COPY-GUIDELINES.md` and `scripts/check-copy.mjs` in the same commit, and say so to Monique: the list is a rule about what the business claims, not a lint preference.
 6. **Run it by hand:** `node scripts/check-copy.mjs`. Prints one line when clean.
+
+## Where the prototype in `preview/` is actually served (19 Sep 2026)
+
+1. **Nowhere public.** GitHub Pages publishes `docs/`, and there is no `docs/preview/`, so `https://yaadly.co.uk/preview/` returns 404 and always has. Verified by fetching it, 19 September 2026.
+2. **CLAUDE.md section 11 says otherwise.** Its table gives `preview/` the home `yaadly.co.uk/preview/`. That line is wrong. The section says itself that it describes what got built rather than a rule, and to confirm anything load bearing against the code; this is what that warning is for. The file is Monique's, so it is recorded here rather than edited.
+3. **To read it:** `python3 -m http.server 8934 --directory preview`, or the entry in `.claude/launch.json`.
+4. **To publish it**, if that is ever wanted, it has to move to or be copied into `docs/preview/`, which also means the copy sweep and every claim in it becomes public. Decide that before copying, not after.
