@@ -2949,6 +2949,14 @@ Today, ignoring the `args` line the pattern also picks up: `is_admin`, `raise_jo
 
 **Migration files here are a record, not the mechanism.** `supabase migration list` skips every file in `supabase/migrations/` because the names are `20260903c_...` rather than a 14-digit timestamp, so `supabase db push` will NOT apply them. They are applied through the dashboard or the API, which records its own timestamped entry. Write the file for the reasoning, apply it separately, then verify with the query above.
 
+**Applying one file, from a terminal, without `db push`:**
+
+```bash
+supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f supabase/migrations/<the one file>.sql
+```
+
+This goes through the Management API on the CLI login, needs no database password and no `supabase link` in the working tree, and applies **only the file you name**, which is the whole point: `db push` would reach for every migration it thinks is pending, and on 3 Sep that would have been four, two already live under other names and one a decision nobody had taken. Used on 19 Sep 2026 for `20260919140000` and `20260919140100`. **Always verify against the database afterwards rather than trusting the output**, which prints an empty `rows` array for a successful DDL statement and looks identical to a statement that matched nothing.
+
 ---
 
 ## WhatsApp intake is returning 503 and nothing is arriving
@@ -5690,7 +5698,7 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 2. **A real lead is missing from the queue.** Each of the three reads takes the newest 150. Check the job's `is_test`: a row marked as testing by mistake is sorted to the bottom of the queue, not lost. Open it and unmark it on the job page.
 3. **You expected rows from `public.intakes`.** There are none, and the queue no longer reads that table. Nothing in this repository has written to it since 31 August 2026. A job arrives through `yaad-post-job` into `jobs`, a WhatsApp message through `yaad-inbound` into `intake_threads`, a contact form through `yaad-enquiry` into `enquiries`, and those three are what the queue reads.
 4. **The rail badge and the headline number disagree.** The badge is set twice: the Overview sets it to people waiting on a reply, then opening the view replaces it with the number of rows loaded. That is every view's behaviour, not Intake's.
-5. **`intakes` can still be written to by anyone with the publishable key.** The policy `public submits requests` is `INSERT ... WITH CHECK (true)`, left over from the old website form. Nothing calls it. If you want it shut, that is a one line migration dropping the policy; flagged 19 Sep 2026, not done, because it is a decision rather than a fix.
+5. **`intakes` could be written to by anyone with the publishable key. Closed 19 September 2026.** The policy `public submits requests` was `INSERT ... WITH CHECK (true)`, left from the old website form. It is dropped (`20260919140000`), along with the same leftover on `applications`, `calls`, `feedback` and `waitlist` (`20260919140100`). Every one of the five is proven shut by an anonymous POST that comes back `42501 new row violates row-level security policy`. Worker signup is unaffected: `/apply` posts to `yaad-vetting-upload`, which writes with the service role, and `service_role` has `rolbypassrls`. **If a public form ever comes back, do not put one of these policies back**: post to an edge function, the way every live form on the site already does.
 
 ## Outstanding, or any money figure, looks too low (19 Sep 2026)
 
