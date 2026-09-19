@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · "Not paid" and "not billed" are different waiting, and the desk had been saying the wrong one
+
+**What happened.** This morning's change made the Materials releases row name both gates instead of one. Reading the live data afterwards showed the money half of it was still wrong. Two jobs, JOB-TEST-WAPAY-2 and JOB-TEST-WAPAY-3, had every client bill paid and no "Materials, at cost" line on any of them. The row said the bill was not paid. It was. Nobody had billed the materials.
+
+**Why that matters more than a wording slip.** It points the wrong way. "The client has not paid" sends you to chase somebody who owes nothing, and the thing actually missing is a bill only Yaadly can raise. On a real job that is a call to a client in London asking for money they already sent.
+
+**What changed.** Desk only, both copies. The panel now reads unpaid bills as well as paid ones, void ones excluded, and separates two sums: what has been billed for materials, and what has been paid. Three outcomes instead of two. Not billed says so and is Yaadly's move. Billed and unpaid names the client. The store question names the client. More than one can show at once, separated by a middot, and the reader can tell whose move each is. `RUNBOOK.md` carries the table.
+
+**What did not move.** No database change and no gate. `materials_paid_jmd()` still has the last word on whether a tranche can go, and it still counts only paid invoices. This panel reports; it has never re-checked.
+
 ## 2026-09-19 · The copy sweep reaches the app, and the public board counts one parish as one
 
 **Why.** "Do the same" again, so the public surfaces were audited the way the desk was: the app at `app.yaadly.co.uk`, the marketing site, and what a stranger actually sees when they load either.
