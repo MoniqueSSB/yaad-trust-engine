@@ -18,6 +18,33 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **One thing found while building it.** A tick inside a list row inherits the desk's blanket `input{width:100%}` rule, which pushed each row off the page. Fixed with a rule beside the table views' own bulk tick, same size and same accent, so a tick means one thing everywhere on this desk.
 
+---
+
+## 2026-09-19 · Nothing waits on Monique unless a client raised it, and evidence.ok is not the record
+
+**Why.** Founder, 19 Sep 2026, looking at the Evidence screen: "nothing should be waiting on me UNLESS it is a dispute." She was right, and the screen was worse than she thought. It was telling her two contradictory things at once, and both were false. The Checked column drew a mango "waiting on you" against sixteen of nineteen filed items, reading `evidence.ok`, a boolean that defaults to `true`, that nothing anywhere in the system has ever written to, and that carries `null` on every row filed since September. And the green box above it read "Nothing is waiting on a client. Every set filed against a job has been approved by the client in their portal", which fired whenever no row carried `ok = false`, which is every screen it has ever drawn, while three stages in fact had evidence filed and no approval at all. A claim that cannot be false is not a check, and a colour attached to a switch nobody has ever thrown is not information.
+
+**What is the record.** `stage_approvals`: job, stage, who approved it, when, and by what method, portal or WhatsApp or in person. That table was always correct and the Evidence screen was simply not reading it. The Overview already had this right, filing evidence under "A client's" rather than "Yours", so the screen and the desk around it disagreed.
+
+**What.** Desk only, `concierge/concierge.html`. No database change, no migration, nothing deployed server side. `evOwner()` decides whose move a filed item is, and there are exactly three answers. Signed off, when a `stage_approvals` row covers its job and stage, shown teal with the approver, the age and the method. With the client, when no such row exists, shown mango: held, not late, and explicitly not hers. Yours, on one of two things and nothing else: an unresolved dispute on the job, or a comment the client wrote about the work, shown coral. The Overview's permanently zero `count(ok = false)` is replaced by `evidenceOwnership()`, which does the same split across the whole table, so "Evidence with clients" reports a real figure for the first time and a client's comment now reaches the Yours lane, which nothing surfaced before. The panel states the position, "3 sets are with the client, 5 are signed off, no dispute is open and nobody has written", instead of declaring a victory it never checked.
+
+**What was deliberately not done.** The rule was scoped to evidence, on the founder's answer to a direct question. Intake to triage, applications in vetting, quotes to pass on, unsent invoice drafts, kickoff packs, enquiries, questions and calls all stay in the Yours lane. None of them is a dispute and all of them are genuinely hers: taking them off the screen does not make them happen, it makes them late quietly.
+
+**What it does not change.** Not one human gate. The client still approves every stage in their own portal, exactly as before, and nothing here approves, releases or rules on anything. `evidence.ok` is left in place, read by nothing on the desk now; a dead line in `jobPage` that counted it and used the result for nothing was removed.
+
+**Deployed** 19 September 2026, `yaadly-concierge` version `c77ab329`, from `origin/main` after the merge, with the branch merged up twice first because main moved under it both times. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302 in front of the hostname.
+
+## 2026-09-19 · The day opens with a picture, and a filed photograph opens as a page
+
+**Why.** Founder, same session: "there should be a visual dashboard when i open the actions", for both The day and the drawer that opens on a row. The day carried four lanes of text and no picture at all, while the Overview next to it had eight charts. And the drawer on an evidence row was a dump of its columns, `ok`, `meta`, `storage_path`, `bytes`, with the photograph itself one field among twenty.
+
+**What.** Desk only, no new data. `renderDayViz()` draws a three-widget strip at the top of The day using the chart vocabulary that already existed: the count of moves that want her, the queues ranked longest first and colour-keyed by whose they are, and the four lanes as one stacked bar. Both pictures now read one `QUEUE` array, shared with the measurement tab, so the two can never disagree about what is waiting. `evidencePage()` gives the Evidence view a `page`, so the drawer opens on the photograph at full width, one sentence in the item's own colour saying whose move it is and why, the job, the fingerprint and what the section means, with every raw field folded under "Every field, as stored" one click down.
+
+**Counts only, no scores.** Every figure on both is a count of rows from a named table. No ratio, no percentage, no index. At this volume a percentage swings twenty points on one event, which is the note already written over the dashboard CSS and the reason it holds here too.
+
+---
+
+
 ## 2026-09-19 · A badge lands on the work it counted, and Sketch packs says what issuing really does
 
 **Why.** Founder, 19 Sep 2026, on Sketch packs: "this shows 3 and when i click on it there is nothing." Both halves were true. The rail badge counts packs at `draft` or `approved`, the two states a person can act on, and there are three. Clicking it opened the view on the Site Inspection Report capture form: five screens of file picker, still count, property label, parish, conditions, visit notes, with "Recent packs" below all of it. The thing the badge named was off the bottom of the screen, so the honest reading of that click was that there was nothing there. The same read found three more things. A pack list that failed to read returned in silence and left the box blank under a badge still claiming work, so an empty list could mean an empty table or a broken read and she could not tell which. Void packs sat in the list looking exactly like live ones. And every one of the five packs in the table has `job_id` null, because the capture form collects `job_ref` as free text and the desk has never sent `job_id` at all.

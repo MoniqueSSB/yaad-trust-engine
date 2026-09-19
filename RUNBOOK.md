@@ -5630,6 +5630,17 @@ Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A
 7. **Job type says "job type not set".** `jobs.trade` is empty on that job; set it on the job.
 
 
+## The Evidence screen says something is waiting on you, or says nothing is when something is (19 Sep 2026)
+
+The rule, set by the founder on 19 Sep 2026: a filed set reaches you on an open dispute or a comment the client wrote, and on nothing else. Approving the work is the client's, in their portal.
+
+1. **Whose move it is comes from `stage_approvals`, never from `evidence.ok`.** A set is "signed off" when a row in `stage_approvals` covers its job and stage; otherwise it is "with the client". `evidence.ok` is a dead column: it defaults to `true`, nothing writes it, and most rows carry `null`. Nothing on the desk reads it any more. Do not put it back.
+2. **A row reads "with the client" and you think it was approved.** Check the record: `select * from stage_approvals where job_id = '<job>' and stage = <n>;`. No row means no approval, whatever was said on the phone. An approval taken in person or over WhatsApp still has to be recorded, or the desk is right and the memory is wrong.
+3. **A row reads "the client wrote about this" and you cannot see what they said.** Open the row: the comment is quoted at the top of the drawer. In SQL: `select body, created_at, origin from evidence_comments where job_id = '<job>' and from_role = 'client' order by created_at;`. A comment with a null `evidence_id` came over WhatsApp, where a client can only name a stage, so it marks every item in that stage.
+4. **A whole job's evidence reads "dispute, waiting on you".** That is the job, not the photographs: `select * from disputes where job_id = '<job>' and state <> 'resolved';`. It clears when the dispute is resolved by a named person.
+5. **The Evidence badge in the rail, and the number the view leads with.** Both count the same thing, the rows a client raised, through `viz:{ want, wants }` on the view (`want: r => evOwner(r).who === "you"`). They read the maps `preEvidence()` fills, which `loadView` runs before either is drawn. If the badge ever shows rows loaded instead, that `viz.want` has been removed: `wantCount()` falls back to the row count when a view does not say.
+6. **"Evidence with clients" on the Overview reads zero and you know sets are filed.** It used to always read zero, because it counted `ok = false`. It is now `evidenceOwnership()`, which reads `evidence`, `stage_approvals`, `disputes` and `evidence_comments` and splits them. A zero now means every filed set really is approved or really is yours.
+
 ## The day says messages did not arrive, "Did it arrive" says nothing is outstanding (19 Sep 2026)
 
 Fixed on 19 September 2026. Both numbers now come from the same rule, `dlvOutcome_()`, and both ignore anything already followed up. If they ever disagree again:
