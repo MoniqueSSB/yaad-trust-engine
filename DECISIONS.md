@@ -6,6 +6,20 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · A stage the client was never billed for is checked against the whole job
+
+**What happened.** A row on Pay workers could not be cleared by any click. INV-2026-0016, J$3,900 owed to a test worker for stage 2 of JOB-TEST-KICKOFF-1, said "waiting on the client to pay their bill first" and offered no way to make that true.
+
+**Why.** The 17 September rule decides a job is billed by stage if any client bill on it carries a stage number, then demands a paid client bill carrying the same stage number as the worker's pay invoice. Since 13 September (`20260913233000`) nothing in the product can produce one. `raise_job_client_invoice()` takes no stage, and `request_invoice_part()` refuses outright to take a part from a bill that has a stage, so every part comes out stage-less. Only bills raised before 13 September carry a stage at all. On that job a single legacy stage 1 bill from 1 September made the whole job read as stage-billed, and the stage 2 payable then asked for a document the system had stopped being able to make six days earlier. Paying the outstanding whole-job bill would not have released it either.
+
+**The decision, hers, 19 September.** Narrow the rule rather than remove it. The stage check now applies only where a client bill actually carries that stage number. Where none does, the pay invoice is checked against the whole job: a paid whole-job bill must exist, and every whole-job bill and the materials bill must be paid. On the job above that means sending and paying INV-2026-0024, the J$8,500 that covers the actual work, releases the worker, which is the right answer, because at that point Yaadly has been paid for the work.
+
+**What did not move.** Every other refusal in `20260917180000` stands word for word, it still fails closed on no job, no client bill or a bill in draft, and where a stage genuinely is billed the stage message is unchanged. The call-back gate, the Stripe payout gate and `mark_worker_paid()`'s admin check are untouched. No human gate moved: a named person still marks the client's bill paid, and a named person still sends the worker's money. `yaad-payout-send` needed no change, because it calls the same function by name.
+
+**Scope, checked rather than assumed.** Every worker payable currently owed across the database was read before the change. One was in this shape, and it was the test job, so no real money was ever stuck. The shape can recur on any job that carries a pre-13-September stage bill.
+
+**Proof.** `supabase/tests/worker_pay_client_paid_guards.sql`, ten lines, all PASS, run against production inside a transaction that was rolled back, and the rollback verified afterwards by reading the live function back and confirming it still had the old body. Three existing expectations changed wording with the rule; each still asserts a refusal, and the test file says so beside each one rather than quietly.
+
 ## 2026-09-19 · The holding sentence is gone, and a CI sweep stops it coming back
 
 **Why.** Flagged in the entry below and then, on the founder's instruction, fixed. The Money view said "Holding goes live once PI insurance is in force" and "Yaadly holds no money today. Holding starts when PI insurance is in force." On 3 September Yaadly became the principal contractor and stopped holding anybody's money, before or after any insurance, so the sentence had been untrue for a fortnight. It is the exact failure CLAUDE.md section 8 describes: no single word in it is banned, so `guardrails.scan` walks straight past it, and section 8 itself once prescribed a sentence of the same shape.
