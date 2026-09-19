@@ -1148,6 +1148,18 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
   <h1 class="vh">Sketch packs</h1>
   <p class="vsub">A record of what was filmed, never a survey. No measurement goes in one, and the database refuses to approve any that slips through. If a client needs dimensions, they need a surveyor.</p>
 
+  <!-- The packs come FIRST, above the form that makes a new one. The rail
+       badge beside "Sketch packs" counts the packs that want a person, and a
+       click on it used to land on four screens of upload form with the thing
+       it counted below the fold, which reads as nothing there. A badge is a
+       claim about work, so the work it names has to be the first thing on
+       the page. -->
+  <div class="card">
+    <div class="chd"><h3>Packs</h3><span class="sp" id="skWant"></span></div>
+    <div id="skListMsg"></div>
+    <div class="list" id="skList"><div class="empty"><b>Reading packs&hellip;</b></div></div>
+  </div>
+
   <div class="card">
     <div class="chd"><h3>Site Inspection Report</h3><span class="chip warn dot">Indicative only</span></div>
     <div id="skMsg"></div>
@@ -1212,10 +1224,6 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
     <iframe id="skPreview" title="Pack preview"></iframe>
   </div>
 
-  <div class="card">
-    <div class="chd"><h3>Recent packs</h3></div>
-    <div class="list" id="skList"></div>
-  </div>
 </section>
 
 <!-- ============================================ MATERIALS TRANCHES -->
@@ -9788,7 +9796,9 @@ function skRenderPack(extra){
       ${draft || p.status === "approved" ? `<button class="btn d" id="skVoid">Void</button>` : ""}
     </div>
     ${draft ? `<p class="conseq">Approving is you saying you have <b>read every one of the ${rooms.length} room${rooms.length === 1 ? "" : "s"}</b> and it matches what you saw on site. It freezes the content. It does not send anything.</p>` : ""}
-    ${p.status === "approved" ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>` : ""}`;
+    ${p.status === "approved" ? (p.job_id
+      ? `<p class="conseq">Issuing makes this <b>visible to the client in their portal</b>. It emails nobody. Reopening clears your approval and starts a new revision.</p>`
+      : `<p class="conseq" style="color:var(--coral)">This pack has <b>no job attached</b>, so issuing it records the decision and <b>shows it to nobody</b>. A client reads a pack through their job, and this one has none. Reopening clears your approval and starts a new revision.</p>`) : ""}`;
 
   show("skPackCard", true);
 
@@ -9912,8 +9922,14 @@ function skRenderPack(extra){
 
   if ($("skApprove")) $("skApprove").addEventListener("click", () =>
     setStatus("approved", "Approve " + p.id + "?\n\nYou are saying you have read every room and it matches what you saw. This freezes the content."));
+  // The confirm says what issuing actually does for THIS pack. A pack with no
+  // job_id cannot be read by any client: the read policy wants status issued
+  // and a job whose client_email is theirs. Promising the portal there would
+  // be the desk telling her something untrue at the moment she decides.
   if ($("skIssue")) $("skIssue").addEventListener("click", () =>
-    setStatus("issued", "Issue " + p.id + " to the client?\n\nIt becomes visible to them in the portal. It does not email anybody."));
+    setStatus("issued", p.job_id
+      ? "Issue " + p.id + " to the client?\n\nIt becomes visible to them in the portal. It does not email anybody."
+      : "Issue " + p.id + "?\n\nThis pack has NO JOB attached, so no client can read it. Issuing records your decision and shows it to nobody. It does not email anybody."));
   if ($("skReopen")) $("skReopen").addEventListener("click", () =>
     setStatus("draft", "Reopen " + p.id + "?\n\nThis clears the approval and starts a new revision."));
   if ($("skVoid")) $("skVoid").addEventListener("click", () =>
@@ -9932,17 +9948,43 @@ $("skPrint").addEventListener("click", () => $("skPreview").contentWindow.print(
 
 let SK_LIST = [];
 
+// Which packs want a person. A draft is one nobody has read; an approved one
+// is read but not issued. Those are the only two states anybody can act on,
+// and they are exactly what the rail badge counts in loadOverview, so the
+// badge and this page read the same predicate and cannot disagree. Issued and
+// void are the log: still listed, because the log is the point of keeping
+// them, but sorted under the live ones and never counted as work.
+const SK_WANTS = p => p.status === "draft" || p.status === "approved";
+const SK_RANK  = { draft:0, approved:1, issued:2, void:3 };
+
 function renderSkList(){
   const q = ($("srch").value || "").trim().toLowerCase();
-  const rows = q ? SK_LIST.filter(p => (p.id + " " + p.property_label + " " + (p.client_name||"")).toLowerCase().includes(q)) : SK_LIST;
-  $("skList").innerHTML = rows.map(p => `
-    <div class="item">
+  const rows = (q ? SK_LIST.filter(p => (p.id + " " + p.property_label + " " + (p.client_name||"")).toLowerCase().includes(q)) : SK_LIST)
+    .slice().sort((a, b) => (SK_RANK[a.status] ?? 9) - (SK_RANK[b.status] ?? 9)
+      || String(b.created_at).localeCompare(String(a.created_at)));
+
+  const want = SK_LIST.filter(SK_WANTS).length;
+  $("skWant").innerHTML = `<span class="chip ${want ? "warn" : "ok"} dot">`
+    + (want ? `${want} ${want === 1 ? "wants" : "want"} you` : "nothing waiting")
+    + `</span> <span style="color:var(--dim);font-size:11.5px">`
+    + `${SK_LIST.length} held, newest 15</span>`;
+
+  $("skList").innerHTML = rows.map(p => {
+    const live = SK_WANTS(p);
+    // A pack reaches a client through its job: the client read policy wants
+    // status issued AND a job whose client_email is theirs. No job, no
+    // reader. Said here rather than only at the Issue button, so it is
+    // visible before the work of reading a pack, not after.
+    const orphan = live && !p.job_id;
+    return `
+    <div class="item"${live ? "" : ' style="opacity:.62"'}>
       <div><a href="#" data-skopen="${esc(p.id)}">${esc(p.id)}</a> ${chipFor(SK_CHIP, p.status)}
+        ${orphan ? '<span class="chip mute">no job attached</span>' : ""}
         <div style="color:var(--dim);font-size:11.5px;margin-top:3px">${esc(p.property_label)}${p.client_name ? " &middot; " + esc(p.client_name) : ""}</div></div>
       <div style="color:var(--dim);font-size:11.5px">${esc(String(p.created_at).slice(0,10))}</div>
-    </div>`).join("")
+    </div>`; }).join("")
     || (q ? '<div class="empty"><b>Nothing matches that</b>Clear the search box to see everything.</div>'
-          : '<div class="empty"><b>Nothing yet</b>Pull the stills from a walkthrough above.</div>');
+          : '<div class="empty"><b>No packs yet</b>Pull the stills from a walkthrough below.</div>');
 
   $("skList").querySelectorAll("[data-skopen]").forEach(a => a.addEventListener("click", async (e) => {
     e.preventDefault();
@@ -9953,9 +9995,16 @@ function renderSkList(){
 
 async function loadSketchPacks(){
   const { data, error } = await sb.from("sketch_packs")
-    .select("id,property_label,client_name,status,created_at,rev")
+    .select("id,property_label,client_name,status,created_at,rev,job_id")
     .order("created_at", { ascending: false }).limit(15);
-  if (error) return;
+  // A failed read used to return in silence, which left the list holding
+  // whatever was there before, or nothing at all, under a badge still
+  // claiming there was work. An empty list has to mean an empty table.
+  if (error) {
+    $("skList").innerHTML = "";
+    return say("skListMsg","err","The packs could not be read, so this list is empty for that reason and not because there are none. " + error.message);
+  }
+  $("skListMsg").innerHTML = "";
   SK_LIST = data || [];
   renderSkList();
 }
