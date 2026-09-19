@@ -499,6 +499,30 @@ If WhatsApp fails outright, a short text goes to the same number, but only if `T
 
 ---
 
+## 10e-i. Working the Intake queue
+
+**Intake is one list over three front doors.** It has no table of its own. It reads `jobs` still at `awaiting_client_setup`, `enquiries`, and `intake_threads`, every time you open it. The hint under the table names all three.
+
+**The box at the top is the work.** It lists only the rows with somebody on the other end of them: nobody has answered them, they left no way back, or the job they built cannot move. Everything else is below it. Click any row in either place to open it.
+
+**What opens.** Three blocks. **Still outstanding**, what is missing or undone and why each one matters. **What they gave you**, every field they actually filled in, and their own words printed whole. **Reach them**, the WhatsApp, call and email buttons with a draft already written, plus the one button that finishes this kind of row: Open the job, Open the conversation, or I have answered this.
+
+**Every Reach them button opens your own app, as you. The desk sends nothing from this screen.** On a conversation, use **Open the conversation** instead and reply from the Yaadly number, so it lands in the chat they already have. A reply from your own number reads to the client as a stranger.
+
+**Your own tests sort to the bottom and are never counted in the box at the top.** A job or a conversation marked `is_test`, and an enquiry marked as a test, all carry a grey "test" state.
+
+**When you cannot answer somebody, close the row.** An enquiry or a conversation with no number and no address will sit at the top of Waiting on you forever otherwise. Open it and press **Close it, nothing to answer**. On an enquiry that marks it binned; it does **not** stamp the reply clock, because you did not reply. On a conversation it stops the clock, hands the number back to the assistant, and saves the reason you type into your own notes on that thread, with your address and the day. It sends nothing and tells them nothing. If they write in again and a person is needed, it comes back on this queue by itself. A closed row shows **closed by you** with your reason on it.
+
+**A job is not closable from here.** Cancelling a job is done on the job page, through **Open the job**, because that is the screen that shows what is being cancelled.
+
+**Nothing on this queue decides anything.** Putting a job on the board is on the job page, converting an enquiry into a booking is under Enquiries, attaching a job to a conversation is under Conversations (10f above). Those buttons exist once each, on the page that shows what is being changed.
+
+**If one door is shut**, the queue says which table could not be read, in red, and shows the other two in full underneath. That is the read failing, not the queue being empty.
+
+**`intakes` is a dead table.** It is still in the database with one test row in it from 12 August 2026. Nothing has written to it since `yaad-website-intake` was retired on 31 August, and nothing reads it any more. Do not put it back on a screen.
+
+---
+
 ## 10f. Turning a conversation into a job
 
 A conversation the assistant read as a question writes **no job row**. That is deliberate, and it is why your job list is not full of people asking how Yaadly works. When one of them turns out to be real work, you promote it yourself.
