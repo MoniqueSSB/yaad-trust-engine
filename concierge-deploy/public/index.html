@@ -206,6 +206,9 @@ tr.unpriced td{background:rgba(245,158,11,.07)}
 .dlvwhat{font-size:12.5px;color:var(--mute);margin:2px 0 8px}
 .dlvfix{font-size:12.5px;line-height:1.55;margin:0 0 12px}
 .dlvissue .brow{display:flex;flex-wrap:wrap;gap:8px}
+.dlvdone{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.dlvdone label{display:block;font-size:12px;color:var(--mute);margin-bottom:5px}
+.dlvdone input{margin-bottom:8px}
 .dlvstory{margin-bottom:6px}
 .dlvrail{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:4px 0 16px}
 .dlvst{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;font-size:11px;color:var(--dim);position:relative}
@@ -2578,8 +2581,8 @@ const VIEWS = [
           + encodeURIComponent(`/console/sms/logs/${r.account_sid}/${r.message_sid}`), "_blank", "noopener") },
       { label:"Mark as followed up", cls:"g",
         when:r => dlvOutcome_(r).problem && !r.followed_up_at,
-        says:() => "Records that you have dealt with this person and what you did, so every message to them that did not arrive drops out of the box at the top. It sends nothing and changes nothing about the message itself.",
-        ask:[{ k:"note", label:"What you did", type:"long", from:() => "",
+        says:() => "Records that you have dealt with this person, so every message to them that did not arrive drops out of the box at the top. It sends nothing and changes nothing about the message itself.",
+        ask:[{ k:"note", label:"What you did, if there is anything to say. Leave it empty and it still closes.", type:"long", from:() => "",
                placeholder:"Rang him on his mobile, he has a new number. Updated the job." }],
         call: dlvFollowedUp_ },
     ]},
@@ -2928,10 +2931,26 @@ function dlvOutcome_(r){
 const dlvDigits_ = (v) => String(v || "").replace(/\D/g, "");
 let DLV_THREADS = {};
 
-async function preDelivery(){
+async function preDelivery(rows){
   DLV_THREADS = {};
   const { data } = await sb.from("intake_threads").select("from_addr,channel,job_id").eq("channel", "whatsapp").limit(500);
   for (const t of data || []) { const d = dlvDigits_(t.from_addr); if (d) DLV_THREADS[d] = t; }
+
+  // The table below reads the newest 200 messages, and until 19 September 2026
+  // the box at the top could only see those 200. The overview counts the whole
+  // table, so it said eight messages never arrived while this page, opened on
+  // the same second, said nothing was outstanding. Both were reading the same
+  // rows; one had a window on them. Every message not yet followed up is
+  // pulled in on top of the 200 here, so the box is the whole truth and the
+  // two numbers cannot disagree again.
+  try {
+    const open = await sb.from("message_deliveries").select("*")
+      .is("followed_up_at", null).order("sent_at", { ascending:false }).limit(500);
+    const seen = new Set((rows || []).map(r => r.message_sid));
+    for (const r of open.data || []) if (!seen.has(r.message_sid) && dlvOutcome_(r).problem) rows.push(r);
+    rows.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+    rows.forEach((r, i) => { r.__i = i; });
+  } catch (e) { console.warn("message_deliveries: open problems not merged:", e.message); }
 }
 const dlvThread_ = (r) => DLV_THREADS[dlvDigits_(r.to_addr)] || null;
 const dlvWho_ = (r) => { const t = dlvThread_(r); return t && t.job_id ? "conversation on " + t.job_id : (r.channel || ""); };
@@ -2948,7 +2967,10 @@ async function dlvOpenThread_(r){
 
 async function dlvFollowedUp_(r, vals){
   const note = String(vals.note || "").trim();
-  if (note.length < 5) throw new Error("Say in a few words what you did, so the next person reading this knows.");
+  // A five character minimum stood here until 19 September 2026 and it refused
+  // "DONE", which is a real answer typed by the person who did the thing. The
+  // words are worth having and are not worth a locked door: an empty box still
+  // records that it was dealt with, by whom, and when.
   // Following up is done with a person, not a message, so it clears every
   // open problem to the same number in one go. The desk can only read this
   // table; mark_delivery_followed_up (20260916140000) is the one write, and it
@@ -3021,9 +3043,18 @@ function panelDelivery(rows){
       + `<p class="dlvwhat">Did not get: ${esc([...new Set(whats)].join(", "))}</p>`
       + `<p class="dlvfix"><b>What to do:</b> ${esc(o.fix)}</p>`
       + `<div class="brow">`
-      + `<button class="btn" data-dlopen="${r.__i}">See exactly what happened</button>`
+      + `<button class="btn" data-dldone="${r.__i}">Mark as followed up</button>`
+      + `<button class="btn g" data-dlopen="${r.__i}">See exactly what happened</button>`
       + (t ? `<button class="btn g" data-dlthread="${r.__i}">Open their conversation</button>` : "")
-      + `<button class="btn g" data-dldone="${r.__i}">Mark as followed up</button>`
+      + `</div>`
+      // Ticking one off is done here, on the card, and not by opening the
+      // drawer behind it. The words are optional and Enter finishes it.
+      + `<div class="dlvdone hidden">`
+      + `<label>What you did, if there is anything to say. Leave it empty and it still closes.</label>`
+      + `<input data-dlnote maxlength="200" placeholder="Rang him on his mobile, he has a new number.">`
+      + `<div class="brow"><button class="btn" data-dlsave="${r.__i}">Done, followed up</button>`
+      + `<button class="btn g" data-dlno>Leave it</button></div>`
+      + `<div data-dlmsg></div>`
       + `</div></div>`;
   }).join("");
   return picture + `<div class="card"><div class="chd"><h3>Needs you</h3><span class="chip crit dot">${people.length} ${people.length === 1 ? "person" : "people"}</span><span class="sp">${open.length} message${open.length === 1 ? "" : "s"} to follow up</span></div>${cards}</div>`
@@ -3035,14 +3066,45 @@ function wireDelivery(){
   const rowOf = (el, attr) => (ROWS.delivery || []).find(r => r.__i === Number(el.getAttribute(attr)));
   host.querySelectorAll("[data-dlopen]").forEach(b => b.addEventListener("click", () => openDetail("delivery", Number(b.dataset.dlopen))));
   host.querySelectorAll("[data-dlthread]").forEach(b => b.addEventListener("click", () => dlvOpenThread_(rowOf(b, "data-dlthread"))));
+  // Founder, 19 September 2026: "I SHOULD BE ABLE TO TICK AND CLOSE THIS
+  // EASY." Until then this button opened the whole drawer, counted the actions
+  // in it, and pressed the one it hoped was the right one, which then refused
+  // any note under five characters. Three ways to be wrong for one tick. The
+  // box is on the card now and the only thing it can do is close the row.
   host.querySelectorAll("[data-dldone]").forEach(b => b.addEventListener("click", () => {
-    const i = Number(b.dataset.dldone);
-    openDetail("delivery", i);
-    const acts = VIEW.delivery.actions.filter(a => !a.when || a.when(rowOf(b, "data-dldone")));
-    const n = acts.findIndex(a => a.label === "Mark as followed up");
-    const btn = document.querySelector(`.drw [data-act="${n}"]`);
-    if (btn) btn.click();
+    const box = b.closest(".dlvissue").querySelector(".dlvdone");
+    if (!box) return;
+    box.classList.remove("hidden");
+    b.disabled = true;
+    const note = box.querySelector("[data-dlnote]");
+    if (note) note.focus();
   }));
+  host.querySelectorAll("[data-dlno]").forEach(b => b.addEventListener("click", () => {
+    const card = b.closest(".dlvissue");
+    card.querySelector(".dlvdone").classList.add("hidden");
+    const back = card.querySelector("[data-dldone]");
+    if (back) back.disabled = false;
+  }));
+  host.querySelectorAll("[data-dlsave]").forEach(b => {
+    const card = b.closest(".dlvissue");
+    const save = async () => {
+      const r = rowOf(b, "data-dlsave"); if (!r) return;
+      const msg = card.querySelector("[data-dlmsg]");
+      b.disabled = true;
+      msg.innerHTML = `<div class="msg ok"><span class="spin"></span>Writing.</div>`;
+      try { await dlvFollowedUp_(r, { note: (card.querySelector("[data-dlnote]") || {}).value || "" }); }
+      catch (e) {
+        // As the function said it. A refusal is the rule working.
+        msg.innerHTML = `<div class="msg err">${esc(e && e.message ? e.message : String(e))}</div>`;
+        b.disabled = false;
+        return;
+      }
+      await loadTableView("delivery");
+    };
+    b.addEventListener("click", save);
+    const note = card.querySelector("[data-dlnote]");
+    if (note) note.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); save(); } });
+  });
 }
 
 // ---------------------------------------------------------------- conversations
@@ -6251,7 +6313,7 @@ function renderStatsViz(d){
     + line("Drafts sent as written, 30 days", d.drafts.accepted, d.drafts.of, d.drafts.of && d.drafts.accepted / d.drafts.of >= 0.6, "no drafts decided yet")
     + line("Live jobs gone quiet", d.quiet.now, d.quiet.of, !d.quiet.now, "no live jobs", "stalled")
     + `<button class="stl" data-v="owed"><span class="k">Longest anyone is waiting on a person</span><span class="v ${d.msgs.oldest >= 24 ? "crit" : d.msgs.oldest ? "warn" : "ok"}">${hrs(d.msgs.oldest)}</span><span class="s">${d.msgs.people ? plural_(d.msgs.people, "person", "people") + " waiting" : "nobody waiting"}</span></button>`
-    + `<button class="stl" data-v="delivery"><span class="k">Messages that never arrived</span><span class="v ${d.msgs.failed ? "crit" : "ok"}">${d.msgs.failed}</span><span class="s">${d.msgs.held ? plural_(d.msgs.held, "reply", "replies") + " held for the 24 hour window" : "nothing held"}</span></button>`;
+    + `<button class="stl" data-v="delivery"><span class="k">Messages to follow up</span><span class="v ${d.msgs.failed ? "crit" : "ok"}">${d.msgs.failed}</span><span class="s">${d.msgs.held ? plural_(d.msgs.held, "reply", "replies") + " held for the 24 hour window" : "nothing held"}</span></button>`;
 
   host.innerHTML = `<div class="stgrid">`
     + sec("What is waiting, by queue", q.length ? plural_(q.reduce((a, x) => a + x.n, 0), "item", "items") : "clear", qBody)
@@ -6460,7 +6522,17 @@ async function loadOverview(){
     countOf("jobs", q => q.eq("source", "whatsapp").eq("status", "awaiting_client_setup")),
     countOf("jobs", q => q.eq("source", "whatsapp").eq("handed_to_human", true)),
     countOf("pending_desk_replies", q => q.is("sent_at", null)),
-    countOf("message_deliveries", q => q.in("status", ["failed", "undelivered"])),
+    // Not a count. This was countOf(status in failed, undelivered) until 19
+    // September 2026, which counted every failure ever recorded, including the
+    // ones already followed up, while the Did it arrive page hides those. The
+    // overview said eight messages never arrived and the page it sent her to
+    // showed nothing outstanding, which teaches you to stop believing the
+    // number. Same rule as the page now, dlvOutcome_ and all, and followed up
+    // means gone from both.
+    sb.from("message_deliveries").select("status,error_code,sent_at,followed_up_at")
+      .is("followed_up_at", null).order("sent_at", { ascending:false }).limit(1000)
+      .then(r => (r.data || []).filter(x => dlvOutcome_(x).problem).length)
+      .catch(() => 0),
   ]);
   // Median would be better than mean on a long tail, but this reads a column
   // rather than computing over rows, and at forty jobs the difference is
@@ -6654,7 +6726,7 @@ async function loadOverview(){
     tile(waHanded ? "warn" : "", "Handed to you", String(waHanded), waTotal ? `${Math.round((waHanded / waTotal) * 100)}% needed a person` : "None yet", "threads"),
     tile("", "Messages to finish one", avgTurns, "Average, where it got there"),
     tile(waWaiting ? "warn" : "", "Replies waiting to send", String(waWaiting), waWaiting ? "Outside the 24 hour window" : "Nothing held", "waiting"),
-    tile(waFailed ? "crit" : "ok", "Messages that failed", String(waFailed), waFailed ? "Somebody is waiting on nothing" : "All delivered", "delivery"),
+    tile(waFailed ? "crit" : "ok", "Messages to follow up", String(waFailed), waFailed ? "Did not arrive, nobody has dealt with it" : "All dealt with", "delivery"),
     tile(slaPct === null ? "" : slaPct >= 90 ? "ok" : slaPct >= 70 ? "warn" : "crit",
       "Replied within a working day", slaPct === null ? "n/a" : slaPct + "%",
       answered.length ? `${slaMet} of ${answered.length} conversations` : "Nobody has needed a person yet", "owed"),
@@ -6755,7 +6827,7 @@ async function loadOverview(){
   else if (enqNew)
     push(yours, "warn", "Unanswered", plural(enqNew, "enquiry has", "enquiries have") + " had no reply", null, null, "Read them", "enq", false);
   if (waFailed)
-    push(yours, "crit", "Failed", plural(waFailed, "message", "messages") + " never arrived", "somebody is waiting on nothing", null, "See them", "delivery", false);
+    push(yours, "crit", "Not arrived", plural(waFailed, "message", "messages") + " did not arrive and nobody has followed up", "somebody is waiting on nothing", null, "See them", "delivery", false);
   if (held.length)
     push(yours, heldHrs >= 24 ? "crit" : "warn", "Held", plural(held.length, "quote pack is", "quote packs are") + " held, so those jobs cannot be quoted", "longest " + Math.round(heldHrs) + " hr", null, "Open drafts", "qpd", heldHrs >= 72);
   if (disputesOpen)
@@ -6826,7 +6898,7 @@ async function loadOverview(){
     [!appsWaiting, "applications"], [!quotesOut, "quotes to pass on"], [!callsNew, "calls requested"],
     [!enqNew, "enquiries to answer"], [!asksNew, "questions to publish"], [!invDraft, "invoice drafts"],
     [!pkDraft && !pkAppr, "sketch packs"], [!kickDraft, "kickoff packs"], [!held.length, "quote packs held"],
-    [!waFailed, "messages that failed"], [!waWaiting, "replies waiting to send"],
+    [!waFailed, "messages to follow up"], [!waWaiting, "replies waiting to send"],
     [!waitingNow.length, "conversations handed over"], [!noEv, "sign-offs with no evidence"],
     [!noFp, "sign-offs with no fingerprint"], [!stalledNow, "jobs gone quiet"], [!unsigned, "jobs never signed for"],
   ].filter(z => z[0]).map(z => z[1]);
@@ -7006,8 +7078,8 @@ async function loadOverview(){
     words.push(ansRow("warn", String(waWaiting), true, "Replies written and not sent",
       "Outside the 24 hour window, so the message is held until they write again.", "Open", "waiting"));
   if (waFailed)
-    words.push(ansRow("crit", String(waFailed), true, "Messages that never arrived",
-      "Twilio accepted these and the phone never got them. Nothing else in the system knows.", "See them", "delivery"));
+    words.push(ansRow("crit", String(waFailed), true, "Messages to follow up",
+      "Twilio accepted these and the phone never got them, and nobody has marked them dealt with. Nothing else in the system knows.", "See them", "delivery"));
   if (asksNew)
     words.push(ansRow("warn", String(asksNew), true, "Questions waiting to be published",
       "Somebody asked on the public board. Check it carries no phone number or address, then publish it or leave it.", "Read", "asks"));

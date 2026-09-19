@@ -5593,3 +5593,20 @@ Fixed 15 Sep 2026, same file as the question fix above (`worker-question.ts`). A
 6. **A job is missing from Live jobs.** It lists booked jobs only (a tradesperson chosen), leaves out cancelled ones, and drops a finished job once every client invoice and worker pay on it is marked paid. It reads the latest 50 booked jobs.
 7. **Job type says "job type not set".** `jobs.trade` is empty on that job; set it on the job.
 
+
+## The day says messages did not arrive, "Did it arrive" says nothing is outstanding (19 Sep 2026)
+
+Fixed on 19 September 2026. Both numbers now come from the same rule, `dlvOutcome_()`, and both ignore anything already followed up. If they ever disagree again:
+
+1. Open "Did it arrive". The box at the top, "Needs you", is the truth: it counts every message not yet followed up, not only the newest 200 rows the table below loads.
+2. If the day panel's "Not arrived" line shows a different number, the merge in `preDelivery()` or the count in `loadOverview()` has drifted apart again. They are about forty lines apart in `concierge/concierge.html`; both call `dlvOutcome_()` and both filter `followed_up_at` null. Neither should ever count rows the other does not.
+3. A number that is high and will not clear usually means the follow-up write is failing, not that the count is wrong. Press the tick and read the red line it gives you: it is the database's own words.
+
+## Following one up will not save (19 Sep 2026, 20260919120000)
+
+The note is optional as of 19 September 2026: press "Mark as followed up" on the card, then "Done, followed up" with the box empty, or type a few words and press Enter. If it refuses:
+
+- **"Say in a few words what you did"** means the database still has the old function. Apply `supabase/migrations/20260919120000_following_one_up_is_a_tick_and_the_words_are_optional.sql`.
+- **"Nothing to follow up for that number"** is also the old function. The new one returns 0 quietly and the row simply disappears on reload.
+- **"That is not a usable number"** is real: the row's `to_addr` has fewer than seven digits, so there is nobody to have followed up with. Nothing to do but leave it.
+- **"Admin only"** or **"No signed-in email on this session"** means the desk session is not what it should be. Sign out and back in.
