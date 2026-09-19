@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · Everything deployed reconciled against main, and two functions found running ahead of it
+
+**Why.** Founder: "fix everything outstanding". `scripts/check-deploy-drift.sh` says "No drift", and it compares names, not content, so it cannot see a function whose deployed code is a different version of the same file. Every one of the 44 deployed functions was downloaded and diffed against `main` instead.
+
+**Eleven were behind and were redeployed.** The one that mattered: `yaad-quote-pack-rescan` was running the guardrails list from before 5 September, the version that still prescribed "held safely with a licensed payment provider" as the replacement for escrow and carried neither pattern that now bans it. A live function screening client-facing text against a superseded banned list is precisely the split CLAUDE.md section 2 exists to prevent, and the repository, the tests and CI were all green throughout, because none of them read what is deployed. Also redeployed: stale `textmodel.ts` copies in `yaad-agent`, `yaad-completion`, `yaad-kickoff` and `yaad-quote-pack` (missing `answerText` and `firstJsonObject`, imported by none of them, so nothing was broken), a stale `stripe.ts` in `yaad-stripe-webhook`, and comment-only drift in `yaad-kickoff-check`, `yaad-notify-client`, `yaad-portal-signup`, `yaad-report` and `yaad-vetting-purge`. `--no-verify-jwt` was preserved on exactly the two that carry it, `yaad-notify-client` and `yaad-stripe-webhook`, and the live list is still exactly the fourteen in section 12, checked after.
+
+**Two are running AHEAD of main, and that is the one to act on.** `yaad-inbound` and `yaad-twilio-setup` are deployed from `claude/job-photo-filing-2917ca`, which is open as PR #277 and not merged. The deployed code was diffed against that branch and matches it exactly. So live behaviour includes a Twilio error-logging fix and a `describe-section-menu` read-back that `main` does not have, and **anyone redeploying either function from `main` would silently revert them**, which is the 6 September incident with a different filename. Left alone deliberately: merging somebody else's open PR is not this session's call. Until it merges, those two are the exception to "deploy from main".
+
+**Also brought level.** The desk twice (`15d2a202`, then `14b95bae` after the chip fix above), and the app once, `763449e6`, carrying PR #280. Each proved by `wrangler deployments list` rather than by reading the deploy output, Access still 302 on the desk, `app.yaadly.co.uk` and `yaadly.co.uk` both answering.
+
+**What this says about the control.** The drift script's own line, "No drift. Deployed and this branch agree", was true and useless: it compares the set of function names. The content check that found all of this was a download-and-diff of every function, which took about ten minutes and is worth adding to that script rather than repeating by hand.
+
 ## 2026-09-19 · "Not paid" and "not billed" are different waiting, and the desk had been saying the wrong one
 
 **What happened.** This morning's change made the Materials releases row name both gates instead of one. Reading the live data afterwards showed the money half of it was still wrong. Two jobs, JOB-TEST-WAPAY-2 and JOB-TEST-WAPAY-3, had every client bill paid and no "Materials, at cost" line on any of them. The row said the bill was not paid. It was. Nobody had billed the materials.
