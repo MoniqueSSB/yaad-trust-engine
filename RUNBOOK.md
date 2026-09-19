@@ -5700,3 +5700,12 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 4. **An invoice with no job at all counts as real.** It is a service, and a service has no test flag.
 5. **Money figures exclude what Yaadly pays tradespeople.** "Out with clients, unpaid" and "Awaiting payment" are money in. A worker payable used to be counted in both, which reported money Yaadly owes as money a client owes. Worker pay is in the Invoices lists under its own heading, and in Pay workers.
 6. **The rail badge on Invoices and the amount beside it come from the same rows.** Two `countOf` calls that counted every invoice were removed on 19 Sep 2026 so they cannot drift apart. Both now read the 600 row money query; if invoices ever pass 600, raise that limit.
+
+## A rail badge, or the band at the top of the Overview, looks wrong (19 Sep 2026)
+
+1. **Every one of those numbers comes from one list.** `QUEUE`, inside `loadOverview` in `concierge/concierge.html`. The band at the top of the Overview, the "What is waiting" bars on The day and on How the desk is doing, and the rail badges all read it. If two of them disagree, something is reading a different list and that is the bug, not the number.
+2. **A badge is a claim about work, never a row count.** A view that cannot say which of its rows want a person shows no badge at all. If you want one on a view that has none, give that view `viz:{ want: r => ..., wants:"words" }` in its `VIEWS` entry, which is the same predicate the count widget at the top of the view uses, so the two cannot drift.
+3. **Hover any badge to see what it counted.** The words are set in the `setCount` block at the end of `loadOverview`. The format is `"one thing|many things"`, split on the pipe by the count.
+4. **A badge you expected is missing.** Either its queue is at zero, which is the badge working, or `loadOverview` threw. Open the browser console: if the Overview drew nothing at all, read §1 of this file and the note at the top of `scripts/check-desk-script.mjs`, because a `const` declared below its first use is how that has failed twice.
+5. **The band is empty but you know there is work.** The band deliberately leaves out any queue whose `tone` is `"client"`, because those are somebody else's move. They are named in the grey line underneath it. Nothing is hidden, it is sorted.
+6. **The band and the "Waiting on you" bar chart say the same thing.** They do. That is known and left alone for now; cutting the widget re-lays the Overview grid.

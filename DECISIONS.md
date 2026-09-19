@@ -6,6 +6,28 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · The Overview leads with a list of work, and a rail badge is only ever a claim about work
+
+**Why.** Founder, 19 Sep 2026: "the dashboard on the side should showcase what needs to be done", and then "it is not clear". Two separate things were unclear and both were true.
+
+**The Overview had no list of work on it.** It is eight widgets, and every one of them measures something: what came in over fourteen days, live jobs by stage, whose move it is, money both ways, jobs on the record. The only thing on the screen that said what to DO was a bar chart in the third widget. Measurement is not a move, and a screen where the work is a bar inside a chart is a screen you read rather than a screen you work from.
+
+**A rail badge meant two different things depending on whether you had opened the page.** If `loadOverview` had worked the number out, it was a claim about work. If you had opened the view yourself, `loadTableView` overwrote it with however many rows the read returned, unless the view declared `viz.want`. Same pill, same colour, same position, two meanings. Live, "Invoices 7" meant seven invoices exist and was read, reasonably, as seven things to do.
+
+**What.** Desk only, `concierge/concierge.html`. No database change, no new read, no migration. A band at the top of the Overview, above the grid, drawn by `renderTodo()` from the same `QUEUE` array that already feeds the bars on The day and on How the desk is doing, so the band, the charts and the rail cannot disagree about what is waiting. One pill per queue with something in it, blocked first in coral and the rest in gold, each one a click straight to that queue. The Overview and its grid are wrapped in a flex column so the band takes its height off the charts rather than pushing them past the fold.
+
+**The band is filtered to her lanes, and says so.** A queue whose `tone` is `"client"` is somebody else's move. Those are named underneath in one grey line rather than counted in with the rest, because a number she cannot act on sitting beside seven she can is how a to-do list stops being believed. Nothing is hidden; it is sorted.
+
+**Deliberately no grand total on the band.** The sentence at the top of the screen and the "Want you" number below it are both counts of open moves; a third number here counting queue items would have sat between them saying a different thing in the same words. The band's only figure is how many queues have something in them, and each pill carries its own count.
+
+**The badge rule, stated once.** A badge is a claim about work. A view that cannot say which of its rows want a person now gets no badge at all, rather than one carrying a row count. `BADGED` records which links hold a number that was worked out as work, so a view loading its own rows can never overwrite one. Every badge also carries the words, as a title: "7 invoices drafted and never sent", "2 quote packs held, and a held pack is a job stopped", singular and plural both written out because "1 calls requested" is the kind of small wrongness that makes a person stop trusting the rest of the sentence.
+
+**Widened from eight badged links to thirteen.** Enquiries, Quote Pack Drafts, Questions, Waiting on you and Stalled jobs were all on the queue list, all had a rail link, and none had a badge. A missing badge is a claim too: it says that place is clear. Jobs is still deliberately unbadged, for the reason already in the code, that its old badge carried the open-dispute count and put a coral pill on a link that does not go to disputes.
+
+**Known and left alone.** The "Waiting on you" bar chart on the Overview now says the same thing as the band, in the same order. It is a duplicate. Cutting it re-lays the twelve column grid, which is a separate change rather than a free one.
+
+**Reviewed as a clickable demo before the live file was touched,** per the way this desk is always changed: the same patch script, exact match anchors, applied first to a copy with a stand in Supabase client and invented rows, then to `concierge/concierge.html` unchanged. `scripts/check-desk-script.mjs` passes.
+
 ## 2026-09-19 · Outstanding counts real money: not her own tests, and not what Yaadly owes
 
 **Why.** Founder, 19 Sep 2026: "fix outstanding". Two separate wrong numbers under one word.

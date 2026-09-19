@@ -294,7 +294,30 @@ tr.unpriced td{background:rgba(245,158,11,.07)}
    The three bands that used to be here are one tab down, under The day. They
    were not deleted: a dashboard says what is true, and that page is where the
    work is actually picked up. */
-.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(148px,.82fr) minmax(200px,1.16fr) minmax(158px,.9fr);gap:10px;margin-top:12px;height:calc(100vh - 196px);min-height:600px}
+/* The band above the charts, added 19 September 2026. The Overview held eight
+   widgets and every one of them was a measurement, so the only thing on the
+   screen that said what to DO was a bar inside the third of them. This band is
+   the one list of work: a line per queue that wants HER, in words, worst
+   first, each one a way in. Everything below it stays measurement.
+   No new data. It reads the same QUEUE list the two pictures read, so the
+   band, the bars and the rail badges cannot disagree with each other. */
+.ovwrap{display:flex;flex-direction:column;height:calc(100vh - 196px);min-height:600px}
+.todo{flex:0 0 auto;margin-top:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:9px 13px 11px}
+.todoh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.todoh b{font-size:14px;color:var(--ink);letter-spacing:-.01em}
+.todoh span{font-size:11.5px;color:var(--dim)}
+.todos{display:flex;flex-wrap:wrap;gap:6px}
+.td{display:inline-flex;align-items:center;gap:7px;padding:5px 11px 5px 6px;border-radius:100px;border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.1);color:var(--mango);font-size:12px;font-weight:600;transition:.14s}
+.td:hover{border-color:var(--mango);background:rgba(245,158,11,.18)}
+.td .n{font-family:var(--mono);font-size:12px;font-weight:700;padding:1px 7px;border-radius:100px;background:rgba(245,158,11,.22)}
+.td.crit{border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.11);color:var(--coral)}
+.td.crit:hover{border-color:var(--coral);background:rgba(248,113,113,.19)}
+.td.crit .n{background:rgba(248,113,113,.24)}
+.todoclear{font-size:13px;color:var(--tealb)}
+.todoelse{margin-top:8px;font-size:11px;color:var(--dim);line-height:1.6}
+.todoelse button{color:var(--mute);border-bottom:1px solid var(--line2)}
+.todoelse button:hover{color:var(--tealb);border-color:var(--tealb)}
+.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(148px,.82fr) minmax(200px,1.16fr) minmax(158px,.9fr);gap:10px;margin-top:10px;flex:1;min-height:0}
 /* The Overview's own header keeps the sentence and drops the three counters:
    the big numbers below say the same thing larger, and the height they cost
    was the difference between fitting one screen and not. */
@@ -362,6 +385,7 @@ svg.chart{width:100%;flex:1;min-height:0;display:block}
 .dv .dvs{margin-left:auto;font-size:9.5px;color:var(--mango);flex:0 0 auto}
 .dvh{font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:8px}
 @media(max-width:1180px){
+  .ovwrap{height:auto;min-height:0}
   .dash{height:auto;grid-template-rows:none}
   .w-num,.w-in{grid-column:span 12}.w-rank{grid-column:span 12;grid-row:auto}
   .w-stg,.w-who,.w-money,.w-diary{grid-column:span 6}
@@ -1036,7 +1060,10 @@ tr.ivdue td{background:rgba(245,158,11,.05)}
     <div class="ovstat" id="ovStat"></div>
   </div>
 
-  <div class="dash" id="dash"><div class="empty" style="grid-column:1/-1"><span class="spin"></span>Counting.</div></div>
+  <div class="ovwrap">
+    <div class="todo" id="ovTodo"><div class="todoclear"><span class="spin"></span>Reading what wants you.</div></div>
+    <div class="dash" id="dash"><div class="empty" style="grid-column:1/-1"><span class="spin"></span>Counting.</div></div>
+  </div>
 </section>
 
 <!-- ============================================ THE DAY -->
@@ -6060,7 +6087,10 @@ async function loadTableView(k){
     ROWS[k] = (built || []).map((r, i) => Object.assign(r, { __i: i }));
     if (v.pre) { try { await v.pre(ROWS[k]); } catch (e) { console.warn(k + " side fetch:", e.message); } }
     renderTableView(k);
-    setCount(k, ROWS[k].length, false);
+    // The rail number for this view is worked out by loadOverview, from the
+    // queue this view belongs to. How many rows the three front doors happened
+    // to return is not a claim about work, so it is not allowed to be a badge.
+    if (!BADGED.has(k)) setCount(k, 0, false);
     return;
   }
   // A column this page names that the live database does not have (a
@@ -6094,10 +6124,14 @@ async function loadTableView(k){
   if (v.pre) { try { await v.pre(ROWS[k]); } catch (e) { console.warn(v.table + " side fetch:", e.message); } }
 
   renderTableView(k);
-  // The badge counts what wants a person where the view can say, not how many
-  // rows the read happened to return. See wantCount.
+  // A badge is a claim about work. A view that cannot say which of its rows
+  // want a person therefore gets NO badge, rather than one carrying however
+  // many rows the read returned: "Invoices 7" meant seven invoices exist and
+  // was read, reasonably, as seven things to do. Where loadOverview has
+  // already put a work number on this link, that number is left alone.
   const want = wantCount(v, ROWS[k]);
-  setCount(k, want === null ? ROWS[k].length : want, false);
+  if (want !== null) setCount(k, want, false, (v.viz && v.viz.wants) || "want a person");
+  else if (!BADGED.has(k)) setCount(k, 0, false);
 }
 
 function renderTableView(k){
@@ -6170,11 +6204,25 @@ function wireReportDrafter(){
   });
 }
 
-function setCount(k, n, hot){
+// Which rail links carry a number that was worked out as a claim about work,
+// so a view loading its own rows can never overwrite one with a row count.
+// Added to by setCount itself, whenever it is given the words.
+const BADGED = new Set();
+
+function setCount(k, n, hot, what){
   const el = $("cnt-" + k);
   if (!el) return;
+  if (what) BADGED.add(k);
   el.className = "cnt" + (n ? (hot ? " hot" : " wait") : " hidden");
   el.textContent = n || "";
+  // A bare number is not a claim anybody can check. The badge now carries the
+  // words too, so 7 beside Invoices reads as seven drafts nobody has sent
+  // rather than seven invoices existing. Same words as the band on the
+  // Overview, because both come off the same queue. "one|many" where the two
+  // differ, because "1 calls requested" is the kind of small wrongness that
+  // makes a person stop trusting the rest of the sentence.
+  if (n && what) el.title = n + " " + (what.includes("|") ? what.split("|")[n === 1 ? 0 : 1] : what);
+  else el.removeAttribute("title");
   railRollup();
 }
 
@@ -6993,6 +7041,45 @@ function renderDayViz(d){
     + widget("", "What is waiting, longest queue first", q.length ? plural_(q.reduce((a, x) => a + x.n, 0), "item", "items") : "clear", rank)
     + widget("", "Whose move is it", plural_(moves, "move", "moves"), chartStack(d.lanes) + `<div class="lgs">${laneLegend}</div>`)
     + `</div>`;
+}
+
+// The one list of work on the Overview. Everything else on this screen is a
+// measurement, and a measurement is not a move.
+//
+// Drawn from the same QUEUE the two other pictures read, filtered to the lanes
+// that are HERS. A queue whose tone is "client" is somebody else's move, and
+// it is named underneath in one muted line rather than counted in with the
+// rest: a number she cannot act on, sitting beside seven she can, is how a
+// to-do list stops being believed.
+function renderTodo(queue){
+  const host = $("ovTodo");
+  if (!host) return;
+  const mine = (queue || []).filter(q => q.n > 0 && q.tone !== "client")
+                            .sort((a, b) => (b.tone === "crit") - (a.tone === "crit") || b.n - a.n);
+  const theirs = (queue || []).filter(q => q.n > 0 && q.tone === "client");
+
+  // Deliberately NOT a grand total. The sentence at the top of this screen and
+  // the "Want you" number below it are both counts of open MOVES, and a third
+  // number here counting queue ITEMS would have sat between them saying a
+  // different thing in the same words. One number per idea: the queue count is
+  // how many places have something in them, and each pill carries its own.
+  const head = mine.length
+    ? `<b>What wants you</b>`
+      + `<span>${mine.length === 1 ? "one queue" : mine.length + " queues"}, blocked first. Click one to land on it.</span>`
+    : `<b>Nothing wants you</b><span>Every queue on this desk is clear.</span>`;
+
+  const pills = mine.length
+    ? `<div class="todos">${mine.map(q => `<button class="td${q.tone === "crit" ? " crit" : ""}" data-v="${esc(q.view)}">`
+        + `<span class="n">${q.n}</span>${esc(q.label)}</button>`).join("")}</div>`
+    : `<div class="todoclear">Nothing is waiting on you in any queue.</div>`;
+
+  const els = theirs.length
+    ? `<div class="todoelse">With somebody else, nothing for you to do: `
+      + theirs.map(q => `<button data-v="${esc(q.view)}">${q.n} ${esc(q.label.toLowerCase())}</button>`).join(", ")
+      + `.</div>`
+    : "";
+
+  host.innerHTML = `<div class="todoh">${head}</div>${pills}${els}`;
 }
 
 async function renderDash(d){
@@ -7887,6 +7974,7 @@ async function loadOverview(){
     { label:"A client's", n:cli.length, color:CH.c, view:"day" },
     { label:"Nobody's", n:non.length, color:CH.l, view:"day" },
   ];
+  renderTodo(QUEUE);
   renderDayViz({ lanes:LANES, queue:QUEUE });
 
   renderStatsViz({
@@ -7942,14 +8030,26 @@ async function loadOverview(){
     ],
   }).catch(e => { $("dash").innerHTML = `<div class="alert crit" style="grid-column:1/-1"><span class="ic">!</span><div><b>The dashboard could not be drawn</b><p>${esc(e.message || String(e))}</p></div></div>`; });
 
-  setCount("intake", intakeNew, false);
-  setCount("apps", appsWaiting, false);
-  setCount("evid", evidYours, true);
-  setCount("quotes", quotesOut, false);
-  setCount("calls", callsNew, false);
-  setCount("invoices", invDraftReal, false);
-  setCount("sketch", pkDraft + pkAppr, false);
-  setCount("kick", kickDraft, false);
+  // Every badge says what it counted, so hovering the rail answers "seven
+  // what?" without opening the page, and the words are the same words the band
+  // at the top of this screen uses, because both read QUEUE.
+  //
+  // Widened on 19 September 2026 from eight links to thirteen. Five queues on
+  // that list had a rail link and no badge, which meant the rail was quietly
+  // claiming those places were clear. A badge missing is a claim too.
+  setCount("intake", intakeNew, false, "person waiting on a reply from a human|people waiting on a reply from a human");
+  setCount("apps", appsWaiting, false, "application in vetting|applications in vetting");
+  setCount("evid", evidYours, true, "item raised by a client, yours to answer|items raised by a client, yours to answer");
+  setCount("quotes", quotesOut, false, "quote to pass on to a client|quotes to pass on to a client");
+  setCount("calls", callsNew, false, "call requested|calls requested");
+  setCount("invoices", invDraftReal, false, "invoice drafted and never sent|invoices drafted and never sent");
+  setCount("sketch", pkDraft + pkAppr, false, "sketch pack to read or issue|sketch packs to read or issue");
+  setCount("kick", kickDraft, false, "kickoff pack still in draft|kickoff packs still in draft");
+  setCount("enq", enqNew, false, "enquiry to answer|enquiries to answer");
+  setCount("qpd", held.length, false, "quote pack held, and a held pack is a job stopped|quote packs held, and a held pack is a job stopped");
+  setCount("asks", asksNew, false, "question waiting to be published|questions waiting to be published");
+  setCount("owed", waitingNow.length, false, "person handed to you, waiting|people handed to you, waiting");
+  setCount("stalled", quiet3, false, "live job quiet for 3 days or more|live jobs quiet for 3 days or more");
   // Deliberately no count on Jobs. It used to carry the open-dispute total,
   // which put a coral badge on a link that does not go to disputes. On this
   // desk a colour is a claim about the thing it sits on, so a badge that means
