@@ -16,6 +16,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Left alone, on purpose.** Two things, both real, neither a display problem. All five packs are the founder's own tests from 5 and 6 September, keyboard-mash labels included, and three of them being drafts is the entire reason the badge reads 3; voiding or deleting her own rows is hers, not a fix to be applied underneath her. And `job_id` is never written, which is why no pack can be issued to anybody: wiring `job_ref` through to a real job id is a change to `yaad-sketch` and a deploy, not a display fix, so it is flagged rather than folded in here.
 
+**Deployed** 19 September 2026, `yaadly-concierge` version `e768a584`, from the branch merged up to `origin/main` first. Cloudflare Access still answers 302 in front of it.
+
 ---
 
 ## 2026-09-19 · Pay workers: one state per row, and the route named on the button
