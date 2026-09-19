@@ -6,6 +6,16 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · The holding sentence is gone, and a CI sweep stops it coming back
+
+**Why.** Flagged in the entry below and then, on the founder's instruction, fixed. The Money view said "Holding goes live once PI insurance is in force" and "Yaadly holds no money today. Holding starts when PI insurance is in force." On 3 September Yaadly became the principal contractor and stopped holding anybody's money, before or after any insurance, so the sentence had been untrue for a fortnight. It is the exact failure CLAUDE.md section 8 describes: no single word in it is banned, so `guardrails.scan` walks straight past it, and section 8 itself once prescribed a sentence of the same shape.
+
+**What the copy says now.** The sentence docs/COPY-GUIDELINES.md section 2 prescribes, stated rather than denied: the client pays Yaadly one agreed price, and Yaadly engages and pays the tradesperson under its own separate agreement. Nothing about insurance, because what the cover is for is an insurance fact and not a display decision. Four more places on the desk carried the bare denial "Yaadly holds none of it", which section 2 bans in that form because it keeps the picture alive by denying it; all four now state the structure instead.
+
+**The sweep is the actual fix.** A sentence corrected by hand comes back. `scripts/check-copy.mjs` greps `concierge/`, `docs/` and `preview/` for the exact phrases in COPY-GUIDELINES section 6, and runs in CI in the Admin desk job. It is deliberately narrow, exact phrases and three folders of pure page copy, for the reason already written over that job: a check that cries wolf gets switched off. `web/` and `supabase/` are left out on purpose, because their source comments discuss these phrases in order to ban them and they carry their own guardrail suites. `docs/` keeps the one sanctioned exception, the explicit "does not operate an escrow service" denial a worried reader needs answered.
+
+**It paid for itself on the first run.** Two more copies of the same false sentence that nobody had found by reading: `concierge/README.md`, where the desk's own documentation asserted it, and `preview/index.html`, the clickable prototype. Both fixed in the same commit. **Correction, an hour later:** that entry first said the prototype is "served at yaadly.co.uk/preview/", which is what CLAUDE.md section 11 says and is not true. GitHub Pages publishes `docs/` and there is no `docs/preview/`, so `https://yaadly.co.uk/preview/` returns 404 and always has. The prototype is read locally. Checked by fetching the URL rather than by reading the table, which is the whole reason section 11 tells you to confirm anything load bearing against the code. It also caught the first replacement wording written for the Money view, which said "no money is held on anybody's behalf": true, but a denial, which is the thing section 2 says not to write. That is the check doing its job on the person adding it.
+
 ## 2026-09-19 · The Overview leads with a list of work, and a rail badge is only ever a claim about work
 
 **Why.** Founder, 19 Sep 2026: "the dashboard on the side should showcase what needs to be done", and then "it is not clear". Two separate things were unclear and both were true.
@@ -45,6 +55,26 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 **Flagged, not changed.** The Money view still says "Holding goes live once PI insurance is in force" and "Yaadly holds no money today. Holding starts when PI insurance is in force." That is the banned idea CLAUDE.md §8 warns about, the one the guardrail screen cannot see because no single word in it is banned: since 3 September Yaadly is the principal contractor and does not hold anybody's money, before or after any insurance. Correcting it needs a sentence about what the insurance is actually for, which is a legal and insurance fact rather than a display fix, so it is written down here for her and left alone.
 
 **Deployed** 19 September 2026, `yaadly-concierge` version `04b4f3d3`, from `origin/main` off disk. wrangler uploaded one modified asset, so it was not a no-op, and Cloudflare Access still answers 302.
+
+## 2026-09-19 · Five public write doors closed on tables no form writes to
+
+**Why.** Founder, 19 Sep 2026: "fix all that is outstanding and make live", answering the one item left flagged after the Intake queue moved off `public.intakes`. That item was an INSERT policy on `intakes`, granted to the `anon` role, `WITH CHECK (true)`, created when the old public "Tell us what needs doing" form wrote straight to the table from the browser with the publishable key. There was no session, so there was nothing for the check to check. The form was deleted on 31 August 2026 and the table has had no writer since, but the door stayed open, and the publishable key is in the page source of a public website by design. Nobody could have read rows through it, since SELECT is admin only, but anybody could have filled the table, and a table nobody watches is exactly where that sits unnoticed.
+
+**The same check found four more.** `applications`, `calls`, `feedback` and `waitlist` all carried the identical leftover. Checked across `docs/`, `preview/`, `web/` and `supabase/functions/` before touching any of them: no browser code anywhere calls `.from()` on any of the five. Every live form on the site posts to an edge function instead, the contact form to `yaad-enquiry`, the service booking to `yaad-book-service`, the chat widget to `yaad-inbound`, and those hold the service role key, which bypasses row level security entirely.
+
+**`applications` is the one that had to be got right,** because `/apply` is a live flow and breaking worker signup to close a door nobody uses would be a bad trade. It does not break: the browser never touches the table, `yaad-vetting-upload` inserts with the service role client, `service_role` has `rolbypassrls`, and `applications` does not force RLS. All three checked against the live database before the drop, not assumed.
+
+**What.** Two migrations, `20260919140000` for `intakes` and `20260919140100` for the other four, kept apart because the first was the flagged decision and the second was found by the same sweep. Each one drops policies only. The tables stay, their rows stay, and the admin read stays, so the Calls, Feedback and Waiting list views on the desk are unchanged. `intakes` also gets a table comment saying it is retired and where intake actually lands now, so the next person to find it does not have to repeat the search.
+
+**The anon GRANTs are deliberately left.** Supabase grants `anon` table privileges across the public schema by default, and every table in this database leans on RLS rather than on grants to decide who may do what. Revoking them on five tables would make those five work differently from the other forty, which is how a rule stops being understood. With no permitting policy, `anon` can do nothing to them, which is what the probes show.
+
+**Proven, not assumed.** An anonymous POST with the publishable key to each of the five comes back `42501 new row violates row-level security policy`. A refused insert writes nothing, so the probe leaves no junk behind. What `anon` keeps is three SELECT policies that are meant to be public: published questions, their answers, and board photographs of open jobs.
+
+**If a public form ever comes back, do not put one of these policies back.** Post to an edge function like every other live form already does. That gets a throttle, an origin check and somewhere to put validation, and none of those exist in a policy whose check is the word `true`.
+
+**How they were applied,** because the runbook only said "the dashboard or the API": `supabase db query --linked --project-ref <ref> -f <the one file>`, which goes through the Management API on the CLI login, needs no database password, and applies only the named file. Not `supabase db push`, which the runbook has warned against since 3 September for reaching at everything it thinks is pending. The CLI prints an empty `rows` array for successful DDL, which looks the same as a statement that matched nothing, so both were verified against `pg_policies` afterwards and then probed.
+
+---
 
 ## 2026-09-19 · The Intake queue reads the three live front doors, not a dead table
 

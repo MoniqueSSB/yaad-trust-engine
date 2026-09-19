@@ -2422,7 +2422,7 @@ const VIEWS = [
 
   { k:"money", g:"Documents & money", label:"Money", icon:"card", bespoke:true,
     title:"Money",
-    sub:"Nothing here is a bank balance. Holding goes live once PI insurance is in force. Until then these are amounts agreed in writing before work started, and what your own invoicing has actually done." },
+    sub:"Nothing here is a bank balance. On every job the client pays Yaadly one agreed price, and Yaadly engages and pays the tradesperson under its own separate agreement. Every figure here is either an amount agreed in writing before work started, or an invoice you raised yourself." },
 
   { k:"svc", g:"Services", label:"Services", icon:"tools",
     title:"Services", table:"services",
@@ -5075,7 +5075,7 @@ function panelEvidence(rows){
           : owner && owner.com
             ? `<b>The client wrote about this work:</b> &ldquo;${esc(String(owner.com.body || "").slice(0, 240))}&rdquo; That is what put it in front of you. Answering them is a reply, not a ruling.`
             : `This set is in front of you because something was raised against it.`
-      } ${owed ? `<b>${owed}</b> is agreed in writing on this job and Yaadly holds none of it.` : "Nothing is recorded as owed on this job yet."} The approval itself stays the client's, in their portal.</p>`
+      } ${owed ? `<b>${owed}</b> is agreed in writing on this job. The client pays Yaadly, and Yaadly pays the tradesperson separately.` : "Nothing is recorded as owed on this job yet."} The approval itself stays the client's, in their portal.</p>`
     + `</div>`;
 }
 
@@ -7137,7 +7137,7 @@ async function renderDash(d){
     + widget("w-rank", "Waiting on you", waiting.length ? plural_(waiting.reduce((a, w) => a + w.n, 0), "item", "items") : "clear", `<div class="rank">${rank}</div>`)
     + widget("w-stg", "Live jobs, by stage", plural_(d.stages.reduce((a, s) => a + s.n, 0), "job", "jobs"), `<div class="stgs">${stages}</div>`)
     + widget("w-who", "Whose move is it", plural_(moves, "move", "moves"), chartStack(d.lanes) + `<div class="lgs">${laneLegend}</div>`)
-    + widget("w-money", "Money, both directions", `Yaadly holds none of it`, `<div class="money3">${moneyRows}</div>`)
+    + widget("w-money", "Money, both directions", `Client pays Yaadly, Yaadly pays the worker`, `<div class="money3">${moneyRows}</div>`)
     + widget("w-diary", "Today, and next", d.visitsToday.length ? plural_(d.visitsToday.length, "visit", "visits") + " today" : "clear today", `<div class="diary">${diary}</div>`)
     + widget("w-line", "Jobs on the record", `${stamps.length} all time`, chartLine(line) + `<div class="wgfoot">Cumulative, by week, from each job's own reference.</div>`);
 }
@@ -7780,7 +7780,7 @@ async function loadOverview(){
       <div class="scrow">
         <div>
           <div class="sl"><span>Agreed in writing</span><span class="v">${esc(jmd(owedTotal))}</span></div>
-          <div class="slnote">Across ${plural(JOBS.length, "open job", "open jobs")}. Yaadly holds none of it.</div>
+          <div class="slnote">Across ${plural(JOBS.length, "open job", "open jobs")}. A promise recorded, not a balance anywhere.</div>
         </div>
         <div>
           <div class="sl"><span>Invoices raised, unsent</span><span class="v warn">${esc(curText(sumOf(draftsInv)))}</span></div>
@@ -8108,7 +8108,7 @@ async function loadMoney(){
       </div>
       <p class="conseq">These are the rates the pricing book fixed on 30 July. They are written here, not read from a table, because nothing enforces them in the database yet.</p>
     </div>
-    <div class="alert warn"><span class="ic">!</span><div><b>None of this is a bank balance</b><p>Yaadly holds no money today. Holding starts when PI insurance is in force. Until then every figure above is an amount agreed in writing, or an invoice you raised yourself.</p></div></div>
+    <div class="alert warn"><span class="ic">!</span><div><b>None of this is a bank balance</b><p>The client pays Yaadly one agreed price. Yaadly engages and pays the tradesperson under its own separate agreement. Every figure above is an amount agreed in writing, or an invoice you raised yourself.</p></div></div>
     ${svcR.data && svcR.data.length ? `<div class="sechd">Service bookings</div>` + tableCard(VIEW.svc, svcR.data) : ""}`;
 }
 

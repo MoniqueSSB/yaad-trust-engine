@@ -2949,6 +2949,14 @@ Today, ignoring the `args` line the pattern also picks up: `is_admin`, `raise_jo
 
 **Migration files here are a record, not the mechanism.** `supabase migration list` skips every file in `supabase/migrations/` because the names are `20260903c_...` rather than a 14-digit timestamp, so `supabase db push` will NOT apply them. They are applied through the dashboard or the API, which records its own timestamped entry. Write the file for the reasoning, apply it separately, then verify with the query above.
 
+**Applying one file, from a terminal, without `db push`:**
+
+```bash
+supabase db query --linked --project-ref leffyisvfvjwzilydlwf -f supabase/migrations/<the one file>.sql
+```
+
+This goes through the Management API on the CLI login, needs no database password and no `supabase link` in the working tree, and applies **only the file you name**, which is the whole point: `db push` would reach for every migration it thinks is pending, and on 3 Sep that would have been four, two already live under other names and one a decision nobody had taken. Used on 19 Sep 2026 for `20260919140000` and `20260919140100`. **Always verify against the database afterwards rather than trusting the output**, which prints an empty `rows` array for a successful DDL statement and looks identical to a statement that matched nothing.
+
 ---
 
 ## WhatsApp intake is returning 503 and nothing is arriving
@@ -5690,7 +5698,7 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 2. **A real lead is missing from the queue.** Each of the three reads takes the newest 150. Check the job's `is_test`: a row marked as testing by mistake is sorted to the bottom of the queue, not lost. Open it and unmark it on the job page.
 3. **You expected rows from `public.intakes`.** There are none, and the queue no longer reads that table. Nothing in this repository has written to it since 31 August 2026. A job arrives through `yaad-post-job` into `jobs`, a WhatsApp message through `yaad-inbound` into `intake_threads`, a contact form through `yaad-enquiry` into `enquiries`, and those three are what the queue reads.
 4. **The rail badge and the headline number disagree.** The badge is set twice: the Overview sets it to people waiting on a reply, then opening the view replaces it with the number of rows loaded. That is every view's behaviour, not Intake's.
-5. **`intakes` can still be written to by anyone with the publishable key.** The policy `public submits requests` is `INSERT ... WITH CHECK (true)`, left over from the old website form. Nothing calls it. If you want it shut, that is a one line migration dropping the policy; flagged 19 Sep 2026, not done, because it is a decision rather than a fix.
+5. **`intakes` could be written to by anyone with the publishable key. Closed 19 September 2026.** The policy `public submits requests` was `INSERT ... WITH CHECK (true)`, left from the old website form. It is dropped (`20260919140000`), along with the same leftover on `applications`, `calls`, `feedback` and `waitlist` (`20260919140100`). Every one of the five is proven shut by an anonymous POST that comes back `42501 new row violates row-level security policy`. Worker signup is unaffected: `/apply` posts to `yaad-vetting-upload`, which writes with the service role, and `service_role` has `rolbypassrls`. **If a public form ever comes back, do not put one of these policies back**: post to an edge function, the way every live form on the site already does.
 
 ## Outstanding, or any money figure, looks too low (19 Sep 2026)
 
@@ -5700,6 +5708,22 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 4. **An invoice with no job at all counts as real.** It is a service, and a service has no test flag.
 5. **Money figures exclude what Yaadly pays tradespeople.** "Out with clients, unpaid" and "Awaiting payment" are money in. A worker payable used to be counted in both, which reported money Yaadly owes as money a client owes. Worker pay is in the Invoices lists under its own heading, and in Pay workers.
 6. **The rail badge on Invoices and the amount beside it come from the same rows.** Two `countOf` calls that counted every invoice were removed on 19 Sep 2026 so they cannot drift apart. Both now read the 600 row money query; if invoices ever pass 600, raise that limit.
+
+## CI says "Page copy carries no banned language" (19 Sep 2026)
+
+1. **Read the finding.** It names the file, the line and the exact phrase. The phrases come from `docs/COPY-GUIDELINES.md` section 6.
+2. **The copy is wrong, not the list.** Rewrite the sentence to say what happens rather than to deny what does not: the client pays Yaadly one agreed price, and Yaadly engages and pays the tradesperson under its own separate agreement. A denial ("no money is held", "Yaadly holds none of it") trips the check on purpose, because section 2 bans the bare denial too.
+3. **It only reads `concierge/`, `docs/` and `preview/`**, the folders that are page copy end to end. `web/` and `supabase/` are left out on purpose: their source comments discuss these phrases in order to ban them, and they have their own guardrail test suites.
+4. **`docs/` may answer the escrow worry head on**, with the exact words "does not operate an escrow service", and nothing else may say the word at all. That asymmetry is in COPY-GUIDELINES section 2.
+5. **To add or remove a phrase**, change `docs/COPY-GUIDELINES.md` and `scripts/check-copy.mjs` in the same commit, and say so to Monique: the list is a rule about what the business claims, not a lint preference.
+6. **Run it by hand:** `node scripts/check-copy.mjs`. Prints one line when clean.
+
+## Where the prototype in `preview/` is actually served (19 Sep 2026)
+
+1. **Nowhere public.** GitHub Pages publishes `docs/`, and there is no `docs/preview/`, so `https://yaadly.co.uk/preview/` returns 404 and always has. Verified by fetching it, 19 September 2026.
+2. **CLAUDE.md section 11 says otherwise.** Its table gives `preview/` the home `yaadly.co.uk/preview/`. That line is wrong. The section says itself that it describes what got built rather than a rule, and to confirm anything load bearing against the code; this is what that warning is for. The file is Monique's, so it is recorded here rather than edited.
+3. **To read it:** `python3 -m http.server 8934 --directory preview`, or the entry in `.claude/launch.json`.
+4. **To publish it**, if that is ever wanted, it has to move to or be copied into `docs/preview/`, which also means the copy sweep and every claim in it becomes public. Decide that before copying, not after.
 
 ## A rail badge, or the band at the top of the Overview, looks wrong (19 Sep 2026)
 
