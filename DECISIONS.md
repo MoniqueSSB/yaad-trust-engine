@@ -6,6 +6,18 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · Workers counts supply, and the sweep for the rest came back clean
+
+**Why.** Founder, "do the same", after the evidence, intake and money passes. So the desk was swept for the same three defects rather than one more view being picked by hand: a badge or headline that counts rows instead of work, a count that includes her own test rows, and a queue attributed to the wrong person.
+
+**What was left.** One thing. `Workers` reported **8 profiles on file, and all eight carry `is_test`**. Six of them are even marked active, which is the flag that lets somebody quote. So the one figure on this desk that answers "how much supply do I actually have" read eight when the answer is none. The Overview's people card said the same in words.
+
+**What.** Desk only, no database change. `Workers` declares `viz:{ want, wants }` with "real, can quote", so the view and its rail badge lead with profiles that are not tests and are active, over "8 loaded" in the small line underneath. The Overview's line counts real profiles and names the tests beside them rather than adding them in: "No real worker on file yet, 8 profiles are your own testing." The test rows stay in the table with the chip they already had, and "That was me testing" and "This one is real" are untouched, because which is which is her call and not a filter.
+
+**The rest of the sweep, and why nothing else changed.** Every other table view was checked against the same three questions. The badge half was already solved, and better than it would have been done here: another session made a badge conditional on a view being able to say what wants a person, and cleared it otherwise, so no badge on this desk now changes meaning when a view is opened. Only three tables carry `is_test` at all (`jobs`, `worker_profiles`, `intake_threads`), and the other two were already handled: `jobs` by that session's Jobs pass, `intake_threads` by the "waiting on you" count, which already excludes tests, and by the conversation state, which already draws a test chip. `applications`, `job_quotes`, `calls`, `kickoff_packs`, `sketch_packs`, `questions`, `enquiries` have no test flag to filter by, and all but sketch packs are at zero anyway. The three sketch packs are her own, flagged by an earlier session and deliberately left, because voiding her own rows is hers.
+
+**What this figure now says out loud.** Zero tradespeople who can take a job. That was true before today and the screen was hiding it behind eight.
+
 ## 2026-09-19 · Desk deployed: concierge version cf2dfddd
 
 **What went live.** Everything on `main` at 09:38 UTC, which over the previous deploy (`3ed5934a`) is one change: the Materials releases row now naming both gates instead of only the materials store. `yaadly-concierge` version `cf2dfddd`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.

@@ -2212,6 +2212,11 @@ const VIEWS = [
     order:"updated_at", search:["name","worker_email","trade","parish"],
     empty:["No published workers","Publishing an application puts a worker here and lets them quote."],
     pre: preWorkers,
+    // Supply, not rows. On 19 September 2026 all eight profiles were her own
+    // test rows, and the screen led with 8, which reads as eight tradespeople
+    // who can take a job. A worker counts here when they are real and can
+    // quote; the test rows stay in the table with their chip.
+    viz:{ want:r => !r.is_test && !!r.active, wants:"real, can quote" },
     // The candidate files, with links to open them. Publishing somebody's
     // face is a decision, and a decision needs to be made looking at the
     // thing, so the links are here rather than a button firing blind.
@@ -7464,7 +7469,7 @@ async function loadOverview(){
   // Columns named one by one, and budget_band deliberately absent. It is the
   // client's private figure and the rule is that it never arrives in this page,
   // not that the page fetches it and declines to draw it. Same rule as Jobs.
-  const [jobQ, quoteQ, invQ, testQ, dispQ, kickQ, revNoReply, workersN] = await Promise.all([
+  const [jobQ, quoteQ, invQ, testQ, dispQ, kickQ, revNoReply, workersN, workersMine] = await Promise.all([
     sb.from("jobs").select("id,parish,trade,stage,status,open,owed,updated_at").eq("open", true).limit(300),
     sb.from("job_quotes").select("job_id").limit(600),
     sb.from("invoices").select("id,job_id,client_name,status,total_pence,currency,created_at,payable_to").limit(600),
@@ -7472,7 +7477,8 @@ async function loadOverview(){
     sb.from("disputes").select("job_id").neq("state", "resolved").limit(200),
     sb.from("kickoff_packs").select("job_id,status").limit(300),
     countOf("reviews", q => q.is("reply", null)),
-    countOf("worker_profiles", null),
+    countOf("worker_profiles", q => q.not("is_test", "is", true)),
+    countOf("worker_profiles", q => q.is("is_test", true)),
   ]);
   const JOBS = jobQ.data || [];
   const staleReplies = revNoReply;
@@ -7908,7 +7914,11 @@ async function loadOverview(){
       "Both directions are tied to a completed job. Replying is your call.", "Read", "reviews"));
   if (!appsWaiting)
     people.push(ansRow("ok", "Clear", false, "Applications and vetting, nothing waiting",
-      plural(workersN, "worker profile", "worker profiles") + " on file. The agent flags, you decide.", null, null));
+      (workersN
+        ? plural(workersN, "worker profile", "worker profiles") + " on file"
+          + (workersMine ? ", and " + workersMine + " more you marked as your own testing" : "")
+        : (workersMine ? "No real worker on file yet. " + plural(workersMine, "profile is", "profiles are") + " your own testing" : "No worker profile on file yet"))
+      + ". The agent flags, you decide.", null, null));
   $("ovPeople").innerHTML = `<h6>People</h6>` + (people.length ? people.join("") : ansRow("ok", "Clear", false, "Nothing on the people side", "No vetting outstanding, no diary clash, no review waiting on a reply.", null, null));
 
   const words = [];
