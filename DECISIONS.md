@@ -33,6 +33,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **Scope, checked rather than assumed.** Every worker payable currently owed across the database was read before the change. One was in this shape, and it was the test job, so no real money was ever stuck. The shape can recur on any job that carries a pre-13-September stage bill.
 
+**The desk had to follow, and did not at first.** Pay workers built its one-line reason from the pay invoice's own stage number and never read the database's answer, so the row still read "the client's stage 2 bill is not paid yet" after the rule had stopped asking for one. Fixed the same day: the line now names whatever the database named, prints a stage number only where the database printed one, and says the payment could not be checked when the check failed rather than guessing a bill. A rule corrected in the database and left wrong on the screen is not corrected, because the screen is what she reads.
+
 **Proof.** `supabase/tests/worker_pay_client_paid_guards.sql`, ten lines, all PASS, run against production inside a transaction that was rolled back, and the rollback verified afterwards by reading the live function back and confirming it still had the old body. Three existing expectations changed wording with the rule; each still asserts a refusal, and the test file says so beside each one rather than quietly.
 
 ## 2026-09-19 · The holding sentence is gone, and a CI sweep stops it coming back
