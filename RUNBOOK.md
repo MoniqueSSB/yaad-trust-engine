@@ -5734,3 +5734,11 @@ The note is optional as of 19 September 2026: press "Mark as followed up" on the
 4. **A badge you expected is missing.** Either its queue is at zero, which is the badge working, or `loadOverview` threw. Open the browser console: if the Overview drew nothing at all, read §1 of this file and the note at the top of `scripts/check-desk-script.mjs`, because a `const` declared below its first use is how that has failed twice.
 5. **The band is empty but you know there is work.** The band deliberately leaves out any queue whose `tone` is `"client"`, because those are somebody else's move. They are named in the grey line underneath it. Nothing is hidden, it is sorted.
 6. **The band and the "Waiting on you" bar chart say the same thing.** They do. That is known and left alone for now; cutting the widget re-lays the Overview grid.
+
+## Workers says 0 and you can see rows in the table (19 Sep 2026)
+
+1. **The number is supply, not rows.** It counts profiles that are not marked as your own test AND are `active`, which is the flag that lets somebody quote. The small line underneath still says how many rows were loaded.
+2. **To see the split:** `select is_test, active, count(*) from worker_profiles group by 1,2;`. On 19 September 2026 that was 8 rows, all `is_test = true`, six of them active.
+3. **A real worker reads as a test.** Open the row and press "This one is real" (`mark_worker_test`). It is recorded as your decision.
+4. **A real, active worker still is not counted.** Check `active`: a profile that is not published cannot quote, so it is not supply. Publishing is done from Applications.
+5. **The Overview's people card says the same thing in words**, and names the tests beside the real count rather than adding them in.
