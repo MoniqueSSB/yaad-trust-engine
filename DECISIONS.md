@@ -18,6 +18,8 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 **"1 parishes covered"** sat on the public job board, which is the page a tradesperson reads while deciding whether this is a real network or an empty shell. Three of its four stat cards had plural-only labels. Each now carries a singular used at one.
 
+**Deployed** 19 September 2026, the app this time rather than the desk: `yaadly-app` version `0ae07dcb`, `app.yaadly.co.uk`, built and deployed with `npm run deploy` from `origin/main`. Confirmed live by fetching the board: it now reads "1 parish covered". The desk, the marketing site and the app all answered normally afterwards.
+
 ## 2026-09-19 · Workers counts supply, and the sweep for the rest came back clean
 
 **Why.** Founder, "do the same", after the evidence, intake and money passes. So the desk was swept for the same three defects rather than one more view being picked by hand: a badge or headline that counts rows instead of work, a count that includes her own test rows, and a queue attributed to the wrong person.
