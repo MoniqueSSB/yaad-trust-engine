@@ -6,6 +6,14 @@ Started 30 August 2026, backfilled from what is already built and from the Yaadl
 
 ---
 
+## 2026-09-19 · Desk deployed: concierge version 3ed5934a, after the deploy copy had gone stale
+
+**What went live.** Everything on `main` at the time: the evidence, intake and money work from this session, plus another session's Overview to-do band and its badge rule. `yaadly-concierge` version `3ed5934a`, one modified asset uploaded so it was not a no-op, Cloudflare Access still answering 302.
+
+**Caught on the way out.** `concierge-deploy/public/index.html` on `main` was three merges behind `concierge/concierge.html`: a desk change had been merged without syncing the copy the Worker actually serves. Deploying as it stood would have reverted the to-do band live, off disk, which is the failure the separate copy exists to catch and which happened on this repository on 6 September. Synced in its own commit first, then deployed. **The lesson is the order: compare the two files before every hand deploy, not after.**
+
+**Nothing else needed deploying.** No Edge Function and no `web/` change had landed since the previous deploy, checked with `git log` against the range rather than assumed. All four migrations dated 19 September are applied in production, including the two that closed the public write door on `intakes` and four other dead tables, so the open `INSERT ... WITH CHECK (true)` flagged earlier today is gone: `intakes` now carries only `admin all intakes`.
+
 ## 2026-09-19 · A stage the client was never billed for is checked against the whole job
 
 **What happened.** A row on Pay workers could not be cleared by any click. INV-2026-0016, J$3,900 owed to a test worker for stage 2 of JOB-TEST-KICKOFF-1, said "waiting on the client to pay their bill first" and offered no way to make that true.
